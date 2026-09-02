@@ -71,8 +71,9 @@ final class RefreshOrderStatusesCommand extends Command
         }
 
         $io->success(sprintf(
-            'Polled %d orders (changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d).',
-            $result->polled,
+            'Requested %d orders (observed: %d, changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d).',
+            $result->requested,
+            $result->observed,
             $result->changed,
             $result->missing,
             $result->invalid,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\IngestOrderStatusEvent;
+use App\Ingestion\Enum\IngestOrderStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -60,9 +61,9 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
      */
     public function observationKeysForRawRecord(string $companyId, string $rawRecordId): array
     {
-        /** @var list<array{orderId: string, rawStatus: string}> $rows */
+        /** @var list<array{orderId: string, rawStatus: string, previousStatus: ?IngestOrderStatus}> $rows */
         $rows = $this->createQueryBuilder('e')
-            ->select('e.orderId AS orderId', 'e.rawStatus AS rawStatus')
+            ->select('e.orderId AS orderId', 'e.rawStatus AS rawStatus', 'e.previousStatus AS previousStatus')
             ->andWhere('e.companyId = :companyId')
             ->andWhere('e.rawRecordId = :rawRecordId')
             ->setParameter('companyId', $companyId)
@@ -71,9 +72,23 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
             ->getResult();
 
         return array_map(
-            static fn (array $row): string => $row['orderId']."\0".$row['rawStatus'],
+            static fn (array $row): string => self::observationKey(
+                $row['orderId'],
+                $row['rawStatus'],
+                $row['previousStatus'],
+            ),
             $rows,
         );
+    }
+
+    /**
+     * Ключ дедупликации наблюдения — тот же набор колонок, что и в уникальном
+     * индексе. Два определения этого ключа неминуемо разошлись бы, и
+     * расхождение проявилось бы падением flush на проде.
+     */
+    public static function observationKey(string $orderId, string $rawStatus, ?IngestOrderStatus $previousStatus): string
+    {
+        return $orderId."\0".$rawStatus."\0".(null === $previousStatus ? '' : $previousStatus->value);
     }
 
     public function save(IngestOrderStatusEvent $event): void

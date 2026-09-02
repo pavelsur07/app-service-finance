@@ -283,25 +283,47 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
-     * Регрессия: existsObservation() спрашивала БД на каждое событие, а
-     * Doctrine-запрос не видит непрофлашенные сущности. Последовательность
-     * A → B → A внутри одного батча создавала два события A и роняла финальный
-     * flush на уникальном индексе.
+     * Журнал не должен расходиться с состоянием заказа.
+     *
+     * Регрессия двойная. Сначала existsObservation() спрашивала БД на каждое
+     * событие, а Doctrine-запрос не видит непрофлашенные сущности:
+     * последовательность A → B → A внутри одного батча создавала два события A
+     * и роняла финальный flush на уникальном индексе. Затем ключ дедупликации
+     * стал `(сырьё, заказ, сырой статус)` — и подавил ЗАКОННЫЙ возврат в A:
+     * заказ оказывался в A, а журнал заканчивался на B. Ключ включает
+     * предыдущий статус, поэтому возврат пишется, а настоящий повтор — нет.
      */
-    public function testRepeatedStatusWithinOneBatchDoesNotDuplicateEvent(): void
+    public function testJournalFollowsStatusBackAndForthWithoutDuplicates(): void
     {
+        $item = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1);
+
         $this->mapper->queue(
-            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
-            $this->orderWithItems('delivered', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
-            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+            $this->orderWithItems('delivering', [$item()]),
+            $this->orderWithItems('delivered', [$item()]),
+            $this->orderWithItems('delivering', [$item()]),
+            // Повторы уже записанных переходов новых строк не дают.
+            $this->orderWithItems('delivered', [$item()]),
+            $this->orderWithItems('delivering', [$item()]),
         );
 
         ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
 
         $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
         self::assertNotNull($order);
-        // delivering и delivered — по одному событию, повтор delivering не пишется.
-        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+
+        // Открывающее delivering, переход в delivered и возврат в delivering.
+        self::assertSame(3, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        $last = $this->connection->fetchAssociative(
+            'SELECT raw_status, previous_status FROM ingest_order_status_events
+             WHERE company_id = :c AND order_id = :o ORDER BY created_at DESC, id DESC LIMIT 1',
+            ['c' => $this->companyId, 'o' => $order->getId()],
+        );
+
+        self::assertIsArray($last);
+        self::assertSame('delivering', $last['raw_status'], 'Журнал заканчивается там же, где заказ.');
+        self::assertSame('delivered', $last['previous_status']);
     }
 
     /**

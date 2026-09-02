@@ -33,7 +33,16 @@ use Webmozart\Assert\Assert;
 // (company_id, raw_record_id): при порядке с order_id посередине B-tree не мог
 // бы использовать префикс, и каждая нормализация просматривала бы все события
 // компании. Кортеж уникальности от перестановки не меняется.
-#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'raw_record_id', 'order_id', 'raw_status'])]
+// previous_status входит в ключ: одно сырьё может содержать наблюдения
+// A → B → A, и без него третье наблюдение подавлялось бы ключом первого —
+// заказ вернулся бы в A, а журнал закончился бы на B.
+//
+// PostgreSQL считает NULL различными, поэтому для записей с пустым
+// previous_status (открывающее событие, неприменённое наблюдение) этот индекс
+// — слабая подстраховка. Основная защита от дублей — ключи наблюдений,
+// поднятые из БД перед разбором, и блокировка самой записи сырья: два
+// нормализатора одного сырья сериализованы.
+#[ORM\UniqueConstraint(name: 'uniq_ingest_order_status_event_observation', columns: ['company_id', 'raw_record_id', 'order_id', 'raw_status', 'previous_status'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_order', columns: ['order_id', 'observed_at'])]
 #[ORM\Index(name: 'idx_ingest_order_status_event_company', columns: ['company_id', 'observed_at'])]
 class IngestOrderStatusEvent implements TenantOwnedInterface
@@ -68,9 +77,13 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
      * позже, чем более свежее. Но переходом такое наблюдение не является: у
      * записи с `applied = false` `previousStatus` пуст, потому что читать её
      * как «заказ перешёл из DELIVERED в SHIPPED» было бы прямой ложью.
+     *
+     * NULL — строки, записанные до появления признака: восстановить его для
+     * них нечем, и проставить `true` значило бы задним числом объявить
+     * переходами то, чего не было.
      */
-    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
-    private bool $applied = true;
+    #[ORM\Column(type: Types::BOOLEAN, nullable: true)]
+    private ?bool $applied;
 
     /** Указатель на сырьё-доказательство; после retention может стать неразрешимым. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
@@ -107,7 +120,7 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function isApplied(): bool
+    public function isApplied(): ?bool
     {
         return $this->applied;
     }

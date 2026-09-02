@@ -17,7 +17,7 @@ final class RefreshOrderStatusesCommandTest extends IntegrationTestCase
         $exit = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('Polled 0 orders', $tester->getDisplay());
+        self::assertStringContainsString('Requested 0 orders', $tester->getDisplay());
     }
 
     /**

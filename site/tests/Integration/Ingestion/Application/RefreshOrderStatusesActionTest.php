@@ -60,7 +60,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(1, $result->polled);
+        self::assertSame(1, $result->observed);
         self::assertSame(1, $result->changed);
 
         $this->em->clear();
@@ -92,7 +92,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         // «Опрошено» и «изменилось» — разные вопросы. Если успешный опрос
         // считать изменением, счётчик не сможет заметить именно то, ради чего
         // заведён: опрос идёт, а статусы стоят.
-        self::assertSame(1, $second->polled);
+        self::assertSame(1, $second->observed);
         self::assertSame(0, $second->changed);
     }
 
@@ -107,7 +107,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->observed);
         self::assertSame([], $this->ozon->calls);
     }
 
@@ -125,7 +125,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(1, $result->polled);
+        self::assertSame(1, $result->observed);
         self::assertSame(1, $result->missing);
 
         $this->em->clear();
@@ -151,7 +151,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->polled, 'Заказ вне окна не опрашивается.');
+        self::assertSame(0, $result->observed, 'Заказ вне окна не опрашивается.');
         self::assertSame(1, $result->stopped);
 
         // Проблема привязана к сырью, из которого заказ наблюдался последний
@@ -184,7 +184,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->observed);
         self::assertSame([], $this->ozon->calls);
     }
 
@@ -230,7 +230,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->observed);
         self::assertSame([], $this->wb->calls);
     }
 
@@ -258,7 +258,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(1, $result->polled);
+        self::assertSame(1, $result->observed);
 
         $this->em->clear();
         $order = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
@@ -316,7 +316,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
 
-        self::assertSame(1, $result->polled, 'Лимит достаётся заказу, который можно спросить.');
+        self::assertSame(1, $result->observed, 'Лимит достаётся заказу, который можно спросить.');
     }
 
     /**
@@ -336,7 +336,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
         self::assertSame(1, $result->failedConnections);
-        self::assertSame(1, $result->polled, 'Ответ, приехавший до сбоя, применяется.');
+        self::assertSame(1, $result->observed, 'Ответ, приехавший до сбоя, применяется.');
 
         $this->em->clear();
         $refreshed = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
@@ -376,7 +376,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->observed);
         self::assertSame(0, $result->missing);
         self::assertSame(1, $result->invalid);
 
@@ -446,7 +446,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         $second = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
 
         // Кто бы ни попал в первый прогон, на втором очередь обязана сдвинуться.
-        self::assertSame(1, $second->polled + $second->missing);
+        self::assertSame(1, $second->observed + $second->missing);
 
         $this->em->clear();
         $alive = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'alive');
@@ -472,7 +472,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         self::assertSame(0, $result->failedConnections, 'Кривое отправление — не сбой подключения.');
         self::assertSame(1, $result->invalid);
-        self::assertSame(1, $result->polled);
+        self::assertSame(1, $result->observed);
 
         $this->em->clear();
         $alive = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'alive');
@@ -619,7 +619,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         self::assertSame([], $this->ozon->calls, 'Без схемы запрос не отправляется.');
         self::assertSame(1, $result->invalid);
-        self::assertSame(0, $result->polled);
+        self::assertSame(0, $result->observed);
     }
 
     /**
@@ -667,7 +667,7 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
         $second = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
 
-        self::assertSame(1, $second->polled, 'На втором прогоне очередь сдвинулась к спрашиваемому заказу.');
+        self::assertSame(1, $second->observed, 'На втором прогоне очередь сдвинулась к спрашиваемому заказу.');
     }
 
     /**

@@ -293,10 +293,19 @@ final class IngestOrderRepository extends ServiceEntityRepository
      * молчать о нём нельзя: заказ выпал бы и из опроса, и из очереди на
      * разбор.
      */
-    public function countStuckWithoutRawRecord(\DateTimeImmutable $orderedBefore): int
+    public function countStuckWithoutRawRecord(\DateTimeImmutable $orderedBefore, ?string $companyId = null): int
     {
+        $qb = $this->createQueryBuilder('o');
+
+        // Прогон с `--company-id` не должен считать чужие компании: иначе в
+        // логе появился бы межтенантный агрегат там, где запрошена одна
+        // компания.
+        if (null !== $companyId) {
+            $qb->andWhere('o.companyId = :companyId')->setParameter('companyId', $companyId);
+        }
+
         /** @var int $count */
-        $count = $this->createQueryBuilder('o')
+        $count = $qb
             ->select('COUNT(o.id)')
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt < :orderedBefore')

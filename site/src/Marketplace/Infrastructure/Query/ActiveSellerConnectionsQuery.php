@@ -60,7 +60,7 @@ final class ActiveSellerConnectionsQuery
              WHERE mc.is_active = true
                AND mc.connection_type = :type
                AND mc.company_id = :companyId
-             ORDER BY mc.company_id, mc.marketplace
+             ORDER BY mc.company_id, mc.marketplace, mc.id
              LIMIT :limit',
             ['type' => 'seller', 'companyId' => $companyId, 'limit' => max(1, min(1000, $limit))],
         ));

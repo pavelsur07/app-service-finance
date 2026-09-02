@@ -123,7 +123,8 @@ final readonly class RefreshOrderStatusesAction
         $this->logger->info('Order status refresh finished.', [
             'companyId' => $command->companyId,
             'days' => $command->days,
-            'polled' => $result->polled,
+            'requested' => $result->requested,
+            'observed' => $result->observed,
             'changed' => $result->changed,
             'missing' => $result->missing,
             'invalid' => $result->invalid,
@@ -244,7 +245,8 @@ final readonly class RefreshOrderStatusesAction
         }
 
         return $result->with(
-            polled: count($poll['observations']),
+            requested: count($poll['attempts']),
+            observed: count($poll['observations']),
             changed: $this->applyObservations($source, $companyId, $poll, $rawRecordId),
         );
     }
@@ -384,7 +386,11 @@ final readonly class RefreshOrderStatusesAction
                 );
             } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
                 // Дальше идти незачем — ключ, лимит и сбой шлюза относятся ко
-                // всему подключению, — но уже полученное сохраняется.
+                // всему подключению, — но уже полученное сохраняется. Попытка
+                // засчитывается и этому заказу: запрос был. Без отметки
+                // постоянный 5xx на самом старом заказе оставлял бы его первым
+                // навсегда и блокировал очередь за лимитом.
+                $attempts[$order->getId()] = $this->applicationTime();
                 $failure = $exception;
                 break;
             } catch (MalformedConnectorResponseException $exception) {
@@ -531,9 +537,16 @@ final readonly class RefreshOrderStatusesAction
             try {
                 $statuses = $this->wbClient->fetchMarketplaceStatuses($companyId, $connectionRef, $chunk);
             } catch (ConnectorAuthException|ConnectorRateLimitedException|ConnectorTransientException $exception) {
-                // Ответа не было вовсе, поэтому заказы этого и следующих чанков
-                // не «неизвестны маркетплейсу» — их просто не спросили. Считать
-                // их missing значило бы объявить сбой сети свойством данных.
+                // Ответа не было вовсе, поэтому заказы этого чанка не
+                // «неизвестны маркетплейсу» — их просто не спросили. Считать их
+                // missing значило бы объявить сбой сети свойством данных. Но
+                // попытка была, и отметку чанк получает: иначе постоянный 5xx
+                // держал бы одну и ту же пачку в начале очереди вечно.
+                $failedAt = $this->applicationTime();
+                foreach ($chunk as $wbOrderId) {
+                    $attempts[$byWbId[$wbOrderId]->getId()] = $failedAt;
+                }
+
                 $failure = $exception;
                 break;
             } catch (MalformedConnectorResponseException $exception) {
@@ -657,9 +670,15 @@ final readonly class RefreshOrderStatusesAction
             rows: $rows,
         ));
 
+        // Пометка уходит в базу ТУТ ЖЕ, а не вместе с наблюдениями: store()
+        // уже сделал flush, и запись существует со статусом PENDING. Падение
+        // между этими моментами оставило бы вечно ожидающий нормализации
+        // ресурс, для которого маппера не существует.
         foreach ($records as $record) {
             $record->markNormalizationSkipped();
         }
+
+        $this->entityManager->flush();
 
         return $records[0]->getId();
     }
@@ -681,7 +700,7 @@ final readonly class RefreshOrderStatusesAction
         // Заказ без сырья остановить нечем — проблема привязывается к сырью, —
         // но и молчать о нём нельзя: он выпал бы и из опроса, и из очереди на
         // разбор. Один агрегированный warning со счётчиком, а не по записи.
-        $orphans = $this->orderRepository->countStuckWithoutRawRecord($orderedBefore);
+        $orphans = $this->orderRepository->countStuckWithoutRawRecord($orderedBefore, $companyId);
         if ($orphans > 0) {
             $this->logger->warning('Stuck orders without a raw record cannot be queued for review.', [
                 'orders' => $orphans,

@@ -27,6 +27,10 @@ final readonly class MarketplaceSyncFacade
         private MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.legacy_wb_sync')]
         private LoggerInterface $logger,
+        // Отдельный канал: переполнение реестра подключений к легаси-синку WB
+        // отношения не имеет, и складывать его в тот же канал значило бы
+        // спрятать инцидент среди сообщений про отключённую фичу.
+        private LoggerInterface $connectionsLogger,
     ) {
     }
 
@@ -43,7 +47,19 @@ final readonly class MarketplaceSyncFacade
      */
     public function activeSellerConnections(string $companyId): array
     {
-        return $this->toDtos($this->activeSellerConnectionsQuery->executeForCompany($companyId));
+        $connections = $this->toDtos($this->activeSellerConnectionsQuery->executeForCompany($companyId));
+
+        // Потолок выборки — ограничение, а не обещание. Молча обрезанный
+        // список выглядел бы как «у компании столько подключений и есть», и
+        // необработанные кабинеты были бы неотличимы от несуществующих.
+        if (ActiveSellerConnectionsQuery::COMPANY_CONNECTIONS_LIMIT === count($connections)) {
+            $this->connectionsLogger->error('Active seller connections hit the per-company cap; some cabinets are not processed.', [
+                'company_id' => $companyId,
+                'cap' => ActiveSellerConnectionsQuery::COMPANY_CONNECTIONS_LIMIT,
+            ]);
+        }
+
+        return $connections;
     }
 
     /**

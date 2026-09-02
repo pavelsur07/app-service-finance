@@ -7,9 +7,12 @@ namespace App\Ingestion\Application\DTO;
 /**
  * Итог одного прогона перепроса статусов.
  *
- * Счётчики разделены намеренно: «опрошено» и «изменилось» отвечают на разные
- * вопросы, и один общий счётчик скрыл бы случай, когда опрос идёт, а статусы
- * почему-то никогда не меняются. По той же причине разведены «маркетплейс не
+ * Счётчики разделены намеренно. «Спрошено» (`requested`) — сколько заказов
+ * дошло до запроса, включая те, что вернулись 404 или без статуса. «Получено
+ * наблюдений» (`observed`) — сколько из них дали пригодный статус. «Изменилось»
+ * (`changed`) — сколько статусов действительно сдвинулось. Один общий счётчик
+ * скрыл бы и настоящую нагрузку, и случай, когда опрос идёт, а статусы почему-то
+ * никогда не меняются. По той же причине разведены «маркетплейс не
  * знает такого заказа» (`missing`) и «ответ нарушает контракт» (`invalid`):
  * первое — норма, второе — дефект интеграции. И отказ авторизации отделён от
  * прочих сбоев подключения: 429 и таймаут проходят сами, протухший ключ ждёт
@@ -18,7 +21,8 @@ namespace App\Ingestion\Application\DTO;
 final readonly class RefreshOrderStatusesResult
 {
     public function __construct(
-        public int $polled = 0,
+        public int $requested = 0,
+        public int $observed = 0,
         public int $changed = 0,
         public int $missing = 0,
         public int $invalid = 0,
@@ -29,7 +33,8 @@ final readonly class RefreshOrderStatusesResult
     }
 
     public function with(
-        int $polled = 0,
+        int $requested = 0,
+        int $observed = 0,
         int $changed = 0,
         int $missing = 0,
         int $invalid = 0,
@@ -38,7 +43,8 @@ final readonly class RefreshOrderStatusesResult
         int $authFailedConnections = 0,
     ): self {
         return new self(
-            $this->polled + $polled,
+            $this->requested + $requested,
+            $this->observed + $observed,
             $this->changed + $changed,
             $this->missing + $missing,
             $this->invalid + $invalid,

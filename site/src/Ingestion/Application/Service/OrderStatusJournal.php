@@ -127,7 +127,7 @@ final readonly class OrderStatusJournal
         array &$seenObservations,
         bool $applied,
     ): void {
-        $key = $order->getId()."\0".$rawStatus;
+        $key = IngestOrderStatusEventRepository::observationKey($order->getId(), $rawStatus, $applied ? $previousStatus : null);
         if (isset($seenObservations[$key])) {
             return;
         }

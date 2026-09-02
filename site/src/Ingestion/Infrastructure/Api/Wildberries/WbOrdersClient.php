@@ -119,7 +119,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         foreach ($rows as $row) {
             $id = $row['id'] ?? null;
             if (!is_int($id)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without an integer id.', self::ORDERS_STATUS_ENDPOINT));
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without an integer id.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
             }
 
             // Обе оси обязательны.
@@ -130,14 +130,14 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             // старому, но настоящему статусу. Повреждённый ответ обязан
             // приводить к повтору, а не к записи выдуманного состояния.
             if (!is_string($row['supplierStatus'] ?? null) || !is_string($row['wbStatus'] ?? null)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without both status axes.', self::ORDERS_STATUS_ENDPOINT));
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without both status axes.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
             }
 
             // Поле обязательно, а не «если прислали»: строка без него — такое
             // же неполное статусное наблюдение, как строка без осей, и
             // записывать по ней состояние нельзя.
             if (!is_bool($row['isCancellable'] ?? null)) {
-                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without a boolean isCancellable.', self::ORDERS_STATUS_ENDPOINT));
+                throw new MalformedConnectorResponseException(sprintf('WB %s returned a status row without a boolean isCancellable.', self::ORDERS_STATUS_ENDPOINT), decodedPayload: self::evidence($decoded['data']));
             }
 
             $indexed[$id] = $row;
@@ -230,7 +230,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             return ['data' => [], 'shape' => []];
         }
 
-        $this->classifyStatus($statusCode, $headers, $endpoint);
+        $this->classifyStatus($statusCode, $headers, $endpoint, $body);
 
         try {
             // Разбираем дважды: ассоциативно — ради данных, объектно — ради
@@ -258,7 +258,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     /**
      * @param array<string, list<string>> $headers
      */
-    private function classifyStatus(?int $statusCode, array $headers, string $endpoint): void
+    private function classifyStatus(?int $statusCode, array $headers, string $endpoint, ?string $payload = null): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
             throw new ConnectorAuthException(sprintf('WB orders auth failed for %s (HTTP %d).', $endpoint, (int) $statusCode));
@@ -274,8 +274,21 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         }
 
         if (200 !== $statusCode) {
-            throw new MalformedConnectorResponseException(sprintf('WB orders returned HTTP %d for %s.', $statusCode, $endpoint));
+            throw new MalformedConnectorResponseException(sprintf('WB orders returned HTTP %d for %s.', $statusCode, $endpoint), decodedPayload: null === $payload ? null : self::evidence(json_decode($payload, true)));
         }
+    }
+
+    /**
+     * Ответ как доказательство для аудита: объект годится, всё остальное
+     * (список, скаляр, неразобранное) хранить нечем — доказательства там и
+     * нет. В лог это не идёт: там разрешены идентификаторы и статусы, но не
+     * тела ответов внешних API.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function evidence(mixed $decoded): ?array
+    {
+        return is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
     }
 
     /**
