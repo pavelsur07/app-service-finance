@@ -94,6 +94,17 @@ final class WbOrderMapperTest extends TestCase
     }
 
     /**
+     * Валюта не подставляется: поля валюты у statistics-api нет вовсе, а
+     * «наверное, рубли» — финансовое утверждение без основания.
+     */
+    public function testStatisticsDoesNotInventCurrency(): void
+    {
+        $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
+
+        self::assertNull($batch->orders[0]->items[0]->currency);
+    }
+
+    /**
      * Две оси статуса склеиваются дословно: пара `new / canceled_by_client`
      * одной осью не выражается.
      */
@@ -171,8 +182,10 @@ final class WbOrderMapperTest extends TestCase
     }
 
     /**
-     * Схема statistics выводится из типа склада. «Склад продавца» наблюдался в
-     * выгрузке; ветка склада WB взята из документации и на данных не проверена.
+     * Схема statistics выводится из типа склада строгим словарём. Оба
+     * настоящих значения наблюдались в выгрузке; незнакомое или отсутствующее
+     * даёт UNKNOWN, а не одну из схем: опечатка или новый тип склада молча
+     * меняли бы схему исполнения заказа и всю отчётность по ней.
      */
     #[DataProvider('warehouseSchemeProvider')]
     public function testStatisticsSchemeComesFromWarehouseType(?string $warehouseType, IngestOrderScheme $expected): void
@@ -197,7 +210,9 @@ final class WbOrderMapperTest extends TestCase
     {
         yield 'склад продавца' => ['Склад продавца', IngestOrderScheme::FBS];
         yield 'склад WB' => ['Склад WB', IngestOrderScheme::FBO];
-        yield 'типа нет' => [null, IngestOrderScheme::FBO];
+        yield 'типа нет' => [null, IngestOrderScheme::UNKNOWN];
+        yield 'незнакомый тип' => ['Склад партнёра', IngestOrderScheme::UNKNOWN];
+        yield 'опечатка' => ['Cклад продавца', IngestOrderScheme::UNKNOWN];
     }
 
     /**
@@ -239,6 +254,11 @@ final class WbOrderMapperTest extends TestCase
             WbResourceType::ORDERS_MARKETPLACE,
             ['rid' => 'r-1', 'createdAt' => '2026-08-30T19:18:04Z', 'nmId' => 1, 'currencyCode' => 111],
             'unknown_currency_code',
+        ];
+        yield 'больше двух знаков в рублях' => [
+            WbResourceType::ORDERS_STATISTICS,
+            ['srid' => 's-1', 'date' => '2026-08-30T22:18:04', 'isCancel' => false, 'nmId' => 1, 'finishedPrice' => '10.999'],
+            'malformed_price',
         ];
         yield 'нецелая цена в копейках' => [
             WbResourceType::ORDERS_MARKETPLACE,
@@ -312,7 +332,6 @@ final class WbOrderMapperTest extends TestCase
         yield 'ноль' => [0, '0'];
         yield 'строка' => ['2715.00', '271500'];
         yield 'отрицательный ноль' => ['-0.00', '0'];
-        yield 'больше двух знаков' => ['10.999', '1099'];
     }
 
     /**

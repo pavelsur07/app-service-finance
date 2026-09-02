@@ -10,6 +10,7 @@ use App\Ingestion\Application\Source\Wildberries\WbOrdersConnector;
 use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersPage;
 use App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient;
@@ -211,18 +212,41 @@ final class WbOrdersConnectorTest extends TestCase
     }
 
     /**
-     * Водяной знак назад не едет даже если WB прислал строку старше курсора.
+     * Регрессия: окно берётся с перекрытием назад, поэтому ответ почти всегда
+     * непуст — в нём лежат те же строки, что и в прошлый раз. Максимум по ВСЕМ
+     * строкам не превышал курсора, тот застревал навсегда, а окно росло с
+     * каждым часом. Повторы обязаны игнорироваться при расчёте водяного знака.
      */
-    public function testStatisticsWatermarkNeverMovesBackwards(): void
+    public function testOverlapRowsAloneDoNotFreezeTheWatermark(): void
     {
         $this->client->queueStatistics(new WbOrdersPage([
-            ['srid' => 's-1', 'lastChangeDate' => '2026-08-01T10:00:00'],
+            ['srid' => 's-1', 'lastChangeDate' => '2026-09-01T11:30:00'],
+            ['srid' => 's-2', 'lastChangeDate' => '2026-09-01T11:55:00'],
+        ], false));
+
+        // Курсор 09:00 UTC = 12:00 по Москве: обе строки внутри перекрытия.
+        $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
+
+        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T12:00:00+00:00', $decoded['since'], 'Новых изменений нет — курсор идёт к времени запроса.');
+    }
+
+    /**
+     * Новая строка среди повторов двигает знак ровно на себя, а не на «сейчас»:
+     * иначе потерялись бы изменения, проштампованные между ней и ответом.
+     */
+    public function testFreshRowAmongOverlapRowsSetsTheWatermark(): void
+    {
+        $this->client->queueStatistics(new WbOrdersPage([
+            ['srid' => 's-1', 'lastChangeDate' => '2026-09-01T11:30:00'],
+            ['srid' => 's-2', 'lastChangeDate' => '2026-09-01T14:00:00'],
         ], false));
 
         $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, '{"since":"2026-09-01T09:00:00+00:00"}'));
 
+        // 14:00 по Москве — это 11:00 UTC.
         $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('2026-09-01T09:00:00+00:00', $decoded['since']);
+        self::assertSame('2026-09-01T11:00:00+00:00', $decoded['since']);
     }
 
     public function testStatisticsMakesExactlyOneCall(): void
@@ -260,6 +284,32 @@ final class WbOrdersConnectorTest extends TestCase
             'wildberries_orders_statistics:window-2026-09-01T10:45:00Z-2026-09-01T12:00:00Z:next-0',
             $result->rawBatch->externalId,
         );
+    }
+
+    /**
+     * Регрессия: не сдвинувшийся `next` на непустой странице означает, что
+     * следующий запрос вернёт то же самое. Обход крутил бы одну страницу до
+     * лимита, а затем создавал продолжение с тем же токеном — и так
+     * бесконечно, потому что на ветке продолжения персистентный курсор не
+     * двигается.
+     */
+    public function testNonGrowingPageCursorIsMalformed(): void
+    {
+        $this->client->queueMarketplace(
+            new WbOrdersPage([['id' => 1, 'rid' => 'r-1']], true, 100),
+            new WbOrdersPage([['id' => 2, 'rid' => 'r-2']], true, 100),
+        );
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, null));
+    }
+
+    public function testMissingPageCursorIsMalformed(): void
+    {
+        $this->client->queueMarketplace(new WbOrdersPage([['id' => 1, 'rid' => 'r-1']], true, null));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $this->connector->pull($this->request(WbResourceType::ORDERS_MARKETPLACE, null));
     }
 
     private function request(string $resourceType, ?string $cursorValue): PullRequest

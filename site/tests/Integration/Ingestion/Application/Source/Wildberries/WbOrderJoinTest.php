@@ -141,6 +141,109 @@ final class WbOrderJoinTest extends IntegrationTestCase
         self::assertSame('2026-08-30T19:18:04+00:00', $fromMarketplace->format(\DATE_ATOM));
     }
 
+    /**
+     * Регрессия: частичное наблюдение из statistics перезаписывало снимок
+     * заказа. Оно подставляло gNumber вместо номера заказа WB и finishedPrice
+     * вместо цены маркетплейса — величину с другой семантикой. Снимок начинал
+     * зависеть от того, какой поток пришёл последним.
+     */
+    public function testStatisticsDoesNotOverwriteMarketplaceSnapshot(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        $before = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        $lineKey = array_key_first($before);
+        $priceFromMarketplace = $before[$lineKey]->getPriceMinor();
+        $currencyFromMarketplace = $before[$lineKey]->getCurrency();
+
+        // Более позднее наблюдение из statistics — и оно принимается.
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        // Номер заказа WB остался, gNumber в него не пролез.
+        self::assertSame('5000000001', $order->getExternalOrderId());
+
+        $after = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame($priceFromMarketplace, $after[$lineKey]->getPriceMinor(), 'Цена marketplace не должна подменяться finishedPrice.');
+        self::assertSame($currencyFromMarketplace, $after[$lineKey]->getCurrency(), 'Валюта marketplace не должна обнуляться.');
+    }
+
+    /**
+     * Полный снимок заказа не должен зависеть от порядка прихода потоков.
+     */
+    public function testCanonicalFieldsDoNotDependOnFeedOrder(): void
+    {
+        $this->normalizeMarketplace(new \DateTimeImmutable('-3 hours'));
+        $this->normalizeStatistics(new \DateTimeImmutable('-2 hours'));
+        $direct = $this->snapshot(self::SHARED_RID);
+
+        // Тот же заказ у другой компании, но потоки в обратном порядке.
+        $this->companyId = Uuid::uuid7()->toString();
+        $this->normalizeStatistics(new \DateTimeImmutable('-3 hours'));
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+        $reversed = $this->snapshot(self::SHARED_RID);
+
+        self::assertSame($direct, $reversed);
+    }
+
+    /**
+     * Повторная нормализация того же сырья не должна плодить ни заказы, ни
+     * позиции, ни события журнала.
+     */
+    public function testRenormalizingTheSameRawIsIdempotent(): void
+    {
+        $fetchedAt = new \DateTimeImmutable('-2 hours');
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_MARKETPLACE,
+            'marketplace-replay',
+            $this->marketplaceRows(),
+            $fetchedAt,
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        self::assertSame(1, $this->orderCount(self::SHARED_RID));
+        self::assertCount(1, $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()));
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function snapshot(string $externalId): array
+    {
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, $externalId);
+        self::assertNotNull($order);
+
+        $items = [];
+        foreach ($this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()) as $lineKey => $item) {
+            $items[$lineKey] = [
+                'priceMinor' => $item->getPriceMinor(),
+                'currency' => $item->getCurrency(),
+                'externalSku' => $item->getExternalSku(),
+                'offerId' => $item->getOfferId(),
+            ];
+        }
+        ksort($items);
+
+        return [
+            'scheme' => $order->getScheme()->value,
+            'orderedAt' => $order->getOrderedAt()->format(\DATE_ATOM),
+            'externalOrderId' => $order->getExternalOrderId(),
+            'items' => $items,
+        ];
+    }
+
     private function normalizeMarketplace(\DateTimeImmutable $fetchedAt): void
     {
         $rawId = $this->storeRaw(

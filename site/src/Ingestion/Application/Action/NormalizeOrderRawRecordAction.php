@@ -8,7 +8,6 @@ use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\DTO\ListingResolution;
 use App\Ingestion\Application\DTO\MappedOrder;
-use App\Ingestion\Application\DTO\MappedOrderItem;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\Domain\Service\OrderMapperRegistry;
@@ -258,9 +257,11 @@ final readonly class NormalizeOrderRawRecordAction
             $this->orderRepository->save($order);
 
             $this->appendStatusEvent($order, $mapped->rawStatus, $status, null, $observedAt, $rawRecord->getId(), $seenObservations);
-            $applied = $this->applyItems($order, $mapped->items, [], $resolutions, $orderIndex);
+            $applied = $this->applyItems($order, $mapped, [], $resolutions, $orderIndex);
             $knownItems[$order->getId()] = $applied;
-            $currentItems[$order->getId()] = $applied;
+            if ($mapped->itemsAuthoritative) {
+                $currentItems[$order->getId()] = $applied;
+            }
 
             return $order;
         }
@@ -296,7 +297,7 @@ final readonly class NormalizeOrderRawRecordAction
 
         $applied = $this->applyItems(
             $order,
-            $mapped->items,
+            $mapped,
             $knownItems[$order->getId()] ?? [],
             $resolutions,
             $orderIndex,
@@ -306,7 +307,13 @@ final readonly class NormalizeOrderRawRecordAction
         // снимка, может вернуться следующим снимком того же батча, и тогда
         // её нужно переиспользовать, а не создавать заново.
         $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
-        $currentItems[$order->getId()] = $applied;
+
+        // Вычистка исчезнувших позиций опирается ТОЛЬКО на полные снимки.
+        // Частичное наблюдение не видит состава заказа целиком, и считать его
+        // снимком значило бы удалить всё, о чём оно просто не знает.
+        if ($mapped->itemsAuthoritative) {
+            $currentItems[$order->getId()] = $applied;
+        }
 
         return $order;
     }
@@ -349,7 +356,6 @@ final readonly class NormalizeOrderRawRecordAction
      * Возвращает набор позиций ЭТОГО снимка (не объединённый с прежними):
      * вызывающий по нему решает, какие старые позиции удалить после батча.
      *
-     * @param list<MappedOrderItem> $mappedItems
      * @param array<string, IngestOrderItem> $existing lineKey => позиция
      * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      *
@@ -357,15 +363,18 @@ final readonly class NormalizeOrderRawRecordAction
      */
     private function applyItems(
         IngestOrder $order,
-        array $mappedItems,
+        MappedOrder $mapped,
         array $existing,
         array $resolutions,
         int $orderIndex,
     ): array {
+        $mappedItems = $mapped->items;
         $applied = [];
 
         foreach ($mappedItems as $index => $mappedItem) {
             $item = $existing[$mappedItem->lineKey] ?? null;
+
+            $isNew = null === $item;
 
             if (null === $item) {
                 $item = new IngestOrderItem(
@@ -383,7 +392,10 @@ final readonly class NormalizeOrderRawRecordAction
                     marketplaceBuyout: $mappedItem->marketplaceBuyout,
                 );
                 $this->itemRepository->save($item);
-            } else {
+            } elseif ($mapped->itemsAuthoritative) {
+                // Частичное наблюдение существующую позицию не трогает: оно
+                // знает о заказе не всё, и его цена может иметь другую
+                // семантику (у WB finishedPrice против price маркетплейса).
                 $item->refresh(
                     $mappedItem->lineNo,
                     $mappedItem->quantity,
@@ -394,17 +406,21 @@ final readonly class NormalizeOrderRawRecordAction
                 );
             }
 
-            $resolution = $resolutions[$orderIndex.':'.$index] ?? null;
+            // Привязку к листингу переписывает только полный снимок или
+            // создание позиции: частичное наблюдение не должно затирать
+            // разрешение, полученное из потока, который видит заказ целиком.
+            if ($isNew || $mapped->itemsAuthoritative) {
+                $resolution = $resolutions[$orderIndex.':'.$index] ?? null;
 
-            // Нерезолвленное не теряется: ключ, по которому пытались искать,
-            // сохраняется даже когда листинг не найден — это очередь на разбор,
-            // а не молчаливый NULL.
-            $listingSku = $resolution?->listingSku;
-            if (null === $listingSku) {
-                $listingSku = $mappedItem->externalSku;
+                // Нерезолвленное не теряется: ключ, по которому пытались
+                // искать, сохраняется даже когда листинг не найден — это
+                // очередь на разбор, а не молчаливый NULL.
+                $item->linkListing(
+                    $resolution?->listingId,
+                    null === $resolution ? $mappedItem->externalSku : $resolution->listingSku,
+                );
             }
 
-            $item->linkListing($resolution?->listingId, $listingSku);
             $applied[$mappedItem->lineKey] = $item;
         }
 

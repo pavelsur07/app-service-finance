@@ -13,12 +13,20 @@ use Webmozart\Assert\Assert;
  * Отдельный тип от {@see MappedTransaction}: тот требует type, direction, money
  * и operationGroupId, потому что описывает денежную проводку. Заказ — не
  * проводка: у него позиции, количества, статус и своя жизнь во времени.
+ *
+ * `itemsAuthoritative` разделяет два вида наблюдений. Полный снимок (Ozon,
+ * marketplace-api WB) заменяет состав заказа целиком, включая удаление
+ * исчезнувших позиций. Частичное наблюдение (statistics-api WB) знает о
+ * заказе не всё: оно вправе ДОБАВИТЬ недостающую позицию, но не переписывать
+ * и не удалять чужие. Без этого различия поток, пришедший последним, стирал
+ * бы цену и состав, которых он попросту не видит.
  */
 final readonly class MappedOrder
 {
     /**
      * @param list<MappedOrderItem> $items
      * @param array<string, mixed> $attributes
+     * @param bool $itemsAuthoritative несёт ли наблюдение ПОЛНЫЙ состав заказа
      */
     public function __construct(
         public string $externalId,
@@ -29,6 +37,7 @@ final readonly class MappedOrder
         public ?string $externalOrderId = null,
         public ?string $rawSubstatus = null,
         public array $attributes = [],
+        public bool $itemsAuthoritative = true,
     ) {
         Assert::notEmpty($externalId);
         Assert::notEmpty($rawStatus);

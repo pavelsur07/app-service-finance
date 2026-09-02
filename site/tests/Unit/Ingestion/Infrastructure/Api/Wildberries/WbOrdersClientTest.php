@@ -247,6 +247,32 @@ final class WbOrdersClientTest extends TestCase
         yield 'orders — пустой объект в строке' => ['{"next":0,"orders":[{}]}'];
         yield 'next не число' => ['{"next":"777","orders":[]}'];
         yield 'orders отсутствует' => ['{"next":0}'];
+        // json_decode(..., true) отдаёт `{}` тем же пустым массивом, что и
+        // `[]`. Для statistics это не безобидно: пустой ответ двигает курсор,
+        // и испорченный означал бы окончательный пропуск окна.
+        yield 'orders — пустой объект' => ['{"next":0,"orders":{}}'];
+    }
+
+    /**
+     * Пустой объект вместо списка у statistics особенно опасен: пустой ответ
+     * двигает курсор к времени запроса, поэтому испорченный ответ означал бы
+     * окончательный пропуск окна изменений.
+     */
+    public function testEmptyObjectInsteadOfStatisticsListIsMalformed(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse('{}', ['http_code' => 200])));
+
+        $this->expectException(MalformedConnectorResponseException::class);
+        $client->fetchStatisticsOrders(self::COMPANY_ID, self::CONNECTION_REF, new \DateTimeImmutable('2026-09-01T10:00:00+00:00'));
+    }
+
+    public function testEmptyListIsStillAValidStatisticsAnswer(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse('[]', ['http_code' => 200])));
+
+        $page = $client->fetchStatisticsOrders(self::COMPANY_ID, self::CONNECTION_REF, new \DateTimeImmutable('2026-09-01T10:00:00+00:00'));
+
+        self::assertSame([], $page->rows);
     }
 
     public function testStatusRowWithoutIntegerIdIsMalformed(): void

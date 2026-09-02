@@ -72,7 +72,9 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
             $headers = $response->getHeaders(false);
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $exception) {
-            throw new ConnectorTransientException('WB finance report transport error.', previous: $exception);
+            // Исходное исключение не прицепляется: его сообщение может нести
+            // DSN с учётными данными, а обработчики сериализуют всю цепочку.
+            throw new ConnectorTransientException(sprintf('WB finance report transport error (%s).', $exception::class));
         } finally {
             $this->logger->info('WB finance report API request finished.', [
                 'companyId' => $companyId,

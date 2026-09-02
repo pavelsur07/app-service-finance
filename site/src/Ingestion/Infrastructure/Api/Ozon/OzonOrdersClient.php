@@ -83,7 +83,9 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
             $headers = $response->getHeaders(false);
             $payload = $response->getContent(false);
         } catch (TransportExceptionInterface $exception) {
-            throw new ConnectorTransientException(sprintf('Ozon orders transport error for %s.', $endpoint), 0, $exception);
+            // Исходное исключение не прицепляется: его сообщение может нести
+            // DSN с учётными данными, а обработчики сериализуют всю цепочку.
+            throw new ConnectorTransientException(sprintf('Ozon orders transport error for %s (%s).', $endpoint, $exception::class));
         }
 
         // Метод, эндпоинт, статус и длительность — обязательный минимум для

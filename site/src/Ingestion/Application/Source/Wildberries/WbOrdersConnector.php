@@ -13,6 +13,7 @@ use App\Ingestion\Domain\Contract\SourceConnectorInterface;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Enum\Capability;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\MalformedConnectorResponseException;
 use App\Ingestion\Exception\UnsupportedCapabilityException;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClient;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface;
@@ -120,12 +121,24 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             );
 
             array_push($rows, ...$page->rows);
-            $next = $page->nextToken ?? $next;
             ++$pages;
 
             if (!$page->hasMore) {
                 break;
             }
+
+            // Курсор постраничности обязан РАСТИ.
+            //
+            // Не сдвинувшийся `next` на непустой странице означал бы, что
+            // следующий запрос вернёт то же самое: обход крутил бы одну
+            // страницу до лимита, а затем создавал продолжение с тем же
+            // токеном — и так бесконечно, потому что персистентный курсор на
+            // ветке продолжения не двигается. Такой ответ считаем испорченным.
+            if (null === $page->nextToken || $page->nextToken <= $next) {
+                throw new MalformedConnectorResponseException(sprintf('WB orders pagination cursor must grow: got %s after %d.', var_export($page->nextToken, true), $next));
+            }
+
+            $next = $page->nextToken;
 
             if ($pages >= self::MAX_PAGES_PER_PULL) {
                 $hasMorePages = true;
@@ -196,19 +209,22 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
             rows: [] === $rows ? [$this->emptyMarker($request->resourceType, $since, $now)] : $rows,
         );
 
-        // Водяной знак — максимальный lastChangeDate, а НЕ время запроса.
+        // Водяной знак — максимальный lastChangeDate СРЕДИ НОВЫХ строк.
         //
         // flag=0 отдаёт поток изменений, и следующий обход обязан начаться
         // ровно там, где кончился предыдущий. Взять вместо этого «сейчас»
         // значило бы пропустить изменения, которые WB проштампует временем
-        // между максимумом и моментом ответа. Граничная строка приедет
-        // повторно — это дешевле пропуска и идемпотентно.
+        // между максимумом и моментом ответа.
         //
-        // Если не изменилось ничего, WB тем самым сказал, что после `since`
-        // записей нет, и курсор безопасно переезжает на время запроса: иначе
-        // окно росло бы бесконечно.
-        $watermark = $this->maxLastChangeDate($rows) ?? $now;
-        $nextSince = max($watermark, $cursorSince ?? $watermark);
+        // Считать максимум по ВСЕМ строкам нельзя: окно берётся с перекрытием
+        // назад, поэтому ответ почти всегда непуст — в нём лежат те же строки,
+        // что и в прошлый раз. Их максимум не превышает курсора, и тот
+        // застревал бы навсегда, а окно росло бы с каждым часом.
+        //
+        // Если новых строк нет, WB тем самым сказал, что после курсора
+        // изменений не было, и курсор безопасно переезжает на время запроса.
+        $fresh = $this->maxLastChangeDateAfter($rows, $cursorSince);
+        $nextSince = max($fresh ?? $now, $cursorSince ?? $now);
 
         return new PullResult(
             rawBatch: $batch,
@@ -264,14 +280,28 @@ final readonly class WbOrdersConnector implements SourceConnectorInterface
     }
 
     /**
+     * Максимальный lastChangeDate строго ПОЗЖЕ границы.
+     *
+     * Граница — прежнее значение курсора, а не начало окна: окно сдвинуто
+     * назад на перекрытие, и строки внутри перекрытия — это повторы, а не
+     * новости.
+     *
      * @param list<array<string, mixed>> $rows
      */
-    private function maxLastChangeDate(array $rows): ?\DateTimeImmutable
+    private function maxLastChangeDateAfter(array $rows, ?\DateTimeImmutable $after): ?\DateTimeImmutable
     {
         $max = null;
         foreach ($rows as $row) {
             $parsed = WbOrderDateParser::parseStatisticsInstant($row['lastChangeDate'] ?? null);
-            if (null !== $parsed && (null === $max || $parsed > $max)) {
+            if (null === $parsed) {
+                continue;
+            }
+
+            if (null !== $after && $parsed <= $after) {
+                continue;
+            }
+
+            if (null === $max || $parsed > $max) {
                 $max = $parsed;
             }
         }

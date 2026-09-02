@@ -45,20 +45,19 @@ final readonly class WbOrderMapper implements OrderMapperInterface
     ];
 
     /**
-     * statistics-api — отчётность продавца в рублях; поля валюты у эндпоинта
-     * нет вовсе. Считать её рублёвой безопаснее, чем оставить деньги без
-     * валюты, но для не-российских рынков это НЕ проверено.
-     */
-    private const STATISTICS_CURRENCY = 'RUB';
-
-    /**
      * Тип склада из statistics. Оба значения наблюдались в реальной выгрузке:
      * «Склад продавца» (поставка продавцом) и «Склад WB» (поставка
-     * маркетплейсом). Любое другое значение трактуется как склад
-     * маркетплейса — это единственная безопасная сторона: FBS означал бы, что
-     * отгружает продавец, и ошибка была бы видна в его собственных операциях.
+     * маркетплейсом).
+     *
+     * Словарь строгий. Незнакомое или отсутствующее значение даёт
+     * {@see IngestOrderScheme::UNKNOWN}, а не одну из настоящих схем: опечатка
+     * или новый тип склада молча меняли бы схему исполнения заказа и всю
+     * отчётность по ней.
      */
-    private const SELLER_WAREHOUSE_TYPE = 'Склад продавца';
+    private const SCHEME_BY_WAREHOUSE_TYPE = [
+        'Склад продавца' => IngestOrderScheme::FBS,
+        'Склад WB' => IngestOrderScheme::FBO,
+    ];
 
     public function source(): IngestSource
     {
@@ -179,17 +178,24 @@ final readonly class WbOrderMapper implements OrderMapperInterface
         return [
             'order' => new MappedOrder(
                 externalId: $srid,
-                scheme: self::SELLER_WAREHOUSE_TYPE === ($row['warehouseType'] ?? null)
-                    ? IngestOrderScheme::FBS
-                    : IngestOrderScheme::FBO,
+                scheme: $this->schemeFromWarehouseType($row['warehouseType'] ?? null),
                 orderedAt: $orderedAt,
                 // Поток statistics статуса не отдаёт вовсе — только признак
                 // отмены. Притвориться, что это статус, было бы враньём.
                 rawStatus: IngestOrderStatusMapper::encodeWbCancelFlag($isCancel),
                 items: [$item],
-                externalOrderId: $this->stringOrNull($row['gNumber'] ?? null),
+                // externalOrderId принадлежит marketplace-потоку: там это
+                // номер заказа WB. gNumber — номер группы, другая сущность, и
+                // он хранится отдельно в атрибутах. Подставлять его сюда
+                // значило бы менять смысл поля в зависимости от того, какой
+                // поток пришёл последним.
+                externalOrderId: null,
                 rawSubstatus: null,
                 attributes: $this->statisticsAttributes($row),
+                // Поток изменений не отдаёт состава заказа: он вправе
+                // добавить недостающую позицию, но не переписывать и не
+                // удалять то, что видел marketplace.
+                itemsAuthoritative: false,
             ),
             'error' => null,
             'hint' => null,
@@ -273,7 +279,11 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             barcode: $this->stringOrNull($row['barcode'] ?? null),
             name: $this->stringOrNull($row['subject'] ?? null),
             priceMinor: $priceMinor,
-            currency: self::STATISTICS_CURRENCY,
+            // Валюта НЕ подставляется: поля валюты у statistics-api нет
+            // вовсе, а «наверное, рубли» — финансовое утверждение без
+            // основания. Для заказа, который есть и в marketplace, валюту даёт
+            // тот поток; для остальных она честно остаётся неизвестной.
+            currency: null,
             marketplaceBuyout: false,
             sourceData: array_filter([
                 'nm_id' => $nmId,
@@ -281,6 +291,15 @@ final readonly class WbOrderMapper implements OrderMapperInterface
                 'barcode' => $this->stringOrNull($row['barcode'] ?? null),
             ], static fn (mixed $v): bool => null !== $v),
         );
+    }
+
+    private function schemeFromWarehouseType(mixed $warehouseType): IngestOrderScheme
+    {
+        if (!is_string($warehouseType)) {
+            return IngestOrderScheme::UNKNOWN;
+        }
+
+        return self::SCHEME_BY_WAREHOUSE_TYPE[trim($warehouseType)] ?? IngestOrderScheme::UNKNOWN;
     }
 
     /**
@@ -384,11 +403,14 @@ final readonly class WbOrderMapper implements OrderMapperInterface
         }
 
         $raw = trim((string) $value);
-        if (1 !== preg_match('/^(-?)(\d+)(?:[.,](\d+))?$/', $raw, $m)) {
+        // Не более двух знаков после разделителя: у WB цены копеечные, и
+        // третий знак означает смену контракта. Усечение молча превращало бы
+        // 10,999 ₽ в 10,99 ₽ — тихое искажение денег вместо видимой ошибки.
+        if (1 !== preg_match('/^(-?)(\d+)(?:[.,](\d{1,2}))?$/', $raw, $m)) {
             return null;
         }
 
-        $fraction = substr(str_pad($m[3] ?? '', 2, '0'), 0, 2);
+        $fraction = str_pad($m[3] ?? '', 2, '0');
         $digits = ltrim($m[2].$fraction, '0');
 
         // Ноль канонизируем без знака: «-0» — то же число, но другая строка.

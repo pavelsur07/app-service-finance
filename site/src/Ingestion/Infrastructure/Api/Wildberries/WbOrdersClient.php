@@ -89,8 +89,8 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             ],
         );
 
-        $rows = $this->listOfObjects($decoded['orders'] ?? null, self::ORDERS_ENDPOINT, 'orders');
-        $nextToken = $decoded['next'] ?? null;
+        $rows = $this->listOfObjects($decoded['data']['orders'] ?? null, $decoded['shape']->orders ?? null, self::ORDERS_ENDPOINT, 'orders');
+        $nextToken = $decoded['data']['next'] ?? null;
         if (!is_int($nextToken)) {
             throw new MalformedConnectorResponseException(sprintf('WB %s returned a non-integer next cursor.', self::ORDERS_ENDPOINT));
         }
@@ -123,7 +123,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             ['json' => ['orders' => $orderIds]],
         );
 
-        $rows = $this->listOfObjects($decoded['orders'] ?? null, self::ORDERS_STATUS_ENDPOINT, 'orders');
+        $rows = $this->listOfObjects($decoded['data']['orders'] ?? null, $decoded['shape']->orders ?? null, self::ORDERS_STATUS_ENDPOINT, 'orders');
 
         $indexed = [];
         foreach ($rows as $row) {
@@ -156,7 +156,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             ['query' => ['dateFrom' => $dateFrom, 'flag' => 0]],
         );
 
-        $rows = $this->listOfObjects($decoded, self::STATISTICS_ORDERS_ENDPOINT, null);
+        $rows = $this->listOfObjects($decoded['data'], $decoded['shape'], self::STATISTICS_ORDERS_ENDPOINT, null);
 
         // Постраничности у эндпоинта нет: он отдаёт весь поток изменений за
         // один ответ, поэтому hasMore всегда false.
@@ -171,7 +171,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     /**
      * @param array<string, mixed> $options
      *
-     * @return array<array-key, mixed>
+     * @return array{data: array<array-key, mixed>, shape: mixed}
      */
     private function request(
         string $method,
@@ -198,9 +198,13 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             $headers = $response->getHeaders(false);
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $exception) {
-            // Сообщение transport-исключения может нести DSN с учётными
-            // данными, поэтому в лог идёт класс, а не текст.
-            throw new ConnectorTransientException(sprintf('WB orders transport error for %s.', $endpoint), 0, $exception);
+            // Исходное исключение НЕ прицепляется как previous.
+            //
+            // Его сообщение может нести DSN с учётными данными, а Messenger и
+            // централизованный обработчик сериализуют всю цепочку — секрет,
+            // который не записали напрямую, всё равно оказался бы в логах.
+            // Наружу отдаём только класс: для классификации сбоя этого хватает.
+            throw new ConnectorTransientException(sprintf('WB orders transport error for %s (%s).', $endpoint, $exception::class));
         } finally {
             $this->logger->info('WB orders API request finished.', [
                 'companyId' => $companyId,
@@ -214,22 +218,32 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
 
         // 204 — легальный «изменений нет», а не ошибка.
         if (204 === $statusCode) {
-            return [];
+            return ['data' => [], 'shape' => []];
         }
 
         $this->classifyStatus($statusCode, $headers, $endpoint);
 
         try {
-            $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+            // Разбираем дважды: ассоциативно — ради данных, объектно — ради
+            // ФОРМЫ. json_decode(..., true) превращает и `[]`, и `{}` в один и
+            // тот же пустой массив, поэтому пустой объект вместо списка
+            // проходил бы за корректный пустой ответ. Для statistics это не
+            // безобидно: пустой ответ двигает курсор вперёд, и испорченный
+            // ответ означал бы окончательный пропуск окна.
+            //
+            // Второй разбор стоит лишнего прохода по телу; страницы заказов
+            // ограничены 1000 строк, и цена этого меньше цены пропуска.
+            $data = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+            $shape = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
             throw new MalformedConnectorResponseException(sprintf('WB %s returned invalid JSON.', $endpoint), 0, $exception);
         }
 
-        if (!is_array($decoded)) {
+        if (!is_array($data)) {
             throw new MalformedConnectorResponseException(sprintf('WB %s returned an unexpected payload.', $endpoint));
         }
 
-        return $decoded;
+        return ['data' => $data, 'shape' => $shape];
     }
 
     /**
@@ -258,24 +272,26 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     /**
      * Список ОБЪЕКТОВ, а не просто массив.
      *
-     * json_decode(..., true) отдаёт объект тем же массивом, поэтому без
-     * проверки на список ассоциативный контейнер прошёл бы за страницу, а
-     * вложенный список — за строку заказа. Счётчик строк при этом участвует в
-     * решении о продолжении пагинации.
+     * Форма берётся из объектного разбора: только он отличает пустой список от
+     * пустого объекта. Данные — из ассоциативного, потому что дальше по
+     * конвейеру ходят массивы.
      *
      * @return list<array<string, mixed>>
      */
-    private function listOfObjects(mixed $value, string $endpoint, ?string $field): array
+    private function listOfObjects(mixed $value, mixed $shape, string $endpoint, ?string $field): array
     {
         $where = null === $field ? $endpoint : sprintf('%s.%s', $endpoint, $field);
 
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!is_array($shape) || !is_array($value) || !array_is_list($value)) {
             throw new MalformedConnectorResponseException(sprintf('WB %s is not a list.', $where));
         }
 
         $rows = [];
-        foreach ($value as $row) {
-            if (!is_array($row) || [] === $row || array_is_list($row)) {
+        foreach ($value as $index => $row) {
+            // Пустой объект — тоже испорченная строка: опознать заказ в нём
+            // нечем. Проверка формы и проверка содержательности здесь обе
+            // нужны, и это та же строгость, что у Ozon-клиента.
+            if (!is_array($row) || [] === $row || !($shape[$index] ?? null) instanceof \stdClass) {
                 throw new MalformedConnectorResponseException(sprintf('WB %s contains a non-object row.', $where));
             }
 
