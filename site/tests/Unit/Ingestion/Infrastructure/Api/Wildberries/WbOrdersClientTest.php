@@ -109,7 +109,7 @@ final class WbOrdersClientTest extends TestCase
     public function testStatusesAreIndexedByOrderId(): void
     {
         $client = $this->client(new MockHttpClient(new MockResponse(
-            '{"orders":[{"id":5,"supplierStatus":"new","wbStatus":"waiting"},{"id":7,"supplierStatus":"complete","wbStatus":"sorted"}]}',
+            '{"orders":[{"id":5,"supplierStatus":"new","wbStatus":"waiting","isCancellable":true},{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}]}',
             ['http_code' => 200],
         )));
 
@@ -334,6 +334,7 @@ final class WbOrdersClientTest extends TestCase
         yield 'нет supplierStatus' => ['{"orders":[{"id":5,"wbStatus":"waiting"}]}'];
         yield 'ось не строка' => ['{"orders":[{"id":5,"supplierStatus":"new","wbStatus":7}]}'];
         yield 'isCancellable не bool' => ['{"orders":[{"id":5,"supplierStatus":"new","wbStatus":"waiting","isCancellable":"да"}]}'];
+        yield 'isCancellable отсутствует' => ['{"orders":[{"id":5,"supplierStatus":"new","wbStatus":"waiting"}]}'];
     }
 
     private function client(MockHttpClient $http): WbOrdersClient

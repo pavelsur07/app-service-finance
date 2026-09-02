@@ -601,6 +601,26 @@ final class WbOrderJoinTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: при создании статусные атрибуты сливались безусловно.
+     *
+     * Строка statistics с `isCancel = false` статуса не наблюдает, но
+     * записывала `is_cancel = false`. Пришедшее следом первое настоящее
+     * наблюдение об отмене принималось (статусной отметки-то не было) — и
+     * заказ получал противоречие: CANCELLED рядом с is_cancel = false.
+     */
+    public function testCreationWithoutStatusDoesNotRecordStatusAttributes(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertArrayNotHasKey('is_cancel', $order->getAttributes() ?? []);
+
+        // Описательное при этом записалось: оно принадлежит другой оси.
+        self::assertSame('190000', ($order->getAttributes() ?? [])['finished_price_minor'] ?? null);
+    }
+
+    /**
      * Полный снимок заказа не должен зависеть от порядка прихода потоков.
      */
     public function testCanonicalFieldsDoNotDependOnFeedOrder(): void

@@ -546,7 +546,13 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             return $length < $limitLength;
         }
 
-        return $digits <= $limit;
+        // Именно strcmp: `$digits <= $limit` для двух numeric-string PHP
+        // выполняет ЧИСЛОВОЕ сравнение и у границы BIGINT приводит операнды к
+        // float, где соседние значения перестают различаться. Тогда
+        // 9223372036854775808 прошло бы как допустимое, и вместо видимой
+        // отбраковки PostgreSQL получил бы выход за диапазон — а это ошибка
+        // записи, на которой нормализация всего батча зацикливается.
+        return strcmp($digits, $limit) <= 0;
     }
 
     private function stringOrNull(mixed $value): ?string

@@ -208,6 +208,18 @@ final readonly class NormalizeOrderRawRecordAction
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    private function initialAttributes(MappedOrder $mapped): ?array
+    {
+        $attributes = $mapped->statusObserved
+            ? array_merge($mapped->attributes, $mapped->statusAttributes)
+            : $mapped->attributes;
+
+        return [] === $attributes ? null : $attributes;
+    }
+
+    /**
      * Момент в зоне приложения — то соглашение, в котором живёт схема.
      */
     private function applicationTime(\DateTimeImmutable $instant): \DateTimeImmutable
@@ -278,11 +290,13 @@ final readonly class NormalizeOrderRawRecordAction
                 externalOrderId: $mapped->externalOrderId,
                 rawSubstatus: $mapped->rawSubstatus,
                 lastRawRecordId: $rawRecord->getId(),
-                // При создании применяются оба набора: обе оси наблюдаются
-                // впервые, и делить их ещё не от чего.
-                attributes: [] === $mapped->attributes && [] === $mapped->statusAttributes
-                    ? null
-                    : array_merge($mapped->attributes, $mapped->statusAttributes),
+                // Статусные атрибуты — только если статус реально наблюдался.
+                //
+                // Иначе строка statistics с `isCancel = false` записала бы
+                // `is_cancel = false` при непринятом статусе, и пришедшее
+                // следом первое настоящее наблюдение об отмене дало бы
+                // противоречие: status = CANCELLED рядом с is_cancel = false.
+                attributes: $this->initialAttributes($mapped),
             );
             // Отметка своей оси ставится и при создании — иначе следующее,
             // более старое наблюдение того же вида прошло бы как первое.

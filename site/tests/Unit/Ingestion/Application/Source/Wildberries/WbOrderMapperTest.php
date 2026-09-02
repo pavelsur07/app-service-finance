@@ -263,6 +263,19 @@ final class WbOrderMapperTest extends TestCase
             ['rid' => 'r-1', 'createdAt' => '2026-08-30T19:18:04Z', 'nmId' => 1, 'currencyCode' => 111],
             'unknown_currency_code',
         ];
+        // Границы BIGINT: `$digits <= $limit` для numeric-string выполняет
+        // ЧИСЛОВОЕ сравнение и у границы приводит операнды к float, где
+        // соседние значения перестают различаться.
+        yield 'копейки на единицу выше BIGINT' => [
+            WbResourceType::ORDERS_MARKETPLACE,
+            ['rid' => 'r-1', 'createdAt' => '2026-08-30T19:18:04Z', 'nmId' => 1, 'price' => '9223372036854775808'],
+            'malformed_price',
+        ];
+        yield 'рубли на копейку выше BIGINT' => [
+            WbResourceType::ORDERS_STATISTICS,
+            ['srid' => 's-1', 'date' => '2026-08-30T22:18:04', 'isCancel' => false, 'nmId' => 1, 'finishedPrice' => '92233720368547758.08'],
+            'malformed_price',
+        ];
         yield 'больше двух знаков в рублях' => [
             WbResourceType::ORDERS_STATISTICS,
             ['srid' => 's-1', 'date' => '2026-08-30T22:18:04', 'isCancel' => false, 'nmId' => 1, 'finishedPrice' => '10.999'],
@@ -396,6 +409,33 @@ final class WbOrderMapperTest extends TestCase
         $path = \dirname(__DIR__, 5).'/Fixtures/Marketplace/Orders/wb_statistics_orders.json';
 
         return json_decode((string) file_get_contents($path), true, 512, \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Ровно на границе значение допустимо: отбраковка «на всякий случай»
+     * теряла бы настоящие суммы.
+     */
+    #[DataProvider('bigintBoundaryProvider')]
+    public function testValuesExactlyOnTheBigintBoundaryAreAccepted(string $price, string $expected): void
+    {
+        $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_MARKETPLACE), [[
+            'rid' => 'r-1',
+            'createdAt' => '2026-08-30T19:18:04Z',
+            'nmId' => 1,
+            'price' => $price,
+        ]]);
+
+        self::assertSame([], $batch->skipped);
+        self::assertSame($expected, $batch->orders[0]->items[0]->priceMinor);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function bigintBoundaryProvider(): iterable
+    {
+        yield 'максимум' => ['9223372036854775807', '9223372036854775807'];
+        yield 'минимум' => ['-9223372036854775808', '-9223372036854775808'];
     }
 
     private function rawRecord(string $resourceType): IngestRawRecord
