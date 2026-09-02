@@ -65,4 +65,39 @@ final class IngestOrderTest extends TestCase
 
         self::assertSame([], $mutators, 'IngestOrderStatusEvent — append-only, публичных мутаторов быть не должно.');
     }
+
+    /**
+     * NULL означает «авторитетного снимка ещё не было», и первый снимок
+     * принимается любым: заказ мог быть создан частичным наблюдением, которое
+     * снимком не является. Заказы, заведённые до появления колонки, к этой
+     * ветке не относятся — им отметка проставлена обратным заполнением в
+     * миграции.
+     */
+    public function testFirstSnapshotIsAcceptedRegardlessOfStatusWatermark(): void
+    {
+        $order = IngestOrderBuilder::anOrder()
+            ->statusObservedAt(new \DateTimeImmutable('2026-09-01T12:00:00+00:00'))
+            ->build();
+
+        // Свежесозданный заказ отметки снимка не несёт: билдер её не задаёт,
+        // а частичное наблюдение снимком не является.
+        self::assertTrue($order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T10:00:00+00:00')));
+
+        $recorded = $order->getSnapshotObservedAt();
+        self::assertNotNull($recorded);
+        self::assertSame('2026-09-01T10:00:00+00:00', $recorded->format(\DATE_ATOM));
+    }
+
+    /**
+     * А вот дальше порядок соблюдается: устаревший снимок не переписывает
+     * более свежий.
+     */
+    public function testStaleSnapshotIsRejectedOnceTheWatermarkExists(): void
+    {
+        $order = IngestOrderBuilder::anOrder()->build();
+        $order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T12:00:00+00:00'));
+
+        self::assertFalse($order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T11:00:00+00:00')));
+        self::assertTrue($order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T13:00:00+00:00')));
+    }
 }

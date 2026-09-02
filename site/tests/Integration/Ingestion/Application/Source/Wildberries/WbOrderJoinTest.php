@@ -395,6 +395,58 @@ final class WbOrderJoinTest extends IntegrationTestCase
     }
 
     /**
+     * Гранулярность сравнения отметок — СЕКУНДА, и это зафиксировано тестом,
+     * а не подразумевается.
+     *
+     * Стандартный тип datetime_immutable пишет `Y-m-d H:i:s` независимо от
+     * точности колонки, поэтому два наблюдения внутри одной секунды считаются
+     * одновременными и побеждает обработанное последним. За пределами секунды
+     * порядок соблюдается строго — это и проверяем обеими половинами теста.
+     * Перечитывание из БД обязательно: без него сравнение шло бы по объекту в
+     * памяти, где микросекунды ещё живы, и тест утверждал бы неправду.
+     */
+    public function testObservationOrderingIsSecondGranular(): void
+    {
+        $base = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+        $this->normalizeMarketplace($base);
+        $this->em->clear();
+
+        // Внутри той же секунды — считается одновременным, побеждает поздний.
+        $this->applyPrice(111100, $base->modify('-200 microseconds'), 'sub-second');
+        self::assertSame('111100', $this->sharedItemPrice());
+
+        // На секунду раньше — уже строго устаревшее наблюдение.
+        $this->applyPrice(222200, $base->modify('-2 seconds'), 'older-second');
+        self::assertSame('111100', $this->sharedItemPrice());
+    }
+
+    private function applyPrice(int $priceMinor, \DateTimeImmutable $fetchedAt, string $key): void
+    {
+        $rows = $this->marketplaceRows();
+        foreach ($rows as $index => $row) {
+            if (self::SHARED_RID === ($row['rid'] ?? null)) {
+                $rows[$index]['price'] = $priceMinor;
+            }
+        }
+
+        ($this->action)(new NormalizeRawRecordCommand(
+            $this->storeRaw(WbResourceType::ORDERS_MARKETPLACE, 'marketplace-'.$key, $rows, $fetchedAt),
+            $this->companyId,
+        ));
+        $this->em->clear();
+    }
+
+    private function sharedItemPrice(): ?string
+    {
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+
+        return $items[array_key_first($items)]->getPriceMinor();
+    }
+
+    /**
      * Полный снимок заказа не должен зависеть от порядка прихода потоков.
      */
     public function testCanonicalFieldsDoNotDependOnFeedOrder(): void
