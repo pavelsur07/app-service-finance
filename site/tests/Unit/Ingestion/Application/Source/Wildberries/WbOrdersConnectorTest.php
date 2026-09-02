@@ -395,6 +395,27 @@ final class WbOrdersConnectorTest extends TestCase
         self::assertSame($first->rawBatch->externalId, $retry->rawBatch->externalId);
     }
 
+    /**
+     * Регрессия: на ПЕРВОМ обходе рассчитанный водяной знак игнорировался.
+     * Без курсора выражение max($fresh, $now) всегда давало «сейчас», потому
+     * что $fresh по определению не позже, — и изменения, проштампованные
+     * между фактическим максимумом и ответом, терялись бы. Ровно то, ради чего
+     * знак и считается по данным.
+     */
+    public function testFirstStatisticsRunUsesTheCalculatedWatermark(): void
+    {
+        $this->client->queueStatistics(new WbOrdersPage([
+            ['srid' => 's-1', 'lastChangeDate' => '2026-09-01T09:00:00'],
+            ['srid' => 's-2', 'lastChangeDate' => '2026-09-01T10:30:00'],
+        ], false));
+
+        $result = $this->connector->pull($this->request(WbResourceType::ORDERS_STATISTICS, null));
+
+        // 10:30 по Москве — это 07:30 UTC, заметно раньше часов 12:00.
+        $decoded = json_decode((string) $result->nextCursorValue, true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('2026-09-01T07:30:00+00:00', $decoded['since']);
+    }
+
     private function request(string $resourceType, ?string $cursorValue): PullRequest
     {
         return new PullRequest(
