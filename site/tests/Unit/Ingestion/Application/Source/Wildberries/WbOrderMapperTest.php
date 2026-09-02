@@ -86,11 +86,19 @@ final class WbOrderMapperTest extends TestCase
     /**
      * `finishedPrice` у statistics-api — в рублях, а не в копейках.
      */
-    public function testStatisticsPriceIsConvertedFromMajorUnits(): void
+    /**
+     * Цену позиции statistics не задаёт: finishedPrice — цена после всех
+     * скидок в рублях, а price маркетплейса — цена продажи в копейках. Класть
+     * их в одну колонку значило бы менять её смысл в зависимости от того,
+     * какой поток заполнил запись. Сумма не теряется — она уходит в атрибуты
+     * заказа под собственным именем.
+     */
+    public function testStatisticsKeepsFinishedPriceInAttributesNotInItemPrice(): void
     {
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $this->statisticsRows());
 
-        self::assertSame('190000', $batch->orders[0]->items[0]->priceMinor);
+        self::assertNull($batch->orders[0]->items[0]->priceMinor);
+        self::assertSame('190000', $batch->orders[0]->attributes['finished_price_minor']);
     }
 
     /**
@@ -318,7 +326,7 @@ final class WbOrderMapperTest extends TestCase
 
         $batch = (new WbOrderMapper())->map($this->rawRecord(WbResourceType::ORDERS_STATISTICS), $rows);
 
-        self::assertSame($expected, $batch->orders[0]->items[0]->priceMinor);
+        self::assertSame($expected, $batch->orders[0]->attributes['finished_price_minor']);
     }
 
     /**

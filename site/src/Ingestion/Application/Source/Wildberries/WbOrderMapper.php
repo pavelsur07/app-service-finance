@@ -263,10 +263,14 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             return 'missing_product_identity';
         }
 
-        // `finishedPrice` у statistics-api — в РУБЛЯХ (в выгрузке 1900 при
-        // цене 1900 ₽), в отличие от копеек marketplace-api.
-        $priceMinor = $this->minorFromMajor($row['finishedPrice'] ?? null);
-        if (null === $priceMinor && null !== ($row['finishedPrice'] ?? null)) {
+        // Цену позиции statistics НЕ задаёт.
+        //
+        // `finishedPrice` — цена после всех скидок в рублях, а `price`
+        // marketplace-api — цена продажи в копейках. Это разные величины, и
+        // класть их в одну колонку значило бы менять её смысл в зависимости от
+        // того, какой поток заполнил запись. Сумма не теряется: она уходит в
+        // атрибуты заказа под собственным именем.
+        if (null !== ($row['finishedPrice'] ?? null) && null === $this->minorFromMajor($row['finishedPrice'])) {
             return 'malformed_price';
         }
 
@@ -278,7 +282,7 @@ final readonly class WbOrderMapper implements OrderMapperInterface
             offerId: $article,
             barcode: $this->stringOrNull($row['barcode'] ?? null),
             name: $this->stringOrNull($row['subject'] ?? null),
-            priceMinor: $priceMinor,
+            priceMinor: null,
             // Валюта НЕ подставляется: поля валюты у statistics-api нет
             // вовсе, а «наверное, рубли» — финансовое утверждение без
             // основания. Для заказа, который есть и в marketplace, валюту даёт
@@ -361,6 +365,13 @@ final readonly class WbOrderMapper implements OrderMapperInterface
 
         if (is_bool($row['isCancel'] ?? null)) {
             $attributes['is_cancel'] = $row['isCancel'];
+        }
+
+        // Сумма из statistics живёт под собственным именем: её семантика
+        // (цена после всех скидок) отличается от цены позиции marketplace.
+        $finishedPriceMinor = $this->minorFromMajor($row['finishedPrice'] ?? null);
+        if (null !== $finishedPriceMinor) {
+            $attributes['finished_price_minor'] = $finishedPriceMinor;
         }
 
         $cancelledAt = WbOrderDateParser::parseStatisticsInstant($row['cancelDate'] ?? null);

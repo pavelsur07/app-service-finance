@@ -210,6 +210,24 @@ class IngestOrder implements TenantOwnedInterface
         return true;
     }
 
+    /**
+     * Схему задаёт только принятый авторитетный снимок.
+     *
+     * Заказ мог быть создан частичным наблюдением, которое схемы не знало и
+     * оставило {@see IngestOrderScheme::UNKNOWN}. Поток, который видит заказ
+     * целиком, обязан это исправить — иначе схема навсегда зависела бы от
+     * того, кто пришёл первым.
+     */
+    public function applyScheme(IngestOrderScheme $scheme): void
+    {
+        if ($this->scheme === $scheme) {
+            return;
+        }
+
+        $this->scheme = $scheme;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function stopRefreshing(\DateTimeImmutable $at): void
     {
         $this->refreshStoppedAt = $at;

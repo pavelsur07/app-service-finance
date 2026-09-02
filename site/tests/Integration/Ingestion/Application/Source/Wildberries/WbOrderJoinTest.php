@@ -249,6 +249,84 @@ final class WbOrderJoinTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия: атрибуты сливались безусловно. Устаревшее сырьё, не сдвинув
+     * статус, всё равно переписывало изменяемые значения — заказ оставался
+     * CANCELLED с атрибутом is_cancel=false.
+     */
+    public function testStaleObservationDoesNotRollBackMutableAttributes(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-1 hour'), cancelShared: true);
+
+        // Более старое наблюдение того же потока говорит «не отменён».
+        $this->normalizeStatistics(new \DateTimeImmutable('-3 hours'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+
+        self::assertSame(IngestOrderStatus::CANCELLED, $order->getStatus());
+        self::assertTrue($order->getAttributes()['is_cancel'] ?? null, 'Атрибут не должен откатываться устаревшим наблюдением.');
+    }
+
+    /**
+     * Регрессия: схема заказа не обновлялась авторитетным снимком. Заказ,
+     * созданный частичным наблюдением с незнакомым типом склада, навсегда
+     * оставался UNKNOWN, и результат зависел от порядка потоков.
+     */
+    public function testAuthoritativeSnapshotFixesUnknownSchemeLeftByStatistics(): void
+    {
+        // statistics с незнакомым типом склада создаёт заказ первым.
+        $rows = $this->statisticsRows();
+        foreach ($rows as $index => $row) {
+            if (self::SHARED_RID === ($row['srid'] ?? null)) {
+                $rows[$index]['warehouseType'] = 'Склад будущего';
+            }
+        }
+        $rawId = $this->storeRaw(
+            WbResourceType::ORDERS_STATISTICS,
+            'statistics-unknown-warehouse',
+            $rows,
+            new \DateTimeImmutable('-3 hours'),
+        );
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderScheme::UNKNOWN, $order->getScheme(), 'Незнакомый склад не должен угадываться.');
+
+        // Поток, который видит заказ целиком, обязан это исправить.
+        $this->normalizeMarketplace(new \DateTimeImmutable('-2 hours'));
+
+        $this->em->clear();
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::WILDBERRIES, self::CONNECTION_REF, self::SHARED_RID);
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderScheme::FBS, $order->getScheme());
+    }
+
+    /**
+     * Заказ, которого в marketplace нет, остаётся без цены позиции — но его
+     * сумма из statistics сохраняется под собственным именем и обновляется
+     * следующими наблюдениями того же потока.
+     */
+    public function testStatisticsOnlyOrderKeepsFinishedPriceInAttributes(): void
+    {
+        $this->normalizeStatistics(new \DateTimeImmutable('-2 hours'));
+
+        $order = $this->orders->findByExternalId(
+            $this->companyId,
+            IngestSource::WILDBERRIES,
+            self::CONNECTION_REF,
+            self::STATISTICS_ONLY_SRID,
+        );
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertNull($items[array_key_first($items)]->getPriceMinor(), 'Цена позиции принадлежит marketplace.');
+        self::assertSame('138100', $order->getAttributes()['finished_price_minor'] ?? null);
+    }
+
+    /**
      * Полный снимок заказа не должен зависеть от порядка прихода потоков.
      */
     public function testCanonicalFieldsDoNotDependOnFeedOrder(): void

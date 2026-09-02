@@ -292,23 +292,52 @@ final readonly class NormalizeOrderRawRecordAction
         //
         // Поэтому у снимка своя отметка. Событие журнала пишется в любом
         // случае: оно фиксирует факт наблюдения, а не текущее состояние.
-        $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
+        $statusAccepted = $order->observeStatus($mapped->rawStatus, $status, $observedAt, $mapped->rawSubstatus, $rawRecord->getId());
 
-        // Атрибуты дополняют, а не заменяют, поэтому сливаются всегда.
-        $order->mergeAttributes($mapped->attributes);
+        // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
+        // Частичное наблюдение снимком не является: оно лишь дополняет состав.
+        $snapshotAccepted = $mapped->itemsAuthoritative && $order->acceptSnapshot($observedAt);
 
-        // externalOrderId приходит только из авторитетного потока и не
-        // меняется во времени, поэтому порядок наблюдений ему безразличен.
-        if (null !== $mapped->externalOrderId) {
+        // Атрибуты сливаются только из ПРИНЯТОГО наблюдения.
+        //
+        // Среди них есть изменяемые: is_cancel, supplier_status, wb_status,
+        // is_cancellable. Безусловное слияние означало бы, что устаревшее
+        // сырьё, не сдвинув статус, всё равно перепишет их — заказ остался бы
+        // CANCELLED с атрибутом is_cancel=false. Пропустить статичный атрибут
+        // из старой записи не так дорого, как показать неверный.
+        if ($statusAccepted || $snapshotAccepted) {
+            $order->mergeAttributes($mapped->attributes);
+        }
+
+        // Номер заказа задаёт принятый авторитетный снимок. Заполнить пустое
+        // можно и из отклонённого наблюдения: номер во времени не меняется, а
+        // пустое поле хуже старого значения.
+        if (null !== $mapped->externalOrderId && ($snapshotAccepted || null === $order->getExternalOrderId())) {
             $order->setExternalOrderId($mapped->externalOrderId);
         }
 
-        // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
-        // Частичное наблюдение снимком не является: оно лишь дополняет состав
-        // и потому применяется всегда, ничего не переписывая.
-        if ($mapped->itemsAuthoritative && !$order->acceptSnapshot($observedAt)) {
+        if (!$mapped->itemsAuthoritative) {
+            // Частичное наблюдение доходит сюда, чтобы дополнить состав
+            // недостающими позициями, ничего не переписывая.
+            $applied = $this->applyItems(
+                $order,
+                $mapped,
+                $knownItems[$order->getId()] ?? [],
+                $resolutions,
+                $orderIndex,
+            );
+            $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
+
             return $order;
         }
+
+        if (!$snapshotAccepted) {
+            return $order;
+        }
+
+        // Схему задаёт только принятый авторитетный снимок: заказ мог быть
+        // создан частичным наблюдением, которое схемы не знало.
+        $order->applyScheme($mapped->scheme);
 
         $applied = $this->applyItems(
             $order,
@@ -324,11 +353,8 @@ final readonly class NormalizeOrderRawRecordAction
         $knownItems[$order->getId()] = $applied + ($knownItems[$order->getId()] ?? []);
 
         // Вычистка исчезнувших позиций опирается ТОЛЬКО на полные снимки.
-        // Частичное наблюдение не видит состава заказа целиком, и считать его
-        // снимком значило бы удалить всё, о чём оно просто не знает.
-        if ($mapped->itemsAuthoritative) {
-            $currentItems[$order->getId()] = $applied;
-        }
+        // Частичное наблюдение сюда не доходит: оно вернулось выше.
+        $currentItems[$order->getId()] = $applied;
 
         return $order;
     }
