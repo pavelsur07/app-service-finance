@@ -142,4 +142,53 @@ final class IngestOrderTest extends TestCase
         self::assertFalse($order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T11:00:00+00:00')));
         self::assertTrue($order->acceptSnapshot(new \DateTimeImmutable('2026-09-01T13:00:00+00:00')));
     }
+
+    /**
+     * Отметка изменения не едет назад НИ ПОСЛЕ ОДНОГО мутатора.
+     *
+     * Часы прогона инжектируются и могут опережать системные — так и работает
+     * `AdvancingClock` в интеграционных тестах. Достаточно одного мутатора,
+     * пишущего «системное сейчас» напрямую, чтобы отметка, поставленная от
+     * инжектированных часов, откатилась, и выборка «что изменилось после
+     * момента X» перестала видеть только что обновлённый заказ.
+     *
+     * Проверяются оба пути наблюдения: сам статус и слияние атрибутов.
+     */
+    public function testUpdatedAtNeverGoesBackwardsAfterAnyMutator(): void
+    {
+        $order = IngestOrderBuilder::anOrder()->build();
+
+        // Часы прогона впереди системных: ровно то, что делает AdvancingClock.
+        $ahead = new \DateTimeImmutable('+1 hour');
+        $order->markRefreshAttempted($ahead);
+
+        self::assertSame($ahead->format('U.u'), $order->getUpdatedAt()->format('U.u'));
+
+        $order->observeStatus(
+            'delivered',
+            IngestOrderStatus::DELIVERED,
+            new \DateTimeImmutable('+2 hours'),
+            null,
+            null,
+        );
+        self::assertGreaterThanOrEqual(
+            $ahead,
+            $order->getUpdatedAt(),
+            'Наблюдение статуса не имеет права откатить отметку изменения.',
+        );
+
+        $order->mergeAttributes(['warehouse' => 'новый склад']);
+        self::assertGreaterThanOrEqual(
+            $ahead,
+            $order->getUpdatedAt(),
+            'Слияние атрибутов — тоже мутатор, и правило для него то же.',
+        );
+
+        $order->stopRefreshing(new \DateTimeImmutable('-1 hour'));
+        self::assertGreaterThanOrEqual(
+            $ahead,
+            $order->getUpdatedAt(),
+            'Даже операция, датированная прошлым, отметку назад не двигает.',
+        );
+    }
 }

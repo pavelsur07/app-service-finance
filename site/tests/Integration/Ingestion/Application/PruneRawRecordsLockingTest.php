@@ -587,6 +587,7 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                 self::getContainer()->get(RawStoragePathBuilder::class),
                 $this->em,
                 self::getContainer()->get(ManagerRegistry::class),
+                new NullLogger(),
             );
 
             $blocked = false;

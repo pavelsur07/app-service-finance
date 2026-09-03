@@ -252,7 +252,7 @@ class IngestOrder implements TenantOwnedInterface
         $this->statusObservedAt = $observedAt;
         $this->rawSubstatus = $rawSubstatus ?? $this->rawSubstatus;
         $this->lastRawRecordId = $rawRecordId ?? $this->lastRawRecordId;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
 
         return true;
     }
@@ -292,7 +292,7 @@ class IngestOrder implements TenantOwnedInterface
 
         $this->snapshotObservedAt = $observedAt;
         $this->snapshotRawRecordId = $rawRecordId ?? $this->snapshotRawRecordId;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
 
         return true;
     }
@@ -312,7 +312,7 @@ class IngestOrder implements TenantOwnedInterface
         }
 
         $this->scheme = $scheme;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
     }
 
     /**
@@ -329,7 +329,7 @@ class IngestOrder implements TenantOwnedInterface
 
         $this->partialObservedAt = $observedAt;
         $this->partialRawRecordId = $rawRecordId ?? $this->partialRawRecordId;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
 
         return true;
     }
@@ -434,10 +434,21 @@ class IngestOrder implements TenantOwnedInterface
         $this->updatedAt = max($this->updatedAt, $at);
     }
 
+    /**
+     * Отметка изменения ставится ТОЛЬКО через {@see touch()} — всеми
+     * мутаторами без исключения.
+     *
+     * Часы прогона инжектируются и могут опережать системные, поэтому
+     * «системное время сейчас» — не гарантированно более поздний момент.
+     * Достаточно одного мутатора, пишущего `new DateTimeImmutable()` напрямую,
+     * чтобы отметка уехала назад после уже проставленной отметки попытки, и
+     * выборка «что изменилось после момента X» перестала видеть только что
+     * обновлённый заказ.
+     */
     public function setExternalOrderId(?string $externalOrderId): void
     {
         $this->externalOrderId = $externalOrderId;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
     }
 
     /**
@@ -450,7 +461,7 @@ class IngestOrder implements TenantOwnedInterface
         }
 
         $this->attributes = array_merge($this->attributes ?? [], $attributes);
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->touch(new \DateTimeImmutable());
     }
 
     public function getId(): string

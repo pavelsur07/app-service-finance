@@ -21,6 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class StoreRawBatchActionTest extends TestCase
 {
@@ -33,7 +34,22 @@ final class StoreRawBatchActionTest extends TestCase
         yield 'строка исчезла' => [false];
     }
 
-    public function testConcurrentDuplicateInsertReturnsExistingRecordAfterUniqueViolation(): void
+    /**
+     * Что делать с уже записанным объектом, когда `flush()` не прошёл.
+     *
+     * Две ветки одного решения, поэтому и тест один. Нарушение уникального
+     * индекса — не сбой: конкурент создал строку на то же сырьё, путь у неё
+     * тот же (он строится из хеша содержимого), и объект остаётся. Любое
+     * другое падение означает, что строки не появилось и не появится: объект
+     * надо убрать здесь же, потому что только это место знает путь ДО
+     * `flush()`. Вызывающий получает путь из возвращённой записи, то есть уже
+     * после успешного `flush()`, и о падении внутри него узнать неоткуда —
+     * сирота осталась бы навсегда, ведь retention ищет кандидатов среди строк.
+     *
+     * @param bool $concurrentDuplicate дубль конкурента или настоящий сбой
+     */
+    #[DataProvider('flushFailureProvider')]
+    public function testFlushFailureKeepsTheObjectOnlyForAConcurrentDuplicate(bool $concurrentDuplicate): void
     {
         $companyId = '11111111-1111-7111-8111-111111111111';
         $resourceType = 'seller-report';
@@ -76,7 +92,7 @@ final class StoreRawBatchActionTest extends TestCase
             ->willReturn(null);
 
         $duplicateLookupCalls = 0;
-        $repository->expects(self::exactly(2))
+        $repository->expects(self::exactly($concurrentDuplicate ? 2 : 1))
             ->method('findOneByCompanySourceExternalIdAndHash')
             ->willReturnCallback(
                 function (
@@ -110,7 +126,7 @@ final class StoreRawBatchActionTest extends TestCase
         // снимало отметки, пока retention удаляет тот же объект.
         $calls = [];
 
-        $repository->expects(self::once())
+        $repository->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('findOneForUpdate')
             ->with($companyId, $existingRecord->getId())
             ->willReturnCallback(static function () use (&$calls, $existingRecord): IngestRawRecord {
@@ -119,14 +135,21 @@ final class StoreRawBatchActionTest extends TestCase
                 return $existingRecord;
             });
 
+        $deleted = null;
+
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('exists')
             ->with('existing-path.ndjson.gz')
             ->willReturnCallback(static function () use (&$calls): bool {
                 $calls[] = 'storage';
 
                 return true;
+            });
+        $objectStorage->expects($concurrentDuplicate ? self::never() : self::once())
+            ->method('delete')
+            ->willReturnCallback(static function (string $path) use (&$deleted): void {
+                $deleted = $path;
             });
         $objectStorage->expects(self::once())
             ->method('write')
@@ -140,15 +163,17 @@ final class StoreRawBatchActionTest extends TestCase
             )
             ->willReturnCallback(static fn (string $path, string $payload): StoredObject => new StoredObject($path, strlen($payload)));
 
-        $uniqueViolation = new UniqueConstraintViolationException(
-            new class('Duplicate raw record') extends \Exception implements DriverException {
-                public function getSQLState(): string
-                {
-                    return '23505';
-                }
-            },
-            null,
-        );
+        $failure = $concurrentDuplicate
+            ? new UniqueConstraintViolationException(
+                new class('Duplicate raw record') extends \Exception implements DriverException {
+                    public function getSQLState(): string
+                    {
+                        return '23505';
+                    }
+                },
+                null,
+            )
+            : new \RuntimeException('database is unavailable');
 
         $flushCalls = 0;
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -161,17 +186,17 @@ final class StoreRawBatchActionTest extends TestCase
         $entityManager->expects(self::never())->method('clear');
         $entityManager->expects(self::once())
             ->method('flush')
-            ->willReturnCallback(static function () use (&$flushCalls, $uniqueViolation): void {
+            ->willReturnCallback(static function () use (&$flushCalls, $failure): void {
                 ++$flushCalls;
 
                 if (1 === $flushCalls) {
-                    throw $uniqueViolation;
+                    throw $failure;
                 }
             });
-        $entityManager->expects(self::once())->method('isOpen')->willReturn(false);
+        $entityManager->expects($concurrentDuplicate ? self::once() : self::never())->method('isOpen')->willReturn(false);
 
         $recoveredEntityManager = $this->createMock(EntityManagerInterface::class);
-        $recoveredEntityManager->expects(self::once())
+        $recoveredEntityManager->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('getRepository')
             ->with(IngestRawRecord::class)
             ->willReturn($repository);
@@ -184,7 +209,7 @@ final class StoreRawBatchActionTest extends TestCase
         $recoveredEntityManager->expects(self::never())->method('flush');
 
         $managerRegistry = $this->createMock(ManagerRegistry::class);
-        $managerRegistry->expects(self::once())
+        $managerRegistry->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('resetManager')
             ->willReturn($recoveredEntityManager);
 
@@ -195,13 +220,37 @@ final class StoreRawBatchActionTest extends TestCase
             new RawStoragePathBuilder(new PathSegmentNormalizer()),
             $entityManager,
             $managerRegistry,
+            new NullLogger(),
         );
+
+        if (!$concurrentDuplicate) {
+            try {
+                $action($batch);
+                self::fail('Настоящий сбой обязан выйти наружу.');
+            } catch (\RuntimeException) {
+                // Ожидаемо: падение и есть предмет проверки.
+            }
+
+            self::assertNotNull($deleted, 'Объект без строки обязан быть убран.');
+            self::assertStringContainsString('/seller-report/', $deleted);
+
+            return;
+        }
 
         $records = $action($batch);
 
         self::assertSame([$existingRecord], $records);
         self::assertGreaterThan($originalLastSeenAt, $existingRecord->getLastSeenAt());
         self::assertSame(['lock', 'storage'], $calls, 'К хранилищу нельзя идти раньше блокировки строки.');
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function flushFailureProvider(): iterable
+    {
+        yield 'дубль конкурента' => [true];
+        yield 'настоящий сбой' => [false];
     }
 
     /**
@@ -300,6 +349,7 @@ final class StoreRawBatchActionTest extends TestCase
             new RawStoragePathBuilder(new PathSegmentNormalizer()),
             $entityManager,
             $managerRegistry,
+            new NullLogger(),
         );
 
         if (!$rowSurvives) {

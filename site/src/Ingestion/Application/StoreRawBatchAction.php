@@ -15,6 +15,7 @@ use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\LoggerInterface;
 
 final readonly class StoreRawBatchAction
 {
@@ -25,6 +26,7 @@ final readonly class StoreRawBatchAction
         private RawStoragePathBuilder $pathBuilder,
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $managerRegistry,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -106,10 +108,45 @@ final readonly class StoreRawBatchAction
         try {
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException $exception) {
+            // Объект остаётся: конкурент создал строку на то же сырьё, и
+            // восстановление ниже пользуется ЕГО путём. Наш собственный путь
+            // при этом совпадает с чужим — он строится из хеша содержимого.
             return [$this->recoverConcurrentDuplicate($batch, $hash, $ndjson, $exception)];
+        } catch (\Throwable $exception) {
+            // Объект записан, строки нет и не будет.
+            //
+            // Компенсация живёт ЗДЕСЬ, а не у вызывающего: только это место
+            // знает путь сразу после записи, до `flush()`. Вызывающий получает
+            // путь из возвращённой записи, то есть уже после успешного
+            // `flush()`, и о падении внутри него узнать неоткуда — сирота
+            // оставалась бы навсегда, потому что retention ищет кандидатов
+            // среди СТРОК.
+            $this->discardOrphanedObject($storedObject->path);
+
+            throw $exception;
         }
 
         return [$record];
+    }
+
+    /**
+     * Убрать объект, чьей строки не появилось.
+     *
+     * Не удалось — не беда для данных, но место занято, и путь обязан уйти в
+     * лог: найти такой объект по базе невозможно, строки-то нет.
+     */
+    private function discardOrphanedObject(string $storagePath): void
+    {
+        try {
+            $this->objectStorage->delete($storagePath);
+        } catch (\Exception $exception) {
+            $this->logger->error('Raw object was left in storage without its record; it has to be removed by hand.', [
+                'storagePath' => $storagePath,
+                // Класс, а не сообщение: в тексте ошибок хранилища встречаются
+                // URL с учётными данными.
+                'exceptionClass' => $exception::class,
+            ]);
+        }
     }
 
     /**
