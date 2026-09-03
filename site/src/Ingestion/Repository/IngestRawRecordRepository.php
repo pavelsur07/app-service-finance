@@ -263,7 +263,12 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
         $records = $this->createQueryBuilder('record')
             ->andWhere('record.payloadPrunedAt IS NOT NULL')
             ->andWhere('record.payloadDeletedAt IS NULL')
-            ->orderBy('record.payloadPrunedAt', 'ASC')
+            // Ни разу не пробованные первыми, затем по давности попытки:
+            // иначе неустранимый объект вечно занимал бы начало очереди, а
+            // остальные не обрабатывались бы никогда.
+            ->addSelect('CASE WHEN record.payloadDeletionAttemptedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN attemptRank')
+            ->orderBy('attemptRank', 'ASC')
+            ->addOrderBy('record.payloadDeletionAttemptedAt', 'ASC')
             ->addOrderBy('record.id', 'ASC')
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()

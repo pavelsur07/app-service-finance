@@ -15,11 +15,13 @@ use App\Ingestion\Exception\RawPayloadPrunedException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\Connection;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class PruneRawRecordsActionTest extends IntegrationTestCase
@@ -167,7 +169,7 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
                 {
                 }
 
-                public function write(string $path, string $contents): \App\Shared\Service\Storage\StoredObject
+                public function write(string $path, string $contents): StoredObject
                 {
                     return $this->inner->write($path, $contents);
                 }
@@ -472,6 +474,111 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $cancelled = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
         self::assertNotNull($cancelled);
         self::assertNull($cancelled->getPayloadPrunedAt(), 'Решение отменяется целиком, а не откладывается.');
+    }
+
+    /**
+     * Решение отменяется только при ЖИВОМ объекте.
+     *
+     * Состояние «решение принято, объект уже удалён, коммит не прошёл»
+     * достижимо. Слепая отмена вернула бы запись к виду «нагрузка есть» при
+     * отсутствующем объекте: чтение падало бы ошибкой хранилища, а проблема
+     * всё равно осталась бы без доказательства — только теперь молча.
+     */
+    public function testCancellationDoesNotResurrectAPayloadThatIsAlreadyGone(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Прежний прогон удалил объект, но отметку удаления не закоммитил.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+        $this->storage->delete($record['path']);
+
+        // И только теперь появилась проблема, которой нужна эта нагрузка.
+        $this->em->persist(new NormalizationIssue(
+            $this->companyId,
+            $record['id'],
+            null,
+            NormalizationIssueKind::MAPPER_FAILURE,
+            [],
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        $this->em->clear();
+        $closed = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
+        self::assertNotNull($closed);
+        self::assertNotNull($closed->getPayloadPrunedAt(), 'Запись не должна утверждать, что нагрузка вернулась.');
+        self::assertNotNull($closed->getPayloadDeletedAt(), 'Состояние закрывается честно, а не остаётся недоделанным.');
+    }
+
+    /**
+     * Неустранимый объект не занимает очередь навсегда.
+     *
+     * Очередь незавершённых сортируется по времени ПОПЫТКИ: без этой отметки
+     * неудачная попытка ключ сортировки не меняет, и запись, которую нельзя
+     * удалить, вечно занимала бы начало.
+     */
+    public function testFailedDeletionYieldsItsPlaceInTheQueue(): void
+    {
+        $stubborn = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $stubborn['id']],
+        );
+        $this->em->clear();
+
+        $action = new PruneRawRecordsAction(
+            $this->rawRecords,
+            new class($this->storage) implements ObjectStorageInterface {
+                public function __construct(private readonly ObjectStorageInterface $inner)
+                {
+                }
+
+                public function write(string $path, string $contents): StoredObject
+                {
+                    return $this->inner->write($path, $contents);
+                }
+
+                public function read(string $path): string
+                {
+                    return $this->inner->read($path);
+                }
+
+                public function readStream(string $path)
+                {
+                    return $this->inner->readStream($path);
+                }
+
+                public function exists(string $path): bool
+                {
+                    return $this->inner->exists($path);
+                }
+
+                public function delete(string $path): void
+                {
+                    throw new \RuntimeException('storage is unavailable');
+                }
+            },
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
+        );
+
+        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        self::assertSame(1, $result->orphanedObjects);
+
+        $this->em->clear();
+        $attempted = $this->rawRecords->findByIdAndCompany($stubborn['id'], $this->companyId);
+        self::assertNotNull($attempted);
+        self::assertNotNull(
+            $attempted->getPayloadDeletionAttemptedAt(),
+            'Без отметки попытки запись вечно занимала бы начало очереди.',
+        );
     }
 
     /**

@@ -102,25 +102,45 @@ final readonly class PruneRawRecordsAction
             return $result;
         }
 
-        // ФАЗА 1: решение. Отметка коммитится ДО любого обращения к хранилищу.
-        foreach (array_chunk(
-            array_map(static fn (IngestRawRecord $record): string => $record->getId(), $records),
-            self::CHUNK,
-        ) as $chunk) {
-            $result = $result->with(prunedPayloads: $this->markChunk($chunk, $notSeenSince));
-        }
+        // Незавершённое СНАЧАЛА, и из общего бюджета прогона.
+        //
+        // Иначе очередь голодает: каждый прогон помечал бы до `limit` новых
+        // записей, а до накопленного backlog очередь доходила бы всё позже.
+        $budget = $command->limit;
+        $pending = $this->rawRecordRepository->findPendingPayloadDeletion($budget);
 
-        // ФАЗА 2: исполнение. Берутся ВСЕ записи с принятым решением, включая
-        // оставшиеся от прежних прогонов: без этого объект, до которого прогон
-        // не дошёл, остался бы в хранилище навсегда — кандидатов ищут среди
-        // непомеченных, и такая строка туда уже не попадает.
         foreach (array_chunk(
-            array_map(
-                static fn (IngestRawRecord $record): string => $record->getId(),
-                $this->rawRecordRepository->findPendingPayloadDeletion($command->limit),
-            ),
+            array_map(static fn (IngestRawRecord $record): string => $record->getId(), $pending),
             self::DELETION_CHUNK,
         ) as $chunk) {
+            $result = $this->deleteChunk($result, $chunk);
+        }
+
+        $budget -= count($pending);
+        if ($budget <= 0) {
+            $this->logger->info('Raw payload prune finished.', $this->context($command, $notSeenSince, $result));
+
+            return $result;
+        }
+
+        // ФАЗА 1: решение. Отметка коммитится ДО любого обращения к хранилищу.
+        $decided = [];
+
+        foreach (array_chunk(
+            array_slice(
+                array_map(static fn (IngestRawRecord $record): string => $record->getId(), $records),
+                0,
+                $budget,
+            ),
+            self::CHUNK,
+        ) as $chunk) {
+            [$marked, $lateHolds] = $this->markChunk($chunk, $notSeenSince);
+            $decided = [...$decided, ...$marked];
+            $result = $result->with(prunedPayloads: count($marked), heldByIssues: $lateHolds);
+        }
+
+        // ФАЗА 2: исполнение решений, принятых ТОЛЬКО ЧТО.
+        foreach (array_chunk($decided, self::DELETION_CHUNK) as $chunk) {
             $result = $this->deleteChunk($result, $chunk);
         }
 
@@ -133,12 +153,15 @@ final readonly class PruneRawRecordsAction
      * Фаза 1: пометить кандидатов чанком, одной транзакцией и без сети.
      *
      * @param list<string> $chunk
+     *
+     * @return array{0: list<string>, 1: int} помеченные идентификаторы и число поздно обнаруженных удержаний
      */
-    private function markChunk(array $chunk, \DateTimeImmutable $notSeenSince): int
+    private function markChunk(array $chunk, \DateTimeImmutable $notSeenSince): array
     {
-        $marked = 0;
+        $marked = [];
+        $lateHolds = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, &$marked): void {
+        $this->entityManager->wrapInTransaction(function () use ($chunk, $notSeenSince, &$marked, &$lateHolds): void {
             $locked = $this->rawRecordRepository->findManyPrunableForUpdate($chunk, $notSeenSince);
 
             // Удержание перепроверяется УЖЕ ПОД блокировкой и отдельным
@@ -149,6 +172,7 @@ final readonly class PruneRawRecordsAction
                 array_map(static fn (IngestRawRecord $record): string => $record->getId(), $locked),
             ));
 
+            $lateHolds = count($held);
             $now = $this->applicationTime();
 
             foreach ($locked as $record) {
@@ -157,11 +181,17 @@ final readonly class PruneRawRecordsAction
                 }
 
                 $record->markPayloadPruned($now);
-                ++$marked;
+                $marked[] = $record->getId();
             }
         });
 
-        return $marked;
+        if ($lateHolds > 0) {
+            $this->logger->warning('Raw payloads became evidence for issues after they were selected.', [
+                'records' => $lateHolds,
+            ]);
+        }
+
+        return [$marked, $lateHolds];
     }
 
     /**
@@ -178,8 +208,10 @@ final readonly class PruneRawRecordsAction
     {
         $freed = 0;
         $orphaned = 0;
+        $cancelled = 0;
+        $evidenceLost = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk, &$freed, &$orphaned): void {
+        $this->entityManager->wrapInTransaction(function () use ($chunk, &$freed, &$orphaned, &$cancelled, &$evidenceLost): void {
             $locked = $this->rawRecordRepository->findPendingPayloadDeletionForUpdate($chunk);
             if ([] === $locked) {
                 return;
@@ -187,33 +219,40 @@ final readonly class PruneRawRecordsAction
 
             // Удержание перепроверяется и ЗДЕСЬ, а не только при решении.
             // Между фазами проходит время, и проблема, заведённая в этом
-            // промежутке, осталась бы без своей нагрузки. Решение по такой
-            // записи отменяется целиком: она снова становится обычной, и
-            // следующий прогон рассмотрит её заново, когда проблему разберут.
+            // промежутке, осталась бы без своей нагрузки.
             $held = array_flip($this->rawRecordRepository->filterHeldByUnresolvedIssues(
                 array_map(static fn (IngestRawRecord $record): string => $record->getId(), $locked),
             ));
 
-            if ([] !== $held) {
-                $this->logger->warning('Prune decision cancelled: an issue now needs this payload as evidence.', [
-                    'records' => count($held),
-                ]);
+            $now = $this->applicationTime();
+            $pending = [];
+
+            foreach ($locked as $record) {
+                if (!isset($held[$record->getId()])) {
+                    $pending[] = $record;
+
+                    continue;
+                }
+
+                // Отменять решение можно ТОЛЬКО если нагрузка ещё на месте.
+                //
+                // Состояние «решение принято, объект уже удалён, коммит не
+                // прошёл» достижимо, и слепая отмена вернула бы запись к виду
+                // «нагрузка есть» при отсутствующем объекте: чтение падало бы
+                // ошибкой хранилища, а проблема всё равно осталась бы без
+                // доказательства — только теперь молча.
+                if ($this->objectStorage->exists($record->getStoragePath())) {
+                    $record->markPayloadRestored();
+                    ++$cancelled;
+
+                    continue;
+                }
+
+                $record->markPayloadDeleted($now);
+                ++$evidenceLost;
             }
 
-            $locked = array_values(array_filter(
-                $locked,
-                static function (IngestRawRecord $record) use ($held): bool {
-                    if (isset($held[$record->getId()])) {
-                        $record->markPayloadRestored();
-
-                        return false;
-                    }
-
-                    return true;
-                },
-            ));
-
-            if ([] === $locked) {
+            if ([] === $pending) {
                 return;
             }
 
@@ -223,22 +262,31 @@ final readonly class PruneRawRecordsAction
             $this->logger->info('Raw objects are about to be deleted.', [
                 'storagePaths' => array_map(
                     static fn (IngestRawRecord $record): string => $record->getStoragePath(),
-                    $locked,
+                    $pending,
                 ),
             ]);
 
-            $now = $this->applicationTime();
+            foreach ($pending as $record) {
+                // Попытка засчитывается независимо от исхода: очередь
+                // незавершённых сортируется по ней, и без отметки неустранимый
+                // объект вечно занимал бы её начало.
+                $record->markPayloadDeletionAttempted($now);
 
-            foreach ($locked as $record) {
                 try {
+                    // Наличие проверяется ДО удаления, чтобы не отчитаться об
+                    // освобождённом месте дважды: повтор после сбоя коммита
+                    // подтверждает отсутствие, а не освобождает что-то ещё.
+                    $existed = $this->objectStorage->exists($record->getStoragePath());
+
                     $this->objectStorage->delete($record->getStoragePath());
                     $record->markPayloadDeleted($now);
-                    $freed += $record->getByteSize();
+
+                    if ($existed) {
+                        $freed += $record->getByteSize();
+                    }
                 } catch (\Throwable $exception) {
                     // Отметка решения остаётся, отметка удаления — нет:
                     // следующий прогон найдёт эту запись и повторит попытку.
-                    // Объект пока занимает место, и его размер в освобождённые
-                    // не идёт.
                     //
                     // Уровень WARNING, а не ERROR: состояние повторяемо и
                     // лечится следующим прогоном, а будить человека на
@@ -257,7 +305,25 @@ final readonly class PruneRawRecordsAction
             }
         });
 
-        return $result->with(bytesFreed: $freed, orphanedObjects: $orphaned);
+        if ($cancelled > 0) {
+            $this->logger->warning('Prune decision cancelled: an issue now needs this payload as evidence.', [
+                'records' => $cancelled,
+            ]);
+        }
+
+        if ($evidenceLost > 0) {
+            // Не самолечится: нагрузки уже нет, и проблему придётся разбирать
+            // без неё. Молчать об этом нельзя.
+            $this->logger->error('Issue needs a payload that was already deleted; the record is closed as pruned.', [
+                'records' => $evidenceLost,
+            ]);
+        }
+
+        return $result->with(
+            bytesFreed: $freed,
+            heldByIssues: $cancelled + $evidenceLost,
+            orphanedObjects: $orphaned,
+        );
     }
 
     private function applicationTime(): \DateTimeImmutable

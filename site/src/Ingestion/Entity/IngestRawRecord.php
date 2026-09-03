@@ -93,6 +93,17 @@ class IngestRawRecord implements TenantOwnedInterface
     #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
     private ?\DateTimeImmutable $payloadDeletedAt = null;
 
+    /**
+     * Когда попытку удаления предпринимали в последний раз.
+     *
+     * Очередь незавершённых удалений сортируется по ней, иначе голодает:
+     * она всегда брала бы самые старые решения, а неудачная попытка ключ
+     * сортировки не меняет — `limit` неустранимых объектов навсегда закрыл бы
+     * дорогу остальным.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadDeletionAttemptedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
@@ -242,6 +253,16 @@ class IngestRawRecord implements TenantOwnedInterface
     public function markPayloadDeleted(\DateTimeImmutable $at): void
     {
         $this->payloadDeletedAt = $at;
+        $this->payloadDeletionAttemptedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Попытку предпринимали — независимо от исхода.
+     */
+    public function markPayloadDeletionAttempted(\DateTimeImmutable $at): void
+    {
+        $this->payloadDeletionAttemptedAt = $at;
         $this->updatedAt = $at;
     }
 
@@ -259,6 +280,7 @@ class IngestRawRecord implements TenantOwnedInterface
 
         $this->payloadPrunedAt = null;
         $this->payloadDeletedAt = null;
+        $this->payloadDeletionAttemptedAt = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -270,6 +292,11 @@ class IngestRawRecord implements TenantOwnedInterface
     public function getPayloadDeletedAt(): ?\DateTimeImmutable
     {
         return $this->payloadDeletedAt;
+    }
+
+    public function getPayloadDeletionAttemptedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadDeletionAttemptedAt;
     }
 
     public function markNormalizationDone(): void

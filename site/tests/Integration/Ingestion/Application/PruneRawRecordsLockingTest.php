@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\PruneRawRecordsAction;
+use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\PruneRawRecordsCommand;
+use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
+use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
@@ -231,6 +234,64 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
             $restored,
             'Возврат нагрузки обязан ждать: иначе отметка снимется, а объект будет удалён следом.',
         );
+    }
+
+    /**
+     * Настоящий `RecordNormalizationIssueAction` обязан ждать чужую блокировку
+     * строки сырья — это вторая половина протокола с retention.
+     *
+     * Проверяется в обратную сторону: блокировку держит отдельное соединение,
+     * а Action работает на основном. Так тест не зависит от того, какой
+     * EntityManager раздаёт репозитории, и краснеет ровно при снятии
+     * блокировки внутри Action.
+     */
+    public function testRecordingAnIssueWaitsForALockedRawRecord(): void
+    {
+        $rawRecordId = $this->seedStaleRawRecord();
+        $companyId = (string) $this->connection->fetchOne(
+            'SELECT company_id FROM ingest_raw_records WHERE id = :id',
+            ['id' => $rawRecordId],
+        );
+
+        $holder = $this->newConnection();
+        $holder->beginTransaction();
+        $holder->executeQuery('SELECT id FROM ingest_raw_records WHERE id = :id FOR UPDATE', ['id' => $rawRecordId]);
+
+        try {
+            // Иначе Action ждал бы держателя до конца теста.
+            $this->connection->executeStatement("SET lock_timeout = '250ms'");
+
+            $action = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+            $blocked = false;
+
+            try {
+                $action(new RecordNormalizationIssueCommand(
+                    companyId: $companyId,
+                    rawRecordId: $rawRecordId,
+                    operationGroupId: null,
+                    kind: NormalizationIssueKind::MAPPER_FAILURE,
+                    details: [],
+                ));
+            } catch (\Throwable) {
+                $blocked = true;
+            }
+
+            self::assertTrue($blocked, 'Создание проблемы обязано брать ту же блокировку, что и retention.');
+
+            self::assertSame(
+                0,
+                (int) $holder->fetchOne(
+                    'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                    ['id' => $rawRecordId],
+                ),
+                'Проблема не должна появиться в обход блокировки.',
+            );
+        } finally {
+            $this->connection->executeStatement('SET lock_timeout = 0');
+            $holder->rollBack();
+            $holder->close();
+        }
     }
 
     private function seedStaleRawRecord(): string

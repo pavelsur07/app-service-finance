@@ -33,7 +33,11 @@ use Doctrine\Migrations\AbstractMigration;
  * - `payload_pruned_at` — РЕШЕНИЕ удалить, коммитится ДО обращения к
  *   хранилищу. Читатели с этого момента считают нагрузку недоступной;
  * - `payload_deleted_at` — объект действительно удалён, ставится после
- *   успешного `delete()`.
+ *   успешного `delete()`;
+ * - `payload_deletion_attempted_at` — когда попытку предпринимали в последний
+ *   раз. Без неё очередь незавершённых удалений голодает: она всегда берёт
+ *   самые старые решения, а неудачная попытка ключ сортировки не меняет, и
+ *   `limit` неустранимых объектов навсегда закрыл бы дорогу остальным.
  *
  * Одной отметки не хватает: она проставляется в памяти, а коммит происходит
  * после удаления объекта, и падение между ними откатывало бы решение при уже
@@ -55,6 +59,9 @@ final class Version20260902180000 extends AbstractMigration
 
         $this->addSql('ALTER TABLE ingest_raw_records ADD payload_deleted_at TIMESTAMP(6) WITHOUT TIME ZONE DEFAULT NULL');
         $this->addSql("COMMENT ON COLUMN ingest_raw_records.payload_deleted_at IS '(DC2Type:datetime_immutable_us)'");
+
+        $this->addSql('ALTER TABLE ingest_raw_records ADD payload_deletion_attempted_at TIMESTAMP(6) WITHOUT TIME ZONE DEFAULT NULL');
+        $this->addSql("COMMENT ON COLUMN ingest_raw_records.payload_deletion_attempted_at IS '(DC2Type:datetime_immutable_us)'");
     }
 
     public function down(Schema $schema): void
@@ -75,6 +82,7 @@ final class Version20260902180000 extends AbstractMigration
             ),
         );
 
+        $this->addSql('ALTER TABLE ingest_raw_records DROP payload_deletion_attempted_at');
         $this->addSql('ALTER TABLE ingest_raw_records DROP payload_deleted_at');
         $this->addSql('ALTER TABLE ingest_raw_records DROP payload_pruned_at');
     }
