@@ -105,7 +105,12 @@ jobs:
                       exit 1
                     fi
 
-                    if [ "$PRODUCTION_ACTION" = 'deploy' ]; then
+                    # Оба production-действия тянут образы по SHA текущего HEAD, и
+                    # образ обязан существовать. Push-сборка этого не гарантирует:
+                    # docs-only merge после кодового пропускает build-and-push по
+                    # path-фильтру, и HEAD остаётся без образов — `migrations` падал на
+                    # `manifest unknown`, хотя код был готов. Поэтому dispatch собирает сам.
+                    if [ "$PRODUCTION_ACTION" = 'deploy' ] || [ "$PRODUCTION_ACTION" = 'migrations' ]; then
                       be=true
                       la=true
                     fi
@@ -711,8 +716,10 @@ jobs:
 
     # 4. ЭТАП МИГРАЦИЙ — отдельный ручной gate до deploy нового commit SHA.
     migrations:
-        needs: changes
-        if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'migrations' }}
+        # build-and-push — предусловие: job тянет site-php-cli по SHA HEAD, и без
+        # собранного образа падал на `manifest unknown`.
+        needs: [ changes, build-and-push ]
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.build-and-push.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'migrations' }}
         concurrency:
             group: production-release
             cancel-in-progress: false
