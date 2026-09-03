@@ -169,6 +169,48 @@ final class IngestOrderRepositoryTest extends IntegrationTestCase
         self::assertSame('ancient', $stuck[0]->getExternalId());
     }
 
+    /**
+     * Носитель номера ищется среди ВСЕХ заказов подключения, а не только среди
+     * тех, что в очереди.
+     *
+     * Один номер маркетплейса — один заказ маркетплейса. Если у нас их два, то
+     * неоднозначность создаёт сам факт двух носителей, а не то, опрашиваем ли
+     * мы второго. Пока область совпадала с очередью, пара «нетерминальный +
+     * терминальный» давала `COUNT = 1`: коллизия не находилась, и ответ
+     * единственного заказа маркетплейса приписывался заказу, который, возможно,
+     * не он.
+     */
+    public function testCollisionIsFoundEvenWhenTheOtherCarrierIsTerminal(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)
+            ->withSource(IngestSource::WILDBERRIES)
+            ->withExternalId('rid-live')
+            ->withExternalOrderId('5000000001')
+            ->withStatus(IngestOrderStatus::SHIPPED, 'supplierStatus=complete;wbStatus=sorted')
+            ->build());
+
+        $this->persist(IngestOrderBuilder::anOrder()->forCompany($companyId)
+            ->withSource(IngestSource::WILDBERRIES)
+            ->withExternalId('rid-done')
+            ->withExternalOrderId('5000000001')
+            ->withStatus(IngestOrderStatus::DELIVERED, 'supplierStatus=complete;wbStatus=sold')
+            ->build());
+
+        $this->em->flush();
+
+        self::assertSame(
+            ['5000000001'],
+            $this->repository->findDuplicateExternalOrderIds(
+                $companyId,
+                IngestSource::WILDBERRIES,
+                'connection-1',
+                ['5000000001'],
+            ),
+        );
+    }
+
     private function persist(object $entity): void
     {
         $this->em->persist($entity);

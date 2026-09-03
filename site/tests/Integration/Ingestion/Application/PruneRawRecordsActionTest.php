@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\PruneRawRecordsAction;
+use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\PruneRawRecordsCommand;
+use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
 use App\Ingestion\Application\ReadRawRecordAction;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\NormalizationIssue;
@@ -628,6 +630,180 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
         $restored = $this->rawRecords->findByIdAndCompany($record['id'], $this->companyId);
         self::assertNotNull($restored);
         self::assertNull($restored->getPayloadPrunedAt(), 'Отметка обязана сняться вместе с возвратом нагрузки.');
+    }
+
+    /**
+     * Проблема на чужое сырьё не заводится вовсе.
+     *
+     * Удержание ищется по паре `(компания, сырьё)` — ровно по ключу той
+     * блокировки, которой протокол сериализует retention и разбор. Проблема с
+     * чужим `companyId` этой блокировки не берёт: она осталась бы вне
+     * протокола и при этом удерживала бы нагрузку СОСЕДНЕГО арендатора,
+     * которому о ней ничего не известно.
+     */
+    public function testIssueForAForeignRawRecordIsRejectedAndHoldsNothing(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $issues = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+        $issues(new RecordNormalizationIssueCommand(
+            companyId: Uuid::uuid7()->toString(),
+            rawRecordId: $record['id'],
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        ));
+
+        self::assertSame(
+            0,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                ['id' => $record['id']],
+            ),
+            'Проблема без своей строки сырья не имеет права появиться.',
+        );
+
+        $result = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(0, $result->heldByIssues, 'Чужая проблема не удерживает нагрузку.');
+        self::assertSame(1, $result->prunedPayloads);
+        self::assertFalse($this->storage->exists($record['path']));
+    }
+
+    /**
+     * Прогноз обязан описывать ТОТ ЖЕ прогон, который потом выполнится.
+     *
+     * Незавершённое прошлых прогонов обслуживается первым и из общего лимита.
+     * Пока dry-run считал только новых кандидатов, он врал дважды: молчал о
+     * работе, которую execute сделает раньше всего, и обещал удалить
+     * кандидата, до которого бюджет уже не дойдёт. Для необратимой операции
+     * это худший сорт неточности — решение принимают именно по этим числам.
+     */
+    public function testDryRunPlansTheSameBoundedWorkAsExecute(): void
+    {
+        $pending = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+        $this->seedRaw('page-2', new \DateTimeImmutable('-401 days'));
+
+        // Решение по первой записи принято прежним прогоном: объект на месте.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $pending['id']],
+        );
+        $this->em->clear();
+
+        $plan = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 1, execute: false));
+
+        self::assertSame(1, $plan->pendingRetries, 'Незавершённое обязано быть видно.');
+        self::assertGreaterThan(0, $plan->pendingBytes);
+        self::assertSame(
+            0,
+            $plan->candidates,
+            'Бюджет уже израсходован на backlog: обещать новых кандидатов нельзя.',
+        );
+
+        $done = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 1, execute: true));
+
+        self::assertSame($plan->pendingRetries, $done->pendingRetries);
+        self::assertSame($plan->candidates, $done->candidates);
+        self::assertSame(0, $done->prunedPayloads, 'Новых решений в этом прогоне быть не могло.');
+        self::assertFalse($this->storage->exists($pending['path']), 'Backlog обязан быть доведён до конца.');
+    }
+
+    /**
+     * Хранилище может не ответить и на вопрос «жив ли объект».
+     *
+     * Выпустить это исключение наружу значило бы откатить весь чанк вместе с
+     * уже засчитанными попытками: запись сохранила бы старейший приоритет и
+     * снова заняла бы начало очереди — то самое голодание, ради которого
+     * отметка попытки и заведена. Соседняя запись при этом теряла бы свой
+     * прогон ни за что.
+     */
+    public function testStorageFailureWhileCheckingAHeldPayloadDoesNotRollBackTheChunk(): void
+    {
+        $held = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+        $neighbour = $this->seedRaw('page-2', new \DateTimeImmutable('-401 days'));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id IN (:ids)',
+            ['ids' => [$held['id'], $neighbour['id']]],
+            ['ids' => Connection::PARAM_STR_ARRAY],
+        );
+
+        // Проблема появилась ПОСЛЕ решения: именно она заставляет спросить
+        // хранилище, жив ли ещё объект.
+        $this->em->persist(new NormalizationIssue(
+            companyId: $this->companyId,
+            rawRecordId: $held['id'],
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        $action = new PruneRawRecordsAction(
+            $this->rawRecords,
+            new class($this->storage, $held['path']) implements ObjectStorageInterface {
+                public function __construct(
+                    private readonly ObjectStorageInterface $inner,
+                    private readonly string $unanswerable,
+                ) {
+                }
+
+                public function write(string $path, string $contents): StoredObject
+                {
+                    return $this->inner->write($path, $contents);
+                }
+
+                public function read(string $path): string
+                {
+                    return $this->inner->read($path);
+                }
+
+                public function readStream(string $path)
+                {
+                    return $this->inner->readStream($path);
+                }
+
+                public function exists(string $path): bool
+                {
+                    if ($path === $this->unanswerable) {
+                        throw new \RuntimeException('storage is unavailable');
+                    }
+
+                    return $this->inner->exists($path);
+                }
+
+                public function delete(string $path): void
+                {
+                    $this->inner->delete($path);
+                }
+            },
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
+        );
+
+        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame(1, $result->orphanedObjects, 'Неотвеченный вопрос обязан давать ненулевой код возврата.');
+
+        $this->em->clear();
+
+        $undecided = $this->rawRecords->findByIdAndCompany($held['id'], $this->companyId);
+        self::assertNotNull($undecided);
+        self::assertNotNull($undecided->getPayloadPrunedAt(), 'Решение остаётся в силе.');
+        self::assertNull($undecided->getPayloadDeletedAt(), 'Ничего не удалено — отвечать было некому.');
+        self::assertNotNull(
+            $undecided->getPayloadDeletionAttemptedAt(),
+            'Попытка обязана быть засчитана, иначе запись вечно первая в очереди.',
+        );
+
+        self::assertFalse(
+            $this->storage->exists($neighbour['path']),
+            'Соседняя запись обязана быть обработана: сбой одной не откатывает чанк.',
+        );
     }
 
     /**

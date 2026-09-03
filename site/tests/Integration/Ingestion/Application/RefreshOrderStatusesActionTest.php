@@ -510,10 +510,67 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
-     * Тихая остановка без видимой очереди хуже, чем заказ, который продолжают
-     * опрашивать: остановленный и невидимый исчезает совсем.
+     * Номер маркетплейса обязан быть КАНОНИЧЕСКИМ: «05» — не «5».
+     *
+     * Дальше строка становится ключом `int`, а поиск коллизий сравнивает
+     * строки. «5» и «05» расходились ровно в этих двух местах: дублями они не
+     * считались, а ключ давали один — и один заказ молча затирал другой.
+     * Затёртый не получал ни наблюдения, ни отметки попытки и вечно
+     * возвращался в начало очереди.
      */
-    public function testStuckOrderWithoutRawRecordIsNotStoppedSilently(): void
+    public function testNonCanonicalMarketplaceIdIsRejectedInsteadOfCollapsingOntoAnother(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+
+        $canonical = $this->seedOrder(
+            $company, 'rid-canonical', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, '5000000001',
+        );
+        $padded = $this->seedOrder(
+            $company, 'rid-padded', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, '05000000001',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sorted',
+            'isCancellable' => false,
+        ]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->observed, 'Спросить можно только канонический номер.');
+        self::assertSame(1, $result->invalid, 'Неканонический номер обязан быть посчитан браком, а не потерян.');
+
+        $this->em->clear();
+
+        $polled = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-canonical');
+        self::assertNotNull($polled);
+        self::assertSame(IngestOrderStatus::SHIPPED, $polled->getStatus());
+
+        $skipped = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-padded');
+        self::assertNotNull($skipped);
+        self::assertSame(IngestOrderStatus::ORDERED, $skipped->getStatus(), 'Чужой статус ему не приписывается.');
+        self::assertNotNull(
+            $skipped->getStatusRefreshAttemptedAt(),
+            'Без отметки попытки он вечно занимал бы начало очереди.',
+        );
+
+        self::assertNotSame($canonical->getId(), $padded->getId());
+    }
+
+    /**
+     * Заказ без сырья останавливается ТОЖЕ — и об этом кричат `error`-ом.
+     *
+     * Прежде он не останавливался «чтобы не пропал молча», но получалось ровно
+     * наоборот: окно опроса его уже не захватывало, а выборка зависших
+     * отсеивала, — заказ не обновлялся, не останавливался и никуда не попадал.
+     * Оставался только счётчик, из которого нельзя было сделать ничего.
+     * Состояние, помеченное плохим, обязано иметь операцию, переводящую его в
+     * хорошее.
+     */
+    public function testStuckOrderWithoutRawRecordIsStoppedAndReportedAsAnError(): void
     {
         $company = $this->seedCompanyWithConnection();
         $order = IngestOrderBuilder::anOrder()
@@ -531,12 +588,20 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
 
-        self::assertSame(0, $result->stopped);
+        self::assertSame(1, $result->stopped);
 
         $this->em->clear();
         $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'orphan');
         self::assertNotNull($reloaded);
-        self::assertNull($reloaded->getRefreshStoppedAt(), 'Заказ остаётся в очереди, а не исчезает молча.');
+        self::assertNotNull($reloaded->getRefreshStoppedAt(), 'Заказ обязан быть остановлен: опрашивать его всё равно некому.');
+
+        // Очереди на разбор нет — привязать её не к чему, — поэтому разбирать
+        // придётся по логу, и уровень обязан быть ERROR: заказ всегда
+        // создаётся нормализацией, значит сырьё у него быть должно.
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'stuck_order'",
+            ['c' => (string) $company->getId()],
+        ));
     }
 
     /**
@@ -712,8 +777,12 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
-     * Заказ, который остановить нечем, не должен блокировать остановку
-     * остальных: он старейший, а выборка идёт по возрастанию даты заказа.
+     * Заказ без сырья не блокирует очередь остановки: он тоже останавливается.
+     *
+     * Он старейший, а выборка идёт по возрастанию даты заказа, поэтому при
+     * лимите в одну запись он всегда первый. Пока его пропускали, лимит
+     * тратился впустую каждый прогон, и остальные зависшие не останавливались
+     * никогда.
      */
     public function testOrphanStuckOrderDoesNotBlockTheStuckQueue(): void
     {
@@ -742,11 +811,19 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
 
         $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
 
-        self::assertSame(1, $result->stopped, 'Лимит достаётся заказу, который можно остановить.');
-        self::assertSame(1, (int) $this->connection->fetchOne(
+        // Лимит достаётся СТАРЕЙШЕМУ — сироте: он тоже останавливается, просто
+        // без записи в очереди. Прежде он занимал место и не двигался, и весь
+        // лимит уходил впустую прогон за прогоном.
+        self::assertSame(1, $result->stopped);
+        self::assertSame(0, (int) $this->connection->fetchOne(
             "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'stuck_order'",
             ['c' => (string) $company->getId()],
         ));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'orphan');
+        self::assertNotNull($reloaded);
+        self::assertNotNull($reloaded->getRefreshStoppedAt(), 'Сирота обязан уйти из очереди, а не занимать её вечно.');
     }
 
     /**
@@ -1015,6 +1092,36 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Минимальная строка сырья: заказу нужна та, на которую можно завести
+     * проблему.
+     */
+    private function seedRawRecord(string $companyId): string
+    {
+        $id = Uuid::uuid7()->toString();
+
+        $this->connection->executeStatement(
+            "INSERT INTO ingest_raw_records
+                 (id, company_id, connection_ref, shop_ref, source, resource_type, external_id,
+                  storage_path, hash, byte_size, fetched_at, last_seen_at, sync_job_id,
+                  normalization_status, created_at, updated_at)
+             VALUES
+                 (:id, :company, :connection, 'shop-main', 'ozon', 'orders_fixture', :external,
+                  :path, :hash, 128, now(), now(), :job, 'done', now(), now())",
+            [
+                'id' => $id,
+                'company' => $companyId,
+                'connection' => self::CONNECTION_ID,
+                'external' => 'page-'.substr($id, 0, 8),
+                'path' => 'company/ozon/shop/orders/'.$id.'.ndjson.gz',
+                'hash' => hash('sha256', $id),
+                'job' => Uuid::uuid7()->toString(),
+            ],
+        );
+
+        return $id;
+    }
+
+    /**
      * @param array<string, mixed>|null $attributes
      */
     private function seedOrder(
@@ -1037,6 +1144,11 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
             ->withExternalId($externalId)
             ->withExternalOrderId($externalOrderId)
             ->withStatus($status, $rawStatus)
+            // Сырьё НАСТОЯЩЕЕ, а не выдуманный UUID: проблема заводится только
+            // на существующую в этой компании строку сырья — иначе её нечем
+            // удерживать и незачем открывать. Выдуманный идентификатор делал
+            // бы тест зелёным там, где прод молча ничего не запишет.
+            ->withLastRawRecordId($this->seedRawRecord((string) $company->getId()))
             ->orderedAt($orderedAt ?? new \DateTimeImmutable('-2 days'));
 
         if (null !== $statusObservedAt) {

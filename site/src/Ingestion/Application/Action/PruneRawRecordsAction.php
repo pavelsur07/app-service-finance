@@ -29,7 +29,7 @@ use Psr\Log\LoggerInterface;
  * выгрузка терялась молча. Дорого стоит объект, а не сотня байт метаданных,
  * поэтому удаляется объект, а строка получает отметку и живёт дальше:
  * указатели разрешаются, дедупу есть что обновлять, а
- * `StoreRawBatchAction::repairMissingObject()` вернёт нагрузку, если та же
+ * `StoreRawBatchAction::restorePayload()` вернёт нагрузку, если та же
  * выгрузка приедет снова.
  *
  * Порядок — отметка, потом объект. Обратный оставил бы при падении запись,
@@ -71,7 +71,25 @@ final readonly class PruneRawRecordsAction
         $now = $this->applicationTime();
         $notSeenSince = $now->modify(sprintf('-%d days', $command->olderThanDays));
 
-        $records = $this->rawRecordRepository->findPrunable($notSeenSince, $command->limit);
+        // ПЛАН СТРОИТСЯ ОДИНАКОВО для обоих режимов, иначе dry-run описывал бы
+        // не тот прогон, который потом выполнится.
+        //
+        // Незавершённое идёт ПЕРВЫМ и из ОБЩЕГО бюджета: очередь иначе
+        // голодает — каждый прогон помечал бы до `limit` новых записей, а до
+        // накопленного backlog доходил бы всё позже. Раз бюджет общий, то и
+        // считать новых кандидатов нужно по ОСТАТКУ: dry-run, показавший 500
+        // кандидатов там, где execute потратит весь лимит на backlog, врёт про
+        // необратимую операцию.
+        $pending = $this->rawRecordRepository->findPendingPayloadDeletion($command->limit);
+        $remaining = max(0, $command->limit - count($pending));
+
+        // Явный ноль, а не вызов с нулевым лимитом: `findPrunable()` поднимает
+        // лимит до единицы, и запрос вернул бы кандидата, на которого бюджета
+        // уже нет.
+        $records = $remaining > 0
+            ? $this->rawRecordRepository->findPrunable($notSeenSince, $remaining)
+            : [];
+
         $held = $this->rawRecordRepository->countHeldByUnresolvedIssues($notSeenSince);
 
         $result = new PruneRawRecordsResult(
@@ -79,10 +97,9 @@ final readonly class PruneRawRecordsAction
             // Объём считается ВСЕГДА, в том числе на dry-run: ради этого числа
             // он и запускается перед Production Gate — решение принимается по
             // освобождаемому месту, а не по числу строк.
-            candidateBytes: array_sum(array_map(
-                static fn (IngestRawRecord $record): int => $record->getByteSize(),
-                $records,
-            )),
+            candidateBytes: $this->bytesOf($records),
+            pendingRetries: count($pending),
+            pendingBytes: $this->bytesOf($pending),
             heldByIssues: $held,
         );
 
@@ -102,22 +119,12 @@ final readonly class PruneRawRecordsAction
             return $result;
         }
 
-        // Незавершённое СНАЧАЛА, и из общего бюджета прогона.
-        //
-        // Иначе очередь голодает: каждый прогон помечал бы до `limit` новых
-        // записей, а до накопленного backlog очередь доходила бы всё позже.
-        $budget = $command->limit;
-        $pending = $this->rawRecordRepository->findPendingPayloadDeletion($budget);
-
-        foreach (array_chunk(
-            array_map(static fn (IngestRawRecord $record): string => $record->getId(), $pending),
-            self::DELETION_CHUNK,
-        ) as $chunk) {
+        // Незавершённое СНАЧАЛА — ровно в том порядке, который обещал план.
+        foreach (array_chunk($this->idsOf($pending), self::DELETION_CHUNK) as $chunk) {
             $result = $this->deleteChunk($result, $chunk);
         }
 
-        $budget -= count($pending);
-        if ($budget <= 0) {
+        if ([] === $records) {
             $this->logger->info('Raw payload prune finished.', $this->context($command, $notSeenSince, $result));
 
             return $result;
@@ -126,14 +133,7 @@ final readonly class PruneRawRecordsAction
         // ФАЗА 1: решение. Отметка коммитится ДО любого обращения к хранилищу.
         $decided = [];
 
-        foreach (array_chunk(
-            array_slice(
-                array_map(static fn (IngestRawRecord $record): string => $record->getId(), $records),
-                0,
-                $budget,
-            ),
-            self::CHUNK,
-        ) as $chunk) {
+        foreach (array_chunk($this->idsOf($records), self::CHUNK) as $chunk) {
             [$marked, $lateHolds] = $this->markChunk($chunk, $notSeenSince);
             $decided = [...$decided, ...$marked];
             $result = $result->with(prunedPayloads: count($marked), heldByIssues: $lateHolds);
@@ -210,8 +210,9 @@ final readonly class PruneRawRecordsAction
         $orphaned = 0;
         $cancelled = 0;
         $evidenceLost = 0;
+        $undecided = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk, &$freed, &$orphaned, &$cancelled, &$evidenceLost): void {
+        $this->entityManager->wrapInTransaction(function () use ($chunk, &$freed, &$orphaned, &$cancelled, &$evidenceLost, &$undecided): void {
             $locked = $this->rawRecordRepository->findPendingPayloadDeletionForUpdate($chunk);
             if ([] === $locked) {
                 return;
@@ -241,7 +242,31 @@ final readonly class PruneRawRecordsAction
                 // «нагрузка есть» при отсутствующем объекте: чтение падало бы
                 // ошибкой хранилища, а проблема всё равно осталась бы без
                 // доказательства — только теперь молча.
-                if ($this->objectStorage->exists($record->getStoragePath())) {
+                //
+                // Сам вопрос «жив ли объект» задаётся хранилищу, а оно может
+                // не ответить. Выпустить это исключение наружу значило бы
+                // откатить ВЕСЬ чанк вместе с уже засчитанными попытками:
+                // запись сохранила бы старейший приоритет и снова заняла бы
+                // начало очереди — то самое голодание, ради которого заведена
+                // отметка попытки. Поэтому сбой обрабатывается поштучно.
+                try {
+                    $stillStored = $this->objectStorage->exists($record->getStoragePath());
+                } catch (\Throwable $exception) {
+                    $record->markPayloadDeletionAttempted($now);
+                    ++$undecided;
+
+                    $this->logger->warning('Storage did not answer whether a held payload still exists; the decision stays pending.', [
+                        'rawRecordId' => $record->getId(),
+                        'storagePath' => $record->getStoragePath(),
+                        // Класс, а не сообщение: в тексте ошибок хранилища
+                        // встречаются URL с учётными данными.
+                        'exceptionClass' => $exception::class,
+                    ]);
+
+                    continue;
+                }
+
+                if ($stillStored) {
                     $record->markPayloadRestored();
                     ++$cancelled;
 
@@ -322,8 +347,29 @@ final readonly class PruneRawRecordsAction
         return $result->with(
             bytesFreed: $freed,
             heldByIssues: $cancelled + $evidenceLost,
-            orphanedObjects: $orphaned,
+            // Неотвеченный вопрос считается наравне с неудалённым объектом:
+            // и то, и другое означает «запись помечена, а хранилище с ней не
+            // разобрались», и оба обязаны давать ненулевой код возврата.
+            orphanedObjects: $orphaned + $undecided,
         );
+    }
+
+    /**
+     * @param list<IngestRawRecord> $records
+     *
+     * @return list<string>
+     */
+    private function idsOf(array $records): array
+    {
+        return array_map(static fn (IngestRawRecord $record): string => $record->getId(), $records);
+    }
+
+    /**
+     * @param list<IngestRawRecord> $records
+     */
+    private function bytesOf(array $records): int
+    {
+        return array_sum(array_map(static fn (IngestRawRecord $record): int => $record->getByteSize(), $records));
     }
 
     private function applicationTime(): \DateTimeImmutable
@@ -344,6 +390,9 @@ final readonly class PruneRawRecordsAction
             'olderThanDays' => $command->olderThanDays,
             'notSeenSince' => $notSeenSince->format(\DATE_ATOM),
             'candidates' => $result->candidates,
+            'candidateBytes' => $result->candidateBytes,
+            'pendingRetries' => $result->pendingRetries,
+            'pendingBytes' => $result->pendingBytes,
             'prunedPayloads' => $result->prunedPayloads,
             'bytesFreed' => $result->bytesFreed,
             'heldByIssues' => $result->heldByIssues,

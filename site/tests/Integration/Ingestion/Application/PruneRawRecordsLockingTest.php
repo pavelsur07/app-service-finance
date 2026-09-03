@@ -8,12 +8,19 @@ use App\Ingestion\Application\Action\PruneRawRecordsAction;
 use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Command\PruneRawRecordsCommand;
 use App\Ingestion\Application\Command\RecordNormalizationIssueCommand;
+use App\Ingestion\Application\StoreRawBatchAction;
+use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
+use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
+use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
 use Ramsey\Uuid\Uuid;
@@ -294,7 +301,138 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
         }
     }
 
-    private function seedStaleRawRecord(): string
+    /**
+     * Повторная выгрузка обязана взять блокировку ДО обращения к хранилищу.
+     *
+     * Это вторая половина того же протокола, и предыдущий тест её НЕ
+     * доказывает: там конкурент правит строку прямым `UPDATE`, а он ждёт
+     * блокировку сам по себе — тест остался бы зелёным и без
+     * `findOneForUpdate()` внутри `StoreRawBatchAction::reuse()`. Опасно же
+     * ровно обратное: запись объекта ДО получения блокировки. Тогда дедуп
+     * вернул бы нагрузку, retention удалил бы её следом, и осталась бы запись
+     * без отметок при отсутствующем объекте.
+     *
+     * Поэтому здесь работает НАСТОЯЩИЙ `StoreRawBatchAction`, а хранилище
+     * заменено шпионом: утверждение — не «конкурент подождал», а «к хранилищу
+     * не обратились вовсе».
+     */
+    public function testReuseTakesTheRowLockBeforeItTouchesStorage(): void
+    {
+        $rows = [['sku' => 'SKU-1', 'qty' => 1]];
+        $codec = new RawNdjsonCodec();
+        $hash = hash('sha256', $codec->encodeRows($rows));
+
+        $rawRecordId = $this->seedStaleRawRecord($hash);
+        $companyId = (string) $this->connection->fetchOne(
+            'SELECT company_id FROM ingest_raw_records WHERE id = :id',
+            ['id' => $rawRecordId],
+        );
+
+        // Решение об очистке уже принято: именно в этом состоянии дедуп и
+        // должен возвращать нагрузку.
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $rawRecordId],
+        );
+
+        $storage = new class implements ObjectStorageInterface {
+            /** @var list<string> */
+            public array $touched = [];
+
+            public function write(string $path, string $contents): StoredObject
+            {
+                $this->touched[] = 'write:'.$path;
+
+                return new StoredObject($path, strlen($contents));
+            }
+
+            public function read(string $path): string
+            {
+                $this->touched[] = 'read:'.$path;
+
+                return '';
+            }
+
+            public function readStream(string $path)
+            {
+                $this->touched[] = 'readStream:'.$path;
+
+                $stream = fopen('php://memory', 'r+');
+                if (false === $stream) {
+                    throw new \RuntimeException('Не удалось открыть поток в памяти.');
+                }
+
+                return $stream;
+            }
+
+            public function exists(string $path): bool
+            {
+                $this->touched[] = 'exists:'.$path;
+
+                return true;
+            }
+
+            public function delete(string $path): void
+            {
+                $this->touched[] = 'delete:'.$path;
+            }
+        };
+
+        $holder = $this->newConnection();
+        $holder->beginTransaction();
+        $holder->executeQuery('SELECT id FROM ingest_raw_records WHERE id = :id FOR UPDATE', ['id' => $rawRecordId]);
+
+        try {
+            // Иначе дедуп ждал бы держателя до конца теста.
+            $this->connection->executeStatement("SET lock_timeout = '250ms'");
+
+            $action = new StoreRawBatchAction(
+                self::getContainer()->get(IngestRawRecordRepository::class),
+                $storage,
+                $codec,
+                self::getContainer()->get(RawStoragePathBuilder::class),
+                $this->em,
+                self::getContainer()->get(ManagerRegistry::class),
+            );
+
+            $blocked = false;
+
+            try {
+                $action(new RawBatch(
+                    companyId: $companyId,
+                    connectionRef: 'conn-1',
+                    shopRef: 'shop-main',
+                    source: IngestSource::OZON,
+                    resourceType: 'prune_fixture',
+                    externalId: 'page-1',
+                    syncJobId: Uuid::uuid7()->toString(),
+                    fetchedAt: new \DateTimeImmutable('-400 days'),
+                    rows: $rows,
+                ));
+            } catch (\Throwable) {
+                $blocked = true;
+            }
+
+            self::assertTrue($blocked, 'Повторная выгрузка обязана ждать чужую блокировку строки сырья.');
+
+            self::assertSame(
+                [],
+                $storage->touched,
+                'До получения блокировки к хранилищу обращаться нельзя: объект вернулся бы под чужим решением об удалении.',
+            );
+
+            self::assertNotNull(
+                $holder->fetchOne('SELECT payload_pruned_at FROM ingest_raw_records WHERE id = :id', ['id' => $rawRecordId]),
+                'Отметка решения обязана уцелеть: снять её можно только под блокировкой.',
+            );
+        } finally {
+            $this->connection->executeStatement('SET lock_timeout = 0');
+            $holder->rollBack();
+            $holder->close();
+        }
+    }
+
+    private function seedStaleRawRecord(string $hash = 'hash'): string
     {
         $id = Uuid::uuid7()->toString();
         $old = (new \DateTimeImmutable('-400 days'))->format('Y-m-d H:i:s.u');
@@ -306,11 +444,12 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                   normalization_status, created_at, updated_at)
              VALUES
                  (:id, :company, 'conn-1', 'shop-main', 'ozon', 'prune_fixture', 'page-1',
-                  'company/ozon/shop/prune/2025/01/01/job/page-1/hash.ndjson.gz', 'hash', 128,
+                  'company/ozon/shop/prune/2025/01/01/job/page-1/hash.ndjson.gz', :hash, 128,
                   :old, :old, :job, 'done', now(), now())",
             [
                 'id' => $id,
                 'company' => Uuid::uuid7()->toString(),
+                'hash' => $hash,
                 'old' => $old,
                 'job' => Uuid::uuid7()->toString(),
             ],

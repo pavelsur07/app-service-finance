@@ -21,19 +21,27 @@ namespace App\Ingestion\Infrastructure\Api\Wildberries;
  * оказалась кривой, не «отсутствует в ответе». Без этого списка он считался бы
  * и как `invalid`, и как `missing`, а в аудит уходило бы ложное утверждение,
  * что маркетплейс его не вернул.
+ *
+ * `auditRows` — строки ровно в том виде, в каком их прислал маркетплейс.
+ * `statuses` для аудита не годятся: оси в них НОРМАЛИЗОВАНЫ, и запись,
+ * объявленная сырым ответом, содержала бы наши значения вместо чужих —
+ * `" complete "` уже не отличить от `"complete"`, а именно такие отклонения от
+ * контракта по сырью потом и разбирают.
  */
 final readonly class WbOrderStatusPage
 {
     /**
-     * @param array<int, array<string, mixed>> $statuses номер заказа => строка ответа
+     * @param array<int, array<string, mixed>> $statuses номер заказа => строка ответа с нормализованными осями
      * @param list<int> $rejectedIds номера отбракованных строк, которые мы спрашивали
      * @param array<string, mixed>|null $evidence разобранный ответ целиком, если что-то отбраковано
+     * @param list<array<string, mixed>> $auditRows строки ответа БЕЗ нормализации — для сырья
      */
     public function __construct(
         public array $statuses = [],
         public int $rejectedRows = 0,
         public array $rejectedIds = [],
         public ?array $evidence = null,
+        public array $auditRows = [],
     ) {
     }
 }

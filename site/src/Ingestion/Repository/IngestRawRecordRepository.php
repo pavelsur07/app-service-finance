@@ -319,6 +319,12 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
      * ЭТОГО запроса, тогда как условие внутри блокирующей выборки осталось бы
      * снимком её собственного момента.
      *
+     * Компания сопоставляется явно. Предикат удержания обязан совпадать с
+     * ключом блокировки, а блокируется пара `(компания, сырьё)` — см.
+     * {@see findOneForUpdate()}. Проблема с чужим `companyId` этой блокировки
+     * не брала, значит протокол её не сериализовал, и считать её удержанием
+     * значило бы позволить одному арендатору тормозить очистку другого.
+     *
      * @companyScopeExempt См. {@see findPrunable()}: политика хранения общая.
      *
      * @param list<string> $ids
@@ -332,11 +338,10 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
         }
 
         /** @var list<array{rawRecordId: string}> $rows */
-        $rows = $this->getEntityManager()->createQueryBuilder()
-            ->select('DISTINCT issue.rawRecordId AS rawRecordId')
-            ->from(NormalizationIssue::class, 'issue')
-            ->andWhere('issue.rawRecordId IN (:ids)')
-            ->andWhere('issue.resolvedAt IS NULL')
+        $rows = $this->createQueryBuilder('record')
+            ->select('DISTINCT record.id AS rawRecordId')
+            ->andWhere('record.id IN (:ids)')
+            ->andWhere($this->unresolvedIssueExists())
             ->setParameter('ids', array_values(array_unique($ids)))
             ->getQuery()
             ->getResult();
@@ -353,12 +358,21 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->setParameter('notSeenSince', $notSeenSince);
     }
 
+    /**
+     * Удержание — это НЕРАЗОБРАННАЯ проблема ТОЙ ЖЕ компании на эту строку.
+     *
+     * Компания в условии не декоративна: блокировка берётся по паре
+     * `(компания, сырьё)`, и предикат удержания обязан совпадать с ключом
+     * блокировки — иначе часть удержаний оказывается вне протокола, который их
+     * должен был сериализовать.
+     */
     private function unresolvedIssueExists(): string
     {
         $issues = $this->getEntityManager()->createQueryBuilder()
             ->select('1')
             ->from(NormalizationIssue::class, 'issue')
             ->andWhere('issue.rawRecordId = record.id')
+            ->andWhere('issue.companyId = record.companyId')
             ->andWhere('issue.resolvedAt IS NULL')
             ->getDQL();
 

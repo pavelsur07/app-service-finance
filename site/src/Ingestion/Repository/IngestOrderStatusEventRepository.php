@@ -49,10 +49,21 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
             ->andWhere('e.orderId = :orderId')
             ->setParameter('companyId', $companyId)
             ->setParameter('orderId', $orderId)
+            // При РАВНОМ времени наблюдения порядок задаёт идентификатор
+            // события, а не сырья.
+            //
+            // `id` — UUID v7, он создаётся в конструкторе события, то есть в
+            // момент ПРИМЕНЕНИЯ, под блокировкой заказа: порядок его значений
+            // и есть порядок, в котором переходы легли на заказ, поэтому
+            // цепочка `previousStatus` сходится. `rawRecordId` для этого не
+            // годился: сырьё получает идентификатор при загрузке, задолго до
+            // разбора и другим процессом, и его порядок с порядком применения
+            // не связан никак.
             ->orderBy('e.observedAt', 'DESC')
-            ->addOrderBy('e.rawRecordId', 'DESC')
-            ->addOrderBy('e.occurrence', 'DESC')
             ->addOrderBy('e.id', 'DESC')
+            // Последний ключ — на случай одинаковых `id`: он невозможен, но
+            // сортировка обязана быть полной, иначе страница нестабильна.
+            ->addOrderBy('e.occurrence', 'DESC')
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();

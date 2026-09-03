@@ -328,6 +328,50 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * Две строки одного заказа — брак ВСЕГО номера, а не одной лишней строки.
+     *
+     * Оставить первую значило бы выбрать статус по порядку в ответе: строки
+     * противоречат друг другу, и какая верна — неизвестно. Если произвольно
+     * выбранная окажется терминальной, заказ навсегда выпадет из перепроса.
+     */
+    public function testConflictingRowsForOneOrderRejectTheOrderEntirely(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":['
+            .'{"id":5,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false},'
+            .'{"id":5,"supplierStatus":"new","wbStatus":"waiting","isCancellable":true},'
+            .'{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}'
+            .']}',
+            ['http_code' => 200],
+        )));
+
+        $page = $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+
+        self::assertSame([7], array_keys($page->statuses), 'Спорный номер не имеет права получить статус.');
+        self::assertSame([5], $page->rejectedIds, 'Он обязан быть виден как отбракованный, а не как отсутствующий.');
+        self::assertSame(1, $page->rejectedRows);
+    }
+
+    /**
+     * В сырьё уходит ответ маркетплейса, а не наш разбор ответа.
+     *
+     * `statuses` для аудита не годятся: оси в них нормализованы, и запись,
+     * объявленная сырым ответом, содержала бы наши значения вместо чужих —
+     * `" complete "` после такой записи уже не отличить от `"complete"`, а
+     * разбирают потом именно такие отклонения.
+     */
+    public function testAuditRowsKeepTheMarketplaceAnswerUntouched(): void
+    {
+        $page = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[{"id":5,"supplierStatus":"  complete  ","wbStatus":"sorted","isCancellable":false}]}',
+            ['http_code' => 200],
+        )))->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame('complete', $page->statuses[5]['supplierStatus'], 'Наблюдение — нормализованное.');
+        self::assertSame('  complete  ', $page->auditRows[0]['supplierStatus'], 'Аудит — исходное.');
+    }
+
+    /**
      * Отбракованная строка запрошенного заказа — не «заказ не вернулся».
      * Вызывающий обязан различать эти два состояния, иначе один заказ
      * считается дважды, а в аудит уходит ложное «маркетплейс его не вернул».

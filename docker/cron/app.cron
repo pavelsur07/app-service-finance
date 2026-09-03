@@ -151,11 +151,15 @@
 # Read-only контроль после rolling refresh и normalize workers: latest raw coverage vs canonical.
 45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# Ежедневно в 05:35: удаление сырья, вышедшего за год горячего хранения.
+# Ежедневно в 05:50: очистка сырья, вышедшего за год горячего хранения.
 #
-# Удаляет ПАРУ — объект в хранилище и строку ingest_raw_records. Lifecycle-правило
-# провайдера здесь не годится: оно видит только объекты и оставило бы строки
-# висячими указателями, на которых ReadRawRecordAction падает.
+# Удаляется ПОЛЕЗНАЯ НАГРУЗКА, строка ingest_raw_records ОСТАЁТСЯ. Дорого стоит
+# объект, а не сотня байт метаданных, и со строкой на месте указатели из
+# ingest_financial_transactions, ingest_order_status_events и
+# ingest_orders.last_raw_record_id остаются разрешимыми: ReadRawRecordAction
+# отвечает внятным RawPayloadPrunedException, а не сбоем хранилища.
+# Lifecycle-правило провайдера здесь не годится по той же причине: оно видит
+# только объекты и не оставило бы признака, что нагрузку удалили НАМЕРЕННО.
 #
 # Возраст считается по «последний раз видели», а не по «скачали»: дедуп при
 # часовом опросе обновляет отметку, не создавая новую запись.

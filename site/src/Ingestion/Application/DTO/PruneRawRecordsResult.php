@@ -20,6 +20,13 @@ namespace App\Ingestion\Application\DTO;
  * удаляем мы их или только считаем. Ради этого числа dry-run и существует:
  * решение включать удаление принимается по объёму, а не по числу строк.
  *
+ * `pendingRetries` и `pendingBytes` — незавершённая работа прошлых прогонов:
+ * решение закоммичено, объект ещё на месте. Она обслуживается ПЕРВОЙ и из
+ * ОБЩЕГО с новыми кандидатами бюджета, поэтому dry-run обязан показывать её
+ * отдельным числом. Без него прогноз врал бы дважды: он не упоминал бы работу,
+ * которую execute сделает в первую очередь, и завышал бы число новых
+ * кандидатов, до которых бюджет может не дойти вовсе.
+ *
  * `heldByIssues` — записи, которые удалять нельзя, потому что они служат
  * доказательством для НЕРАЗОБРАННОЙ проблемы. Без отдельного счётчика «нечего
  * удалять» и «удалять нельзя» выглядели бы одинаково, хотя реакция на них
@@ -35,6 +42,8 @@ final readonly class PruneRawRecordsResult
     public function __construct(
         public int $candidates = 0,
         public int $candidateBytes = 0,
+        public int $pendingRetries = 0,
+        public int $pendingBytes = 0,
         public int $prunedPayloads = 0,
         public int $bytesFreed = 0,
         public int $heldByIssues = 0,
@@ -45,6 +54,8 @@ final readonly class PruneRawRecordsResult
     public function with(
         int $candidates = 0,
         int $candidateBytes = 0,
+        int $pendingRetries = 0,
+        int $pendingBytes = 0,
         int $prunedPayloads = 0,
         int $bytesFreed = 0,
         int $heldByIssues = 0,
@@ -53,6 +64,8 @@ final readonly class PruneRawRecordsResult
         return new self(
             $this->candidates + $candidates,
             $this->candidateBytes + $candidateBytes,
+            $this->pendingRetries + $pendingRetries,
+            $this->pendingBytes + $pendingBytes,
             $this->prunedPayloads + $prunedPayloads,
             $this->bytesFreed + $bytesFreed,
             $this->heldByIssues + $heldByIssues,

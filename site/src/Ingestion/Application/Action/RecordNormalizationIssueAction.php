@@ -40,10 +40,34 @@ final readonly class RecordNormalizationIssueAction
         // Блокировка требует транзакции. Вызывающие приходят и из транзакции
         // (нормализация), и без неё (обслуживающие команды), поэтому
         // wrapInTransaction: вложенный вызов станет savepoint'ом.
-        $this->entityManager->wrapInTransaction(function () use ($command): void {
+        $recorded = false;
+
+        $this->entityManager->wrapInTransaction(function () use ($command, &$recorded): void {
             $record = $this->rawRecordRepository->findOneForUpdate($command->companyId, $command->rawRecordId, refresh: false);
 
-            if (null !== $record && null !== $record->getPayloadPrunedAt()) {
+            if (null === $record) {
+                // Проблема без своей строки сырья не заводится — и дело не
+                // только в том, что разбирающему нечего открыть.
+                //
+                // Удержание сырья ищется по паре `(компания, сырьё)`, ровно по
+                // ключу этой блокировки. Строка, которой в компании нет,
+                // блокировку не даёт: протокол с retention на такой проблеме
+                // не работает вовсе, а её `rawRecordId` при этом попадал бы в
+                // чужую компанию — соседний арендатор удерживал бы нагрузку
+                // из-за нашей записи.
+                //
+                // Уровень ERROR: состояние само не лечится и означает дефект
+                // вызывающего, а не ожидаемый ход событий.
+                $this->logger->error('Normalization issue was not recorded: the raw record does not exist in this company.', [
+                    'companyId' => $command->companyId,
+                    'rawRecordId' => $command->rawRecordId,
+                    'kind' => $command->kind->value,
+                ]);
+
+                return;
+            }
+
+            if (null !== $record->getPayloadPrunedAt()) {
                 // Честнее сказать сразу, чем оставить разбирающего гадать,
                 // почему сырьё не читается.
                 $this->logger->warning('Normalization issue is recorded for a raw record whose payload was already pruned.', [
@@ -60,7 +84,13 @@ final readonly class RecordNormalizationIssueAction
                 kind: $command->kind,
                 details: $command->details,
             ));
+
+            $recorded = true;
         });
+
+        if (!$recorded) {
+            return;
+        }
 
         $this->logger->warning('Ingestion normalization issue recorded.', [
             'companyId' => $command->companyId,

@@ -96,6 +96,9 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
             rejectedRows: $this->rejectedRows,
             rejectedIds: $this->rejectedIds,
             evidence: $this->rejectedEvidence,
+            // Настоящий клиент отдаёт строки ответа как есть; здесь наши
+            // строки уже «как есть», нормализовывать их некому.
+            auditRows: array_values($result),
         );
     }
 

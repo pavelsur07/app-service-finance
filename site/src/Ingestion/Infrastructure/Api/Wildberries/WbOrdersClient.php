@@ -128,15 +128,39 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         $indexed = [];
         $rejected = 0;
         $rejectedIds = [];
+        $seen = [];
 
         foreach ($rows as $row) {
+            $id = $row['id'] ?? null;
+            $ours = is_int($id) && isset($requested[$id]);
+
+            // ПОВТОР номера — брак ВСЕГО номера, а не одной лишней строки.
+            //
+            // Отбраковать вторую строку и оставить первую значило бы выбрать
+            // статус по порядку в ответе: две строки одного заказа
+            // противоречат друг другу, и какая из них верна — неизвестно. Если
+            // произвольно выбранная окажется терминальной, заказ навсегда
+            // выпадет из перепроса. Поэтому уже принятая строка снимается
+            // тоже, а номер уходит в отбракованные.
+            if ($ours && isset($seen[$id])) {
+                unset($indexed[$id]);
+                ++$rejected;
+                $rejectedIds[] = $id;
+
+                continue;
+            }
+
+            if ($ours) {
+                $seen[$id] = true;
+            }
+
             // Повреждённая СТРОКА отбраковывается, а не роняет ответ.
             //
             // Ответ — это, как правило, всё подключение целиком, поэтому
             // исключение на первой кривой строке навсегда блокировало бы
             // обновление всех остальных корректных заказов. Нарушение формы
             // всего ответа по-прежнему исключение: см. listOfObjects().
-            $accepted = self::statusRow($row, $requested, $indexed);
+            $accepted = self::statusRow($row, $requested);
 
             if (null === $accepted) {
                 ++$rejected;
@@ -146,17 +170,23 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
                 // «заказа в ответе не оказалось». Иначе один и тот же заказ
                 // считался бы и как invalid, и как missing, а в аудит уходило
                 // бы ложное «маркетплейс заказ не вернул».
-                $rejectedId = $row['id'] ?? null;
-                if (is_int($rejectedId) && isset($requested[$rejectedId])) {
-                    $rejectedIds[] = $rejectedId;
+                if ($ours) {
+                    $rejectedIds[] = $id;
                 }
 
                 continue;
             }
 
-            /** @var int $id */
-            $id = $accepted['id'];
-            $indexed[$id] = $accepted;
+            /** @var int $acceptedId */
+            $acceptedId = $accepted['id'];
+            $indexed[$acceptedId] = $accepted;
+        }
+
+        // Номер, снятый как повторный, мог быть принят ДО повтора: тогда он
+        // попал и в `$indexed`, и в `$rejectedIds`. Первое уже снято выше;
+        // здесь остаётся не отдать наружу статус, которому мы не верим.
+        foreach ($rejectedIds as $rejectedId) {
+            unset($indexed[$rejectedId]);
         }
 
         if ($rejected > 0) {
@@ -173,27 +203,30 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             rejectedRows: $rejected,
             rejectedIds: array_values(array_unique($rejectedIds)),
             evidence: $rejected > 0 ? $evidence : null,
+            // Строки БЕЗ нормализации: сырьё обязано содержать ответ
+            // маркетплейса, а не наш разбор этого ответа.
+            auditRows: $rows,
         );
     }
 
     /**
      * Пригодна ли строка статуса. `null` — отбраковать.
      *
+     * Только ФОРМА строки. Повторы номеров разбираются вызывающим: там видно
+     * уже принятое, и снять его — часть того же решения.
+     *
      * @param array<string, mixed> $row
      * @param array<int, int> $requested спрошенные номера
-     * @param array<int, array<string, mixed>> $indexed уже принятые строки
      *
      * @return array<string, mixed>|null
      */
-    private static function statusRow(array $row, array $requested, array $indexed): ?array
+    private static function statusRow(array $row, array $requested): ?array
     {
         $id = $row['id'] ?? null;
 
         // Чужой номер означает, что строка относится не к нашему запросу;
         // принять её значило бы записать статус постороннего заказа.
-        // Повтор номера — тоже брак: строки с разными статусами молча
-        // затирали бы друг друга.
-        if (!is_int($id) || !isset($requested[$id]) || isset($indexed[$id])) {
+        if (!is_int($id) || !isset($requested[$id])) {
             return null;
         }
 

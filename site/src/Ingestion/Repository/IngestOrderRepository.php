@@ -188,12 +188,6 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt < :orderedBefore')
             ->andWhere('o.refreshStoppedAt IS NULL')
-            // Заказ без сырья остановить нечем: проблема привязывается к
-            // сырью, а остановка без видимой очереди — тихая потеря. Пропускать
-            // его уже ПОСЛЕ выборки нельзя: он остаётся с пустым
-            // refreshStoppedAt и вечно занимает начало следующей, блокируя
-            // остановку всех остальных.
-            ->andWhere('o.lastRawRecordId IS NOT NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedBefore', $orderedBefore)
@@ -271,7 +265,6 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.status IN (:statuses)')
             ->andWhere('o.orderedAt < :orderedBefore')
             ->andWhere('o.refreshStoppedAt IS NULL')
-            ->andWhere('o.lastRawRecordId IS NOT NULL')
             ->setParameter('statuses', self::nonTerminalStatuses())
             ->setParameter('orderedBefore', $orderedBefore)
             ->orderBy('o.orderedAt', 'ASC')
@@ -284,14 +277,19 @@ final class IngestOrderRepository extends ServiceEntityRepository
     }
 
     /**
-     * Сколько зависших заказов остановить нечем — у них нет сырья, к которому
-     * привязывается проблема.
+     * Сколько зависших заказов не имеют сырья, к которому привязать проблему.
+     *
+     * Такой заказ ВСЁ РАВНО останавливается — просто без записи в очереди на
+     * разбор, и об этом отдельно кричат `error`-ом. Прежде он отсеивался в
+     * выборке зависших, а окно опроса его уже не захватывало: заказ не
+     * обновлялся, не останавливался и не попадал ни в какую очередь — оставался
+     * только этот счётчик, из которого ничего нельзя сделать. Состояние,
+     * помеченное плохим, обязано иметь операцию, переводящую его в хорошее.
      *
      * @companyScopeExempt Аномалия считается по всем компаниям тем же
      * системным прогоном, что и остановка зависших. Состояние недостижимое —
      * заказ всегда создаётся нормализацией, — но если оно всё же появится,
-     * молчать о нём нельзя: заказ выпал бы и из опроса, и из очереди на
-     * разбор.
+     * молчать о нём нельзя.
      */
     public function countStuckWithoutRawRecord(\DateTimeImmutable $orderedBefore, ?string $companyId = null): int
     {
@@ -333,8 +331,13 @@ final class IngestOrderRepository extends ServiceEntityRepository
      * заказ молча заменил бы другой. Размер выборки при этом ограничен
      * страницей очереди.
      *
-     * Область та же, что у очереди: остановленные и терминальные заказы не
-     * опрашиваются, и конфликт между ними ни на что не влияет.
+     * Область ШИРЕ очереди: носители номера считаются среди ВСЕХ заказов
+     * подключения, включая терминальные и остановленные. Ограничить её очередью
+     * было ошибкой: если один носитель в очереди, а второй уже терминален,
+     * `COUNT` равен единице, коллизия не находится — и ответ единственного
+     * заказа маркетплейса приписывается заказу, который, возможно, не он.
+     * Неоднозначность создаёт САМ факт двух носителей одного номера, а не то,
+     * опрашиваем ли мы второго.
      *
      * @param list<string> $externalOrderIds номера заказов текущей страницы
      *
@@ -356,13 +359,10 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.companyId = :companyId')
             ->andWhere('o.source = :source')
             ->andWhere('o.connectionRef = :connectionRef')
-            ->andWhere('o.status IN (:statuses)')
-            ->andWhere('o.refreshStoppedAt IS NULL')
             ->andWhere('o.externalOrderId IN (:externalOrderIds)')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
             ->setParameter('connectionRef', $connectionRef)
-            ->setParameter('statuses', self::nonTerminalStatuses())
             ->setParameter('externalOrderIds', array_values(array_unique($externalOrderIds)))
             ->groupBy('o.externalOrderId')
             ->having('COUNT(o.id) > 1')

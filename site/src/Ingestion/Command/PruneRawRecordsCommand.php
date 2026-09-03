@@ -77,6 +77,11 @@ final class PruneRawRecordsCommand extends Command
             ['olderThanDays', (string) $command->olderThanDays],
             ['candidates', (string) $result->candidates],
             ['candidateBytes', (string) $result->candidateBytes],
+            // Незавершённое прошлых прогонов обслуживается ПЕРВЫМ и из того же
+            // лимита. Без этих двух строк dry-run умалчивал бы о работе,
+            // которую execute сделает раньше всего остального.
+            ['pendingRetries', (string) $result->pendingRetries],
+            ['pendingBytes', (string) $result->pendingBytes],
             ['prunedPayloads', (string) $result->prunedPayloads],
             ['bytesFreed', (string) $result->bytesFreed],
             ['heldByIssues', (string) $result->heldByIssues],
