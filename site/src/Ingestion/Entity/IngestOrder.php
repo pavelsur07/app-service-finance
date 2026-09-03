@@ -250,7 +250,11 @@ class IngestOrder implements TenantOwnedInterface
         $this->rawStatus = $rawStatus;
         $this->status = $status;
         $this->statusObservedAt = $observedAt;
-        $this->rawSubstatus = $rawSubstatus ?? $this->rawSubstatus;
+        // Уточнение принадлежит ЭТОМУ наблюдению. Прежнее «пусто — оставить
+        // старое» сохраняло уточнение прошлого статуса рядом с новым:
+        // `delivered` с `posting_on_way_to_city` — противоречие, которого
+        // маркетплейс не присылал.
+        $this->rawSubstatus = $rawSubstatus;
         $this->lastRawRecordId = $rawRecordId ?? $this->lastRawRecordId;
         $this->touch(new \DateTimeImmutable());
 

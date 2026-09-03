@@ -580,10 +580,8 @@ final readonly class RefreshOrderStatusesAction
             // собой все остальные заказы кабинета, вопреки правилу
             // «испорчено одно отправление — прочие продолжаются».
             $rawStatus = self::statusToken($posting['status'] ?? null);
-            $substatusValue = $posting['substatus'] ?? null;
-            $rawSubstatus = self::statusToken($substatusValue);
 
-            if (null === $rawStatus || (null !== $substatusValue && null === $rawSubstatus)) {
+            if (null === $rawStatus) {
                 // Нарушение контракта, а не отсутствие заказа: считается
                 // отдельно от честного 404, иначе одно прячется за другим.
                 ++$invalid;
@@ -594,6 +592,23 @@ final readonly class RefreshOrderStatusesAction
                 ]);
 
                 continue;
+            }
+
+            // `substatus` — УТОЧНЕНИЕ, а не статус, и в нормализацию не
+            // попадает. Непригодное уточнение отбрасывается само по себе:
+            // отклонять вместе с ним весь ответ значило бы терять настоящий
+            // переход — в том числе терминальный — из-за поля, которое на
+            // статус не влияет. Сырьё при этом уже сохранено выше, так что
+            // доказательство остаётся, а наблюдение идёт без уточнения.
+            $substatusValue = $posting['substatus'] ?? null;
+            $rawSubstatus = self::statusToken($substatusValue);
+
+            if (null !== $substatusValue && null === $rawSubstatus) {
+                $this->logger->warning('Ozon posting substatus is unusable and was dropped; the status itself is applied.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'externalId' => $order->getExternalId(),
+                ]);
             }
 
             $observations[] = [

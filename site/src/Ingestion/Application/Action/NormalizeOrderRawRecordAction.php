@@ -40,6 +40,9 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class NormalizeOrderRawRecordAction
 {
+    /** Потолок одной пачки проблем — тот же, что у RecordNormalizationIssueAction. */
+    private const ISSUE_BATCH = 1000;
+
     public function __construct(
         private IngestRawRecordRepository $rawRecordRepository,
         private RawStorageFacade $rawStorageFacade,
@@ -188,6 +191,15 @@ final readonly class NormalizeOrderRawRecordAction
                     $sourceDataRows,
                 );
 
+            // Проблемы собираются и записываются ОДНОЙ пачкой перед финальным
+            // flush. Поштучный вызов внутри цикла — N+1 под удерживаемыми
+            // блокировками сырья и всех заказов партии: на каждую проблему
+            // своя вложенная транзакция, свой `findOneForUpdate()` и свой
+            // запрос отметок. Партия до 20 000 заказов давала бы десятки тысяч
+            // запросов, пока часовой перепрос ждёт эти же строки.
+            /** @var list<RecordNormalizationIssueCommand> $issues */
+            $issues = [];
+
             foreach ($orders as $orderIndex => $mappedOrder) {
                 // Один и тот же externalId может встретиться в батче дважды:
                 // второй раз он обязан попасть в уже созданную запись, а не
@@ -203,6 +215,7 @@ final readonly class NormalizeOrderRawRecordAction
                     $resolutions,
                     $orderIndex,
                     $isReplay,
+                    $issues,
                 );
             }
 
@@ -215,7 +228,7 @@ final readonly class NormalizeOrderRawRecordAction
             // сообщения или forceReplay размножали бы одинаковые элементы
             // видимой очереди, у которой уникального ключа нет.
             foreach ($isReplay ? [] : $batch->skipped as $skipped) {
-                ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+                $issues[] = new RecordNormalizationIssueCommand(
                     companyId: $command->companyId,
                     rawRecordId: $rawRecord->getId(),
                     operationGroupId: null,
@@ -226,7 +239,7 @@ final readonly class NormalizeOrderRawRecordAction
                         'reason' => $skipped['reason'],
                         'externalId' => $skipped['hint'],
                     ],
-                ));
+                );
             }
 
             // Позиции, исчезнувшие из последнего снимка заказа, удаляются: строка,
@@ -237,6 +250,13 @@ final readonly class NormalizeOrderRawRecordAction
                         $this->itemRepository->remove($item);
                     }
                 }
+            }
+
+            // Чанками по потолку пакетного Action: все команды одной партии
+            // ссылаются на одно и то же сырьё, так что каждая пачка берёт
+            // одну уже удерживаемую блокировку и делает один запрос отметок.
+            foreach (array_chunk($issues, self::ISSUE_BATCH) as $chunk) {
+                $this->recordNormalizationIssueAction->recordMany($chunk);
             }
 
             $rawRecord->markNormalizationDone();
@@ -281,6 +301,7 @@ final readonly class NormalizeOrderRawRecordAction
      *                                        изменяется по ссылке
      * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      * @param bool $isReplay сырьё уже разбирали: наблюдений больше нет, есть пересчёт
+     * @param list<RecordNormalizationIssueCommand> $issues копилка проблем партии, пишется одной пачкой
      */
     private function applyOrder(
         IngestRawRecord $rawRecord,
@@ -293,6 +314,7 @@ final readonly class NormalizeOrderRawRecordAction
         array $resolutions,
         int $orderIndex,
         bool $isReplay,
+        array &$issues,
     ): IngestOrder {
         $companyId = $rawRecord->getCompanyId();
         $status = $this->statusMapper->map($rawRecord->getSource(), $mapped->scheme, $mapped->rawStatus);
@@ -300,7 +322,7 @@ final readonly class NormalizeOrderRawRecordAction
         if (IngestOrderStatus::UNKNOWN === $status && !$isReplay) {
             // Видимая очередь на разбор вместо тихой потери: заказ сохраняется,
             // но незнакомый токен становится заметен в существующем UI issues.
-            ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
+            $issues[] = new RecordNormalizationIssueCommand(
                 companyId: $companyId,
                 rawRecordId: $rawRecord->getId(),
                 operationGroupId: null,
@@ -311,7 +333,7 @@ final readonly class NormalizeOrderRawRecordAction
                     'rawStatus' => $mapped->rawStatus,
                     'externalId' => $mapped->externalId,
                 ],
-            ));
+            );
         }
 
         $order = $known[$mapped->externalId] ?? null;

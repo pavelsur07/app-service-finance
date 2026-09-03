@@ -659,6 +659,61 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Непригодное уточнение не отбирает у заказа настоящий статус.
+     *
+     * `substatus` — уточнение, в нормализацию не попадает. Пока непригодное
+     * уточнение отклоняло весь ответ, валидный переход — в том числе
+     * терминальный — не попадал ни в заказ, ни в журнал, а отметка попытки
+     * при этом сдвигалась: заказ доезжал до STUCK_ORDER из-за поля, которое
+     * на статус не влияет. Принятое пустое уточнение обязано ещё и стереть
+     * прежнее: `delivered` рядом с `posting_on_way_to_city` — противоречие,
+     * которого маркетплейс не присылал.
+     *
+     * @param mixed $substatus то, что пришло в поле `substatus`
+     */
+    #[DataProvider('unusableSubstatusProvider')]
+    public function testUnusableSubstatusDoesNotDiscardATerminalStatus(mixed $substatus): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        // Прежнее уточнение — чтобы было что стирать.
+        $this->connection->executeStatement(
+            'UPDATE ingest_orders SET raw_substatus = :substatus WHERE id = :id',
+            ['substatus' => 'posting_on_way_to_city', 'id' => $order->getId()],
+        );
+        $this->em->clear();
+
+        $posting = ['posting_number' => 'posting-1', 'status' => 'delivered'];
+        if ('__absent__' !== $substatus) {
+            $posting['substatus'] = $substatus;
+        }
+        $this->ozon->setPostings(['posting-1' => $posting]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->observed, 'Статус обязан быть принят.');
+        self::assertSame(0, $result->invalid, 'Наблюдение состоялось — это не брак.');
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::DELIVERED, $reloaded->getStatus());
+        self::assertNull($reloaded->getRawSubstatus(), 'Прежнее уточнение не должно пережить новое наблюдение.');
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function unusableSubstatusProvider(): iterable
+    {
+        yield 'пустая строка' => [''];
+        yield 'null' => [null];
+        yield 'число' => [42];
+        yield 'поля нет' => ['__absent__'];
+    }
+
+    /**
      * Незнакомый токен попадает в очередь, даже если проиграл гонку.
      *
      * Наблюдение, оказавшееся старше уже записанного, состояние заказа не
