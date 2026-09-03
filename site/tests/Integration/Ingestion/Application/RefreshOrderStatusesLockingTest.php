@@ -142,6 +142,112 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
     }
 
     /**
+     * Чужое сырьё НЕ блокируется, даже если на него ссылается наш заказ.
+     *
+     * Указатель заказа — данные, и они могут быть повреждены. Заказ компании
+     * A, ссылающийся на сырьё компании B, брал бы `PESSIMISTIC_WRITE` на
+     * чужую строку и задерживал чужой ingestion. Владелец выясняется до
+     * блокировки, а несовпадение считается отсутствующим доказательством:
+     * заказ останавливается без записи в очереди, как и заказ вовсе без сырья.
+     */
+    public function testForeignEvidenceIsNeverLockedAndTheOrderIsStoppedWithoutAnIssue(): void
+    {
+        [$orderId, $rawRecordId] = $this->seedStuckOrderWithEvidence();
+
+        // Сырьё «переезжает» к другой компании: указатель заказа остаётся.
+        $foreignCompanyId = Uuid::uuid7()->toString();
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET company_id = :company WHERE id = :id',
+            ['company' => $foreignCompanyId, 'id' => $rawRecordId],
+        );
+
+        $observer = $this->newConnection();
+        $observer->executeStatement("SET lock_timeout = '250ms'");
+
+        $rawFree = null;
+
+        $probe = new class($observer, $rawRecordId, $rawFree) extends AbstractLogger {
+            /**
+             * @param ?bool $rawFree свободна ли чужая строка в момент блокировки заказов
+             */
+            public function __construct(
+                private readonly Connection $observer,
+                private readonly string $rawRecordId,
+                private ?bool &$rawFree,
+            ) {
+            }
+
+            public function rawFree(): ?bool
+            {
+                return $this->rawFree;
+            }
+
+            /**
+             * @param mixed[] $context
+             */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                if (!str_contains((string) $message, 'locked evidence rows before the orders')) {
+                    return;
+                }
+
+                $this->observer->beginTransaction();
+
+                try {
+                    $this->observer->executeQuery(
+                        'SELECT id FROM ingest_raw_records WHERE id = :id FOR UPDATE NOWAIT',
+                        ['id' => $this->rawRecordId],
+                    );
+                    $this->rawFree = true;
+                } catch (\Throwable $exception) {
+                    if (!RefreshOrderStatusesLockingTest::isLockTimeout($exception)) {
+                        throw $exception;
+                    }
+
+                    $this->rawFree = false;
+                } finally {
+                    $this->observer->rollBack();
+                }
+            }
+        };
+
+        $action = new RefreshOrderStatusesAction(
+            self::getContainer()->get(\App\Marketplace\Facade\MarketplaceSyncFacade::class),
+            self::getContainer()->get(\App\Ingestion\Repository\IngestOrderRepository::class),
+            self::getContainer()->get(\App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface::class),
+            self::getContainer()->get(\App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface::class),
+            self::getContainer()->get(\App\Ingestion\Domain\Service\IngestOrderStatusMapper::class),
+            self::getContainer()->get(\App\Ingestion\Application\Service\OrderStatusJournal::class),
+            self::getContainer()->get(\App\Ingestion\Facade\RawStorageFacade::class),
+            self::getContainer()->get(\App\Ingestion\Repository\IngestRawRecordRepository::class),
+            self::getContainer()->get(\App\Ingestion\Application\Action\RecordNormalizationIssueAction::class),
+            $this->em,
+            self::getContainer()->get(\Psr\Clock\ClockInterface::class),
+            $probe,
+        );
+
+        try {
+            $result = $action(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+        } finally {
+            $observer->close();
+        }
+
+        self::assertTrue($rawFree, 'Чужая строка сырья не имеет права быть заблокированной нашим прогоном.');
+        self::assertSame(1, $result->stopped, 'Заказ обязан быть остановлен: доказательства у него нет.');
+        self::assertSame(
+            0,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                ['id' => $rawRecordId],
+            ),
+            'Проблема на чужое сырьё не заводится.',
+        );
+        self::assertNotNull(
+            $this->connection->fetchOne('SELECT refresh_stopped_at FROM ingest_orders WHERE id = :id', ['id' => $orderId]),
+        );
+    }
+
+    /**
      * @return array{0: string, 1: string} идентификаторы заказа и его сырья
      */
     private function seedStuckOrderWithEvidence(): array

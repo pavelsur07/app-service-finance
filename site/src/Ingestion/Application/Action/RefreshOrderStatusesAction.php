@@ -488,6 +488,26 @@ final readonly class RefreshOrderStatusesAction
                 continue;
             }
 
+            // Номер отправления проверяется ЗДЕСЬ, а не в клиенте.
+            //
+            // Клиент на пустой номер бросает InvalidArgumentException — это
+            // честно для него, но для прогона означало бы, что один
+            // пробельный идентификатор из базы прерывает всё: накопленные
+            // ответы не применяются, следующие подключения не обрабатываются,
+            // а сам проблемный заказ отметки попытки не получает и вечно
+            // стоит первым в очереди. Испорчен один заказ — прочие продолжают.
+            if ('' === trim($order->getExternalId())) {
+                ++$invalid;
+                $attempts[$order->getId()] = $this->applicationTime();
+                $this->logger->warning('Ozon order has no usable posting number to poll.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'orderId' => $order->getId(),
+                ]);
+
+                continue;
+            }
+
             ++$requested;
 
             try {
@@ -1033,7 +1053,27 @@ final readonly class RefreshOrderStatusesAction
             }
         }
 
-        $candidateRawRecordIds = array_values(array_unique($rawRecordIdByOrder));
+        // Блокируется только СВОЁ сырьё. Указатель заказа — данные, и они
+        // могут быть повреждены: заказ компании A, ссылающийся на сырьё
+        // компании B, брал бы `PESSIMISTIC_WRITE` на чужую строку и задерживал
+        // чужой ingestion. Владелец выясняется до блокировки — тем же способом,
+        // что и в пакетной записи проблем, — а несовпадение считается
+        // отсутствующим доказательством: заказ остановится без записи в
+        // очереди, как и заказ вовсе без сырья.
+        //
+        // Карта «заказ → сырьё» при этом остаётся полной: по ней ниже
+        // отличают «указатель сменился» (отложить) от «указатель тот же, а
+        // строки под блокировкой нет» (остановить). Чужое сырьё попадает во
+        // второй случай именно потому, что его не блокировали.
+        $owners = $this->rawRecordRepository->ownersOf(array_values(array_unique($rawRecordIdByOrder)));
+        $candidateRawRecordIds = [];
+        foreach ($candidates as $candidate) {
+            $rawRecordId = $rawRecordIdByOrder[$candidate->getId()] ?? null;
+            if (null !== $rawRecordId && ($owners[$rawRecordId] ?? null) === $candidate->getCompanyId()) {
+                $candidateRawRecordIds[$rawRecordId] = true;
+            }
+        }
+        $candidateRawRecordIds = array_keys($candidateRawRecordIds);
 
         $stopped = 0;
 

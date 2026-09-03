@@ -659,6 +659,42 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Пробельный номер отправления не прерывает прогон.
+     *
+     * Клиент на пустой номер бросает InvalidArgumentException, и без проверки
+     * до вызова один испорченный идентификатор из базы прерывал всё:
+     * накопленные ответы не применялись, следующие подключения не
+     * обрабатывались, а сам заказ отметки попытки не получал и вечно стоял
+     * первым в очереди. Испорчен один заказ — прочие продолжают.
+     */
+    public function testBlankPostingNumberIsCountedInvalidAndTheRunGoesOn(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'before', IngestOrderStatus::SHIPPED, 'delivering');
+        $blank = $this->seedOrder($company, '   ', IngestOrderStatus::SHIPPED, 'delivering');
+        $this->seedOrder($company, 'after', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings([
+            'before' => ['posting_number' => 'before', 'status' => 'delivered'],
+            'after' => ['posting_number' => 'after', 'status' => 'delivered'],
+        ]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(2, $result->observed, 'Соседи испорченного заказа обязаны быть опрошены.');
+        self::assertSame(1, $result->invalid);
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, '   ');
+        self::assertNotNull($reloaded);
+        self::assertSame($blank->getId(), $reloaded->getId());
+        self::assertNotNull(
+            $reloaded->getStatusRefreshAttemptedAt(),
+            'Без отметки попытки испорченный заказ вечно стоял бы первым в очереди.',
+        );
+    }
+
+    /**
      * Непригодное уточнение не отбирает у заказа настоящий статус.
      *
      * `substatus` — уточнение, в нормализацию не попадает. Пока непригодное
