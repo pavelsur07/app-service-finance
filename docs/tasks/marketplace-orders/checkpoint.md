@@ -259,6 +259,40 @@ ingestion-воркеры → применить миграции → выкат�
    Воспроизводится на `master`. Выбор между UTC и таймзоной компании —
    доменное решение, поэтому чинить в этой задаче не стал.
 
+## Состояние прода — проверено 2026-09-03 (read-only, `vf-prod-codex`)
+
+Код всех шести стадий смержен в `master` (#2403, `deef8298`; cleanup #2404,
+`f55a4faa`). На прод **не выкачен**:
+
+| Факт | Значение |
+|---|---|
+| Образы всех контейнеров (php-fpm, воркеры, scheduler, nginx) | тег `59693356…` — merge #2401 от 2026-09-01 |
+| Последняя выполненная миграция | `Version20260901090000` (2026-09-01 16:53) |
+| Колонки `status_event_seq`, `recorded_seq`, `occurrence`, `payload_pruned_at` | отсутствуют |
+| Прогоны `Deploy to Production` после мержа | два push-прогона, оба остановлены на `Verify production schema is ready` (`doctrine:migrations:up-to-date` красный); `deploy` пропущен; `workflow_dispatch` не запускался |
+
+Гейт сработал как задуман: автодеплой кода с непримененными миграциями не
+пошёл — а именно rolling deployment здесь и запрещён (см. Production Gate в
+секции Stage 5).
+
+**Порядок выкатки, который остаётся выполнить Владельцу:**
+
+1. Остановить (или дренировать) ingestion-воркеры на проде:
+   `site-messenger-worker-sync`, `-pipeline`, `-wb-finance`, `-ads`.
+2. `Deploy to Production` → `workflow_dispatch`, `production_action = migrations`
+   — применит `Version20260902150000`…`210000` (семь миграций; `190000`
+   нетранзакционная, строит индексы `CONCURRENTLY`).
+3. `Deploy to Production` → `production_action = deploy` (или push в `master`):
+   теперь `schema-ready` пройдёт.
+4. Поднять воркеры. Кроны заказов и retention уже в `docker/cron/app.cron`;
+   retention — с `--dry-run`.
+5. Первую неделю смотреть `error`-алерты: `Stuck orders`, `orphaned`,
+   `brokenConnections`, `Raw object may be orphaned`.
+
+После выкатки сверить: `doctrine:migrations:up-to-date` зелёный; за первый
+час появились строки в `ingest_orders` и `ingest_order_status_events`;
+`app:ingestion:raw:prune --dry-run` ночью напечатал `candidateBytes`.
+
 ## Не проверено на реальных данных
 
 Сквозной прогон на тестовых ключах (`run-incremental --resource=ozon_orders_fbo`
