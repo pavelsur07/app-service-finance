@@ -113,40 +113,31 @@ final readonly class StoreRawBatchAction
             // при этом совпадает с чужим — он строится из хеша содержимого.
             return [$this->recoverConcurrentDuplicate($batch, $hash, $ndjson, $exception)];
         } catch (\Throwable $exception) {
-            // Объект записан, строки нет и не будет.
+            // Объект записан, а есть ли строка — НЕИЗВЕСТНО.
             //
-            // Компенсация живёт ЗДЕСЬ, а не у вызывающего: только это место
-            // знает путь сразу после записи, до `flush()`. Вызывающий получает
-            // путь из возвращённой записи, то есть уже после успешного
-            // `flush()`, и о падении внутри него узнать неоткуда — сирота
-            // оставалась бы навсегда, потому что retention ищет кандидатов
-            // среди СТРОК.
-            $this->discardOrphanedObject($storedObject->path);
+            // Соблазн удалить объект здесь же был, и он опасен: исход коммита
+            // бывает неопределённым — PostgreSQL мог зафиксировать строку, а
+            // клиент потерять подтверждение. Удалив объект, мы оставили бы
+            // живую запись без нагрузки и без отметки `payload_pruned_at`:
+            // чтение падало бы инфраструктурной ошибкой, а retention такую
+            // запись не починит. Это путь к необратимой потере, тогда как
+            // осиротевший объект — лишь занятое место.
+            //
+            // Поэтому утечка, но ВИДИМАЯ: путь уходит в error, и убрать объект
+            // может человек, убедившись, что строки на него нет. Найти его по
+            // базе иначе невозможно — retention ищет кандидатов среди строк.
+            $this->logger->error('Raw object may be orphaned: its record failed to persist and the outcome is unknown.', [
+                'companyId' => $batch->companyId,
+                'storagePath' => $storedObject->path,
+                // Класс, а не сообщение: в тексте транспортных исключений
+                // встречаются DSN с учётными данными.
+                'exceptionClass' => $exception::class,
+            ]);
 
             throw $exception;
         }
 
         return [$record];
-    }
-
-    /**
-     * Убрать объект, чьей строки не появилось.
-     *
-     * Не удалось — не беда для данных, но место занято, и путь обязан уйти в
-     * лог: найти такой объект по базе невозможно, строки-то нет.
-     */
-    private function discardOrphanedObject(string $storagePath): void
-    {
-        try {
-            $this->objectStorage->delete($storagePath);
-        } catch (\Exception $exception) {
-            $this->logger->error('Raw object was left in storage without its record; it has to be removed by hand.', [
-                'storagePath' => $storagePath,
-                // Класс, а не сообщение: в тексте ошибок хранилища встречаются
-                // URL с учётными данными.
-                'exceptionClass' => $exception::class,
-            ]);
-        }
     }
 
     /**

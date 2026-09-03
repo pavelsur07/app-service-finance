@@ -29,7 +29,6 @@ use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Marketplace\DTO\ActiveSellerConnectionDTO;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
-use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -82,7 +81,6 @@ final readonly class RefreshOrderStatusesAction
         private IngestOrderStatusMapper $statusMapper,
         private OrderStatusJournal $statusJournal,
         private RawStorageFacade $rawStorageFacade,
-        private ObjectStorageInterface $objectStorage,
         private IngestRawRecordRepository $rawRecordRepository,
         private RecordNormalizationIssueAction $recordIssueAction,
         private EntityManagerInterface $entityManager,
@@ -329,13 +327,19 @@ final readonly class RefreshOrderStatusesAction
                 $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
             });
         } catch (\Throwable $exception) {
-            // Объект уже записан, а строка сырья откачена вместе с транзакцией.
+            // Объекты аудита записаны, а есть ли их строки — НЕИЗВЕСТНО.
             //
-            // Хранилище не транзакционно, и без компенсации каждый повторяемый
-            // сбой оставлял бы недостижимый объект: retention ищет кандидатов
-            // среди СТРОК, и объекта без строки он не найдёт никогда. Почасовой
-            // прогон превращал бы это в неограниченную утечку.
-            $this->discardOrphanedAudit($auditPaths, $companyId, $connectionRef);
+            // Удалять их здесь нельзя: исход коммита бывает неопределённым —
+            // PostgreSQL мог зафиксировать строки, а клиент потерять
+            // подтверждение. Удалив объект живой записи, мы оставили бы её без
+            // нагрузки и без отметки `payload_pruned_at`; чтение падало бы
+            // инфраструктурной ошибкой, и retention такое не чинит. Это путь
+            // к необратимой потере, тогда как сирота — лишь занятое место.
+            //
+            // Поэтому утечка, но ВИДИМАЯ: пути уходят в error, чтобы человек
+            // мог убрать объекты, убедившись, что строк на них нет. По базе их
+            // иначе не найти — retention ищет кандидатов среди строк.
+            $this->reportPossiblyOrphanedAudit($auditPaths, $companyId, $connectionRef, $exception);
 
             throw $exception;
         }
@@ -930,30 +934,22 @@ final readonly class RefreshOrderStatusesAction
     }
 
     /**
-     * Убрать объекты аудита, чьи строки откатила транзакция.
-     *
-     * Не удалось — не беда для данных, но место занято, и путь обязан уйти в
-     * лог: убрать такой объект может только человек, потому что найти его по
-     * базе невозможно — строки нет.
-     *
      * @param list<string> $storagePaths
      */
-    private function discardOrphanedAudit(array $storagePaths, string $companyId, string $connectionRef): void
+    private function reportPossiblyOrphanedAudit(array $storagePaths, string $companyId, string $connectionRef, \Throwable $exception): void
     {
-        foreach ($storagePaths as $storagePath) {
-            try {
-                $this->objectStorage->delete($storagePath);
-            } catch (\Exception $exception) {
-                $this->logger->error('Audit object was left in storage without its raw record; it has to be removed by hand.', [
-                    'companyId' => $companyId,
-                    'connectionRef' => $connectionRef,
-                    'storagePath' => $storagePath,
-                    // Класс, а не сообщение: в тексте ошибок хранилища
-                    // встречаются URL с учётными данными.
-                    'exceptionClass' => $exception::class,
-                ]);
-            }
+        if ([] === $storagePaths) {
+            return;
         }
+
+        $this->logger->error('Audit objects may be orphaned: writing observations failed and the outcome is unknown.', [
+            'companyId' => $companyId,
+            'connectionRef' => $connectionRef,
+            'storagePaths' => $storagePaths,
+            // Класс, а не сообщение: в тексте транспортных исключений
+            // встречаются DSN с учётными данными.
+            'exceptionClass' => $exception::class,
+        ]);
     }
 
     /**

@@ -21,6 +21,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 
 final class StoreRawBatchActionTest extends TestCase
@@ -40,11 +42,11 @@ final class StoreRawBatchActionTest extends TestCase
      * Две ветки одного решения, поэтому и тест один. Нарушение уникального
      * индекса — не сбой: конкурент создал строку на то же сырьё, путь у неё
      * тот же (он строится из хеша содержимого), и объект остаётся. Любое
-     * другое падение означает, что строки не появилось и не появится: объект
-     * надо убрать здесь же, потому что только это место знает путь ДО
-     * `flush()`. Вызывающий получает путь из возвращённой записи, то есть уже
-     * после успешного `flush()`, и о падении внутри него узнать неоткуда —
-     * сирота осталась бы навсегда, ведь retention ищет кандидатов среди строк.
+     * другое падение оставляет исход НЕИЗВЕСТНЫМ: PostgreSQL мог зафиксировать
+     * строку, а клиент потерять подтверждение. Удалить объект значило бы
+     * оставить живую запись без нагрузки и без отметки — необратимая потеря.
+     * Поэтому объект НЕ трогается, а его путь уходит в error: убрать сироту
+     * может человек, убедившись, что строки на неё нет.
      *
      * @param bool $concurrentDuplicate дубль конкурента или настоящий сбой
      */
@@ -135,8 +137,6 @@ final class StoreRawBatchActionTest extends TestCase
                 return $existingRecord;
             });
 
-        $deleted = null;
-
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
         $objectStorage->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('exists')
@@ -146,11 +146,9 @@ final class StoreRawBatchActionTest extends TestCase
 
                 return true;
             });
-        $objectStorage->expects($concurrentDuplicate ? self::never() : self::once())
-            ->method('delete')
-            ->willReturnCallback(static function (string $path) use (&$deleted): void {
-                $deleted = $path;
-            });
+        // Удаления НЕТ ни в одной ветке: исход неизвестен, а удаление
+        // необратимо.
+        $objectStorage->expects(self::never())->method('delete');
         $objectStorage->expects(self::once())
             ->method('write')
             ->with(
@@ -213,6 +211,19 @@ final class StoreRawBatchActionTest extends TestCase
             ->method('resetManager')
             ->willReturn($recoveredEntityManager);
 
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: mixed[]}> */
+            public array $records = [];
+
+            /**
+             * @param mixed[] $context
+             */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
+
         $action = new StoreRawBatchAction(
             $repository,
             $objectStorage,
@@ -220,7 +231,7 @@ final class StoreRawBatchActionTest extends TestCase
             new RawStoragePathBuilder(new PathSegmentNormalizer()),
             $entityManager,
             $managerRegistry,
-            new NullLogger(),
+            $logger,
         );
 
         if (!$concurrentDuplicate) {
@@ -231,8 +242,13 @@ final class StoreRawBatchActionTest extends TestCase
                 // Ожидаемо: падение и есть предмет проверки.
             }
 
-            self::assertNotNull($deleted, 'Объект без строки обязан быть убран.');
-            self::assertStringContainsString('/seller-report/', $deleted);
+            $errors = array_values(array_filter(
+                $logger->records,
+                static fn (array $entry): bool => LogLevel::ERROR === $entry['level'],
+            ));
+            self::assertCount(1, $errors, 'Возможная сирота обязана быть видна: по базе её не найти.');
+            self::assertStringContainsString('/seller-report/', (string) $errors[0]['context']['storagePath']);
+            self::assertArrayNotHasKey('exceptionMessage', $errors[0]['context'], 'В лог идёт класс, не сообщение.');
 
             return;
         }
