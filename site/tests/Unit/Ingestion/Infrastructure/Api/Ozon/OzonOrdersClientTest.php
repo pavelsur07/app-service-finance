@@ -408,6 +408,39 @@ final class OzonOrdersClientTest extends TestCase
         );
     }
 
+    /**
+     * Не-объект в теле — тоже доказательство.
+     *
+     * `[]`, `"broken"` или `0` нарушают контракт ровно так же, как объект без
+     * нужного поля. Пока доказательством считался только объект, такой ответ
+     * давал пустой `decodedPayload`, сырья не появлялось вовсе — и разбирать
+     * дефект интеграции было не по чему.
+     */
+    #[DataProvider('nonObjectPayloadProvider')]
+    public function testNonObjectPayloadOfAnUnexpectedStatusIsStillEvidence(string $payload, mixed $expected): void
+    {
+        $client = $this->client(new MockResponse($payload, ['http_code' => 418]));
+
+        try {
+            $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, 'posting-1');
+            self::fail('Неожиданный код обязан быть нарушением контракта.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertSame(['_malformed_response' => $expected], $exception->decodedPayload());
+            self::assertTrue($exception->isEndpointWide());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function nonObjectPayloadProvider(): iterable
+    {
+        yield 'пустой список' => ['[]', []];
+        yield 'список строк' => ['["a","b"]', ['a', 'b']];
+        yield 'строка' => ['"broken"', 'broken'];
+        yield 'число' => ['0', 0];
+    }
+
     private function client(MockResponse $response): OzonOrdersClient
     {
         return new OzonOrdersClient(

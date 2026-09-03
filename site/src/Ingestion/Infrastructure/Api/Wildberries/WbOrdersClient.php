@@ -45,6 +45,15 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
     private const DEFAULT_RETRY_AFTER_SECONDS = 70;
     private const TIMEOUT_SECONDS = 120;
 
+    /**
+     * Ключ конверта для доказательства, которое не является JSON-объектом.
+     *
+     * Строка сырья — объект на запись, а список или скаляр в такую форму не
+     * ложатся. Подчёркивание в начале отделяет наше поле от полей
+     * маркетплейса: столкнуться с ним в ответе Ozon или WB нечему.
+     */
+    private const EVIDENCE_ENVELOPE_KEY = '_malformed_response';
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private WbCredentialProviderInterface $credentialProvider,
@@ -406,9 +415,32 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * Тело ответа как доказательство.
+     *
+     * Объект едет как есть. Список и скаляр — тоже доказательство, и терять их
+     * нельзя: `[]`, `"broken"` или `0` нарушают контракт ровно так же, а
+     * пустое доказательство означает, что сырья не появится вовсе и разбирать
+     * дефект интеграции будет не по чему. Строка сырья — JSON-объект на
+     * запись, поэтому не-объект заворачивается в конверт с одним полем.
+     *
+     * `null` остаётся `null`: разбирать было нечего — невалидный JSON или
+     * буквальный `null` в теле. Конверт вокруг пустоты доказательством не
+     * является, он лишь создаёт видимость записи.
+     *
+     * @return array<string, mixed>|null
+     */
     private static function evidence(mixed $decoded): ?array
     {
-        return is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
+        if (null === $decoded) {
+            return null;
+        }
+
+        if (is_array($decoded) && !array_is_list($decoded)) {
+            return $decoded;
+        }
+
+        return [self::EVIDENCE_ENVELOPE_KEY => $decoded];
     }
 
     /**

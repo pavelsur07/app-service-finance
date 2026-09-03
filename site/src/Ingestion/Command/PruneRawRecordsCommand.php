@@ -85,6 +85,7 @@ final class PruneRawRecordsCommand extends Command
             ['prunedPayloads', (string) $result->prunedPayloads],
             ['bytesFreed', (string) $result->bytesFreed],
             ['heldByIssues', (string) $result->heldByIssues],
+            ['heldAfterPlanning', (string) $result->heldAfterPlanning],
             ['orphanedObjects', (string) $result->orphanedObjects],
         ]);
 

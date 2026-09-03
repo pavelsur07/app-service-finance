@@ -77,7 +77,11 @@ final class Version20260902170000 extends AbstractMigration
               WHERE e.id = numbered.id'
         );
 
-        $this->addSql('DROP INDEX uniq_ingest_order_status_event_observation');
+        // `IF EXISTS`, потому что смысл шага — ЗАМЕНИТЬ индекс, а не убедиться
+        // в его наличии. База, где его почему-то нет, обязана прийти к нужной
+        // форме, а не встать посреди миграции из-за отсутствующего объекта,
+        // который следующая строка всё равно создаёт заново.
+        $this->addSql('DROP INDEX IF EXISTS uniq_ingest_order_status_event_observation');
         $this->addSql(
             'CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation
              ON ingest_order_status_events (company_id, raw_record_id, order_id, occurrence)'
@@ -123,7 +127,11 @@ final class Version20260902170000 extends AbstractMigration
 
         $this->addSql('DROP INDEX idx_ingest_order_refresh_queue');
 
-        $this->addSql('DROP INDEX uniq_ingest_order_status_event_observation');
+        // `IF EXISTS`, потому что смысл шага — ЗАМЕНИТЬ индекс, а не убедиться
+        // в его наличии. База, где его почему-то нет, обязана прийти к нужной
+        // форме, а не встать посреди миграции из-за отсутствующего объекта,
+        // который следующая строка всё равно создаёт заново.
+        $this->addSql('DROP INDEX IF EXISTS uniq_ingest_order_status_event_observation');
         $this->addSql(
             'CREATE UNIQUE INDEX uniq_ingest_order_status_event_observation
              ON ingest_order_status_events (company_id, raw_record_id, order_id, raw_status)'

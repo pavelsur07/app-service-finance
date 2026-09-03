@@ -17,6 +17,13 @@ namespace App\Ingestion\Application\DTO;
  * первое — норма, второе — дефект интеграции. И отказ авторизации отделён от
  * прочих сбоев подключения: 429 и таймаут проходят сами, протухший ключ ждёт
  * человека.
+ *
+ * `brokenConnections` — третий вид, и он тоже сам не пройдёт: ответ, который
+ * нарушает контракт целиком (неожиданный HTTP-код, эндпоинт, отвечающий не тем
+ * форматом), будет таким же и через час. Пока он считался наравне с 429,
+ * постоянная несовместимость API заканчивалась нулевым кодом возврата и одним
+ * `warning`: под `--quiet` в кроне прогон выглядел успешным, а подключение не
+ * обновлялось вовсе.
  */
 final readonly class RefreshOrderStatusesResult
 {
@@ -29,6 +36,7 @@ final readonly class RefreshOrderStatusesResult
         public int $stopped = 0,
         public int $failedConnections = 0,
         public int $authFailedConnections = 0,
+        public int $brokenConnections = 0,
     ) {
     }
 
@@ -41,6 +49,7 @@ final readonly class RefreshOrderStatusesResult
         int $stopped = 0,
         int $failedConnections = 0,
         int $authFailedConnections = 0,
+        int $brokenConnections = 0,
     ): self {
         return new self(
             $this->requested + $requested,
@@ -51,6 +60,7 @@ final readonly class RefreshOrderStatusesResult
             $this->stopped + $stopped,
             $this->failedConnections + $failedConnections,
             $this->authFailedConnections + $authFailedConnections,
+            $this->brokenConnections + $brokenConnections,
         );
     }
 }

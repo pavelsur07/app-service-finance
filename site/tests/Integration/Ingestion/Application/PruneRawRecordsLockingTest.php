@@ -23,6 +23,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -299,6 +300,94 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
             $holder->rollBack();
             $holder->close();
         }
+    }
+
+    /**
+     * РЕШЕНИЕ обязано быть закоммичено ДО того, как тронут объект.
+     *
+     * Это и есть смысл двух фаз, и проверить его можно без имитации аварии:
+     * подставное хранилище в момент `delete()` спрашивает ДРУГОЕ соединение,
+     * видно ли уже `payload_pruned_at`. Видно — значит решение закоммичено, и
+     * падение процесса прямо здесь оставит честное «нагрузки нет», а не
+     * запись, которая утверждает обратное при уже уничтоженных данных.
+     *
+     * Однофазная реализация (пометить и удалить в одной транзакции, поймав
+     * исключение удаления) этот тест красит: чужое соединение увидит NULL.
+     */
+    public function testTheDecisionIsCommittedBeforeTheObjectIsTouched(): void
+    {
+        $rawRecordId = $this->seedStaleRawRecord();
+
+        $observer = $this->newConnection();
+        $seenByOthers = null;
+
+        $action = new PruneRawRecordsAction(
+            self::getContainer()->get(IngestRawRecordRepository::class),
+            new class($observer, $rawRecordId, $seenByOthers) implements ObjectStorageInterface {
+                /**
+                 * @param ?bool $seenByOthers видел ли посторонний отметку решения
+                 */
+                public function __construct(
+                    private readonly Connection $observer,
+                    private readonly string $rawRecordId,
+                    private ?bool &$seenByOthers,
+                ) {
+                }
+
+                public function seenByOthers(): ?bool
+                {
+                    return $this->seenByOthers;
+                }
+
+                public function write(string $path, string $contents): StoredObject
+                {
+                    return new StoredObject($path, strlen($contents));
+                }
+
+                public function read(string $path): string
+                {
+                    return '';
+                }
+
+                public function readStream(string $path)
+                {
+                    $stream = fopen('php://memory', 'r+');
+                    if (false === $stream) {
+                        throw new \RuntimeException('Не удалось открыть поток в памяти.');
+                    }
+
+                    return $stream;
+                }
+
+                public function exists(string $path): bool
+                {
+                    return true;
+                }
+
+                public function delete(string $path): void
+                {
+                    // Чужое соединение видит только закоммиченное.
+                    $this->seenByOthers = null !== $this->observer->fetchOne(
+                        'SELECT payload_pruned_at FROM ingest_raw_records WHERE id = :id',
+                        ['id' => $this->rawRecordId],
+                    );
+                }
+            },
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
+        );
+
+        try {
+            $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        } finally {
+            $observer->close();
+        }
+
+        self::assertTrue(
+            $seenByOthers,
+            'К хранилищу нельзя идти, пока решение не закоммичено: падение здесь оставило бы запись, утверждающую, что нагрузка на месте.',
+        );
     }
 
     /**

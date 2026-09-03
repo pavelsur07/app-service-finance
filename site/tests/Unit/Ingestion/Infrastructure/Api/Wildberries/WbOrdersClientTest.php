@@ -328,6 +328,41 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * Не-объект в теле — тоже доказательство.
+     *
+     * `[]`, `"broken"` или `0` нарушают контракт ровно так же, как объект без
+     * нужного поля. Пока доказательством считался только объект, такой ответ
+     * давал пустой `decodedPayload`, сырья не появлялось вовсе — и разбирать
+     * дефект интеграции было не по чему.
+     *
+     * @param string $payload тело неожиданного ответа
+     */
+    #[DataProvider('nonObjectPayloadProvider')]
+    public function testNonObjectPayloadOfAnUnexpectedStatusIsStillEvidence(string $payload, mixed $expected): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 418])));
+
+        try {
+            $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+            self::fail('Неожиданный код обязан быть нарушением контракта.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertSame(['_malformed_response' => $expected], $exception->decodedPayload());
+            self::assertTrue($exception->isEndpointWide());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function nonObjectPayloadProvider(): iterable
+    {
+        yield 'пустой список' => ['[]', []];
+        yield 'список строк' => ['["a","b"]', ['a', 'b']];
+        yield 'строка' => ['"broken"', 'broken'];
+        yield 'число' => ['0', 0];
+    }
+
+    /**
      * Две строки одного заказа — брак ВСЕГО номера, а не одной лишней строки.
      *
      * Оставить первую значило бы выбрать статус по порядку в ответе: строки

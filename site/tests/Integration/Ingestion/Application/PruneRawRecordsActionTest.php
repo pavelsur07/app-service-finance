@@ -526,19 +526,26 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
      */
     public function testFailedDeletionYieldsItsPlaceInTheQueue(): void
     {
-        $stubborn = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+        $stubborn = $this->seedRaw('page-1', new \DateTimeImmutable('-402 days'));
+        // Вторая запись СВЕЖЕЕ, поэтому в очереди она вторая: без отметки
+        // попытки первая осталась бы впереди навсегда и до этой очередь не
+        // дошла бы никогда.
+        $next = $this->seedRaw('page-2', new \DateTimeImmutable('-401 days'));
 
         $this->connection->executeStatement(
-            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
-            ['id' => $stubborn['id']],
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id IN (:ids)',
+            ['ids' => [$stubborn['id'], $next['id']]],
+            ['ids' => Connection::PARAM_STR_ARRAY],
         );
         $this->em->clear();
 
         $action = new PruneRawRecordsAction(
             $this->rawRecords,
-            new class($this->storage) implements ObjectStorageInterface {
-                public function __construct(private readonly ObjectStorageInterface $inner)
-                {
+            new class($this->storage, $stubborn['path']) implements ObjectStorageInterface {
+                public function __construct(
+                    private readonly ObjectStorageInterface $inner,
+                    private readonly string $undeletable,
+                ) {
                 }
 
                 public function write(string $path, string $contents): StoredObject
@@ -563,7 +570,11 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
 
                 public function delete(string $path): void
                 {
-                    throw new \RuntimeException('storage is unavailable');
+                    if ($path === $this->undeletable) {
+                        throw new \RuntimeException('storage is unavailable');
+                    }
+
+                    $this->inner->delete($path);
                 }
             },
             $this->em,
@@ -571,7 +582,9 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             new NullLogger(),
         );
 
-        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        // Лимит РОВНО в одну запись: с большим лимитом обе записи попали бы
+        // в один прогон, и голодание было бы нечем показать.
+        $result = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 1, execute: true));
         self::assertSame(1, $result->orphanedObjects);
 
         $this->em->clear();
@@ -581,6 +594,19 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             $attempted->getPayloadDeletionAttemptedAt(),
             'Без отметки попытки запись вечно занимала бы начало очереди.',
         );
+
+        // ВТОРОЙ прогон, тем же лимитом. Именно он и есть утверждение: место в
+        // очереди достаётся следующей записи, а не снова неустранимой.
+        $second = $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 1, execute: true));
+
+        self::assertSame(0, $second->orphanedObjects, 'Неустранимая запись обязана уступить место.');
+        self::assertSame(1, $second->pendingRetries);
+
+        $this->em->clear();
+        $served = $this->rawRecords->findByIdAndCompany($next['id'], $this->companyId);
+        self::assertNotNull($served);
+        self::assertNotNull($served->getPayloadDeletedAt(), 'Вторая запись обязана быть доведена до конца.');
+        self::assertFalse($this->storage->exists($next['path']));
     }
 
     /**
@@ -804,6 +830,104 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             $this->storage->exists($neighbour['path']),
             'Соседняя запись обязана быть обработана: сбой одной не откатывает чанк.',
         );
+    }
+
+    /**
+     * Дефект программы не притворяется сбоем хранилища.
+     *
+     * `TypeError`, `AssertionError` и прочие `\Error` следующим прогоном не
+     * лечатся. Поймать их наравне с недоступностью хранилища значило бы
+     * записать `warning`, оставить запись в вечном pending и спрятать поломку
+     * за счётчиком, который никогда не сойдётся.
+     */
+    public function testProgrammingErrorInStorageIsNotSwallowedAsARetry(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $action = new PruneRawRecordsAction(
+            $this->rawRecords,
+            new class($this->storage) implements ObjectStorageInterface {
+                public function __construct(private readonly ObjectStorageInterface $inner)
+                {
+                }
+
+                public function write(string $path, string $contents): StoredObject
+                {
+                    return $this->inner->write($path, $contents);
+                }
+
+                public function read(string $path): string
+                {
+                    return $this->inner->read($path);
+                }
+
+                public function readStream(string $path)
+                {
+                    return $this->inner->readStream($path);
+                }
+
+                public function exists(string $path): bool
+                {
+                    return $this->inner->exists($path);
+                }
+
+                public function delete(string $path): void
+                {
+                    throw new \TypeError('storage adapter is broken');
+                }
+            },
+            $this->em,
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
+        );
+
+        $this->expectException(\TypeError::class);
+
+        try {
+            $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        } finally {
+            // Объект обязан уцелеть: до удаления дело не дошло.
+            self::assertTrue($this->storage->exists($record['path']));
+        }
+    }
+
+    /**
+     * Удержание среди УЖЕ ПОМЕЧЕННОГО backlog видно в прогнозе.
+     *
+     * Запрос удержаний смотрит только на непомеченные записи, поэтому backlog
+     * выпадал из него целиком: dry-run обещал освободить место, которое
+     * execute не освободит — решение по этим записям будет отменено.
+     */
+    public function testHeldBacklogIsVisibleInTheForecast(): void
+    {
+        $held = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $held['id']],
+        );
+
+        $this->em->persist(new NormalizationIssue(
+            companyId: $this->companyId,
+            rawRecordId: $held['id'],
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        $plan = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: false));
+
+        self::assertSame(1, $plan->pendingRetries, 'Запись в backlog есть…');
+        self::assertSame(1, $plan->heldByIssues, '…и она удержана — прогноз обязан это сказать.');
+        self::assertSame(0, $plan->pendingBytes, 'Обещать освобождение её объёма нельзя: он не освободится.');
+
+        $done = ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+
+        self::assertSame($plan->heldByIssues, $done->heldByIssues, 'Одна и та же запись не считается дважды.');
+        self::assertSame(0, $done->heldAfterPlanning, 'Удержание было известно плану, а не появилось позже.');
+        self::assertTrue($this->storage->exists($held['path']), 'Доказательство обязано уцелеть.');
     }
 
     /**

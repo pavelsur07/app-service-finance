@@ -92,6 +92,18 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $occurrence;
 
+    /**
+     * Порядковый номер события в истории ЗАКАЗА — порядок применения.
+     *
+     * Отличается от `occurrence` по назначению: тот различает наблюдения
+     * внутри одного сырья и служит ключом уникальности, этот задаёт порядок
+     * между событиями РАЗНЫХ сырьевых записей, когда время наблюдения у них
+     * совпало. Выдаётся счётчиком заказа под его блокировкой, поэтому
+     * монотонен и между процессами.
+     */
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    private int $recordedSeq;
+
     /** Указатель на сырьё-доказательство; после retention может стать неразрешимым. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $rawRecordId = null;
@@ -109,6 +121,7 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         ?string $rawRecordId = null,
         bool $applied = true,
         int $occurrence = 0,
+        int $recordedSeq = 0,
     ) {
         Assert::uuid($companyId);
         Assert::uuid($orderId);
@@ -126,6 +139,7 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
         $this->applied = $applied;
         $this->previousStatus = $applied ? $previousStatus : null;
         $this->occurrence = $occurrence;
+        $this->recordedSeq = $recordedSeq;
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -137,6 +151,11 @@ class IngestOrderStatusEvent implements TenantOwnedInterface
     public function getOccurrence(): int
     {
         return $this->occurrence;
+    }
+
+    public function getRecordedSeq(): int
+    {
+        return $this->recordedSeq;
     }
 
     public function getId(): string

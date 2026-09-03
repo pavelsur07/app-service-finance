@@ -21,7 +21,9 @@ namespace App\Ingestion\Application\DTO;
  * решение включать удаление принимается по объёму, а не по числу строк.
  *
  * `pendingRetries` и `pendingBytes` — незавершённая работа прошлых прогонов:
- * решение закоммичено, объект ещё на месте. Она обслуживается ПЕРВОЙ и из
+ * решение закоммичено, объект ещё на месте. `pendingBytes` считает только те
+ * из них, которые действительно будут удалены: удержанные проблемой места не
+ * освободят, и включать их в обещанный объём значило бы завысить прогноз. Она обслуживается ПЕРВОЙ и из
  * ОБЩЕГО с новыми кандидатами бюджета, поэтому dry-run обязан показывать её
  * отдельным числом. Без него прогноз врал бы дважды: он не упоминал бы работу,
  * которую execute сделает в первую очередь, и завышал бы число новых
@@ -30,7 +32,16 @@ namespace App\Ingestion\Application\DTO;
  * `heldByIssues` — записи, которые удалять нельзя, потому что они служат
  * доказательством для НЕРАЗОБРАННОЙ проблемы. Без отдельного счётчика «нечего
  * удалять» и «удалять нельзя» выглядели бы одинаково, хотя реакция на них
- * разная: во втором случае нужно разобрать очередь.
+ * разная: во втором случае нужно разобрать очередь. Считается ПО ПЛАНУ, до
+ * всякого исполнения, и потому одинаково в обоих режимах — включая удержания
+ * среди уже помеченного backlog, которые прежде выпадали из прогноза целиком:
+ * запрос удержаний смотрел только на НЕпомеченные записи.
+ *
+ * `heldAfterPlanning` — удержания, появившиеся ПОСЛЕ того, как план построен:
+ * проблема заведена между отбором и решением или между решением и удалением.
+ * Отдельно от `heldByIssues` именно потому, что план их знать не мог, а
+ * сложить их вместе значило бы посчитать одну и ту же запись дважды на
+ * execute и не посчитать вовсе на dry-run.
  *
  * `orphanedObjects` — запись помечена, а объект в хранилище удалить не вышло.
  * Порядок именно такой намеренно: запись, утверждающая, что нагрузка на месте,
@@ -47,6 +58,7 @@ final readonly class PruneRawRecordsResult
         public int $prunedPayloads = 0,
         public int $bytesFreed = 0,
         public int $heldByIssues = 0,
+        public int $heldAfterPlanning = 0,
         public int $orphanedObjects = 0,
     ) {
     }
@@ -59,6 +71,7 @@ final readonly class PruneRawRecordsResult
         int $prunedPayloads = 0,
         int $bytesFreed = 0,
         int $heldByIssues = 0,
+        int $heldAfterPlanning = 0,
         int $orphanedObjects = 0,
     ): self {
         return new self(
@@ -69,6 +82,7 @@ final readonly class PruneRawRecordsResult
             $this->prunedPayloads + $prunedPayloads,
             $this->bytesFreed + $bytesFreed,
             $this->heldByIssues + $heldByIssues,
+            $this->heldAfterPlanning + $heldAfterPlanning,
             $this->orphanedObjects + $orphanedObjects,
         );
     }

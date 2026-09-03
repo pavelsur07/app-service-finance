@@ -71,7 +71,7 @@ final class RefreshOrderStatusesCommand extends Command
         }
 
         $io->success(sprintf(
-            'Requested %d orders (observed: %d, changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d).',
+            'Requested %d orders (observed: %d, changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d, broken connections: %d).',
             $result->requested,
             $result->observed,
             $result->changed,
@@ -80,12 +80,16 @@ final class RefreshOrderStatusesCommand extends Command
             $result->stopped,
             $result->failedConnections,
             $result->authFailedConnections,
+            $result->brokenConnections,
         ));
 
-        // Отказ авторизации сам не пройдёт: пока ключ не заменят, подключение
-        // не обновляется вовсе. Ненулевой код возврата делает это видимым в
-        // выводе cron, а не только в логах.
-        if ($result->authFailedConnections > 0) {
+        // Неустранимые сами не пройдут: пока ключ не заменят или API не
+        // починят, подключение не обновляется вовсе, и через час будет ровно
+        // то же самое. Ненулевой код возврата делает это видимым в выводе
+        // cron, а не только в логах. Retryable-сбои (429, таймаут) сюда не
+        // относятся: они лечатся следующим прогоном, и падать на них значило
+        // бы обесценить сам сигнал.
+        if ($result->authFailedConnections > 0 || $result->brokenConnections > 0) {
             return Command::FAILURE;
         }
 

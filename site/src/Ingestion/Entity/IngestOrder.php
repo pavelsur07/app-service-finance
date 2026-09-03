@@ -135,6 +135,24 @@ class IngestOrder implements TenantOwnedInterface
     #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
     private ?\DateTimeImmutable $statusRefreshAttemptedAt = null;
 
+    /**
+     * Сколько событий журнала уже записано ЭТОМУ заказу.
+     *
+     * Счётчик заказа, а не события, потому что монотонность нужна ровно в
+     * пределах одного заказа и обеспечивается его же блокировкой: журнал
+     * пишется только под `PESSIMISTIC_WRITE` на эту строку, поэтому два
+     * процесса получают номера по очереди, а не одновременно.
+     *
+     * Нужен, чтобы у истории был НАСТОЯЩИЙ порядок применения. Сортировать
+     * события с равным `observedAt` по `id` — не то же самое: UUID v7
+     * упорядочен по миллисекунде, и два процесса, взявшие блокировку внутри
+     * одной миллисекунды, могли дать порядок, обратный порядку применения.
+     * Тогда цепочка `previousStatus` не сходится, а последним в истории
+     * оказывается не тот переход, который стоит в заказе.
+     */
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    private int $statusEventSeq = 0;
+
     /** @var array<string, mixed> */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $attributes = null;
@@ -308,6 +326,22 @@ class IngestOrder implements TenantOwnedInterface
     public function getStatusRefreshAttemptedAt(): ?\DateTimeImmutable
     {
         return $this->statusRefreshAttemptedAt;
+    }
+
+    /**
+     * Выдать следующий номер события журнала.
+     *
+     * Вызывается ТОЛЬКО под блокировкой этой строки — иначе два процесса
+     * прочитали бы одно значение и выдали бы один номер дважды.
+     */
+    public function nextStatusEventSequence(): int
+    {
+        return ++$this->statusEventSeq;
+    }
+
+    public function getStatusEventSeq(): int
+    {
+        return $this->statusEventSeq;
     }
 
     public function stopRefreshing(\DateTimeImmutable $at): void

@@ -90,7 +90,17 @@ final readonly class PruneRawRecordsAction
             ? $this->rawRecordRepository->findPrunable($notSeenSince, $remaining)
             : [];
 
-        $held = $this->rawRecordRepository->countHeldByUnresolvedIssues($notSeenSince);
+        // Удержания среди УЖЕ ПОМЕЧЕННЫХ считаются отдельно: запрос выше
+        // смотрит только на непомеченные записи, и backlog выпадал из прогноза
+        // целиком. Dry-run обещал освободить место, которое execute не
+        // освободит, потому что решение по этим записям будет отменено.
+        $pendingHeld = array_flip($this->rawRecordRepository->filterHeldByUnresolvedIssues($this->idsOf($pending)));
+        $pendingToDelete = array_values(array_filter(
+            $pending,
+            static fn (IngestRawRecord $record): bool => !isset($pendingHeld[$record->getId()]),
+        ));
+
+        $held = $this->rawRecordRepository->countHeldByUnresolvedIssues($notSeenSince) + count($pendingHeld);
 
         $result = new PruneRawRecordsResult(
             candidates: count($records),
@@ -99,7 +109,9 @@ final readonly class PruneRawRecordsAction
             // освобождаемому месту, а не по числу строк.
             candidateBytes: $this->bytesOf($records),
             pendingRetries: count($pending),
-            pendingBytes: $this->bytesOf($pending),
+            // Только то, что действительно освободится: удержанные записи
+            // места не отдадут.
+            pendingBytes: $this->bytesOf($pendingToDelete),
             heldByIssues: $held,
         );
 
@@ -120,8 +132,14 @@ final readonly class PruneRawRecordsAction
         }
 
         // Незавершённое СНАЧАЛА — ровно в том порядке, который обещал план.
+        //
+        // Удержанные записи идут сюда ТОЖЕ, хотя план уже знает о них: решение
+        // по ним нужно отменить, иначе строка навсегда осталась бы с отметкой
+        // «нагрузки нет» при живом объекте. Но в счётчик «появилось позже» они
+        // не попадают — план их знал, и посчитать их там значило бы посчитать
+        // одну запись дважды.
         foreach (array_chunk($this->idsOf($pending), self::DELETION_CHUNK) as $chunk) {
-            $result = $this->deleteChunk($result, $chunk);
+            $result = $this->deleteChunk($result, $chunk, $pendingHeld);
         }
 
         if ([] === $records) {
@@ -136,7 +154,7 @@ final readonly class PruneRawRecordsAction
         foreach (array_chunk($this->idsOf($records), self::CHUNK) as $chunk) {
             [$marked, $lateHolds] = $this->markChunk($chunk, $notSeenSince);
             $decided = [...$decided, ...$marked];
-            $result = $result->with(prunedPayloads: count($marked), heldByIssues: $lateHolds);
+            $result = $result->with(prunedPayloads: count($marked), heldAfterPlanning: $lateHolds);
         }
 
         // ФАЗА 2: исполнение решений, принятых ТОЛЬКО ЧТО.
@@ -203,16 +221,18 @@ final readonly class PruneRawRecordsAction
      * блокировку сотнями удалений незачем.
      *
      * @param list<string> $chunk
+     * @param array<string, int> $knownHolds удержания, которые план уже посчитал
      */
-    private function deleteChunk(PruneRawRecordsResult $result, array $chunk): PruneRawRecordsResult
+    private function deleteChunk(PruneRawRecordsResult $result, array $chunk, array $knownHolds = []): PruneRawRecordsResult
     {
         $freed = 0;
         $orphaned = 0;
         $cancelled = 0;
         $evidenceLost = 0;
         $undecided = 0;
+        $lateHolds = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($chunk, &$freed, &$orphaned, &$cancelled, &$evidenceLost, &$undecided): void {
+        $this->entityManager->wrapInTransaction(function () use ($chunk, $knownHolds, &$freed, &$orphaned, &$cancelled, &$evidenceLost, &$undecided, &$lateHolds): void {
             $locked = $this->rawRecordRepository->findPendingPayloadDeletionForUpdate($chunk);
             if ([] === $locked) {
                 return;
@@ -235,6 +255,10 @@ final readonly class PruneRawRecordsAction
                     continue;
                 }
 
+                if (!isset($knownHolds[$record->getId()])) {
+                    ++$lateHolds;
+                }
+
                 // Отменять решение можно ТОЛЬКО если нагрузка ещё на месте.
                 //
                 // Состояние «решение принято, объект уже удалён, коммит не
@@ -249,9 +273,15 @@ final readonly class PruneRawRecordsAction
                 // запись сохранила бы старейший приоритет и снова заняла бы
                 // начало очереди — то самое голодание, ради которого заведена
                 // отметка попытки. Поэтому сбой обрабатывается поштучно.
+                // Ловится `\Exception`, а не `\Throwable`.
+                //
+                // `TypeError`, `AssertionError` и прочие `\Error` — дефекты
+                // программы: следующий прогон их не исправит, а тихий
+                // `warning` и вечный pending спрятали бы поломку. Пусть падает
+                // громко.
                 try {
                     $stillStored = $this->objectStorage->exists($record->getStoragePath());
-                } catch (\Throwable $exception) {
+                } catch (\Exception $exception) {
                     $record->markPayloadDeletionAttempted($now);
                     ++$undecided;
 
@@ -309,7 +339,11 @@ final readonly class PruneRawRecordsAction
                     if ($existed) {
                         $freed += $record->getByteSize();
                     }
-                } catch (\Throwable $exception) {
+                } catch (\Exception $exception) {
+                    // `\Error` сюда не попадает намеренно: дефект программы
+                    // следующим прогоном не лечится, и превращать его в
+                    // ожидаемый retry значило бы прятать поломку.
+                    //
                     // Отметка решения остаётся, отметка удаления — нет:
                     // следующий прогон найдёт эту запись и повторит попытку.
                     //
@@ -346,7 +380,10 @@ final readonly class PruneRawRecordsAction
 
         return $result->with(
             bytesFreed: $freed,
-            heldByIssues: $cancelled + $evidenceLost,
+            // Удержания, которых план знать не мог: проблема появилась между
+            // решением и удалением. Уже известные плану сюда не попадают —
+            // иначе одна и та же запись считалась бы дважды.
+            heldAfterPlanning: $lateHolds,
             // Неотвеченный вопрос считается наравне с неудалённым объектом:
             // и то, и другое означает «запись помечена, а хранилище с ней не
             // разобрались», и оба обязаны давать ненулевой код возврата.
@@ -396,6 +433,7 @@ final readonly class PruneRawRecordsAction
             'prunedPayloads' => $result->prunedPayloads,
             'bytesFreed' => $result->bytesFreed,
             'heldByIssues' => $result->heldByIssues,
+            'heldAfterPlanning' => $result->heldAfterPlanning,
             'orphanedObjects' => $result->orphanedObjects,
         ];
     }

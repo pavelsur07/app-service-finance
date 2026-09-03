@@ -31,6 +31,7 @@ use App\Marketplace\Facade\MarketplaceSyncFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -244,11 +245,25 @@ final readonly class RefreshOrderStatusesAction
         // каждый час обнуляла бы весь прогресс подключения и заказы в его
         // конце не обновлялись бы никогда.
         if (null !== $poll['failure']) {
-            $result = $poll['failure'] instanceof ConnectorAuthException
-                ? $result->with(authFailedConnections: 1)
-                : $result->with(failedConnections: 1);
+            // Три разных исхода, а не один «сбой подключения».
+            //
+            // 429 и таймаут пройдут сами — это `warning`. Протухший ключ и
+            // ответ, нарушающий контракт целиком, сами НЕ пройдут: через час
+            // будет ровно то же самое. Считать их вместе с retryable значило
+            // бы закончить прогон нулевым кодом возврата, а под `--quiet` в
+            // кроне это выглядит как успешный прогон при подключении, которое
+            // не обновляется вовсе.
+            $failure = $poll['failure'];
+            $unrecoverable = $failure instanceof ConnectorAuthException
+                || $failure instanceof MalformedConnectorResponseException;
 
-            $this->logger->warning('Order status refresh could not finish a connection.', [
+            $result = match (true) {
+                $failure instanceof ConnectorAuthException => $result->with(authFailedConnections: 1),
+                $failure instanceof MalformedConnectorResponseException => $result->with(brokenConnections: 1),
+                default => $result->with(failedConnections: 1),
+            };
+
+            $this->logger->log($unrecoverable ? LogLevel::ERROR : LogLevel::WARNING, 'Order status refresh could not finish a connection.', [
                 'companyId' => $companyId,
                 'connectionRef' => $connectionRef,
                 'source' => $source->value,

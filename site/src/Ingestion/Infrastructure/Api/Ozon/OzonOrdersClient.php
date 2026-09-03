@@ -35,6 +35,15 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
     private const TIMEOUT_SECONDS = 60;
     private const DEFAULT_RETRY_AFTER_SECONDS = 60;
 
+    /**
+     * Ключ конверта для доказательства, которое не является JSON-объектом.
+     *
+     * Строка сырья — объект на запись, а список или скаляр в такую форму не
+     * ложатся. Подчёркивание в начале отделяет наше поле от полей
+     * маркетплейса: столкнуться с ним в ответе Ozon или WB нечему.
+     */
+    private const EVIDENCE_ENVELOPE_KEY = '_malformed_response';
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private OzonCredentialProviderInterface $credentialProvider,
@@ -234,7 +243,7 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
 
         // Нарушивший контракт ответ едет вместе с исключением: именно он и
         // нужен как доказательство, а выброшенный он не объясняет ничего.
-        $evidence = is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
+        $evidence = self::evidence($decoded);
 
         $result = is_array($decoded) ? ($decoded['result'] ?? null) : null;
 
@@ -256,17 +265,39 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
     }
 
     /**
-     * Тело ответа как доказательство: объект — годится, всё остальное (список,
-     * строка, невалидный JSON) хранить нечем, и это не потеря — доказательства
-     * там и нет.
+     * Тело ответа как доказательство.
+     *
+     * Объект едет как есть. Список и скаляр — тоже доказательство, и терять их
+     * нельзя: `[]`, `"broken"` или `0` нарушают контракт ровно так же, а
+     * пустое доказательство означает, что сырья не появится вовсе и разбирать
+     * дефект интеграции будет не по чему. Строка сырья — JSON-объект на
+     * запись, поэтому не-объект заворачивается в конверт с одним полем.
+     *
+     * `null` остаётся `null`: разбирать было нечего — невалидный JSON или
+     * буквальный `null` в теле. Конверт вокруг пустоты доказательством не
+     * является, он лишь создаёт видимость записи.
      *
      * @return array<string, mixed>|null
      */
     private static function decodeEvidence(string $payload): ?array
     {
-        $decoded = json_decode($payload, true);
+        return self::evidence(json_decode($payload, true));
+    }
 
-        return is_array($decoded) && !array_is_list($decoded) ? $decoded : null;
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function evidence(mixed $decoded): ?array
+    {
+        if (null === $decoded) {
+            return null;
+        }
+
+        if (is_array($decoded) && !array_is_list($decoded)) {
+            return $decoded;
+        }
+
+        return [self::EVIDENCE_ENVELOPE_KEY => $decoded];
     }
 
     /**
