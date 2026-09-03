@@ -9,9 +9,19 @@ use App\Ingestion\Entity\NormalizationIssue;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Webmozart\Assert\Assert;
 
 final readonly class RecordNormalizationIssueAction
 {
+    /**
+     * Потолок одной пачки.
+     *
+     * Совпадает с наибольшим `--limit` прогона перепроса: больше этого числа
+     * проблем за одну транзакцию неоткуда взяться, а если появится — это
+     * дефект вызывающего.
+     */
+    private const BATCH_MAX = 1000;
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private IngestRawRecordRepository $rawRecordRepository,
@@ -39,6 +49,16 @@ final readonly class RecordNormalizationIssueAction
         if ([] === $commands) {
             return;
         }
+
+        // Потолок утверждается здесь, а не подразумевается комментарием.
+        // Блокировки живут до конца транзакции вызывающего, и неограниченная
+        // пачка остановила бы ingestion надолго. Прогон перепроса ограничен
+        // своим `--limit`, поэтому предел — утверждение о контракте.
+        Assert::lessThanEq(
+            count($commands),
+            self::BATCH_MAX,
+            sprintf('Refusing to record more than %d normalization issues at once, got %%s.', self::BATCH_MAX),
+        );
 
         $recorded = [];
 

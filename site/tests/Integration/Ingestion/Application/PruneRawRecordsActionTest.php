@@ -786,6 +786,32 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
     }
 
     /**
+     * Пачка сверх потолка отвергается, а не обрабатывается молча.
+     *
+     * Блокировки живут до конца транзакции вызывающего: неограниченная пачка
+     * остановила бы ingestion надолго. Прогон перепроса ограничен своим
+     * `--limit`, поэтому превышение означает дефект вызывающего, и молчать о
+     * нём хуже, чем упасть.
+     */
+    public function testBatchAboveTheCapIsRefused(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $command = new RecordNormalizationIssueCommand(
+            companyId: $this->companyId,
+            rawRecordId: $record['id'],
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        );
+
+        $issues = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $issues->recordMany(array_fill(0, 1001, $command));
+    }
+
+    /**
      * Честная команда не авторизует поддельную с тем же идентификатором.
      *
      * Проверка по идентификатору вместо пары давала ровно это: настоящая

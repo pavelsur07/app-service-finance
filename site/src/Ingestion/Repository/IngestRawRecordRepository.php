@@ -13,14 +13,24 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Webmozart\Assert\Assert;
 
 /**
  * @extends ServiceEntityRepository<IngestRawRecord>
  */
 final class IngestRawRecordRepository extends ServiceEntityRepository
 {
-    /** Строк на один запрос проверки владения. */
+    /** Строк на один запрос проверки владения и одну блокирующую выборку. */
     private const OWNERSHIP_LOOKUP_CHUNK = 500;
+
+    /**
+     * Потолок пачки, которую разрешено заблокировать за раз.
+     *
+     * Совпадает с наибольшим `--limit` прогона перепроса: больше этого числа
+     * проблем за одну транзакцию неоткуда взяться, а если появится — это
+     * дефект вызывающего, и молчать о нём нельзя.
+     */
+    private const LOCK_BATCH_MAX = 1000;
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -422,27 +432,45 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
      */
     public function lockManyWithMarks(array $ids): array
     {
+        $ids = array_values(array_unique($ids));
         if ([] === $ids) {
             return [];
         }
 
-        /** @var list<array{id: string, prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}> $rows */
-        $rows = $this->createQueryBuilder('record')
-            ->select(
-                'record.id AS id',
-                'record.payloadPrunedAt AS prunedAt',
-                'record.payloadDeletedAt AS deletedAt',
-            )
-            ->andWhere('record.id IN (:ids)')
-            ->setParameter('ids', array_values(array_unique($ids)))
-            ->orderBy('record.id', 'ASC')
-            ->getQuery()
-            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
-            ->getResult();
+        // Потолок, а не молчаливая обработка чего угодно: блокировки живут до
+        // конца транзакции вызывающего, и неограниченная пачка остановила бы
+        // ingestion надолго. Прогон перепроса ограничен своим `--limit`,
+        // поэтому предел здесь — утверждение о контракте, а не фильтр.
+        Assert::lessThanEq(
+            count($ids),
+            self::LOCK_BATCH_MAX,
+            sprintf('Refusing to lock more than %d raw records at once, got %%s.', self::LOCK_BATCH_MAX),
+        );
+
+        // Порядок ГЛОБАЛЬНЫЙ и до разбиения на чанки: он и есть защита от
+        // цикла блокировок с прогоном retention.
+        sort($ids);
 
         $marks = [];
-        foreach ($rows as $row) {
-            $marks[$row['id']] = ['prunedAt' => $row['prunedAt'], 'deletedAt' => $row['deletedAt']];
+
+        foreach (array_chunk($ids, self::OWNERSHIP_LOOKUP_CHUNK) as $chunk) {
+            /** @var list<array{id: string, prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}> $rows */
+            $rows = $this->createQueryBuilder('record')
+                ->select(
+                    'record.id AS id',
+                    'record.payloadPrunedAt AS prunedAt',
+                    'record.payloadDeletedAt AS deletedAt',
+                )
+                ->andWhere('record.id IN (:ids)')
+                ->setParameter('ids', $chunk)
+                ->orderBy('record.id', 'ASC')
+                ->getQuery()
+                ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+                ->getResult();
+
+            foreach ($rows as $row) {
+                $marks[$row['id']] = ['prunedAt' => $row['prunedAt'], 'deletedAt' => $row['deletedAt']];
+            }
         }
 
         return $marks;
