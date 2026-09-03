@@ -67,10 +67,30 @@ final readonly class RecordNormalizationIssueAction
                 return;
             }
 
-            if (null !== $record->getPayloadPrunedAt()) {
-                // Честнее сказать сразу, чем оставить разбирающего гадать,
-                // почему сырьё не читается.
-                $this->logger->warning('Normalization issue is recorded for a raw record whose payload was already pruned.', [
+            // Отметки читаются СВЕЖИМ скалярным запросом, а не с сущности.
+            //
+            // Перечитывать сущность нельзя — вызывающий правит её прямо сейчас,
+            // и `HINT_REFRESH` затёр бы незафлашенные изменения, — но и верить
+            // её полям нельзя: она могла быть загружена задолго до блокировки,
+            // а retention успел закоммитить своё решение. Скалярный запрос
+            // отвечает на вопрос «что в базе» и ничего не трогает.
+            $marks = $this->rawRecordRepository->payloadMarks($command->companyId, $command->rawRecordId);
+
+            if (null !== ($marks['deletedAt'] ?? null)) {
+                // Доказательства уже нет, и оно не вернётся. Retention об этом
+                // промолчал не по злому умыслу: проблемы в момент удаления ещё
+                // не существовало, и он не мог посчитать её потерянной. Здесь
+                // последний и единственный наблюдатель — значит здесь ERROR.
+                $this->logger->error('Normalization issue is recorded for a raw record whose payload is already deleted; it will have to be triaged without evidence.', [
+                    'companyId' => $command->companyId,
+                    'rawRecordId' => $command->rawRecordId,
+                    'kind' => $command->kind->value,
+                ]);
+            } elseif (null !== ($marks['prunedAt'] ?? null)) {
+                // Решение принято, объект пока на месте: у retention ещё есть
+                // шанс увидеть проблему и отменить удаление. Это WARNING —
+                // состояние поправимое.
+                $this->logger->warning('Normalization issue is recorded for a raw record whose payload is marked for pruning.', [
                     'companyId' => $command->companyId,
                     'rawRecordId' => $command->rawRecordId,
                     'kind' => $command->kind->value,

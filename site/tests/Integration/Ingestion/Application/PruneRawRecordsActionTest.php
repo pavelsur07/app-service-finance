@@ -931,6 +931,85 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
     }
 
     /**
+     * Чтение опирается на СВЕЖУЮ отметку, а не на карту идентичности.
+     *
+     * Сущность могла быть загружена задолго до того, как retention закоммитил
+     * своё решение. Поверив её полям, чтение полезло бы в хранилище — и либо
+     * упало бы невнятной ошибкой, либо вернуло данные, которых по решению уже
+     * быть не должно.
+     */
+    public function testReadingUsesFreshPruneMarksInsteadOfTheIdentityMap(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        // Сущность попадает в карту идентичности ДО появления отметки.
+        self::assertNotNull($this->rawRecords->findByIdAndCompany($record['id'], $this->companyId));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+
+        // Объект НАМЕРЕННО оставлен на месте: иначе тест краснел бы от сбоя
+        // хранилища, а не от прочитанной отметки.
+        self::assertTrue($this->storage->exists($record['path']));
+
+        /** @var ReadRawRecordAction $read */
+        $read = self::getContainer()->get(ReadRawRecordAction::class);
+
+        $this->expectException(RawPayloadPrunedException::class);
+        iterator_to_array($read($record['id'], $this->companyId), false);
+    }
+
+    /**
+     * Проблема на сырьё с УЖЕ УДАЛЁННОЙ нагрузкой — это `error`.
+     *
+     * Retention промолчал не по злому умыслу: проблемы в момент удаления ещё
+     * не существовало, и посчитать её потерянной он не мог. Здесь последний и
+     * единственный наблюдатель — значит здесь и кричать.
+     */
+    public function testIssueOnAnAlreadyDeletedPayloadIsReportedAsAnError(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET payload_pruned_at = now(), payload_deleted_at = now() WHERE id = :id',
+            ['id' => $record['id']],
+        );
+
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string}> */
+            public array $records = [];
+
+            /**
+             * @param mixed[] $context
+             */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message];
+            }
+        };
+
+        $action = new RecordNormalizationIssueAction($this->em, $this->rawRecords, $logger);
+
+        $action(new RecordNormalizationIssueCommand(
+            companyId: $this->companyId,
+            rawRecordId: $record['id'],
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        ));
+
+        $errors = array_values(array_filter(
+            $logger->records,
+            static fn (array $entry): bool => LogLevel::ERROR === $entry['level'],
+        ));
+
+        self::assertCount(1, $errors, 'Безвозвратная потеря доказательства обязана быть инцидентом, а не заметкой.');
+        self::assertStringContainsString('already deleted', $errors[0]['message']);
+    }
+
+    /**
      * @return array{id: string, path: string}
      */
     private function seedRaw(string $externalId, \DateTimeImmutable $lastSeenAt, ?\DateTimeImmutable $fetchedAt = null): array

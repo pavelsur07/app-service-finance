@@ -312,6 +312,74 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
+     * Взять блокировку записи на перечисленные строки сырья.
+     *
+     * Нужна тем, кто ПОТОМ пойдёт блокировать заказы. Порядок блокировок в
+     * проекте один: сначала сырьё, потом заказы — его задаёт нормализация,
+     * которая иначе не может (она начинает с сырья). Часовая остановка
+     * зависших брала их в обратном порядке, и две транзакции складывались в
+     * цикл: крон держал заказ и ждал сырьё, нормализатор держал сырьё и ждал
+     * заказ. PostgreSQL разрывает такой цикл, убивая одну из транзакций, —
+     * пачка остановки откатывалась, а часовой прогон падал.
+     *
+     * Порядок внутри пачки детерминированный по той же причине: два прогона,
+     * взявшие одни и те же строки в разной последовательности, заблокировали
+     * бы друг друга уже между собой.
+     *
+     * @companyScopeExempt Кандидаты уже отобраны запросом с ограничением по
+     * компании; здесь берётся только блокировка на их сырьё, и разбивать её по
+     * компаниям значило бы выполнить запрос на компанию — прямой N+1 в часовом
+     * cron-пути.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<string> идентификаторы строк, которые удалось заблокировать
+     */
+    public function lockManyForUpdate(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<array{id: string}> $rows */
+        $rows = $this->createQueryBuilder('record')
+            ->select('record.id AS id')
+            ->andWhere('record.id IN (:ids)')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->orderBy('record.id', 'ASC')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getResult();
+
+        return array_map(static fn (array $row): string => $row['id'], $rows);
+    }
+
+    /**
+     * Отметки очистки СВЕЖИМ скалярным запросом, мимо карты идентичности.
+     *
+     * Вызывающий уже держит блокировку строки, но его сущность могла быть
+     * загружена задолго до этого и правится прямо сейчас: перечитать её
+     * значило бы затереть незафлашенные изменения. Скалярный запрос отвечает
+     * на вопрос «что в базе» и ничего не трогает.
+     *
+     * @return array{prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}|null
+     */
+    public function payloadMarks(string $companyId, string $rawRecordId): ?array
+    {
+        /** @var array{prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}|null $row */
+        $row = $this->createQueryBuilder('record')
+            ->select('record.payloadPrunedAt AS prunedAt', 'record.payloadDeletedAt AS deletedAt')
+            ->andWhere('record.companyId = :companyId')
+            ->andWhere('record.id = :rawRecordId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('rawRecordId', $rawRecordId)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $row;
+    }
+
+    /**
      * Какие из этих записей удерживаются НЕРАЗОБРАННОЙ проблемой.
      *
      * Спрашивается уже под блокировкой строк сырья и отдельным запросом:

@@ -26,12 +26,12 @@ use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface;
 use App\Ingestion\Repository\IngestOrderRepository;
+use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Marketplace\DTO\ActiveSellerConnectionDTO;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\LogLevel;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -81,6 +81,7 @@ final readonly class RefreshOrderStatusesAction
         private IngestOrderStatusMapper $statusMapper,
         private OrderStatusJournal $statusJournal,
         private RawStorageFacade $rawStorageFacade,
+        private IngestRawRecordRepository $rawRecordRepository,
         private RecordNormalizationIssueAction $recordIssueAction,
         private EntityManagerInterface $entityManager,
         private ClockInterface $clock,
@@ -152,15 +153,19 @@ final readonly class RefreshOrderStatusesAction
             'stopped' => $result->stopped,
             'failedConnections' => $result->failedConnections,
             'authFailedConnections' => $result->authFailedConnections,
+            'brokenConnections' => $result->brokenConnections,
         ]);
 
-        // Протухший ключ сам не лечится: пока человек его не заменит,
-        // подключение не получает обновлений вообще. Это инцидент, а не
-        // ожидаемая помеха, поэтому один агрегированный error со счётчиком —
-        // не по подключению, чтобы не устраивать веер алертов.
-        if ($result->authFailedConnections > 0) {
-            $this->logger->error('Order status refresh could not authenticate against marketplaces.', [
+        // Протухший ключ и сломанный эндпоинт сами не лечатся: пока человек не
+        // вмешается, подключение не получает обновлений вообще. Это инцидент,
+        // а не ожидаемая помеха, поэтому ОДИН агрегированный error со
+        // счётчиками — не по подключению, чтобы не устраивать веер алертов.
+        // Запись по каждому подключению остаётся диагностической и идёт
+        // `warning`-ом: два error об одном и том же событии — это два алерта.
+        if ($result->authFailedConnections > 0 || $result->brokenConnections > 0) {
+            $this->logger->error('Order status refresh could not finish connections for reasons that will not pass on their own.', [
                 'authFailedConnections' => $result->authFailedConnections,
+                'brokenConnections' => $result->brokenConnections,
             ]);
         }
 
@@ -254,8 +259,6 @@ final readonly class RefreshOrderStatusesAction
             // кроне это выглядит как успешный прогон при подключении, которое
             // не обновляется вовсе.
             $failure = $poll['failure'];
-            $unrecoverable = $failure instanceof ConnectorAuthException
-                || $failure instanceof MalformedConnectorResponseException;
 
             $result = match (true) {
                 $failure instanceof ConnectorAuthException => $result->with(authFailedConnections: 1),
@@ -263,7 +266,10 @@ final readonly class RefreshOrderStatusesAction
                 default => $result->with(failedConnections: 1),
             };
 
-            $this->logger->log($unrecoverable ? LogLevel::ERROR : LogLevel::WARNING, 'Order status refresh could not finish a connection.', [
+            // WARNING, а не ERROR: неустранимость сообщает ОДИН агрегированный
+            // error после обхода. Здесь — диагностика конкретного подключения,
+            // и второй error об одном и том же событии дал бы веер алертов.
+            $this->logger->warning('Order status refresh could not finish a connection.', [
                 'companyId' => $companyId,
                 'connectionRef' => $connectionRef,
                 'source' => $source->value,
@@ -912,10 +918,36 @@ final readonly class RefreshOrderStatusesAction
 
         $candidateIds = array_map(static fn (IngestOrder $order): string => $order->getId(), $candidates);
 
+        // Сырьё кандидатов — ДО транзакции, чтобы внутри неё блокировки
+        // брались в том же порядке, что и у нормализации: сначала сырьё, потом
+        // заказы.
+        $candidateRawRecordIds = array_values(array_unique(array_filter(array_map(
+            static fn (IngestOrder $order): ?string => $order->getLastRawRecordId(),
+            $candidates,
+        ))));
+
         $stopped = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($candidateIds, $orderedBefore, &$stopped): void {
+        $this->entityManager->wrapInTransaction(function () use ($candidateIds, $candidateRawRecordIds, $orderedBefore, &$stopped): void {
             $now = $this->applicationTime();
+
+            // ПОРЯДОК БЛОКИРОВОК: сначала сырьё, потом заказы.
+            //
+            // Нормализация иначе не может — она начинает с сырья, — поэтому
+            // порядок задаёт она, а не эта команда. Обратный порядок здесь
+            // складывался с ней в цикл: крон держал заказ и ждал сырьё,
+            // нормализатор держал сырьё и ждал заказ. PostgreSQL разрывает цикл,
+            // убивая одну из транзакций: пачка остановки откатывалась целиком, а
+            // часовой прогон падал.
+            $lockedRawRecordIds = array_flip($this->rawRecordRepository->lockManyForUpdate($candidateRawRecordIds));
+
+            // Строка о взятых блокировках пишется ДО блокировки заказов: по
+            // ней в логе видно, что порядок соблюдён, и по ней же видно, что
+            // именно держала транзакция, если следующий шаг встал в ожидание.
+            $this->logger->info('Stuck order cleanup locked evidence rows before the orders.', [
+                'rawRecords' => count($lockedRawRecordIds),
+                'orders' => count($candidateIds),
+            ]);
 
             // Одна блокирующая выборка на всех кандидатов. Разбивать её по
             // компаниям значило бы выполнить запрос на компанию — прямой N+1 в
@@ -939,6 +971,20 @@ final readonly class RefreshOrderStatusesAction
                 if (null === $lastRawRecordId) {
                     $order->stopRefreshing($now);
                     ++$stopped;
+
+                    continue;
+                }
+
+                // Сырьё сменилось между выборкой кандидатов и блокировкой:
+                // нужной строки мы не держим, и создание проблемы пошло бы
+                // блокировать её уже ПОСЛЕ заказа — то есть в обратном
+                // порядке. Заказ откладывается до следующего прогона; он
+                // никуда не денется, а цикл блокировок так не возникает.
+                if (!isset($lockedRawRecordIds[$lastRawRecordId])) {
+                    $this->logger->warning('Stuck order changed its raw record while it was being stopped; deferred to the next run.', [
+                        'companyId' => $order->getCompanyId(),
+                        'orderId' => $order->getId(),
+                    ]);
 
                     continue;
                 }

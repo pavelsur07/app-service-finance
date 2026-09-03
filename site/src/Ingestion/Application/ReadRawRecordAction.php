@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Application;
 
-use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Exception\RawPayloadPrunedException;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
-use Doctrine\ORM\EntityManagerInterface;
 use Webmozart\Assert\Assert;
 
 final readonly class ReadRawRecordAction
@@ -19,7 +17,6 @@ final readonly class ReadRawRecordAction
         private IngestRawRecordRepository $rawRecordRepository,
         private ObjectStorageInterface $objectStorage,
         private RawNdjsonCodec $ndjsonCodec,
-        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -40,29 +37,44 @@ final readonly class ReadRawRecordAction
         // намеренно: указатели на неё остаются разрешимыми, и вызывающий
         // узнаёт, что данные вышли за окно хранения, а не что «что-то
         // сломалось».
-        $this->assertPayloadKept($record);
+        //
+        // Отметка читается СВЕЖИМ скалярным запросом, а не с сущности: та
+        // могла прийти из карты идентичности, будучи загруженной задолго до
+        // того, как retention закоммитил своё решение.
+        //
+        // Гарантия ровно такая: решение, закоммиченное ДО этой проверки,
+        // всегда даёт отказ. Чтение, успевшее забрать байты раньше, вернёт
+        // настоящие данные — и это не ложь, объект в тот момент существовал.
+        // Линеаризовать сильнее (держать `FOR SHARE` до конца чтения) значило
+        // бы блокировать retention на всё время сетевого чтения объекта.
+        $this->assertPayloadKept($record->getId(), $this->prunedAt($companyId, $rawRecordId));
 
         try {
             return $this->ndjsonCodec->decodeCompressedRows($this->objectStorage->read($record->getStoragePath()));
         } catch (\Throwable $exception) {
             // Retention мог сработать между проверкой и чтением. Отличить это
-            // от настоящего сбоя хранилища можно только перечитав запись:
-            // появившаяся отметка означает, что нагрузку удалили намеренно, и
-            // отдавать инфраструктурную ошибку было бы враньём.
-            $this->entityManager->refresh($record);
-            $this->assertPayloadKept($record);
+            // от настоящего сбоя хранилища можно только перечитав отметку:
+            // появившаяся означает, что нагрузку удалили намеренно, и отдавать
+            // инфраструктурную ошибку было бы враньём.
+            $this->assertPayloadKept($record->getId(), $this->prunedAt($companyId, $rawRecordId));
 
             throw $exception;
         }
     }
 
-    private function assertPayloadKept(IngestRawRecord $record): void
+    private function prunedAt(string $companyId, string $rawRecordId): ?\DateTimeImmutable
     {
-        $prunedAt = $record->getPayloadPrunedAt();
+        $marks = $this->rawRecordRepository->payloadMarks($companyId, $rawRecordId);
+
+        return $marks['prunedAt'] ?? null;
+    }
+
+    private function assertPayloadKept(string $rawRecordId, ?\DateTimeImmutable $prunedAt): void
+    {
         if (null === $prunedAt) {
             return;
         }
 
-        throw new RawPayloadPrunedException(sprintf('Raw payload was pruned by the retention policy on %s.', $prunedAt->format(\DATE_ATOM)));
+        throw new RawPayloadPrunedException(sprintf('Raw payload of %s was pruned by the retention policy on %s.', $rawRecordId, $prunedAt->format(\DATE_ATOM)));
     }
 }

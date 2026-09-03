@@ -62,8 +62,11 @@ final class Version20260902190000 extends AbstractMigration
         // PostgreSQL брал Parallel Seq Scan и top-N сортировку — 5899 буферов
         // и 40 мс, то есть отбирал и сортировал ВЕСЬ backlog до применения
         // `LIMIT`, ровно тогда, когда backlog велик: при массовом сбое
-        // хранилища. С выражением в индексе тот же запрос идёт Index Only
-        // Scan'ом: 28 буферов и 0,2 мс.
+        // хранилища. С выражением в индексе тот же запрос идёт Index Scan'ом:
+        // 28 буферов и 0,2 мс. Именно Index Scan, а не Index Only: ORM
+        // гидратирует сущность целиком, поэтому обращение к таблице
+        // неизбежно — индекс здесь даёт порядок и лимит, а не покрытие.
+        // Замерялся SQL той формы, которую строит Doctrine, а не упрощённый.
         $this->addSql(
             'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ingest_raw_record_pending_deletion
              ON ingest_raw_records (
