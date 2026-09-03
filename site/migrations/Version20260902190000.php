@@ -103,6 +103,16 @@ final class Version20260902190000 extends AbstractMigration
      */
     public function down(Schema $schema): void
     {
+        // Замок ДО транзакции и на всю сессию: он переживает и её, и границу
+        // между двумя откатываемыми миграциями. `ACCESS EXCLUSIVE` внутри
+        // транзакции защищает только собственный шаг, а между `down()` этой
+        // миграции и `down()` следующей блокировок нет вовсе — и прогон
+        // retention успевал пометить и удалить нагрузку ровно там: индексы уже
+        // сняты, а следующая миграция прерывается на своей проверке.
+        //
+        // Ключ повторён в `PruneRawRecordsAction` — менять только вместе.
+        $this->connection->executeStatement('SELECT pg_advisory_lock(6902180000)');
+
         $this->connection->beginTransaction();
 
         try {

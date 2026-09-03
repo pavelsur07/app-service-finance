@@ -48,6 +48,22 @@ final readonly class PruneRawRecordsAction
     private const CHUNK = 100;
 
     /**
+     * Ключ advisory-блокировки, общий с откатом retention-миграций.
+     *
+     * Откат снимает колонки отметок и индексы, а прогон их пишет. Проверить
+     * «нет ли уже очищенных записей» и снять колонки одной транзакцией
+     * невозможно: миграций две, и между их блокировками остаётся окно, в
+     * которое прогон успевает пометить и удалить нагрузку. Advisory-блокировка
+     * — единственный замок, который переживает границу транзакций и который
+     * обе стороны могут взять по договорённости.
+     *
+     * Число произвольно, но ЗАФИКСИРОВАНО: оно повторено в
+     * `Version20260902180000` и `Version20260902190000`, и менять его можно
+     * только вместе с ними.
+     */
+    private const ADVISORY_LOCK_KEY = 6902180000;
+
+    /**
      * Записей на транзакцию во ВТОРОЙ фазе.
      *
      * Меньше первой: внутри транзакции идут сетевые вызовы к хранилищу, и
@@ -137,6 +153,38 @@ final readonly class PruneRawRecordsAction
             return $result;
         }
 
+        // Замок, общий с откатом миграций. Не ждём: retention идёт ночью и
+        // каждую ночь, а откат — операция человека, которая длится минуты.
+        // Пропустить один прогон дешевле, чем держать cron в ожидании или
+        // дать ему удалить нагрузку прямо под откатом.
+        if (!$this->acquireAdvisoryLock()) {
+            $this->logger->warning('Raw payload prune skipped: the retention schema is locked by a migration.', [
+                'notSeenSince' => $notSeenSince->format(\DATE_ATOM),
+            ]);
+
+            return $result;
+        }
+
+        try {
+            return $this->execute($command, $notSeenSince, $result, $pending, $pendingHeld, $records);
+        } finally {
+            $this->releaseAdvisoryLock();
+        }
+    }
+
+    /**
+     * @param list<IngestRawRecord> $pending
+     * @param array<string, int> $pendingHeld
+     * @param list<IngestRawRecord> $records
+     */
+    private function execute(
+        PruneRawRecordsCommand $command,
+        \DateTimeImmutable $notSeenSince,
+        PruneRawRecordsResult $result,
+        array $pending,
+        array $pendingHeld,
+        array $records,
+    ): PruneRawRecordsResult {
         // Незавершённое СНАЧАЛА — ровно в том порядке, который обещал план.
         //
         // Удержанные записи идут сюда ТОЖЕ, хотя план уже знает о них: решение
@@ -394,6 +442,22 @@ final readonly class PruneRawRecordsAction
             // и то, и другое означает «запись помечена, а хранилище с ней не
             // разобрались», и оба обязаны давать ненулевой код возврата.
             orphanedObjects: $orphaned + $undecided,
+        );
+    }
+
+    private function acquireAdvisoryLock(): bool
+    {
+        return (bool) $this->entityManager->getConnection()->fetchOne(
+            'SELECT pg_try_advisory_lock(:key)',
+            ['key' => self::ADVISORY_LOCK_KEY],
+        );
+    }
+
+    private function releaseAdvisoryLock(): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'SELECT pg_advisory_unlock(:key)',
+            ['key' => self::ADVISORY_LOCK_KEY],
         );
     }
 

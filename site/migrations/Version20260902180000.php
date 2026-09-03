@@ -67,6 +67,13 @@ final class Version20260902180000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        // Замок, общий с прогоном retention, — на случай отката ТОЛЬКО этой
+        // миграции: при полном откате его уже держит `Version20260902190000`,
+        // и повторный вызов в той же сессии лишь увеличивает счётчик.
+        //
+        // Ключ повторён в `PruneRawRecordsAction` — менять только вместе.
+        $this->connection->executeStatement('SELECT pg_advisory_lock(6902180000)');
+
         // Таблица блокируется ДО подсчёта.
         //
         // Без блокировки проверка и DDL разнесены во времени: `COUNT(*)`

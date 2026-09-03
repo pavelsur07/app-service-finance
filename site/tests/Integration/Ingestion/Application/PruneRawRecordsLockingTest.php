@@ -19,6 +19,7 @@ use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Clock\ClockInterface;
@@ -66,7 +67,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
 
             try {
                 $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
-            } catch (\Throwable) {
+            } catch (\Throwable $exception) {
+                if (!self::isLockTimeout($exception)) {
+                    throw $exception;
+                }
+
                 // Ожидание блокировки прервано таймаутом — это и есть
                 // доказательство, что блокировка бралась.
                 $failed = true;
@@ -143,7 +148,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                             ['id' => $this->rawRecordId],
                         );
                         $this->refreshed = true;
-                    } catch (\Throwable) {
+                    } catch (\Throwable $exception) {
+                        if (!PruneRawRecordsLockingTest::isLockTimeout($exception)) {
+                            throw $exception;
+                        }
+
                         $this->refreshed = false;
                     }
                 }
@@ -225,7 +234,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                             ['id' => $this->rawRecordId],
                         );
                         $this->restored = true;
-                    } catch (\Throwable) {
+                    } catch (\Throwable $exception) {
+                        if (!PruneRawRecordsLockingTest::isLockTimeout($exception)) {
+                            throw $exception;
+                        }
+
                         $this->restored = false;
                     }
                 }
@@ -281,7 +294,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                     kind: NormalizationIssueKind::MAPPER_FAILURE,
                     details: [],
                 ));
-            } catch (\Throwable) {
+            } catch (\Throwable $exception) {
+                if (!self::isLockTimeout($exception)) {
+                    throw $exception;
+                }
+
                 $blocked = true;
             }
 
@@ -357,7 +374,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                             ['id' => $this->rawRecordId],
                         );
                         $this->refreshed = true;
-                    } catch (\Throwable) {
+                    } catch (\Throwable $exception) {
+                        if (!PruneRawRecordsLockingTest::isLockTimeout($exception)) {
+                            throw $exception;
+                        }
+
                         $this->refreshed = false;
                     }
                 }
@@ -582,7 +603,11 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                     fetchedAt: new \DateTimeImmutable('-400 days'),
                     rows: $rows,
                 ));
-            } catch (\Throwable) {
+            } catch (\Throwable $exception) {
+                if (!self::isLockTimeout($exception)) {
+                    throw $exception;
+                }
+
                 $blocked = true;
             }
 
@@ -634,5 +659,25 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
     private function newConnection(): Connection
     {
         return DriverManager::getConnection($this->connection->getParams());
+    }
+
+    /**
+     * Это ИМЕННО ожидание блокировки, а не любая ошибка.
+     *
+     * `catch (\Throwable)` красил тест зелёным от чего угодно: опечатки в SQL,
+     * отсутствующей колонки, закрытого соединения, исключения самого Action.
+     * Регрессия в протоколе, который защищает от необратимого удаления, могла
+     * бы спрятаться за посторонним сбоем. PostgreSQL сообщает о вышедшем
+     * `lock_timeout` кодом `55P03`, и принимается только он.
+     */
+    public static function isLockTimeout(\Throwable $exception): bool
+    {
+        for ($error = $exception; null !== $error; $error = $error->getPrevious()) {
+            if ($error instanceof DriverException && '55P03' === $error->getSQLState()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

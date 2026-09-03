@@ -144,6 +144,10 @@ final readonly class NormalizeOrderRawRecordAction
             $occurrences = $this->statusEventRepository->lastOccurrencesForRawRecord(
                 $command->companyId,
                 $rawRecord->getId(),
+                array_values(array_map(
+                    static fn (IngestOrder $order): string => $order->getId(),
+                    $known,
+                )),
             );
 
             // Две карты, а не одна.

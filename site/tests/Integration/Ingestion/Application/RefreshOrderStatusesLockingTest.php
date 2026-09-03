@@ -17,6 +17,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Ingestion\IngestOrderBuilder;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\DriverManager;
 use Psr\Log\AbstractLogger;
 use Ramsey\Uuid\Uuid;
@@ -100,7 +101,11 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
                     );
 
                     return true;
-                } catch (\Throwable) {
+                } catch (\Throwable $exception) {
+                    if (!RefreshOrderStatusesLockingTest::isLockTimeout($exception)) {
+                        throw $exception;
+                    }
+
                     return false;
                 } finally {
                     $this->observer->rollBack();
@@ -202,5 +207,25 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
     private function newConnection(): Connection
     {
         return DriverManager::getConnection($this->connection->getParams());
+    }
+
+    /**
+     * Это ИМЕННО ожидание блокировки, а не любая ошибка.
+     *
+     * `catch (\Throwable)` красил тест зелёным от чего угодно: опечатки в SQL,
+     * отсутствующей колонки, закрытого соединения, исключения самого Action.
+     * Регрессия в протоколе, который защищает от необратимого удаления, могла
+     * бы спрятаться за посторонним сбоем. PostgreSQL сообщает о вышедшем
+     * `lock_timeout` кодом `55P03`, и принимается только он.
+     */
+    public static function isLockTimeout(\Throwable $exception): bool
+    {
+        for ($error = $exception; null !== $error; $error = $error->getPrevious()) {
+            if ($error instanceof DriverException && '55P03' === $error->getSQLState()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

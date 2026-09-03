@@ -963,8 +963,6 @@ final readonly class RefreshOrderStatusesAction
         $missingEvidence = 0;
 
         $this->entityManager->wrapInTransaction(function () use ($candidateIds, $candidateRawRecordIds, $rawRecordIdByOrder, $orderedBefore, &$stopped, &$missingEvidence): void {
-            $now = $this->applicationTime();
-
             // ПОРЯДОК БЛОКИРОВОК: сначала сырьё, потом заказы.
             //
             // Нормализация иначе не может — она начинает с сырья, — поэтому
@@ -987,7 +985,15 @@ final readonly class RefreshOrderStatusesAction
             // компаниям значило бы выполнить запрос на компанию — прямой N+1 в
             // часовом cron-пути. Компания берётся у каждого заказа своя, там
             // где создаётся проблема.
-            foreach ($this->orderRepository->findManyForUpdateAcrossCompanies($candidateIds) as $order) {
+            $orders = $this->orderRepository->findManyForUpdateAcrossCompanies($candidateIds);
+
+            // Время снимается ПОСЛЕ блокировок, а не до них: ожидание чужой
+            // транзакции может занять минуты, и отметка остановки, снятая
+            // раньше, оказалась бы старше состояния, на основании которого
+            // заказ и остановили.
+            $now = $this->applicationTime();
+
+            foreach ($orders as $order) {
                 if (!$this->isStillStuck($order, $orderedBefore)) {
                     continue;
                 }

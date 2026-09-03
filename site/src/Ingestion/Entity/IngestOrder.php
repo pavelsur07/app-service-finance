@@ -320,7 +320,7 @@ class IngestOrder implements TenantOwnedInterface
         // записи, и читать рядом системное время значило бы завести вторую
         // шкалу: при замороженных часах в тестах или сдвиге системного времени
         // updatedAt разошёлся бы с фактическим временем попытки.
-        $this->updatedAt = $at;
+        $this->touch($at);
     }
 
     public function getStatusRefreshAttemptedAt(): ?\DateTimeImmutable
@@ -350,7 +350,22 @@ class IngestOrder implements TenantOwnedInterface
         // Одна операция — одни часы, как и в markRefreshAttempted(): момент
         // остановки И есть «сейчас» этой записи, а системное время рядом с
         // переданным завело бы вторую шкалу.
-        $this->updatedAt = $at;
+        $this->touch($at);
+    }
+
+    /**
+     * Отметка изменения НИКОГДА не едет назад.
+     *
+     * Момент операции снимается до ожидания блокировки, а под блокировкой
+     * перечитывается состояние, которое конкурент мог записать позже. Присвоив
+     * своё время безусловно, перепрос откатил бы `updated_at` в прошлое — и
+     * выборка «что изменилось с такого-то момента» пропустила бы чужую свежую
+     * запись. Своё время при этом остаётся в собственных колонках
+     * (`statusRefreshAttemptedAt`, `refreshStoppedAt`) и не искажается.
+     */
+    private function touch(\DateTimeImmutable $at): void
+    {
+        $this->updatedAt = max($this->updatedAt, $at);
     }
 
     public function setExternalOrderId(?string $externalOrderId): void

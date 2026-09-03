@@ -13,6 +13,9 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 final class IngestOrderStatusEventRepository extends ServiceEntityRepository
 {
+    /** Заказов на один запрос номеров наблюдений. */
+    private const OCCURRENCE_LOOKUP_CHUNK = 500;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, IngestOrderStatusEvent::class);
@@ -95,24 +98,37 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
      * остаться не может, а успешно разобранное сырьё идёт по пути повтора и
      * событий не создаёт вовсе.
      *
+     * Спрашивается ТОЛЬКО про заказы текущего батча и чанками. Без списка
+     * заказов выборка ограничена одним `rawRecordId`, а сколько за ним стоит
+     * заказов, схема не ограничивает: запрос выполняется внутри транзакции
+     * нормализации, уже под блокировками сырья и заказов, и одна крупная или
+     * повреждённая партия растягивала бы их удержание.
+     *
+     * @param list<string> $orderIds заказы текущего батча
+     *
      * @return array<string, int> orderId => максимальный номер
      */
-    public function lastOccurrencesForRawRecord(string $companyId, string $rawRecordId): array
+    public function lastOccurrencesForRawRecord(string $companyId, string $rawRecordId, array $orderIds): array
     {
-        /** @var list<array{orderId: string, maxOccurrence: int|string}> $rows */
-        $rows = $this->createQueryBuilder('e')
-            ->select('e.orderId AS orderId', 'MAX(e.occurrence) AS maxOccurrence')
-            ->andWhere('e.companyId = :companyId')
-            ->andWhere('e.rawRecordId = :rawRecordId')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('rawRecordId', $rawRecordId)
-            ->groupBy('e.orderId')
-            ->getQuery()
-            ->getResult();
-
         $indexed = [];
-        foreach ($rows as $row) {
-            $indexed[$row['orderId']] = (int) $row['maxOccurrence'];
+
+        foreach (array_chunk(array_values(array_unique($orderIds)), self::OCCURRENCE_LOOKUP_CHUNK) as $chunk) {
+            /** @var list<array{orderId: string, maxOccurrence: int|string}> $rows */
+            $rows = $this->createQueryBuilder('e')
+                ->select('e.orderId AS orderId', 'MAX(e.occurrence) AS maxOccurrence')
+                ->andWhere('e.companyId = :companyId')
+                ->andWhere('e.rawRecordId = :rawRecordId')
+                ->andWhere('e.orderId IN (:orderIds)')
+                ->setParameter('companyId', $companyId)
+                ->setParameter('rawRecordId', $rawRecordId)
+                ->setParameter('orderIds', $chunk)
+                ->groupBy('e.orderId')
+                ->getQuery()
+                ->getResult();
+
+            foreach ($rows as $row) {
+                $indexed[$row['orderId']] = (int) $row['maxOccurrence'];
+            }
         }
 
         return $indexed;
