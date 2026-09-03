@@ -118,6 +118,18 @@ final readonly class NormalizeOrderRawRecordAction
             // и вторая пошла бы разбирать как первый раз — дописав ложный
             // обратный переход. Порядок блокировок один для всех
             // нормализаторов: сначала запись сырья, потом заказы.
+            // Замок подключения — ПЕРВЫМ, до сырья и заказов. Он общий с
+            // перепросом: номер маркетплейса присваивается здесь, а
+            // применяется там, и между запросом к маркетплейсу и записью
+            // ответа проходят минуты. Без общего замка ответ на номер, который
+            // мы тем временем присвоили ещё одному заказу, ложился бы на
+            // первого носителя — вплоть до терминального статуса.
+            $this->orderRepository->lockConnectionScope(
+                $command->companyId,
+                $rawRecord->getSource(),
+                $rawRecord->getConnectionRef(),
+            );
+
             $this->entityManager->lock($rawRecord, LockMode::PESSIMISTIC_WRITE);
             $this->entityManager->refresh($rawRecord);
 

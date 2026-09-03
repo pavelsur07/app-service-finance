@@ -10,6 +10,9 @@ use App\Ingestion\Infrastructure\Api\Ozon\OzonRawPage;
 
 final class FakeOzonOrdersClient implements OzonOrdersClientInterface
 {
+    /** @var (callable(string, IngestOrderScheme): void)|null */
+    private $postingRequestHook;
+
     /**
      * Вызовы обоих эндпоинтов: у списка и у одиночного отправления разный
      * набор ключей, поэтому тип общий.
@@ -40,7 +43,20 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
     }
 
     /**
-     * @param array<string, array<string, mixed>|null> $postings номер => отправление
+     * Что сделать в момент запроса отправления — до ответа.
+     *
+     * Нужно тестам гонок: за время сетевого вызова конкурент успевает
+     * изменить заказ, и прогон обязан заметить это под блокировкой.
+     *
+     * @param callable(string, IngestOrderScheme): void $hook
+     */
+    public function onPostingRequest(callable $hook): void
+    {
+        $this->postingRequestHook = $hook;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $postings номер отправления => ответ
      */
     public function setPostings(array $postings): void
     {
@@ -62,6 +78,10 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
         string $postingNumber,
     ): ?array {
         $this->calls[] = ['endpoint' => 'posting_get', 'postingNumber' => $postingNumber];
+
+        if (null !== $this->postingRequestHook) {
+            ($this->postingRequestHook)($postingNumber, $scheme);
+        }
 
         if (isset($this->postingFailures[$postingNumber])) {
             throw $this->postingFailures[$postingNumber];

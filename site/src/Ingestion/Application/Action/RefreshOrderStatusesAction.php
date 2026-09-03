@@ -324,7 +324,7 @@ final readonly class RefreshOrderStatusesAction
                     $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt, $auditPaths);
                 }
 
-                $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
+                $changed = $this->applyObservations($source, $companyId, $connectionRef, $poll, $rawRecordId);
             });
         } catch (\Throwable $exception) {
             // Объекты аудита записаны, а есть ли их строки — НЕИЗВЕСТНО.
@@ -366,11 +366,12 @@ final readonly class RefreshOrderStatusesAction
      * если наблюдения не случилось: 404 и ответ без статуса иначе не двигали бы
      * ничего, и такие заказы вечно занимали бы начало очереди.
      *
-     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expected?: array<string, string>} $poll
+     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expected?: array<string, string>, expectedSchemes?: array<string, IngestOrderScheme>} $poll
      */
     private function applyObservations(
         IngestSource $source,
         string $companyId,
+        string $connectionRef,
         array $poll,
         ?string $rawRecordId,
     ): int {
@@ -384,6 +385,11 @@ final readonly class RefreshOrderStatusesAction
         // тысячи наблюдений за раз и держит при этом блокировки всей пачки.
         $issues = [];
 
+        // Замок подключения — ДО блокировки заказов, тем же порядком, что и у
+        // нормализации: под ним номер маркетплейса не может быть присвоен
+        // другому заказу, пока мы записываем ответ на него.
+        $this->orderRepository->lockConnectionScope($companyId, $source, $connectionRef);
+
         $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
         // Номер маркетплейса сверяется ПОСЛЕ блокировки с тем, который
@@ -394,11 +400,52 @@ final readonly class RefreshOrderStatusesAction
         // закрыл бы перепрос. Такой заказ откладывается целиком — без отметки
         // попытки и без наблюдения: попытка была не о нём.
         $deferred = [];
-        foreach ($poll['expected'] ?? [] as $orderId => $expectedExternalOrderId) {
+        $expected = $poll['expected'] ?? [];
+
+        // Коллизии перепроверяются ПОД замком: проверка до сети устаревает за
+        // минуты запроса, а нормализация могла присвоить тот же номер ещё
+        // одному заказу. Ответ на такой номер стал неоднозначным, и применять
+        // его первому носителю нельзя — тем более терминальный.
+        $collidingNow = [] === $expected ? [] : array_flip($this->orderRepository->findDuplicateExternalOrderIds(
+            $companyId,
+            $source,
+            $connectionRef,
+            array_values($expected),
+        ));
+
+        foreach ($expected as $orderId => $expectedExternalOrderId) {
             $order = $locked[$orderId] ?? null;
-            if (null !== $order && $order->getExternalOrderId() !== $expectedExternalOrderId) {
+            if (null === $order) {
+                continue;
+            }
+
+            if ($order->getExternalOrderId() !== $expectedExternalOrderId) {
                 $deferred[$orderId] = true;
                 $this->logger->warning('Order changed its marketplace id while it was being polled; the answer is discarded.', [
+                    'companyId' => $companyId,
+                    'orderId' => $orderId,
+                ]);
+
+                continue;
+            }
+
+            if (isset($collidingNow[$expectedExternalOrderId])) {
+                $deferred[$orderId] = true;
+                $this->logger->warning('Marketplace id gained a second carrier while it was being polled; the answer is discarded.', [
+                    'companyId' => $companyId,
+                    'orderId' => $orderId,
+                    'externalOrderId' => $expectedExternalOrderId,
+                ]);
+            }
+        }
+
+        // Схема Ozon — то, по чему выбирали эндпоинт. Сменилась — ответ был
+        // не о том пути, и он откладывается вместе с отметкой попытки.
+        foreach ($poll['expectedSchemes'] ?? [] as $orderId => $expectedScheme) {
+            $order = $locked[$orderId] ?? null;
+            if (null !== $order && $order->getScheme() !== $expectedScheme) {
+                $deferred[$orderId] = true;
+                $this->logger->warning('Order changed its scheme while it was being polled; the answer is discarded.', [
                     'companyId' => $companyId,
                     'orderId' => $orderId,
                 ]);
@@ -478,7 +525,7 @@ final readonly class RefreshOrderStatusesAction
     /**
      * @param list<IngestOrder> $orders
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expectedSchemes: array<string, IngestOrderScheme>}
      */
     private function pollOzon(string $companyId, string $connectionRef, array $orders): array
     {
@@ -490,10 +537,19 @@ final readonly class RefreshOrderStatusesAction
         $invalid = 0;
         $failure = null;
 
+        /** @var array<string, IngestOrderScheme> $expectedSchemes заказ => схема, по которой выбирали эндпоинт */
+        $expectedSchemes = [];
+
         foreach ($orders as $order) {
             // Схема нужна, чтобы выбрать эндпоинт. Заказ с неизвестной схемой
             // спросить нечем: отправив его в FBO «по умолчанию», мы получили
             // бы ложный 404 и молча оставили заказ без обновлений.
+            // Схема фиксируется ДО сети: эндпоинт выбирается по ней, а
+            // нормализация может уточнить схему конкурентно. Под блокировкой
+            // она сверяется, и ответ не того эндпоинта — 404, сбой или даже
+            // успех — не приписывается переклассифицированному заказу.
+            $expectedSchemes[$order->getId()] = $order->getScheme();
+
             if (IngestOrderScheme::FBO !== $order->getScheme() && IngestOrderScheme::FBS !== $order->getScheme()) {
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
@@ -667,6 +723,7 @@ final readonly class RefreshOrderStatusesAction
             'missing' => $missing,
             'invalid' => $invalid,
             'failure' => $failure,
+            'expectedSchemes' => $expectedSchemes,
         ];
     }
 
@@ -691,6 +748,9 @@ final readonly class RefreshOrderStatusesAction
         $byWbId = [];
         $attempts = [];
         $invalid = 0;
+
+        /** @var array<string, string> $expected заказ => номер маркетплейса, который спрашивали */
+        $expected = [];
 
         /** @var array<string, list<string>> $collidingExternalIds */
         $collidingExternalIds = [];
@@ -751,6 +811,11 @@ final readonly class RefreshOrderStatusesAction
             }
 
             $byWbId[$wbOrderId] = $order;
+            // Ожидаемый номер фиксируется ДО сети и для КАЖДОГО заказа, который
+            // будут спрашивать, — не только для тех, на кого придёт пригодная
+            // строка. Отметка попытки ставится и при промахе, и при браке, и
+            // при сбое, и все они относятся к номеру, который спрашивали.
+            $expected[$order->getId()] = $externalOrderId;
         }
 
         // Один агрегированный warning на номер, а не по записи: конфликт
@@ -773,7 +838,7 @@ final readonly class RefreshOrderStatusesAction
                 'missing' => 0,
                 'invalid' => $invalid,
                 'failure' => null,
-                'expected' => [],
+                'expected' => $expected,
             ];
         }
 
@@ -782,9 +847,6 @@ final readonly class RefreshOrderStatusesAction
         $requested = 0;
         $missing = 0;
         $failure = null;
-
-        /** @var array<string, string> $expected заказ => номер маркетплейса, который спрашивали */
-        $expected = [];
 
         foreach (array_chunk(array_keys($byWbId), self::WB_STATUS_CHUNK) as $chunk) {
             $requested += count($chunk);
@@ -893,9 +955,6 @@ final readonly class RefreshOrderStatusesAction
                     'statusAttributes' => $statusAttributes,
                     'observedAt' => $answeredAt,
                 ];
-                // Номер, по которому спрашивали: под блокировкой он сверяется
-                // с текущим — конкурентная нормализация могла его сменить.
-                $expected[$order->getId()] = (string) $wbOrderId;
             }
 
             // Попытка засчитывается всему чанку, на который ответ пришёл:

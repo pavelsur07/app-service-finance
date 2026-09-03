@@ -248,9 +248,65 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
     }
 
     /**
+     * Запись ответов ЖДЁТ замок подключения — тот же, что берёт нормализация.
+     *
+     * Номер маркетплейса присваивается нормализацией и применяется
+     * перепросом; без общего замка их шаги переплетались, и ответ на номер,
+     * присвоенный тем временем ещё одному заказу, ложился на первого
+     * носителя. Замок держит отдельное соединение — как держала бы
+     * нормализация, — и прогон обязан упереться в него, а не записать ответ
+     * мимо.
+     */
+    public function testApplyingAnswersWaitsForTheConnectionScopeLock(): void
+    {
+        [$orderId] = $this->seedStuckOrderWithEvidence(orderedDaysAgo: 2);
+        $companyId = (string) $this->connection->fetchOne('SELECT company_id FROM ingest_orders WHERE id = :id', ['id' => $orderId]);
+
+        /** @var \App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient $ozon */
+        $ozon = self::getContainer()->get(\App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface::class);
+        $ozon->setPostings(['ancient' => ['posting_number' => 'ancient', 'status' => 'delivered']]);
+
+        $holder = $this->newConnection();
+        $holder->beginTransaction();
+        $holder->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:scope))',
+            ['scope' => sprintf('ingest_orders:%s:%s:%s', $companyId, 'ozon', self::CONNECTION_ID)],
+        );
+
+        try {
+            // Иначе прогон ждал бы держателя до конца теста.
+            $this->connection->executeStatement("SET lock_timeout = '250ms'");
+
+            $action = self::getContainer()->get(RefreshOrderStatusesAction::class);
+            $blocked = false;
+
+            try {
+                $action(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+            } catch (\Throwable $exception) {
+                if (!self::isLockTimeout($exception)) {
+                    throw $exception;
+                }
+
+                $blocked = true;
+            }
+
+            self::assertTrue($blocked, 'Запись ответов обязана ждать замок подключения.');
+            self::assertSame(
+                'shipped',
+                $holder->fetchOne('SELECT status FROM ingest_orders WHERE id = :id', ['id' => $orderId]),
+                'Ответ не должен быть записан в обход замка.',
+            );
+        } finally {
+            $this->connection->executeStatement('SET lock_timeout = 0');
+            $holder->rollBack();
+            $holder->close();
+        }
+    }
+
+    /**
      * @return array{0: string, 1: string} идентификаторы заказа и его сырья
      */
-    private function seedStuckOrderWithEvidence(): array
+    private function seedStuckOrderWithEvidence(int $orderedDaysAgo = 90): array
     {
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('refresh-locks-'.Uuid::uuid4()->toString().'@example.com');
@@ -301,7 +357,7 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
             ->withExternalId('ancient')
             ->withStatus(IngestOrderStatus::SHIPPED, 'delivering')
             ->withLastRawRecordId($rawRecordId)
-            ->orderedAt(new \DateTimeImmutable('-90 days'))
+            ->orderedAt(new \DateTimeImmutable(sprintf('-%d days', $orderedDaysAgo)))
             ->build();
 
         $this->em->persist($order);

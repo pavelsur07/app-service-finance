@@ -704,6 +704,140 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Номер, получивший ВТОРОГО носителя во время запроса, не применяется.
+     *
+     * Проверка коллизий до сети устаревает за минуты запроса: нормализация
+     * могла присвоить тот же номер ещё одному заказу. Ответ стал
+     * неоднозначным, и применять его первому носителю нельзя — тем более
+     * терминальный, после которого заказ навсегда выпадает из перепроса.
+     * Перепроверка идёт под замком подключения, непосредственно перед записью.
+     */
+    public function testAnswerIsDiscardedWhenTheNumberGainsASecondCarrierDuringThePoll(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $polled = $this->seedOrder(
+            $company, 'rid-1', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, '5000000001',
+        );
+        $other = $this->seedOrder(
+            $company, 'rid-2', IngestOrderStatus::DELIVERED, 'supplierStatus=complete;wbStatus=sold',
+            null, null, IngestSource::WILDBERRIES, null, '6000000006',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sold',
+            'isCancellable' => false,
+        ]]);
+
+        // Пока «идёт сеть», нормализация присваивает тот же номер другому заказу.
+        $this->wb->onStatusRequest(function () use ($other): void {
+            $this->connection->executeStatement(
+                'UPDATE ingest_orders SET external_order_id = :id WHERE id = :order',
+                ['id' => '5000000001', 'order' => $other->getId()],
+            );
+        });
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->changed, 'Неоднозначный ответ не имеет права сдвинуть статус.');
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::ORDERED, $reloaded->getStatus());
+        self::assertNull($reloaded->getStatusRefreshAttemptedAt(), 'Заказ откладывается целиком — без отметки попытки.');
+        self::assertSame($polled->getId(), $reloaded->getId());
+    }
+
+    /**
+     * Смена номера во время запроса откладывает заказ и без пригодной строки.
+     *
+     * Отметка попытки ставится и при промахе, и при браке, и при сбое — и все
+     * они относятся к номеру, который спрашивали. Пока ожидаемый номер
+     * запоминался только для пригодных строк, перепривязанный заказ получал
+     * отметку по старому номеру: он уезжал в конец очереди и у границы окна
+     * мог сразу стать STUCK_ORDER, ни разу не спрошенный по новому номеру.
+     *
+     * @param string $outcome что ответил маркетплейс: missing, rejected или failure
+     */
+    #[DataProvider('unusableAnswerProvider')]
+    public function testIdChangeDuringThePollDefersTheOrderEvenWithoutAUsableRow(string $outcome): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $order = $this->seedOrder(
+            $company, 'rid-1', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, '5000000001',
+        );
+
+        match ($outcome) {
+            'missing' => $this->wb->setStatuses([]),
+            'rejected' => $this->wb->rejectRows(1, [5000000001], ['orders' => [['id' => 5000000001]]]),
+            'failure' => $this->wb->failStatusesWith(new ConnectorRateLimitedException('slow down', 60)),
+            default => throw new \InvalidArgumentException(sprintf('Unknown outcome %s.', $outcome)),
+        };
+
+        $this->wb->onStatusRequest(function () use ($order): void {
+            $this->connection->executeStatement(
+                'UPDATE ingest_orders SET external_order_id = :id WHERE id = :order',
+                ['id' => '7000000007', 'order' => $order->getId()],
+            );
+        });
+
+        ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
+        self::assertNotNull($reloaded);
+        self::assertNull($reloaded->getStatusRefreshAttemptedAt(), 'Попытка была по старому номеру — отметки быть не должно.');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unusableAnswerProvider(): iterable
+    {
+        yield 'заказа нет в ответе' => ['missing'];
+        yield 'строка отбракована' => ['rejected'];
+        yield 'сбой подключения' => ['failure'];
+    }
+
+    /**
+     * Ответ Ozon применяется только к заказу с ТОЙ ЖЕ схемой, что спрашивали.
+     *
+     * Эндпоинт выбирается по схеме, а нормализация может уточнить её
+     * конкурентно. Без сверки под блокировкой 404, сбой или даже успешный
+     * ответ старого эндпоинта отмечал переклассифицированный заказ попыткой
+     * либо применял к нему ответ не того пути.
+     */
+    public function testAnswerIsDiscardedWhenTheSchemeChangedDuringThePoll(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivered']]);
+
+        // Пока «идёт сеть», нормализация уточняет схему.
+        $this->ozon->onPostingRequest(function () use ($order): void {
+            $this->connection->executeStatement(
+                "UPDATE ingest_orders SET scheme = 'fbs' WHERE id = :order",
+                ['order' => $order->getId()],
+            );
+        });
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->changed, 'Ответ старого эндпоинта не имеет права сдвинуть статус.');
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::SHIPPED, $reloaded->getStatus());
+        self::assertNull($reloaded->getStatusRefreshAttemptedAt(), 'Попытка была о другой схеме — отметки быть не должно.');
+    }
+
+    /**
      * NUL внутри статуса бракует отправление, а не откатывает подключение.
      *
      * `"deliver\u0000ed"` — валидный JSON, проходящий по типу, длине и
