@@ -659,6 +659,51 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Ответ применяется только к заказу с ТЕМ ЖЕ номером, что спрашивали.
+     *
+     * Между запросом и записью проходят секунды или минуты, и параллельная
+     * нормализация может сменить `externalOrderId`. Без сверки под
+     * блокировкой ответ для номера 5 ложился на заказ, который теперь связан
+     * с номером 7: в журнал попадал чужой переход, а терминальный результат
+     * навсегда закрывал перепрос. Такой заказ откладывается целиком — без
+     * отметки попытки и без наблюдения.
+     */
+    public function testAnswerIsDiscardedWhenTheMarketplaceIdChangedDuringThePoll(): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $order = $this->seedOrder(
+            $company, 'rid-1', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, '5000000001',
+        );
+
+        $this->wb->setStatuses([5000000001 => [
+            'id' => 5000000001,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sold',
+            'isCancellable' => false,
+        ]]);
+
+        // Пока «идёт сеть», конкурент перепривязывает заказ к другому номеру.
+        $this->wb->onStatusRequest(function () use ($order): void {
+            $this->connection->executeStatement(
+                'UPDATE ingest_orders SET external_order_id = :id WHERE id = :order',
+                ['id' => '7000000007', 'order' => $order->getId()],
+            );
+        });
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->changed, 'Чужой ответ не имеет права сдвинуть статус.');
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::WILDBERRIES, self::CONNECTION_ID, 'rid-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::ORDERED, $reloaded->getStatus());
+        self::assertNull($reloaded->getStatusRefreshAttemptedAt(), 'Попытка была не об этом заказе — отметки быть не должно.');
+        self::assertSame(0, $this->events->countByOrder((string) $company->getId(), $order->getId()) - 0, 'Журнал не получает чужой переход.');
+    }
+
+    /**
      * NUL внутри статуса бракует отправление, а не откатывает подключение.
      *
      * `"deliver\u0000ed"` — валидный JSON, проходящий по типу, длине и
@@ -666,14 +711,15 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
      * значение доезжало до финального flush и откатывало общую транзакцию
      * подключения вместе с уже собранными корректными наблюдениями соседей.
      */
-    public function testNulByteInStatusIsInvalidAndTheNeighbourIsStillApplied(): void
+    #[DataProvider('nulStatusProvider')]
+    public function testNulByteInStatusIsInvalidAndTheNeighbourIsStillApplied(string $status): void
     {
         $company = $this->seedCompanyWithConnection();
         $this->seedOrder($company, 'broken', IngestOrderStatus::SHIPPED, 'delivering');
         $this->seedOrder($company, 'fine', IngestOrderStatus::SHIPPED, 'delivering');
 
         $this->ozon->setPostings([
-            'broken' => ['posting_number' => 'broken', 'status' => "deliver\0ed"],
+            'broken' => ['posting_number' => 'broken', 'status' => $status],
             'fine' => ['posting_number' => 'fine', 'status' => 'delivered'],
         ]);
 
@@ -691,6 +737,20 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         self::assertNotNull($broken);
         self::assertSame(IngestOrderStatus::SHIPPED, $broken->getStatus());
         self::assertNotNull($broken->getStatusRefreshAttemptedAt(), 'Попытка засчитана — иначе заказ вечно первый в очереди.');
+    }
+
+    /**
+     * Ведущий и замыкающий NUL проверяются отдельно: стандартный `trim()`
+     * срезал бы их, и «\0delivered» принималось бы как настоящий терминальный
+     * статус — заказ выпадал бы из перепроса вместо ветки invalid.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function nulStatusProvider(): iterable
+    {
+        yield 'NUL внутри' => ["deliver\0ed"];
+        yield 'NUL в начале' => ["\0delivered"];
+        yield 'NUL в конце' => ["delivered\0"];
     }
 
     /**

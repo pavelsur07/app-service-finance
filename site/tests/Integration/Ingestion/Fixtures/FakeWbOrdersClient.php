@@ -13,6 +13,9 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
     /** @var list<array<string, mixed>> */
     public array $calls = [];
 
+    /** @var (callable(list<int>): void)|null */
+    private $statusRequestHook;
+
     /** @var list<WbOrdersPage> */
     private array $marketplacePages = [];
 
@@ -76,9 +79,26 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
         $this->statusFailure = $failure;
     }
 
+    /**
+     * Что сделать в момент запроса статусов — до ответа.
+     *
+     * Нужно тестам гонок: за время сетевого вызова конкурент успевает
+     * изменить заказ, и прогон обязан заметить это под блокировкой.
+     *
+     * @param callable(list<int>): void $hook
+     */
+    public function onStatusRequest(callable $hook): void
+    {
+        $this->statusRequestHook = $hook;
+    }
+
     public function fetchMarketplaceStatuses(string $companyId, string $connectionRef, array $orderIds): WbOrderStatusPage
     {
         $this->calls[] = ['endpoint' => 'status', 'ids' => $orderIds];
+
+        if (null !== $this->statusRequestHook) {
+            ($this->statusRequestHook)($orderIds);
+        }
 
         if (null !== $this->statusFailure) {
             throw $this->statusFailure;

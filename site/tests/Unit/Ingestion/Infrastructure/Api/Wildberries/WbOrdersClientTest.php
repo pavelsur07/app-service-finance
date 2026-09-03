@@ -355,11 +355,12 @@ final class WbOrdersClientTest extends TestCase
      * проходит. Но PostgreSQL не принимает `0x00` в text: такое значение
      * дошло бы до финального flush и откатило наблюдения всех соседей.
      */
-    public function testAxisWithNulByteIsRejectedWithoutLosingItsNeighbour(): void
+    #[DataProvider('nulAxisProvider')]
+    public function testAxisWithNulByteIsRejectedWithoutLosingItsNeighbour(string $supplierStatus, string $wbStatus): void
     {
         $page = $this->client(new MockHttpClient(new MockResponse(
             '{"orders":['
-            .'{"id":5,"supplierStatus":"complete","wbStatus":"sort\\u0000ed","isCancellable":false},'
+            .sprintf('{"id":5,"supplierStatus":"%s","wbStatus":"%s","isCancellable":false},', $supplierStatus, $wbStatus)
             .'{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}'
             .']}',
             ['http_code' => 200],
@@ -368,6 +369,21 @@ final class WbOrdersClientTest extends TestCase
         self::assertSame([7], array_keys($page->statuses), 'Сосед обязан уцелеть.');
         self::assertSame([5], $page->rejectedIds);
         self::assertSame(1, $page->rejectedRows);
+    }
+
+    /**
+     * Ведущий и замыкающий NUL проверяются отдельно: стандартный `trim()`
+     * срезал бы их, и «\0sorted» превращалось бы в допустимый `sorted`.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function nulAxisProvider(): iterable
+    {
+        yield 'NUL внутри wbStatus' => ['complete', 'sort\\u0000ed'];
+        yield 'NUL в начале wbStatus' => ['complete', '\\u0000sorted'];
+        yield 'NUL в конце wbStatus' => ['complete', 'sorted\\u0000'];
+        yield 'NUL в начале supplierStatus' => ['\\u0000complete', 'sorted'];
+        yield 'NUL в конце supplierStatus' => ['complete\\u0000', 'sorted'];
     }
 
     /**

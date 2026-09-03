@@ -366,7 +366,7 @@ final readonly class RefreshOrderStatusesAction
      * если наблюдения не случилось: 404 и ответ без статуса иначе не двигали бы
      * ничего, и такие заказы вечно занимали бы начало очереди.
      *
-     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null} $poll
+     * @param array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expected?: array<string, string>} $poll
      */
     private function applyObservations(
         IngestSource $source,
@@ -386,15 +386,34 @@ final readonly class RefreshOrderStatusesAction
 
         $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
+        // Номер маркетплейса сверяется ПОСЛЕ блокировки с тем, который
+        // спрашивали. Между запросом и записью прошли секунды или минуты, и
+        // параллельная нормализация могла сменить `externalOrderId`: ответ
+        // для номера 5 лёг бы на заказ, который теперь связан с номером 7, в
+        // журнал попал бы чужой переход, а терминальный результат навсегда
+        // закрыл бы перепрос. Такой заказ откладывается целиком — без отметки
+        // попытки и без наблюдения: попытка была не о нём.
+        $deferred = [];
+        foreach ($poll['expected'] ?? [] as $orderId => $expectedExternalOrderId) {
+            $order = $locked[$orderId] ?? null;
+            if (null !== $order && $order->getExternalOrderId() !== $expectedExternalOrderId) {
+                $deferred[$orderId] = true;
+                $this->logger->warning('Order changed its marketplace id while it was being polled; the answer is discarded.', [
+                    'companyId' => $companyId,
+                    'orderId' => $orderId,
+                ]);
+            }
+        }
+
         foreach ($poll['attempts'] as $orderId => $attemptedAt) {
-            if (isset($locked[$orderId])) {
+            if (isset($locked[$orderId]) && !isset($deferred[$orderId])) {
                 $locked[$orderId]->markRefreshAttempted($attemptedAt);
             }
         }
 
         foreach ($poll['observations'] as $observation) {
             $order = $locked[$observation['orderId']] ?? null;
-            if (null === $order || null === $rawRecordId) {
+            if (null === $order || null === $rawRecordId || isset($deferred[$observation['orderId']])) {
                 continue;
             }
 
@@ -655,7 +674,7 @@ final readonly class RefreshOrderStatusesAction
      * @param list<IngestOrder> $orders
      * @param list<string> $duplicateExternalOrderIds номера, встречающиеся у нескольких заказов подключения
      *
-     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null}
+     * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expected: array<string, string>}
      */
     private function pollWildberries(string $companyId, string $connectionRef, array $orders, array $duplicateExternalOrderIds): array
     {
@@ -754,6 +773,7 @@ final readonly class RefreshOrderStatusesAction
                 'missing' => 0,
                 'invalid' => $invalid,
                 'failure' => null,
+                'expected' => [],
             ];
         }
 
@@ -762,6 +782,9 @@ final readonly class RefreshOrderStatusesAction
         $requested = 0;
         $missing = 0;
         $failure = null;
+
+        /** @var array<string, string> $expected заказ => номер маркетплейса, который спрашивали */
+        $expected = [];
 
         foreach (array_chunk(array_keys($byWbId), self::WB_STATUS_CHUNK) as $chunk) {
             $requested += count($chunk);
@@ -870,6 +893,9 @@ final readonly class RefreshOrderStatusesAction
                     'statusAttributes' => $statusAttributes,
                     'observedAt' => $answeredAt,
                 ];
+                // Номер, по которому спрашивали: под блокировкой он сверяется
+                // с текущим — конкурентная нормализация могла его сменить.
+                $expected[$order->getId()] = (string) $wbOrderId;
             }
 
             // Попытка засчитывается всему чанку, на который ответ пришёл:
@@ -909,6 +935,7 @@ final readonly class RefreshOrderStatusesAction
             'missing' => $missing,
             'invalid' => $invalid,
             'failure' => $failure,
+            'expected' => $expected,
         ];
     }
 
@@ -1224,6 +1251,13 @@ final readonly class RefreshOrderStatusesAction
             return null;
         }
 
+        // NUL ищется ДО trim(): стандартный trim() срезает "\\0" по краям, и
+        // "\\0delivered" превращался бы в допустимый delivered — повреждённый
+        // ответ принимался бы как настоящий терминальный статус.
+        if (str_contains($value, "\0")) {
+            return null;
+        }
+
         $token = trim($value);
 
         // NUL внутри токена — валидный JSON (`"deliver\u0000ed"`), но
@@ -1231,7 +1265,7 @@ final readonly class RefreshOrderStatusesAction
         // прошло бы разбор и уронило финальный flush, откатив вместе с
         // собой уже собранные наблюдения соседей — вопреки поштучной
         // изоляции ошибок. Сырьё при этом уже сохранено, доказательство есть.
-        if ('' === $token || str_contains($token, "\0") || mb_strlen($token) > self::STATUS_TOKEN_MAX_LENGTH) {
+        if ('' === $token || mb_strlen($token) > self::STATUS_TOKEN_MAX_LENGTH) {
             return null;
         }
 

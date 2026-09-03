@@ -105,8 +105,18 @@ final readonly class RecordNormalizationIssueAction
             }
         });
 
-        foreach ($recorded as $command) {
-            $this->reportRecorded($command);
+        // Одна строка на пачку и БЕЗ слова «записано»: `wrapInTransaction()`
+        // изнутри чужой транзакции — лишь вложенный уровень, и внешний коммит
+        // ещё может всё откатить. Утверждать «записано» вправе только тот,
+        // кто коммитит; здесь честно лишь «подготовлено».
+        if ([] !== $recorded) {
+            $this->logger->info('Ingestion normalization issues staged; the enclosing transaction decides whether they persist.', [
+                'count' => count($recorded),
+                'kinds' => array_values(array_unique(array_map(
+                    static fn (RecordNormalizationIssueCommand $command): string => $command->kind->value,
+                    $recorded,
+                ))),
+            ]);
         }
     }
 
