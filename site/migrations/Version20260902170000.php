@@ -109,9 +109,16 @@ final class Version20260902170000 extends AbstractMigration
         // разрешает новый: законная последовательность A → B → A даёт две
         // строки с одинаковым raw_status. Обнаружить это после удаления
         // индексов значило бы оставить схему разобранной.
+        //
+        // Строки с пустым `raw_record_id` из проверки исключены: в уникальном
+        // индексе PostgreSQL сравнивает NULL как РАЗЛИЧНЫЕ значения, поэтому
+        // сколько угодно таких строк с одинаковыми остальными полями индексу
+        // не мешают. Считать их конфликтом значило бы заблокировать аварийный
+        // откат на совершенно законных legacy-данных.
         $conflicting = (int) $this->connection->fetchOne(
             'SELECT COUNT(*) FROM (
                  SELECT 1 FROM ingest_order_status_events
+                  WHERE raw_record_id IS NOT NULL
                  GROUP BY company_id, raw_record_id, order_id, raw_status
                  HAVING COUNT(*) > 1
              ) AS duplicates'

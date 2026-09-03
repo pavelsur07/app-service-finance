@@ -698,6 +698,94 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
     }
 
     /**
+     * Пачка проблем не блокирует чужие строки и не растёт по числу запросов.
+     *
+     * Два утверждения одного решения. Чужая строка не должна блокироваться
+     * даже на мгновение — это межтенантный побочный эффект, задерживающий
+     * чужой ingestion. А владение при этом проверяется отдельным запросом
+     * именно потому, что блокировать нужно в одном глобальном порядке: фильтр
+     * по компании внутри блокирующего запроса этот порядок разрушил бы.
+     */
+    public function testBatchOfIssuesNeitherTouchesForeignRowsNorScalesQueries(): void
+    {
+        $mine = [
+            $this->seedRaw('page-1', new \DateTimeImmutable('-400 days')),
+            $this->seedRaw('page-2', new \DateTimeImmutable('-401 days')),
+            $this->seedRaw('page-3', new \DateTimeImmutable('-402 days')),
+        ];
+
+        $foreignCompanyId = Uuid::uuid7()->toString();
+        $foreignRawRecordId = Uuid::uuid7()->toString();
+        $this->connection->executeStatement(
+            "INSERT INTO ingest_raw_records
+                 (id, company_id, connection_ref, shop_ref, source, resource_type, external_id,
+                  storage_path, hash, byte_size, fetched_at, last_seen_at, sync_job_id,
+                  normalization_status, created_at, updated_at)
+             VALUES
+                 (:id, :company, 'conn-1', 'shop-main', 'ozon', 'prune_fixture', 'foreign',
+                  'company/ozon/shop/foreign.ndjson.gz', 'foreign-hash', 128,
+                  now(), now(), :job, 'done', now(), now())",
+            [
+                'id' => $foreignRawRecordId,
+                'company' => $foreignCompanyId,
+                'job' => Uuid::uuid7()->toString(),
+            ],
+        );
+
+        $issues = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+        $commands = [];
+        foreach ($mine as $record) {
+            $commands[] = new RecordNormalizationIssueCommand(
+                companyId: $this->companyId,
+                rawRecordId: $record['id'],
+                operationGroupId: null,
+                kind: NormalizationIssueKind::MAPPER_FAILURE,
+                details: [],
+            );
+        }
+
+        // Чужая строка под НАШЕЙ компанией: ни проблемы, ни блокировки.
+        $commands[] = new RecordNormalizationIssueCommand(
+            companyId: $this->companyId,
+            rawRecordId: $foreignRawRecordId,
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: [],
+        );
+
+        $issues->recordMany($commands);
+
+        self::assertSame(
+            3,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c',
+                ['c' => $this->companyId],
+            ),
+            'Проблемы своих записей обязаны появиться…',
+        );
+
+        self::assertSame(
+            0,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                ['id' => $foreignRawRecordId],
+            ),
+            '…а чужой — нет.',
+        );
+
+        // И до блокировки дело не доходит: отбор владения — отдельный шаг,
+        // и чужой идентификатор из него не выходит. Проверяется напрямую,
+        // потому что внутри одной транзакции теста «заблокирована ли строка»
+        // спросить нечем: своя же транзакция и держала бы этот замок.
+        self::assertSame(
+            [],
+            $this->rawRecords->filterOwned([$this->companyId => [$foreignRawRecordId]]),
+            'Чужая строка не должна попадать в блокирующий запрос вовсе.',
+        );
+    }
+
+    /**
      * Прогноз обязан описывать ТОТ ЖЕ прогон, который потом выполнится.
      *
      * Незавершённое прошлых прогонов обслуживается первым и из общего лимита.

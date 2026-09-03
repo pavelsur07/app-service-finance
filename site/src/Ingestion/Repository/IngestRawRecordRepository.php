@@ -355,6 +355,100 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
+     * Какие из этих строк действительно принадлежат названным компаниям.
+     *
+     * Запрос НЕ блокирующий и стоит ПЕРЕД блокировкой намеренно. Блокировать
+     * нужно в одном глобальном порядке — по идентификатору, — иначе пачка
+     * проблем и прогон retention берут строки в разной последовательности и
+     * складываются в цикл. Но глобальный порядок несовместим с фильтром по
+     * компании внутри одного запроса, а блокировать чужую строку нельзя даже
+     * на мгновение: это межтенантный побочный эффект, задерживающий чужой
+     * ingestion. Компания у строки неизменяема, поэтому предварительная
+     * проверка владения не устаревает.
+     *
+     * @companyScopeExempt Компания здесь и есть предмет проверки: метод
+     * получает пары «компания → строки» и отвечает, какие из них настоящие.
+     *
+     * @param array<string, list<string>> $idsByCompany
+     *
+     * @return list<string> идентификаторы, отсортированные по возрастанию
+     */
+    public function filterOwned(array $idsByCompany): array
+    {
+        $owned = [];
+
+        foreach ($idsByCompany as $companyId => $ids) {
+            if ([] === $ids) {
+                continue;
+            }
+
+            /** @var list<array{id: string}> $rows */
+            $rows = $this->createQueryBuilder('record')
+                ->select('record.id AS id')
+                ->andWhere('record.companyId = :companyId')
+                ->andWhere('record.id IN (:ids)')
+                ->setParameter('companyId', (string) $companyId)
+                ->setParameter('ids', array_values(array_unique($ids)))
+                ->getQuery()
+                ->getResult();
+
+            foreach ($rows as $row) {
+                $owned[] = $row['id'];
+            }
+        }
+
+        sort($owned);
+
+        return $owned;
+    }
+
+    /**
+     * Заблокировать строки и прочитать их отметки ОДНИМ запросом.
+     *
+     * Пачка проблем заводится до тысячи штук за раз, и запрос отметок на
+     * каждую был бы тем же N+1, ради устранения которого пачка и появилась:
+     * блокировки при этом удерживаются до конца всех запросов.
+     *
+     * Порядок — по идентификатору, тот же глобальный, что и у
+     * {@see lockManyForUpdate()}.
+     *
+     * @companyScopeExempt Принадлежность проверена до вызова —
+     * см. {@see filterOwned()}; здесь берётся блокировка в глобальном порядке,
+     * а фильтр по компании этот порядок разрушил бы.
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, array{prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}>
+     */
+    public function lockManyWithMarks(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<array{id: string, prunedAt: ?\DateTimeImmutable, deletedAt: ?\DateTimeImmutable}> $rows */
+        $rows = $this->createQueryBuilder('record')
+            ->select(
+                'record.id AS id',
+                'record.payloadPrunedAt AS prunedAt',
+                'record.payloadDeletedAt AS deletedAt',
+            )
+            ->andWhere('record.id IN (:ids)')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->orderBy('record.id', 'ASC')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getResult();
+
+        $marks = [];
+        foreach ($rows as $row) {
+            $marks[$row['id']] = ['prunedAt' => $row['prunedAt'], 'deletedAt' => $row['deletedAt']];
+        }
+
+        return $marks;
+    }
+
+    /**
      * Отметки очистки СВЕЖИМ скалярным запросом, мимо карты идентичности.
      *
      * Вызывающий уже держит блокировку строки, но его сущность могла быть

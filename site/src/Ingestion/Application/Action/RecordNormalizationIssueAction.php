@@ -28,6 +28,10 @@ final readonly class RecordNormalizationIssueAction
      * блокируются одним запросом и в порядке идентификатора — тем же, что
      * задаёт общий порядок блокировок в проекте.
      *
+     * Владение проверяется ДО блокировки и отдельным запросом: чужую строку
+     * нельзя блокировать даже на мгновение — это межтенантный побочный
+     * эффект, задерживающий чужой ingestion.
+     *
      * @param list<RecordNormalizationIssueCommand> $commands
      */
     public function recordMany(array $commands): void
@@ -39,29 +43,30 @@ final readonly class RecordNormalizationIssueAction
         $recorded = [];
 
         $this->entityManager->wrapInTransaction(function () use ($commands, &$recorded): void {
-            $byCompany = [];
+            $idsByCompany = [];
             foreach ($commands as $command) {
-                $byCompany[$command->companyId][$command->rawRecordId] = true;
+                $idsByCompany[$command->companyId][] = $command->rawRecordId;
             }
 
-            // Блокировка и отметки — по одному запросу на компанию, а не на
-            // проблему. Компаний в пачке столько же, сколько кабинетов у
-            // прогона, то есть единицы.
-            $marks = [];
-            foreach ($byCompany as $companyId => $rawRecordIds) {
-                foreach ($this->rawRecordRepository->lockManyForUpdate(array_keys($rawRecordIds)) as $rawRecordId) {
-                    $marks[$companyId][$rawRecordId] = $this->rawRecordRepository->payloadMarks((string) $companyId, $rawRecordId);
-                }
-            }
+            // ДВА запроса на пачку, а не два на проблему.
+            //
+            // Владение проверяется отдельно и БЕЗ блокировки: блокировать
+            // нужно в одном глобальном порядке — по идентификатору, — иначе
+            // пачка и прогон retention берут строки в разной
+            // последовательности и складываются в цикл. Но глобальный порядок
+            // несовместим с фильтром по компании в том же запросе, а
+            // блокировать чужую строку нельзя даже на мгновение.
+            $owned = array_flip($this->rawRecordRepository->filterOwned($idsByCompany));
+            $marks = $this->rawRecordRepository->lockManyWithMarks(array_keys($owned));
 
             foreach ($commands as $command) {
-                if (!isset($marks[$command->companyId][$command->rawRecordId])) {
+                if (!isset($owned[$command->rawRecordId], $marks[$command->rawRecordId])) {
                     $this->reportMissingRecord($command);
 
                     continue;
                 }
 
-                $this->reportPayloadState($command, $marks[$command->companyId][$command->rawRecordId]);
+                $this->reportPayloadState($command, $marks[$command->rawRecordId]);
                 $this->entityManager->persist($this->issue($command));
 
                 $recorded[] = $command;
