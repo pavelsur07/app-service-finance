@@ -563,7 +563,8 @@ final readonly class RefreshOrderStatusesAction
                 continue;
             }
 
-            // Номер отправления проверяется ЗДЕСЬ, а не в клиенте.
+            // Номер отправления проверяется ЗДЕСЬ, а не в клиенте, и
+            // требуется КАНОНИЧЕСКИМ: непустым и без пробелов по краям.
             //
             // Клиент на пустой номер бросает InvalidArgumentException — это
             // честно для него, но для прогона означало бы, что один
@@ -571,7 +572,13 @@ final readonly class RefreshOrderStatusesAction
             // ответы не применяются, следующие подключения не обрабатываются,
             // а сам проблемный заказ отметки попытки не получает и вечно
             // стоит первым в очереди. Испорчен один заказ — прочие продолжают.
-            if ('' === trim($order->getExternalId())) {
+            //
+            // Пробелы по краям — не мелочь: клиент срезал бы их, спросил бы
+            // «P-1» вместо « P-1 » и сверил номер ответа уже с обрезанным.
+            // Статус ЧУЖОГО отправления лёг бы на наш заказ — вплоть до
+            // терминального, после которого он навсегда выпал бы из перепроса.
+            $externalId = $order->getExternalId();
+            if ('' === $externalId || $externalId !== trim($externalId)) {
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
                 $this->logger->warning('Ozon order has no usable posting number to poll.', [

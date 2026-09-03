@@ -181,9 +181,13 @@ final readonly class OzonOrdersClient implements OzonOrdersClientInterface
         IngestOrderScheme $scheme,
         string $postingNumber,
     ): ?array {
-        $postingNumber = trim($postingNumber);
-        if ('' === $postingNumber) {
-            throw new \InvalidArgumentException('Ozon posting number cannot be empty.');
+        // Номер НЕ нормализуется: он обязан прийти каноническим. Срезав
+        // пробелы, клиент спросил бы «P-1» вместо « P-1 » и сверил бы номер
+        // ответа уже с обрезанным — статус чужого отправления вернулся бы
+        // вызывающему как ответ на его заказ. Это ошибка вызывающего, и
+        // молчать о ней нельзя.
+        if ('' === $postingNumber || $postingNumber !== trim($postingNumber)) {
+            throw new \InvalidArgumentException('Ozon posting number must be non-empty and canonical (no surrounding whitespace).');
         }
 
         $credentials = $this->credentials($companyId, $connectionRef);

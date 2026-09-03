@@ -896,15 +896,19 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
      * обрабатывались, а сам заказ отметки попытки не получал и вечно стоял
      * первым в очереди. Испорчен один заказ — прочие продолжают.
      */
-    public function testBlankPostingNumberIsCountedInvalidAndTheRunGoesOn(): void
+    #[DataProvider('nonCanonicalPostingNumberProvider')]
+    public function testBlankPostingNumberIsCountedInvalidAndTheRunGoesOn(string $externalId): void
     {
         $company = $this->seedCompanyWithConnection();
         $this->seedOrder($company, 'before', IngestOrderStatus::SHIPPED, 'delivering');
-        $blank = $this->seedOrder($company, '   ', IngestOrderStatus::SHIPPED, 'delivering');
+        $blank = $this->seedOrder($company, $externalId, IngestOrderStatus::SHIPPED, 'delivering');
         $this->seedOrder($company, 'after', IngestOrderStatus::SHIPPED, 'delivering');
 
+        // Отправление с ОБРЕЗАННЫМ номером у маркетплейса есть: клиент срезал
+        // бы пробелы и получил бы его статус для нашего « P-1 ».
         $this->ozon->setPostings([
             'before' => ['posting_number' => 'before', 'status' => 'delivered'],
+            'P-1' => ['posting_number' => 'P-1', 'status' => 'delivered'],
             'after' => ['posting_number' => 'after', 'status' => 'delivered'],
         ]);
 
@@ -914,13 +918,27 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         self::assertSame(1, $result->invalid);
 
         $this->em->clear();
-        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, '   ');
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, $externalId);
         self::assertNotNull($reloaded);
         self::assertSame($blank->getId(), $reloaded->getId());
+        self::assertSame(IngestOrderStatus::SHIPPED, $reloaded->getStatus(), 'Чужой статус не должен лечь на неканонический номер.');
         self::assertNotNull(
             $reloaded->getStatusRefreshAttemptedAt(),
             'Без отметки попытки испорченный заказ вечно стоял бы первым в очереди.',
         );
+    }
+
+    /**
+     * Пробелы по краям — не мелочь: клиент срезал бы их, спросил бы «P-1»
+     * вместо « P-1 » и сверил номер ответа уже с обрезанным — статус ЧУЖОГО
+     * отправления лёг бы на наш заказ.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function nonCanonicalPostingNumberProvider(): iterable
+    {
+        yield 'только пробелы' => ['   '];
+        yield 'пробелы по краям' => [' P-1 '];
     }
 
     /**

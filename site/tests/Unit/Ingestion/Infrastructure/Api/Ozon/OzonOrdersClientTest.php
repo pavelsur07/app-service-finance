@@ -409,6 +409,47 @@ final class OzonOrdersClientTest extends TestCase
     }
 
     /**
+     * Номер отправления обязан быть каноническим — клиент его не чинит.
+     *
+     * Срезав пробелы, клиент спросил бы «P-1» вместо « P-1 » и сверил бы
+     * номер ответа уже с обрезанным: статус чужого отправления вернулся бы
+     * как ответ на наш заказ. Отказ — ДО любого HTTP-вызова.
+     */
+    #[DataProvider('nonCanonicalPostingNumberProvider')]
+    public function testNonCanonicalPostingNumberIsRejectedBeforeAnyRequest(string $postingNumber): void
+    {
+        $requests = 0;
+        $client = new OzonOrdersClient(
+            new MockHttpClient(function () use (&$requests): MockResponse {
+                ++$requests;
+
+                return new MockResponse('{}', ['http_code' => 200]);
+            }),
+            $this->credentialProvider(),
+            new NullLogger(),
+        );
+
+        try {
+            $client->fetchPosting(self::COMPANY_ID, self::CONNECTION_ID, IngestOrderScheme::FBO, $postingNumber);
+            self::fail('Неканонический номер обязан быть отвергнут.');
+        } catch (\InvalidArgumentException) {
+            // Ожидаемо.
+        }
+
+        self::assertSame(0, $requests, 'До HTTP дело доходить не должно.');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function nonCanonicalPostingNumberProvider(): iterable
+    {
+        yield 'пусто' => [''];
+        yield 'только пробелы' => ['   '];
+        yield 'пробелы по краям' => [' P-1 '];
+    }
+
+    /**
      * Не-объект в теле — тоже доказательство.
      *
      * `[]`, `"broken"` или `0` нарушают контракт ровно так же, как объект без

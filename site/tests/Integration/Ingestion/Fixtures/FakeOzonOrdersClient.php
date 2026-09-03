@@ -77,6 +77,13 @@ final class FakeOzonOrdersClient implements OzonOrdersClientInterface
         IngestOrderScheme $scheme,
         string $postingNumber,
     ): ?array {
+        // Зеркало контракта настоящего клиента: неканонический номер — ошибка
+        // вызывающего, а не тихий промах. Без этого тест на пробельный номер
+        // не краснел бы на старом коде: фейк отвечал бы «не найдено».
+        if ('' === $postingNumber || $postingNumber !== trim($postingNumber)) {
+            throw new \InvalidArgumentException('Ozon posting number must be non-empty and canonical (no surrounding whitespace).');
+        }
+
         $this->calls[] = ['endpoint' => 'posting_get', 'postingNumber' => $postingNumber];
 
         if (null !== $this->postingRequestHook) {
