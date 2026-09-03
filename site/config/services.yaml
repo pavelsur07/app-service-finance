@@ -163,7 +163,13 @@ services:
     App\Ingestion\Facade\MarketplaceListingFacade:
         public: true
 
-    App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
+    # Память на процесс поверх источника: перепрос статусов ходит в Ozon по одному
+    # отправлению, и чтение секрета из БД на каждый вызов было бы N+1.
+    App\Ingestion\Infrastructure\Api\Ozon\CachingOzonCredentialProvider:
+        arguments:
+            $inner: '@App\Ingestion\Infrastructure\Api\Ozon\CredentialFacadeOzonCredentialProvider'
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonCredentialProviderInterface: '@App\Ingestion\Infrastructure\Api\Ozon\CachingOzonCredentialProvider'
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient'
     App\Ingestion\Infrastructure\Api\Ozon\OzonPerformanceReportClient:
@@ -206,6 +212,58 @@ services:
     App\Ingestion\Domain\Service\MapperRegistry:
         arguments:
             $mappers: !tagged_iterator app.ingestion.mapper
+
+    # Реестр мапперов заказов. Он же — предикат ветвления нормализации:
+    # заказный ресурс узнаётся по наличию маппера, а не по списку строк
+    # в условии, который пришлось бы держать в нескольких местах.
+    App\Ingestion\Domain\Service\OrderMapperRegistry:
+        arguments:
+            $mappers: !tagged_iterator app.ingestion.order_mapper
+
+    # ─── Заказы Ozon ───
+    App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface: '@App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClient'
+
+    App\Ingestion\Application\Source\Ozon\OzonOrdersConnector:
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Ozon\OzonOrderMapper:
+        tags: ['app.ingestion.order_mapper']
+
+    # Один класс стратегии на обе схемы: они отличаются только строкой ресурса.
+    ingestion.strategy.ozon_orders_fbo:
+        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'ozon_orders_fbo'
+        tags: ['app.ingestion.incremental_strategy']
+
+    ingestion.strategy.ozon_orders_fbs:
+        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'ozon_orders_fbs'
+        tags: ['app.ingestion.incremental_strategy']
+
+    # ─── Заказы Wildberries ───
+    App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClient'
+
+    App\Ingestion\Application\Source\Wildberries\WbOrdersConnector:
+        tags: ['app.ingestion.connector']
+
+    App\Ingestion\Application\Source\Wildberries\WbOrderMapper:
+        tags: ['app.ingestion.order_mapper']
+
+    # Два потока, две стратегии. Оба нужны: marketplace знает состав заказа,
+    # statistics приносит отмены и правки задним числом.
+    ingestion.strategy.wb_orders_marketplace:
+        class: App\Ingestion\Application\Service\WbOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'wildberries_orders_marketplace'
+        tags: ['app.ingestion.incremental_strategy']
+
+    ingestion.strategy.wb_orders_statistics:
+        class: App\Ingestion\Application\Service\WbOrdersIncrementalStrategy
+        arguments:
+            $resourceType: 'wildberries_orders_statistics'
+        tags: ['app.ingestion.incremental_strategy']
 
     App\Ingestion\Application\Service\ListingResolverRegistry:
         arguments:

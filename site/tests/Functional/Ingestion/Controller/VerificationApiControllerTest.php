@@ -164,7 +164,14 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             self::assertSame('ozon_finance_accrual_by_day', $cell['resource_type']);
             self::assertSame(1, $cell['raw_count']);
             self::assertSame(1, $cell['tx_count']);
-            self::assertSame('2026-06-20T07:00:00Z', $cell['last_fetched_at']);
+            // Ровно тот момент, который засеян выше (`10:00:00+00:00`).
+            //
+            // Раньше здесь стояло `07:00:00Z`: колонка без зоны хранила
+            // UTC-время, а читалась как местное, и каждый round-trip терял
+            // смещение зоны — UI показывал скачивание на три часа раньше, чем
+            // оно было. Тип `datetime_immutable_us` приводит момент к зоне
+            // приложения на записи и разбирает в ней же на чтении.
+            self::assertSame('2026-06-20T10:00:00Z', $cell['last_fetched_at']);
         }
     }
 

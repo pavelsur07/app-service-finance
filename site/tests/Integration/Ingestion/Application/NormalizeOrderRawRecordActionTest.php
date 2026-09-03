@@ -1,0 +1,843 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Ingestion\Application;
+
+use App\Ingestion\Application\Action\NormalizeOrderRawRecordAction;
+use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
+use App\Ingestion\Application\DTO\MappedOrder;
+use App\Ingestion\Application\DTO\MappedOrderItem;
+use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Enum\IngestOrderScheme;
+use App\Ingestion\Enum\IngestOrderStatus;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Facade\RawStorageFacade;
+use App\Ingestion\Repository\IngestOrderItemRepository;
+use App\Ingestion\Repository\IngestOrderRepository;
+use App\Ingestion\Repository\IngestOrderStatusEventRepository;
+use App\Tests\Integration\Ingestion\Fixtures\FakeOrderMapper;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Ramsey\Uuid\Uuid;
+
+final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
+{
+    private const CONNECTION_REF = 'connection-1';
+
+    private string $companyId;
+    private FakeOrderMapper $mapper;
+    private NormalizeOrderRawRecordAction $action;
+    private IngestOrderRepository $orders;
+    private IngestOrderItemRepository $items;
+    private IngestOrderStatusEventRepository $events;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->companyId = Uuid::uuid7()->toString();
+        $this->mapper = self::getContainer()->get(FakeOrderMapper::class);
+        $this->action = self::getContainer()->get(NormalizeOrderRawRecordAction::class);
+        $this->orders = self::getContainer()->get(IngestOrderRepository::class);
+        $this->items = self::getContainer()->get(IngestOrderItemRepository::class);
+        $this->events = self::getContainer()->get(IngestOrderStatusEventRepository::class);
+    }
+
+    public function testCreatesOrderWithItemsAndOpeningStatusEvent(): void
+    {
+        $this->mapper->queue($this->order('delivering', 2));
+        $rawId = $this->storeRaw();
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::SHIPPED, $order->getStatus());
+        self::assertCount(2, $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()));
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Перенормализация того же сырья не должна плодить ни позиции, ни события.
+     * Ключ идемпотентности позиций — (company, order, lineKey).
+     */
+    public function testRenormalizingSameRawCreatesNoDuplicates(): void
+    {
+        $this->mapper->queue($this->order('delivering', 2));
+        $rawId = $this->storeRaw();
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertCount(2, $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId()));
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Часовой опрос присылает один и тот же статус снова и снова: событие
+     * пишется только на смену, иначе журнал рос бы на 24 строки в сутки на
+     * каждый заказ.
+     */
+    public function testStatusChangeAppendsSecondEvent(): void
+    {
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Устаревшее наблюдение — факт, и оно фиксируется. Но текущее состояние
+     * заказа назад не едет: доставленный заказ не должен снова стать «в пути».
+     */
+    public function testStaleObservationIsRecordedButDoesNotRewindStatus(): void
+    {
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('-1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus(), 'Статус не должен ехать назад.');
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()), 'Наблюдение — факт, оно фиксируется.');
+
+        // ...но переходом оно не является. Запись с previousStatus = DELIVERED
+        // и status = SHIPPED утверждала бы движение заказа, которого не было.
+        $stale = $this->connection->fetchAssociative(
+            'SELECT applied, previous_status FROM ingest_order_status_events
+             WHERE company_id = :c AND order_id = :o AND raw_status = :s',
+            ['c' => $this->companyId, 'o' => $order->getId(), 's' => 'delivering'],
+        );
+
+        self::assertIsArray($stale);
+        self::assertFalse((bool) $stale['applied'], 'Устаревшее наблюдение состояние не сдвинуло.');
+        self::assertNull($stale['previous_status'], 'У неприменённого наблюдения перехода нет.');
+    }
+
+    /**
+     * Регрессия: устаревшее наблюдение не двигает статус заказа, поэтому
+     * «статус отличается от текущего» остаётся истиной навсегда. На старом
+     * коде каждый повторный прогон того же сырья дописывал ещё одну копию
+     * события, и журнал рос при полном отсутствии новых данных.
+     */
+    public function testReplayingStaleObservationDoesNotDuplicateItsEvent(): void
+    {
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $this->mapper->queue($this->order('delivering', 1));
+        $staleRawId = $this->storeRaw('page-2', new \DateTimeImmutable('-1 hour'));
+        ($this->action)(new NormalizeRawRecordCommand($staleRawId, $this->companyId));
+        ($this->action)(new NormalizeRawRecordCommand($staleRawId, $this->companyId, forceReplay: true));
+        ($this->action)(new NormalizeRawRecordCommand($staleRawId, $this->companyId, forceReplay: true));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Регрессия: повтор вёл себя по-разному в зависимости от момента.
+     *
+     * Сырьё, впервые разобранное при том же статусе, события не давало —
+     * записывать было нечего. Но ключ подавления брался из уже записанных
+     * событий, поэтому после следующей смены статуса тот же повтор внезапно
+     * находил отличие, ключа не находил и дописывал событие с
+     * `previousStatus` из будущего: перевёрнутый переход, появившийся из
+     * ничего. На старом коде журнал рос от каждого повтора.
+     */
+    public function testReplayOfRawSeenAtTheSameStatusStaysSilentAfterStatusMoves(): void
+    {
+        // Заказ создан первым сырьём — у него есть открывающее событие.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('-3 hours')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        // Второе сырьё подтверждает ТОТ ЖЕ статус: событий не появляется, и
+        // ключа подавления для этого сырья тоже не остаётся — именно здесь
+        // старый код и ломался.
+        $this->mapper->queue($this->order('delivering', 1));
+        $confirmingRawId = $this->storeRaw('page-2', new \DateTimeImmutable('-2 hours'));
+        ($this->action)(new NormalizeRawRecordCommand($confirmingRawId, $this->companyId));
+
+        $afterConfirmation = $this->events->countByOrder($this->companyId, $order->getId());
+        self::assertSame(1, $afterConfirmation, 'Подтверждение того же статуса события не даёт.');
+
+        // Статус уехал вперёд.
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-3', new \DateTimeImmutable('-1 hour')), $this->companyId));
+
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        // Повтор подтверждающего сырья наблюдением не является. На старом коде
+        // он находил отличие, ключа не находил и дописывал событие
+        // `DELIVERED → DELIVERING`: перевёрнутый переход из ничего.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($confirmingRawId, $this->companyId, forceReplay: true));
+
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::DELIVERED, $reloaded->getStatus(), 'Повтор старого сырья не откатывает статус.');
+    }
+
+    /**
+     * Регрессия: повтор размножал элементы видимой очереди.
+     *
+     * Флаг повтора подавлял только события журнала, а ветки MAPPER_FAILURE и
+     * UNKNOWN_ORDER_STATUS выполнялись снова. Уникального ключа у проблем нет,
+     * поэтому повторная доставка сообщения или forceReplay плодили копии, и
+     * очередь на разбор превращалась в шум.
+     */
+    public function testReplayDoesNotDuplicateNormalizationIssues(): void
+    {
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+
+        $rawId = $this->storeRaw('page-1', new \DateTimeImmutable('-1 hour'));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $countIssues = fn (): int => (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c',
+            ['c' => $this->companyId],
+        );
+
+        $afterFirstParse = $countIssues();
+        self::assertSame(2, $afterFirstParse, 'Незнакомый статус и неразобранная строка — по проблеме на каждую.');
+
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $this->mapper->queue($this->order('teleported', 1));
+        $this->mapper->queueSkipped([['reason' => 'broken row', 'hint' => 'posting-2']]);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        self::assertSame($afterFirstParse, $countIssues(), 'Повтор проблем не заводит.');
+    }
+
+    /**
+     * Регрессия: повтор создавал открывающее событие, если заказа не оказалось.
+     *
+     * Ветка создания заказа звала recordOpening() безусловно, а флаг повтора
+     * учитывался только ниже, для уже существующего заказа. Повтор
+     * разобранного сырья — например, после удаления заказа — датировал бы
+     * наблюдение моментом повтора и дал бы журнал, в котором есть начало и нет
+     * ни одного последующего перехода: те идут через reapply() и событий не
+     * пишут.
+     */
+    public function testReplayDoesNotOpenAJournalForAnOrderItRecreates(): void
+    {
+        $this->mapper->queue($this->order('delivering', 1));
+        $rawId = $this->storeRaw('page-1', new \DateTimeImmutable('-1 hour'));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(1, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        // Заказ исчез: события и позиции уходят вместе с ним.
+        $this->connection->executeStatement('DELETE FROM ingest_order_status_events WHERE order_id = :o', ['o' => $order->getId()]);
+        $this->connection->executeStatement('DELETE FROM ingest_order_items WHERE order_id = :o', ['o' => $order->getId()]);
+        $this->connection->executeStatement('DELETE FROM ingest_orders WHERE id = :o', ['o' => $order->getId()]);
+        $this->em->clear();
+
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $recreated = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($recreated);
+        self::assertSame(
+            0,
+            $this->events->countByOrder($this->companyId, $recreated->getId()),
+            'Повтор событий не создаёт — ни переходов, ни открывающего.',
+        );
+    }
+
+    /**
+     * Регрессия: повтор с РАВНОЙ отметкой времени затирал чужое наблюдение.
+     *
+     * `observeStatus()` отклоняет только строго более старое, поэтому при
+     * одинаковом `fetchedAt` двух разных сырьевых записей повтор первой
+     * перезаписывал состояние, записанное второй, — и не оставлял даже строки
+     * в журнале, потому что повтор событий не пишет. Микросекунды делают
+     * совпадение редким, но полного порядка не создают.
+     */
+    public function testReplayWithEqualFetchTimeDoesNotOverwriteAnotherRaw(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $this->mapper->queue($this->order('delivering', 1));
+        $firstRawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId));
+
+        // Второе сырьё с ТОЙ ЖЕ отметкой скачивания.
+        $this->mapper->queue($this->order('delivered', 1));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', $at), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+
+        // Повтор первого сырья ничего не сообщает: оно уже разобрано.
+        $this->mapper->queue($this->order('delivering', 1));
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(
+            IngestOrderStatus::DELIVERED,
+            $reloaded->getStatus(),
+            'Повтор не перезаписывает наблюдение другого сырья с равной отметкой.',
+        );
+    }
+
+    /**
+     * Повтор с равной отметкой не откатывает и ОСТАЛЬНЫЕ данные.
+     *
+     * Статусная ось закрыта отдельно, и в этом была ловушка: заказ выглядел
+     * согласованным по статусу, а цена, атрибуты и состав откатывались к
+     * снимку более раннего сырья — порча ничем себя не выдавала.
+     */
+    public function testReplayWithEqualFetchTimeDoesNotRewindSnapshotData(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $first = $this->order('delivering', 1);
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'старый склад'],
+        ));
+        $firstRawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId));
+
+        // Второе сырьё с ТОЙ ЖЕ отметкой: другая цена, другие атрибуты.
+        $second = $this->order('delivered', 1);
+        $secondItems = [new MappedOrderItem(
+            lineNo: 0,
+            lineKey: $second->items[0]->lineKey,
+            quantity: 1,
+            externalSku: $second->items[0]->externalSku,
+            offerId: $second->items[0]->offerId,
+            name: $second->items[0]->name,
+            priceMinor: '999000',
+            currency: 'RUB',
+            sourceData: $second->items[0]->sourceData,
+        )];
+        $this->mapper->queue(new MappedOrder(
+            externalId: $second->externalId,
+            scheme: $second->scheme,
+            orderedAt: $second->orderedAt,
+            rawStatus: $second->rawStatus,
+            items: $secondItems,
+            attributes: ['warehouse' => 'новый склад'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', $at), $this->companyId));
+
+        // Повтор ПЕРВОГО сырья: оно уже разобрано и ничего нового не сообщает.
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'старый склад'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::DELIVERED, $reloaded->getStatus());
+        self::assertSame(
+            'новый склад',
+            $reloaded->getAttributes()['warehouse'] ?? null,
+            'Атрибуты обязаны остаться от сырья, разобранного позже.',
+        );
+
+        $price = (string) $this->connection->fetchOne(
+            'SELECT price_minor FROM ingest_order_items WHERE order_id = :id',
+            ['id' => $reloaded->getId()],
+        );
+        self::assertSame('999000', $price, 'Цена обязана остаться от сырья, разобранного позже.');
+    }
+
+    /**
+     * Повтор СВОЕГО сырья исправляет снимок — ради этого forceReplay и есть.
+     *
+     * У уже разобранного сырья отметка оси равна его собственному
+     * `fetchedAt`, поэтому запрет на равное время, введённый против чужого
+     * отката, отобрал бы у повтора весь смысл: маппер починили, а цена и
+     * состав остались бы прежними. Различает эти два случая владелец оси.
+     */
+    public function testReplayOfItsOwnRawFixesTheSnapshotItWrote(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $first = $this->order('delivering', 1);
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'разобрано неверно'],
+        ));
+        $rawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        // Маппер починили: то же сырьё разбирается заново и по-другому.
+        $fixedItems = [new MappedOrderItem(
+            lineNo: 0,
+            lineKey: $first->items[0]->lineKey,
+            quantity: 1,
+            externalSku: $first->items[0]->externalSku,
+            offerId: $first->items[0]->offerId,
+            name: $first->items[0]->name,
+            priceMinor: '777000',
+            currency: 'RUB',
+            sourceData: $first->items[0]->sourceData,
+        )];
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $fixedItems,
+            attributes: ['warehouse' => 'разобрано верно'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame('разобрано верно', $reloaded->getAttributes()['warehouse'] ?? null);
+
+        $price = (string) $this->connection->fetchOne(
+            'SELECT price_minor FROM ingest_order_items WHERE order_id = :id',
+            ['id' => $reloaded->getId()],
+        );
+        self::assertSame('777000', $price, 'Повтор своего сырья обязан переписать то, что сам же и записал.');
+
+        // Событий журнала повтор по-прежнему не пишет.
+        self::assertSame(
+            1,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_order_status_events WHERE order_id = :id',
+                ['id' => $reloaded->getId()],
+            ),
+        );
+    }
+
+    /**
+     * Регрессия: идентичность позиции была позиционной. Источник вправе
+     * прислать те же товары в другом порядке — на старом коде строка 0
+     * сохраняла прежние externalSku/offerId, но получала количество, цену и
+     * листинг соседнего товара. Прямое смешение данных между позициями.
+     */
+    public function testReorderedItemsKeepTheirOwnData(): void
+    {
+        $first = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '10000');
+        $second = new MappedOrderItem(lineNo: 1, lineKey: 'sku:BBB#0', quantity: 7, externalSku: 'BBB', priceMinor: '90000');
+
+        $this->mapper->queue($this->orderWithItems('delivering', [$first, $second]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        // Тот же заказ, те же товары — переставлены местами.
+        $this->mapper->queue($this->orderWithItems('delivering', [
+            new MappedOrderItem(lineNo: 0, lineKey: 'sku:BBB#0', quantity: 7, externalSku: 'BBB', priceMinor: '90000'),
+            new MappedOrderItem(lineNo: 1, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '10000'),
+        ]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertCount(2, $items, 'Перестановка не должна создавать новые позиции.');
+
+        // Количество и цена остались при своих SKU, а не переехали к соседу.
+        self::assertSame('AAA', $items['sku:AAA#0']->getExternalSku());
+        self::assertSame(1, $items['sku:AAA#0']->getQuantity());
+        self::assertSame('BBB', $items['sku:BBB#0']->getExternalSku());
+        self::assertSame(7, $items['sku:BBB#0']->getQuantity());
+
+        // Порядок отображения при этом обновился.
+        self::assertSame(0, $items['sku:BBB#0']->getLineNo());
+        self::assertSame(1, $items['sku:AAA#0']->getLineNo());
+    }
+
+    /**
+     * Регрессия: результат observeStatus() игнорировался. Устаревшее сырьё не
+     * трогало статус, но всё равно откатывало количество, цену и атрибуты —
+     * получался внутренне противоречивый заказ: новый статус с данными из
+     * старого ответа.
+     */
+    public function testStaleObservationDoesNotRewindItemData(): void
+    {
+        $fresh = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 5, externalSku: 'AAA', priceMinor: '90000');
+        $this->mapper->queue($this->orderWithItems('delivered', [$fresh]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        // Старое сырьё: другой статус И другие данные позиции.
+        $stale = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '10000');
+        $this->mapper->queue($this->orderWithItems('delivering', [$stale]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('-1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::DELIVERED, $order->getStatus());
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(5, $items['sku:AAA#0']->getQuantity(), 'Количество не должно откатываться старым сырьём.');
+        self::assertSame('90000', $items['sku:AAA#0']->getPriceMinor(), 'Цена не должна откатываться старым сырьём.');
+
+        // Событие при этом фиксируется: наблюдение — факт, который был.
+        self::assertSame(2, $this->events->countByOrder($this->companyId, $order->getId()));
+    }
+
+    /**
+     * Батч с несколькими заказами обрабатывается целиком, и повторяющийся
+     * externalId внутри одного батча попадает в ту же запись, а не создаёт
+     * вторую и не упирается в уникальный индекс.
+     */
+    public function testBatchWithRepeatedExternalIdCreatesSingleOrder(): void
+    {
+        $this->mapper->queue(
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1)]),
+            $this->orderWithItems('delivering', [new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 2)]),
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_orders WHERE company_id = :c',
+            ['c' => $this->companyId],
+        ));
+    }
+
+    /**
+     * Журнал не должен расходиться с состоянием заказа.
+     *
+     * Регрессия тройная, и каждая следующая — следствие предыдущей правки.
+     * Сначала existsObservation() спрашивала БД на каждое событие, а
+     * Doctrine-запрос не видит непрофлашенные сущности: A → B → A внутри
+     * одного батча создавала два события A и роняла flush на уникальном
+     * индексе. Потом ключ стал `(сырьё, заказ, сырой статус)` и подавил
+     * законный возврат в A: заказ в A, журнал заканчивается на B. Потом в ключ
+     * добавили предыдущий статус — и подавился второй переход `A → B`
+     * последовательности A → B → A → B: заказ в B, журнал заканчивается на A.
+     *
+     * Содержательного ключа, свободного от этого, не существует: наблюдения
+     * различаются фактом появления, а не содержанием. Отсюда порядковый номер.
+     *
+     * @param list<string> $statuses
+     */
+    #[DataProvider('journalSequenceProvider')]
+    public function testJournalFollowsEveryAppliedTransition(
+        array $statuses,
+        IngestOrderStatus $expectedStatus,
+        string $expectedLastRawStatus,
+        int $expectedEvents,
+    ): void {
+        $item = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1);
+
+        $this->mapper->queue(...array_map(
+            fn (string $status): MappedOrder => $this->orderWithItems($status, [$item()]),
+            $statuses,
+        ));
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame($expectedStatus, $order->getStatus());
+        self::assertSame($expectedEvents, $this->events->countByOrder($this->companyId, $order->getId()));
+
+        $last = $this->connection->fetchAssociative(
+            'SELECT raw_status FROM ingest_order_status_events
+             WHERE company_id = :c AND order_id = :o ORDER BY occurrence DESC LIMIT 1',
+            ['c' => $this->companyId, 'o' => $order->getId()],
+        );
+
+        self::assertIsArray($last);
+        self::assertSame($expectedLastRawStatus, $last['raw_status'], 'Журнал заканчивается там же, где заказ.');
+    }
+
+    /**
+     * @return iterable<string, array{statuses: list<string>, expectedStatus: IngestOrderStatus, expectedLastRawStatus: string, expectedEvents: int}>
+     */
+    public static function journalSequenceProvider(): iterable
+    {
+        yield 'single observation' => [
+            'statuses' => ['delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 1,
+        ];
+
+        // Подтверждение того же статуса события не даёт.
+        yield 'repeated identical status' => [
+            'statuses' => ['delivering', 'delivering', 'delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 1,
+        ];
+
+        yield 'there and back' => [
+            'statuses' => ['delivering', 'delivered', 'delivering'],
+            'expectedStatus' => IngestOrderStatus::SHIPPED,
+            'expectedLastRawStatus' => 'delivering',
+            'expectedEvents' => 3,
+        ];
+
+        // Именно эта последовательность теряла последний переход при ключе с
+        // предыдущим статусом: заказ оказывался в B, журнал — в A.
+        yield 'there and back and there again' => [
+            'statuses' => ['delivering', 'delivered', 'delivering', 'delivered'],
+            'expectedStatus' => IngestOrderStatus::DELIVERED,
+            'expectedLastRawStatus' => 'delivered',
+            'expectedEvents' => 4,
+        ];
+    }
+
+    /**
+     * Регрессия: refresh() сохранял прежние nullable-значения через `??`.
+     * Источник отдаёт отправление целиком, поэтому отсутствие цены в свежем
+     * ответе означает «цены нет», а не «оставь старую» — заказ нёс стоимость
+     * из устаревшего ответа.
+     */
+    public function testFreshSnapshotClearsPriceThatDisappeared(): void
+    {
+        $withPrice = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA', priceMinor: '90000');
+        $this->mapper->queue($this->orderWithItems('delivering', [$withPrice]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $withoutPrice = new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA');
+        $this->mapper->queue($this->orderWithItems('delivered', [$withoutPrice]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertNull($items['sku:AAA#0']->getPriceMinor());
+    }
+
+    /**
+     * Позиция, исчезнувшая из свежего снимка, удаляется: оставленная строка
+     * завышала бы и сумму заказа, и агрегаты по выкупу.
+     */
+    public function testItemMissingFromFreshSnapshotIsRemoved(): void
+    {
+        $this->mapper->queue($this->orderWithItems('delivering', [
+            new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA'),
+            new MappedOrderItem(lineNo: 1, lineKey: 'sku:BBB#0', quantity: 1, externalSku: 'BBB'),
+        ]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $this->mapper->queue($this->orderWithItems('delivered', [
+            new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA'),
+        ]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(['sku:AAA#0'], array_keys($items));
+    }
+
+    /**
+     * Регрессия: удаление исчезнувших позиций выполнялось внутри цикла. Если
+     * тот же заказ встречался в батче ещё раз со снимком {A,B} после {A},
+     * Doctrine выполнял INSERT раньше DELETE и уникальный индекс ронял общий
+     * flush. Вычистка перенесена за пределы батча.
+     */
+    public function testItemReappearingLaterInTheSameBatchSurvives(): void
+    {
+        $a = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA#0', quantity: 1, externalSku: 'AAA');
+        $b = static fn (): MappedOrderItem => new MappedOrderItem(lineNo: 1, lineKey: 'sku:BBB#0', quantity: 1, externalSku: 'BBB');
+
+        // Заказ уже существует с двумя позициями.
+        $this->mapper->queue($this->orderWithItems('delivering', [$a(), $b()]));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        // Один raw: сначала снимок {A}, затем снова {A,B}.
+        $this->mapper->queue(
+            $this->orderWithItems('delivering', [$a()]),
+            $this->orderWithItems('delivered', [$a(), $b()]),
+        );
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', new \DateTimeImmutable('+1 hour')), $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+
+        $items = $this->items->findByOrderIndexedByLineKey($this->companyId, $order->getId());
+        self::assertSame(['sku:AAA#0', 'sku:BBB#0'], $this->sortedKeys($items));
+    }
+
+    /**
+     * @param array<string, mixed> $items
+     *
+     * @return list<string>
+     */
+    private function sortedKeys(array $items): array
+    {
+        $keys = array_keys($items);
+        sort($keys);
+
+        return $keys;
+    }
+
+    /**
+     * Резолв листингов вынесен из цикла: один вызов на всё сырьё вместо вызова
+     * на заказ. Ключ теперь составной — «индекс заказа:индекс позиции», и
+     * ошибка в нём привязала бы позицию к чужому листингу. Проверяем, что
+     * позиции разных заказов сохранили каждая свой ключ резолва.
+     */
+    public function testResolutionsStayWithTheirOwnOrdersWhenResolvedInOneBatch(): void
+    {
+        $this->mapper->queue(
+            $this->orderWithExternalId('posting-1', [
+                new MappedOrderItem(lineNo: 0, lineKey: 'sku:AAA|offer:#0', quantity: 1, externalSku: 'AAA', sourceData: ['sku' => 'AAA']),
+            ]),
+            $this->orderWithExternalId('posting-2', [
+                new MappedOrderItem(lineNo: 0, lineKey: 'sku:BBB|offer:#0', quantity: 1, externalSku: 'BBB', sourceData: ['sku' => 'BBB']),
+                new MappedOrderItem(lineNo: 1, lineKey: 'sku:CCC|offer:#0', quantity: 1, externalSku: 'CCC', sourceData: ['sku' => 'CCC']),
+            ]),
+        );
+
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-1'), $this->companyId));
+
+        $first = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        $second = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-2');
+        self::assertNotNull($first);
+        self::assertNotNull($second);
+
+        $firstItems = $this->items->findByOrderIndexedByLineKey($this->companyId, $first->getId());
+        $secondItems = $this->items->findByOrderIndexedByLineKey($this->companyId, $second->getId());
+
+        self::assertSame(['sku:AAA|offer:#0'], array_keys($firstItems));
+        self::assertSame(['sku:BBB|offer:#0', 'sku:CCC|offer:#0'], $this->sortedKeys($secondItems));
+
+        // Ключ резолва сохранён у каждой позиции свой — листинг не найден, но
+        // именно свой externalSku, а не соседний.
+        self::assertSame('AAA', $firstItems['sku:AAA|offer:#0']->getListingSku());
+        self::assertSame('BBB', $secondItems['sku:BBB|offer:#0']->getListingSku());
+        self::assertSame('CCC', $secondItems['sku:CCC|offer:#0']->getListingSku());
+    }
+
+    /**
+     * @param list<MappedOrderItem> $items
+     */
+    private function orderWithExternalId(string $externalId, array $items): MappedOrder
+    {
+        return new MappedOrder(
+            externalId: $externalId,
+            scheme: IngestOrderScheme::FBO,
+            orderedAt: new \DateTimeImmutable('-2 days'),
+            rawStatus: 'delivering',
+            items: $items,
+        );
+    }
+
+    /**
+     * Незнакомый статус деградирует в UNKNOWN и попадает в видимую очередь,
+     * а не в NULL и не в исключение.
+     */
+    public function testUnknownStatusBecomesUnknownAndRaisesIssue(): void
+    {
+        $this->mapper->queue($this->order('какой_то_новый_статус', 1));
+        $rawId = $this->storeRaw();
+
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        $order = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($order);
+        self::assertSame(IngestOrderStatus::UNKNOWN, $order->getStatus());
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'unknown_order_status'",
+            ['c' => $this->companyId],
+        ));
+    }
+
+    /**
+     * @param list<MappedOrderItem> $items
+     */
+    private function orderWithItems(string $rawStatus, array $items): MappedOrder
+    {
+        return new MappedOrder(
+            externalId: 'posting-1',
+            scheme: IngestOrderScheme::FBO,
+            orderedAt: new \DateTimeImmutable('-2 days'),
+            rawStatus: $rawStatus,
+            items: $items,
+        );
+    }
+
+    private function order(string $rawStatus, int $itemCount): MappedOrder
+    {
+        $items = [];
+        for ($i = 0; $i < $itemCount; ++$i) {
+            $items[] = new MappedOrderItem(
+                lineNo: $i,
+                lineKey: 'sku:70000000'.$i.'#0',
+                quantity: 1,
+                externalSku: '70000000'.$i,
+                offerId: 'TEST-ART-'.$i,
+                name: 'Товар '.$i,
+                priceMinor: '150000',
+                currency: 'RUB',
+                sourceData: ['sku' => '70000000'.$i, 'offer_id' => 'TEST-ART-'.$i],
+            );
+        }
+
+        return new MappedOrder(
+            externalId: 'posting-1',
+            scheme: IngestOrderScheme::FBO,
+            orderedAt: new \DateTimeImmutable('-2 days'),
+            rawStatus: $rawStatus,
+            items: $items,
+        );
+    }
+
+    private function storeRaw(string $externalId = 'page-1', ?\DateTimeImmutable $fetchedAt = null): string
+    {
+        /** @var RawStorageFacade $facade */
+        $facade = self::getContainer()->get(RawStorageFacade::class);
+
+        return $facade->storeAndGetIds(new RawBatch(
+            companyId: $this->companyId,
+            connectionRef: self::CONNECTION_REF,
+            shopRef: 'shop-main',
+            source: IngestSource::OZON,
+            resourceType: FakeOrderMapper::RESOURCE_TYPE,
+            externalId: $externalId,
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: $fetchedAt ?? new \DateTimeImmutable(),
+            rows: [['posting_number' => 'posting-1']],
+        ))[0];
+    }
+}

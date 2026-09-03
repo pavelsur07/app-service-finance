@@ -6,6 +6,7 @@ namespace App\Ingestion\Application;
 
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Exception\RawStorageException;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
@@ -14,6 +15,7 @@ use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\LoggerInterface;
 
 final readonly class StoreRawBatchAction
 {
@@ -24,7 +26,29 @@ final readonly class StoreRawBatchAction
         private RawStoragePathBuilder $pathBuilder,
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $managerRegistry,
+        private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Вернуть нагрузку, если её нет, и только ПОТОМ снять отметку.
+     *
+     * Порядок важен: отметка, снятая раньше записи объекта, означала бы
+     * запись, утверждающую, что нагрузка на месте, когда её ещё нет.
+     */
+    private function restorePayload(IngestRawRecord $record, string $ndjson): void
+    {
+        if (null !== $record->getPayloadPrunedAt() || !$this->objectStorage->exists($record->getStoragePath())) {
+            $compressed = gzencode($ndjson, 6);
+            if (false === $compressed) {
+                throw new RawStorageException('Failed to gzip raw payload.');
+            }
+
+            $this->objectStorage->write($record->getStoragePath(), $compressed);
+        }
+
+        $record->markPayloadRestored();
+        $record->markSeen();
     }
 
     /**
@@ -43,10 +67,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $latestRecord && $latestRecord->getHash() === $hash) {
-            $this->repairMissingObject($latestRecord, $ndjson);
-            $this->entityManager->flush();
-
-            return [$latestRecord];
+            return [$this->reuse($batch, $latestRecord, $ndjson)];
         }
 
         $existingRecord = $this->rawRecordRepository->findOneByCompanySourceExternalIdAndHash(
@@ -58,10 +79,7 @@ final readonly class StoreRawBatchAction
         );
 
         if (null !== $existingRecord) {
-            $this->repairMissingObject($existingRecord, $ndjson);
-            $this->entityManager->flush();
-
-            return [$existingRecord];
+            return [$this->reuse($batch, $existingRecord, $ndjson)];
         }
 
         $compressed = gzencode($ndjson, 6);
@@ -90,24 +108,77 @@ final readonly class StoreRawBatchAction
         try {
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException $exception) {
+            // Объект остаётся: конкурент создал строку на то же сырьё, и
+            // восстановление ниже пользуется ЕГО путём. Наш собственный путь
+            // при этом совпадает с чужим — он строится из хеша содержимого.
             return [$this->recoverConcurrentDuplicate($batch, $hash, $ndjson, $exception)];
+        } catch (\Throwable $exception) {
+            // Объект записан, а есть ли строка — НЕИЗВЕСТНО.
+            //
+            // Соблазн удалить объект здесь же был, и он опасен: исход коммита
+            // бывает неопределённым — PostgreSQL мог зафиксировать строку, а
+            // клиент потерять подтверждение. Удалив объект, мы оставили бы
+            // живую запись без нагрузки и без отметки `payload_pruned_at`:
+            // чтение падало бы инфраструктурной ошибкой, а retention такую
+            // запись не починит. Это путь к необратимой потере, тогда как
+            // осиротевший объект — лишь занятое место.
+            //
+            // Поэтому утечка, но ВИДИМАЯ: путь уходит в error, и убрать объект
+            // может человек, убедившись, что строки на него нет. Найти его по
+            // базе иначе невозможно — retention ищет кандидатов среди строк.
+            $this->logger->error('Raw object may be orphaned: its record failed to persist and the outcome is unknown.', [
+                'companyId' => $batch->companyId,
+                'storagePath' => $storedObject->path,
+                // Класс, а не сообщение: в тексте транспортных исключений
+                // встречаются DSN с учётными данными.
+                'exceptionClass' => $exception::class,
+            ]);
+
+            throw $exception;
         }
 
         return [$record];
     }
 
-    private function repairMissingObject(IngestRawRecord $record, string $ndjson): void
+    /**
+     * Повторная встреча того же сырья: подтвердить, при необходимости вернуть
+     * нагрузку и снять отметку retention.
+     *
+     * Всё это — ПОД БЛОКИРОВКОЙ строки, потому что retention правит ту же
+     * строку и тот же объект. Без общей блокировки шаги переплетались:
+     * восстановление снимало отметку, видя ещё существующий объект, а
+     * retention следом удалял его — оставалась запись, которая утверждает,
+     * что нагрузка на месте, и чтение падало ошибкой хранилища.
+     *
+     * Порядок внутри тоже важен: объект пишется ДО снятия отметки. Иначе
+     * отметка снялась бы раньше, чем данные появились.
+     */
+    private function reuse(RawBatch $batch, IngestRawRecord $record, string $ndjson): IngestRawRecord
     {
-        if (!$this->objectStorage->exists($record->getStoragePath())) {
-            $compressed = gzencode($ndjson, 6);
-            if (false === $compressed) {
-                throw new RawStorageException('Failed to gzip raw payload.');
-            }
+        $reused = $record;
 
-            $this->objectStorage->write($record->getStoragePath(), $compressed);
-        }
+        $this->entityManager->wrapInTransaction(
+            function () use ($batch, $record, $ndjson, &$reused): void {
+                $locked = $this->rawRecordRepository->findOneForUpdate($batch->companyId, $record->getId());
 
-        $record->markSeen();
+                // Строки нет — продолжать НЕЛЬЗЯ.
+                //
+                // Прежний откат на прочитанную ранее сущность выглядел
+                // безобидно, а был тем же классом тихой потери: объект писался
+                // без блокировки, Doctrine выполняла UPDATE по отсутствующей
+                // строке, задевая ноль строк, и вызывающий получал «сохранено»
+                // при записи, которой нет. В хранилище оставалась сирота.
+                if (null === $locked) {
+                    throw new RawRecordNotFoundException(sprintf('Raw record %s disappeared before its payload could be restored.', $record->getId()));
+                }
+
+                $this->restorePayload($locked, $ndjson);
+
+                $reused = $locked;
+            },
+        );
+
+        return $reused;
     }
 
     private function recoverConcurrentDuplicate(
@@ -148,9 +219,30 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        $this->repairMissingObject($existingRecord, $ndjson);
-        $entityManager->flush();
+        // ПОД БЛОКИРОВКОЙ, как и обычная повторная встреча.
+        //
+        // Прежде здесь стояло рассуждение «запись только что создана
+        // конкурентом, значит свежая и кандидатом retention быть не может».
+        // Кодом оно не обеспечено: ветка не смотрит на `lastSeenAt`, а
+        // историческая выгрузка попадает под retention-предикат сразу. Без
+        // блокировки шаги переплетались ровно так же, как в `reuse()`:
+        // восстановление писало объект и снимало отметки в памяти, retention
+        // следом удалял объект, а flush закреплял запись, утверждающую, что
+        // нагрузка на месте.
+        $recovered = $existingRecord;
 
-        return $existingRecord;
+        $entityManager->wrapInTransaction(function () use ($batch, $repository, $existingRecord, $ndjson, &$recovered): void {
+            $locked = $repository->findOneForUpdate($batch->companyId, $existingRecord->getId());
+
+            if (null === $locked) {
+                throw new RawRecordNotFoundException(sprintf('Raw record %s disappeared before its payload could be restored.', $existingRecord->getId()));
+            }
+
+            $this->restorePayload($locked, $ndjson);
+
+            $recovered = $locked;
+        });
+
+        return $recovered;
     }
 }

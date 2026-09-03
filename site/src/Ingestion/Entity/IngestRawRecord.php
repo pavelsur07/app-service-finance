@@ -51,7 +51,14 @@ class IngestRawRecord implements TenantOwnedInterface
     #[ORM\Column(type: Types::INTEGER)]
     private int $byteSize;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
+    /**
+     * Момент СКАЧИВАНИЯ — он же момент наблюдения для нормализации, поэтому
+     * микросекунды здесь обязаны переживать запись: усечённые до секунды, они
+     * делают два наблюдения внутри одной секунды неразличимыми, и более
+     * старое побеждает более новое.
+     */
+    // Имя типа, а не класс: см. IngestOrder. Регистрация — doctrine.yaml.
+    #[ORM\Column(type: 'datetime_immutable_us')]
     private \DateTimeImmutable $fetchedAt;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
@@ -62,6 +69,40 @@ class IngestRawRecord implements TenantOwnedInterface
 
     #[ORM\Column(type: Types::STRING, length: 32, enumType: RawNormalizationStatus::class)]
     private RawNormalizationStatus $normalizationStatus = RawNormalizationStatus::PENDING;
+
+    /**
+     * Когда полезная нагрузка удалена по политике хранения.
+     *
+     * Строка при этом остаётся: дорого стоит объект в хранилище, а не сотня
+     * байт метаданных. Указатели на сырьё продолжают разрешаться, чтение
+     * отвечает внятной ошибкой вместо сбоя хранилища, а дедупу есть что
+     * обновлять. Если та же выгрузка приедет снова, объект восстановится и
+     * отметка снимется.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadPrunedAt = null;
+
+    /**
+     * Когда объект действительно удалён из хранилища.
+     *
+     * Отдельно от решения: хранилище не транзакционно, и коммит решения обязан
+     * произойти ДО обращения к нему. Иначе падение между удалением и коммитом
+     * откатило бы решение при уже уничтоженных данных. Пара отметок делает
+     * незавершённое состояние видимым, а работу — повторяемой.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadDeletedAt = null;
+
+    /**
+     * Когда попытку удаления предпринимали в последний раз.
+     *
+     * Очередь незавершённых удалений сортируется по ней, иначе голодает:
+     * она всегда брала бы самые старые решения, а неудачная попытка ключ
+     * сортировки не меняет — `limit` неустранимых объектов навсегда закрыл бы
+     * дорогу остальным.
+     */
+    #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
+    private ?\DateTimeImmutable $payloadDeletionAttemptedAt = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
@@ -195,6 +236,67 @@ class IngestRawRecord implements TenantOwnedInterface
     {
         $this->lastSeenAt = $seenAt ?? new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Решение удалить нагрузку. Коммитится ДО обращения к хранилищу.
+     */
+    public function markPayloadPruned(\DateTimeImmutable $at): void
+    {
+        $this->payloadPrunedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Объект действительно удалён.
+     */
+    public function markPayloadDeleted(\DateTimeImmutable $at): void
+    {
+        $this->payloadDeletedAt = $at;
+        $this->payloadDeletionAttemptedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Попытку предпринимали — независимо от исхода.
+     */
+    public function markPayloadDeletionAttempted(\DateTimeImmutable $at): void
+    {
+        $this->payloadDeletionAttemptedAt = $at;
+        $this->updatedAt = $at;
+    }
+
+    /**
+     * Нагрузка вернулась — отметка снимается.
+     *
+     * Иначе запись утверждала бы, что объекта нет, тогда как он снова на
+     * месте, и чтение отвечало бы ошибкой на существующих данных.
+     */
+    public function markPayloadRestored(): void
+    {
+        if (null === $this->payloadPrunedAt) {
+            return;
+        }
+
+        $this->payloadPrunedAt = null;
+        $this->payloadDeletedAt = null;
+        $this->payloadDeletionAttemptedAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPayloadPrunedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadPrunedAt;
+    }
+
+    public function getPayloadDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadDeletedAt;
+    }
+
+    public function getPayloadDeletionAttemptedAt(): ?\DateTimeImmutable
+    {
+        return $this->payloadDeletionAttemptedAt;
     }
 
     public function markNormalizationDone(): void

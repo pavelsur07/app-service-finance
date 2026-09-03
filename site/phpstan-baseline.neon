@@ -11679,7 +11679,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Ingestion\\Command\\RunIncrementalCommandTest\:\:incrementalJobCount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
-			count: 13
+			count: 12
 			path: tests/Integration/Ingestion/Command/RunIncrementalCommandTest.php
 
 		-
@@ -13721,12 +13721,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Unit/Ingestion/Application/Source/Wildberries/WbFinanceReportConnectorTest.php
-
-		-
-			message: '#^Method Exception@anonymous/tests/Unit/Ingestion/Application/StoreRawBatchActionTest\.php\:115\:\:getSQLState\(\) never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Unit/Ingestion/Application/StoreRawBatchActionTest.php
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'

@@ -8,6 +8,7 @@ use App\Ingestion\Application\StoreRawBatchAction;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Infrastructure\Storage\PathSegmentNormalizer;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
@@ -18,11 +19,39 @@ use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 
 final class StoreRawBatchActionTest extends TestCase
 {
-    public function testConcurrentDuplicateInsertReturnsExistingRecordAfterUniqueViolation(): void
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function lockedRowProvider(): iterable
+    {
+        yield 'строка на месте' => [true];
+        yield 'строка исчезла' => [false];
+    }
+
+    /**
+     * Что делать с уже записанным объектом, когда `flush()` не прошёл.
+     *
+     * Две ветки одного решения, поэтому и тест один. Нарушение уникального
+     * индекса — не сбой: конкурент создал строку на то же сырьё, путь у неё
+     * тот же (он строится из хеша содержимого), и объект остаётся. Любое
+     * другое падение оставляет исход НЕИЗВЕСТНЫМ: PostgreSQL мог зафиксировать
+     * строку, а клиент потерять подтверждение. Удалить объект значило бы
+     * оставить живую запись без нагрузки и без отметки — необратимая потеря.
+     * Поэтому объект НЕ трогается, а его путь уходит в error: убрать сироту
+     * может человек, убедившись, что строки на неё нет.
+     *
+     * @param bool $concurrentDuplicate дубль конкурента или настоящий сбой
+     */
+    #[DataProvider('flushFailureProvider')]
+    public function testFlushFailureKeepsTheObjectOnlyForAConcurrentDuplicate(bool $concurrentDuplicate): void
     {
         $companyId = '11111111-1111-7111-8111-111111111111';
         $resourceType = 'seller-report';
@@ -65,7 +94,7 @@ final class StoreRawBatchActionTest extends TestCase
             ->willReturn(null);
 
         $duplicateLookupCalls = 0;
-        $repository->expects(self::exactly(2))
+        $repository->expects(self::exactly($concurrentDuplicate ? 2 : 1))
             ->method('findOneByCompanySourceExternalIdAndHash')
             ->willReturnCallback(
                 function (
@@ -94,11 +123,32 @@ final class StoreRawBatchActionTest extends TestCase
                 },
             );
 
+        // Порядок, а не только факт: блокировка обязана быть ВЗЯТА до
+        // обращения к хранилищу. Иначе восстановление писало бы объект и
+        // снимало отметки, пока retention удаляет тот же объект.
+        $calls = [];
+
+        $repository->expects($concurrentDuplicate ? self::once() : self::never())
+            ->method('findOneForUpdate')
+            ->with($companyId, $existingRecord->getId())
+            ->willReturnCallback(static function () use (&$calls, $existingRecord): IngestRawRecord {
+                $calls[] = 'lock';
+
+                return $existingRecord;
+            });
+
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('exists')
             ->with('existing-path.ndjson.gz')
-            ->willReturn(true);
+            ->willReturnCallback(static function () use (&$calls): bool {
+                $calls[] = 'storage';
+
+                return true;
+            });
+        // Удаления НЕТ ни в одной ветке: исход неизвестен, а удаление
+        // необратимо.
+        $objectStorage->expects(self::never())->method('delete');
         $objectStorage->expects(self::once())
             ->method('write')
             ->with(
@@ -111,42 +161,68 @@ final class StoreRawBatchActionTest extends TestCase
             )
             ->willReturnCallback(static fn (string $path, string $payload): StoredObject => new StoredObject($path, strlen($payload)));
 
-        $uniqueViolation = new UniqueConstraintViolationException(
-            new class('Duplicate raw record') extends \Exception implements DriverException {
-                public function getSQLState()
-                {
-                    return '23505';
-                }
-            },
-            null,
-        );
+        $failure = $concurrentDuplicate
+            ? new UniqueConstraintViolationException(
+                new class('Duplicate raw record') extends \Exception implements DriverException {
+                    public function getSQLState(): string
+                    {
+                        return '23505';
+                    }
+                },
+                null,
+            )
+            : new \RuntimeException('database is unavailable');
 
         $flushCalls = 0;
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        // Повторная встреча сырья идёт под блокировкой строки, то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе.
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($entityManager),
+        );
         $entityManager->expects(self::once())->method('persist')->with(self::isInstanceOf(IngestRawRecord::class));
         $entityManager->expects(self::never())->method('clear');
         $entityManager->expects(self::once())
             ->method('flush')
-            ->willReturnCallback(static function () use (&$flushCalls, $uniqueViolation): void {
+            ->willReturnCallback(static function () use (&$flushCalls, $failure): void {
                 ++$flushCalls;
 
                 if (1 === $flushCalls) {
-                    throw $uniqueViolation;
+                    throw $failure;
                 }
             });
-        $entityManager->expects(self::once())->method('isOpen')->willReturn(false);
+        $entityManager->expects($concurrentDuplicate ? self::once() : self::never())->method('isOpen')->willReturn(false);
 
         $recoveredEntityManager = $this->createMock(EntityManagerInterface::class);
-        $recoveredEntityManager->expects(self::once())
+        $recoveredEntityManager->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('getRepository')
             ->with(IngestRawRecord::class)
             ->willReturn($repository);
-        $recoveredEntityManager->expects(self::once())->method('flush');
+        // Восстановление идёт под блокировкой строки — то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе. Отдельного
+        // flush() больше нет, коммит делает wrapInTransaction().
+        $recoveredEntityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($recoveredEntityManager),
+        );
+        $recoveredEntityManager->expects(self::never())->method('flush');
 
         $managerRegistry = $this->createMock(ManagerRegistry::class);
-        $managerRegistry->expects(self::once())
+        $managerRegistry->expects($concurrentDuplicate ? self::once() : self::never())
             ->method('resetManager')
             ->willReturn($recoveredEntityManager);
+
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: mixed[]}> */
+            public array $records = [];
+
+            /**
+             * @param mixed[] $context
+             */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
 
         $action = new StoreRawBatchAction(
             $repository,
@@ -155,15 +231,59 @@ final class StoreRawBatchActionTest extends TestCase
             new RawStoragePathBuilder(new PathSegmentNormalizer()),
             $entityManager,
             $managerRegistry,
+            $logger,
         );
+
+        if (!$concurrentDuplicate) {
+            try {
+                $action($batch);
+                self::fail('Настоящий сбой обязан выйти наружу.');
+            } catch (\RuntimeException) {
+                // Ожидаемо: падение и есть предмет проверки.
+            }
+
+            $errors = array_values(array_filter(
+                $logger->records,
+                static fn (array $entry): bool => LogLevel::ERROR === $entry['level'],
+            ));
+            self::assertCount(1, $errors, 'Возможная сирота обязана быть видна: по базе её не найти.');
+            self::assertStringContainsString('/seller-report/', (string) $errors[0]['context']['storagePath']);
+            self::assertArrayNotHasKey('exceptionMessage', $errors[0]['context'], 'В лог идёт класс, не сообщение.');
+
+            return;
+        }
 
         $records = $action($batch);
 
         self::assertSame([$existingRecord], $records);
         self::assertGreaterThan($originalLastSeenAt, $existingRecord->getLastSeenAt());
+        self::assertSame(['lock', 'storage'], $calls, 'К хранилищу нельзя идти раньше блокировки строки.');
     }
 
-    public function testSameHashLatestRecordRepairsMissingStorageObject(): void
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function flushFailureProvider(): iterable
+    {
+        yield 'дубль конкурента' => [true];
+        yield 'настоящий сбой' => [false];
+    }
+
+    /**
+     * Восстановление нагрузки — ТОЛЬКО под блокировкой существующей строки.
+     *
+     * Два случая одного правила, поэтому и тест один. Строка на месте — объект
+     * возвращается. Строки нет — Action обязан остановиться ДО хранилища:
+     * прежний откат на прочитанную ранее сущность выглядел безобидно, а был
+     * тем же классом тихой потери, что и удаление строки вместе с объектом:
+     * объект писался без блокировки, UPDATE задевал ноль строк, и вызывающий
+     * получал «сохранено» при записи, которой нет, — а в хранилище оставалась
+     * сирота.
+     *
+     * @param bool $rowSurvives нашлась ли строка под блокировкой
+     */
+    #[DataProvider('lockedRowProvider')]
+    public function testSameHashLatestRecordRepairsMissingStorageObject(bool $rowSurvives): void
     {
         $companyId = '11111111-1111-7111-8111-111111111111';
         $resourceType = 'ozon_finance_accrual_types';
@@ -201,13 +321,19 @@ final class StoreRawBatchActionTest extends TestCase
             ->with($companyId, IngestSource::OZON, $resourceType, $externalId)
             ->willReturn($existingRecord);
         $repository->expects(self::never())->method('findOneByCompanySourceExternalIdAndHash');
+        // Блокировка строки — предусловие восстановления: без неё Action
+        // отказывается идти в хранилище.
+        $repository->expects(self::once())
+            ->method('findOneForUpdate')
+            ->with($companyId, $existingRecord->getId())
+            ->willReturn($rowSurvives ? $existingRecord : null);
 
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($rowSurvives ? self::once() : self::never())
             ->method('exists')
             ->with('missing-types.ndjson.gz')
             ->willReturn(false);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($rowSurvives ? self::once() : self::never())
             ->method('write')
             ->with(
                 'missing-types.ndjson.gz',
@@ -219,8 +345,15 @@ final class StoreRawBatchActionTest extends TestCase
             ->willReturnCallback(static fn (string $path, string $payload): StoredObject => new StoredObject($path, strlen($payload)));
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        // Повторная встреча сырья идёт под блокировкой строки, то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе.
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($entityManager),
+        );
         $entityManager->expects(self::never())->method('persist');
-        $entityManager->expects(self::once())->method('flush');
+        // Отдельного flush() больше нет: повторная встреча идёт внутри
+        // wrapInTransaction(), который коммитит и сбрасывает сам.
+        $entityManager->expects(self::never())->method('flush');
 
         $managerRegistry = $this->createMock(ManagerRegistry::class);
         $managerRegistry->expects(self::never())->method('resetManager');
@@ -232,7 +365,12 @@ final class StoreRawBatchActionTest extends TestCase
             new RawStoragePathBuilder(new PathSegmentNormalizer()),
             $entityManager,
             $managerRegistry,
+            new NullLogger(),
         );
+
+        if (!$rowSurvives) {
+            $this->expectException(RawRecordNotFoundException::class);
+        }
 
         self::assertSame([$existingRecord], $action($batch));
     }

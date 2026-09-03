@@ -52,6 +52,56 @@ Read-only проверки можно выполнять после запрос
 - SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
 - Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.
 
+## Настройка алиаса на новой машине
+
+Алиас `vf-prod-codex` живёт только в `~/.ssh/config` конкретной машины и в репозиторий не попадает.
+Без него все формы выше падают ещё до аутентификации. Проверено 2026-09-03 на машине агента.
+
+Блок конфига (IP и ключ не коммитить):
+
+```
+Host vf-prod-codex
+    HostName <PROD-IP>
+    User codex-prod
+    IdentityFile ~/.ssh/vf-prod-codex
+    IdentitiesOnly yes
+```
+
+Обязательно:
+- пользователь ровно `codex-prod` — sudoers-правило `/etc/sudoers.d/codex-prod` выдано именно ему.
+  Пользователь `codex` на проде не существует; если завести его, вход по ключу заработает, а
+  `sudo` будет просить пароль, и wrappers останутся недоступны;
+- ключ — отдельная пара `~/.ssh/vf-prod-codex` с правами `600`, не личный `id_ed25519`;
+- `IdentitiesOnly yes`, чтобы ssh не перебирал чужие ключи и не упирался в лимит попыток.
+
+Агент работает только через `vf-prod-codex`. Root-алиас `vf-prod` для работы агентов не
+используется ни в каком виде: ни для проверок, ни для настройки, ни для «одной быстрой команды».
+Он существует для Владельца; в `settings.local.json` он под `ask`, и агент не запрашивает на него
+разрешение. Публичный ключ в `authorized_keys` пользователя `codex-prod` добавляет Владелец из
+своего терминала. Команда для него:
+
+```bash
+ssh vf-prod 'H=$(getent passwd codex-prod | cut -d: -f6) && mkdir -p "$H/.ssh" && cat >> "$H/.ssh/authorized_keys" && chown -R codex-prod:codex-prod "$H/.ssh" && chmod 700 "$H/.ssh" && chmod 600 "$H/.ssh/authorized_keys"' < ~/.ssh/vf-prod-codex.pub
+```
+
+Проверка настройки — одна команда, она же первый вызов в сессии перед любой PROD-проверкой:
+
+```bash
+timeout 20 ssh -o BatchMode=yes vf-prod-codex "sudo -n /usr/local/bin/codex-docker-ps" < /dev/null
+```
+
+Диагностика по тексту ошибки — они различимы, лечить наугад не нужно:
+
+| Симптом | Причина | Кто чинит |
+|---|---|---|
+| `Could not resolve hostname vf-prod-codex` | Блока `Host vf-prod-codex` нет в `~/.ssh/config` | Владелец на машине агента |
+| `Permission denied (publickey,password)` | Ключ не прописан в `authorized_keys` у `codex-prod` | Владелец на проде |
+| `sudo: a password is required` | Вход под другим пользователем, sudoers выдан `codex-prod` | Поправить `User` в алиасе |
+| Висит до таймаута, `"true"` тоже висит | Песочница Bash глушит исходящий TCP | Вызов вне песочницы, см. выше |
+| Висит только `codex-psql-ro` | Потерян `< /dev/null` | Поправить форму вызова |
+
+Отказ по любой строке — не STOP-условие: доделать остальное и отдать Владельцу точную команду.
+
 ## Добавление PROD-разрешений
 
 Если нужной команды нет в wrapper:

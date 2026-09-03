@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+  <style>
+    body{margin:0;box-sizing:border-box;}
+    *{box-sizing:border-box;}
+    ::-webkit-scrollbar{width:8px;height:8px;}
+    ::-webkit-scrollbar-thumb{background:#d3d9e3;border-radius:8px;}
+  </style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:#f4f6fa;font-family:'Inter',sans-serif;color:#1a2233;">
+
+  <aside style="width:260px;flex-shrink:0;background:#ffffff;border-right:1px solid #e6e9ef;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;">
+    <div style="display:flex;align-items:center;gap:10px;padding:20px 20px;border-bottom:1px solid #eef0f4;">
+      <div style="width:34px;height:34px;border-radius:8px;background:#206bc4;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:800;font-size:16px;">V</div>
+      <div style="font-weight:700;font-size:16px;letter-spacing:-0.2px;">ВашФинДир</div>
+    </div>
+    <nav style="flex:1;padding:16px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
+      <div style="font-size:11px;font-weight:700;color:#98a2b3;text-transform:uppercase;letter-spacing:0.06em;padding:8px 12px 6px;">Меню</div>
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="8">
+        <a href="#" style="{{ item.style }}">
+          <i class="{{ item.icon }}" style="font-size:18px;width:20px;text-align:center;"></i>
+          <span>{{ item.label }}</span>
+          <sc-if value="{{ item.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="margin-left:auto;background:#e8f1fc;color:#206bc4;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;">{{ item.badge }}</span>
+          </sc-if>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="padding:14px 16px;border-top:1px solid #eef0f4;display:flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:#e8f1fc;display:flex;align-items:center;justify-content:center;color:#206bc4;font-weight:700;font-size:14px;">АК</div>
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Анна Ковалёва</div>
+        <div style="font-size:12px;color:#8a94a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Финансовый директор</div>
+      </div>
+      <i class="ti ti-dots-vertical" style="margin-left:auto;color:#98a2b3;cursor:pointer;"></i>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;padding:28px 36px 48px;">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px;">
+      <div>
+        <h1 style="margin:0 0 4px;font-size:24px;font-weight:800;letter-spacing:-0.3px;">Отчёт о движении денежных средств</h1>
+        <div style="font-size:14px;color:#8a94a6;">Январь – Август 2026</div>
+      </div>
+      <button style="display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:6px;border:1px solid #dfe3ea;background:#ffffff;color:#1a2233;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+        <i class="ti ti-download" style="font-size:15px;"></i> Экспорт
+      </button>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;row-gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12.5px;color:#8a94a6;font-weight:600;">Группировка</span>
+          <div style="{{ groupingWrapStyle }}">
+            <sc-for list="{{ groupingOptions }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:12.5px;color:#8a94a6;font-weight:600;">Режим</span>
+          <div style="display:flex;background:#f4f6fa;border-radius:6px;padding:3px;gap:2px;">
+            <sc-for list="{{ modeOptions }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+          <span style="font-size:12.5px;color:#8a94a6;font-weight:600;">Формат</span>
+          <div style="display:flex;background:#f4f6fa;border-radius:6px;padding:3px;gap:2px;">
+            <sc-for list="{{ formatOptions }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #eef0f4;padding-top:14px;">
+        <span style="font-size:12.5px;color:#8a94a6;font-weight:600;">Фильтры:</span>
+
+        <div style="position:relative;">
+          <button onClick="{{ toggleProjectsDropdown }}" style="{{ projectsChipStyle }}">
+            <i class="ti ti-briefcase" style="font-size:14px;"></i>{{ projectsChipLabel }}
+            <i class="ti ti-chevron-down" style="font-size:12px;"></i>
+          </button>
+          <sc-if value="{{ projectsDropdownOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:calc(100% + 6px);left:0;width:230px;background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;box-shadow:0 8px 24px rgba(20,30,50,0.12);z-index:30;padding:8px;">
+              <sc-for list="{{ projectItems }}" as="p" hint-placeholder-count="5">
+                <label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;font-size:13px;cursor:pointer;">
+                  <input type="checkbox" checked="{{ p.checked }}" onChange="{{ p.onToggle }}" style="width:14px;height:14px;accent-color:#206bc4;cursor:pointer;">
+                  {{ p.name }}
+                </label>
+              </sc-for>
+              <div style="border-top:1px solid #eef0f4;margin-top:6px;padding-top:6px;">
+                <button onClick="{{ selectAllProjects }}" style="border:none;background:none;color:#206bc4;font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 8px;">Выбрать все</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position:relative;">
+          <button onClick="{{ toggleCfoDropdown }}" style="{{ cfoChipStyle }}">
+            <i class="ti ti-building-warehouse" style="font-size:14px;"></i>{{ cfoChipLabel }}
+            <i class="ti ti-chevron-down" style="font-size:12px;"></i>
+          </button>
+          <sc-if value="{{ cfoDropdownOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:calc(100% + 6px);left:0;width:230px;background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;box-shadow:0 8px 24px rgba(20,30,50,0.12);z-index:30;padding:8px;">
+              <sc-for list="{{ cfoItems }}" as="c" hint-placeholder-count="5">
+                <label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;font-size:13px;cursor:pointer;">
+                  <input type="checkbox" checked="{{ c.checked }}" onChange="{{ c.onToggle }}" style="width:14px;height:14px;accent-color:#206bc4;cursor:pointer;">
+                  {{ c.name }}
+                </label>
+              </sc-for>
+              <div style="border-top:1px solid #eef0f4;margin-top:6px;padding-top:6px;">
+                <button onClick="{{ selectAllCfo }}" style="border:none;background:none;color:#206bc4;font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 8px;">Выбрать все</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position:relative;">
+          <button onClick="{{ toggleActivityDropdown }}" style="{{ activityChipStyle }}">
+            <i class="ti ti-adjustments" style="font-size:14px;"></i>{{ activityChipLabel }}
+            <i class="ti ti-chevron-down" style="font-size:12px;"></i>
+          </button>
+          <sc-if value="{{ activityDropdownOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:calc(100% + 6px);left:0;width:230px;background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;box-shadow:0 8px 24px rgba(20,30,50,0.12);z-index:30;padding:8px;">
+              <sc-for list="{{ activityItems }}" as="a" hint-placeholder-count="3">
+                <label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;font-size:13px;cursor:pointer;">
+                  <input type="checkbox" checked="{{ a.checked }}" onChange="{{ a.onToggle }}" style="width:14px;height:14px;accent-color:#206bc4;cursor:pointer;">
+                  {{ a.name }}
+                </label>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ filtersActive }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ resetFilters }}" style="display:flex;align-items:center;gap:4px;border:none;background:none;color:#d63939;font-size:12.5px;font-weight:600;cursor:pointer;">
+            <i class="ti ti-x" style="font-size:13px;"></i>Сбросить фильтры
+          </button>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="background:#ffffff;border:1px solid #e6e9ef;border-radius:8px;overflow:hidden;">
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+          <thead>
+            <tr style="background:#f8f9fb;">
+              <th style="text-align:left;padding:12px 16px;font-size:12px;font-weight:700;color:#8a94a6;text-transform:uppercase;letter-spacing:0.03em;border-bottom:1px solid #e6e9ef;white-space:nowrap;position:sticky;left:0;background:#f8f9fb;min-width:240px;">Показатель</th>
+              <sc-for list="{{ columns }}" as="col" hint-placeholder-count="8">
+                <th style="text-align:right;padding:12px 16px;font-size:12px;font-weight:700;color:#8a94a6;text-transform:uppercase;letter-spacing:0.03em;border-bottom:1px solid #e6e9ef;white-space:nowrap;">{{ col.label }}</th>
+              </sc-for>
+              <th style="text-align:right;padding:12px 16px;font-size:12px;font-weight:700;color:#556072;text-transform:uppercase;letter-spacing:0.03em;border-bottom:1px solid #e6e9ef;white-space:nowrap;background:#eef0f4;">Итого</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ rows }}" as="row" hint-placeholder-count="16">
+              <tr style="{{ row.rowStyle }}">
+                <td style="{{ row.labelCellStyle }}">
+                  <sc-if value="{{ row.toggle }}" hint-placeholder-val="{{ false }}">
+                    <span onClick="{{ row.toggle }}" style="display:inline-flex;width:16px;cursor:pointer;color:#8a94a6;">
+                      <i class="{{ row.toggleIcon }}" style="font-size:13px;"></i>
+                    </span>
+                  </sc-if>
+                  {{ row.label }}
+                </td>
+                <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="8">
+                  <td style="{{ cell.style }}">{{ cell.text }}</td>
+                </sc-for>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <sc-if value="{{ quarterFootnote }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:10px 20px;font-size:12px;color:#98a2b3;border-top:1px solid #eef0f4;">{{ quarterFootnote }}</div>
+      </sc-if>
+    </div>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;currency&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;₽&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;₽&quot;,&quot;$&quot;,&quot;€&quot;],&quot;section&quot;:&quot;Параметры&quot;}}">
+const PROJECTS = [
+  { id:'retail', name:'Розница', weight:0.32 },
+  { id:'wholesale', name:'Опт', weight:0.27 },
+  { id:'ecom', name:'E-commerce', weight:0.21 },
+  { id:'export', name:'Экспорт', weight:0.14 },
+  { id:'other', name:'Прочее', weight:0.06 },
+];
+const CFOS = [
+  { id:'sales', name:'Продажи', weight:0.30 },
+  { id:'production', name:'Производство', weight:0.25 },
+  { id:'logistics', name:'Логистика', weight:0.18 },
+  { id:'marketing', name:'Маркетинг', weight:0.15 },
+  { id:'admin', name:'Администрация', weight:0.12 },
+];
+const ACTIVITIES = [
+  { id:'operating', name:'Операционная' },
+  { id:'financing', name:'Финансовая' },
+  { id:'investing', name:'Инвестиционная' },
+];
+const MONTH_LABELS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг'];
+const QUARTER_GROUPS = [
+  { idxs:[0,1,2], label:'I кв. 2026' },
+  { idxs:[3,4,5], label:'II кв. 2026' },
+  { idxs:[6,7], label:'III кв. 2026*' },
+];
+
+const RAW = {
+  opInflow:  [4650000,4820000,4790000,5050000,5220000,5450000,5670000,5900000],
+  opOutflow: [3900000,3980000,4020000,4150000,4280000,4400000,4520000,4650000],
+  finInflow: [200000,0,300000,0,0,500000,0,0],
+  finOutflow:[150000,150000,150000,150000,180000,180000,180000,180000],
+  invInflow: [0,0,50000,0,0,0,80000,0],
+  invOutflow:[220000,180000,260000,150000,300000,190000,340000,210000],
+};
+
+function sumArr(a){ return a.reduce((s,v)=>s+v,0); }
+function zeros(n){ return Array.from({length:n},()=>0); }
+function sumSeries(list){
+  const n = list[0].cols.length;
+  const cols = Array.from({length:n},(_,i)=> list.reduce((s,se)=>s+se.cols[i],0));
+  const total = list.reduce((s,se)=>s+se.total,0);
+  return { cols, total };
+}
+function fmtCell(v, format, currency){
+  const neg = v < -0.5;
+  const absVal = Math.abs(v);
+  const shown = format === 'k' ? Math.round(absVal/1000) : Math.round(absVal);
+  let text = shown.toLocaleString('ru-RU');
+  if (format !== 'k') text += ' ' + currency; else text += ' т.' + currency;
+  if (neg) text = '(' + text + ')';
+  return { text, color: neg ? '#d63939' : '#1a2233' };
+}
+
+class Component extends DCLogic {
+  state = {
+    grouping: 'month', mode: 'period', format: 'full',
+    projectsOpen: false, cfoOpen: false, activityOpen: false,
+    selectedProjects: new Set(PROJECTS.map(p=>p.id)),
+    selectedCfo: new Set(CFOS.map(c=>c.id)),
+    selectedActivities: new Set(ACTIVITIES.map(a=>a.id)),
+    expandOp: true, expandFin: true, expandInv: true,
+  };
+
+  navItem(icon, label, active, badge){
+    return { icon, label, badge,
+      style: `display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;font-size:13.5px;font-weight:${active?600:500};text-decoration:none;color:${active?'#206bc4':'#556072'};background:${active?'#e8f1fc':'transparent'};` };
+  }
+
+  toggleSet(key, id){ this.setState(s=>{ const n=new Set(s[key]); n.has(id)?n.delete(id):n.add(id); return {[key]:n}; }); }
+
+  renderVals(){
+    const currency = this.props.currency ?? '₽';
+    const { grouping, mode, format, selectedProjects, selectedCfo, selectedActivities } = this.state;
+
+    const cfoShare = CFOS.filter(c=>selectedCfo.has(c.id)).reduce((s,c)=>s+c.weight,0);
+    const projectShare = PROJECTS.filter(p=>selectedProjects.has(p.id)).reduce((s,p)=>s+p.weight,0);
+    const selectedProjectList = PROJECTS.filter(p=>selectedProjects.has(p.id));
+    const opOn = selectedActivities.has('operating');
+    const finOn = selectedActivities.has('financing');
+    const invOn = selectedActivities.has('investing');
+
+    function colValues(raw, on){
+      const mult = on ? 1 : 0;
+      if (mode === 'project'){
+        if (selectedProjectList.length === 0) return { cols: zeros(1), total: 0 };
+        const total = sumArr(raw) * mult;
+        const cols = selectedProjectList.map(p => total * p.weight * cfoShare);
+        return { cols, total: sumArr(cols) };
+      }
+      const scaled = raw.map(v => v * projectShare * cfoShare * mult);
+      const cols = grouping === 'month' ? scaled : QUARTER_GROUPS.map(g => g.idxs.reduce((s,i)=>s+scaled[i],0));
+      return { cols, total: sumArr(scaled) };
+    }
+
+    const opIn = colValues(RAW.opInflow, opOn);
+    const opOut = colValues(RAW.opOutflow.map(v=>-v), opOn);
+    const opNet = sumSeries([opIn, opOut]);
+    const finIn = colValues(RAW.finInflow, finOn);
+    const finOut = colValues(RAW.finOutflow.map(v=>-v), finOn);
+    const finNet = sumSeries([finIn, finOut]);
+    const invIn = colValues(RAW.invInflow, invOn);
+    const invOut = colValues(RAW.invOutflow.map(v=>-v), invOn);
+    const invNet = sumSeries([invIn, invOut]);
+    const netChange = sumSeries([opNet, finNet, invNet]);
+
+    const openingBalance = 8500000 * projectShare * cfoShare;
+    const colCount = netChange.cols.length;
+    const closingCols = [];
+    let running = openingBalance;
+    for (let i=0;i<colCount;i++){ running += netChange.cols[i]; closingCols.push(running); }
+    const closingBalance = { cols: closingCols, total: closingCols[closingCols.length-1] ?? openingBalance };
+    const openingCols = closingCols.map((_,i)=> i===0 ? openingBalance : closingCols[i-1]);
+    const openingSeries = { cols: openingCols, total: openingBalance };
+
+    const cell = (v) => fmtCell(v, format, currency);
+    const cellsFor = (series, extra) => {
+      const arr = series.cols.map(v => ({ ...cell(v), ...(extra||{}) }));
+      arr.push({ ...cell(series.total), ...(extra||{}), bold: true });
+      return arr;
+    };
+    const cellsForBalance = (series) => {
+      const arr = series.cols.map(v => cell(v));
+      arr.push({ ...cell(series.cols[series.cols.length-1] ?? series.total), bold:true });
+      return arr;
+    };
+
+    const baseCellStyle = (bold, color) => `text-align:right;padding:9px 16px;white-space:nowrap;color:${color||'#1a2233'};font-weight:${bold?700:400};font-size:13.5px;border-bottom:1px solid #eef0f4;`;
+    const totalColStyle = (bold, color) => baseCellStyle(bold,color) + 'background:#f8f9fb;';
+
+    function makeRow({ label, indent=0, bold=false, cells, toggle=null, toggleIcon=null, highlight=false }){
+      const labelCellStyle = `padding:9px 16px;white-space:nowrap;font-weight:${bold?700:400};color:${bold?'#1a2233':'#374151'};padding-left:${16+indent*20}px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #eef0f4;position:sticky;left:0;background:${highlight?'#eaf7ee':'#ffffff'};font-size:${bold?14:13.5}px;`;
+      const rowStyle = highlight ? 'background:#eaf7ee;' : '';
+      const styledCells = cells.map((c,i) => ({
+        text: c.text,
+        style: (i === cells.length-1 ? totalColStyle(c.bold||bold, c.color) : baseCellStyle(c.bold||bold, c.color)) + (highlight?'background:#eaf7ee;':'')
+      }));
+      return { label, toggle, toggleIcon, rowStyle, labelCellStyle, cells: styledCells };
+    }
+
+    const rows = [];
+    rows.push(makeRow({ label:'Остаток на начало периода', cells: cellsForBalance(openingSeries) }));
+    rows.push(makeRow({ label:'Операционная деятельность', bold:true, toggle:()=>this.setState(s=>({expandOp:!s.expandOp})), toggleIcon: this.state.expandOp?'ti ti-chevron-down':'ti ti-chevron-right', cells: cellsFor(opNet) }));
+    if (this.state.expandOp){
+      rows.push(makeRow({ label:'Поступления от операционной деятельности', indent:1, cells: cellsFor(opIn) }));
+      rows.push(makeRow({ label:'Выплаты по операционной деятельности', indent:1, cells: cellsFor(opOut) }));
+    }
+    rows.push(makeRow({ label:'Финансовая деятельность', bold:true, toggle:()=>this.setState(s=>({expandFin:!s.expandFin})), toggleIcon: this.state.expandFin?'ti ti-chevron-down':'ti ti-chevron-right', cells: cellsFor(finNet) }));
+    if (this.state.expandFin){
+      rows.push(makeRow({ label:'Поступления от финансовой деятельности', indent:1, cells: cellsFor(finIn) }));
+      rows.push(makeRow({ label:'Выплаты по финансовой деятельности', indent:1, cells: cellsFor(finOut) }));
+    }
+    rows.push(makeRow({ label:'Инвестиционная деятельность', bold:true, toggle:()=>this.setState(s=>({expandInv:!s.expandInv})), toggleIcon: this.state.expandInv?'ti ti-chevron-down':'ti ti-chevron-right', cells: cellsFor(invNet) }));
+    if (this.state.expandInv){
+      rows.push(makeRow({ label:'Поступления от инвестиционной деятельности', indent:1, cells: cellsFor(invIn) }));
+      rows.push(makeRow({ label:'Выплаты по инвестиционной деятельности', indent:1, cells: cellsFor(invOut) }));
+    }
+    rows.push(makeRow({ label:'Чистое изменение денежных средств', bold:true, cells: cellsFor(netChange, {color: netChange.total<0?'#d63939':'#2fb344'}) }));
+    rows.push(makeRow({ label:'Остаток на конец периода', bold:true, highlight:true, cells: cellsForBalance(closingBalance) }));
+
+    const columns = mode === 'project'
+      ? selectedProjectList.map(p => ({ label: p.name }))
+      : (grouping === 'month' ? MONTH_LABELS.map(l=>({label:l})) : QUARTER_GROUPS.map(g=>({label:g.label})));
+
+    const segStyle = (active) => `border:none;background:${active?'#ffffff':'transparent'};color:${active?'#206bc4':'#8a94a6'};font-weight:${active?700:500};font-size:12.5px;padding:6px 14px;border-radius:5px;cursor:pointer;box-shadow:${active?'0 1px 3px rgba(0,0,0,0.08)':'none'};white-space:nowrap;flex-shrink:0;`;
+
+    const groupingOptions = [
+      { label:'Месяц', onClick: () => this.setState({grouping:'month'}), style: segStyle(grouping==='month') },
+      { label:'Квартал', onClick: () => this.setState({grouping:'quarter'}), style: segStyle(grouping==='quarter') },
+    ];
+    const modeOptions = [
+      { label:'По периодам', onClick: () => this.setState({mode:'period'}), style: segStyle(mode==='period') },
+      { label:'По проектам', onClick: () => this.setState({mode:'project'}), style: segStyle(mode==='project') },
+    ];
+    const formatOptions = [
+      { label: currency, onClick: () => this.setState({format:'full'}), style: segStyle(format==='full') },
+      { label:'тыс '+currency, onClick: () => this.setState({format:'k'}), style: segStyle(format==='k') },
+    ];
+
+    const chipStyle = (active) => `display:flex;align-items:center;gap:6px;border:1px solid ${active?'#206bc4':'#dfe3ea'};background:${active?'#e8f1fc':'#ffffff'};color:${active?'#206bc4':'#556072'};font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;`;
+
+    const filtersActive = selectedProjects.size < PROJECTS.length || selectedCfo.size < CFOS.length || selectedActivities.size < ACTIVITIES.length;
+
+    const fmtSummary = (v) => (v<0?'−':'') + Math.round(Math.abs(v)).toLocaleString('ru-RU') + ' ' + currency;
+
+    return {
+      navItems: [
+        this.navItem('ti ti-layout-dashboard','Дашборд', false),
+        this.navItem('ti ti-cash','Движение денег', true),
+        this.navItem('ti ti-building-bank','Счета и карты', false),
+        this.navItem('ti ti-receipt-2','Транзакции', false, '12'),
+        this.navItem('ti ti-file-invoice','Инвойсы', false),
+        this.navItem('ti ti-users','Контрагенты', false),
+        this.navItem('ti ti-chart-bar','Отчёты', false),
+        this.navItem('ti ti-settings','Настройки', false),
+      ],
+      groupingWrapStyle: `display:flex;background:#f4f6fa;border-radius:6px;padding:3px;gap:2px;opacity:${mode==='project'?0.45:1};pointer-events:${mode==='project'?'none':'auto'};`,
+      groupingOptions, modeOptions, formatOptions,
+      toggleProjectsDropdown: () => this.setState(s=>({projectsOpen:!s.projectsOpen, cfoOpen:false, activityOpen:false})),
+      toggleCfoDropdown: () => this.setState(s=>({cfoOpen:!s.cfoOpen, projectsOpen:false, activityOpen:false})),
+      toggleActivityDropdown: () => this.setState(s=>({activityOpen:!s.activityOpen, projectsOpen:false, cfoOpen:false})),
+      projectsDropdownOpen: this.state.projectsOpen,
+      cfoDropdownOpen: this.state.cfoOpen,
+      activityDropdownOpen: this.state.activityOpen,
+      projectsChipStyle: chipStyle(selectedProjects.size < PROJECTS.length),
+      cfoChipStyle: chipStyle(selectedCfo.size < CFOS.length),
+      activityChipStyle: chipStyle(selectedActivities.size < ACTIVITIES.length),
+      projectsChipLabel: 'Проекты: ' + (selectedProjects.size === PROJECTS.length ? 'Все' : selectedProjects.size),
+      cfoChipLabel: 'ЦФО: ' + (selectedCfo.size === CFOS.length ? 'Все' : selectedCfo.size),
+      activityChipLabel: 'Деятельность: ' + (selectedActivities.size === ACTIVITIES.length ? 'Все' : selectedActivities.size),
+      projectItems: PROJECTS.map(p => ({ name: p.name, checked: selectedProjects.has(p.id), onToggle: () => this.toggleSet('selectedProjects', p.id) })),
+      cfoItems: CFOS.map(c => ({ name: c.name, checked: selectedCfo.has(c.id), onToggle: () => this.toggleSet('selectedCfo', c.id) })),
+      activityItems: ACTIVITIES.map(a => ({ name: a.name, checked: selectedActivities.has(a.id), onToggle: () => this.toggleSet('selectedActivities', a.id) })),
+      selectAllProjects: () => this.setState({selectedProjects: new Set(PROJECTS.map(p=>p.id))}),
+      selectAllCfo: () => this.setState({selectedCfo: new Set(CFOS.map(c=>c.id))}),
+      filtersActive,
+      resetFilters: () => this.setState({selectedProjects: new Set(PROJECTS.map(p=>p.id)), selectedCfo: new Set(CFOS.map(c=>c.id)), selectedActivities: new Set(ACTIVITIES.map(a=>a.id))}),
+      columns, rows,
+      summaryCards: [
+        { label:'Остаток на начало', value: fmtSummary(openingBalance), color:'#1a2233' },
+        { label:'Чистый денежный поток', value: fmtSummary(netChange.total), color: netChange.total<0?'#d63939':'#2fb344' },
+        { label:'Операционный поток', value: fmtSummary(opNet.total), color:'#206bc4' },
+        { label:'Остаток на конец', value: fmtSummary(closingBalance.total), color:'#1a2233' },
+      ],
+      quarterFootnote: (mode==='period' && grouping==='quarter') ? '* III квартал 2026 показан неполным составом (июль–август).' : null,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

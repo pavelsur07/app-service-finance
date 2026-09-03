@@ -23,6 +23,33 @@
 # больше одной задачи на подключение за запуск.
 20 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Почасовой обход заказов Ozon. Отдельная строка с --resource, а НЕ перевод
+# всей команды run-incremental на час: иначе финансовые стратегии просыпались бы
+# 24 раза в сутки без нужды. Каденция принадлежит ресурсу и выражена его
+# cursorIsDue(); крон лишь даёт возможность.
+35 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbo --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+37 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=ozon_orders_fbs --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Почасовой обход заказов Wildberries. Потоков два, и оба нужны: marketplace
+# знает состав заказа, statistics приносит отмены и правки задним числом.
+# Разнесены по минутам, потому что у statistics-api лимит порядка одного
+# запроса в минуту, и одновременный старт съел бы его впустую.
+39 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_marketplace --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+41 * * * * cd /app && php bin/console app:ingestion:run-incremental --resource=wildberries_orders_statistics --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Почасовой перепрос статусов нетерминальных заказов.
+#
+# Потоки заказов фильтруются по времени СОЗДАНИЯ, поэтому заказ попадает в них
+# один раз и его дальнейшие смены статуса не увидит никто. Отдельная строка
+# после загрузок: сначала появляются новые заказы, затем опрашиваются старые.
+47 * * * * cd /app && php bin/console app:ingestion:orders:refresh-statuses --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Освобождение ресурсов, заблокированных зависшими задачами синхронизации.
+# findLatestForResource() считает активной любую задачу в OPEN/RUNNING БЕЗ
+# ограничения по возрасту, поэтому воркер, убитый по SIGKILL или OOM, молча
+# останавливает загрузку ресурса навсегда. Раз в час, дешёвый индексный запрос.
+52 * * * * cd /app && php bin/console app:ingestion:reap-stale-jobs --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Каталог товаров Ozon -> листинги (наименование, offer_id, дата создания товара).
 # Слот 03:40 выбран ДО финансовой выгрузки в 04:00, чтобы её процессоры видели уже
 # именованные листинги. Команда только диспатчит; HTTP-обход каталога делает
@@ -123,6 +150,30 @@
 
 # Read-only контроль после rolling refresh и normalize workers: latest raw coverage vs canonical.
 45 6 * * * cd /app && php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Ежедневно в 05:50: очистка сырья, вышедшего за год горячего хранения.
+#
+# Удаляется ПОЛЕЗНАЯ НАГРУЗКА, строка ingest_raw_records ОСТАЁТСЯ. Дорого стоит
+# объект, а не сотня байт метаданных, и со строкой на месте указатели из
+# ingest_financial_transactions, ingest_order_status_events и
+# ingest_orders.last_raw_record_id остаются разрешимыми: ReadRawRecordAction
+# отвечает внятным RawPayloadPrunedException, а не сбоем хранилища.
+# Lifecycle-правило провайдера здесь не годится по той же причине: оно видит
+# только объекты и не оставило бы признака, что нагрузку удалили НАМЕРЕННО.
+#
+# Возраст считается по «последний раз видели», а не по «скачали»: дедуп при
+# часовом опросе обновляет отметку, не создавая новую запись.
+#
+# Слот 05:50 выбран как свободный: :15 и :45 того же часа заняты accrual-задачами,
+# а на :35 приходится часовой заказный ingestion. Лимит на прогон ограничивает
+# длительность; накопленное разбирается за несколько суток.
+#
+# ЗДЕСЬ СОЗНАТЕЛЬНО `--dry-run`. Удаление сырья необратимо и затрагивает
+# production-аудит, поэтому включение `--execute` — решение Владельца на
+# Production Gate, а не побочный эффект выкатки стадии. Пока команда каждую ночь
+# печатает, сколько записей и байт УШЛО БЫ: это даёт настоящие цифры до того,
+# как что-то будет удалено, и делает переключение осознанным.
+50 5 * * * cd /app && php bin/console app:ingestion:raw:prune --dry-run --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Ежедневная загрузка Ozon Performance ingestion с начала месяца до вчерашнего дня.
 # Команда только планирует SyncJob/chunks; HTTP-загрузка выполняется async worker'ом.

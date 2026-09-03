@@ -12,10 +12,36 @@ services:
     App\Tests\Integration\Ingestion\Fixtures\FakeMapper:
         tags: ['app.ingestion.mapper']
 
+    App\Tests\Integration\Ingestion\Fixtures\FakeOrderMapper:
+        # public, потому что тест настраивает поведение фейка перед прогоном;
+        # без этого сервис инлайнится и из контейнера недоступен.
+        public: true
+        tags: ['app.ingestion.order_mapper']
+
     App\Ingestion\Application\Source\Wildberries\WbFinanceReportConnector:
         tags: []
 
     App\Ingestion\Infrastructure\Api\Ozon\OzonAccrualClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonAccrualClient'
+
+    # Клиенты заказов подменяются целиком: цикл перепроса ходит во внешние API,
+    # и проверять его на настоящих HTTP-вызовах нечем.
+    App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient:
+        public: true
+
+    App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient:
+        public: true
+
+    # Часы перепроса двигаются на секунду за обращение: иначе момент снятия
+    # отметки не проверить — одна общая отметка на всё подключение выглядит
+    # ровно как отметка, снятая после каждого ответа.
+    App\Tests\Integration\Ingestion\Fixtures\AdvancingClock: ~
+
+    App\Ingestion\Application\Action\RefreshOrderStatusesAction:
+        arguments:
+            $clock: '@App\Tests\Integration\Ingestion\Fixtures\AdvancingClock'
+
+    App\Ingestion\Infrastructure\Api\Ozon\OzonOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient'
+    App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient'
 
     test.ingestion_lock_store:
         class: Symfony\Component\Lock\Store\InMemoryStore

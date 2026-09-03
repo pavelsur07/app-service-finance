@@ -62,6 +62,38 @@ final class SyncJobRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Задачи, застрявшие в нерабочем состоянии: OPEN/RUNNING без движения
+     * дольше порога.
+     *
+     * Нужны потому, что findLatestForResource() считает активной любую такую
+     * задачу БЕЗ ограничения по возрасту, и StartIncrementalAction бросает на
+     * неё ActiveBackfillExistsException. Воркер, убитый по SIGKILL или OOM, не
+     * выполняет finally, задача остаётся RUNNING, и ресурс перестаёт
+     * загружаться молча — навсегда.
+     *
+     * @companyScopeExempt уборщик обходит все компании: зависшая задача одной
+     *                     компании не должна ждать, пока кто-то откроет её
+     *                     кабинет
+     *
+     * @return list<SyncJob>
+     */
+    public function findStaleActive(\DateTimeImmutable $olderThan, int $limit): array
+    {
+        /** @var list<SyncJob> $jobs */
+        $jobs = $this->createQueryBuilder('job')
+            ->andWhere('job.status IN (:statuses)')
+            ->andWhere('job.updatedAt < :olderThan')
+            ->setParameter('statuses', [SyncJobStatus::OPEN->value, SyncJobStatus::RUNNING->value])
+            ->setParameter('olderThan', $olderThan)
+            ->orderBy('job.updatedAt', 'ASC')
+            ->setMaxResults(max(1, min(500, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return $jobs;
+    }
+
     public function findLatestForResource(
         string $companyId,
         string $connectionRef,
