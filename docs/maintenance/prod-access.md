@@ -22,6 +22,28 @@ ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-console <allowed-c
 - `< /dev/null` на конце — без закрытого stdin `codex-psql-ro` не отдаёт результат и вызов висит до таймаута;
 - допускается префикс `timeout <ms|s>` перед `ssh`.
 
+## Ручная диагностика Владельца
+
+Provisioner `./provision-vf-prod-deploy.sh` запускает только Владелец с машины,
+для которой разрешён source IP. Claude Code/Codex этот скрипт не запускает.
+
+Отдельный пользователь `deploy` и wrapper `/usr/local/bin/deploy-diagnostics`
+предназначены только для ручной диагностики Владельцем. Claude Code/Codex не
+использует этот аккаунт и не подменяет им ограниченный путь `vf-prod-codex`.
+
+Канонические ручные формы для Владельца:
+
+```bash
+ssh -o IdentitiesOnly=yes -i ~/.ssh/vf_prod_deploy -l deploy vf-prod
+sudo /usr/local/bin/deploy-diagnostics ps
+sudo /usr/local/bin/deploy-diagnostics images
+sudo /usr/local/bin/deploy-diagnostics logs <container> --tail=500 --since=10m --timestamps
+sudo /usr/local/bin/deploy-diagnostics psql -c "SELECT ..."
+```
+
+`deploy-diagnostics psql` сам закрывает stdin для `codex-psql-ro`; добавлять
+перенаправление вручную при интерактивном запуске не требуется.
+
 Если агент запущен в песочнице Bash, эти формы висят на connect молча: исходящий TCP глушится, и
 вместо `Connection refused` не приходит ничего до таймаута. Признак именно песочницы, а не прода —
 `ssh -o BatchMode=yes vf-prod-codex "true"` тоже не завершается. Лечится запуском конкретного
@@ -117,4 +139,3 @@ timeout 20 ssh -o BatchMode=yes vf-prod-codex "sudo -n /usr/local/bin/codex-dock
 Запрещено добавлять dangerous/general permissions: arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, package installation. Для one-off production writes предпочтителен временный narrowly scoped wrapper, который Владелец удаляет после использования.
 
 ---
-
