@@ -18,7 +18,7 @@ use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\StoredObject;
-use App\Tests\Support\Kernel\IntegrationTestCase;
+use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\Connection;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
@@ -26,7 +26,7 @@ use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
-final class PruneRawRecordsActionTest extends IntegrationTestCase
+final class PruneRawRecordsActionTest extends PostgresResetTestCase
 {
     private const CONNECTION_REF = '0192f0c2-0000-7000-8000-00000000c001';
 
@@ -783,6 +783,34 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             $this->rawRecords->ownersOf([$foreignRawRecordId])[$foreignRawRecordId] ?? null,
             'Владелец чужой строки — чужая компания, и пара не сойдётся.',
         );
+    }
+
+    /**
+     * Внутри чужой транзакции очистка ОТКАЗЫВАЕТСЯ работать.
+     *
+     * Обе фазы опираются на то, что решение коммитится до обращения к
+     * хранилищу. Внутри открытой транзакции `wrapInTransaction()` даёт лишь
+     * вложенный уровень: «коммит» первой фазы ничего не фиксирует, и откат
+     * внешней транзакции после успешного удаления вернул бы строке вид записи
+     * с нагрузкой, которой уже нет.
+     */
+    public function testPruningRefusesToRunInsideAnOpenTransaction(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+
+        $this->connection->beginTransaction();
+
+        try {
+            ($this->action)(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+            self::fail('Очистка внутри чужой транзакции обязана отказать.');
+        } catch (\LogicException $exception) {
+            self::assertStringContainsString('open transaction', $exception->getMessage());
+        } finally {
+            $this->connection->rollBack();
+        }
+
+        // Отказ наступает ДО обращения к хранилищу.
+        self::assertTrue($this->storage->exists($record['path']));
     }
 
     /**

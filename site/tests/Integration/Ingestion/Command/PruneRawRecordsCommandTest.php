@@ -6,14 +6,14 @@ namespace App\Tests\Integration\Ingestion\Command;
 
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\StoredObject;
-use App\Tests\Support\Kernel\IntegrationTestCase;
+use App\Tests\Support\Kernel\PostgresResetTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
-final class PruneRawRecordsCommandTest extends IntegrationTestCase
+final class PruneRawRecordsCommandTest extends PostgresResetTestCase
 {
     public function testDryRunReportsNothingToDelete(): void
     {

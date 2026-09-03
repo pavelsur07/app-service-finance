@@ -153,6 +153,19 @@ final readonly class PruneRawRecordsAction
             return $result;
         }
 
+        // Внешней транзакции быть НЕ ДОЛЖНО.
+        //
+        // Обе фазы опираются на то, что решение коммитится ДО обращения к
+        // хранилищу. Внутри чужой транзакции `wrapInTransaction()` даёт лишь
+        // вложенный уровень: «коммит» первой фазы ничего не фиксирует, и откат
+        // внешней транзакции после успешного `delete()` вернул бы строке вид
+        // записи с нагрузкой, которой уже нет. Это ровно та центральная
+        // гарантия, ради которой фазы и разделены, поэтому здесь отказ, а не
+        // предупреждение.
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            throw new \LogicException('Raw payload pruning must not run inside an open transaction: the decision has to be committed before the object is deleted.');
+        }
+
         // Замок, общий с откатом миграций. Не ждём: retention идёт ночью и
         // каждую ночь, а откат — операция человека, которая длится минуты.
         // Пропустить один прогон дешевле, чем держать cron в ожидании или
