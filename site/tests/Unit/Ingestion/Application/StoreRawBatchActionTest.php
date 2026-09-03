@@ -8,6 +8,7 @@ use App\Ingestion\Application\StoreRawBatchAction;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Infrastructure\Storage\PathSegmentNormalizer;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
@@ -18,10 +19,20 @@ use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class StoreRawBatchActionTest extends TestCase
 {
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function lockedRowProvider(): iterable
+    {
+        yield 'строка на месте' => [true];
+        yield 'строка исчезла' => [false];
+    }
+
     public function testConcurrentDuplicateInsertReturnsExistingRecordAfterUniqueViolation(): void
     {
         $companyId = '11111111-1111-7111-8111-111111111111';
@@ -113,7 +124,7 @@ final class StoreRawBatchActionTest extends TestCase
 
         $uniqueViolation = new UniqueConstraintViolationException(
             new class('Duplicate raw record') extends \Exception implements DriverException {
-                public function getSQLState()
+                public function getSQLState(): string
                 {
                     return '23505';
                 }
@@ -168,7 +179,21 @@ final class StoreRawBatchActionTest extends TestCase
         self::assertGreaterThan($originalLastSeenAt, $existingRecord->getLastSeenAt());
     }
 
-    public function testSameHashLatestRecordRepairsMissingStorageObject(): void
+    /**
+     * Восстановление нагрузки — ТОЛЬКО под блокировкой существующей строки.
+     *
+     * Два случая одного правила, поэтому и тест один. Строка на месте — объект
+     * возвращается. Строки нет — Action обязан остановиться ДО хранилища:
+     * прежний откат на прочитанную ранее сущность выглядел безобидно, а был
+     * тем же классом тихой потери, что и удаление строки вместе с объектом:
+     * объект писался без блокировки, UPDATE задевал ноль строк, и вызывающий
+     * получал «сохранено» при записи, которой нет, — а в хранилище оставалась
+     * сирота.
+     *
+     * @param bool $rowSurvives нашлась ли строка под блокировкой
+     */
+    #[DataProvider('lockedRowProvider')]
+    public function testSameHashLatestRecordRepairsMissingStorageObject(bool $rowSurvives): void
     {
         $companyId = '11111111-1111-7111-8111-111111111111';
         $resourceType = 'ozon_finance_accrual_types';
@@ -206,13 +231,19 @@ final class StoreRawBatchActionTest extends TestCase
             ->with($companyId, IngestSource::OZON, $resourceType, $externalId)
             ->willReturn($existingRecord);
         $repository->expects(self::never())->method('findOneByCompanySourceExternalIdAndHash');
+        // Блокировка строки — предусловие восстановления: без неё Action
+        // отказывается идти в хранилище.
+        $repository->expects(self::once())
+            ->method('findOneForUpdate')
+            ->with($companyId, $existingRecord->getId())
+            ->willReturn($rowSurvives ? $existingRecord : null);
 
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($rowSurvives ? self::once() : self::never())
             ->method('exists')
             ->with('missing-types.ndjson.gz')
             ->willReturn(false);
-        $objectStorage->expects(self::once())
+        $objectStorage->expects($rowSurvives ? self::once() : self::never())
             ->method('write')
             ->with(
                 'missing-types.ndjson.gz',
@@ -245,6 +276,10 @@ final class StoreRawBatchActionTest extends TestCase
             $entityManager,
             $managerRegistry,
         );
+
+        if (!$rowSurvives) {
+            $this->expectException(RawRecordNotFoundException::class);
+        }
 
         self::assertSame([$existingRecord], $action($batch));
     }

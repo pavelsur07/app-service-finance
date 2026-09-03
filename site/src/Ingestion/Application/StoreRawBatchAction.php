@@ -6,6 +6,7 @@ namespace App\Ingestion\Application;
 
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Exception\RawStorageException;
 use App\Ingestion\Infrastructure\Storage\RawNdjsonCodec;
 use App\Ingestion\Infrastructure\Storage\RawStoragePathBuilder;
@@ -130,8 +131,18 @@ final readonly class StoreRawBatchAction
 
         $this->entityManager->wrapInTransaction(
             function () use ($batch, $record, $ndjson, &$reused): void {
-                $locked = $this->rawRecordRepository->findOneForUpdate($batch->companyId, $record->getId())
-                    ?? $record;
+                $locked = $this->rawRecordRepository->findOneForUpdate($batch->companyId, $record->getId());
+
+                // Строки нет — продолжать НЕЛЬЗЯ.
+                //
+                // Прежний откат на прочитанную ранее сущность выглядел
+                // безобидно, а был тем же классом тихой потери: объект писался
+                // без блокировки, Doctrine выполняла UPDATE по отсутствующей
+                // строке, задевая ноль строк, и вызывающий получал «сохранено»
+                // при записи, которой нет. В хранилище оставалась сирота.
+                if (null === $locked) {
+                    throw new RawRecordNotFoundException(sprintf('Raw record %s disappeared before its payload could be restored.', $record->getId()));
+                }
 
                 $this->restorePayload($locked, $ndjson);
 

@@ -303,6 +303,90 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
     }
 
     /**
+     * Блокировка берётся НА ВЫБОРКЕ первой фазы, а не на записи решения.
+     *
+     * Между свежим чтением кандидатов и flush решения проходит время, и без
+     * `PESSIMISTIC_WRITE` конкурент успевает подтвердить запись: `last_seen_at`
+     * обновляется, а решение об очистке всё равно коммитится — удаляется уже
+     * свежее сырьё.
+     *
+     * Остальные тесты этого не ловят: они либо начинают с уже заблокированной
+     * строки (тогда конкурент упирается в собственную блокировку UPDATE), либо
+     * вмешиваются во ВТОРОЙ фазе. Момент вмешательства здесь даёт часы: их
+     * второй вызов приходится ровно между блокирующей выборкой и пометкой.
+     */
+    public function testConcurrentRefreshCannotSlipBetweenTheLockedSelectionAndTheDecision(): void
+    {
+        $rawRecordId = $this->seedStaleRawRecord();
+
+        $competitor = $this->newConnection();
+        // Иначе конкурент ждал бы prune до конца теста.
+        $competitor->executeStatement("SET lock_timeout = '250ms'");
+
+        $refreshed = null;
+
+        $clock = new class($competitor, $rawRecordId, $refreshed) implements ClockInterface {
+            private int $calls = 0;
+
+            /**
+             * @param ?bool $refreshed успел ли конкурент подтвердить запись
+             */
+            public function __construct(
+                private readonly Connection $competitor,
+                private readonly string $rawRecordId,
+                private ?bool &$refreshed,
+            ) {
+            }
+
+            public function competitorSucceeded(): ?bool
+            {
+                return $this->refreshed;
+            }
+
+            public function now(): \DateTimeImmutable
+            {
+                ++$this->calls;
+
+                // Первый вызов — начало прогона, до всяких блокировок. Второй
+                // — внутри первой фазы: выборка уже под блокировкой, решение
+                // ещё не записано.
+                if (2 === $this->calls) {
+                    try {
+                        $this->competitor->executeStatement(
+                            'UPDATE ingest_raw_records SET last_seen_at = now() WHERE id = :id',
+                            ['id' => $this->rawRecordId],
+                        );
+                        $this->refreshed = true;
+                    } catch (\Throwable) {
+                        $this->refreshed = false;
+                    }
+                }
+
+                return new \DateTimeImmutable();
+            }
+        };
+
+        $action = new PruneRawRecordsAction(
+            self::getContainer()->get(IngestRawRecordRepository::class),
+            self::getContainer()->get(ObjectStorageInterface::class),
+            $this->em,
+            $clock,
+            new NullLogger(),
+        );
+
+        try {
+            $action(new PruneRawRecordsCommand(olderThanDays: 365, limit: 100, execute: true));
+        } finally {
+            $competitor->close();
+        }
+
+        self::assertFalse(
+            $refreshed,
+            'Подтверждение записи обязано ждать: без блокировки НА ВЫБОРКЕ решение принималось бы по устаревшему снимку.',
+        );
+    }
+
+    /**
      * РЕШЕНИЕ обязано быть закоммичено ДО того, как тронут объект.
      *
      * Это и есть смысл двух фаз, и проверить его можно без имитации аварии:

@@ -80,6 +80,25 @@ final class Version20260902190000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        // Та же проверка, что и в `Version20260902180000::down()`, и по той же
+        // причине — только раньше по времени.
+        //
+        // Откат идёт от новых миграций к старым, поэтому эта снимает индексы
+        // ПЕРВОЙ. Если следующая упрётся в необратимое состояние и прервётся,
+        // горячая таблица уже останется без retention-индексов: откат
+        // провалился, а вред нанесён. Отказываться надо ДО первого `DROP`.
+        $pruned = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_raw_records WHERE payload_pruned_at IS NOT NULL'
+        );
+
+        $this->abortIf(
+            $pruned > 0,
+            sprintf(
+                'Rollback would erase the only evidence that %d payload(s) were pruned on purpose. Decide what to do with them first.',
+                $pruned,
+            ),
+        );
+
         $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_pending_deletion');
         $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_retention');
     }

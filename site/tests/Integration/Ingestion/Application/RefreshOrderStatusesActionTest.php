@@ -561,6 +561,47 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Граница — `PHP_INT_MAX`, а не выдуманное число цифр.
+     *
+     * Ровно 18 цифр отвергали бы настоящий девятнадцатизначный номер навсегда,
+     * доводя заказ до STUCK_ORDER. А переполнение молча даёт `PHP_INT_MAX`, и
+     * обратное преобразование — единственная точная проверка того, что число
+     * вообще влезло.
+     *
+     * @param string $externalOrderId номер маркетплейса
+     */
+    #[DataProvider('marketplaceIdBoundaryProvider')]
+    public function testMarketplaceIdBoundaryIsIntMaxNotADigitCount(string $externalOrderId, bool $usable): void
+    {
+        $company = $this->seedCompanyWithConnection(MarketplaceType::WILDBERRIES);
+        $this->seedOrder(
+            $company, 'rid-1', IngestOrderStatus::ORDERED, 'supplierStatus=new;wbStatus=waiting',
+            null, null, IngestSource::WILDBERRIES, null, $externalOrderId,
+        );
+
+        $this->wb->setStatuses([(int) $externalOrderId => [
+            'id' => (int) $externalOrderId,
+            'supplierStatus' => 'complete',
+            'wbStatus' => 'sorted',
+            'isCancellable' => false,
+        ]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame($usable ? 1 : 0, $result->observed);
+        self::assertSame($usable ? 0 : 1, $result->invalid);
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function marketplaceIdBoundaryProvider(): iterable
+    {
+        yield 'PHP_INT_MAX' => [(string) \PHP_INT_MAX, true];
+        yield 'на единицу больше PHP_INT_MAX' => ['9223372036854775808', false];
+    }
+
+    /**
      * Заказ без сырья останавливается ТОЖЕ — и об этом кричат `error`-ом.
      *
      * Прежде он не останавливался «чтобы не пропал молча», но получалось ровно

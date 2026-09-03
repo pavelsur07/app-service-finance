@@ -126,7 +126,22 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         );
 
         $evidence = self::evidence($decoded['data']);
-        $rows = $this->listOfObjects($decoded['data']['orders'] ?? null, $decoded['shape']->orders ?? null, self::ORDERS_STATUS_ENDPOINT, 'orders', $evidence);
+
+        // Здесь список разбирается ТЕРПИМО к строкам и строго к контейнеру.
+        //
+        // Ответ на запрос статусов — это, как правило, всё подключение
+        // целиком. Исключение на первой не-объектной строке уносило бы вместе
+        // с ней все корректные наблюдения соседей, а «в списке попался null»
+        // — это дефект одной строки, а не всего эндпоинта. Сам же контейнер,
+        // не являющийся списком, — именно свойство эндпоинта: следующая пачка
+        // вернёт то же самое, поэтому там `endpointWide`.
+        $rows = $this->tolerantRowsOfList(
+            $decoded['data']['orders'] ?? null,
+            $decoded['shape']->orders ?? null,
+            self::ORDERS_STATUS_ENDPOINT,
+            'orders',
+            $evidence,
+        );
 
         // Спрошенные номера — множество, по которому проверяется КАЖДЫЙ
         // вернувшийся. Чужой номер означает, что ответ относится не к нашему
@@ -140,6 +155,14 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         $seen = [];
 
         foreach ($rows as $row) {
+            // Не-объектная строка: опознать в ней заказ нечем, поэтому она
+            // просто отбраковывается — соседи остаются пригодными.
+            if (null === $row) {
+                ++$rejected;
+
+                continue;
+            }
+
             $id = $row['id'] ?? null;
             $ours = is_int($id) && isset($requested[$id]);
 
@@ -152,8 +175,12 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             // выпадет из перепроса. Поэтому уже принятая строка снимается
             // тоже, а номер уходит в отбракованные.
             if ($ours && isset($seen[$id])) {
+                // Непригодны ОБЕ строки, а не одна: уже принятая снимается
+                // вместе с этой. Считать её пригодной значило бы занизить
+                // число отбракованных строк ровно на ту, которую мы только что
+                // и признали негодной.
+                $rejected += isset($indexed[$id]) ? 2 : 1;
                 unset($indexed[$id]);
-                ++$rejected;
                 $rejectedIds[] = $id;
 
                 continue;
@@ -213,8 +240,14 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             rejectedIds: array_values(array_unique($rejectedIds)),
             evidence: $rejected > 0 ? $evidence : null,
             // Строки БЕЗ нормализации: сырьё обязано содержать ответ
-            // маркетплейса, а не наш разбор этого ответа.
-            auditRows: $rows,
+            // маркетплейса, а не наш разбор этого ответа. Не-объектные строки
+            // сюда не идут: аудит — это NDJSON, где строка обязана быть
+            // объектом; они посчитаны отбракованными, а сам ответ целиком
+            // лежит в `evidence`.
+            auditRows: array_values(array_filter(
+                $rows,
+                static fn (?array $row): bool => null !== $row,
+            )),
         );
     }
 
@@ -495,6 +528,38 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             }
 
             $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Список, строгий к КОНТЕЙНЕРУ и терпимый к СТРОКАМ.
+     *
+     * `null` на месте строки означает «строка непригодна»: решение, что с ней
+     * делать, принимает вызывающий — он один знает, можно ли отбраковать её в
+     * одиночку. Контейнер, не являющийся списком, — свойство эндпоинта:
+     * следующая пачка вернёт то же самое, продолжать по ней бессмысленно.
+     *
+     * @param array<string, mixed>|null $evidence разобранный ответ целиком — доказательство для аудита
+     *
+     * @return list<array<string, mixed>|null>
+     */
+    private function tolerantRowsOfList(mixed $value, mixed $shape, string $endpoint, string $field, ?array $evidence): array
+    {
+        $where = sprintf('%s.%s', $endpoint, $field);
+
+        if (!is_array($shape) || !is_array($value) || !array_is_list($value)) {
+            throw new MalformedConnectorResponseException(sprintf('WB %s is not a list.', $where), decodedPayload: $evidence, endpointWide: true);
+        }
+
+        $rows = [];
+        foreach ($value as $index => $row) {
+            // Пустой объект — тоже испорченная строка: опознать заказ в нём
+            // нечем.
+            $rows[] = is_array($row) && [] !== $row && ($shape[$index] ?? null) instanceof \stdClass
+                ? $row
+                : null;
         }
 
         return $rows;

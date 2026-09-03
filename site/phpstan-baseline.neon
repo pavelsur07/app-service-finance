@@ -13723,12 +13723,6 @@ parameters:
 			path: tests/Unit/Ingestion/Application/Source/Wildberries/WbFinanceReportConnectorTest.php
 
 		-
-			message: '#^Method Exception@anonymous/tests/Unit/Ingestion/Application/StoreRawBatchActionTest\.php\:115\:\:getSQLState\(\) never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Unit/Ingestion/Application/StoreRawBatchActionTest.php
-
-		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 2

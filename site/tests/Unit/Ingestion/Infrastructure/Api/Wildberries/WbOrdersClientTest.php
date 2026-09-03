@@ -328,6 +328,51 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * Одна не-объектная строка не уносит с собой соседей.
+     *
+     * Ответ на запрос статусов — это, как правило, всё подключение целиком.
+     * Исключение на первом `null` в списке отбрасывало бы все корректные
+     * наблюдения, и одна вечно кривая строка навсегда блокировала бы
+     * обновление остальных заказов.
+     */
+    public function testNonObjectRowIsRejectedWithoutLosingItsNeighbours(): void
+    {
+        $page = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[null,{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}]}',
+            ['http_code' => 200],
+        )))->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+
+        self::assertSame([7], array_keys($page->statuses));
+        self::assertSame(1, $page->rejectedRows);
+        self::assertSame([], $page->rejectedIds, 'Номер непригодной строки неизвестен — приписывать его нельзя.');
+        self::assertNotNull($page->evidence, 'Ответ целиком обязан дойти до аудита.');
+    }
+
+    /**
+     * Сломанный КОНТЕЙНЕР — свойство эндпоинта, а не пачки.
+     *
+     * `orders`, не являющийся списком, вернётся таким же и на следующий
+     * запрос. Без признака `endpointWide` цикл перепроса принял бы сломанный
+     * API за набор испорченных пачек, продолжил долбить его и завершил прогон
+     * успехом.
+     */
+    public function testNonListContainerIsEndpointWide(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":{"id":5}}',
+            ['http_code' => 200],
+        )));
+
+        try {
+            $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+            self::fail('Контейнер не список — нарушение контракта.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertTrue($exception->isEndpointWide());
+            self::assertNotNull($exception->decodedPayload());
+        }
+    }
+
+    /**
      * Не-объект в теле — тоже доказательство.
      *
      * `[]`, `"broken"` или `0` нарушают контракт ровно так же, как объект без
@@ -384,7 +429,7 @@ final class WbOrdersClientTest extends TestCase
 
         self::assertSame([7], array_keys($page->statuses), 'Спорный номер не имеет права получить статус.');
         self::assertSame([5], $page->rejectedIds, 'Он обязан быть виден как отбракованный, а не как отсутствующий.');
-        self::assertSame(1, $page->rejectedRows);
+        self::assertSame(2, $page->rejectedRows, 'Непригодны ОБЕ строки спорного номера, а не одна лишняя.');
     }
 
     /**

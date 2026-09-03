@@ -586,7 +586,11 @@ final readonly class RefreshOrderStatusesAction
      */
     private function pollWildberries(string $companyId, string $connectionRef, array $orders, array $duplicateExternalOrderIds): array
     {
-        $collidingWbIds = array_flip($duplicateExternalOrderIds);
+        // Список, а не map: номера здесь — десятичные строки, и в ключах
+        // массива PHP превратил бы их в int, размывая тип на ровном месте.
+        // Коллизии редки, а сам список почти всегда пуст, поэтому линейный
+        // поиск ничего не стоит.
+        $collidingWbIds = $duplicateExternalOrderIds;
 
         // Номер marketplace-api живёт в собственной колонке, а не в JSON:
         // по ней же идёт отсев в запросе. Заказ, известный лишь из потока
@@ -614,7 +618,17 @@ final readonly class RefreshOrderStatusesAction
             // дублями они не считаются, а ключ дают один, и один заказ молча
             // затирал бы другой. Затёртый не получил бы ни наблюдения, ни
             // отметки попытки и вечно возвращался бы в начало очереди.
-            if (null === $externalOrderId || 1 !== preg_match('/^[1-9]\d{0,17}$/', $externalOrderId)) {
+            //
+            // Верхняя граница проверяется ОБРАТНЫМ ПРЕОБРАЗОВАНИЕМ, а не
+            // числом цифр. Ровно 18 цифр — граница выдуманная: `PHP_INT_MAX`
+            // девятнадцатизначен, и настоящий номер такой длины считался бы
+            // браком навсегда, доводя заказ до STUCK_ORDER. Переполнение же
+            // молча даёт `PHP_INT_MAX`, и обратное преобразование — это
+            // единственная точная проверка того, что число вообще влезло.
+            if (null === $externalOrderId
+                || 1 !== preg_match('/^[1-9]\d{0,18}$/', $externalOrderId)
+                || (string) (int) $externalOrderId !== $externalOrderId
+            ) {
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
                 $this->logger->warning('Wildberries order has no usable marketplace id.', [
@@ -636,7 +650,7 @@ final readonly class RefreshOrderStatusesAction
             // нельзя: доказательства, что это один и тот же заказ, нет.
             // Конфликтный номер в опрос не идёт вовсе — независимо от того,
             // сколько его носителей попало в эту страницу очереди.
-            if (isset($collidingWbIds[$externalOrderId])) {
+            if (in_array($externalOrderId, $collidingWbIds, true)) {
                 ++$invalid;
                 $attempts[$order->getId()] = $this->applicationTime();
                 $collidingExternalIds[$externalOrderId][] = $order->getExternalId();
