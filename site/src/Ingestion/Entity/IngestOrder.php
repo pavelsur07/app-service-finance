@@ -254,7 +254,7 @@ class IngestOrder implements TenantOwnedInterface
      *
      * @return bool применять ли снимок
      */
-    public function acceptSnapshot(\DateTimeImmutable $observedAt): bool
+    public function acceptSnapshot(\DateTimeImmutable $observedAt, bool $strict = false): bool
     {
         // NULL означает «авторитетного снимка ещё не было» — и такой снимок
         // принимается любым. Это не дыра: заказ мог быть создан ЧАСТИЧНЫМ
@@ -266,7 +266,7 @@ class IngestOrder implements TenantOwnedInterface
         // им отметка проставлена обратным заполнением в миграции
         // Version20260902130000, потому что до этой стадии все наблюдения были
         // полными снимками и пользовались status_observed_at.
-        if (null !== $this->snapshotObservedAt && $observedAt < $this->snapshotObservedAt) {
+        if (null !== $this->snapshotObservedAt && $this->outdated($observedAt, $this->snapshotObservedAt, $strict)) {
             return false;
         }
 
@@ -298,9 +298,9 @@ class IngestOrder implements TenantOwnedInterface
      * Принять ЧАСТИЧНОЕ наблюдение: атрибуты, уточнение схемы, добавление
      * недостающих позиций. Со статусом не связано — см. докблок поля.
      */
-    public function acceptPartialObservation(\DateTimeImmutable $observedAt): bool
+    public function acceptPartialObservation(\DateTimeImmutable $observedAt, bool $strict = false): bool
     {
-        if (null !== $this->partialObservedAt && $observedAt < $this->partialObservedAt) {
+        if (null !== $this->partialObservedAt && $this->outdated($observedAt, $this->partialObservedAt, $strict)) {
             return false;
         }
 
@@ -308,6 +308,25 @@ class IngestOrder implements TenantOwnedInterface
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
+    }
+
+    /**
+     * Устарело ли наблюдение относительно уже принятого.
+     *
+     * Для НАБЛЮДЕНИЯ равное время — не повод отказывать: «последний победил»
+     * здесь осознанное правило, потоки приходят вперемешку.
+     *
+     * Для ПОВТОРА уже разобранного сырья — повод. Повтор ничего нового не
+     * сообщает: этот снимок однажды уже применялся или был отклонён, и
+     * применить его снова при равной отметке значило бы откатить цену, состав
+     * и атрибуты, записанные ДРУГИМ сырьём того же мгновения. Статусная ось
+     * закрывает это тем же правилом в {@see OrderStatusJournal::reapply()}, и
+     * без него заказ выглядел бы согласованным по статусу при испорченных
+     * остальных данных.
+     */
+    private function outdated(\DateTimeImmutable $observedAt, \DateTimeImmutable $accepted, bool $strict): bool
+    {
+        return $strict ? $observedAt <= $accepted : $observedAt < $accepted;
     }
 
     /**

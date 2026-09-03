@@ -105,11 +105,29 @@ final class StoreRawBatchActionTest extends TestCase
                 },
             );
 
+        // Порядок, а не только факт: блокировка обязана быть ВЗЯТА до
+        // обращения к хранилищу. Иначе восстановление писало бы объект и
+        // снимало отметки, пока retention удаляет тот же объект.
+        $calls = [];
+
+        $repository->expects(self::once())
+            ->method('findOneForUpdate')
+            ->with($companyId, $existingRecord->getId())
+            ->willReturnCallback(static function () use (&$calls, $existingRecord): IngestRawRecord {
+                $calls[] = 'lock';
+
+                return $existingRecord;
+            });
+
         $objectStorage = $this->createMock(ObjectStorageInterface::class);
         $objectStorage->expects(self::once())
             ->method('exists')
             ->with('existing-path.ndjson.gz')
-            ->willReturn(true);
+            ->willReturnCallback(static function () use (&$calls): bool {
+                $calls[] = 'storage';
+
+                return true;
+            });
         $objectStorage->expects(self::once())
             ->method('write')
             ->with(
@@ -157,7 +175,13 @@ final class StoreRawBatchActionTest extends TestCase
             ->method('getRepository')
             ->with(IngestRawRecord::class)
             ->willReturn($repository);
-        $recoveredEntityManager->expects(self::once())->method('flush');
+        // Восстановление идёт под блокировкой строки — то есть внутри
+        // транзакции: без этого замыкание не выполнилось бы вовсе. Отдельного
+        // flush() больше нет, коммит делает wrapInTransaction().
+        $recoveredEntityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work($recoveredEntityManager),
+        );
+        $recoveredEntityManager->expects(self::never())->method('flush');
 
         $managerRegistry = $this->createMock(ManagerRegistry::class);
         $managerRegistry->expects(self::once())
@@ -177,6 +201,7 @@ final class StoreRawBatchActionTest extends TestCase
 
         self::assertSame([$existingRecord], $records);
         self::assertGreaterThan($originalLastSeenAt, $existingRecord->getLastSeenAt());
+        self::assertSame(['lock', 'storage'], $calls, 'К хранилищу нельзя идти раньше блокировки строки.');
     }
 
     /**

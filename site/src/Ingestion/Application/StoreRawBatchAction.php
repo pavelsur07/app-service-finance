@@ -191,11 +191,30 @@ final readonly class StoreRawBatchAction
             throw $exception;
         }
 
-        // Без блокировки: сюда попадают только что созданную конкурентом
-        // запись, она свежая и кандидатом retention быть не может.
-        $this->restorePayload($existingRecord, $ndjson);
-        $entityManager->flush();
+        // ПОД БЛОКИРОВКОЙ, как и обычная повторная встреча.
+        //
+        // Прежде здесь стояло рассуждение «запись только что создана
+        // конкурентом, значит свежая и кандидатом retention быть не может».
+        // Кодом оно не обеспечено: ветка не смотрит на `lastSeenAt`, а
+        // историческая выгрузка попадает под retention-предикат сразу. Без
+        // блокировки шаги переплетались ровно так же, как в `reuse()`:
+        // восстановление писало объект и снимало отметки в памяти, retention
+        // следом удалял объект, а flush закреплял запись, утверждающую, что
+        // нагрузка на месте.
+        $recovered = $existingRecord;
 
-        return $existingRecord;
+        $entityManager->wrapInTransaction(function () use ($batch, $repository, $existingRecord, $ndjson, &$recovered): void {
+            $locked = $repository->findOneForUpdate($batch->companyId, $existingRecord->getId());
+
+            if (null === $locked) {
+                throw new RawRecordNotFoundException(sprintf('Raw record %s disappeared before its payload could be restored.', $existingRecord->getId()));
+            }
+
+            $this->restorePayload($locked, $ndjson);
+
+            $recovered = $locked;
+        });
+
+        return $recovered;
     }
 }

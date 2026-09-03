@@ -417,7 +417,12 @@ final readonly class NormalizeOrderRawRecordAction
 
         // Полный снимок применяется, если он новее ПОСЛЕДНЕГО полного снимка.
         // Частичное наблюдение снимком не является: оно лишь дополняет состав.
-        $snapshotAccepted = $mapped->itemsAuthoritative && $order->acceptSnapshot($observedAt);
+        // На ПОВТОРЕ равное время снимка не принимается: см. {@see
+        // IngestOrder::outdated()}. Иначе повтор более раннего сырья с тем же
+        // `fetchedAt` откатывал бы цену, валюту, атрибуты и состав, записанные
+        // сырьём, разобранным позже, — а статус при этом оставался бы верным,
+        // и порча остальных данных ничем себя не выдавала бы.
+        $snapshotAccepted = $mapped->itemsAuthoritative && $order->acceptSnapshot($observedAt, strict: $isReplay);
 
         // Атрибуты сливаются ПО ВЛАДЕЛЬЦУ ОСИ.
         //
@@ -455,7 +460,7 @@ final readonly class NormalizeOrderRawRecordAction
             // `isCancel = false` статуса не несёт вовсе, и тогда все его
             // непротиворечивые данные — сумма, склад, уточнение схемы,
             // недостающая позиция — терялись бы навсегда.
-            if (!$order->acceptPartialObservation($observedAt)) {
+            if (!$order->acceptPartialObservation($observedAt, strict: $isReplay)) {
                 return $order;
             }
 

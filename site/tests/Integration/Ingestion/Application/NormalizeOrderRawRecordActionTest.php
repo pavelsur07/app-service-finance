@@ -309,6 +309,80 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Повтор с равной отметкой не откатывает и ОСТАЛЬНЫЕ данные.
+     *
+     * Статусная ось закрыта отдельно, и в этом была ловушка: заказ выглядел
+     * согласованным по статусу, а цена, атрибуты и состав откатывались к
+     * снимку более раннего сырья — порча ничем себя не выдавала.
+     */
+    public function testReplayWithEqualFetchTimeDoesNotRewindSnapshotData(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $first = $this->order('delivering', 1);
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'старый склад'],
+        ));
+        $firstRawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId));
+
+        // Второе сырьё с ТОЙ ЖЕ отметкой: другая цена, другие атрибуты.
+        $second = $this->order('delivered', 1);
+        $secondItems = [new MappedOrderItem(
+            lineNo: 0,
+            lineKey: $second->items[0]->lineKey,
+            quantity: 1,
+            externalSku: $second->items[0]->externalSku,
+            offerId: $second->items[0]->offerId,
+            name: $second->items[0]->name,
+            priceMinor: '999000',
+            currency: 'RUB',
+            sourceData: $second->items[0]->sourceData,
+        )];
+        $this->mapper->queue(new MappedOrder(
+            externalId: $second->externalId,
+            scheme: $second->scheme,
+            orderedAt: $second->orderedAt,
+            rawStatus: $second->rawStatus,
+            items: $secondItems,
+            attributes: ['warehouse' => 'новый склад'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw('page-2', $at), $this->companyId));
+
+        // Повтор ПЕРВОГО сырья: оно уже разобрано и ничего нового не сообщает.
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'старый склад'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($firstRawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame(IngestOrderStatus::DELIVERED, $reloaded->getStatus());
+        self::assertSame(
+            'новый склад',
+            $reloaded->getAttributes()['warehouse'] ?? null,
+            'Атрибуты обязаны остаться от сырья, разобранного позже.',
+        );
+
+        $price = (string) $this->connection->fetchOne(
+            'SELECT price_minor FROM ingest_order_items WHERE order_id = :id',
+            ['id' => $reloaded->getId()],
+        );
+        self::assertSame('999000', $price, 'Цена обязана остаться от сырья, разобранного позже.');
+    }
+
+    /**
      * Регрессия: идентичность позиции была позиционной. Источник вправе
      * прислать те же товары в другом порядке — на старом коде строка 0
      * сохраняла прежние externalSku/offerId, но получала количество, цену и
