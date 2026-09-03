@@ -1226,7 +1226,12 @@ final readonly class RefreshOrderStatusesAction
 
         $token = trim($value);
 
-        if ('' === $token || mb_strlen($token) > self::STATUS_TOKEN_MAX_LENGTH) {
+        // NUL внутри токена — валидный JSON (`"deliver\u0000ed"`), но
+        // PostgreSQL не принимает `0x00` в text/varchar: такое значение
+        // прошло бы разбор и уронило финальный flush, откатив вместе с
+        // собой уже собранные наблюдения соседей — вопреки поштучной
+        // изоляции ошибок. Сырьё при этом уже сохранено, доказательство есть.
+        if ('' === $token || str_contains($token, "\0") || mb_strlen($token) > self::STATUS_TOKEN_MAX_LENGTH) {
             return null;
         }
 

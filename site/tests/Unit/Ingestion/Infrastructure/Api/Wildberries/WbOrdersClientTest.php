@@ -349,6 +349,28 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * NUL внутри оси бракует строку, а не роняет запись всего подключения.
+     *
+     * `"sort\u0000ed"` — валидный JSON, и по типу, длине и `trim()` он
+     * проходит. Но PostgreSQL не принимает `0x00` в text: такое значение
+     * дошло бы до финального flush и откатило наблюдения всех соседей.
+     */
+    public function testAxisWithNulByteIsRejectedWithoutLosingItsNeighbour(): void
+    {
+        $page = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":['
+            .'{"id":5,"supplierStatus":"complete","wbStatus":"sort\\u0000ed","isCancellable":false},'
+            .'{"id":7,"supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}'
+            .']}',
+            ['http_code' => 200],
+        )))->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5, 7]);
+
+        self::assertSame([7], array_keys($page->statuses), 'Сосед обязан уцелеть.');
+        self::assertSame([5], $page->rejectedIds);
+        self::assertSame(1, $page->rejectedRows);
+    }
+
+    /**
      * Строка со СТРОКОВЫМ номером опознаётся, хотя и бракуется.
      *
      * `"id": "5"` контракт нарушает, но заказ называет однозначно. Пока

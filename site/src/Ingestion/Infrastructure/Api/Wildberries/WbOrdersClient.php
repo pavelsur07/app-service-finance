@@ -501,7 +501,10 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
 
         $axis = trim($value);
 
-        if ('' === $axis || mb_strlen($axis) > self::STATUS_AXIS_MAX_LENGTH) {
+        // NUL внутри оси — валидный JSON, но PostgreSQL не принимает `0x00`
+        // в text/varchar: такое значение прошло бы разбор и уронило финальный
+        // flush, откатив наблюдения всех соседей по ответу.
+        if ('' === $axis || str_contains($axis, "\0") || mb_strlen($axis) > self::STATUS_AXIS_MAX_LENGTH) {
             return null;
         }
 

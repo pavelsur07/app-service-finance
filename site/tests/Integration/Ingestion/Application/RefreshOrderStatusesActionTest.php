@@ -659,6 +659,41 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * NUL внутри статуса бракует отправление, а не откатывает подключение.
+     *
+     * `"deliver\u0000ed"` — валидный JSON, проходящий по типу, длине и
+     * `trim()`. Но PostgreSQL не принимает `0x00` в text: без проверки
+     * значение доезжало до финального flush и откатывало общую транзакцию
+     * подключения вместе с уже собранными корректными наблюдениями соседей.
+     */
+    public function testNulByteInStatusIsInvalidAndTheNeighbourIsStillApplied(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'broken', IngestOrderStatus::SHIPPED, 'delivering');
+        $this->seedOrder($company, 'fine', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings([
+            'broken' => ['posting_number' => 'broken', 'status' => "deliver\0ed"],
+            'fine' => ['posting_number' => 'fine', 'status' => 'delivered'],
+        ]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(1, $result->observed);
+        self::assertSame(1, $result->invalid);
+
+        $this->em->clear();
+        $fine = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'fine');
+        self::assertNotNull($fine);
+        self::assertSame(IngestOrderStatus::DELIVERED, $fine->getStatus(), 'Сосед обязан быть применён.');
+
+        $broken = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'broken');
+        self::assertNotNull($broken);
+        self::assertSame(IngestOrderStatus::SHIPPED, $broken->getStatus());
+        self::assertNotNull($broken->getStatusRefreshAttemptedAt(), 'Попытка засчитана — иначе заказ вечно первый в очереди.');
+    }
+
+    /**
      * Пробельный номер отправления не прерывает прогон.
      *
      * Клиент на пустой номер бросает InvalidArgumentException, и без проверки
