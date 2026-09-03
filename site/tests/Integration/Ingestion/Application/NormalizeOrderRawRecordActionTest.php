@@ -383,6 +383,73 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Повтор СВОЕГО сырья исправляет снимок — ради этого forceReplay и есть.
+     *
+     * У уже разобранного сырья отметка оси равна его собственному
+     * `fetchedAt`, поэтому запрет на равное время, введённый против чужого
+     * отката, отобрал бы у повтора весь смысл: маппер починили, а цена и
+     * состав остались бы прежними. Различает эти два случая владелец оси.
+     */
+    public function testReplayOfItsOwnRawFixesTheSnapshotItWrote(): void
+    {
+        $at = new \DateTimeImmutable('2026-09-01T10:00:00.500000+00:00');
+
+        $first = $this->order('delivering', 1);
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $first->items,
+            attributes: ['warehouse' => 'разобрано неверно'],
+        ));
+        $rawId = $this->storeRaw('page-1', $at);
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId));
+
+        // Маппер починили: то же сырьё разбирается заново и по-другому.
+        $fixedItems = [new MappedOrderItem(
+            lineNo: 0,
+            lineKey: $first->items[0]->lineKey,
+            quantity: 1,
+            externalSku: $first->items[0]->externalSku,
+            offerId: $first->items[0]->offerId,
+            name: $first->items[0]->name,
+            priceMinor: '777000',
+            currency: 'RUB',
+            sourceData: $first->items[0]->sourceData,
+        )];
+        $this->mapper->queue(new MappedOrder(
+            externalId: $first->externalId,
+            scheme: $first->scheme,
+            orderedAt: $first->orderedAt,
+            rawStatus: $first->rawStatus,
+            items: $fixedItems,
+            attributes: ['warehouse' => 'разобрано верно'],
+        ));
+        ($this->action)(new NormalizeRawRecordCommand($rawId, $this->companyId, forceReplay: true));
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId($this->companyId, IngestSource::OZON, self::CONNECTION_REF, 'posting-1');
+        self::assertNotNull($reloaded);
+        self::assertSame('разобрано верно', $reloaded->getAttributes()['warehouse'] ?? null);
+
+        $price = (string) $this->connection->fetchOne(
+            'SELECT price_minor FROM ingest_order_items WHERE order_id = :id',
+            ['id' => $reloaded->getId()],
+        );
+        self::assertSame('777000', $price, 'Повтор своего сырья обязан переписать то, что сам же и записал.');
+
+        // Событий журнала повтор по-прежнему не пишет.
+        self::assertSame(
+            1,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_order_status_events WHERE order_id = :id',
+                ['id' => $reloaded->getId()],
+            ),
+        );
+    }
+
+    /**
      * Регрессия: идентичность позиции была позиционной. Источник вправе
      * прислать те же товары в другом порядке — на старом коде строка 0
      * сохраняла прежние externalSku/offerId, но получала количество, цену и

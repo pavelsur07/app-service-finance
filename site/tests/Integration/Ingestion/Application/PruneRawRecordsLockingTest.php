@@ -630,7 +630,95 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
         }
     }
 
-    private function seedStaleRawRecord(string $hash = 'hash'): string
+    /**
+     * ПАКЕТНАЯ запись проблем берёт ту же блокировку — и только на своё.
+     *
+     * Одиночный путь проверяется отдельным тестом, но пачка ходит другим
+     * запросом. Снятие `FOR UPDATE` с него оставило бы retention возможность
+     * удалить доказательство между проверкой и вставкой, а блокировка чужой
+     * строки задержала бы ingestion соседнего арендатора — и ни то, ни другое
+     * не видно по итоговым строкам таблицы.
+     */
+    public function testBatchOfIssuesWaitsForItsOwnRowAndNeverForAForeignOne(): void
+    {
+        $rawRecordId = $this->seedStaleRawRecord();
+        $companyId = (string) $this->connection->fetchOne(
+            'SELECT company_id FROM ingest_raw_records WHERE id = :id',
+            ['id' => $rawRecordId],
+        );
+
+        $foreignCompanyId = Uuid::uuid7()->toString();
+        $foreignRawRecordId = $this->seedStaleRawRecord(company: $foreignCompanyId);
+
+        $holder = $this->newConnection();
+        $holder->beginTransaction();
+        $holder->executeQuery(
+            'SELECT id FROM ingest_raw_records WHERE id IN (:ids) FOR UPDATE',
+            ['ids' => [$rawRecordId, $foreignRawRecordId]],
+            ['ids' => Connection::PARAM_STR_ARRAY],
+        );
+
+        try {
+            // Иначе пачка ждала бы держателя до конца теста.
+            $this->connection->executeStatement("SET lock_timeout = '250ms'");
+
+            $action = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+            // ЧУЖАЯ строка: ждать нечего — до блокировки дело не доходит.
+            $action->recordMany([new RecordNormalizationIssueCommand(
+                companyId: $companyId,
+                rawRecordId: $foreignRawRecordId,
+                operationGroupId: null,
+                kind: NormalizationIssueKind::MAPPER_FAILURE,
+                details: [],
+            )]);
+
+            self::assertSame(
+                0,
+                (int) $holder->fetchOne(
+                    'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                    ['id' => $foreignRawRecordId],
+                ),
+                'Проблема на чужое сырьё не имеет права появиться.',
+            );
+
+            // СВОЯ строка: пачка обязана упереться в чужую блокировку.
+            $blocked = false;
+
+            try {
+                $action->recordMany([new RecordNormalizationIssueCommand(
+                    companyId: $companyId,
+                    rawRecordId: $rawRecordId,
+                    operationGroupId: null,
+                    kind: NormalizationIssueKind::MAPPER_FAILURE,
+                    details: [],
+                )]);
+            } catch (\Throwable $exception) {
+                if (!self::isLockTimeout($exception)) {
+                    throw $exception;
+                }
+
+                $blocked = true;
+            }
+
+            self::assertTrue($blocked, 'Пачка обязана брать ту же блокировку, что и retention.');
+
+            self::assertSame(
+                0,
+                (int) $holder->fetchOne(
+                    'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                    ['id' => $rawRecordId],
+                ),
+                'Проблема не должна появиться в обход блокировки.',
+            );
+        } finally {
+            $this->connection->executeStatement('SET lock_timeout = 0');
+            $holder->rollBack();
+            $holder->close();
+        }
+    }
+
+    private function seedStaleRawRecord(string $hash = 'hash', ?string $company = null): string
     {
         $id = Uuid::uuid7()->toString();
         $old = (new \DateTimeImmutable('-400 days'))->format('Y-m-d H:i:s.u');
@@ -646,7 +734,7 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
                   :old, :old, :job, 'done', now(), now())",
             [
                 'id' => $id,
-                'company' => Uuid::uuid7()->toString(),
+                'company' => $company ?? Uuid::uuid7()->toString(),
                 'hash' => $hash,
                 'old' => $old,
                 'job' => Uuid::uuid7()->toString(),

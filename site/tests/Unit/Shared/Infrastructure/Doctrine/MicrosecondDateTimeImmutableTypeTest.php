@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Shared\Infrastructure\Doctrine;
 
 use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 use PHPUnit\Framework\TestCase;
 
 final class MicrosecondDateTimeImmutableTypeTest extends TestCase
@@ -94,5 +96,32 @@ final class MicrosecondDateTimeImmutableTypeTest extends TestCase
 
         self::assertNull($type->convertToDatabaseValue(null, $platform));
         self::assertNull($type->convertToPHPValue(null, $platform));
+    }
+
+    /**
+     * Старый тип ЧИТАЕТ то, что пишет новый.
+     *
+     * Это про выкатку: пока часть процессов ещё на прежней версии, они будут
+     * читать строки, записанные новой. Если бы стандартный
+     * `datetime_immutable` спотыкался о дробную часть, rolling deployment
+     * ронял бы normalize-worker на гидратации общей таблицы сырья — и это
+     * касалось бы не только заказов.
+     *
+     * Он не спотыкается: `createFromFormat('Y-m-d H:i:s', ...)` разбирает
+     * дробную часть как хвост и возвращает объект, а не `false`. Проверено
+     * здесь, а не рассуждением.
+     */
+    public function testValueWrittenByTheNewTypeIsReadableByTheStandardOne(): void
+    {
+        $platform = new PostgreSQLPlatform();
+        $written = new \DateTimeImmutable('2026-09-01 10:00:00.123456');
+
+        $stored = (new MicrosecondDateTimeImmutableType())->convertToDatabaseValue($written, $platform);
+        self::assertIsString($stored);
+
+        $restored = Type::getType(Types::DATETIME_IMMUTABLE)->convertToPHPValue($stored, $platform);
+
+        self::assertInstanceOf(\DateTimeImmutable::class, $restored);
+        self::assertSame($written->format('Y-m-d H:i:s'), $restored->format('Y-m-d H:i:s'));
     }
 }

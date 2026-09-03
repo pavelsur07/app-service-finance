@@ -13,7 +13,6 @@ use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestOrder;
-use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
@@ -303,7 +302,9 @@ final readonly class RefreshOrderStatusesAction
         // теряло переход навсегда, потому что переразобрать такую запись
         // некому. Сеть уже отработала, поэтому транзакция короткая.
         $changed = 0;
-        $auditPath = null;
+
+        /** @var list<string> $auditPaths */
+        $auditPaths = [];
 
         try {
             $this->entityManager->wrapInTransaction(function () use (
@@ -313,7 +314,7 @@ final readonly class RefreshOrderStatusesAction
                 $poll,
                 $storedAt,
                 &$changed,
-                &$auditPath,
+                &$auditPaths,
             ): void {
                 $rawRecordId = null;
                 if ([] !== $poll['rows']) {
@@ -322,9 +323,7 @@ final readonly class RefreshOrderStatusesAction
                     // Нормализация к этой записи не применяется — маппера у
                     // ресурса нет, и запись сразу помечается пропущенной, иначе
                     // она вечно висела бы в очереди.
-                    $audit = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
-                    $rawRecordId = $audit->getId();
-                    $auditPath = $audit->getStoragePath();
+                    $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt, $auditPaths);
                 }
 
                 $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
@@ -336,7 +335,7 @@ final readonly class RefreshOrderStatusesAction
             // сбой оставлял бы недостижимый объект: retention ищет кандидатов
             // среди СТРОК, и объекта без строки он не найдёт никогда. Почасовой
             // прогон превращал бы это в неограниченную утечку.
-            $this->discardOrphanedAudit($auditPath, $companyId, $connectionRef);
+            $this->discardOrphanedAudit($auditPaths, $companyId, $connectionRef);
 
             throw $exception;
         }
@@ -876,6 +875,7 @@ final readonly class RefreshOrderStatusesAction
 
     /**
      * @param list<array<string, mixed>> $rows
+     * @param list<string> $writtenPaths пути записанных объектов, заполняется по ссылке
      */
     private function storeAudit(
         IngestSource $source,
@@ -883,7 +883,8 @@ final readonly class RefreshOrderStatusesAction
         string $connectionRef,
         array $rows,
         \DateTimeImmutable $now,
-    ): IngestRawRecord {
+        array &$writtenPaths,
+    ): string {
         $resourceType = IngestSource::OZON === $source
             ? OzonResourceType::ORDER_STATUS_REFRESH
             : WbResourceType::ORDER_STATUS_REFRESH;
@@ -908,7 +909,11 @@ final readonly class RefreshOrderStatusesAction
             rows: $rows,
         ));
 
+        // Пути собираются СРАЗУ, до любой проверки: объекты уже записаны, и
+        // исключение ниже оставило бы их без строк — а компенсация умеет
+        // убирать только то, о чём знает.
         foreach ($records as $record) {
+            $writtenPaths[] = $record->getStoragePath();
             $record->markNormalizationSkipped();
         }
 
@@ -921,33 +926,33 @@ final readonly class RefreshOrderStatusesAction
             throw new RawStorageException(sprintf('Order status refresh audit expected a single raw record, got %d.', count($records)));
         }
 
-        return $records[0];
+        return $records[0]->getId();
     }
 
     /**
-     * Убрать объект аудита, чью строку откатила транзакция.
+     * Убрать объекты аудита, чьи строки откатила транзакция.
      *
      * Не удалось — не беда для данных, но место занято, и путь обязан уйти в
      * лог: убрать такой объект может только человек, потому что найти его по
      * базе невозможно — строки нет.
+     *
+     * @param list<string> $storagePaths
      */
-    private function discardOrphanedAudit(?string $storagePath, string $companyId, string $connectionRef): void
+    private function discardOrphanedAudit(array $storagePaths, string $companyId, string $connectionRef): void
     {
-        if (null === $storagePath) {
-            return;
-        }
-
-        try {
-            $this->objectStorage->delete($storagePath);
-        } catch (\Exception $exception) {
-            $this->logger->error('Audit object was left in storage without its raw record; it has to be removed by hand.', [
-                'companyId' => $companyId,
-                'connectionRef' => $connectionRef,
-                'storagePath' => $storagePath,
-                // Класс, а не сообщение: в тексте ошибок хранилища встречаются
-                // URL с учётными данными.
-                'exceptionClass' => $exception::class,
-            ]);
+        foreach ($storagePaths as $storagePath) {
+            try {
+                $this->objectStorage->delete($storagePath);
+            } catch (\Exception $exception) {
+                $this->logger->error('Audit object was left in storage without its raw record; it has to be removed by hand.', [
+                    'companyId' => $companyId,
+                    'connectionRef' => $connectionRef,
+                    'storagePath' => $storagePath,
+                    // Класс, а не сообщение: в тексте ошибок хранилища
+                    // встречаются URL с учётными данными.
+                    'exceptionClass' => $exception::class,
+                ]);
+            }
         }
     }
 

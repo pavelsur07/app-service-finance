@@ -347,10 +347,13 @@ final readonly class NormalizeOrderRawRecordAction
             );
             // Отметка своей оси ставится и при создании — иначе следующее,
             // более старое наблюдение того же вида прошло бы как первое.
+            // Вместе с ней запоминается ВЛАДЕЛЕЦ: без него повтор этого же
+            // сырья при равном времени считался бы чужим и не смог бы
+            // исправить снимок, который сам же и записал.
             if ($mapped->itemsAuthoritative) {
-                $order->acceptSnapshot($observedAt);
+                $order->acceptSnapshot($observedAt, $rawRecord->getId());
             } else {
-                $order->acceptPartialObservation($observedAt);
+                $order->acceptPartialObservation($observedAt, $rawRecord->getId());
             }
 
             $this->orderRepository->save($order);
@@ -422,7 +425,8 @@ final readonly class NormalizeOrderRawRecordAction
         // `fetchedAt` откатывал бы цену, валюту, атрибуты и состав, записанные
         // сырьём, разобранным позже, — а статус при этом оставался бы верным,
         // и порча остальных данных ничем себя не выдавала бы.
-        $snapshotAccepted = $mapped->itemsAuthoritative && $order->acceptSnapshot($observedAt, strict: $isReplay);
+        $snapshotAccepted = $mapped->itemsAuthoritative
+            && $order->acceptSnapshot($observedAt, $rawRecord->getId(), isReplay: $isReplay);
 
         // Атрибуты сливаются ПО ВЛАДЕЛЬЦУ ОСИ.
         //
@@ -460,7 +464,7 @@ final readonly class NormalizeOrderRawRecordAction
             // `isCancel = false` статуса не несёт вовсе, и тогда все его
             // непротиворечивые данные — сумма, склад, уточнение схемы,
             // недостающая позиция — терялись бы навсегда.
-            if (!$order->acceptPartialObservation($observedAt, strict: $isReplay)) {
+            if (!$order->acceptPartialObservation($observedAt, $rawRecord->getId(), isReplay: $isReplay)) {
                 return $order;
             }
 

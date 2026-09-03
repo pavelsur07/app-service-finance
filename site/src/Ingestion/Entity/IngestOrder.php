@@ -111,6 +111,24 @@ class IngestOrder implements TenantOwnedInterface
     #[ORM\Column(type: 'datetime_immutable_us', nullable: true)]
     private ?\DateTimeImmutable $partialObservedAt = null;
 
+    /**
+     * Чьё сырьё записало последний снимок и последнее частичное наблюдение.
+     *
+     * Нужно ровно для ПОВТОРА. Равное время — не повод отказывать наблюдению:
+     * потоки приходят вперемешку, и «последний победил» здесь осознанное
+     * правило. Для повтора это правило неверно: он ничего нового не сообщает,
+     * а применённый заново откатывал бы цену, состав и атрибуты, записанные
+     * другим сырьём того же мгновения. Но и запретить повтор целиком нельзя —
+     * тогда `forceReplay` перестал бы быть способом исправить уже записанный
+     * заказ после починки маппера. Различает эти два случая владелец оси: своё
+     * сырьё при равном времени повторить можно, чужое — нет.
+     */
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $snapshotRawRecordId = null;
+
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $partialRawRecordId = null;
+
     /** Указатель на raw, из которого получено последнее наблюдение. */
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $lastRawRecordId = null;
@@ -254,7 +272,7 @@ class IngestOrder implements TenantOwnedInterface
      *
      * @return bool применять ли снимок
      */
-    public function acceptSnapshot(\DateTimeImmutable $observedAt, bool $strict = false): bool
+    public function acceptSnapshot(\DateTimeImmutable $observedAt, ?string $rawRecordId = null, bool $isReplay = false): bool
     {
         // NULL означает «авторитетного снимка ещё не было» — и такой снимок
         // принимается любым. Это не дыра: заказ мог быть создан ЧАСТИЧНЫМ
@@ -266,11 +284,14 @@ class IngestOrder implements TenantOwnedInterface
         // им отметка проставлена обратным заполнением в миграции
         // Version20260902130000, потому что до этой стадии все наблюдения были
         // полными снимками и пользовались status_observed_at.
-        if (null !== $this->snapshotObservedAt && $this->outdated($observedAt, $this->snapshotObservedAt, $strict)) {
+        if (null !== $this->snapshotObservedAt
+            && $this->outdated($observedAt, $this->snapshotObservedAt, $isReplay, $rawRecordId, $this->snapshotRawRecordId)
+        ) {
             return false;
         }
 
         $this->snapshotObservedAt = $observedAt;
+        $this->snapshotRawRecordId = $rawRecordId ?? $this->snapshotRawRecordId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
@@ -298,13 +319,16 @@ class IngestOrder implements TenantOwnedInterface
      * Принять ЧАСТИЧНОЕ наблюдение: атрибуты, уточнение схемы, добавление
      * недостающих позиций. Со статусом не связано — см. докблок поля.
      */
-    public function acceptPartialObservation(\DateTimeImmutable $observedAt, bool $strict = false): bool
+    public function acceptPartialObservation(\DateTimeImmutable $observedAt, ?string $rawRecordId = null, bool $isReplay = false): bool
     {
-        if (null !== $this->partialObservedAt && $this->outdated($observedAt, $this->partialObservedAt, $strict)) {
+        if (null !== $this->partialObservedAt
+            && $this->outdated($observedAt, $this->partialObservedAt, $isReplay, $rawRecordId, $this->partialRawRecordId)
+        ) {
             return false;
         }
 
         $this->partialObservedAt = $observedAt;
+        $this->partialRawRecordId = $rawRecordId ?? $this->partialRawRecordId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return true;
@@ -324,9 +348,32 @@ class IngestOrder implements TenantOwnedInterface
      * без него заказ выглядел бы согласованным по статусу при испорченных
      * остальных данных.
      */
-    private function outdated(\DateTimeImmutable $observedAt, \DateTimeImmutable $accepted, bool $strict): bool
-    {
-        return $strict ? $observedAt <= $accepted : $observedAt < $accepted;
+    private function outdated(
+        \DateTimeImmutable $observedAt,
+        \DateTimeImmutable $accepted,
+        bool $isReplay,
+        ?string $rawRecordId,
+        ?string $owner,
+    ): bool {
+        if ($observedAt < $accepted) {
+            return true;
+        }
+
+        if ($observedAt > $accepted || !$isReplay) {
+            return false;
+        }
+
+        // Равное время на ПОВТОРЕ: применить можно только СВОЁ.
+        //
+        // Чужое — это откат цены, состава и атрибутов, записанных сырьём того
+        // же мгновения, разобранным позже. Своё — единственный способ
+        // исправить уже записанный заказ после починки маппера, и запрещать
+        // его значило бы отобрать у `forceReplay` его смысл.
+        //
+        // Неизвестный владелец (заказы, записанные до появления колонки, если
+        // обратное заполнение не нашло указателя) считается чужим: гадать
+        // безопаснее в сторону отказа.
+        return null === $owner || null === $rawRecordId || $owner !== $rawRecordId;
     }
 
     /**
