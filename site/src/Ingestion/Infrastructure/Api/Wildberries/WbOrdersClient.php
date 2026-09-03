@@ -163,8 +163,15 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
                 continue;
             }
 
-            $id = $row['id'] ?? null;
-            $ours = is_int($id) && isset($requested[$id]);
+            // ОПОЗНАНИЕ и ПРИГОДНОСТЬ — разные вопросы.
+            //
+            // `"id": "5"` контракт нарушает, но заказ называет однозначно.
+            // Пока опознание требовало `int`, такая строка бракавалась
+            // безымянной: заказ считался и `invalid`, и `missing`, а в аудит
+            // уходило ложное «маркетплейс его не вернул». Принять её от этого
+            // нельзя — принимает по-прежнему только `int`.
+            $id = self::requestedId($row['id'] ?? null, $requested);
+            $ours = null !== $id;
 
             // ПОВТОР номера — брак ВСЕГО номера, а не одной лишней строки.
             //
@@ -401,11 +408,18 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
             $data = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
             $shape = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $exception) {
-            throw new MalformedConnectorResponseException(sprintf('WB %s returned invalid JSON.', $endpoint), 0, $exception);
+            // Свойство ЭНДПОИНТА, а не пачки: тело, которое не является JSON,
+            // будет таким же и через час. Без этого признака цикл перепроса
+            // принимал бы полностью несовместимый ответ за набор испорченных
+            // пачек, продолжал долбить его и завершал прогон успехом.
+            throw new MalformedConnectorResponseException(sprintf('WB %s returned invalid JSON.', $endpoint), 0, $exception, endpointWide: true);
         }
 
         if (!is_array($data)) {
-            throw new MalformedConnectorResponseException(sprintf('WB %s returned an unexpected payload.', $endpoint));
+            // Скаляр в корне — тоже свойство эндпоинта, и он ЕСТЬ
+            // доказательство: разобрать его удалось, и потерять его значило бы
+            // не создать сырья вовсе.
+            throw new MalformedConnectorResponseException(sprintf('WB %s returned an unexpected payload.', $endpoint), decodedPayload: self::evidence($data), endpointWide: true);
         }
 
         return ['data' => $data, 'shape' => $shape];
@@ -531,6 +545,32 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
         }
 
         return $rows;
+    }
+
+    /**
+     * Какой из СПРОШЕННЫХ заказов называет эта строка. `null` — никакой.
+     *
+     * Опознание шире приёмки намеренно: каноническая десятичная строка
+     * называет заказ однозначно, хотя контракт и нарушает. Не опознав её, мы
+     * посчитали бы один заказ дважды — и как `invalid`, и как `missing` — и
+     * записали бы в аудит, что маркетплейс его не вернул, хотя строка была.
+     *
+     * @param array<int, int> $requested спрошенные номера
+     */
+    private static function requestedId(mixed $id, array $requested): ?int
+    {
+        if (is_int($id)) {
+            return isset($requested[$id]) ? $id : null;
+        }
+
+        // Только каноническая запись: «05» и «5.0» заказ называют неоднозначно,
+        // а `PHP_INT_MAX + 1` молча схлопнулось бы в `PHP_INT_MAX` и назвало бы
+        // ЧУЖОЙ заказ.
+        if (!is_string($id) || 1 !== preg_match('/^[1-9]\d{0,18}$/', $id) || (string) (int) $id !== $id) {
+            return null;
+        }
+
+        return isset($requested[(int) $id]) ? (int) $id : null;
     }
 
     /**

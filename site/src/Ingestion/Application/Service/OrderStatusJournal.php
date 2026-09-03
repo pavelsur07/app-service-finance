@@ -91,7 +91,12 @@ final readonly class OrderStatusJournal
         // наблюдение не старше текущей отметки, включая повторяющее тот же
         // статус; изменением — только то, которое статус действительно
         // сдвинуло.
-        return new StatusObservationOutcome(accepted: $accepted, changed: $accepted && $differs);
+        return new StatusObservationOutcome(
+            accepted: $accepted,
+            changed: $accepted && $differs,
+            // Записано в журнал — то же условие, при котором пишется событие.
+            recorded: $differs,
+        );
     }
 
     /**

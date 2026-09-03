@@ -70,7 +70,7 @@ final class RefreshOrderStatusesCommand extends Command
             $this->release();
         }
 
-        $io->success(sprintf(
+        $summary = sprintf(
             'Requested %d orders (observed: %d, changed: %d, not returned: %d, invalid: %d, stopped: %d, failed connections: %d, auth failures: %d, broken connections: %d).',
             $result->requested,
             $result->observed,
@@ -81,7 +81,7 @@ final class RefreshOrderStatusesCommand extends Command
             $result->failedConnections,
             $result->authFailedConnections,
             $result->brokenConnections,
-        ));
+        );
 
         // Неустранимые сами не пройдут: пока ключ не заменят или API не
         // починят, подключение не обновляется вовсе, и через час будет ровно
@@ -89,9 +89,17 @@ final class RefreshOrderStatusesCommand extends Command
         // cron, а не только в логах. Retryable-сбои (429, таймаут) сюда не
         // относятся: они лечатся следующим прогоном, и падать на них значило
         // бы обесценить сам сигнал.
+        //
+        // Баннер выбирается ПОСЛЕ решения о коде возврата: зелёный `[OK]` над
+        // неуспешным прогоном — ровно то, из-за чего ручной запуск читают
+        // неверно.
         if ($result->authFailedConnections > 0 || $result->brokenConnections > 0) {
+            $io->error($summary);
+
             return Command::FAILURE;
         }
+
+        $io->success($summary);
 
         return Command::SUCCESS;
     }

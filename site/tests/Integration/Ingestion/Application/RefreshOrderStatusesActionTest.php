@@ -561,6 +561,88 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
     }
 
     /**
+     * Незнакомый токен попадает в очередь, даже если проиграл гонку.
+     *
+     * Наблюдение, оказавшееся старше уже записанного, состояние заказа не
+     * двигает, но в журнал попадает — и незнакомый токен в нём такой же
+     * настоящий. Пока проблема заводилась только при изменении состояния,
+     * такой токен оставался лишь в журнале: если победившее наблюдение сделало
+     * заказ терминальным, второй попытки не будет никогда, и сломанный
+     * контракт API навсегда оставался бы незамеченным.
+     */
+    public function testUnknownStatusThatLostTheRaceStillReachesTheReviewQueue(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+
+        // Заказ уже наблюдался ПОЗЖЕ, чем ответ, который придёт сейчас.
+        $this->seedOrder(
+            $company,
+            'posting-1',
+            IngestOrderStatus::SHIPPED,
+            'delivering',
+            null,
+            null,
+            IngestSource::OZON,
+            null,
+            null,
+            new \DateTimeImmutable('+1 hour'),
+        );
+
+        $this->ozon->setPostings(['posting-1' => [
+            'posting_number' => 'posting-1',
+            'status' => 'совершенно_незнакомый_статус',
+        ]]);
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+
+        self::assertSame(0, $result->changed, 'Устаревшее наблюдение состояние не двигает.');
+
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'unknown_order_status'",
+            ['c' => (string) $company->getId()],
+        ), 'Незнакомый токен обязан быть виден, даже если наблюдение проиграло.');
+    }
+
+    /**
+     * Заказ, чьё сырьё исчезло, останавливается, а не откладывается вечно.
+     *
+     * Указатель тот же, а строки нет — она и не появится. Пока такой заказ
+     * откладывался, он старейший, и при малом лимите очередь зависших вечно
+     * начиналась с него: остальные не останавливались никогда.
+     */
+    public function testStuckOrderWhoseEvidenceRowVanishedIsStoppedNotDeferred(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $order = $this->seedOrder(
+            $company,
+            'ancient',
+            IngestOrderStatus::SHIPPED,
+            'delivering',
+            new \DateTimeImmutable('-90 days'),
+        );
+
+        // Строка сырья исчезает, а указатель на неё остаётся.
+        $this->connection->executeStatement(
+            'DELETE FROM ingest_raw_records WHERE id = :id',
+            ['id' => (string) $order->getLastRawRecordId()],
+        );
+
+        $result = ($this->action)(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 1));
+
+        self::assertSame(1, $result->stopped);
+
+        $this->em->clear();
+        $reloaded = $this->orders->findByExternalId((string) $company->getId(), IngestSource::OZON, self::CONNECTION_ID, 'ancient');
+        self::assertNotNull($reloaded);
+        self::assertNotNull($reloaded->getRefreshStoppedAt(), 'Иначе он вечно занимал бы начало очереди.');
+
+        self::assertSame(0, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'stuck_order'",
+            ['c' => (string) $company->getId()],
+        ), 'Привязать проблему не к чему — разбирать придётся по логу.');
+    }
+
+    /**
      * Граница — `PHP_INT_MAX`, а не выдуманное число цифр.
      *
      * Ровно 18 цифр отвергали бы настоящий девятнадцатизначный номер навсегда,

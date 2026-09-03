@@ -6,6 +6,7 @@ namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
+use Doctrine\Migrations\Exception\AbortMigration;
 
 /**
  * Индексы retention строятся КОНКУРЕНТНО.
@@ -78,29 +79,66 @@ final class Version20260902190000 extends AbstractMigration
         );
     }
 
+    /**
+     * Откат — СВОЯ транзакция под `ACCESS EXCLUSIVE`, и без `CONCURRENTLY`.
+     *
+     * Асимметрия с `up()` намеренная. Долгая операция — построение индекса,
+     * ради неё и нужен `CONCURRENTLY`: он не держит запись, пока читает всю
+     * горячую таблицу. Удаление индекса — операция над метаданными, её
+     * блокировка коротка, и платить за `CONCURRENTLY` здесь нечем, кроме как
+     * невозможностью проверить условие.
+     *
+     * А проверить нужно. Та же проверка, что и в
+     * `Version20260902180000::down()`, но раньше по времени: откат идёт от
+     * новых миграций к старым, поэтому эта снимает индексы ПЕРВОЙ. Если
+     * следующая упрётся в необратимое состояние и прервётся, горячая таблица
+     * уже останется без retention-индексов — откат провалился, а вред нанесён.
+     *
+     * Проверка и удаление обязаны быть ОДНИМ решением. Миграция
+     * нетранзакционная, и между `COUNT(*)` и `DROP` конкурентный `--execute`
+     * успевал закоммитить отметку: проверка говорила «ноль», индексы уходили,
+     * а следующая миграция прерывалась уже после этого. `ACCESS EXCLUSIVE`
+     * закрывает окно, а с `CONCURRENTLY` его закрыть нечем — оно запрещено в
+     * транзакции.
+     */
     public function down(Schema $schema): void
     {
-        // Та же проверка, что и в `Version20260902180000::down()`, и по той же
-        // причине — только раньше по времени.
-        //
-        // Откат идёт от новых миграций к старым, поэтому эта снимает индексы
-        // ПЕРВОЙ. Если следующая упрётся в необратимое состояние и прервётся,
-        // горячая таблица уже останется без retention-индексов: откат
-        // провалился, а вред нанесён. Отказываться надо ДО первого `DROP`.
-        $pruned = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM ingest_raw_records WHERE payload_pruned_at IS NOT NULL'
-        );
+        $this->connection->beginTransaction();
 
-        $this->abortIf(
-            $pruned > 0,
-            sprintf(
-                'Rollback would erase the only evidence that %d payload(s) were pruned on purpose. Decide what to do with them first.',
-                $pruned,
-            ),
-        );
+        try {
+            $this->connection->executeStatement('LOCK TABLE ingest_raw_records IN ACCESS EXCLUSIVE MODE');
 
-        $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_pending_deletion');
-        $this->addSql('DROP INDEX CONCURRENTLY IF EXISTS idx_ingest_raw_record_retention');
+            $pruned = (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_raw_records WHERE payload_pruned_at IS NOT NULL'
+            );
+
+            if ($pruned > 0) {
+                $this->connection->rollBack();
+
+                $this->abortIf(
+                    true,
+                    sprintf(
+                        'Rollback would erase the only evidence that %d payload(s) were pruned on purpose. Decide what to do with them first.',
+                        $pruned,
+                    ),
+                );
+
+                return;
+            }
+
+            $this->connection->executeStatement('DROP INDEX IF EXISTS idx_ingest_raw_record_pending_deletion');
+            $this->connection->executeStatement('DROP INDEX IF EXISTS idx_ingest_raw_record_retention');
+
+            $this->connection->commit();
+        } catch (AbortMigration $abort) {
+            throw $abort;
+        } catch (\Throwable $exception) {
+            if ($this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+
+            throw $exception;
+        }
     }
 
     /**

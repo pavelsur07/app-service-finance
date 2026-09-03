@@ -14,17 +14,26 @@ namespace App\Ingestion\Application\DTO;
  * флаг превращал бы каждый успешный часовой опрос в «изменение» и делал
  * счётчик бесполезным ровно там, где он нужен: заметить, что опрос идёт, а
  * статусы почему-то стоят.
+ *
+ * Третий ответ — `recorded`: наблюдение ОТЛИЧАЛОСЬ от текущего состояния и
+ * потому попало в журнал, даже если состояние заказа оно не сдвинуло (более
+ * свежее наблюдение уже победило). Без него незнакомый токен, проигравший
+ * гонку, оставался бы в журнале с `applied = false` и не попадал бы в видимую
+ * очередь вовсе: если победившее наблюдение сделало заказ терминальным, второй
+ * попытки не будет никогда, и новый или сломанный токен API навсегда остался
+ * бы незамеченным.
  */
 final readonly class StatusObservationOutcome
 {
     public function __construct(
         public bool $accepted,
         public bool $changed,
+        public bool $recorded = false,
     ) {
     }
 
     public static function rejected(): self
     {
-        return new self(false, false);
+        return new self(false, false, false);
     }
 }

@@ -390,12 +390,19 @@ final readonly class RefreshOrderStatusesAction
             }
 
             // Незнакомый токен уходит в ту же видимую очередь, что и при
-            // нормализации, но ТОЛЬКО когда наблюдение действительно
-            // изменило состояние. Часовой опрос неизменного неизвестного
-            // статуса иначе плодил бы по проблеме в час — до 720 копий на
-            // заказ за окно опроса, и очередь на разбор превращалась бы в
-            // шум, в котором настоящие проблемы не найти.
-            if ($outcome->changed && IngestOrderStatus::UNKNOWN === $status) {
+            // нормализации, но ТОЛЬКО когда наблюдение попало в журнал.
+            // Часовой опрос неизменного неизвестного статуса иначе плодил бы
+            // по проблеме в час — до 720 копий на заказ за окно опроса, и
+            // очередь на разбор превращалась бы в шум.
+            //
+            // Условие именно `recorded`, а не `changed`. Наблюдение,
+            // проигравшее более свежему, состояние заказа не двигает, но в
+            // журнал попадает — и незнакомый токен в нём такой же настоящий.
+            // Пока условием было `changed`, такой токен оставался только в
+            // журнале: если победившее наблюдение сделало заказ терминальным,
+            // второй попытки не будет никогда, и сломанный контракт API
+            // навсегда оставался бы незамеченным.
+            if ($outcome->recorded && IngestOrderStatus::UNKNOWN === $status) {
                 ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
                     companyId: $companyId,
                     rawRecordId: $rawRecordId,
@@ -935,14 +942,27 @@ final readonly class RefreshOrderStatusesAction
         // Сырьё кандидатов — ДО транзакции, чтобы внутри неё блокировки
         // брались в том же порядке, что и у нормализации: сначала сырьё, потом
         // заказы.
-        $candidateRawRecordIds = array_values(array_unique(array_filter(array_map(
-            static fn (IngestOrder $order): ?string => $order->getLastRawRecordId(),
-            $candidates,
-        ))));
+        //
+        // Карта «заказ → его сырьё на момент отбора» нужна, чтобы потом
+        // отличить ДВА разных состояния: указатель сменился конкурентом (тогда
+        // нужной строки мы не держим — откладываем) и строки сырья просто нет
+        // (тогда откладывать бессмысленно: она не появится, а заказ вечно
+        // занимал бы начало очереди).
+        $rawRecordIdByOrder = [];
+        foreach ($candidates as $candidate) {
+            $lastRawRecordId = $candidate->getLastRawRecordId();
+            if (null !== $lastRawRecordId) {
+                $rawRecordIdByOrder[$candidate->getId()] = $lastRawRecordId;
+            }
+        }
+
+        $candidateRawRecordIds = array_values(array_unique($rawRecordIdByOrder));
 
         $stopped = 0;
 
-        $this->entityManager->wrapInTransaction(function () use ($candidateIds, $candidateRawRecordIds, $orderedBefore, &$stopped): void {
+        $missingEvidence = 0;
+
+        $this->entityManager->wrapInTransaction(function () use ($candidateIds, $candidateRawRecordIds, $rawRecordIdByOrder, $orderedBefore, &$stopped, &$missingEvidence): void {
             $now = $this->applicationTime();
 
             // ПОРЯДОК БЛОКИРОВОК: сначала сырьё, потом заказы.
@@ -989,16 +1009,29 @@ final readonly class RefreshOrderStatusesAction
                     continue;
                 }
 
-                // Сырьё сменилось между выборкой кандидатов и блокировкой:
-                // нужной строки мы не держим, и создание проблемы пошло бы
-                // блокировать её уже ПОСЛЕ заказа — то есть в обратном
-                // порядке. Заказ откладывается до следующего прогона; он
-                // никуда не денется, а цикл блокировок так не возникает.
                 if (!isset($lockedRawRecordIds[$lastRawRecordId])) {
-                    $this->logger->warning('Stuck order changed its raw record while it was being stopped; deferred to the next run.', [
-                        'companyId' => $order->getCompanyId(),
-                        'orderId' => $order->getId(),
-                    ]);
+                    // Указатель СМЕНИЛСЯ между выборкой и блокировкой: нужной
+                    // строки мы не держим, и создание проблемы пошло бы
+                    // блокировать её уже ПОСЛЕ заказа — в обратном порядке.
+                    // Откладываем: заказ никуда не денется, а цикл блокировок
+                    // так не возникает.
+                    if (($rawRecordIdByOrder[$order->getId()] ?? null) !== $lastRawRecordId) {
+                        $this->logger->warning('Stuck order changed its raw record while it was being stopped; deferred to the next run.', [
+                            'companyId' => $order->getCompanyId(),
+                            'orderId' => $order->getId(),
+                        ]);
+
+                        continue;
+                    }
+
+                    // Указатель ТОТ ЖЕ, а строки сырья нет. Откладывать
+                    // бессмысленно — она не появится, — и заказ вечно занимал
+                    // бы начало очереди зависших, не давая дойти до остальных.
+                    // Останавливаем, как и заказ вовсе без сырья, и считаем в
+                    // тот же агрегированный error.
+                    ++$missingEvidence;
+                    $order->stopRefreshing($now);
+                    ++$stopped;
 
                     continue;
                 }
@@ -1020,6 +1053,15 @@ final readonly class RefreshOrderStatusesAction
                 ++$stopped;
             }
         });
+
+        if ($missingEvidence > 0) {
+            // Тот же уровень и та же причина, что у заказов вовсе без сырья:
+            // указатель есть, а строки нет — состояние недостижимое, но раз
+            // оно возникло, разбирать его придётся по логу.
+            $this->logger->error('Stuck orders point at raw records that no longer exist; they are stopped without a review queue entry.', [
+                'orders' => $missingEvidence,
+            ]);
+        }
 
         return $result->with(stopped: $stopped);
     }

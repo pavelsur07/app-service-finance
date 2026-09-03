@@ -349,6 +349,59 @@ final class WbOrdersClientTest extends TestCase
     }
 
     /**
+     * Строка со СТРОКОВЫМ номером опознаётся, хотя и бракуется.
+     *
+     * `"id": "5"` контракт нарушает, но заказ называет однозначно. Пока
+     * опознание требовало `int`, такая строка бракавалась безымянной: заказ
+     * считался и `invalid`, и `missing`, а в аудит уходило ложное
+     * «маркетплейс его не вернул».
+     */
+    public function testStringIdIsIdentifiedEvenThoughTheRowIsRejected(): void
+    {
+        $page = $this->client(new MockHttpClient(new MockResponse(
+            '{"orders":[{"id":"5","supplierStatus":"complete","wbStatus":"sorted","isCancellable":false}]}',
+            ['http_code' => 200],
+        )))->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+
+        self::assertSame([], $page->statuses, 'Принимается по-прежнему только int.');
+        self::assertSame(1, $page->rejectedRows);
+        self::assertSame([5], $page->rejectedIds, 'Но заказ назван — и он не «отсутствующий».');
+    }
+
+    /**
+     * Тело, которое не является JSON или объектом, — свойство эндпоинта.
+     *
+     * Через час оно будет ровно таким же. Пока это считалось дефектом пачки,
+     * полностью несовместимый ответ WB выглядел как успешный часовой прогон.
+     *
+     * @param string $payload тело ответа
+     */
+    #[DataProvider('brokenRootProvider')]
+    public function testBrokenRootPayloadIsEndpointWide(string $payload, mixed $evidence): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])));
+
+        try {
+            $client->fetchMarketplaceStatuses(self::COMPANY_ID, self::CONNECTION_REF, [5]);
+            self::fail('Такое тело — нарушение контракта.');
+        } catch (MalformedConnectorResponseException $exception) {
+            self::assertTrue($exception->isEndpointWide());
+            self::assertSame($evidence, $exception->decodedPayload());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function brokenRootProvider(): iterable
+    {
+        // Невалидный JSON: разбирать нечего, доказательства не будет.
+        yield 'невалидный JSON' => ['{"orders":', null];
+        yield 'строка' => ['"broken"', ['_malformed_response' => 'broken']];
+        yield 'число' => ['0', ['_malformed_response' => 0]];
+    }
+
+    /**
      * Сломанный КОНТЕЙНЕР — свойство эндпоинта, а не пачки.
      *
      * `orders`, не являющийся списком, вернётся таким же и на следующий
