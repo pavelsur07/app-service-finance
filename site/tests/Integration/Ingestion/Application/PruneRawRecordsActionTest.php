@@ -774,14 +774,64 @@ final class PruneRawRecordsActionTest extends IntegrationTestCase
             '…а чужой — нет.',
         );
 
-        // И до блокировки дело не доходит: отбор владения — отдельный шаг,
-        // и чужой идентификатор из него не выходит. Проверяется напрямую,
-        // потому что внутри одной транзакции теста «заблокирована ли строка»
-        // спросить нечем: своя же транзакция и держала бы этот замок.
+        // И до блокировки дело не доходит: владение выясняется отдельным
+        // шагом, и чужая пара из него не выходит. Проверяется напрямую, потому
+        // что внутри одной транзакции теста «заблокирована ли строка» спросить
+        // нечем: своя же транзакция и держала бы этот замок.
         self::assertSame(
-            [],
-            $this->rawRecords->filterOwned([$this->companyId => [$foreignRawRecordId]]),
-            'Чужая строка не должна попадать в блокирующий запрос вовсе.',
+            $foreignCompanyId,
+            $this->rawRecords->ownersOf([$foreignRawRecordId])[$foreignRawRecordId] ?? null,
+            'Владелец чужой строки — чужая компания, и пара не сойдётся.',
+        );
+    }
+
+    /**
+     * Честная команда не авторизует поддельную с тем же идентификатором.
+     *
+     * Проверка по идентификатору вместо пары давала ровно это: настоящая
+     * команда своей компании открывала дорогу команде чужой компании на ту же
+     * строку, и проблема появлялась на чужое сырьё.
+     */
+    public function testForeignCompanyCannotRideOnAValidIssueForTheSameRecord(): void
+    {
+        $record = $this->seedRaw('page-1', new \DateTimeImmutable('-400 days'));
+        $intruder = Uuid::uuid7()->toString();
+
+        $issues = self::getContainer()->get(RecordNormalizationIssueAction::class);
+
+        $issues->recordMany([
+            new RecordNormalizationIssueCommand(
+                companyId: $this->companyId,
+                rawRecordId: $record['id'],
+                operationGroupId: null,
+                kind: NormalizationIssueKind::MAPPER_FAILURE,
+                details: [],
+            ),
+            new RecordNormalizationIssueCommand(
+                companyId: $intruder,
+                rawRecordId: $record['id'],
+                operationGroupId: null,
+                kind: NormalizationIssueKind::MAPPER_FAILURE,
+                details: [],
+            ),
+        ]);
+
+        self::assertSame(
+            1,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE raw_record_id = :id',
+                ['id' => $record['id']],
+            ),
+            'Проблема обязана появиться ровно одна — у настоящего владельца.',
+        );
+
+        self::assertSame(
+            0,
+            (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_normalization_issues WHERE company_id = :c',
+                ['c' => $intruder],
+            ),
+            'Чужая компания не имеет права завести проблему на не своё сырьё.',
         );
     }
 

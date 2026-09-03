@@ -43,11 +43,6 @@ final readonly class RecordNormalizationIssueAction
         $recorded = [];
 
         $this->entityManager->wrapInTransaction(function () use ($commands, &$recorded): void {
-            $idsByCompany = [];
-            foreach ($commands as $command) {
-                $idsByCompany[$command->companyId][] = $command->rawRecordId;
-            }
-
             // ДВА запроса на пачку, а не два на проблему.
             //
             // Владение проверяется отдельно и БЕЗ блокировки: блокировать
@@ -56,11 +51,28 @@ final readonly class RecordNormalizationIssueAction
             // последовательности и складываются в цикл. Но глобальный порядок
             // несовместим с фильтром по компании в том же запросе, а
             // блокировать чужую строку нельзя даже на мгновение.
-            $owned = array_flip($this->rawRecordRepository->filterOwned($idsByCompany));
-            $marks = $this->rawRecordRepository->lockManyWithMarks(array_keys($owned));
+            $owners = $this->rawRecordRepository->ownersOf(array_map(
+                static fn (RecordNormalizationIssueCommand $command): string => $command->rawRecordId,
+                $commands,
+            ));
+
+            // Проверяется ПАРА, а не идентификатор. Иначе честная команда
+            // своей компании авторизовала бы заодно поддельную команду того же
+            // идентификатора под чужой компанией — и проблема появилась бы на
+            // чужое сырьё.
+            $authorized = [];
+            foreach ($commands as $command) {
+                if (($owners[$command->rawRecordId] ?? null) === $command->companyId) {
+                    $authorized[$command->rawRecordId] = true;
+                }
+            }
+
+            $marks = $this->rawRecordRepository->lockManyWithMarks(array_keys($authorized));
 
             foreach ($commands as $command) {
-                if (!isset($owned[$command->rawRecordId], $marks[$command->rawRecordId])) {
+                if (($owners[$command->rawRecordId] ?? null) !== $command->companyId
+                    || !isset($marks[$command->rawRecordId])
+                ) {
                     $this->reportMissingRecord($command);
 
                     continue;

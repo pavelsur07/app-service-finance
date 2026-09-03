@@ -19,6 +19,9 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 final class IngestRawRecordRepository extends ServiceEntityRepository
 {
+    /** Строк на один запрос проверки владения. */
+    private const OWNERSHIP_LOOKUP_CHUNK = 500;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, IngestRawRecord::class);
@@ -355,7 +358,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     }
 
     /**
-     * Какие из этих строк действительно принадлежат названным компаниям.
+     * Кому принадлежит каждая из этих строк.
      *
      * Запрос НЕ блокирующий и стоит ПЕРЕД блокировкой намеренно. Блокировать
      * нужно в одном глобальном порядке — по идентификатору, — иначе пачка
@@ -363,43 +366,40 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
      * складываются в цикл. Но глобальный порядок несовместим с фильтром по
      * компании внутри одного запроса, а блокировать чужую строку нельзя даже
      * на мгновение: это межтенантный побочный эффект, задерживающий чужой
-     * ingestion. Компания у строки неизменяема, поэтому предварительная
-     * проверка владения не устаревает.
+     * ingestion. Компания у строки неизменяема, поэтому ответ не устаревает.
      *
-     * @companyScopeExempt Компания здесь и есть предмет проверки: метод
-     * получает пары «компания → строки» и отвечает, какие из них настоящие.
+     * Возвращается именно ПАРА, а не список идентификаторов. Список позволял
+     * бы подделку: команда с чужой компанией и настоящим чужим
+     * идентификатором проходила бы проверку заодно с честной командой того же
+     * идентификатора.
      *
-     * @param array<string, list<string>> $idsByCompany
+     * @companyScopeExempt Компания здесь и есть ответ, а не фильтр: метод
+     * сообщает, кому принадлежит строка, и ровно на этом строится проверка
+     * вызывающего.
      *
-     * @return list<string> идентификаторы, отсортированные по возрастанию
+     * @param list<string> $ids
+     *
+     * @return array<string, string> идентификатор строки => её компания
      */
-    public function filterOwned(array $idsByCompany): array
+    public function ownersOf(array $ids): array
     {
-        $owned = [];
+        $owners = [];
 
-        foreach ($idsByCompany as $companyId => $ids) {
-            if ([] === $ids) {
-                continue;
-            }
-
-            /** @var list<array{id: string}> $rows */
+        foreach (array_chunk(array_values(array_unique($ids)), self::OWNERSHIP_LOOKUP_CHUNK) as $chunk) {
+            /** @var list<array{id: string, companyId: string}> $rows */
             $rows = $this->createQueryBuilder('record')
-                ->select('record.id AS id')
-                ->andWhere('record.companyId = :companyId')
+                ->select('record.id AS id', 'record.companyId AS companyId')
                 ->andWhere('record.id IN (:ids)')
-                ->setParameter('companyId', (string) $companyId)
-                ->setParameter('ids', array_values(array_unique($ids)))
+                ->setParameter('ids', $chunk)
                 ->getQuery()
                 ->getResult();
 
             foreach ($rows as $row) {
-                $owned[] = $row['id'];
+                $owners[$row['id']] = $row['companyId'];
             }
         }
 
-        sort($owned);
-
-        return $owned;
+        return $owners;
     }
 
     /**
