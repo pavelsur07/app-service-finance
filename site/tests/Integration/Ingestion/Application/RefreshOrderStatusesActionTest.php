@@ -6,24 +6,35 @@ namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Ingestion\Application\Action\RecordNormalizationIssueAction;
 use App\Ingestion\Application\Action\RefreshOrderStatusesAction;
 use App\Ingestion\Application\Command\RefreshOrderStatusesCommand;
+use App\Ingestion\Application\Service\OrderStatusJournal;
+use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\MalformedConnectorResponseException;
+use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestOrderStatusEventRepository;
+use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
+use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Builders\Ingestion\IngestOrderBuilder;
 use App\Tests\Integration\Ingestion\Fixtures\FakeOzonOrdersClient;
 use App\Tests\Integration\Ingestion\Fixtures\FakeWbOrdersClient;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Clock\ClockInterface;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class RefreshOrderStatusesActionTest extends IntegrationTestCase
@@ -558,6 +569,120 @@ final class RefreshOrderStatusesActionTest extends IntegrationTestCase
         );
 
         self::assertNotSame($canonical->getId(), $padded->getId());
+    }
+
+    /**
+     * Сбой записи наблюдений не оставляет объект аудита сиротой.
+     *
+     * Объект пишется до коммита, а строка сырья откатывается вместе с
+     * транзакцией. Без компенсации каждый повторяемый сбой оставлял бы
+     * недостижимый объект: retention ищет кандидатов среди СТРОК, и объекта
+     * без строки не найдёт никогда — почасовой прогон превращал бы это в
+     * неограниченную утечку.
+     */
+    public function testAuditObjectIsRemovedWhenWritingObservationsFails(): void
+    {
+        $company = $this->seedCompanyWithConnection();
+        $this->seedOrder($company, 'posting-1', IngestOrderStatus::SHIPPED, 'delivering');
+
+        $this->ozon->setPostings(['posting-1' => ['posting_number' => 'posting-1', 'status' => 'delivered']]);
+
+        /** @var ObjectStorageInterface $storage */
+        $storage = self::getContainer()->get(ObjectStorageInterface::class);
+
+        $deleted = [];
+
+        // Шпион перехватывает только удаление: сам объект пишет
+        // RawStorageFacade реальным хранилищем, и путь к нему известен ровно
+        // из компенсирующего вызова — строку сырья транзакция откатила.
+        $spy = new class($storage, $deleted) implements ObjectStorageInterface {
+            /**
+             * @param list<string> $deleted путь каждого удалённого объекта
+             */
+            public function __construct(
+                private readonly ObjectStorageInterface $inner,
+                private array &$deleted,
+            ) {
+            }
+
+            /**
+             * @return list<string>
+             */
+            public function deletedPaths(): array
+            {
+                return $this->deleted;
+            }
+
+            public function write(string $path, string $contents): StoredObject
+            {
+                return $this->inner->write($path, $contents);
+            }
+
+            public function read(string $path): string
+            {
+                return $this->inner->read($path);
+            }
+
+            public function readStream(string $path)
+            {
+                return $this->inner->readStream($path);
+            }
+
+            public function exists(string $path): bool
+            {
+                return $this->inner->exists($path);
+            }
+
+            public function delete(string $path): void
+            {
+                $this->deleted[] = $path;
+                $this->inner->delete($path);
+            }
+        };
+
+        // Транзакция записи наблюдений падает уже ПОСЛЕ того, как объект
+        // аудита записан: ровно то окно, ради которого нужна компенсация.
+        $realEntityManager = $this->em;
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $realEntityManager->wrapInTransaction(
+                static function (EntityManagerInterface $em) use ($work): void {
+                    $work($em);
+
+                    throw new \RuntimeException('observation write failed');
+                },
+            ),
+        );
+        $entityManager->method('flush')->willReturnCallback(static fn () => $realEntityManager->flush());
+
+        $action = new RefreshOrderStatusesAction(
+            self::getContainer()->get(MarketplaceSyncFacade::class),
+            self::getContainer()->get(IngestOrderRepository::class),
+            $this->ozon,
+            $this->wb,
+            self::getContainer()->get(IngestOrderStatusMapper::class),
+            self::getContainer()->get(OrderStatusJournal::class),
+            self::getContainer()->get(RawStorageFacade::class),
+            $spy,
+            self::getContainer()->get(IngestRawRecordRepository::class),
+            self::getContainer()->get(RecordNormalizationIssueAction::class),
+            $entityManager,
+            self::getContainer()->get(ClockInterface::class),
+            new NullLogger(),
+        );
+
+        try {
+            $action(new RefreshOrderStatusesCommand(days: 30, limitPerConnection: 100));
+            self::fail('Запись наблюдений обязана упасть.');
+        } catch (\RuntimeException) {
+            // Ожидаемо: падение и есть предмет проверки.
+        }
+
+        self::assertCount(1, $deleted, 'Осиротевший объект аудита обязан быть убран.');
+        self::assertFalse(
+            $storage->exists($deleted[0]),
+            'Объект, чью строку откатила транзакция, не должен остаться в хранилище: найти его по базе уже нельзя.',
+        );
     }
 
     /**

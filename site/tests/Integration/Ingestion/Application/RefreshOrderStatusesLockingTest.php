@@ -121,6 +121,7 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
             self::getContainer()->get(\App\Ingestion\Domain\Service\IngestOrderStatusMapper::class),
             self::getContainer()->get(\App\Ingestion\Application\Service\OrderStatusJournal::class),
             self::getContainer()->get(\App\Ingestion\Facade\RawStorageFacade::class),
+            self::getContainer()->get(\App\Shared\Service\Storage\ObjectStorageInterface::class),
             self::getContainer()->get(\App\Ingestion\Repository\IngestRawRecordRepository::class),
             self::getContainer()->get(\App\Ingestion\Application\Action\RecordNormalizationIssueAction::class),
             $this->em,

@@ -13,6 +13,7 @@ use App\Ingestion\Application\Source\Wildberries\WbResourceType;
 use App\Ingestion\Domain\Service\IngestOrderStatusMapper;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\IngestOrder;
+use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestOrderScheme;
 use App\Ingestion\Enum\IngestOrderStatus;
 use App\Ingestion\Enum\IngestSource;
@@ -29,6 +30,7 @@ use App\Ingestion\Repository\IngestOrderRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Marketplace\DTO\ActiveSellerConnectionDTO;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -81,6 +83,7 @@ final readonly class RefreshOrderStatusesAction
         private IngestOrderStatusMapper $statusMapper,
         private OrderStatusJournal $statusJournal,
         private RawStorageFacade $rawStorageFacade,
+        private ObjectStorageInterface $objectStorage,
         private IngestRawRecordRepository $rawRecordRepository,
         private RecordNormalizationIssueAction $recordIssueAction,
         private EntityManagerInterface $entityManager,
@@ -300,27 +303,43 @@ final readonly class RefreshOrderStatusesAction
         // теряло переход навсегда, потому что переразобрать такую запись
         // некому. Сеть уже отработала, поэтому транзакция короткая.
         $changed = 0;
+        $auditPath = null;
 
-        $this->entityManager->wrapInTransaction(function () use (
-            $source,
-            $companyId,
-            $connectionRef,
-            $poll,
-            $storedAt,
-            &$changed,
-        ): void {
-            $rawRecordId = null;
-            if ([] !== $poll['rows']) {
-                // Ответ маркетплейса сохраняется в raw ради аудита: без него
-                // нечем объяснить, почему статус изменился именно так.
-                // Нормализация к этой записи не применяется — маппера у
-                // ресурса нет, и запись сразу помечается пропущенной, иначе
-                // она вечно висела бы в очереди.
-                $rawRecordId = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
-            }
+        try {
+            $this->entityManager->wrapInTransaction(function () use (
+                $source,
+                $companyId,
+                $connectionRef,
+                $poll,
+                $storedAt,
+                &$changed,
+                &$auditPath,
+            ): void {
+                $rawRecordId = null;
+                if ([] !== $poll['rows']) {
+                    // Ответ маркетплейса сохраняется в raw ради аудита: без него
+                    // нечем объяснить, почему статус изменился именно так.
+                    // Нормализация к этой записи не применяется — маппера у
+                    // ресурса нет, и запись сразу помечается пропущенной, иначе
+                    // она вечно висела бы в очереди.
+                    $audit = $this->storeAudit($source, $companyId, $connectionRef, $poll['rows'], $storedAt);
+                    $rawRecordId = $audit->getId();
+                    $auditPath = $audit->getStoragePath();
+                }
 
-            $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
-        });
+                $changed = $this->applyObservations($source, $companyId, $poll, $rawRecordId);
+            });
+        } catch (\Throwable $exception) {
+            // Объект уже записан, а строка сырья откачена вместе с транзакцией.
+            //
+            // Хранилище не транзакционно, и без компенсации каждый повторяемый
+            // сбой оставлял бы недостижимый объект: retention ищет кандидатов
+            // среди СТРОК, и объекта без строки он не найдёт никогда. Почасовой
+            // прогон превращал бы это в неограниченную утечку.
+            $this->discardOrphanedAudit($auditPath, $companyId, $connectionRef);
+
+            throw $exception;
+        }
 
         return $result->with(
             requested: $poll['requested'],
@@ -354,6 +373,13 @@ final readonly class RefreshOrderStatusesAction
     ): int {
         $changed = 0;
         $occurrences = [];
+
+        // Проблемы собираются и записываются ОДНОЙ пачкой в конце.
+        //
+        // Поштучный вызов внутри цикла — прямой N+1: каждая проблема брала бы
+        // свою блокировку сырья и свой запрос отметок, а прогон применяет до
+        // тысячи наблюдений за раз и держит при этом блокировки всей пачки.
+        $issues = [];
 
         $locked = $this->orderRepository->findManyForUpdate($companyId, array_keys($poll['attempts']));
 
@@ -403,7 +429,7 @@ final readonly class RefreshOrderStatusesAction
             // второй попытки не будет никогда, и сломанный контракт API
             // навсегда оставался бы незамеченным.
             if ($outcome->recorded && IngestOrderStatus::UNKNOWN === $status) {
-                ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                $issues[] = new RecordNormalizationIssueCommand(
                     companyId: $companyId,
                     rawRecordId: $rawRecordId,
                     operationGroupId: null,
@@ -414,13 +440,15 @@ final readonly class RefreshOrderStatusesAction
                         'rawStatus' => $observation['rawStatus'],
                         'externalId' => $order->getExternalId(),
                     ],
-                ));
+                );
             }
 
             if ($outcome->changed) {
                 ++$changed;
             }
         }
+
+        $this->recordIssueAction->recordMany($issues);
 
         return $changed;
     }
@@ -855,7 +883,7 @@ final readonly class RefreshOrderStatusesAction
         string $connectionRef,
         array $rows,
         \DateTimeImmutable $now,
-    ): string {
+    ): IngestRawRecord {
         $resourceType = IngestSource::OZON === $source
             ? OzonResourceType::ORDER_STATUS_REFRESH
             : WbResourceType::ORDER_STATUS_REFRESH;
@@ -893,7 +921,34 @@ final readonly class RefreshOrderStatusesAction
             throw new RawStorageException(sprintf('Order status refresh audit expected a single raw record, got %d.', count($records)));
         }
 
-        return $records[0]->getId();
+        return $records[0];
+    }
+
+    /**
+     * Убрать объект аудита, чью строку откатила транзакция.
+     *
+     * Не удалось — не беда для данных, но место занято, и путь обязан уйти в
+     * лог: убрать такой объект может только человек, потому что найти его по
+     * базе невозможно — строки нет.
+     */
+    private function discardOrphanedAudit(?string $storagePath, string $companyId, string $connectionRef): void
+    {
+        if (null === $storagePath) {
+            return;
+        }
+
+        try {
+            $this->objectStorage->delete($storagePath);
+        } catch (\Exception $exception) {
+            $this->logger->error('Audit object was left in storage without its raw record; it has to be removed by hand.', [
+                'companyId' => $companyId,
+                'connectionRef' => $connectionRef,
+                'storagePath' => $storagePath,
+                // Класс, а не сообщение: в тексте ошибок хранилища встречаются
+                // URL с учётными данными.
+                'exceptionClass' => $exception::class,
+            ]);
+        }
     }
 
     /**
@@ -922,9 +977,15 @@ final readonly class RefreshOrderStatusesAction
         // Уровень ERROR, а не WARNING: заказ всегда создаётся нормализацией,
         // значит сырьё у него быть обязано. Это не ожидаемый ход событий,
         // а дефект, и разбирать его придётся по логу — очереди-то нет.
+        //
+        // Счётчик отвечает на вопрос «сколько их ВСЕГО», а не «сколько
+        // остановлено сейчас»: он считается до лимита, и сироты могут вообще
+        // не попасть в текущую страницу. Сколько остановил ЭТОТ прогон —
+        // отдельная строка после транзакции: смешать эти два числа значило бы
+        // сообщить оператору результат, которого не было.
         $orphans = $this->orderRepository->countStuckWithoutRawRecord($orderedBefore, $companyId);
         if ($orphans > 0) {
-            $this->logger->error('Stuck orders have no raw record; they are stopped without a review queue entry.', [
+            $this->logger->error('Stuck orders without a raw record exist; they are stopped in batches and get no review queue entry.', [
                 'orders' => $orphans,
             ]);
         }
@@ -973,6 +1034,11 @@ final readonly class RefreshOrderStatusesAction
             // часовой прогон падал.
             $lockedRawRecordIds = array_flip($this->rawRecordRepository->lockManyForUpdate($candidateRawRecordIds));
 
+            // Проблемы — одной пачкой в конце, по той же причине, что и в
+            // applyObservations(): поштучный вызов внутри цикла брал бы
+            // блокировку и читал отметки на каждый зависший заказ.
+            $issues = [];
+
             // Строка о взятых блокировках пишется ДО блокировки заказов: по
             // ней в логе видно, что порядок соблюдён, и по ней же видно, что
             // именно держала транзакция, если следующий шаг встал в ожидание.
@@ -1009,6 +1075,7 @@ final readonly class RefreshOrderStatusesAction
                 // об этом ушёл выше одним агрегированным `error`.
                 $lastRawRecordId = $order->getLastRawRecordId();
                 if (null === $lastRawRecordId) {
+                    ++$missingEvidence;
                     $order->stopRefreshing($now);
                     ++$stopped;
 
@@ -1042,7 +1109,7 @@ final readonly class RefreshOrderStatusesAction
                     continue;
                 }
 
-                ($this->recordIssueAction)(new RecordNormalizationIssueCommand(
+                $issues[] = new RecordNormalizationIssueCommand(
                     companyId: $order->getCompanyId(),
                     rawRecordId: $lastRawRecordId,
                     operationGroupId: null,
@@ -1053,18 +1120,21 @@ final readonly class RefreshOrderStatusesAction
                         'status' => $order->getStatus()->value,
                         'orderedAt' => $order->getOrderedAt()->format(\DATE_ATOM),
                     ],
-                ));
+                );
 
                 $order->stopRefreshing($now);
                 ++$stopped;
             }
+
+            $this->recordIssueAction->recordMany($issues);
         });
 
         if ($missingEvidence > 0) {
-            // Тот же уровень и та же причина, что у заказов вовсе без сырья:
-            // указатель есть, а строки нет — состояние недостижимое, но раз
-            // оно возникло, разбирать его придётся по логу.
-            $this->logger->error('Stuck orders point at raw records that no longer exist; they are stopped without a review queue entry.', [
+            // Что сделал ИМЕННО ЭТОТ прогон: указатель пуст или ведёт в
+            // никуда — привязать проблему не к чему, и заказ остановлен без
+            // записи в очереди. Число здесь фактическое, в отличие от общего
+            // счётчика выше, который считается до лимита.
+            $this->logger->error('Stuck orders were stopped without a review queue entry: their raw record is missing.', [
                 'orders' => $missingEvidence,
             ]);
         }
