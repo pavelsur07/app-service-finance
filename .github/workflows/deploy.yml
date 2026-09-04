@@ -51,6 +51,18 @@ jobs:
                         - 'site/composer.lock'
                         - 'site/docker/**'
                         - '.github/workflows/deploy.yml'
+                        # Payload деплоя — это ровно `docker-compose.prod.yml` и `docker/`
+                        # (см. шаг «Create deploy archive»); `docker/cron/app.cron`
+                        # монтируется в scheduler bind-mount'ом. Без этих путей правка
+                        # расписания или compose проходила CI зелёной и молча не доезжала
+                        # до прода: матрица образов пустая → build-and-push пропущен →
+                        # schema-ready пропущен → deploy пропущен. Раньше не всплывало,
+                        # потому что такие правки всегда ехали вместе с кодом.
+                        # Deploy тянет образы по SHA коммита, поэтому конфиг-правке тоже
+                        # нужна сборка на этом SHA — отсюда именно `backend`, а не
+                        # отдельный лёгкий фильтр.
+                        - 'docker/**'
+                        - 'docker-compose.prod.yml'
                       frontend:
                         - 'site/assets/**'
                         # ui-kit — исходники стилей: app.css тянет их через @import,
