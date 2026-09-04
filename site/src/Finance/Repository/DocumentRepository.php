@@ -29,17 +29,58 @@ class DocumentRepository extends ServiceEntityRepository
 
         $queryBuilder = $this->createQueryBuilder('d')
             ->addSelect('pd')
+            ->addSelect('cp')
             ->leftJoin('d.projectDirection', 'pd')
+            ->leftJoin('d.counterparty', 'cp')
             ->andWhere('d.company = :company')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('company', $dto->company)
             ->orderBy('d.date', 'DESC');
+
+        if (null !== $dto->dateFrom) {
+            $queryBuilder->andWhere('d.date >= :dateFrom')
+                ->setParameter('dateFrom', $dto->dateFrom);
+        }
+
+        if (null !== $dto->dateTo) {
+            $queryBuilder->andWhere('d.date <= :dateTo')
+                ->setParameter('dateTo', $dto->dateTo);
+        }
+
+        if (null !== $dto->type) {
+            $queryBuilder->andWhere('d.type = :type')
+                ->setParameter('type', $dto->type);
+        }
+
+        if (null !== $dto->status) {
+            $queryBuilder->andWhere('d.status = :status')
+                ->setParameter('status', $dto->status);
+        }
+
+        if (null !== $dto->number) {
+            $queryBuilder->andWhere('LOWER(d.number) LIKE :number')
+                ->setParameter('number', self::containsPattern($dto->number));
+        }
+
+        if (null !== $dto->counterparty) {
+            $queryBuilder->andWhere('LOWER(cp.name) LIKE :counterparty')
+                ->setParameter('counterparty', self::containsPattern($dto->counterparty));
+        }
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($limit);
         $pager->setCurrentPage($page);
 
         return $pager;
+    }
+
+    /**
+     * Шаблон подстроки для LIKE: спецсимволы LIKE экранируются, иначе «%» из
+     * пользовательского ввода превращает фильтр в «показать всё».
+     */
+    private static function containsPattern(string $value): string
+    {
+        return '%'.addcslashes(mb_strtolower($value), '%_\\').'%';
     }
 
     /** Returns active and soft-deleted documents so restore can use the same tenant-safe lookup. */
