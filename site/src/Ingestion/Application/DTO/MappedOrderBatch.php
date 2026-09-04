@@ -17,7 +17,7 @@ final readonly class MappedOrderBatch
 {
     /**
      * @param list<MappedOrder> $orders
-     * @param list<array{reason: string, hint: ?string}> $skipped
+     * @param list<array{reason: string, hint: ?string, value?: ?string}> $skipped пропущенные строки: причина, номер и (если есть) отвергнутое значение
      */
     public function __construct(
         public array $orders = [],
