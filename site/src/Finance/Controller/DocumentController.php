@@ -51,7 +51,17 @@ class DocumentController extends AbstractController
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = (int) $request->query->get('limit', 20);
 
-        $pager = $repo->findByCompany(new DocumentListDTO($company, $page, $limit));
+        $pager = $repo->findByCompany(new DocumentListDTO(
+            $company,
+            $page,
+            $limit,
+            $request->query->getString('dateFrom'),
+            $request->query->getString('dateTo'),
+            $request->query->getString('type'),
+            $request->query->getString('status'),
+            $request->query->getString('number'),
+            $request->query->getString('counterparty'),
+        ));
         $items = iterator_to_array($pager->getCurrentPageResults());
 
         $documentNatures = [];

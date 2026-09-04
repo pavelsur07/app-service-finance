@@ -27,6 +27,7 @@
         'INACTIVE': 'Неактивен',
         'TO_DELETE': 'На удаление'
     } %}
+    {% set filterKeys = ['dateFrom', 'dateTo', 'type', 'status', 'number', 'counterparty'] %}
     {% set statusClasses = {
         'DRAFT': 'bg-secondary text-white',
         'ACTIVE': 'bg-success text-white',
@@ -172,7 +173,7 @@
                 </table>
             </div>
             <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
-                <form method="get" class="d-flex align-items-center gap-2">
+                <form method="get" id="document-limit-form" class="d-flex align-items-center gap-2">
                     <label for="document-limit" class="form-label mb-0">Показывать по</label>
                     <select id="document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
                         {% for option in [20, 30, 50] %}
@@ -180,6 +181,14 @@
                         {% endfor %}
                     </select>
                     <input type="hidden" name="page" value="1">
+                    {# Смена размера страницы не должна сбрасывать активные фильтры.
+                       Сравнение с пустой строкой, а не проверка на истинность: «0» — это значение фильтра. #}
+                    {% for key in filterKeys %}
+                        {% set filterValue = app.request.query.get(key) %}
+                        {% if filterValue is not null and filterValue != '' %}
+                            <input type="hidden" name="{{ key }}" value="{{ filterValue }}">
+                        {% endif %}
+                    {% endfor %}
                 </form>
                 <div class="ms-md-auto w-100 w-md-auto">
                     {% include 'partials/_pagerfanta.html.twig' with { pager: pager, route: 'document_index', params: app.request.query.all|merge({'limit': limit}) } %}
