@@ -112,6 +112,60 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
+     * Отвергнутое значение едет в очередь вместе с причиной.
+     *
+     * Проблема с одной лишь причиной не разбираема: сырьё в S3, читать его
+     * с прода нечем. На проде 1 651 FBS-строка Ozon ушла в очередь с
+     * `malformed_product_price` — и ни одного примера, что именно пришло.
+     * Значение ограничено по длине: очередь — не место для тел ответов.
+     */
+    public function testRejectedValueTravelsWithTheReason(): void
+    {
+        $batch = (new OzonOrderMapper())->map(
+            $this->rawRecord(OzonResourceType::ORDERS_FBS),
+            $this->rowsWithPrice('1290.0000'),
+        );
+
+        self::assertSame(
+            [['reason' => 'malformed_product_price', 'hint' => 'p-1', 'value' => '"1290.0000"']],
+            $batch->skipped,
+        );
+
+        $long = (new OzonOrderMapper())->map(
+            $this->rawRecord(OzonResourceType::ORDERS_FBS),
+            $this->rowsWithPrice(str_repeat('9', 200)),
+        );
+
+        $value = (string) ($long->skipped[0]['value'] ?? '');
+        self::assertSame(80, mb_strlen($value), 'Длина ограничена.');
+        self::assertStringEndsWith('...', $value);
+
+        // Контейнер не сериализуется: обрезка не защитила бы от фрагмента
+        // тела ответа с адресом или ФИО. Достаточно типа и размера.
+        $nested = (new OzonOrderMapper())->map(
+            $this->rawRecord(OzonResourceType::ORDERS_FBS),
+            $this->rowsWithPrice(['amount' => '1290.00', 'customer' => 'Иван Иванов']),
+        );
+
+        $nestedValue = $nested->skipped[0]['value'] ?? null;
+        self::assertSame('array(2)', $nestedValue);
+        self::assertStringNotContainsString('Иван', (string) $nestedValue);
+    }
+
+    /**
+     * @param list<array{reason: string, hint: ?string, value?: ?string}> $skipped
+     *
+     * @return list<array{reason: string, hint: ?string}>
+     */
+    private static function reasonsAndHints(array $skipped): array
+    {
+        return array_map(
+            static fn (array $row): array => ['reason' => $row['reason'], 'hint' => $row['hint']],
+            $skipped,
+        );
+    }
+
+    /**
      * Присутствующая, но неразбираемая цена — испорченная строка, а не
      * «бесплатно». Молчаливый null обнулял бы позицию в любом денежном
      * расчёте, и заметить это было бы нечем.
@@ -125,7 +179,7 @@ final class OzonOrderMapperTest extends TestCase
         );
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'malformed_product_price', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'malformed_product_price', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -155,7 +209,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => $expectedReason, 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => $expectedReason, 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -192,7 +246,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'malformed_products', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'malformed_products', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -210,7 +264,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -282,7 +336,7 @@ final class OzonOrderMapperTest extends TestCase
         $batch = (new OzonOrderMapper())->map($this->rawRecord(OzonResourceType::ORDERS_FBO), [$row]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'malformed_products', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'malformed_products', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -315,7 +369,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'missing_product_identity', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'missing_product_identity', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**
@@ -409,7 +463,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     public function testMalformedPreferredDateIsNotReplacedForFbsEither(): void
@@ -423,7 +477,7 @@ final class OzonOrderMapperTest extends TestCase
         ]]);
 
         self::assertSame([], $batch->orders);
-        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], $batch->skipped);
+        self::assertSame([['reason' => 'unparsable_created_at', 'hint' => 'p-1']], self::reasonsAndHints($batch->skipped));
     }
 
     /**

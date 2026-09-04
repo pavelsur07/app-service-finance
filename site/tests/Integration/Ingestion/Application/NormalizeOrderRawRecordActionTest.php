@@ -450,6 +450,39 @@ final class NormalizeOrderRawRecordActionTest extends IntegrationTestCase
     }
 
     /**
+     * Отвергнутое значение доезжает до очереди — а его отсутствие не ломает
+     * форму.
+     *
+     * Очередь с одной причиной не разбираема: сырьё в S3, читать его с прода
+     * нечем. Значение обязано попасть в `details` проблемы. При этом маппер
+     * WB значения не кладёт вовсе, и `details` для него обязаны остаться
+     * прежними — с пустым `value`, а не с ошибкой.
+     */
+    public function testRejectedValueReachesTheIssueAndItsAbsenceIsTolerated(): void
+    {
+        $this->mapper->queueSkipped([
+            ['reason' => 'malformed_product_price', 'hint' => 'posting-1', 'value' => '"1290.0000"'],
+            ['reason' => 'missing_status', 'hint' => 'posting-2'],
+        ]);
+        ($this->action)(new NormalizeRawRecordCommand($this->storeRaw(), $this->companyId));
+
+        /** @var list<array<string, mixed>> $details форма не фиксируется заранее — её и проверяем */
+        $details = array_map(
+            static fn (string $json): array => json_decode($json, true, 512, \JSON_THROW_ON_ERROR),
+            $this->connection->fetchFirstColumn(
+                "SELECT details::text FROM ingest_normalization_issues WHERE company_id = :c AND kind = 'mapper_failure' ORDER BY details->>'externalId'",
+                ['c' => $this->companyId],
+            ),
+        );
+
+        self::assertCount(2, $details);
+        self::assertSame('"1290.0000"', $details[0]['value'], 'Значение обязано доехать до очереди.');
+        self::assertSame('posting-1', $details[0]['externalId']);
+        self::assertArrayHasKey('value', $details[1], 'Форма details одна для всех мапперов.');
+        self::assertNull($details[1]['value'], 'Маппер без значения даёт пустое поле, а не ошибку.');
+    }
+
+    /**
      * Регрессия: идентичность позиции была позиционной. Источник вправе
      * прислать те же товары в другом порядке — на старом коде строка 0
      * сохраняла прежние externalSku/offerId, но получала количество, цену и

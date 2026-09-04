@@ -100,7 +100,7 @@ final class OzonOrderMapper implements OrderMapperInterface
 
             $mappedItems = $this->mapItems($row);
             if (null !== $mappedItems['error']) {
-                $skipped[] = ['reason' => $mappedItems['error'], 'hint' => $postingNumber];
+                $skipped[] = ['reason' => $mappedItems['error'], 'hint' => $postingNumber, 'value' => $mappedItems['value'] ?? null];
                 continue;
             }
 
@@ -131,7 +131,7 @@ final class OzonOrderMapper implements OrderMapperInterface
      *
      * @param array<string, mixed> $row
      *
-     * @return array{items: list<MappedOrderItem>, error: ?string}
+     * @return array{items: list<MappedOrderItem>, error: ?string, value?: ?string}
      */
     private function mapItems(array $row): array
     {
@@ -143,7 +143,7 @@ final class OzonOrderMapper implements OrderMapperInterface
         // ключами. Пустой `{}` от пустого `[]` таким способом не отличить, но
         // и наблюдаемый результат у них один — ноль позиций.
         if (!array_key_exists('products', $row) || !is_array($row['products']) || !array_is_list($row['products'])) {
-            return ['items' => [], 'error' => 'malformed_products'];
+            return ['items' => [], 'error' => 'malformed_products', 'value' => self::rejected($row['products'] ?? null)];
         }
 
         $products = $row['products'];
@@ -153,17 +153,17 @@ final class OzonOrderMapper implements OrderMapperInterface
         $seen = [];
         foreach ($products as $product) {
             if (!is_array($product)) {
-                return ['items' => [], 'error' => 'malformed_product_entry'];
+                return ['items' => [], 'error' => 'malformed_product_entry', 'value' => self::rejected($product)];
             }
 
             $quantity = $this->intOrNull($product['quantity'] ?? null);
             if (null === $quantity || $quantity < 0) {
-                return ['items' => [], 'error' => 'malformed_product_quantity'];
+                return ['items' => [], 'error' => 'malformed_product_quantity', 'value' => self::rejected($product['quantity'] ?? null)];
             }
 
             $buyout = $this->boolOrNull($product['is_marketplace_buyout'] ?? null);
             if (null === $buyout) {
-                return ['items' => [], 'error' => 'malformed_product_buyout'];
+                return ['items' => [], 'error' => 'malformed_product_buyout', 'value' => self::rejected($product['is_marketplace_buyout'] ?? null)];
             }
 
             // Цена может отсутствовать легально, но присутствующая и
@@ -172,7 +172,7 @@ final class OzonOrderMapper implements OrderMapperInterface
             $rawPrice = $product['price'] ?? null;
             $priceMinor = null === $rawPrice ? null : $this->toMinor($rawPrice);
             if (null !== $rawPrice && null === $priceMinor) {
-                return ['items' => [], 'error' => 'malformed_product_price'];
+                return ['items' => [], 'error' => 'malformed_product_price', 'value' => self::rejected($rawPrice)];
             }
 
             $sku = $this->stringOrNull($product['sku'] ?? null);
@@ -180,7 +180,7 @@ final class OzonOrderMapper implements OrderMapperInterface
             if (null === $sku && null === $offerId) {
                 // Опознать позицию нечем, и падение на позиционный ключ
                 // вернуло бы ровно тот дефект, ради которого вводился lineKey.
-                return ['items' => [], 'error' => 'missing_product_identity'];
+                return ['items' => [], 'error' => 'missing_product_identity', 'value' => null];
             }
 
             $name = $this->stringOrNull($product['name'] ?? null);
@@ -301,6 +301,42 @@ final class OzonOrderMapper implements OrderMapperInterface
         }
 
         return $base.'#'.$occurrence;
+    }
+
+    /**
+     * Отвергнутое значение — в очередь, ограниченной длины.
+     *
+     * Проблема с одной лишь причиной не разбираема: сырьё лежит в S3, а
+     * читать его с прода нечем, и на проде 1 651 FBS-строка ушла в очередь с
+     * `malformed_product_price` — без единого примера, ЧТО именно пришло.
+     * Значение обрезается, а контейнеры не сериализуются вовсе: очередь — не
+     * место для тел ответов, а цена или количество в 80 символов помещаются с
+     * запасом.
+     */
+    private static function rejected(mixed $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+
+        // Только СКАЛЯР. Контейнер — это уже фрагмент тела ответа, и обрезка
+        // не спасает: первые восемьдесят символов вложенного объекта могут
+        // нести адрес, ФИО или что угодно ещё. Для него достаточно типа и
+        // размера — разбирающему этого хватит, чтобы понять форму.
+        if (is_array($value)) {
+            return sprintf('array(%d)', count($value));
+        }
+
+        if (!is_scalar($value)) {
+            return get_debug_type($value);
+        }
+
+        $encoded = json_encode($value, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+        if (false === $encoded) {
+            return get_debug_type($value);
+        }
+
+        return mb_strlen($encoded) > 80 ? mb_substr($encoded, 0, 77).'...' : $encoded;
     }
 
     /**

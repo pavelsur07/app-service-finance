@@ -20,7 +20,7 @@ final class FakeOrderMapper implements OrderMapperInterface
     private array $queued = [];
 
     /**
-     * @var list<array{reason: string, hint: ?string}>
+     * @var list<array{reason: string, hint: ?string, value?: ?string}>
      */
     private array $skipped = [];
 
@@ -30,7 +30,7 @@ final class FakeOrderMapper implements OrderMapperInterface
     }
 
     /**
-     * @param list<array{reason: string, hint: ?string}> $skipped
+     * @param list<array{reason: string, hint: ?string, value?: ?string}> $skipped
      */
     public function queueSkipped(array $skipped): void
     {

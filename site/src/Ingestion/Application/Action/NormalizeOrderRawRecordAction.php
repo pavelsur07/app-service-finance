@@ -250,6 +250,9 @@ final readonly class NormalizeOrderRawRecordAction
                         'resourceType' => $rawRecord->getResourceType(),
                         'reason' => $skipped['reason'],
                         'externalId' => $skipped['hint'],
+                        // Отвергнутое значение — чтобы очередь была разбираема
+                        // без похода в S3.
+                        'value' => $skipped['value'] ?? null,
                     ],
                 );
             }
