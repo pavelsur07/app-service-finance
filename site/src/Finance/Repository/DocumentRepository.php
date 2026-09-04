@@ -27,15 +27,24 @@ class DocumentRepository extends ServiceEntityRepository
         $limit = in_array($dto->limit, $allowedLimits, true) ? $dto->limit : $allowedLimits[0];
         $page = max(1, $dto->page);
 
+        // Операции и их категории читает сам шаблон списка, когда считает доход и расход
+        // по строкам документа. Без fetch-join каждая строка списка добавляет свои запросы.
         $queryBuilder = $this->createQueryBuilder('d')
             ->addSelect('pd')
             ->addSelect('cp')
+            ->addSelect('op')
+            ->addSelect('opCategory')
             ->leftJoin('d.projectDirection', 'pd')
             ->leftJoin('d.counterparty', 'cp')
+            ->leftJoin('d.operations', 'op')
+            ->leftJoin('op.category', 'opCategory')
             ->andWhere('d.company = :company')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('company', $dto->company)
-            ->orderBy('d.date', 'DESC');
+            ->orderBy('d.date', 'DESC')
+            // Одной даты мало: при равных датах порядок не определён, и один документ
+            // может попасть на две страницы, а другой — ни на одну.
+            ->addOrderBy('d.id', 'ASC');
 
         if (null !== $dto->dateFrom) {
             $queryBuilder->andWhere('d.date >= :dateFrom')
