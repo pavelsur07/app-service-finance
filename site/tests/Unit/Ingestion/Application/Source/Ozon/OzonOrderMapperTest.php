@@ -144,6 +144,17 @@ final class OzonOrderMapperTest extends TestCase
         $value = (string) ($long->skipped[0]['value'] ?? '');
         self::assertSame(80, mb_strlen($value), 'Длина ограничена.');
         self::assertStringEndsWith('...', $value);
+
+        // Контейнер не сериализуется: обрезка не защитила бы от фрагмента
+        // тела ответа с адресом или ФИО. Достаточно типа и размера.
+        $nested = (new OzonOrderMapper())->map(
+            $this->rawRecord(OzonResourceType::ORDERS_FBS),
+            $this->rowsWithPrice(['amount' => '1290.00', 'customer' => 'Иван Иванов']),
+        );
+
+        $nestedValue = $nested->skipped[0]['value'] ?? null;
+        self::assertSame('array(2)', $nestedValue);
+        self::assertStringNotContainsString('Иван', (string) $nestedValue);
     }
 
     /**
