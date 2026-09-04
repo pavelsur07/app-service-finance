@@ -7,6 +7,8 @@ namespace App\MarketplaceAds\Command;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Application\LoadWbAdSpendDayActionInterface;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\WildberriesAdRateLimitException;
+use App\MarketplaceAds\Exception\WildberriesAdTransientException;
 use App\Shared\Service\AppLogger;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -89,6 +91,7 @@ final class WbAdDailySpendCommand extends Command
             $loaded = 0;
             $reviewRequired = 0;
             $failed = 0;
+            $incidentFailures = [];
             $reviewSample = [];
 
             foreach ($connections as $connection) {
@@ -144,13 +147,21 @@ final class WbAdDailySpendCommand extends Command
                     ));
                 } catch (\Throwable $exception) {
                     ++$failed;
-                    $this->logger->error('WB daily ad spend connection failed.', [
+                    // Rate-limit и сетевые сбои после ретраев ожидаемы и лечатся повторным
+                    // запуском с --date; error оставлен для auth, сверки и неизвестного.
+                    // Детали каждого сбоя — warning; инцидент-уровень — один
+                    // агрегированный error после цикла, а не по подключению.
+                    $failureContext = [
                         'companyId' => $currentCompanyId,
                         'connectionId' => $currentConnectionId,
                         'date' => $date->format('Y-m-d'),
                         'exception' => $exception::class,
                         'error' => $exception->getMessage(),
-                    ]);
+                    ];
+                    $this->logger->warning('WB daily ad spend connection failed.', $failureContext);
+                    if (!$exception instanceof WildberriesAdRateLimitException && !$exception instanceof WildberriesAdTransientException) {
+                        $incidentFailures[] = $failureContext;
+                    }
                     $output->writeln(sprintf(
                         '<error>company=%s connection=%s failed: %s</error>',
                         $currentCompanyId,
@@ -158,6 +169,15 @@ final class WbAdDailySpendCommand extends Command
                         $exception->getMessage(),
                     ));
                 }
+            }
+
+            if ([] !== $incidentFailures) {
+                $this->logger->error('WB daily ad spend connections failed.', [
+                    'event' => 'wb_ad_spend_connections_failed',
+                    'date' => $date->format('Y-m-d'),
+                    'failedCount' => count($incidentFailures),
+                    'failures' => $incidentFailures,
+                ]);
             }
 
             if ($reviewRequired > 0) {

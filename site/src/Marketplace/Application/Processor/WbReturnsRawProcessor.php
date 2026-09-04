@@ -158,7 +158,12 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $return->setQuantity(abs($this->normalizer->quantity($item)));
             $return->setRefundAmount((string) $this->normalizer->retailPriceWithDisc($item));
             $return->setReturnReason($this->normalizer->sellerOperName($item));
-            $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $item));
+            $return->setCostPrice($this->costPriceResolver->resolveForReturn(
+                $listing,
+                $sale,
+                $item,
+                $this->normalizer->reportDate($item),
+            ));
             $return->setRawData($item);
             if (null !== $rawDocId) {
                 $return->setRawDocumentId($rawDocId);

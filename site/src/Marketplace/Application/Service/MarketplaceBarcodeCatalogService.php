@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use Ramsey\Uuid\Uuid;
 
@@ -17,6 +18,7 @@ final class MarketplaceBarcodeCatalogService
 {
     public function __construct(
         private readonly MarketplaceBarcodeCatalogRepository $repository,
+        private readonly WbSalesReportRowNormalizer $normalizer = new WbSalesReportRowNormalizer(),
     ) {
     }
 
@@ -31,9 +33,10 @@ final class MarketplaceBarcodeCatalogService
         $rows = [];
 
         foreach ($rawRows as $item) {
-            $nmId = trim((string) ($item['nm_id'] ?? ''));
-            $barcode = trim((string) ($item['barcode'] ?? ''));
-            $tsName = trim((string) ($item['ts_name'] ?? ''));
+            // Финансовый API WB отдаёт nmId/sku/techSize, старые документы — nm_id/barcode/ts_name.
+            $nmId = trim($this->normalizer->nmId($item));
+            $barcode = trim((string) $this->normalizer->barcode($item));
+            $tsName = trim((string) $this->normalizer->techSize($item));
 
             if ('' === $nmId || '0' === $nmId || '' === $barcode || '' === $tsName) {
                 continue;

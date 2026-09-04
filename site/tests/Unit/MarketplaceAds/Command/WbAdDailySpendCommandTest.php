@@ -9,6 +9,7 @@ use App\MarketplaceAds\Application\DTO\WbAdSpendLoadResult;
 use App\MarketplaceAds\Application\LoadWbAdSpendDayActionInterface;
 use App\MarketplaceAds\Command\WbAdDailySpendCommand;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\WildberriesAdRateLimitException;
 use App\Shared\Service\AppLogger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -110,7 +111,51 @@ final class WbAdDailySpendCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger
             ->expects(self::once())
+            ->method('warning')
+            ->with(
+                'WB daily ad spend connection failed.',
+                self::callback(static fn (array $context): bool => self::COMPANY_1 === ($context['companyId'] ?? null)),
+            );
+        $logger
+            ->expects(self::once())
             ->method('error')
+            ->with(
+                'WB daily ad spend connections failed.',
+                self::callback(static fn (array $context): bool => 1 === $context['failedCount']
+                    && self::COMPANY_1 === $context['failures'][0]['companyId']),
+            );
+
+        $tester = $this->tester($facade, $action, logger: $logger);
+
+        self::assertSame(Command::FAILURE, $tester->execute(['--date' => '2026-07-10']));
+        self::assertSame([self::COMPANY_1, self::COMPANY_2], $attempted);
+        self::assertStringContainsString('loaded=1 review_required=0 failed=1', $tester->getDisplay());
+    }
+
+    /**
+     * Rate-limit после ретраев — ожидаемый исход, лечится повтором с --date,
+     * поэтому не должен будить человека через error-уровень.
+     */
+    public function testTransientConnectionFailureIsLoggedAsWarningNotError(): void
+    {
+        $facade = $this->facadeWithConnections($this->connections());
+        $action = $this->createMock(LoadWbAdSpendDayActionInterface::class);
+        $action
+            ->expects(self::exactly(2))
+            ->method('__invoke')
+            ->willReturnCallback(function (string $companyId): WbAdSpendLoadResult {
+                if (self::COMPANY_1 === $companyId) {
+                    throw new WildberriesAdRateLimitException('WB Promotion API rate limit exhausted.', 120);
+                }
+
+                return $this->loadResult(AdRawDocumentStatus::PROCESSED);
+            });
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+        $logger
+            ->expects(self::once())
+            ->method('warning')
             ->with(
                 'WB daily ad spend connection failed.',
                 self::callback(static fn (array $context): bool => self::COMPANY_1 === ($context['companyId'] ?? null)),
@@ -119,8 +164,36 @@ final class WbAdDailySpendCommandTest extends TestCase
         $tester = $this->tester($facade, $action, logger: $logger);
 
         self::assertSame(Command::FAILURE, $tester->execute(['--date' => '2026-07-10']));
-        self::assertSame([self::COMPANY_1, self::COMPANY_2], $attempted);
         self::assertStringContainsString('loaded=1 review_required=0 failed=1', $tester->getDisplay());
+    }
+
+    /**
+     * Несколько инцидентов за прогон — один error со счётчиком, а не алерт на подключение.
+     */
+    public function testMultipleIncidentFailuresEmitExactlyOneAggregatedError(): void
+    {
+        $facade = $this->facadeWithConnections($this->connections());
+        $action = $this->createMock(LoadWbAdSpendDayActionInterface::class);
+        $action
+            ->expects(self::exactly(2))
+            ->method('__invoke')
+            ->willThrowException(new \RuntimeException('WB unavailable'));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::exactly(2))->method('warning');
+        $logger
+            ->expects(self::once())
+            ->method('error')
+            ->with(
+                'WB daily ad spend connections failed.',
+                self::callback(static fn (array $context): bool => 2 === $context['failedCount']
+                    && [self::COMPANY_1, self::COMPANY_2] === array_column($context['failures'], 'companyId')),
+            );
+
+        $tester = $this->tester($facade, $action, logger: $logger);
+
+        self::assertSame(Command::FAILURE, $tester->execute(['--date' => '2026-07-10']));
+        self::assertStringContainsString('loaded=0 review_required=0 failed=2', $tester->getDisplay());
     }
 
     public function testEmitsOneAggregatedAlertForAllReviewRequiredResults(): void

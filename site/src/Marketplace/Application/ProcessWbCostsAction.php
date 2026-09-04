@@ -57,6 +57,8 @@ final class ProcessWbCostsAction
         $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
         $unprocessedTypes = [];
+        $failedItems = 0;
+        $lastItemError = null;
         $batchSize = 100;
 
         // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
@@ -333,20 +335,33 @@ final class ProcessWbCostsAction
                     }
                 }
 
-                if (!$processed && isset($item['supplier_oper_name'])) {
-                    $operName = (string) $item['supplier_oper_name'];
+                $operName = $this->normalizer->sellerOperName($item);
+                if (!$processed && '' !== $operName) {
                     if (!isset($unprocessedTypes[$operName])) {
                         $unprocessedTypes[$operName] = 0;
                     }
                     ++$unprocessedTypes[$operName];
                 }
             } catch (\Exception $e) {
-                $this->logger->error('Failed to process cost item', [
+                // Одна строка — warning; агрегированный error со счётчиком ниже,
+                // иначе один битый отчёт даёт сотни алертов.
+                ++$failedItems;
+                $lastItemError = $e->getMessage();
+                $this->logger->warning('Failed to process cost item', [
                     'srid' => $item['srid'] ?? 'unknown',
                     'error' => $e->getMessage(),
                 ]);
                 continue;
             }
+        }
+
+        if ($failedItems > 0) {
+            $this->logger->error('Cost items failed to process', [
+                'raw_document_id' => $rawDocId,
+                'failed_count' => $failedItems,
+                'total_records' => count($rawData),
+                'last_error' => $lastItemError,
+            ]);
         }
 
         if (!empty($pendingIds)) {

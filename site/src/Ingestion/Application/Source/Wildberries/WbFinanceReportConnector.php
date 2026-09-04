@@ -94,7 +94,10 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
             nextCursorValue: $nextCursor,
             hasMore: $page->hasMore || $incrementalHasMore,
             normalizeRawRecords: true,
-            continuationDelaySeconds: $page->hasMore ? $this->continuationDelaySeconds : null,
+            // Переход на следующий день — ещё один запрос к WB: без задержки обработчик
+            // сразу упирается в локальный limiter и тратит попытки rate-limit на каждый
+            // день отставания.
+            continuationDelaySeconds: $page->hasMore || $incrementalHasMore ? $this->continuationDelaySeconds : null,
         );
     }
 
@@ -241,7 +244,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>       $metadata
      *
      * @return list<array<string, mixed>>
      */

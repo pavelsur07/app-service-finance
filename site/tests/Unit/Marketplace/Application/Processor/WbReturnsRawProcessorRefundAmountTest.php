@@ -88,6 +88,72 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
     }
 
     /**
+     * Регрессия: возврат из финансового API (camelCase) без связанной продажи
+     * должен резолвить себестоимость по orderDt, а не молча получать 0.00.
+     */
+    public function testCamelCaseReturnResolvesCostPriceByOrderDateWhenSaleIsUnknown(): void
+    {
+        $resolvedDates = [];
+        $innerResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerResolver->method('resolve')->willReturnCallback(
+            static function (string $companyId, string $listingId, \DateTimeImmutable $date) use (&$resolvedDates): string {
+                $resolvedDates[] = $date->format('Y-m-d');
+
+                return '350.00';
+            },
+        );
+
+        $result = $this->runProcessorWithRow([
+            'docTypeName' => 'Возврат',
+            'sellerOperName' => 'Возврат',
+            'quantity' => 1,
+            'retailPriceWithDisc' => 2099,
+            'nmId' => '123',
+            'techSize' => 'XL',
+            'orderDt' => '2026-04-02T10:00:00Z',
+            'saleDt' => '2026-05-22T10:00:00Z',
+            'rrDate' => '2026-05-22',
+            'srid' => 'test-return-srid-2',
+        ], innerResolver: $innerResolver);
+
+        self::assertCount(1, $result['returns']);
+        self::assertSame('350.00', $result['returns'][0]->getCostPrice());
+        self::assertSame(['2026-04-02'], $resolvedDates);
+    }
+
+    /**
+     * Регрессия: без даты заказа себестоимость возврата берётся на дату возврата,
+     * а не остаётся 0.00.
+     */
+    public function testReturnWithoutOrderDateFallsBackToReturnDateForCostPrice(): void
+    {
+        $resolvedDates = [];
+        $innerResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerResolver->method('resolve')->willReturnCallback(
+            static function (string $companyId, string $listingId, \DateTimeImmutable $date) use (&$resolvedDates): string {
+                $resolvedDates[] = $date->format('Y-m-d');
+
+                return '410.00';
+            },
+        );
+
+        $result = $this->runProcessorWithRow([
+            'docTypeName' => 'Возврат',
+            'sellerOperName' => 'Возврат',
+            'quantity' => 1,
+            'retailPriceWithDisc' => 2099,
+            'nmId' => '123',
+            'techSize' => 'XL',
+            'rrDate' => '2026-05-22',
+            'srid' => 'test-return-srid-3',
+        ], innerResolver: $innerResolver);
+
+        self::assertCount(1, $result['returns']);
+        self::assertSame('410.00', $result['returns'][0]->getCostPrice());
+        self::assertSame(['2026-05-22'], $resolvedDates);
+    }
+
+    /**
      * Регрессия H1: связанные продажи должны грузиться одним батч-запросом
      * (findByMarketplaceOrdersIndexed), а не по строке в цикле (findByMarketplaceOrder).
      */
@@ -176,7 +242,7 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
      *
      * @return array{returns: list<MarketplaceReturn>, createdListings: list<MarketplaceListing>, nmIdsCalls: list<list<string>>}
      */
-    private function runProcessorWithRow(array $row, bool $forceResolve = false): array
+    private function runProcessorWithRow(array $row, bool $forceResolve = false, ?CostPriceResolverInterface $innerResolver = null): array
     {
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
@@ -236,9 +302,11 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
         $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
 
-        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
-        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
-        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
+        if (null === $innerResolver) {
+            $innerResolver = $this->createMock(CostPriceResolverInterface::class);
+            $innerResolver->method('resolve')->willReturn('0.00');
+        }
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerResolver);
 
         $processor = new WbReturnsRawProcessor(
             $this->makeProcessWbReturnsActionStub(),

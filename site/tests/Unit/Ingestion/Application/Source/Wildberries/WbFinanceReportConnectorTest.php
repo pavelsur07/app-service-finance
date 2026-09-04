@@ -159,6 +159,10 @@ final class WbFinanceReportConnectorTest extends TestCase
 
         self::assertSame('2026-06-21', $result->nextCursorValue);
         self::assertTrue($result->hasMore);
+        // Переход на следующий день — это ещё один запрос к WB, и он обязан
+        // уважать интервал лимитера, иначе обработчик сразу упирается в локальный
+        // limiter и тратит попытки rate-limit на каждый день отставания.
+        self::assertSame(70, $result->continuationDelaySeconds);
     }
 
     public function testIncrementalCursorDoesNotAdvancePastToday(): void

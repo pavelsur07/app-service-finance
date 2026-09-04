@@ -168,6 +168,8 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
             $startedAt = microtime(true);
             $statusCode = null;
             $headers = [];
+            $body = null;
+            $transportException = null;
 
             try {
                 $response = $this->httpClient->request('GET', self::BASE_URL.$path, [
@@ -179,7 +181,7 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
                 $headers = $response->getHeaders(false);
                 $body = $response->getContent(false);
             } catch (TransportExceptionInterface $exception) {
-                throw new WildberriesAdTransientException('WB Promotion API transport error.', previous: $exception);
+                $transportException = $exception;
             } finally {
                 $this->logger->info('WB Promotion API request finished.', [
                     'companyId' => $companyId,
@@ -192,6 +194,34 @@ final readonly class WildberriesAdClient implements AdPlatformClientInterface
                     'durationMs' => (int) ((microtime(true) - $startedAt) * 1000),
                 ]);
             }
+
+            if (null !== $transportException) {
+                if ($attempt >= self::MAX_REQUEST_ATTEMPTS) {
+                    throw new WildberriesAdTransientException('WB Promotion API transport error.', previous: $transportException);
+                }
+
+                // Таймаут или обрыв соединения — та же transient-ситуация, что и 5xx:
+                // без этой ветки один сетевой сбой обнулял весь день по подключению.
+                $delaySeconds = self::BASE_RETRY_DELAY_SECONDS * $attempt;
+                $this->logger->warning('WB Promotion API request retry scheduled after transport error.', [
+                    'event' => 'wb_ad_spend_request_retry',
+                    'companyId' => $companyId,
+                    'connectionId' => $connectionId,
+                    'operation' => $operation,
+                    'date' => $date,
+                    'campaignCount' => $campaignCount,
+                    'attempt' => $attempt,
+                    'nextAttempt' => $attempt + 1,
+                    'error' => $transportException->getMessage(),
+                    'delaySeconds' => $delaySeconds,
+                ]);
+                $this->clock->sleep($delaySeconds);
+
+                continue;
+            }
+
+            // Без транспортной ошибки ответ прочитан целиком.
+            \assert(null !== $statusCode && null !== $body);
 
             if ($this->isRetryableStatus($statusCode) && $attempt < self::MAX_REQUEST_ATTEMPTS) {
                 $delaySeconds = $this->retryDelaySeconds($headers, $attempt);
