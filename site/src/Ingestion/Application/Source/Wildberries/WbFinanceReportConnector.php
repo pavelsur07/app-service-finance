@@ -244,7 +244,7 @@ final readonly class WbFinanceReportConnector implements SourceConnectorInterfac
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed>       $metadata
+     * @param array<string, mixed> $metadata
      *
      * @return list<array<string, mixed>>
      */
