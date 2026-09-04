@@ -220,8 +220,10 @@
                         <label class="form-label" for="document-filter-type">Тип</label>
                         <select id="document-filter-type" name="type" class="form-select">
                             <option value="">Все</option>
-                            {% for value, label in typeShortLabels %}
-                                <option value="{{ value }}" {% if app.request.query.get('type') == value %}selected{% endif %}>{{ label }}</option>
+                            {# Список ведётся от самого enum: тип, добавленный в DocumentType,
+                               обязан появиться и здесь, иначе отфильтровать его через интерфейс нельзя. #}
+                            {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
+                                <option value="{{ documentType.value }}" {% if app.request.query.get('type') == documentType.value %}selected{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</option>
                             {% endfor %}
                         </select>
                     </div>
