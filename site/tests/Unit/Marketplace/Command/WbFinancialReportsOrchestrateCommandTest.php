@@ -356,14 +356,78 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter()));
     }
 
-    public function testFirstBusinessDayOfMonthDoesNotQueryEmptyRecoveryWindow(): void
+    /**
+     * Регрессия: день, помеченный empty ночью 1-го числа, выпадал из окна
+     * восстановления «с начала месяца» и не перезапрашивался никогда
+     * (прод, 2026-08-31 у двух компаний). На 1-е число окно обязано захватывать
+     * хвост предыдущего месяца глубиной refresh-days-back.
+     */
+    public function testFirstDayOfMonthRecoversEmptyDaysOfPreviousMonthTail(): void
     {
         $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
-        $this->db->method('fetchOne')->willReturnCallback(static function (string $sql, array $params = []): mixed {
-            self::assertFalse(
-                ($params['fromDate'] ?? null) === '2026-06-01' && ($params['toDate'] ?? null) === '2026-05-31',
-                'Recovery range must not be queried when current month start is after yesterday.',
-            );
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            [],
+            [],
+            [],
+            ['company-a:conn-a:2026-08-18:2026-08-31' => 1],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+        $this->planner->expects(self::once())->method('planEmptyRefresh')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-08-18' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-08-31' === $date->format('Y-m-d')),
+            24,
+        )->willReturn(1);
+
+        $exit = $this->execute($this->rateLimiter(), ['--refresh-days-back' => '14'], now: '2026-09-01 00:20:00 Europe/Moscow');
+
+        self::assertSame(Command::SUCCESS, $exit);
+    }
+
+    /**
+     * Самый тяжёлый случай границы месяца: у дня прошлого месяца нет строки
+     * статуса вовсе. Скользящее обновление такие дни не создаёт (это зона
+     * planMissing), а окно «с начала месяца» их не видело — день финансовых
+     * данных не загружался никогда.
+     */
+    public function testFirstDayOfMonthRecoversMissingDaysOfPreviousMonthTail(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $this->db->method('fetchOne')->willReturnCallback($this->dbFetchOneCallback(
+            ['company-a:conn-a' => 'success'],
+            [],
+            [],
+            ['company-a:conn-a:2026-08-18:2026-08-31' => 13],
+        ));
+        $this->planner->expects(self::never())->method('planDueRetry');
+        $this->planner->expects(self::never())->method('planEmptyRefresh');
+        $this->planner->expects(self::never())->method('planRefreshRecentDays');
+        $this->planner->expects(self::once())->method('planMissing')->with(
+            'company-a',
+            'conn-a',
+            1,
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-08-18' === $date->format('Y-m-d')),
+            self::callback(static fn (\DateTimeImmutable $date): bool => '2026-08-31' === $date->format('Y-m-d')),
+        )->willReturn(1);
+
+        $exit = $this->execute($this->rateLimiter(), ['--refresh-days-back' => '14'], now: '2026-09-01 00:20:00 Europe/Moscow');
+
+        self::assertSame(Command::SUCCESS, $exit);
+    }
+
+    public function testFirstDayOfMonthQueriesPreviousMonthTailInsteadOfEmptyMonthRange(): void
+    {
+        $this->connections->method('execute')->willReturn([$this->conn('conn-a', 'company-a')]);
+        $queriedRanges = [];
+        $this->db->method('fetchOne')->willReturnCallback(static function (string $sql, array $params = []) use (&$queriedRanges): mixed {
+            if (isset($params['fromDate'], $params['toDate'])) {
+                $queriedRanges[$params['fromDate'].':'.$params['toDate']] = true;
+            }
 
             if (str_contains($sql, 'AND business_date = :businessDate')) {
                 return 'success';
@@ -379,9 +443,12 @@ final class WbFinancialReportsOrchestrateCommandTest extends TestCase
         });
         $this->planner->expects(self::never())->method('planDueRetry');
         $this->planner->expects(self::never())->method('planMissing');
+        $this->planner->expects(self::never())->method('planEmptyRefresh');
         $this->planner->expects(self::once())->method('planRefreshRecentDays')->with('company-a', 'conn-a', 2, 1)->willReturn(1);
 
         self::assertSame(Command::SUCCESS, $this->execute($this->rateLimiter(), [], now: '2026-06-01 00:00:00 Europe/Moscow'));
+        self::assertArrayNotHasKey('2026-06-01:2026-05-31', $queriedRanges, 'Inverted month range must never be queried.');
+        self::assertArrayHasKey('2026-05-30:2026-05-31', $queriedRanges, 'Recovery must cover the previous month tail (refresh-days-back=2).');
     }
 
     private function execute(WbFinanceRateLimiter $rateLimiter, array $input = [], ?CommandTester &$tester = null, string $now = '2026-05-21 00:00:00 Europe/Moscow'): int

@@ -54,8 +54,8 @@ final class WbFinancialReportsOrchestrateCommand extends Command
         $this
             ->addOption('company-id', null, InputOption::VALUE_OPTIONAL)
             ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL)
-            ->addOption('refresh-days-back', null, InputOption::VALUE_OPTIONAL, 'Refresh only the last N business days before today.', '2')
-            ->addOption('retry-window-days', null, InputOption::VALUE_OPTIONAL, 'Deprecated compatibility option; operational recovery uses current month-to-date.', '14')
+            ->addOption('refresh-days-back', null, InputOption::VALUE_OPTIONAL, 'Refresh only the last N business days before today; the same N extends the operational recovery window past the current month start.', '2')
+            ->addOption('retry-window-days', null, InputOption::VALUE_OPTIONAL, 'Deprecated compatibility option; operational recovery uses current month-to-date united with the last refresh-days-back days.', '14')
             ->addOption('include-historical-retry', null, InputOption::VALUE_NONE, 'Allow due retries and missing days older than current month-to-date.')
             ->addOption('historical-max-days', null, InputOption::VALUE_OPTIONAL, 'Maximum historical days to schedule per connection when history is explicitly enabled.', '1')
             ->addOption('mode', null, InputOption::VALUE_OPTIONAL, 'Run mode: operational or historical-recovery.', self::MODE_OPERATIONAL);
@@ -91,7 +91,9 @@ final class WbFinancialReportsOrchestrateCommand extends Command
             }
             $yesterday = $this->periodResolver->yesterday();
             $currentYearStart = $this->periodResolver->currentYearStart();
-            $recoveryFrom = $this->periodResolver->currentMonthStart();
+            // Хвост предыдущего месяца глубиной refresh-days-back входит в окно:
+            // иначе empty-день, записанный ночью 1-го, выпадал из восстановления.
+            $recoveryFrom = $this->periodResolver->recoveryWindowStart($refreshDaysBack);
             $hasRecoveryWindow = $recoveryFrom <= $yesterday;
             $historicalTo = $hasRecoveryWindow ? $recoveryFrom->modify('-1 day') : $yesterday;
 

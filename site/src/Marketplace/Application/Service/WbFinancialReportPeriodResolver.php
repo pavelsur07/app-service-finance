@@ -35,6 +35,26 @@ final class WbFinancialReportPeriodResolver
     }
 
     /**
+     * Начало окна оперативного восстановления: объединение «с начала текущего
+     * месяца» и «последние $daysBack дней до вчера», не раньше начала года.
+     *
+     * Окно только «с начала месяца» теряло день, помеченный empty ночью 1-го
+     * числа: утром он уже был «историей» и не перезапрашивался никогда.
+     * Одно правило для оркестратора и планировщика, чтобы они не разошлись.
+     */
+    public function recoveryWindowStart(int $daysBack): \DateTimeImmutable
+    {
+        if ($daysBack <= 0) {
+            throw new \DomainException('Days back must be a positive integer.');
+        }
+
+        $rollingStart = $this->yesterday()->modify(sprintf('-%d days', $daysBack - 1));
+        $start = min($this->currentMonthStart(), $rollingStart);
+
+        return max($start, $this->currentYearStart());
+    }
+
+    /**
      * @return list<\DateTimeImmutable>
      */
     public function last14Days(): array

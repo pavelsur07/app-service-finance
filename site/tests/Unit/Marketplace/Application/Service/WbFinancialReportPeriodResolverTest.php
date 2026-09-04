@@ -38,6 +38,54 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
         self::assertSame('2026-05-01 00:00:00 Europe/Moscow', $resolver->currentMonthStart()->format('Y-m-d H:i:s e'));
     }
 
+    /**
+     * Окно оперативного восстановления — объединение «с начала месяца» и
+     * «последние N дней»: на первое число оно обязано захватывать хвост
+     * предыдущего месяца, иначе день, помеченный empty ночью 1-го, теряется.
+     */
+    public function testRecoveryWindowStartCoversPreviousMonthTailOnFirstDayOfMonth(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-09-01 00:20:00 Europe/Moscow'));
+
+        self::assertSame('2026-08-18', $resolver->recoveryWindowStart(14)->format('Y-m-d'));
+    }
+
+    public function testRecoveryWindowStartFallsBackToMonthStartWhenMonthIsLonger(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-09-20 12:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-09-01', $resolver->recoveryWindowStart(14)->format('Y-m-d'));
+    }
+
+    public function testRecoveryWindowStartUsesRollingTailInEarlyMonth(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-09-05 12:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-08-22', $resolver->recoveryWindowStart(14)->format('Y-m-d'));
+    }
+
+    public function testRecoveryWindowStartNeverGoesBeforeYearStart(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-01-01 12:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-01-01', $resolver->recoveryWindowStart(14)->format('Y-m-d'));
+    }
+
+    public function testRecoveryWindowStartWithOneDayEqualsYesterdayOrMonthStart(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-09-01 12:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-08-31', $resolver->recoveryWindowStart(1)->format('Y-m-d'));
+    }
+
+    public function testRecoveryWindowStartRejectsNonPositiveDays(): void
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-09-01 12:00:00 Europe/Moscow'));
+
+        $this->expectException(\DomainException::class);
+        $resolver->recoveryWindowStart(0);
+    }
+
     public function testLast14DaysReturnsFourteenDatesIncludingYesterday(): void
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 Europe/Moscow'));
