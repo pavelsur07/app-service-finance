@@ -661,6 +661,31 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertTrue($this->dispatchedMessages[0]->forceRefresh);
     }
 
+    public function testPlanEmptyRefreshDefaultWindowCoversPreviousMonthTailOnFirstDay(): void
+    {
+        $planner = new WbFinancialReportSyncPlanner(
+            $this->connections,
+            new WbFinancialReportPeriodResolver(new MockClock('2026-06-01 00:20:00 Europe/Moscow')),
+            $this->statuses,
+            $this->bus,
+            $this->clock,
+        );
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->expects(self::once())
+            ->method('findStatusesForDateRange')
+            ->with(
+                'co1',
+                'c1',
+                MarketplaceType::WILDBERRIES,
+                'sales_report',
+                self::callback(static fn (\DateTimeImmutable $from): bool => '2026-05-18' === $from->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $to): bool => '2026-05-31' === $to->format('Y-m-d')),
+            )
+            ->willReturn([]);
+
+        self::assertSame(0, $planner->planEmptyRefresh(null, null, 1));
+    }
+
     private function planner(): WbFinancialReportSyncPlanner
     {
         return new WbFinancialReportSyncPlanner(

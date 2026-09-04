@@ -18,9 +18,11 @@
 #10 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=1 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Оркестрация WB financial reports: каждый час восстанавливает текущий месяц
-# (daily/retry/missing/empty), затем переобновляет последние 14 дней для
-# задних правок WB. Команда учитывает cooldown/LockableTrait и ставит не
-# больше одной задачи на подключение за запуск.
+# плюс хвост предыдущего глубиной refresh-days-back (daily/retry/missing/empty),
+# затем переобновляет последние 14 дней для задних правок WB. Хвост нужен,
+# чтобы empty-день, записанный ночью 1-го числа, не выпадал из восстановления.
+# Команда учитывает cooldown/LockableTrait и ставит не больше одной задачи на
+# подключение за запуск.
 20 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Почасовой обход заказов Ozon. Отдельная строка с --resource, а НЕ перевод

@@ -16,6 +16,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlannerInterface
 {
     private const REPORT_TYPE = 'sales_report';
+    /** Совпадает с --refresh-days-back в cron оркестратора. */
+    private const DEFAULT_RECOVERY_DAYS_BACK = 14;
     private const API_ENDPOINT = 'wildberries::finance-sales-reports-detailed';
 
     public function __construct(
@@ -205,7 +207,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         }
 
         $dispatched = 0;
-        $from ??= $this->periodResolver->currentMonthStart();
+        $from ??= $this->periodResolver->recoveryWindowStart(self::DEFAULT_RECOVERY_DAYS_BACK);
         $to ??= $this->periodResolver->yesterday();
 
         foreach ($this->activeConnections($companyId, $connectionId) as $connection) {
