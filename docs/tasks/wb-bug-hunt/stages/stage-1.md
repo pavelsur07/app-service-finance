@@ -70,7 +70,7 @@
 - module: `phpunit --testsuite integration --filter 'Marketplace|Ingestion|Inventory'` — OK (894)
 - full relevant stage: `composer test:unit` — OK (2282, те же 4 deprecations)
 - static: `make site-stan` — `[OK] No errors`
-- style: `php-cs-fixer --dry-run` по изменённым файлам — 0 fixable
+- style: `composer cs:check` (конфиг CI `.php-cs-fixer.php`) — `Found 0 of 2464`; `composer cs:strict-types` — `Found 0 of 2464`. Первый push дал красный `🎨 PHP code style`: локальная проверка шла с `.php-cs-fixer.dist.php`, который расходится с CI на выравнивании `@param`; исправлено отдельным коммитом
 
 #### Internal automatic review
 - Iterations: 1
