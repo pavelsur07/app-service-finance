@@ -7,14 +7,18 @@ namespace App\Tests\Integration\Inventory\Command;
 use App\Company\Entity\Company;
 use App\Inventory\Application\DTO\WbInventorySnapshotRequestResult;
 use App\Inventory\Application\RequestWbInventorySnapshotAction;
+use App\Inventory\Command\WbInventoryDailySyncCommand;
 use App\Inventory\Entity\InventorySnapshotSession;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\MockObject\MockObject;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -131,7 +135,7 @@ final class WbInventoryDailySyncCommandTest extends IntegrationTestCase
         $company = $this->seedCompany('owner-inv-wb-fail@example.test');
         $this->seedWbConnection($company, '77777777-7777-7777-7777-000000000024');
 
-        $action = $this->createMock(RequestWbInventorySnapshotAction::class);
+        $action = $this->actionMock();
         $action->method('__invoke')->willThrowException(new \RuntimeException('dispatch is down'));
         self::getContainer()->set(RequestWbInventorySnapshotAction::class, $action);
 
@@ -162,7 +166,7 @@ final class WbInventoryDailySyncCommandTest extends IntegrationTestCase
         $this->seedWbConnection($failing, '77777777-7777-7777-7777-000000000025');
         $this->seedWbConnection($working, '77777777-7777-7777-7777-000000000026');
 
-        $action = $this->createMock(RequestWbInventorySnapshotAction::class);
+        $action = $this->actionMock();
         $action->method('__invoke')->willReturnCallback(
             static function (string $companyId) use ($failing): WbInventorySnapshotRequestResult {
                 if ($companyId === $failing->getId()) {
@@ -180,6 +184,83 @@ final class WbInventoryDailySyncCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $exit);
         self::assertStringContainsString('active connections count: 2 / queued count: 1', $tester->getDisplay());
         self::assertStringContainsString('errors count: 1', $tester->getDisplay());
+    }
+
+    /**
+     * Сбой по компании — warning с деталями, а инцидент в целом — один error
+     * со счётчиком: cron-stdout никто не читает, а per-row error засоряет GlitchTip.
+     */
+    public function testCompanyFailureIsLoggedAsWarningAndOneAggregatedError(): void
+    {
+        $failing = $this->seedCompany(
+            'owner-inv-wb-log-a@example.test',
+            '11111111-1111-1111-1111-00000000000c',
+            '22222222-2222-2222-2222-00000000000c',
+        );
+        $working = $this->seedCompany(
+            'owner-inv-wb-log-b@example.test',
+            '11111111-1111-1111-1111-00000000000d',
+            '22222222-2222-2222-2222-00000000000d',
+        );
+        $this->seedWbConnection($failing, '77777777-7777-7777-7777-000000000027');
+        $this->seedWbConnection($working, '77777777-7777-7777-7777-000000000028');
+
+        $action = $this->actionMock();
+        $action->method('__invoke')->willReturnCallback(
+            static function (string $companyId) use ($failing): WbInventorySnapshotRequestResult {
+                if ($companyId === $failing->getId()) {
+                    throw new \RuntimeException('dispatch is down');
+                }
+
+                return new WbInventorySnapshotRequestResult(1, 0, true, false);
+            },
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                'WB inventory daily sync failed for company.',
+                self::callback(static fn (array $context): bool => $context['companyId'] === $failing->getId()
+                    && 'dispatch is down' === $context['error']),
+            );
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(
+                'WB inventory daily sync failed for some companies.',
+                self::callback(static fn (array $context): bool => 1 === $context['failedCount']
+                    && [$failing->getId()] === $context['companyIds']),
+            );
+
+        $tester = new CommandTester(new WbInventoryDailySyncCommand(
+            self::getContainer()->get(MarketplaceFacade::class),
+            self::asAction($action),
+            $logger,
+        ));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('errors count: 1', $tester->getDisplay());
+    }
+
+    public function testSuccessfulRunLogsNoError(): void
+    {
+        $company = $this->seedCompany('owner-inv-wb-log-ok@example.test');
+        $this->seedWbConnection($company, '77777777-7777-7777-7777-000000000029');
+
+        $action = $this->actionMock();
+        $action->method('__invoke')->willReturn(new WbInventorySnapshotRequestResult(1, 0, true, false));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
+        $logger->expects(self::never())->method('error');
+
+        $tester = new CommandTester(new WbInventoryDailySyncCommand(
+            self::getContainer()->get(MarketplaceFacade::class),
+            self::asAction($action),
+            $logger,
+        ));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
     }
 
     private function seedWbConnection(Company $company, string $id): MarketplaceConnection
@@ -225,6 +306,22 @@ final class WbInventoryDailySyncCommandTest extends IntegrationTestCase
      * выбросила бы подменённые в контейнере сервисы и тест молча проверял бы
      * реальную реализацию.
      */
+    private function actionMock(): MockObject
+    {
+        return $this->createMock(RequestWbInventorySnapshotAction::class);
+    }
+
+    /**
+     * Мок final readonly Action нельзя типизировать пересечением с MockObject
+     * (PHPStan: unresolvable type), поэтому сужение делается через instanceof.
+     */
+    private static function asAction(object $action): RequestWbInventorySnapshotAction
+    {
+        \assert($action instanceof RequestWbInventorySnapshotAction);
+
+        return $action;
+    }
+
     private function makeTester(): CommandTester
     {
         $app = new Application(self::$kernel);

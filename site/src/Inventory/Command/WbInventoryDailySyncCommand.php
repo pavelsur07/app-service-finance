@@ -7,6 +7,7 @@ namespace App\Inventory\Command;
 use App\Inventory\Application\RequestWbInventorySnapshotAction;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Marketplace\Facade\MarketplaceFacade;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
@@ -24,6 +25,7 @@ final class WbInventoryDailySyncCommand extends Command
     public function __construct(
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly RequestWbInventorySnapshotAction $requestSnapshotAction,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -54,6 +56,8 @@ final class WbInventoryDailySyncCommand extends Command
             $queuedCount = 0;
             $skippedCount = 0;
             $errorsCount = 0;
+            $failedCompanyIds = [];
+            $lastError = null;
 
             foreach ($companyIds as $companyId) {
                 try {
@@ -66,8 +70,26 @@ final class WbInventoryDailySyncCommand extends Command
                     $skippedCount += $result->skippedCount;
                 } catch (\Throwable $e) {
                     ++$errorsCount;
+                    $failedCompanyIds[] = $companyId;
+                    $lastError = $e->getMessage();
+                    // Action только создаёт сессию и ставит сообщение в очередь — API WB
+                    // здесь не вызывается, поэтому любое исключение неожиданно. Детали
+                    // по компании — warning, один агрегированный error — после цикла.
+                    $this->logger->warning('WB inventory daily sync failed for company.', [
+                        'companyId' => $companyId,
+                        'exceptionClass' => $e::class,
+                        'error' => $e->getMessage(),
+                    ]);
                     $output->writeln(sprintf('company %s error: %s', $companyId, $e->getMessage()));
                 }
+            }
+
+            if ($errorsCount > 0) {
+                $this->logger->error('WB inventory daily sync failed for some companies.', [
+                    'failedCount' => $errorsCount,
+                    'companyIds' => $failedCompanyIds,
+                    'lastError' => $lastError,
+                ]);
             }
 
             $output->writeln(sprintf('active connections count: %d / queued count: %d', count($connections), $queuedCount));

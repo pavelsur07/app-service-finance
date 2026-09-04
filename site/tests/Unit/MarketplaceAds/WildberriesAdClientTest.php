@@ -249,6 +249,44 @@ final class WildberriesAdClientTest extends TestCase
         self::assertSame('2026-07-21 00:00:02', $clock->now()->format('Y-m-d H:i:s'));
     }
 
+    public function testRetriesTransportErrorBeforeGivingUp(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', ['error' => 'Connection timed out']),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+
+        self::assertSame([], $this->client($http, $clock)->fetchExpenses(
+            self::COMPANY_ID,
+            self::CONNECTION_ID,
+            new \DateTimeImmutable('2026-07-20'),
+        ));
+        self::assertSame(2, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:02', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
+    public function testExhaustsExactlyThreeTransportAttempts(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse('', ['error' => 'Connection timed out']),
+            new MockResponse('', ['error' => 'Connection reset by peer']),
+            new MockResponse('', ['error' => 'Connection timed out']),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
+        $clock = new MockClock('2026-07-21 00:00:00 UTC');
+
+        try {
+            $this->client($http, $clock)->fetchExpenses(self::COMPANY_ID, self::CONNECTION_ID, new \DateTimeImmutable('2026-07-20'));
+            self::fail('Expected transient exception after three transport failures.');
+        } catch (WildberriesAdTransientException $exception) {
+            self::assertStringContainsString('transport error', $exception->getMessage());
+        }
+
+        self::assertSame(3, $http->getRequestsCount());
+        self::assertSame('2026-07-21 00:00:06', $clock->now()->format('Y-m-d H:i:s'));
+    }
+
     public function testRetriesUsingHttpDateRetryAfter(): void
     {
         $http = new MockHttpClient([

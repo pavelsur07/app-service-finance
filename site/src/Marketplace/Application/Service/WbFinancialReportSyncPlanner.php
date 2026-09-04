@@ -65,59 +65,54 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                 $from,
                 $to,
             );
-            $statusByDayAndMode = [];
+            // На день существует ровно одна строка статуса (уникальный индекс
+            // company+marketplace+report_type+business_date), а её mode переписывается
+            // каждым новым запуском. Поэтому «есть ли у дня daily-строка» после первого
+            // refresh проверить нельзя: скользящее окно смотрит на статус дня, а не на mode.
+            $statusByDay = [];
             foreach ($statuses as $statusEntity) {
-                $mode = $statusEntity->getMode();
-                if (null === $mode) {
-                    continue;
-                }
-
-                $statusByDayAndMode[$statusEntity->getBusinessDate()->format('Y-m-d')][$mode->value] = $statusEntity;
+                $statusByDay[$statusEntity->getBusinessDate()->format('Y-m-d')] = $statusEntity;
             }
 
             $retryDue = [];
             $success = [];
-            $dailyCompletedWithoutRefresh = [];
 
             foreach ($days as $day) {
                 $dayKey = $day->format('Y-m-d');
-                $dailyStatus = ($statusByDayAndMode[$dayKey][FinancialReportSyncMode::DAILY->value] ?? null)?->getStatus();
-                $dailyCompleted = \in_array($dailyStatus, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true);
-                $refreshStatusEntity = $statusByDayAndMode[$dayKey][FinancialReportSyncMode::REFRESH_14D->value] ?? null;
-                $refreshStatus = $refreshStatusEntity?->getStatus();
-
-                if (null !== $refreshStatusEntity) {
-                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
-                        continue;
-                    }
-
-                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)) {
-                        if (null !== $refreshStatusEntity->getNextRetryAt() && $refreshStatusEntity->getNextRetryAt() > $now) {
-                            continue;
-                        }
-
-                        if (FinancialReportSyncStatus::QUEUED === $refreshStatus && null === $refreshStatusEntity->getNextRetryAt()) {
-                            continue;
-                        }
-
-                        $retryDue[] = $day;
-                        continue;
-                    }
-
-                    if (\in_array($refreshStatus, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)) {
-                        if ($dailyCompleted) {
-                            $success[] = [
-                                'day' => $day,
-                                'updated_at' => $refreshStatusEntity->getUpdatedAt() ?? new \DateTimeImmutable('9999-12-31T00:00:00+00:00'),
-                            ];
-                        }
-
-                        continue;
-                    }
+                $statusEntity = $statusByDay[$dayKey] ?? null;
+                if (null === $statusEntity) {
+                    // День без строки — зона planMissing, refresh его не создаёт.
+                    continue;
                 }
 
-                if ($dailyCompleted) {
-                    $dailyCompletedWithoutRefresh[] = $day;
+                $status = $statusEntity->getStatus();
+                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
+                    continue;
+                }
+
+                if (\in_array($status, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)) {
+                    // Повтор неудачного refresh; сбои других режимов ведёт planDueRetry.
+                    if (FinancialReportSyncMode::REFRESH_14D !== $statusEntity->getMode()) {
+                        continue;
+                    }
+
+                    if (null !== $statusEntity->getNextRetryAt() && $statusEntity->getNextRetryAt() > $now) {
+                        continue;
+                    }
+
+                    if (FinancialReportSyncStatus::QUEUED === $status && null === $statusEntity->getNextRetryAt()) {
+                        continue;
+                    }
+
+                    $retryDue[] = $day;
+                    continue;
+                }
+
+                if (\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)) {
+                    $success[] = [
+                        'day' => $day,
+                        'updated_at' => $statusEntity->getUpdatedAt() ?? new \DateTimeImmutable('9999-12-31T00:00:00+00:00'),
+                    ];
                 }
             }
 
@@ -133,7 +128,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $successDays = array_map(static fn (array $item): \DateTimeImmutable => $item['day'], $success);
 
             $scheduledForConnection = 0;
-            foreach (array_merge($retryDue, $successDays, $dailyCompletedWithoutRefresh) as $day) {
+            foreach (array_merge($retryDue, $successDays) as $day) {
                 if ($scheduledForConnection >= $maxDays) {
                     break;
                 }

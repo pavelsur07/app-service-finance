@@ -52,8 +52,9 @@ final class MarketplaceCostPriceResolver
             return $sale->getCostPrice();
         }
 
-        // Шаг 2: ищем по order_dt из rawData
-        $orderDt = $rawData['order_dt'] ?? null;
+        // Шаг 2: ищем по дате заказа из rawData — финансовый API отдаёт orderDt,
+        // старые snake_case-документы — order_dt
+        $orderDt = $rawData['orderDt'] ?? $rawData['order_dt'] ?? null;
         if (null !== $orderDt && '' !== $orderDt) {
             try {
                 $orderDate = new \DateTimeImmutable($orderDt);

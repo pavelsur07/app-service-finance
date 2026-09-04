@@ -178,10 +178,8 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $planner = $this->planner();
         $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
         $this->statuses->method('findStatusesForDateRange')->willReturn([
-            $this->statusEntity('2026-05-20', FinancialReportSyncStatus::SUCCESS, null, '2026-05-20T08:00:00+03:00', null, null, FinancialReportSyncMode::DAILY),
             $this->statusEntity('2026-05-20', FinancialReportSyncStatus::SUCCESS, null, '2026-05-21T09:00:00+03:00'),
-            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::EMPTY, null, '2026-05-19T08:00:00+03:00', null, null, FinancialReportSyncMode::DAILY),
-            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::EMPTY, null, '2026-05-18T09:00:00+03:00'),
+            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::EMPTY, null, '2026-05-18T09:00:00+03:00', null, null, FinancialReportSyncMode::DAILY),
         ]);
 
         self::assertSame(1, $planner->planRefresh14Days(null, null, 1));
@@ -211,7 +209,12 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertSame([], $this->dispatchedMessages);
     }
 
-    public function testRefreshSuccessRequiresDailySuccess(): void
+    /**
+     * Регрессия: в таблице статусов ровно одна строка на день, и после refresh её mode
+     * становится refresh_14d. Такой день обязан попадать в скользящее обновление снова,
+     * иначе «обновление за 14 дней» вырождается в однократное.
+     */
+    public function testRefreshedDayIsRefreshedAgainInRollingWindow(): void
     {
         $planner = $this->planner();
         $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
@@ -219,8 +222,28 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
             $this->statusEntity('2026-05-20', FinancialReportSyncStatus::SUCCESS, null, '2026-05-20T09:00:00+03:00', null, null, FinancialReportSyncMode::REFRESH_14D),
         ]);
 
-        self::assertSame(0, $planner->planRefreshRecentDays(null, null, 1, 1));
-        self::assertSame([], $this->dispatchedMessages);
+        self::assertSame(1, $planner->planRefreshRecentDays(null, null, 1, 1));
+        self::assertSame('2026-05-20', $this->dispatchedMessages[0]->businessDate);
+        self::assertSame('refresh_14d', $this->dispatchedMessages[0]->mode);
+    }
+
+    /**
+     * Регрессия: день, загруженный initial/missing/manual, тоже входит в скользящее окно.
+     */
+    public function testDaysLoadedByOtherModesAreRefreshed(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findStatusesForDateRange')->willReturn([
+            $this->statusEntity('2026-05-20', FinancialReportSyncStatus::SUCCESS, null, '2026-05-20T09:00:00+03:00', null, null, FinancialReportSyncMode::INITIAL),
+            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::EMPTY, null, '2026-05-19T09:00:00+03:00', null, null, FinancialReportSyncMode::MISSING),
+        ]);
+
+        self::assertSame(2, $planner->planRefreshRecentDays(null, null, 2, 2));
+        self::assertSame(
+            ['2026-05-19', '2026-05-20'],
+            array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages),
+        );
     }
 
     public function testRefreshCanPlanAfterDailySuccessWithoutExistingRefresh(): void
@@ -255,7 +278,6 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
         $this->statuses->method('findStatusesForDateRange')->willReturn([
             $this->statusEntity('2026-05-20', FinancialReportSyncStatus::FAILED, null, '2026-05-21T09:00:00+03:00'),
-            $this->statusEntity('2026-05-19', FinancialReportSyncStatus::SUCCESS, null, '2026-05-17T09:00:00+03:00', null, null, FinancialReportSyncMode::DAILY),
             $this->statusEntity('2026-05-19', FinancialReportSyncStatus::SUCCESS, null, '2026-05-18T09:00:00+03:00'),
         ]);
 
