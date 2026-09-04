@@ -112,11 +112,6 @@ final class OzonOrderMapperTest extends TestCase
     }
 
     /**
-     * Присутствующая, но неразбираемая цена — испорченная строка, а не
-     * «бесплатно». Молчаливый null обнулял бы позицию в любом денежном
-     * расчёте, и заметить это было бы нечем.
-     */
-    /**
      * Отвергнутое значение едет в очередь вместе с причиной.
      *
      * Проблема с одной лишь причиной не разбираема: сырьё в S3, читать его
@@ -170,6 +165,11 @@ final class OzonOrderMapperTest extends TestCase
         );
     }
 
+    /**
+     * Присутствующая, но неразбираемая цена — испорченная строка, а не
+     * «бесплатно». Молчаливый null обнулял бы позицию в любом денежном
+     * расчёте, и заметить это было бы нечем.
+     */
     #[DataProvider('malformedPriceCases')]
     public function testMalformedPriceSkipsThePostingInsteadOfNullingIt(mixed $price): void
     {
