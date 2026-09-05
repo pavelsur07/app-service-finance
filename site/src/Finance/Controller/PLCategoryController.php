@@ -10,13 +10,14 @@ use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Application\DeletePLCategoryAction;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Exception\PLCategoryInUseException;
 use App\Finance\Form\PLCategoryFormType;
 use App\Finance\Repository\PLCategoryRepository;
-use App\Finance\Repository\PLDailyTotalRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -350,7 +351,7 @@ class PLCategoryController extends AbstractController
 
     #[Route('/{id}/delete', name: 'pl_category_delete', methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function delete(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService, PLDailyTotalRepository $dailyTotalRepository): Response
+    public function delete(Request $request, PLCategory $category, ActiveCompanyService $companyService, DeletePLCategoryAction $deleteAction): Response
     {
         $company = $companyService->getActiveCompany();
         if ($category->getCompany() !== $company) {
@@ -359,14 +360,15 @@ class PLCategoryController extends AbstractController
 
         if ($this->isCsrfTokenValid('delete'.$category->getId(), $request->request->get('_token'))) {
             $companyId = $company->getId();
-            $categoryId = $category->getId();
-            $em->wrapInTransaction(static function () use ($em, $dailyTotalRepository, $companyId, $categoryId, $category): void {
-                if (null !== $companyId && null !== $categoryId) {
-                    $dailyTotalRepository->moveCategoryRowsToUncategorized($companyId, $categoryId);
-                }
+            if (null !== $companyId) {
+                try {
+                    $deleteAction($category, $companyId);
+                } catch (PLCategoryInUseException) {
+                    $this->addFlash('danger', 'Нельзя удалить статью, к которой привязаны операции документов ОПиУ. Сначала перекатегоризируйте их.');
 
-                $em->remove($category);
-            });
+                    return $this->redirectToRoute('pl_category_index');
+                }
+            }
         }
 
         return $this->redirectToRoute('pl_category_index');

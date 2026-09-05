@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Finance;
 
 use App\Company\Entity\ProjectDirection;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLExpenseType;
@@ -14,6 +16,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 
 final class PLCategoryEditControllerTest extends WebTestCaseBase
 {
@@ -165,5 +168,65 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertIsArray($row);
         self::assertSame('30.00', $row['amount_income']);
         self::assertSame('3.00', $row['amount_expense']);
+    }
+
+    /**
+     * Прод-сценарий issue 287: категория привязана к операции документа ОПиУ.
+     * FK document_operations.category_id -> pl_categories не имеет ON DELETE, и до
+     * этой правки исключение из БД долетало до пользователя как 500 вместо понятного
+     * сообщения. Статья обязана уцелеть, а не просто "не упасть".
+     */
+    public function testDeleteFailsGracefullyWhenDocumentOperationsReferenceCategory(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $category = PLCategoryBuilder::aPLCategory()
+            ->forCompany($company)
+            ->withId('33333333-3333-3333-3333-000000077704')
+            ->withName('In use')
+            ->withFlow(PLFlow::EXPENSE)
+            ->build();
+
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+        $operation = new DocumentOperation();
+        $operation->setAmount('42.00');
+        $operation->setCategory($category);
+        $document->addOperation($operation);
+
+        $em = $this->em();
+        foreach ([$user, $company, $category, $document] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $companyId = (string) $company->getId();
+        $categoryId = (string) $category->getId();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+        $client->request('POST', '/pl-categories/'.$categoryId.'/delete', [
+            '_token' => $this->csrfToken($client, 'delete'.$categoryId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/');
+
+        $client->followRedirect();
+        self::assertSelectorTextContains('.text-bg-danger .toast-body', 'привязаны операции');
+
+        $this->em()->clear();
+        self::assertInstanceOf(
+            PLCategory::class,
+            $this->em()->getRepository(PLCategory::class)->find($categoryId),
+            'Категория с операциями обязана пережить попытку удаления.',
+        );
+
+        $reloadedOperation = $this->em()->getRepository(DocumentOperation::class)->find($operation->getId());
+        self::assertInstanceOf(DocumentOperation::class, $reloadedOperation);
+        $reloadedCategory = $reloadedOperation->getCategory();
+        self::assertNotNull($reloadedCategory, 'Операция не должна лишиться категории при отклонённом удалении.');
+        self::assertSame($categoryId, (string) $reloadedCategory->getId());
     }
 }
