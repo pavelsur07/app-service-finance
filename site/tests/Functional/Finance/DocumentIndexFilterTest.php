@@ -17,6 +17,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Регрессия: форма фильтров на /documents/ отправляла GET-параметры,
@@ -70,6 +71,53 @@ final class DocumentIndexFilterTest extends WebTestCaseBase
 
         self::assertStringContainsString('PAYROLL-DOC', $content);
         self::assertStringNotContainsString('TAXES-DOC', $content);
+    }
+
+    /**
+     * Выпадающий список типов обязан покрывать enum целиком: тип, которого в нём нет,
+     * отфильтровать через интерфейс нельзя, хотя бэкенд такое значение принимает.
+     */
+    public function testTypeFilterOffersEveryDocumentType(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/documents/');
+
+        self::assertResponseIsSuccessful();
+
+        $offered = $crawler->filter('#document-filter-type option')->each(
+            static fn (Crawler $option): string => (string) $option->attr('value'),
+        );
+        $offered = array_values(array_filter($offered, static fn (string $value): bool => '' !== $value));
+
+        $expected = array_map(static fn (DocumentType $type): string => $type->value, DocumentType::cases());
+
+        sort($offered);
+        sort($expected);
+        self::assertSame($expected, $offered);
+
+        // У типа без короткой подписи берётся собственная подпись enum, а не пустая строка.
+        $marketplaceOption = $crawler->filter(
+            \sprintf('#document-filter-type option[value="%s"]', DocumentType::MARKETPLACE_PL->value),
+        );
+        self::assertSame(DocumentType::MARKETPLACE_PL->label(), trim($marketplaceOption->text()));
+    }
+
+    public function testFiltersByMarketplaceType(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+
+        $this->persistDocument($company, ['number' => 'MP-DOC', 'type' => DocumentType::MARKETPLACE_PL]);
+        $this->persistDocument($company, ['number' => 'OTHER-DOC', 'type' => DocumentType::OTHER]);
+
+        $content = $this->requestIndex($client, $user, $company, ['type' => DocumentType::MARKETPLACE_PL->value]);
+
+        self::assertStringContainsString('MP-DOC', $content);
+        self::assertStringNotContainsString('OTHER-DOC', $content);
     }
 
     public function testFiltersByStatus(): void
