@@ -98,6 +98,44 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
         ));
     }
 
+    /**
+     * Прод-сценарий issue 274: countMismatches и amountMismatches по нулям, сверка
+     * сошлась, но категория одной строки не распознана. Нераспознанная категория —
+     * задача таксономии, а не расхождение данных, ради которого существует эта команда.
+     */
+    public function testUnknownCategoryRowsWarnInsteadOfFailingWhenParityHolds(): void
+    {
+        $company = $this->seedCompany(2203);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000002203');
+        $date = (new \DateTimeImmutable('yesterday'))->format('Y-m-d');
+
+        $rawRecord = $this->storeAccrualRaw($companyId, $connection->getId(), $date, 220300, withUnknownCategoryService: true);
+
+        /** @var NormalizeRawRecordHandler $handler */
+        $handler = self::getContainer()->get(NormalizeRawRecordHandler::class);
+        $handler(new NormalizeRawRecordMessage($rawRecord->getId(), $companyId));
+        $this->em->clear();
+
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:verify-rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--days-back' => '2',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertFalse($logHandler->hasErrorRecords(), $tester->getDisplay());
+        self::assertTrue($logHandler->hasWarningThatPasses(
+            static fn (LogRecord $record): bool => 'Ozon accrual rolling refresh verification found unknown categories.' === $record->message
+                && ($record->context['unknownCategoryRows'] ?? 0) > 0,
+        ), $tester->getDisplay());
+    }
+
     private function seedCompany(int $index): Company
     {
         $owner = UserBuilder::aUser()->withIndex($index)->build();
@@ -128,7 +166,7 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
         return $connection;
     }
 
-    private function storeAccrualRaw(string $companyId, string $connectionRef, string $date, int $accrualId): IngestRawRecord
+    private function storeAccrualRaw(string $companyId, string $connectionRef, string $date, int $accrualId, bool $withUnknownCategoryService = false): IngestRawRecord
     {
         /** @var RawStorageFacade $rawStorageFacade */
         $rawStorageFacade = self::getContainer()->get(RawStorageFacade::class);
@@ -147,12 +185,20 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
                 'date' => $date,
                 'accrued_category' => 'POSTING',
                 'posting' => [
-                    'products' => [[
+                    'products' => [array_filter([
                         'commission' => [
                             'sale_amount' => ['amount' => '100.00', 'currency' => 'RUB'],
                             'commission' => ['amount' => '-10.00', 'currency' => 'RUB'],
                         ],
-                    ]],
+                        // Услуга с неизвестным type_id: категория нераспознана,
+                        // но суммы и количества сходятся — ровно прод-сценарий issue 274.
+                        'delivery' => $withUnknownCategoryService ? [
+                            'services' => [[
+                                'type_id' => '99999',
+                                'accrued' => ['amount' => '-5.00', 'currency' => 'RUB'],
+                            ]],
+                        ] : null,
+                    ], static fn (mixed $value): bool => null !== $value)],
                 ],
             ]],
         ));

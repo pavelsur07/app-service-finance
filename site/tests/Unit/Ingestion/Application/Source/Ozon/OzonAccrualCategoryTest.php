@@ -97,7 +97,9 @@ final class OzonAccrualCategoryTest extends TestCase
             'EarlyPayment' => 'ozon_early_payout',
             'InternetSiteAdvertising' => 'ozon_site_advertising',
             'ItemCompensation' => 'ozon_item_compensation',
+            'Installment' => 'ozon_installment',
             'ItemPacking' => 'ozon_partner_packaging',
+            'LabelBrandVerified' => 'ozon_brand_verification_labeling',
             'LabelOriginal' => 'ozon_original_labeling',
             'Logistic' => 'ozon_logistics',
             'Marketing' => 'ozon_marketing',
@@ -125,6 +127,32 @@ final class OzonAccrualCategoryTest extends TestCase
             self::assertTrue($category->known, sprintf('Ozon external code "%s" must not resolve as unknown.', $ozonExternalCode));
             self::assertSame($expectedCode, $category->code, sprintf('Unexpected category for Ozon external code "%s".', $ozonExternalCode));
         }
+    }
+
+    /**
+     * Оба кода пришли из прода: LabelBrandVerified с 2026-08-02 (35 строк, 52 500 ₽),
+     * Installment с 2026-08-20 (1 строка). Их не было в каталоге, поэтому они висели
+     * в статусе new и каждую ночь роняли health-гейт daily-maintenance.
+     */
+    public function testAugust2026OzonCodesResolveToOwnCategories(): void
+    {
+        $brandVerified = OzonAccrualCategory::forTypedFee(null, null, TransactionType::FEE, 'LabelBrandVerified');
+        self::assertTrue($brandVerified->known);
+        self::assertSame('ozon_brand_verification_labeling', $brandVerified->code);
+        self::assertSame('Маркировка проверенного бренда', $brandVerified->label);
+        self::assertSame('Другие услуги и штрафы', $brandVerified->group);
+        self::assertSame(TransactionType::FEE, $brandVerified->transactionType);
+
+        $installment = OzonAccrualCategory::forTypedFee(null, null, TransactionType::FEE, 'Installment');
+        self::assertTrue($installment->known);
+        self::assertSame('ozon_installment', $installment->code);
+        self::assertSame('Рассрочка', $installment->label);
+        self::assertSame('Другие услуги и штрафы', $installment->group);
+        self::assertSame(TransactionType::FEE, $installment->transactionType);
+
+        // Обе категории обязаны отличаться от соседей, а не сливаться с ними.
+        self::assertNotSame($brandVerified->code, OzonAccrualCategory::findByOzonName('LabelOriginal')?->code);
+        self::assertNotSame($installment->code, OzonAccrualCategory::findByOzonName('EarlyPayment')?->code);
     }
 
     public function testNameOnlyTypedFeeStaysUnknown(): void
