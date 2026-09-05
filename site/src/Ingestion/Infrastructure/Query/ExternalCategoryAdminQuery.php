@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Ingestion\Infrastructure\Query;
 
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class ExternalCategoryAdminQuery
@@ -118,7 +120,15 @@ final readonly class ExternalCategoryAdminQuery
      * The daily maintenance health gate passes its repair window so the gate
      * only fails on rows the maintenance run can actually rewrite.
      *
-     * @return array{transactions: int, groups: int}
+     * `orphan*` counts the subset that no registered external category can explain:
+     * neither its external code nor its type id is queued for review in
+     * `ingest_external_categories`. Discovery enqueues everything it can identify and
+     * requires a type id to do so, so a leftover row means the taxonomy pipeline
+     * itself produced something unidentifiable — nobody can map it, and that is an
+     * incident. The remaining rows wait for a human to map an already visible
+     * category: expected, and cleared by that mapping rather than by an alert.
+     *
+     * @return array{transactions: int, groups: int, orphanTransactions: int, orphanGroups: int}
      */
     public function unclassifiedOzonAccrualTransactions(?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): array
     {
@@ -138,32 +148,63 @@ final readonly class ExternalCategoryAdminQuery
             $params['toExclusive'] = $to->modify('+1 day')->format('Y-m-d 00:00:00');
         }
 
+        $params['pendingStatuses'] = [
+            ExternalCategoryStatus::NEW->value,
+            ExternalCategoryStatus::NEEDS_IDENTIFICATION->value,
+        ];
+
+        // Идентичность строки и признак «сопоставить нечем» вычисляются по одному разу
+        // во внутреннем запросе, а внешний только агрегирует. Копия предиката в каждом
+        // COUNT рано или поздно разошлась бы с оригиналом.
+        //
+        // EXISTS, а не JOIN: категория может совпасть и по коду, и по type_id
+        // одновременно, и join размножил бы строку, завысив COUNT(*).
         $row = $this->connection->fetchAssociative(
             "SELECT
                 COUNT(*) AS transactions,
-                COUNT(DISTINCT COALESCE(
-                    NULLIF(ft.source_data->>'_ingestion_external_code', ''),
-                    NULLIF(ft.source_data->>'_ingestion_provider_label', ''),
-                    NULLIF(ft.source_data->>'_ozon_category_label', ''),
-                    ft.description,
-                    ft.type
-                )) AS groups
-             FROM ingest_financial_transactions ft
-             WHERE ft.source = :source
-               AND ft.source_data->>'_ingestion_resource' = :resourceType
-               AND (
-                    ft.source_data->>'_ozon_category_known' = 'false'
-                    OR NULLIF(ft.source_data->>'_ozon_category_group', '') IS NULL
-                    OR ft.source_data->>'_ozon_category_group' IN ('Неизвестные категории Ozon', 'Требует классификации', 'Без группы Ozon')
-                    OR ft.source_data->>'_ozon_category_label' LIKE 'Неизвест%'
-                    OR COALESCE(ft.description, '') LIKE 'Ozon accrual%'
-               )".$window,
+                COUNT(DISTINCT identity) AS groups,
+                COUNT(*) FILTER (WHERE is_orphan) AS orphan_transactions,
+                COUNT(DISTINCT identity) FILTER (WHERE is_orphan) AS orphan_groups
+             FROM (
+                SELECT
+                    COALESCE(
+                        NULLIF(ft.source_data->>'_ingestion_external_code', ''),
+                        NULLIF(ft.source_data->>'_ingestion_provider_label', ''),
+                        NULLIF(ft.source_data->>'_ozon_category_label', ''),
+                        ft.description,
+                        ft.type
+                    ) AS identity,
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM ingest_external_categories ec
+                        WHERE ec.source = :source
+                          AND ec.resource_type = :resourceType
+                          AND ec.status IN (:pendingStatuses)
+                          AND (
+                               lower(NULLIF(ec.external_code, '')) = lower(NULLIF(ft.source_data->>'_ingestion_external_code', ''))
+                               OR NULLIF(ec.external_type_id, '') = NULLIF(ft.source_data->>'_ingestion_type_id', '')
+                          )
+                    ) AS is_orphan
+                FROM ingest_financial_transactions ft
+                WHERE ft.source = :source
+                  AND ft.source_data->>'_ingestion_resource' = :resourceType
+                  AND (
+                       ft.source_data->>'_ozon_category_known' = 'false'
+                       OR NULLIF(ft.source_data->>'_ozon_category_group', '') IS NULL
+                       OR ft.source_data->>'_ozon_category_group' IN ('Неизвестные категории Ozon', 'Требует классификации', 'Без группы Ozon')
+                       OR ft.source_data->>'_ozon_category_label' LIKE 'Неизвест%'
+                       OR COALESCE(ft.description, '') LIKE 'Ozon accrual%'
+                  )".$window.'
+             ) unclassified',
             $params,
+            ['pendingStatuses' => ArrayParameterType::STRING],
         );
 
         return [
             'transactions' => (int) ($row['transactions'] ?? 0),
             'groups' => (int) ($row['groups'] ?? 0),
+            'orphanTransactions' => (int) ($row['orphan_transactions'] ?? 0),
+            'orphanGroups' => (int) ($row['orphan_groups'] ?? 0),
         ];
     }
 }

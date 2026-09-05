@@ -120,6 +120,7 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
         $rows = [];
         $failedTargets = 0;
         $failedTargetDetails = [];
+        $unknownCategoryTargets = [];
         $totals = [
             'targets' => count($targets),
             'rawRecords' => 0,
@@ -139,6 +140,14 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
                 }
 
                 $totals[$metric] += $result[$metric];
+            }
+
+            if ($result['unknownCategoryRows'] > 0) {
+                $unknownCategoryTargets[] = [
+                    'companyId' => $target['companyId'],
+                    'shopRef' => $target['shopRef'],
+                    'unknownCategoryRows' => $result['unknownCategoryRows'],
+                ];
             }
 
             if (!$result['ok']) {
@@ -193,6 +202,24 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
             return Command::FAILURE;
         }
 
+        if ($totals['unknownCategoryRows'] > 0) {
+            // Один агрегированный warning после цикла, а не error по каждой строке:
+            // состояние ожидаемое, видно в очереди на разбор и чинится сопоставлением.
+            $this->logger->warning('Ozon accrual rolling refresh verification found unknown categories.', [
+                'unknownCategoryRows' => $totals['unknownCategoryRows'],
+                'unknownCategoryTargetCount' => count($unknownCategoryTargets),
+                // Срез, а не весь список: целей может быть до 500, и неограниченный
+                // контекст лога всё равно обрежется на стороне приёмника.
+                'unknownCategoryTargets' => array_slice($unknownCategoryTargets, 0, 20),
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+            ]);
+            $io->warning(sprintf(
+                'Verification matched raw and canonical data, but %d preview row(s) still have an unmapped Ozon category.',
+                $totals['unknownCategoryRows'],
+            ));
+        }
+
         return Command::SUCCESS;
     }
 
@@ -238,9 +265,12 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
             }
         }
 
+        // unknownCategoryRows сюда не входит намеренно. Команда сверяет сырьё с
+        // каноническими транзакциями; нераспознанная категория расхождением сверки
+        // не является и чинится сопоставлением в таксономии, а не здесь. Её видно
+        // в таблице и в агрегированном warning после цикла.
         $ok = [] !== $rawRecords
             && 0 === $nonDoneRaw
-            && 0 === $unknownCategoryRows
             && 0 === $amountMismatches
             && 0 === $countMismatches;
 

@@ -202,7 +202,9 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
                 'health' => $health,
             ]);
             $io->note('Scoped run: taxonomy health is informational and does not affect exit code.');
-        } elseif ($health['unclassifiedTransactions'] > 0 || $health['unclassifiedGroups'] > 0) {
+        } elseif ($health['orphanedTransactions'] > 0 || $health['orphanedGroups'] > 0) {
+            // error только здесь: за этими строками нет зарегистрированной категории,
+            // сопоставить их нечем, и починить состояние без правки пайплайна нельзя.
             $hasFailure = true;
             $this->logger->error('Ozon accrual daily maintenance health check failed.', [
                 'from' => $from->format('Y-m-d'),
@@ -211,13 +213,16 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
                 'shop_ref' => $shopRef,
                 'health' => $health,
             ]);
-        } elseif ($health['unmappedCategories'] > 0) {
+        } elseif ($health['unclassifiedTransactions'] > 0 || $health['unmappedCategories'] > 0) {
+            // Категория уже в очереди на ручной разбор: состояние ожидаемое, операция
+            // починки существует и выполняется человеком. Ночной инцидент здесь означал бы
+            // будить дежурного за задачу, которую он и так видит в очереди.
             $this->logger->warning('Ozon accrual daily maintenance has categories awaiting mapping.', [
                 'from' => $from->format('Y-m-d'),
                 'to' => $to->format('Y-m-d'),
                 'health' => $health,
             ]);
-            $io->warning('Ozon accrual categories are awaiting mapping, but canonical transactions are classified.');
+            $io->warning('Ozon accrual categories are awaiting mapping; every unclassified row is queued for review.');
         }
 
         if ($hasFailure) {
@@ -293,11 +298,17 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         // The gate is windowed to the repair range: rows older than the window
         // can never be rewritten by this run, so counting them globally made
         // the nightly ERROR permanent once a stale row aged out of the window.
+        //
+        // Внутри окна строки делятся надвое, и только вторая половина — инцидент:
+        // orphaned не объясняется ни одной зарегистрированной категорией, остальные
+        // ждут ручного сопоставления уже видимой категории.
         $unclassified = $this->categoryAdminQuery->unclassifiedOzonAccrualTransactions($from, $to);
 
         return [
             'unclassifiedTransactions' => $unclassified['transactions'],
             'unclassifiedGroups' => $unclassified['groups'],
+            'orphanedTransactions' => $unclassified['orphanTransactions'],
+            'orphanedGroups' => $unclassified['orphanGroups'],
             'unmappedCategories' => $this->unmappedOzonAccrualCategories(),
         ];
     }

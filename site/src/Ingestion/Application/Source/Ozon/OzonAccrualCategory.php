@@ -86,10 +86,12 @@ final readonly class OzonAccrualCategory
             new self('ozon_item_compensation', 'Компенсация товара', 'Компенсации', TransactionType::ADJUSTMENT, 995, aliases: ['ItemCompensation']),
 
             new self('ozon_early_payout', 'Досрочная выплата', 'Другие услуги и штрафы', TransactionType::FEE, 1000, aliases: ['EarlyPayment']),
+            new self('ozon_installment', 'Рассрочка', 'Другие услуги и штрафы', TransactionType::FEE, 1005, aliases: ['Installment']),
             new self('ozon_disposal', 'Утилизация товара', 'Другие услуги и штрафы', TransactionType::FEE, 1010, aliases: ['Disposal']),
             new self('ozon_packaging_materials', 'Обеспечение материалами для упаковки товара', 'Другие услуги и штрафы', TransactionType::FEE, 1020, aliases: ['PackageCost']),
             new self('ozon_premium_subscription', 'Premium-подписка', 'Другие услуги и штрафы', TransactionType::FEE, 1030, aliases: ['PremiumSubscription']),
             new self('ozon_original_labeling', 'Маркировка оригинальности', 'Другие услуги и штрафы', TransactionType::FEE, 1040, aliases: ['LabelOriginal']),
+            new self('ozon_brand_verification_labeling', 'Маркировка проверенного бренда', 'Другие услуги и штрафы', TransactionType::FEE, 1042, aliases: ['LabelBrandVerified']),
             new self('ozon_stock_insurance', 'Страхование остатков', 'Другие услуги и штрафы', TransactionType::FEE, 1045, typeIds: ['76'], aliases: ['StockInsurance']),
             new self('ozon_defect_fine_complaint', 'Штраф за жалобу', 'Другие услуги и штрафы', TransactionType::PENALTY, 1050, aliases: ['DefectFineComplaint']),
             new self('ozon_defect_fine_shipment_delay', 'Штраф за задержку отгрузки', 'Другие услуги и штрафы', TransactionType::PENALTY, 1060, aliases: ['DefectFineShipmentDelayRate']),

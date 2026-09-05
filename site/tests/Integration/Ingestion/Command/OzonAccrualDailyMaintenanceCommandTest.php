@@ -106,11 +106,72 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         self::assertStringContainsString('taxonomy health is informational', $tester->getDisplay());
     }
 
-    public function testExecuteFailsWhenUnclassifiedTransactionInsideWindow(): void
+    /**
+     * Изменение поведения, а не исправление: раньше любая неклассифицированная строка
+     * внутри окна давала error. Строка с type_id ставится discovery в очередь на разбор
+     * в этом же прогоне, поэтому теперь это warning — будить дежурного не за чем.
+     */
+    public function testExecuteWarnsWhenUnclassifiedTransactionIsDiscoverableByTypeId(): void
     {
         $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
         self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
         $this->persistUnclassifiedTransaction('2026-06-10 00:00:00+03:00');
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertStringContainsString('categories are awaiting mapping', $tester->getDisplay());
+    }
+
+    /**
+     * Прод-сценарий issue 237: код начисления зарегистрирован в очереди на ручной
+     * разбор (status new), человек его ещё не сопоставил. Это ожидаемое состояние
+     * с существующей операцией починки, поэтому warning и exit 0, а не ночной error.
+     */
+    public function testExecuteWarnsInsteadOfFailingWhenUnclassifiedCodeIsQueuedForMapping(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->em->persist(new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_ANY,
+            normalizedKey: 'code:queuedforreview',
+            externalCode: 'QueuedForReview',
+            externalName: 'QueuedForReview',
+            status: ExternalCategoryStatus::NEW,
+            seenAt: new \DateTimeImmutable('2026-06-10 12:00:00+00:00'),
+        ));
+        $this->em->flush();
+        $this->persistUnclassifiedTransaction('2026-06-10 00:00:00+03:00', 'QueuedForReview');
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-25',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertStringContainsString('categories are awaiting mapping', $tester->getDisplay());
+        self::assertStringNotContainsString('finished with failures', $tester->getDisplay());
+    }
+
+    /**
+     * Обратная сторона и guard: discovery отбирает строки только с type_id, поэтому строку
+     * без него он не поставит в очередь никогда. Сопоставить её нечем — это поломка самого
+     * пайплайна таксономии, и она обязана оставаться error.
+     */
+    public function testExecuteStillFailsWhenUnclassifiedRowCannotBeQueuedForReview(): void
+    {
+        $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, $runner);
+        $this->persistUnclassifiedTransaction('2026-06-10 00:00:00+03:00', 'NeverDiscovered', typeId: null);
 
         $tester = $this->tester();
         $exit = $tester->execute([
@@ -165,7 +226,7 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         return new CommandTester($app->find('app:ingestion:ozon-accrual:daily-maintenance'));
     }
 
-    private function persistUnclassifiedTransaction(string $occurredAt = '2026-06-25 00:00:00+03:00'): void
+    private function persistUnclassifiedTransaction(string $occurredAt = '2026-06-25 00:00:00+03:00', ?string $externalCode = null, ?string $typeId = '999'): void
     {
         $companyId = Uuid::uuid7()->toString();
         $connectionRef = Uuid::uuid7()->toString();
@@ -176,7 +237,7 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
             connectionRef: $connectionRef,
             shopRef: $connectionRef,
             source: IngestSource::OZON,
-            externalId: 'ozon:accrual-by-day:test-unclassified',
+            externalId: sprintf('ozon:accrual-by-day:test-unclassified:%s:%s', $externalCode ?? 'no-code', $typeId ?? 'no-type'),
             externalUpdatedAt: new \DateTimeImmutable('2026-06-25 00:00:00+00:00'),
             operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:unclassified', $companyId))->toString(),
             type: TransactionType::FEE,
@@ -185,13 +246,14 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
             occurredAt: new \DateTimeImmutable($occurredAt),
             rawRecordId: $rawRecordId,
             description: 'Ozon accrual unclassified test',
-            sourceData: [
+            sourceData: array_filter([
                 '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
-                '_ingestion_type_id' => '999',
+                '_ingestion_type_id' => $typeId,
+                '_ingestion_external_code' => $externalCode,
                 '_ozon_category_label' => 'Неизвестный type_id Ozon: 999',
                 '_ozon_category_group' => 'Требует классификации',
                 '_ozon_category_known' => false,
-            ],
+            ], static fn (mixed $value): bool => null !== $value),
             sourceTz: 'Europe/Moscow',
         ));
         $this->em->flush();
