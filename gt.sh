@@ -26,11 +26,16 @@ gt_get() {
 
 org_slug() { gt_get "/organizations/" | jq -r '.[0].slug'; }
 
+# Выдача ограничена проектом $PROJECT. Организационный эндпоинт
+# /organizations/<slug>/issues/ отдаёт issues всех проектов сразу, включая чужой
+# api_conwix, и триаж по числу событий начинает врать: верхние строки принадлежат
+# другому продукту. lastSeen выводится по той же причине — без свежести давно
+# потухший issue выглядит важнее вчерашнего.
 cmd_list() {
     local limit=${1:-10} slug
     slug=$(org_slug)
-    gt_get "/organizations/$slug/issues/?query=is:unresolved&limit=$limit" \
-        | jq -r '["ID","EVENTS","TITLE"], (.[] | [.id, .count, .title]) | @tsv' \
+    gt_get "/projects/$slug/$PROJECT/issues/?query=is:unresolved&limit=$limit" \
+        | jq -r '["ID","EVENTS","LAST","TITLE"], (.[] | [.id, .count, (.lastSeen // "-" | .[0:16]), .title]) | @tsv' \
         | column -t -s $'\t'
 }
 

@@ -66,11 +66,17 @@ site-stan-baseline: site-stan-prepare
 
 # ===== TESTS =====
 
-.PHONY: test-provision-vf-prod-deploy
+.PHONY: test-provision-vf-prod-deploy test-gt
 
 # Локальный security-тест owner-run provisioner; production не вызывается.
 test-provision-vf-prod-deploy:
 	bash tests/shell/provision-vf-prod-deploy-test.sh
+
+# Поведение читалки GlitchTip на заглушке curl; сеть не вызывается.
+# gt.sh лежит в корне репозитория и в контейнер не смонтирован, поэтому тест
+# запускается на хосте, а не через PHPUnit.
+test-gt:
+	bash tests/shell/gt-test.sh
 
 site-test-telegram:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:smoke
