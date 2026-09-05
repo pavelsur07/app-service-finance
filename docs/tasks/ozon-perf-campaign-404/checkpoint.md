@@ -13,6 +13,7 @@
 - `make site-cs-check` — Found 0 of 2466 (перепроверено с `--using-cache=no`)
 - `make site-cs-strict-types` — Found 0 of 2466
 - `make site-stan` — No errors, baseline не рос
+- CI на PR #2415 — все проверки зелёные
 
 ### Review status
 - внутренний review: зелёный, iteration 1

@@ -61,6 +61,8 @@
 - `make site-cs-check` — Found 0 of 2466 (перепроверено с `--using-cache=no`, 79 с)
 - `make site-cs-strict-types` — Found 0 of 2466
 - `make site-stan` — No errors; `phpstan-baseline.neon` не менялся
+- CI на PR #2415 (run 33946019763) — все проверки зелёные: Unit, Integration, Functional 1–3/3,
+  Static analysis, PHP code style, migrations-empty-db, Check API types sync, build-and-push
 
 #### Internal automatic review
 - Iterations: 2
