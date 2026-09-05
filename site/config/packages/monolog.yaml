@@ -27,8 +27,13 @@ when@dev:
             sentry:
                 type: service
                 id: Sentry\Monolog\Handler
+                # Объём в GlitchTip ограничивают уровень и SentryRateLimiter (10 событий
+                # на ключ за 60 с), а не список каналов. Исключать канал здесь нельзя:
+                # `marketplace_ads` был исключён, и 15 мест с logger->error() в модуле
+                # MarketplaceAds не попадали в GlitchTip вообще — падения
+                # app:marketplace-ads:scheduler были видны только внутри общей корзины
+                # supercronic. Инвариант закреплён SentryChannelCoverageTest.
                 level: error # В GlitchTip только ошибки
-                channels: ["!marketplace_ads"]
 
             console:
                 type: console
@@ -76,8 +81,13 @@ when@prod:
             sentry:
                 type: service
                 id: Sentry\Monolog\Handler
+                # Объём в GlitchTip ограничивают уровень и SentryRateLimiter (10 событий
+                # на ключ за 60 с), а не список каналов. Исключать канал здесь нельзя:
+                # `marketplace_ads` был исключён, и 15 мест с logger->error() в модуле
+                # MarketplaceAds не попадали в GlitchTip вообще — падения
+                # app:marketplace-ads:scheduler были видны только внутри общей корзины
+                # supercronic. Инвариант закреплён SentryChannelCoverageTest.
                 level: error # В GlitchTip только ошибки
-                channels: ["!marketplace_ads"]
 
             console:
                 type: console

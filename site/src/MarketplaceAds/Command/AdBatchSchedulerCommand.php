@@ -194,7 +194,14 @@ final class AdBatchSchedulerCommand extends Command
                 $e::class,
             ));
 
-            return self::FAILURE;
+            // SUCCESS, а не FAILURE. Код возврата — тоже канал алертинга: supercronic
+            // превращает любой ненулевой код в событие error «error running command:
+            // exit status 1». Возвращать FAILURE значило бы заводить инцидент ровно на
+            // том состоянии, которое строкой выше объявлено не инцидентом: batch
+            // остаётся PLANNED, следующий тик через минуту повторит.
+            // Затянувшийся простой ловит app:marketplace-ads:reconcile — он пишет error
+            // по каждому невосстановленному дню, и этот error теперь доходит до GlitchTip.
+            return self::SUCCESS;
         }
     }
 }
