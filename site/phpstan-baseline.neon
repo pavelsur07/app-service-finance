@@ -4051,12 +4051,6 @@ parameters:
 			path: src/Ingestion/Application/Action/NormalizeRawRecordAction.php
 
 		-
-			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: src/Ingestion/Application/Action/RefreshOzonAccrualCategoryMetadataAction.php
-
-		-
 			message: '#^Parameter \#5 \$newValues of method App\\Ingestion\\Application\\Action\\UpdateExternalCategoryMappingAction\:\:audit\(\) expects array\<string, mixed\>, array\<string, mixed\>\|null given\.$#'
 			identifier: argument.type
 			count: 2

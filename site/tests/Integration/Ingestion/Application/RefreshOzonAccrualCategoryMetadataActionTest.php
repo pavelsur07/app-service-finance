@@ -241,6 +241,45 @@ final class RefreshOzonAccrualCategoryMetadataActionTest extends IntegrationTest
         self::assertSame(0, $resultRows[0]['updated']);
     }
 
+    /**
+     * Прод-масштаб: упавшие raw-записи из GlitchTip issue 252/262 содержали
+     * 5 664–7 753 строк каждая (см. docs/tasks/ozon-accrual-refresh-oom/task.md).
+     * До правки refresh() материализовал decoded-строки в полный array ДО передачи
+     * в маппер, который строил из них ещё один полный array MappedTransaction —
+     * оба разом в памяти. Тест не измеряет память (значение зависит от окружения,
+     * PHP-версии, coverage-драйвера — порог был бы хрупким в CI), но фиксирует
+     * корректность на реальном масштабе, чтобы регрессия обратно к
+     * iterator_to_array() была видна хотя бы по функциональному поведению.
+     */
+    public function testRefreshHandlesRawRecordAtProductionIncidentScale(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $rowCount = 6000;
+        $rows = [];
+        for ($i = 0; $i < $rowCount; ++$i) {
+            $rows[] = $this->unknownFeeRow(1001 + $i, sprintf('LargeShopUnknownFee-%d', $i), sprintf('-%d.%02d', $i + 1, $i % 100));
+        }
+
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-05:2026-06-05',
+            rows: $rows,
+        );
+        $record->markNormalizationDone();
+        $this->em->flush();
+
+        /** @var RefreshOzonAccrualCategoryMetadataAction $action */
+        $action = self::getContainer()->get(RefreshOzonAccrualCategoryMetadataAction::class);
+        $resultRows = $action->refresh($companyId, [['id' => $record->getId()]], dryRun: false);
+
+        self::assertSame('done', $resultRows[0]['status']);
+        self::assertSame($rowCount, $resultRows[0]['scanned']);
+        self::assertSame($rowCount, $resultRows[0]['missing']);
+        self::assertSame(0, $resultRows[0]['updated']);
+    }
+
     private function refreshActionWithFirstFlushFailure(): RefreshOzonAccrualCategoryMetadataAction
     {
         $entityManager = new class($this->em) extends EntityManagerDecorator {

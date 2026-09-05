@@ -115,14 +115,20 @@ final readonly class RefreshOzonAccrualCategoryMetadataAction
                     throw new \RuntimeException('Done Ozon accrual raw record was not found.');
                 }
 
-                /** @var list<array<string, mixed>> $rows */
-                $rows = array_values(iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $companyId), false));
+                // rawStorageFacade->read() уже yield-ит по строке (RawNdjsonCodec
+                // декодирует NDJSON лениво), а mapForCategoryMetadataRefresh() перебирает
+                // $rows единственным проходом (preview() внутри — один foreach, без
+                // повторного чтения). Материализовывать в array здесь было незачем: для
+                // raw-записи в 5-8 тыс. строк (обычный размер суточной пачки для крупных
+                // шопов) это держало в памяти одновременно и полный набор decoded строк,
+                // и полный набор построенных MappedTransaction — см.
+                // docs/tasks/ozon-accrual-refresh-oom/task.md. Generator передаётся как
+                // есть; повторно $rows нигде не используется.
                 $mappedTransactions = $this->mapper->mapForCategoryMetadataRefresh(
                     rawRecord: $rawRecord,
-                    rows: $rows,
+                    rows: $this->rawStorageFacade->read($rawRecord->getId(), $companyId),
                     recordUnknownCategories: !$dryRun,
                 );
-                unset($rows);
 
                 $scanned = 0;
                 $matched = 0;
