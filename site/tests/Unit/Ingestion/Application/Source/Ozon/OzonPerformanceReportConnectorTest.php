@@ -109,7 +109,7 @@ final class OzonPerformanceReportConnectorTest extends TestCase
                         'endpoint' => '/api/client/campaign/13815400/objects',
                         'campaignId' => '13815400',
                         'skippedReason' => 'campaign_not_found',
-                        'responseBody' => '{"error":"campaign not found"}',
+                        'responseBody' => '{"error":"Объект не найден"}',
                     ],
                     'campaignId' => '13815400',
                     'campaignOffset' => 0,
@@ -257,7 +257,7 @@ final class FakeOzonPerformanceReportClient implements OzonPerformanceReportClie
     public function fetchCampaignObjects(string $companyId, string $connectionRef, string $campaignId): OzonRawPage
     {
         if (($this->missingCampaignObjects[$campaignId] ?? false) === true) {
-            throw new OzonPerformanceCampaignNotFoundException($campaignId, sprintf('/api/client/campaign/%s/objects', $campaignId), '{"error":"campaign not found"}');
+            throw new OzonPerformanceCampaignNotFoundException($campaignId, sprintf('/api/client/campaign/%s/objects', $campaignId), '{"error":"Объект не найден"}');
         }
 
         return new OzonRawPage([['campaign_id' => $campaignId, 'sku' => 'sku-1']], false);

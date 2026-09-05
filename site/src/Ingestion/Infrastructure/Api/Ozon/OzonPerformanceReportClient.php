@@ -277,7 +277,7 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
 
         $statusCode = $response->getStatusCode();
         $content = $response->getContent(false);
-        $this->classifyStatus($statusCode, $endpoint, $content);
+        $this->classifyStatus($companyId, $connectionRef, $statusCode, $endpoint, $content);
 
         return $content;
     }
@@ -399,7 +399,7 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
         });
     }
 
-    private function classifyStatus(int $statusCode, string $endpoint, string $content): void
+    private function classifyStatus(string $companyId, string $connectionRef, int $statusCode, string $endpoint, string $content): void
     {
         if (401 === $statusCode || 403 === $statusCode) {
             throw new ConnectorAuthException(sprintf('Ozon Performance auth failed for %s.', $endpoint));
@@ -413,12 +413,27 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
             throw new ConnectorTransientException(sprintf('Ozon Performance server error %d for %s.', $statusCode, $endpoint));
         }
 
+        // Эндпоинт адресует ровно одну сущность — кампанию, поэтому 404 на нём
+        // означает только её отсутствие. Текст ответа не проверяем: Ozon отдаёт
+        // его на русском ({"error":"Объект не найден"}), и завязка на подстроку
+        // 'campaign not found' три месяца роняла синхронизацию вместо пропуска.
+        // Неверный base URL сюда не доходит: он падает раньше, на /api/client/token.
         if (
             404 === $statusCode
             && preg_match('#^/api/client/campaign/([^/]+)/objects$#', $endpoint, $matches)
-            && str_contains(strtolower($content), 'campaign not found')
         ) {
-            throw new OzonPerformanceCampaignNotFoundException(rawurldecode($matches[1]), $endpoint, mb_substr($content, 0, 500));
+            $campaignId = rawurldecode($matches[1]);
+            // warning, а не error: пропуск удалённой кампании — ожидаемое
+            // состояние, которое обрабатывается само и не требует инцидента.
+            $this->logger->warning('Ozon Performance campaign is unavailable, skipping its objects.', [
+                'companyId' => $companyId,
+                'connectionRef' => $connectionRef,
+                'campaignId' => $campaignId,
+                'endpoint' => $endpoint,
+                'statusCode' => $statusCode,
+            ]);
+
+            throw new OzonPerformanceCampaignNotFoundException($campaignId, $endpoint, mb_substr($content, 0, 500));
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
