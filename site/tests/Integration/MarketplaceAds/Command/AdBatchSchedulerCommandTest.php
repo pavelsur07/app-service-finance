@@ -177,7 +177,12 @@ final class AdBatchSchedulerCommandTest extends PostgresResetTestCase
         $tester = $this->makeCommandTester();
         $exit = $tester->execute([]);
 
-        self::assertSame(Command::FAILURE, $exit, 'Transient — exit FAILURE, чтобы cron-обвязка видела факт');
+        self::assertSame(
+            Command::SUCCESS,
+            $exit,
+            'Transient — exit SUCCESS: cron-обвязка превращает ненулевой код в error, '
+            .'а это состояние обрабатывается само (batch остаётся PLANNED, следующий тик повторит)',
+        );
 
         $this->em->clear();
         $reloaded = $this->batchRepo->find($batch->getId());

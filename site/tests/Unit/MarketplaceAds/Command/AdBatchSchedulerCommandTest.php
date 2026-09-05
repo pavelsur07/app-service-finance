@@ -150,7 +150,11 @@ final class AdBatchSchedulerCommandTest extends TestCase
         self::assertStringContainsString('permanent', (string) $batch->getLastError());
     }
 
-    public function testTransientFailureRollsBackAndExitsFailure(): void
+    /**
+     * Изменение поведения: transient-путь возвращает SUCCESS. Код возврата — канал
+     * алертинга, а строкой выше то же состояние объявлено warning'ом и не инцидентом.
+     */
+    public function testTransientFailureRollsBackAndExitsSuccess(): void
     {
         $batch = $this->buildBatch();
 
@@ -167,7 +171,7 @@ final class AdBatchSchedulerCommandTest extends TestCase
         $this->connection->expects(self::never())->method('commit');
 
         $tester = new CommandTester($this->command);
-        self::assertSame(1, $tester->execute([]), 'Transient — FAILURE');
+        self::assertSame(0, $tester->execute([]), 'Transient — SUCCESS: batch остаётся PLANNED, cron повторит');
 
         // Объект batch в памяти не изменился на successful path'е,
         // но мог быть частично модифицирован — это неважно, rollback на уровне БД
@@ -205,7 +209,7 @@ final class AdBatchSchedulerCommandTest extends TestCase
         );
 
         $tester = new CommandTester($command);
-        self::assertSame(1, $tester->execute([]));
+        self::assertSame(0, $tester->execute([]));
     }
 
     private function buildBatch(): AdScheduledBatch
