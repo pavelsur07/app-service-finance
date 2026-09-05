@@ -16,6 +16,9 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -158,18 +161,33 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         ], $page->rows);
     }
 
-    public function testFetchCampaignObjectsRaisesTypedExceptionWhenCampaignIsMissing(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function campaignNotFoundBodyProvider(): iterable
+    {
+        // Тело, которое Ozon отдаёт в проде. До 2026-09-05 распознавание 404
+        // опиралось на подстроку 'campaign not found', поэтому реальный ответ
+        // на русском не распознавался и улетал generic RuntimeException.
+        yield 'russian body returned by production' => ['{"error":"Объект не найден"}'];
+        yield 'english body' => ['{"error":"campaign not found"}'];
+        yield 'body without any hint' => ['{"code":5,"details":[]}'];
+        yield 'empty body' => [''];
+    }
+
+    #[DataProvider('campaignNotFoundBodyProvider')]
+    public function testFetchCampaignObjectsRaisesTypedExceptionWhenCampaignIsMissing(string $responseBody): void
     {
         $company = $this->seedCompany('11111111-1111-4111-8111-00000000b209', 9209);
         $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b209');
         $this->em->flush();
 
-        $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
+        $http = new MockHttpClient(static function (string $method, string $url) use ($responseBody): MockResponse {
             if (str_ends_with($url, '/api/client/token')) {
                 return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
             }
             if (str_ends_with($url, '/api/client/campaign/13815400/objects')) {
-                return new MockResponse('{"error":"campaign not found"}', ['http_code' => 404]);
+                return new MockResponse($responseBody, ['http_code' => 404]);
             }
 
             throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
@@ -179,6 +197,77 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         $this->expectExceptionMessage('campaign "13815400" was not found');
 
         $this->client($http)->fetchCampaignObjects($company->getId(), $connection->getId(), '13815400');
+    }
+
+    public function testCampaignNotFoundExceptionCarriesResponseBodyForDiagnostics(): void
+    {
+        $companyId = '11111111-1111-4111-8111-00000000b210';
+        $company = $this->seedCompany($companyId, 9210);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b210');
+        $this->em->flush();
+
+        $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_ends_with($url, '/api/client/campaign/12871922/objects')) {
+                return new MockResponse('{"error":"Объект не найден"}', ['http_code' => 404]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $logger = $this->collectingLogger();
+
+        try {
+            $this->client($http, $logger)->fetchCampaignObjects($companyId, $connection->getId(), '12871922');
+            self::fail('Expected OzonPerformanceCampaignNotFoundException.');
+        } catch (OzonPerformanceCampaignNotFoundException $exception) {
+            self::assertSame('12871922', $exception->campaignId);
+            self::assertSame('/api/client/campaign/12871922/objects', $exception->endpoint);
+            self::assertSame('{"error":"Объект не найден"}', $exception->responseBody);
+        }
+
+        // Пропуск обязан быть виден в логах, иначе отсутствие рекламных данных
+        // по кампании становится необъяснимым. Уровень warning, не error.
+        $warnings = array_values(array_filter(
+            $logger->records,
+            static fn (array $record): bool => 'warning' === $record['level'],
+        ));
+
+        self::assertCount(1, $warnings);
+        self::assertSame('Ozon Performance campaign is unavailable, skipping its objects.', $warnings[0]['message']);
+        self::assertSame($companyId, $warnings[0]['context']['companyId']);
+        self::assertSame('12871922', $warnings[0]['context']['campaignId']);
+        self::assertSame(404, $warnings[0]['context']['statusCode']);
+    }
+
+    public function testNotFoundOnOtherEndpointStaysGenericInsteadOfBeingSkipped(): void
+    {
+        $companyId = '11111111-1111-4111-8111-00000000b211';
+        $company = $this->seedCompany($companyId, 9211);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b211');
+        $this->em->flush();
+
+        $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+            if (str_contains($url, '/api/client/campaign')) {
+                return new MockResponse('{"error":"Объект не найден"}', ['http_code' => 404]);
+            }
+
+            throw new \LogicException(sprintf('Unexpected request: %s %s', $method, $url));
+        });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Ozon Performance returned HTTP 404 for /api/client/campaign');
+
+        try {
+            $this->client($http)->listCampaigns($companyId, $connection->getId(), ['SKU']);
+        } catch (OzonPerformanceCampaignNotFoundException) {
+            self::fail('A 404 outside the campaign-objects endpoint must not be treated as a missing campaign.');
+        }
     }
 
     public function testRejectsMismatchedConnectionRefInsteadOfFallingBackToCompanyCredentials(): void
@@ -338,15 +427,31 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         ], $page->rows);
     }
 
-    private function client(MockHttpClient $http): OzonPerformanceReportClient
+    private function client(MockHttpClient $http, ?LoggerInterface $logger = null): OzonPerformanceReportClient
     {
         return new OzonPerformanceReportClient(
             $http,
             self::getContainer()->get(MarketplaceFacade::class),
             new ArrayAdapter(),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
             'https://api-performance.ozon.ru',
         );
+    }
+
+    /**
+     * @return AbstractLogger&object{records: list<array{level: string, message: string, context: array<string, mixed>}>}
+     */
+    private function collectingLogger(): AbstractLogger
+    {
+        return new class extends AbstractLogger {
+            /** @var list<array{level: string, message: string, context: array<string, mixed>}> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = ['level' => (string) $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
     }
 
     private function seedCompany(string $companyId, int $ownerIndex): Company
