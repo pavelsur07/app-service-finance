@@ -223,6 +223,19 @@ services:
             - site_storage:/app/var/storage
             - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
+        # Единственный PHP-сервис без лимита памяти был единственным, чей OOM
+        # зависел от состояния всего хоста, а не своего cgroup — ad-hoc команды
+        # (app:ingestion:ozon-accrual:daily-maintenance --execute и подобные)
+        # порождают подпроцессы с собственным memory_limit=1024M
+        # (docker/common/php/conf.d/memory-limit.ini); 1536M — этот подпроцесс
+        # плюс родительский PHP-процесс и заметный запас, а не произвольное
+        # число. См. docs/tasks/ozon-accrual-refresh-oom/task.md.
+        deploy:
+            resources:
+                limits:
+                    memory: 1536M
+                reservations:
+                    memory: 128M
 
     site-messenger-worker-sync:
         image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
