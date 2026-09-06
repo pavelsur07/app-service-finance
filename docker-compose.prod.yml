@@ -476,6 +476,31 @@ services:
             site-redis:
                 condition: service_healthy
         restart: unless-stopped
+        # Последний PHP-сервис, остававшийся без cgroup-лимита вовсе.
+        #
+        # 3G — не замер, а осознанно щедрая оценка сверху по составу расписания:
+        # фон из 4–8 одновременных процессов (четыре ежеминутные ads-задачи плюс
+        # 2/5/10/30-минутные, совпадающие на минуте :00 каждого получаса) и до ~2G
+        # от app:ingestion:ozon-accrual:daily-maintenance — она порождает подпроцесс,
+        # который стартует как новый php, читает php.ini (1024M) и родительский
+        # `-d memory_limit=1G` не наследует.
+        #
+        # Задача лимита здесь не экономить память, а перевести отказ из host-wide OOM
+        # (ядро выбирает жертву само и может убить посторонний сервис) в
+        # container-scoped, и включить счётчики memory.events, которых без лимита нет.
+        # Слишком тесный лимит был бы опаснее отсутствующего: supercronic схлопывает
+        # все отказы cron в один issue GlitchTip, поэтому регулярный OOM-килл отдельной
+        # команды был бы тихим.
+        #
+        # Уточнение числа — по `cat /sys/fs/cgroup/memory.peak` внутри контейнера после
+        # полного цикла, включая месячную задачу `0 6 5 * *`.
+        # См. docs/tasks/scheduler-cgroup-limit/task.md.
+        deploy:
+            resources:
+                limits:
+                    memory: 3G
+                reservations:
+                    memory: 256M
 
 volumes:
     site_storage:
