@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAnalytics\Infrastructure\Query;
 
+use App\Inventory\Application\DTO\StockOnDateResult;
 use App\Inventory\Facade\InventoryFacade;
 use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
 use App\Marketplace\DTO\ListingMetaDTO;
@@ -110,7 +111,11 @@ final class UnitExtendedQueryTest extends TestCase
         $this->marketplaceFacade->method('getListingsMetaByIds')
             ->willReturnCallback(fn (): array => $this->listingMeta);
         $this->inventoryFacade->method('getStockQtyByListingOnReportDate')
-            ->willReturnCallback(fn (): array => $this->stockQtyByListing);
+            ->willReturnCallback(fn (): StockOnDateResult => new StockOnDateResult(
+                $this->stockQtyByListing,
+                [] === $this->stockQtyByListing ? [] : ['ozon' => '2026-04-30'],
+                [],
+            ));
         $this->adsFacade->method('getAdSpendByListingForPeriod')
             ->willReturnCallback(function (
                 string $companyId,

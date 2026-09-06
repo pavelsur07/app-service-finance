@@ -50,7 +50,12 @@ final readonly class UnitExtendedQuery
         // sales/returns/costs are intentionally NOT merged into $allListingIds — the row
         // would be empty otherwise; their spend is still counted in totals via
         // getTotalAdCostForPeriod() below (which includes non-attributed too).
-        $stockQtyByListing = $this->inventoryFacade->getStockQtyByListingOnReportDate($companyId, $to);
+
+        // Контракт фасада Inventory отдаёт происхождение данных (дата снапшота, протухшие
+        // источники). Здесь пока используется только карта количеств — замена нуля на
+        // явное «нет данных» идёт отдельным этапом, чтобы этот шаг не менял вид отчёта.
+        $stockOnDate = $this->inventoryFacade->getStockQtyByListingOnReportDate($companyId, $to);
+        $stockQtyByListing = $stockOnDate->qtyByListingId;
 
         $adSpendByListing = $this->adsFacade->getAdSpendByListingForPeriod(
             $companyId,

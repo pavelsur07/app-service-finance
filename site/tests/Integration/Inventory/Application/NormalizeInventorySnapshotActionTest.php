@@ -213,7 +213,9 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         self::assertSame('3.000', $byVariantAndStatus['2'][StockStatus::InTransitToCustomer->value]->getQuantity());
         self::assertSame('2.000', $byVariantAndStatus['2'][StockStatus::InTransitFromCustomer->value]->getQuantity());
 
-        $stockByListing = self::getContainer()->get(StockQtyByListingOnDateQuery::class)->execute($company->getId(), new \DateTimeImmutable());
+        $stockByListing = self::getContainer()->get(StockQtyByListingOnDateQuery::class)
+            ->execute($company->getId(), new \DateTimeImmutable())
+            ->qtyByListingId;
         self::assertCount(2, $stockByListing);
         self::assertSame(4.0, $stockByListing[$listing42->getId()]);
         self::assertSame(6.0, $stockByListing[$listing44->getId()]);
@@ -299,7 +301,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         $stockByListing = self::getContainer()->get(StockQtyByListingOnDateQuery::class)->execute(
             $company->getId(),
             new \DateTimeImmutable('2026-06-02'),
-        );
+        )->qtyByListingId;
 
         self::assertSame([$listing->getId() => 12.0], $stockByListing);
     }
