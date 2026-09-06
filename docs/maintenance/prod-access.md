@@ -12,6 +12,8 @@
 ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-psql-ro -c \"SELECT ...;\"" < /dev/null
 ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-docker-ps" < /dev/null
 ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-console <allowed-command> ..." < /dev/null
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-cgroup" < /dev/null
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-cgroup <container>" < /dev/null
 ```
 
 Обязательные элементы формы:
@@ -45,8 +47,9 @@ docker compose -f <compose> run --rm --no-deps -T site-php-cli bin/console <cmd>
 - Формы вызова из предыдущего раздела **не изменились** — меняется только то, что
   происходит на проде после `sudo /usr/local/bin/codex-console`.
 
-Референсная копия wrapper'а — `docs/maintenance/codex-console.sh`. Она не применяется
-автоматически: файл на проде обновляет только Владелец.
+Референсные копии wrapper'ов — `docs/maintenance/codex-console.sh` и
+`docs/maintenance/codex-cgroup.sh`. Они не применяются автоматически: файлы на проде
+обновляет только Владелец, он же правит sudoers.
 
 ## Ручная диагностика Владельца
 
@@ -90,6 +93,13 @@ Read-only проверки можно выполнять после запрос
 - Живость SMTP через `codex-console app:mailer:healthcheck` — SMTP handshake с AUTH, письмо не отправляется, данные не меняются. Мутирующего режима и флагов у команды нет. Учитывать: сбой пишет `error` и заводит issue в GlitchTip, поэтому ручной прогон при мёртвой почте создаёт алерт.
 - Сверка строк разбивки ДДС через `codex-console app:cash:verify-transaction-splits` — только чтение, ненулевой exit code при расхождении. Wrapper запрещает этой команде любые аргументы.
 - Read-only SQL через `codex-psql-ro` и роль БД `codex_ro`.
+- Память cgroup контейнеров через `codex-cgroup`: без аргумента — таблица
+  `LIMIT / CURRENT / PEAK / PEAK% / OOM_KILL` по всем работающим, с именем
+  контейнера — подробности и полный `memory.events`. Нужен для подбора лимитов
+  памяти: `memory.peak` даёт high-water mark одним чтением, без сэмплирования
+  `docker stats`. Не использует `docker exec` — внутри контейнеров не запускается
+  ни один процесс, всё читается с хоста через cgroupfs. `memory.peak` обнуляется
+  при пересоздании контейнера, то есть при каждом деплое.
 
 Перед выполнением команд, которые меняют данные, обрабатывают очереди, вызывают внешние API или меняют состояние приложения, нужно явное подтверждение Владельца непосредственно перед запуском:
 - `messenger:consume`.
