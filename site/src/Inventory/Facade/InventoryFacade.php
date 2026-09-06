@@ -28,9 +28,15 @@ final readonly class InventoryFacade
      * 4) Если snapshot до даты отчёта отсутствует — возвращается пустой результат.
      *
      * Отсутствие листинга в qtyByListingId означает «остаток неизвестен», а не «ноль».
+     *
+     * $marketplace сужает выборку до одного источника ('ozon', 'wildberries');
+     * null — все источники компании.
      */
-    public function getStockQtyByListingOnReportDate(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
-    {
-        return $this->stockQtyByListingOnDateQuery->execute($companyId, $reportDate);
+    public function getStockQtyByListingOnReportDate(
+        string $companyId,
+        \DateTimeImmutable $reportDate,
+        ?string $marketplace = null,
+    ): StockOnDateResult {
+        return $this->stockQtyByListingOnDateQuery->execute($companyId, $reportDate, $marketplace);
     }
 }

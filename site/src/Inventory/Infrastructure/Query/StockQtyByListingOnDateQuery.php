@@ -27,9 +27,26 @@ final readonly class StockQtyByListingOnDateQuery
      * LEFT JOIN нужен именно для этого: он оставляет строку с датой даже для
      * отброшенного источника, поэтому «данных нет» отличимо от «данные протухли»
      * без второго запроса.
+     *
+     * $marketplace сужает выборку до одного источника. Он обязателен там, где
+     * вызывающий код сам отфильтрован по маркетплейсу: без него в отчёт по Ozon
+     * попали бы остатки Wildberries.
      */
-    public function execute(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
+    public function execute(string $companyId, \DateTimeImmutable $reportDate, ?string $marketplace = null): StockOnDateResult
     {
+        $params = [
+            'companyId' => $companyId,
+            'reportDate' => $reportDate->format('Y-m-d'),
+            'status' => StockStatus::Available->value,
+            'earliestAcceptableDate' => $this->freshnessPolicy->earliestAcceptableDate($reportDate)->format('Y-m-d'),
+        ];
+
+        $sourceFilter = '';
+        if (null !== $marketplace) {
+            $sourceFilter = ' AND candidate.source = :marketplace';
+            $params['marketplace'] = $marketplace;
+        }
+
         $rows = $this->connection->fetchAllAssociative(
             'WITH latest_sessions AS (
                 SELECT DISTINCT ON (candidate.source)
@@ -39,7 +56,7 @@ final readonly class StockQtyByListingOnDateQuery
                 FROM inventory_stock_snapshots candidate
                 WHERE candidate.company_id = :companyId
                   AND candidate.snapshot_date <= :reportDate
-                  AND candidate.listing_id IS NOT NULL
+                  AND candidate.listing_id IS NOT NULL'.$sourceFilter.'
                 ORDER BY
                     candidate.source,
                     candidate.snapshot_date DESC,
@@ -60,12 +77,7 @@ final readonly class StockQtyByListingOnDateQuery
                AND s.listing_id IS NOT NULL
                AND latest.snapshot_date >= :earliestAcceptableDate
              GROUP BY latest.source, latest.snapshot_date, s.listing_id',
-            [
-                'companyId' => $companyId,
-                'reportDate' => $reportDate->format('Y-m-d'),
-                'status' => StockStatus::Available->value,
-                'earliestAcceptableDate' => $this->freshnessPolicy->earliestAcceptableDate($reportDate)->format('Y-m-d'),
-            ],
+            $params,
         );
 
         $qtyByListingId = [];

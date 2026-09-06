@@ -52,6 +52,8 @@ final class UnitExtendedQueryTest extends TestCase
     private array $listingMeta = [];
     /** @var array<string, float> */
     private array $stockQtyByListing = [];
+    /** @var array{string, \DateTimeImmutable, ?string}|null */
+    private ?array $lastStockCall = null;
     /** @var array<string, string> */
     private array $adSpendByListing = [];
     private string $totalAdSpend = '0';
@@ -111,11 +113,19 @@ final class UnitExtendedQueryTest extends TestCase
         $this->marketplaceFacade->method('getListingsMetaByIds')
             ->willReturnCallback(fn (): array => $this->listingMeta);
         $this->inventoryFacade->method('getStockQtyByListingOnReportDate')
-            ->willReturnCallback(fn (): StockOnDateResult => new StockOnDateResult(
-                $this->stockQtyByListing,
-                [] === $this->stockQtyByListing ? [] : ['ozon' => '2026-04-30'],
-                [],
-            ));
+            ->willReturnCallback(function (
+                string $companyId,
+                \DateTimeImmutable $reportDate,
+                ?string $marketplace = null,
+            ): StockOnDateResult {
+                $this->lastStockCall = [$companyId, $reportDate, $marketplace];
+
+                return new StockOnDateResult(
+                    $this->stockQtyByListing,
+                    [] === $this->stockQtyByListing ? [] : ['ozon' => '2026-04-30'],
+                    [],
+                );
+            });
         $this->adsFacade->method('getAdSpendByListingForPeriod')
             ->willReturnCallback(function (
                 string $companyId,
@@ -618,6 +628,112 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertNull($result['totals']['drrPercent']);
         self::assertNull($result['totals']['marginPercent']);
         self::assertNull($result['totals']['roiPercent']);
+    }
+
+    public function testListingWithStockAndNoMovementProducesRow(): void
+    {
+        // Залежавшийся товар: остаток есть, за период ни продаж, ни возвратов, ни затрат.
+        // До этого изменения такая позиция в отчёт не попадала вовсе.
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-dead-stock' => 17.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-dead-stock', 'Залежавшийся товар', 'SKU-DEAD', 'ozon', 'ART-DEAD'),
+        ]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-dead-stock');
+
+        self::assertNotNull($row, 'Листинг с остатком обязан давать строку даже без движения за период.');
+        self::assertSame(17.0, $row['stockQty']);
+        self::assertSame('Залежавшийся товар', $row['title']);
+        self::assertSame('SKU-DEAD', $row['sku']);
+        self::assertSame('ozon', $row['marketplace']);
+        self::assertSame(0.0, $row['revenue']);
+        self::assertSame(0, $row['quantity']);
+    }
+
+    public function testListingWithZeroStockAndNoMovementProducesNoRow(): void
+    {
+        // Строка «остаток 0, движения нет» ничего не сообщает — это чистый шум.
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-zero-stock' => 0.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-zero-stock', 'Нулевой остаток', 'SKU-ZERO', 'ozon'),
+        ]);
+
+        $result = $this->execute();
+
+        self::assertNull($this->findRow($result['items'], 'l-zero-stock'));
+        self::assertSame([], $result['items']);
+    }
+
+    public function testStockOnlyRowsDoNotChangeMovementTotals(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-sold', 'Проданный', 'SKU-SOLD', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-sold' => 2.0, 'l-dead-stock' => 17.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-dead-stock', 'Залежавшийся товар', 'SKU-DEAD', 'ozon'),
+        ]);
+
+        $result = $this->execute();
+
+        self::assertCount(2, $result['items'], 'Обе позиции должны присутствовать.');
+        self::assertSame(1000.0, $result['totals']['revenue']);
+        self::assertSame(5, $result['totals']['quantity']);
+        self::assertSame(0.0, $result['totals']['returnsTotal']);
+        self::assertSame(0, $result['totals']['returnsQuantity']);
+        self::assertSame(300.0, $result['totals']['costPriceTotal']);
+    }
+
+    public function testStockOnlyListingIsSubjectToTagFilter(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-tagged' => 3.0, 'l-untagged' => 4.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-tagged', 'С тегом', 'SKU-T', 'ozon'),
+            new ListingMetaDTO('l-untagged', 'Без тега', 'SKU-U', 'ozon'),
+        ]);
+        $this->tagsByListing = ['l-tagged' => ['tag-1']];
+
+        $result = $this->execute(tagIds: ['tag-1']);
+
+        self::assertNotNull($this->findRow($result['items'], 'l-tagged'));
+        self::assertNull($this->findRow($result['items'], 'l-untagged'));
+    }
+
+    public function testMarketplaceFilterIsForwardedToInventoryFacade(): void
+    {
+        // Остатки хранятся по всем источникам компании. Без проброса фильтра
+        // отчёт по Ozon получил бы строки листингов Wildberries.
+        $this->stubSales([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty([]);
+
+        $this->execute();
+
+        self::assertNotNull($this->lastStockCall);
+        self::assertSame(self::COMPANY_ID, $this->lastStockCall[0]);
+        self::assertSame(self::PERIOD_TO, $this->lastStockCall[1]->format('Y-m-d'));
+        self::assertSame('ozon', $this->lastStockCall[2]);
     }
 
     /**

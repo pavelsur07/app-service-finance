@@ -53,9 +53,20 @@ final readonly class UnitExtendedQuery
 
         // Контракт фасада Inventory отдаёт происхождение данных (дата снапшота, протухшие
         // источники). Здесь пока используется только карта количеств — замена нуля на
-        // явное «нет данных» идёт отдельным этапом, чтобы этот шаг не менял вид отчёта.
-        $stockOnDate = $this->inventoryFacade->getStockQtyByListingOnReportDate($companyId, $to);
+        // явное «нет данных» идёт отдельным этапом.
+        //
+        // $marketplace передаётся обязательно: остатки хранятся по всем источникам
+        // компании, и без фильтра в отчёт по Ozon попали бы листинги Wildberries.
+        $stockOnDate = $this->inventoryFacade->getStockQtyByListingOnReportDate($companyId, $to, $marketplace);
         $stockQtyByListing = $stockOnDate->qtyByListingId;
+
+        // Листинги с ненулевым остатком — самостоятельный источник строк (см. merge ниже).
+        // Нулевой остаток сюда не входит: строка «остаток 0, движения нет» ничего не
+        // сообщает, а позиция, которая обнулилась и продавалась в периоде, придёт из продаж.
+        $stockedListingIds = array_keys(array_filter(
+            $stockQtyByListing,
+            static fn (float $qty): bool => $qty > 0.0,
+        ));
 
         $adSpendByListing = $this->adsFacade->getAdSpendByListingForPeriod(
             $companyId,
@@ -64,12 +75,18 @@ final readonly class UnitExtendedQuery
             $marketplace,
         );
 
-        // Merge all unique listing IDs from three sources so listings
-        // with only returns or costs are not lost
+        // Merge all unique listing IDs from four sources so listings
+        // with only returns, costs or stock are not lost.
+        //
+        // Для рекламы выше принято обратное решение — не мёржить, потому что строка
+        // получилась бы пустой. С остатками рассуждение противоположное: строка не
+        // пустая, в ней остаток и капитал в остатках, и именно залежавшийся товар
+        // без движения — то, ради чего остатки и загружаются.
         $allListingIds = array_unique(array_merge(
             array_keys($sales),
             array_keys($returns),
             array_keys($costs),
+            $stockedListingIds,
         ));
 
         // Фильтр по тегам сужает набор ДО цикла, поэтому totals считаются уже по
