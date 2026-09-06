@@ -33,10 +33,16 @@ GlitchTip:
 **1. `site-php-cli` — единственный PHP-сервис в `docker-compose.prod.yml` без лимита памяти.**
 У `site-php-fpm` (800M), `site-messenger-worker-sync` (256M), `-pipeline` (768M),
 `-wb-finance` (256M), `-ads` (256M) есть явный `deploy.resources.limits.memory`.
-У `site-php-cli` — контейнера, в котором выполняются ad-hoc команды через `codex-console` и
-внутри которого `OzonAccrualCategoryMetadataBulkRunner` порождает подпроцессы, — лимита нет
-вовсе. OOM здесь не предсказуем cgroup-ом контейнера, а зависит от того, сколько свободной
-памяти на хосте есть в момент запуска — то есть от состояния совершенно посторонних сервисов.
+У `site-php-cli` лимита не было вовсе.
+
+> **Коррекция 2026-09-06.** Здесь стояло утверждение, что ad-hoc команды через
+> `codex-console` выполняются именно в `site-php-cli`. Это неверно: прямое чтение
+> `/usr/local/bin/codex-console` показало `docker exec` внутрь
+> `site-messenger-worker-sync` (cgroup 256M). То есть добавленный этой задачей лимит
+> 1536M на `site-php-cli` действовал только на миграционный шаг деплоя
+> (`deploy.yml`, `docker compose run --rm ... site-php-cli`), а на путь `codex-console`
+> не влиял никак. Разбор — `docs/tasks/scheduler-memory-limit/task.md`; путь исполнения
+> исправлен там же.
 
 **2. `RefreshOzonAccrualCategoryMetadataAction::refresh()` держит в памяти всю raw-запись
 целиком, а не потоково.**
