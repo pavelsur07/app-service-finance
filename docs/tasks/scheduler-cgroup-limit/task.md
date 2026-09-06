@@ -120,10 +120,21 @@ docker exec scheduler cat /sys/fs/cgroup/memory.events   # счётчики low/
 3. Записать значение до любых изменений: после установки лимита восстановить его будет
    нечем (см. «Замеры "до" снимать до изменения» в `CLAUDE.md`).
 
-**Ограничение доступа:** существующие wrapper-ы (`codex-console`, `codex-psql-ro`,
-`codex-docker-ps`) команды `docker exec ... cat` не дают, а `codex-console` принимает
-только Symfony-команды из allowlist. Значит замер выполняет Владелец вручную, либо
-добавляется новый read-only wrapper. Агент себе прав не расширяет.
+**Ограничение доступа (снято 2026-09-06).** Существующие wrapper-ы (`codex-console`,
+`codex-psql-ro`, `codex-docker-ps`) команды `docker exec ... cat` не дают, а
+`codex-console` принимает только Symfony-команды из allowlist. Поэтому заведён
+четвёртый read-only wrapper — `codex-cgroup`, референсная копия в
+`docs/maintenance/codex-cgroup.sh`. Он читает cgroup **с хоста**, без `docker exec`,
+и отдаёт `memory.max` / `memory.current` / `memory.peak` / `memory.events`.
+
+После его установки Владельцем замер шага A выполняется так:
+
+```bash
+ssh -o BatchMode=yes vf-prod-codex "sudo /usr/local/bin/codex-cgroup scheduler" < /dev/null
+```
+
+До установки — Владельцем вручную через `docker exec`. Агент себе прав не расширяет:
+и файл, и строку sudoers ставит Владелец.
 
 ## Варианты решения
 
