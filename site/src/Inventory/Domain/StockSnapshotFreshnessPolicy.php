@@ -11,9 +11,12 @@ namespace App\Inventory\Domain;
  * предиката в трёх запросах рано или поздно разойдутся и дадут взаимоисключающие
  * показания о том, свежие данные или нет.
  *
- * Порог считается в днях от даты отчёта. При пороге 2 и ежедневной загрузке
- * (04:05 Ozon, 04:15 WB) отчёт переживает два подряд пропущенных прогона:
- * для отчёта на 06.09 принимаются снапшоты за 04.09 и новее.
+ * Порог считается в днях от ОПОРНОЙ даты, а не от даты отчёта напрямую. Опорная —
+ * это `min(дата отчёта, сегодня)`: см. referenceDate().
+ *
+ * При пороге 2 и ежедневной загрузке (04:05 Ozon, 04:15 WB) отчёт переживает два
+ * подряд пропущенных прогона: для опорной даты 06.09 принимаются снапшоты за 04.09
+ * и новее.
  */
 final readonly class StockSnapshotFreshnessPolicy
 {
@@ -33,15 +36,45 @@ final readonly class StockSnapshotFreshnessPolicy
     }
 
     /**
-     * Самая ранняя дата снапшота, ещё пригодная для отчёта на указанную дату.
+     * Опорная дата для оценки свежести: `min(дата отчёта, сегодня)`.
+     *
+     * Свежесть отвечает на вопрос «жива ли загрузка», а не «насколько снапшот близок
+     * к концу отчётного периода». Период может заканчиваться в будущем — пресет
+     * «текущий месяц» отдаёт последний день месяца, — и тогда сегодняшний снапшот
+     * оказался бы просроченным на три недели, а отчёт остался бы вовсе без остатков.
+     * Для периода в прошлом опорной остаётся дата отчёта: там уместен снапшот того
+     * времени, а не сегодняшний.
      */
-    public function earliestAcceptableDate(\DateTimeImmutable $reportDate): \DateTimeImmutable
+    public function referenceDate(\DateTimeImmutable $reportDate, ?\DateTimeImmutable $now = null): \DateTimeImmutable
     {
-        return $reportDate->setTime(0, 0)->modify(sprintf('-%d days', $this->maxAgeDays));
+        $today = self::calendarDate($now ?? new \DateTimeImmutable('today'));
+        $report = self::calendarDate($reportDate);
+
+        return $report < $today ? $report : $today;
     }
 
-    public function isStale(\DateTimeImmutable $snapshotDate, \DateTimeImmutable $reportDate): bool
+    /**
+     * Самая ранняя дата снапшота, ещё пригодная для указанной опорной даты.
+     */
+    public function earliestAcceptableDate(\DateTimeImmutable $referenceDate): \DateTimeImmutable
     {
-        return $snapshotDate->setTime(0, 0) < $this->earliestAcceptableDate($reportDate);
+        return self::calendarDate($referenceDate)->modify(sprintf('-%d days', $this->maxAgeDays));
+    }
+
+    public function isStale(\DateTimeImmutable $snapshotDate, \DateTimeImmutable $referenceDate): bool
+    {
+        return self::calendarDate($snapshotDate) < $this->earliestAcceptableDate($referenceDate);
+    }
+
+    /**
+     * Приводит значение к календарной дате в UTC.
+     *
+     * Сравнивать `setTime(0, 0)` недостаточно: у значений в разных часовых поясах
+     * полночь приходится на разные моменты, и календарно более поздняя дата может
+     * оказаться «меньше». Политика оперирует днями, а не моментами времени.
+     */
+    private static function calendarDate(\DateTimeImmutable $value): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable($value->format('Y-m-d'), new \DateTimeZone('UTC'));
     }
 }
