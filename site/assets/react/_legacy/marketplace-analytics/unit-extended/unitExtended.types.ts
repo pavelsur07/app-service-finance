@@ -30,7 +30,8 @@ export interface UnitExtendedItem {
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;
-    costPriceUnit: number;
+    /** null = нет проданных единиц с известной себестоимостью, а не «себестоимость ноль». */
+    costPriceUnit: number | null;
     /** null = остаток неизвестен (снапшота нет или он протух), а не «ноль». */
     stockQty: number | null;
     /** null = остаток или себестоимость единицы неизвестны. */

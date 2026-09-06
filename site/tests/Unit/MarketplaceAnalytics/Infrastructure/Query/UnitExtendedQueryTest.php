@@ -611,9 +611,8 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertNotNull($row);
         self::assertNotNull($summary);
         // costPriceQuantity = 0 означает «себестоимость единицы неизвестна», а не «равна
-        // нулю»: денежная оценка остатка в этом случае неизвестна тоже. Публичное поле
-        // costPriceUnit сохраняет прежний контракт с 0.0.
-        self::assertSame(0.0, $row['costPriceUnit']);
+        // нулю»: неизвестна и она сама, и денежная оценка остатка.
+        self::assertNull($row['costPriceUnit']);
         // Остаток именно известен — иначе тест доказывал бы другую ветку.
         self::assertSame(7.0, $row['stockQty']);
         self::assertNull($row['stockCapitalRub']);
@@ -682,6 +681,8 @@ final class UnitExtendedQueryTest extends TestCase
 
         self::assertNotNull($row);
         self::assertNotNull($summary);
+        // Продажи есть (costPriceQuantity = 2), себестоимость нулевая — это известный
+        // ноль, и он обязан остаться нулём, а не превратиться в «неизвестно».
         self::assertSame(0.0, $row['costPriceUnit']);
         self::assertSame(7.0, $row['stockQty']);
         self::assertSame(0.0, $row['stockCapitalRub']);

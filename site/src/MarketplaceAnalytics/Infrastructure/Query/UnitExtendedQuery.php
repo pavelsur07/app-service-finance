@@ -134,19 +134,20 @@ final readonly class UnitExtendedQuery
             $netSoldQty = $quantity - $returnsQuantity;
             $costPriceTotal = null !== $sale ? (float) $sale->costPriceTotal : 0.0;
             $costPriceQuantity = null !== $sale ? $sale->costPriceQuantity : 0;
-            // null = себестоимость единицы неизвестна (продаж в периоде не было),
-            // а не «равна нулю». Публичное поле costPriceUnit ниже сохраняет прежний
-            // контракт с 0.0; различие нужно только для денежной оценки остатка.
-            $knownCostPriceUnit = $costPriceQuantity > 0
+            // null = себестоимость единицы неизвестна: нет ни одной проданной единицы с
+            // известной себестоимостью, делить нечего. Продажи при этом могли быть —
+            // costPriceQuantity считает не все продажи, а только те, где себестоимость
+            // известна. Это не то же самое, что «себестоимость равна нулю»: второе
+            // возможно при известной себестоимости и должно показываться нулём.
+            $costPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
                 : null;
-            $costPriceUnit = $knownCostPriceUnit ?? 0.0;
 
             // Отсутствие листинга в карте означает «остаток неизвестен»: снапшота нет
             // или он отброшен как протухший. Ноль здесь был бы утверждением о факте.
             $stockQty = $stockQtyByListing[$listingId] ?? null;
-            $stockCapitalRub = null !== $stockQty && null !== $knownCostPriceUnit
-                ? round($stockQty * $knownCostPriceUnit, 2)
+            $stockCapitalRub = null !== $stockQty && null !== $costPriceUnit
+                ? round($stockQty * $costPriceUnit, 2)
                 : null;
 
             // Listing metadata: prefer sales source, fallback to listings table
