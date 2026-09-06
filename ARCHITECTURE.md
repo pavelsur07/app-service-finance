@@ -1471,6 +1471,34 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 
 ---
 
+### `InventoryFacade` (`src/Inventory/Facade/InventoryFacade.php`)
+
+```php
+// Остатки на дату отчёта по листингам вместе с происхождением данных.
+// Возвращает Application\DTO\StockOnDateResult, а не голую карту.
+getStockQtyByListingOnReportDate(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
+```
+
+`StockOnDateResult` (`src/Inventory/Application/DTO/StockOnDateResult.php`):
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| `qtyByListingId` | `array<string, float>` | listingId → остаток, шт. **Отсутствие ключа = остаток неизвестен, а не ноль** |
+| `snapshotDateBySource` | `array<string, string>` | marketplace → дата снапшота (`Y-m-d`), из которого взяты данные |
+| `staleSources` | `array<string, string>` | marketplace → дата последнего снапшота, отброшенного как протухший |
+
+Правило выбора snapshot: точное совпадение с датой отчёта → иначе последний с
+`snapshot_date <= reportDate` → **но не старше порога свежести**; такой источник
+попадает в `staleSources`, а его листинги в результат не входят. Остановившаяся
+загрузка не должна выглядеть здоровыми данными.
+
+Порог задаёт `Inventory\Domain\StockSnapshotFreshnessPolicy` (по умолчанию 2 дня) —
+единственное определение понятия «снапшот протух». Его же использует гейт
+`app:inventory:stock-freshness-check`, чтобы предикат не разошёлся между запросом
+и мониторингом.
+
+---
+
 ## Repository — ключевые методы MarketplaceAds
 
 > Контракты репозиториев, используемых handler'ами Ozon Ads pipeline.

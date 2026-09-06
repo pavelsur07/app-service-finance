@@ -95,9 +95,9 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'returnsTotal' => 0.0,
                 'returnsQuantity' => 0,
                 'costPriceTotal' => 0.0,
-                'costPriceUnit' => 0.0,
-                'stockQty' => 0.0,
-                'stockCapitalRub' => 0.0,
+                'costPriceUnit' => null,
+                'stockQty' => null,
+                'stockCapitalRub' => null,
                 'commission' => 0.0,
                 'commissionAverageRub' => null,
                 'adSpend' => 0.0,
@@ -214,6 +214,13 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertSame('20', (string) ($dataRows[0][$cacColumnIndex] ?? ''));
         self::assertSame('', (string) ($dataRows[2][$commissionAverageColumnIndex] ?? ''));
         self::assertSame('', (string) ($dataRows[2][$cacColumnIndex] ?? ''));
+        // Неизвестный остаток выгружается пустой ячейкой, а не нулём: ноль в выгрузке
+        // читался бы как утверждение «на складе ничего нет».
+        self::assertSame('10.5', (string) ($dataRows[0][$stockQtyColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$stockQtyColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$stockCapitalColumnIndex] ?? ''));
+        self::assertSame('80', (string) ($dataRows[0][$costUnitColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$costUnitColumnIndex] ?? ''));
 
         $totalsRow = $rows[$headerRowIndex + 4];
         self::assertSame('ИТОГО', (string) $totalsRow[0]);

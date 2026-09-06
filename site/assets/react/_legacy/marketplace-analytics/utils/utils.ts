@@ -15,6 +15,19 @@ export function formatMoney(value: string | number | null | undefined, decimals 
 /**
  * Форматирование даты YYYY-MM-DD → DD.MM.YYYY
  */
+/**
+ * Форматирование количества. null/undefined = значение неизвестно, а не ноль:
+ * показываем прочерк, как и для денежных колонок.
+ */
+export function formatQty(value: number | null | undefined, maxDecimals = 3): string {
+    if (value === null || value === undefined || Number.isNaN(value)) return '\u2014';
+
+    return value.toLocaleString('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: maxDecimals,
+    });
+}
+
 export function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return '—';
 

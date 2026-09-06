@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAnalytics\Infrastructure\Query;
 
+use App\Inventory\Application\DTO\StockOnDateResult;
 use App\Inventory\Facade\InventoryFacade;
 use App\Marketplace\DTO\ListingCostCategoryAggregateDTO;
 use App\Marketplace\DTO\ListingMetaDTO;
@@ -51,6 +52,10 @@ final class UnitExtendedQueryTest extends TestCase
     private array $listingMeta = [];
     /** @var array<string, float> */
     private array $stockQtyByListing = [];
+    /** @var array{string, \DateTimeImmutable, ?string}|null */
+    private ?array $lastStockCall = null;
+    /** @var array<string, string> */
+    private array $staleStockSources = [];
     /** @var array<string, string> */
     private array $adSpendByListing = [];
     private string $totalAdSpend = '0';
@@ -110,7 +115,19 @@ final class UnitExtendedQueryTest extends TestCase
         $this->marketplaceFacade->method('getListingsMetaByIds')
             ->willReturnCallback(fn (): array => $this->listingMeta);
         $this->inventoryFacade->method('getStockQtyByListingOnReportDate')
-            ->willReturnCallback(fn (): array => $this->stockQtyByListing);
+            ->willReturnCallback(function (
+                string $companyId,
+                \DateTimeImmutable $reportDate,
+                ?string $marketplace = null,
+            ): StockOnDateResult {
+                $this->lastStockCall = [$companyId, $reportDate, $marketplace];
+
+                return new StockOnDateResult(
+                    $this->stockQtyByListing,
+                    [] === $this->stockQtyByListing ? [] : ['ozon' => '2026-04-30'],
+                    $this->staleStockSources,
+                );
+            });
         $this->adsFacade->method('getAdSpendByListingForPeriod')
             ->willReturnCallback(function (
                 string $companyId,
@@ -161,8 +178,9 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(55.0, $row['marginPercent']);
         // roiPercent = 550 / 300 * 100 = 183.3
         self::assertSame(183.3, $row['roiPercent']);
-        self::assertSame(0.0, $row['stockQty']);
-        self::assertSame(0.0, $row['stockCapitalRub']);
+        // Остаток по этому листингу не загружался — значение неизвестно, а не ноль.
+        self::assertNull($row['stockQty']);
+        self::assertNull($row['stockCapitalRub']);
     }
 
     public function testTagFilterNarrowsItemsAndTotals(): void
@@ -577,7 +595,7 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(750.0, $row['stockCapitalRub']);
     }
 
-    public function testStockCapitalIsZeroWhenUnitCostIsZero(): void
+    public function testStockCapitalIsUnknownWhenUnitCostIsUnknown(): void
     {
         $this->stubSales([
             new ListingSalesAggregateDTO('l-zero', 'Товар', 'SKU-0', 'ozon', '100.00', 1, '0.00', 0),
@@ -592,9 +610,84 @@ final class UnitExtendedQueryTest extends TestCase
         $summary = $this->findTagSummaryRow($result['tagSummary'], 't-zero');
         self::assertNotNull($row);
         self::assertNotNull($summary);
+        // costPriceQuantity = 0 означает «себестоимость единицы неизвестна», а не «равна
+        // нулю»: неизвестна и она сама, и денежная оценка остатка.
+        self::assertNull($row['costPriceUnit']);
+        // Остаток именно известен — иначе тест доказывал бы другую ветку.
+        self::assertSame(7.0, $row['stockQty']);
+        self::assertNull($row['stockCapitalRub']);
+        self::assertNull($summary['stockCapitalRub']);
+        self::assertSame(1, $summary['stockCapitalUnknownCount']);
+    }
+
+    public function testTagSummarySumsOnlyKnownStockCapitalInMixedGroup(): void
+    {
+        // Смешанная группа: у одного листинга капитал известен, у другого нет.
+        // Сумма обязана содержать только известное значение и честно сообщать,
+        // сколько листингов в неё не вошло.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-known', 'Известный', 'SKU-K', 'ozon', '200.00', 2, '100.00', 2),
+            new ListingSalesAggregateDTO('l-unknown', 'Без себестоимости', 'SKU-U', 'ozon', '100.00', 1, '0.00', 0),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-known' => 3.0, 'l-unknown' => 5.0]);
+        $this->stubTags(['l-known' => ['t-mix'], 'l-unknown' => ['t-mix']]);
+
+        $result = $this->execute(withTagSummary: true);
+        $summary = $this->findTagSummaryRow($result['tagSummary'], 't-mix');
+
+        self::assertNotNull($summary);
+        // l-known: costPriceUnit = 100/2 = 50, капитал = 3 * 50 = 150.
+        // l-unknown в сумму не входит.
+        self::assertSame(150.0, $summary['stockCapitalRub']);
+        self::assertSame(1, $summary['stockCapitalUnknownCount']);
+        self::assertSame(2, $summary['listingsCount']);
+    }
+
+    public function testResponseCarriesStockProvenance(): void
+    {
+        // Прочерк в колонке остатка сам по себе не объясняет, почему значения нет.
+        // Дата снапшота и список отброшенных источников делают это различимым.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '100.00', 1, '10.00', 1),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-1' => 3.0]);
+        $this->stubStaleStockSources(['wildberries' => '2026-05-23']);
+
+        $result = $this->execute();
+
+        self::assertSame(['ozon' => '2026-04-30'], $result['stock']['snapshotDateBySource']);
+        self::assertSame(['wildberries' => '2026-05-23'], $result['stock']['staleSources']);
+    }
+
+    public function testStockCapitalIsZeroWhenUnitCostIsGenuinelyZero(): void
+    {
+        // Отличие от предыдущего теста: продажи есть (costPriceQuantity = 2), но
+        // себестоимость нулевая. Это известный ноль, и он должен остаться нулём.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-free', 'Товар', 'SKU-FREE', 'ozon', '100.00', 2, '0.00', 2),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-free' => 7.0]);
+        $this->stubTags(['l-free' => ['t-free']]);
+
+        $result = $this->execute(withTagSummary: true);
+        $row = $this->findRow($result['items'], 'l-free');
+        $summary = $this->findTagSummaryRow($result['tagSummary'], 't-free');
+
+        self::assertNotNull($row);
+        self::assertNotNull($summary);
+        // Продажи есть (costPriceQuantity = 2), себестоимость нулевая — это известный
+        // ноль, и он обязан остаться нулём, а не превратиться в «неизвестно».
         self::assertSame(0.0, $row['costPriceUnit']);
+        self::assertSame(7.0, $row['stockQty']);
         self::assertSame(0.0, $row['stockCapitalRub']);
         self::assertSame(0.0, $summary['stockCapitalRub']);
+        self::assertSame(0, $summary['stockCapitalUnknownCount']);
     }
 
     public function testEmptyEverythingProducesZeroTotals(): void
@@ -613,6 +706,112 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertNull($result['totals']['drrPercent']);
         self::assertNull($result['totals']['marginPercent']);
         self::assertNull($result['totals']['roiPercent']);
+    }
+
+    public function testListingWithStockAndNoMovementProducesRow(): void
+    {
+        // Залежавшийся товар: остаток есть, за период ни продаж, ни возвратов, ни затрат.
+        // До этого изменения такая позиция в отчёт не попадала вовсе.
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-dead-stock' => 17.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-dead-stock', 'Залежавшийся товар', 'SKU-DEAD', 'ozon', 'ART-DEAD'),
+        ]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-dead-stock');
+
+        self::assertNotNull($row, 'Листинг с остатком обязан давать строку даже без движения за период.');
+        self::assertSame(17.0, $row['stockQty']);
+        self::assertSame('Залежавшийся товар', $row['title']);
+        self::assertSame('SKU-DEAD', $row['sku']);
+        self::assertSame('ozon', $row['marketplace']);
+        self::assertSame(0.0, $row['revenue']);
+        self::assertSame(0, $row['quantity']);
+    }
+
+    public function testListingWithZeroStockAndNoMovementProducesNoRow(): void
+    {
+        // Строка «остаток 0, движения нет» ничего не сообщает — это чистый шум.
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-zero-stock' => 0.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-zero-stock', 'Нулевой остаток', 'SKU-ZERO', 'ozon'),
+        ]);
+
+        $result = $this->execute();
+
+        self::assertNull($this->findRow($result['items'], 'l-zero-stock'));
+        self::assertSame([], $result['items']);
+    }
+
+    public function testStockOnlyRowsDoNotChangeMovementTotals(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-sold', 'Проданный', 'SKU-SOLD', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-sold' => 2.0, 'l-dead-stock' => 17.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-dead-stock', 'Залежавшийся товар', 'SKU-DEAD', 'ozon'),
+        ]);
+
+        $result = $this->execute();
+
+        self::assertCount(2, $result['items'], 'Обе позиции должны присутствовать.');
+        self::assertSame(1000.0, $result['totals']['revenue']);
+        self::assertSame(5, $result['totals']['quantity']);
+        self::assertSame(0.0, $result['totals']['returnsTotal']);
+        self::assertSame(0, $result['totals']['returnsQuantity']);
+        self::assertSame(300.0, $result['totals']['costPriceTotal']);
+    }
+
+    public function testStockOnlyListingIsSubjectToTagFilter(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCosts([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-tagged' => 3.0, 'l-untagged' => 4.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-tagged', 'С тегом', 'SKU-T', 'ozon'),
+            new ListingMetaDTO('l-untagged', 'Без тега', 'SKU-U', 'ozon'),
+        ]);
+        $this->tagsByListing = ['l-tagged' => ['tag-1']];
+
+        $result = $this->execute(tagIds: ['tag-1']);
+
+        self::assertNotNull($this->findRow($result['items'], 'l-tagged'));
+        self::assertNull($this->findRow($result['items'], 'l-untagged'));
+    }
+
+    public function testMarketplaceFilterIsForwardedToInventoryFacade(): void
+    {
+        // Остатки хранятся по всем источникам компании. Без проброса фильтра
+        // отчёт по Ozon получил бы строки листингов Wildberries.
+        $this->stubSales([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty([]);
+
+        $this->execute();
+
+        self::assertNotNull($this->lastStockCall);
+        self::assertSame(self::COMPANY_ID, $this->lastStockCall[0]);
+        self::assertSame(self::PERIOD_TO, $this->lastStockCall[1]->format('Y-m-d'));
+        self::assertSame('ozon', $this->lastStockCall[2]);
     }
 
     /**
@@ -668,6 +867,14 @@ final class UnitExtendedQueryTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $staleSources
+     */
+    private function stubStaleStockSources(array $staleSources): void
+    {
+        $this->staleStockSources = $staleSources;
+    }
+
+    /**
      * @param array<string, string> $byListing
      */
     private function stubAdSpend(array $byListing): void
@@ -699,7 +906,7 @@ final class UnitExtendedQueryTest extends TestCase
     /**
      * @param list<string> $tagIds
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
      */
     private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false): array
     {
