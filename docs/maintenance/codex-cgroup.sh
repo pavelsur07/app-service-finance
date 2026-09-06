@@ -4,9 +4,11 @@ set -euo pipefail
 # codex-cgroup — read-only отчёт о памяти cgroup контейнеров.
 #
 # Зачем: без cgroup-лимита у контейнера нет ни потолка, ни счётчиков, и подобрать
-# лимит можно только гаданием. `memory.peak` даёт high-water mark с момента старта
-# контейнера одним чтением, без сэмплирования `docker stats`, а `memory.events`
-# показывает, упирался ли контейнер в потолок и убивал ли ядро процессы внутри него.
+# лимит можно только гаданием. `memory.events` показывает, упирался ли контейнер в
+# потолок (`max`) и убивал ли ядро процессы внутри него (`oom_kill`) — эти счётчики
+# накапливаются сами, без сэмплирования. `memory.peak` дал бы ещё и high-water mark
+# одним чтением, но он появился в cgroup v2 только в Linux 5.19: на более старом ядре
+# файла нет, и тогда `max` остаётся единственным сигналом.
 # См. docs/tasks/scheduler-cgroup-limit/task.md.
 #
 # Почему это безопасно отдавать агенту:
@@ -34,6 +36,18 @@ if [ "$#" -gt 1 ]; then
 fi
 
 running_names() { docker ps --format '{{.Names}}' | sort; }
+
+# memory.peak появился в cgroup v2 только в Linux 5.19. На более старых ядрах файла
+# нет вовсе, и high-water mark из ядра получить нечем — остаётся счётчик
+# memory.events.max, который считает, сколько раз cgroup упирался в потолок.
+# Печатаем версию ядра, чтобы прочерк в PEAK читался как свойство ядра, а не сбой.
+kernel_note() {
+    printf 'kernel    : %s' "$(uname -r)"
+    if [ "$1" = "no-peak" ]; then
+        printf '  — без memory.peak (нужен 5.19+)'
+    fi
+    printf '\n'
+}
 
 cgroup_dir() {   # cgroup_dir <container> -> путь или пусто
     local pid rel
@@ -82,6 +96,7 @@ report_one() {
         echo "codex-cgroup: cgroup контейнера $name не найден (не запущен?)" >&2
         exit 3
     fi
+    kernel_note "$([ "$(val "$dir" memory.peak)" = "-" ] && echo no-peak || echo ok)"
     echo "container : $name"
     echo "cgroup    : $dir"
     echo
@@ -91,7 +106,11 @@ report_one() {
     peak=$(val "$dir" memory.peak)
     printf 'memory.max      %-14s %s\n' "$limit"   "$(mib "$limit")"
     printf 'memory.current  %-14s %s\n' "$current" "$(mib "$current")"
-    printf 'memory.peak     %-14s %s   (%s от лимита)\n' "$peak" "$(mib "$peak")" "$(pct "$peak" "$limit")"
+    if [ "$peak" = "-" ]; then
+        printf 'memory.peak     %-14s %s\n' "недоступен" "(ядро старше 5.19)"
+    else
+        printf 'memory.peak     %-14s %s   (%s от лимита)\n' "$peak" "$(mib "$peak")" "$(pct "$peak" "$limit")"
+    fi
     echo
     echo "memory.events:"
     if [ -r "$dir/memory.events" ]; then
@@ -100,14 +119,25 @@ report_one() {
         echo "  (недоступен)"
     fi
     echo
-    echo "Трактовка: max=0 и oom_kill=0 — потолок не задет; max>0 — упирался, но выжил"
-    echo "на reclaim; oom_kill>0 — процесс убит внутри контейнера, хост при этом цел."
-    echo "memory.peak обнуляется при пересоздании контейнера, то есть при каждом деплое."
+    echo "Трактовка memory.events: max=0 и oom_kill=0 — потолок ни разу не задет;"
+    echo "max>0 — контейнер упирался в лимит, но выжил за счёт reclaim, снижать нельзя;"
+    echo "oom_kill>0 — процесс убит внутри контейнера, хост при этом цел."
+    echo
+    echo "Счётчики и memory.peak обнуляются при пересоздании контейнера, то есть при"
+    echo "каждом деплое: замер после деплоя ничего не показывает."
 }
 
 report_all() {
     # Ширина колонок считается по данным (column -t), иначе длинное имя
     # контейнера съезжает и таблица становится нечитаемой.
+    # Наличие memory.peak определяем ОДИН раз и ДО пайпа: присваивание внутри
+    # `{ ... } | column` ушло бы в субшелл и наружу не вернулось.
+    local probe probe_dir
+    peak_missing=0
+    probe=$(running_names | head -1)
+    if [ -n "$probe" ] && probe_dir=$(cgroup_dir "$probe"); then
+        [ -r "$probe_dir/memory.peak" ] || peak_missing=1
+    fi
     {
         printf 'CONTAINER\tLIMIT\tCURRENT\tPEAK\tPEAK%%\tOOM_KILL\n'
         local name dir limit current peak
@@ -127,6 +157,12 @@ report_all() {
     echo
     echo "«—» в LIMIT означает отсутствие cgroup-лимита: OOM такого контейнера"
     echo "ограничен только памятью хоста и может задеть посторонние сервисы."
+    if [ "$peak_missing" = "1" ]; then
+        echo
+        echo "PEAK пуст у всех: ядро $(uname -r) без memory.peak (нужен 5.19+)."
+        echo "High-water mark из ядра получить нечем — ориентироваться на OOM_KILL и"
+        echo "на счётчик max в \`codex-cgroup <container>\`."
+    fi
 }
 
 if [ "$#" -eq 0 ]; then
