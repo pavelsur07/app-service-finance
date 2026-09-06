@@ -74,7 +74,17 @@ const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) =>
                                 <td className="text-end">{formatMoney(row.revenue)}</td>
                                 <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
-                                <td className="text-end">{formatMoney(row.stockCapitalRub)}</td>
+                                <td className="text-end">
+                                    {formatMoney(row.stockCapitalRub)}
+                                    {row.stockCapitalUnknownCount > 0 && (
+                                        <span
+                                            className="text-muted ms-1"
+                                            title={`Сумма неполная: у ${row.stockCapitalUnknownCount} из ${row.listingsCount} листингов стоимость остатка неизвестна (не загружен остаток либо неизвестна себестоимость единицы) и в сумму не вошла`}
+                                        >
+                                            *
+                                        </span>
+                                    )}
+                                </td>
                                 <td className="text-end">{formatMoney(row.adSpend)}</td>
                                 <td className="text-end">{formatMoney(row.totalCosts)}</td>
                                 <td className="text-end">{formatMoney(row.profit)}</td>

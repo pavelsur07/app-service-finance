@@ -25,7 +25,7 @@ final readonly class UnitExtendedQuery
     /**
      * @param list<string> $tagIds фильтр по тегам листингов; пустой = без фильтра
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
      */
     public function execute(
         string $companyId,
@@ -134,11 +134,20 @@ final readonly class UnitExtendedQuery
             $netSoldQty = $quantity - $returnsQuantity;
             $costPriceTotal = null !== $sale ? (float) $sale->costPriceTotal : 0.0;
             $costPriceQuantity = null !== $sale ? $sale->costPriceQuantity : 0;
-            $costPriceUnit = $costPriceQuantity > 0
+            // null = себестоимость единицы неизвестна (продаж в периоде не было),
+            // а не «равна нулю». Публичное поле costPriceUnit ниже сохраняет прежний
+            // контракт с 0.0; различие нужно только для денежной оценки остатка.
+            $knownCostPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
-                : 0.0;
-            $stockQty = (float) ($stockQtyByListing[$listingId] ?? 0.0);
-            $stockCapitalRub = round($stockQty * $costPriceUnit, 2);
+                : null;
+            $costPriceUnit = $knownCostPriceUnit ?? 0.0;
+
+            // Отсутствие листинга в карте означает «остаток неизвестен»: снапшота нет
+            // или он отброшен как протухший. Ноль здесь был бы утверждением о факте.
+            $stockQty = $stockQtyByListing[$listingId] ?? null;
+            $stockCapitalRub = null !== $stockQty && null !== $knownCostPriceUnit
+                ? round($stockQty * $knownCostPriceUnit, 2)
+                : null;
 
             // Listing metadata: prefer sales source, fallback to listings table
             $title = $sale?->title ?? $meta?->title ?? '';
@@ -325,6 +334,13 @@ final readonly class UnitExtendedQuery
             'items' => $items,
             'totals' => $totals,
             'tagSummary' => $withTagSummary ? $this->buildTagSummary($summaryRows) : [],
+            // Происхождение остатков: на какой момент они показаны и какие источники
+            // отброшены как протухшие. Без этого прочерк в колонке остатка неотличим
+            // от «данных по этому листингу просто нет».
+            'stock' => [
+                'snapshotDateBySource' => $stockOnDate->snapshotDateBySource,
+                'staleSources' => $stockOnDate->staleSources,
+            ],
         ];
     }
 
@@ -362,7 +378,9 @@ final readonly class UnitExtendedQuery
             $revenue = round($bucket['revenue'], 2);
             $returnsTotal = round($bucket['returnsTotal'], 2);
             $costPriceTotal = round($bucket['costPriceTotal'], 2);
-            $stockCapitalRub = round($bucket['stockCapitalRub'], 2);
+            $stockCapitalRub = $bucket['stockCapitalKnownCount'] > 0
+                ? round($bucket['stockCapitalRub'], 2)
+                : null;
             $commission = round($bucket['commission'], 2);
             $logistics = round($bucket['logistics'], 2);
             $otherCosts = round($bucket['otherCosts'], 2);
@@ -381,6 +399,7 @@ final readonly class UnitExtendedQuery
                 'returnsQuantity' => $bucket['returnsQuantity'],
                 'costPriceTotal' => $costPriceTotal,
                 'stockCapitalRub' => $stockCapitalRub,
+                'stockCapitalUnknownCount' => $bucket['stockCapitalUnknownCount'],
                 'commission' => $commission,
                 'commissionAverageRub' => $this->averagePerNetSoldQty($commission, $netSoldQty),
                 'adSpend' => $adSpend,
@@ -427,6 +446,8 @@ final readonly class UnitExtendedQuery
                 'returnsTotal' => 0.0,
                 'costPriceTotal' => 0.0,
                 'stockCapitalRub' => 0.0,
+                'stockCapitalKnownCount' => 0,
+                'stockCapitalUnknownCount' => 0,
                 'commission' => 0.0,
                 'logistics' => 0.0,
                 'otherCosts' => 0.0,
@@ -440,7 +461,15 @@ final readonly class UnitExtendedQuery
         $buckets[$key]['returnsQuantity'] += $row['returnsQuantity'];
         $buckets[$key]['returnsTotal'] += $row['returnsTotal'];
         $buckets[$key]['costPriceTotal'] += $row['costPriceTotal'];
-        $buckets[$key]['stockCapitalRub'] += $row['stockCapitalRub'];
+
+        // Неизвестные значения в сумму не входят и считаются отдельно: иначе частичный
+        // результат читался бы как полный.
+        if (null !== $row['stockCapitalRub']) {
+            $buckets[$key]['stockCapitalRub'] += $row['stockCapitalRub'];
+            ++$buckets[$key]['stockCapitalKnownCount'];
+        } else {
+            ++$buckets[$key]['stockCapitalUnknownCount'];
+        }
         $buckets[$key]['commission'] += $row['commission'];
         $buckets[$key]['logistics'] += $row['logistics'];
         $buckets[$key]['otherCosts'] += $row['otherCosts'];

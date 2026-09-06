@@ -76,7 +76,15 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
         self::assertContains(null, $tagIds, 'Ожидается бакет «Без тегов»');
         foreach ($data['tagSummary'] as $row) {
             self::assertArrayHasKey('stockCapitalRub', $row);
-            self::assertTrue(\is_int($row['stockCapitalRub']) || \is_float($row['stockCapitalRub']));
+            // null = ни у одного листинга группы остаток не известен. Ноль означал бы
+            // «капитал в остатках равен нулю» — это разные утверждения.
+            self::assertTrue(
+                null === $row['stockCapitalRub']
+                || \is_int($row['stockCapitalRub'])
+                || \is_float($row['stockCapitalRub']),
+            );
+            self::assertArrayHasKey('stockCapitalUnknownCount', $row);
+            self::assertIsInt($row['stockCapitalUnknownCount']);
         }
     }
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import type { UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
-import { formatMoney } from '../utils/utils';
+import { formatMoney, formatQty } from '../utils/utils';
 import { useFixedHeader } from './useFixedHeader';
 
 type SortField =
@@ -490,7 +490,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         <td className="text-end text-red">{formatMoney(row.returnsTotal)}</td>
                                         <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
                                         <td className="text-end">{formatMoney(row.costPriceUnit)}</td>
-                                        <td className="text-end">{row.stockQty.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 3 })}</td>
+                                        <td className="text-end">{formatQty(row.stockQty)}</td>
                                         <td className="text-end">{formatMoney(row.stockCapitalRub)}</td>
                                         <td className="text-end">{formatMoney(row.commission)}</td>
                                         <td className="text-end">{formatMoney(row.commissionAverageRub)}</td>

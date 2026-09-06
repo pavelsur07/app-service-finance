@@ -31,8 +31,10 @@ export interface UnitExtendedItem {
     returnsQuantity: number;
     costPriceTotal: number;
     costPriceUnit: number;
-    stockQty: number;
-    stockCapitalRub: number;
+    /** null = остаток неизвестен (снапшота нет или он протух), а не «ноль». */
+    stockQty: number | null;
+    /** null = остаток или себестоимость единицы неизвестны. */
+    stockCapitalRub: number | null;
     commission: number;
     commissionAverageRub: number | null;
     adSpend: number;
@@ -79,7 +81,10 @@ export interface TagSummaryRow {
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;
-    stockCapitalRub: number;
+    /** null = ни у одного листинга группы остаток не известен. */
+    stockCapitalRub: number | null;
+    /** Сколько листингов группы не вошло в сумму остатка из-за неизвестного значения. */
+    stockCapitalUnknownCount: number;
     commission: number;
     commissionAverageRub: number | null;
     adSpend: number;
