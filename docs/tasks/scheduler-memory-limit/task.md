@@ -174,3 +174,48 @@ Wrapper восстанавливает их из окружения уже ра�
 нужен доступ к `docker stats`/`free`, которого у существующих read-only wrappers нет.
 
 Пункт 5 закрыт: лимит 1536M на `site-php-cli` начинает работать по назначению.
+
+---
+
+## Follow-up после установки wrapper'а на прод (2026-09-06)
+
+Первый же боевой вызов `codex-console messenger:stats` через новый путь показал побочный
+эффект, которого на макете не было видно: вывод залит deprecation-сообщениями, а команда
+заметно медленнее.
+
+### Причина — образ `site-php-cli` собирается без прогрева DI-контейнера
+
+`site/docker/production/php-fpm/Dockerfile` содержит `ENV APP_ENV=prod` и
+`RUN php bin/console cache:clear` — контейнер компилируется на сборке и запекается в образ.
+В `site/docker/production/php-cli/Dockerfile` этого не было вовсе, только
+`mkdir -p var/cache var/log`.
+
+Долгоживущие воркеры платили за это один раз при старте, и эффект был невидим. Одноразовый
+`docker compose run --rm` начинает с чистого writable-слоя, поэтому компилировал контейнер
+**на каждый вызов**.
+
+### Замер (локальный образ `app-service-finance-site-php-cli:latest`, `bin/console list`, `APP_ENV=prod`)
+
+| Состояние `var/cache/prod` | Время | Строк `"channel":"deprecation"` |
+|---|---|---|
+| тёплый | **0.90 s** | 1 (посторонняя, от Doctrine Proxy Autoloader) |
+| холодный | **8.41 s** | **126** |
+
+То есть 125 из 126 сообщений — компиляционные (`FrameworkExtension.php:375`,
+`TaggedIterator.php:38` — оба пути компиляции DI-контейнера), и ~7.5 s на вызов уходило
+на пересборку того, что можно запечь в образ один раз.
+
+### Исправление
+
+- `site/docker/production/php-cli/Dockerfile` — добавлены `ENV APP_ENV=prod` и
+  `RUN php bin/console cache:clear` перед `chown -R app:www-data var`, чтобы права на
+  сгенерированный кэш выставились тем же существующим шагом. Зеркалит php-fpm.
+- `docker-compose.prod.yml` — удалён устаревший `version: '3.8'`. Compose v2 его игнорирует
+  и печатал предупреждение, которое теперь попадало в вывод каждой ad-hoc команды.
+
+Проверено, что правка не заденет CI: тесты гоняются на образе из
+`site/docker/development/php-cli/Dockerfile`, это другой файл. Правка
+`site/docker/**` попадает в фильтр `backend`, поэтому образ пересобирается на PR —
+успешный `cache:clear` на сборке проверяется до мержа.
+
+Прогрев ускоряет и штатный старт воркеров после деплоя, не только ad-hoc команды.

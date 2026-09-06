@@ -88,6 +88,18 @@ WORKDIR /app
 COPY --from=builder /app ./
 COPY ./ ./
 
+ENV APP_ENV=prod
+
+# Прогрев DI-контейнера на этапе сборки — так же, как в php-fpm/Dockerfile.
+# Без него КАЖДЫЙ контейнер из этого образа компилирует контейнер сам при первом
+# вызове bin/console. Долгоживущим воркерам это стоило одной компиляции при
+# старте и было незаметно, но codex-console выполняет команды в одноразовом
+# `docker compose run --rm`, и цена стала повторяться на каждом вызове.
+# Замер на локальном образе (bin/console list, APP_ENV=prod): холодный кэш —
+# 8.41 s и 126 строк deprecation-шума, тёплый — 0.90 s и одна строка.
+# См. docs/tasks/scheduler-memory-limit/task.md.
+RUN php bin/console cache:clear
+
 # Права на var/cache и var/log — под app (воркер работает под app)
 RUN mkdir -p var/cache var/log \
  && chown -R app:www-data var \
