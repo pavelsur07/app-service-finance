@@ -33,9 +33,12 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
     private const FRESH_OZON_SESSION_ID = '22222222-2222-2222-2222-000000000703';
     private const FRESH_OZON_LISTING_ID = '55555555-5555-5555-5555-000000000703';
 
-    private const REPORT_DATE = '2026-09-06';
-    private const STALE_SNAPSHOT_DATE = '2026-05-23';
-    private const FRESH_SNAPSHOT_DATE = '2026-09-06';
+    // Даты считаются от сегодняшнего дня: свежесть оценивается относительно
+    // min(дата отчёта, сегодня), поэтому фиксированные даты сделали бы тест
+    // «протухающим» — он начал бы падать через двое суток после написания.
+    private string $reportDate;
+    private string $staleSnapshotDate;
+    private string $freshSnapshotDate;
 
     protected Connection $connection;
 
@@ -45,17 +48,23 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
 
         $this->connection = self::getContainer()->get(Connection::class);
 
+        $today = new \DateTimeImmutable('today');
+        $this->reportDate = $today->format('Y-m-d');
+        $this->freshSnapshotDate = $today->format('Y-m-d');
+        // 106 дней — реальный разрыв компании 5d26f9aa на PROD.
+        $this->staleSnapshotDate = $today->modify('-106 days')->format('Y-m-d');
+
         $this->persistSnapshot(
             MarketplaceType::OZON,
             self::STALE_SESSION_ID,
-            self::STALE_SNAPSHOT_DATE,
+            $this->staleSnapshotDate,
             self::STALE_LISTING_ID,
             '17.000',
         );
         $this->persistSnapshot(
             MarketplaceType::WILDBERRIES,
             self::FRESH_SESSION_ID,
-            self::FRESH_SNAPSHOT_DATE,
+            $this->freshSnapshotDate,
             self::FRESH_LISTING_ID,
             '4.000',
         );
@@ -66,7 +75,7 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
     public function testStaleSnapshotIsNotServedAsCurrentStock(): void
     {
         $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy())
-            ->execute(self::COMPANY_ID, new \DateTimeImmutable(self::REPORT_DATE));
+            ->execute(self::COMPANY_ID, new \DateTimeImmutable($this->reportDate));
 
         self::assertArrayNotHasKey(
             self::STALE_LISTING_ID,
@@ -74,7 +83,7 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
             'Снапшот 106-дневной давности не должен участвовать в остатках на дату отчёта.',
         );
         self::assertSame(
-            [MarketplaceType::OZON->value => self::STALE_SNAPSHOT_DATE],
+            [MarketplaceType::OZON->value => $this->staleSnapshotDate],
             $result->staleSources,
             'Отброшенный источник обязан быть виден вызывающему коду, иначе «нет данных» неотличимо от «протухли».',
         );
@@ -83,11 +92,11 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
     public function testFreshSnapshotOfAnotherSourceIsUnaffected(): void
     {
         $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy())
-            ->execute(self::COMPANY_ID, new \DateTimeImmutable(self::REPORT_DATE));
+            ->execute(self::COMPANY_ID, new \DateTimeImmutable($this->reportDate));
 
         self::assertSame([self::FRESH_LISTING_ID => 4.0], $result->qtyByListingId);
         self::assertSame(
-            [MarketplaceType::WILDBERRIES->value => self::FRESH_SNAPSHOT_DATE],
+            [MarketplaceType::WILDBERRIES->value => $this->freshSnapshotDate],
             $result->snapshotDateBySource,
         );
     }
@@ -96,7 +105,7 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
     {
         // Поведение до изменения: порог, заведомо перекрывающий возраст снапшота.
         $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy(100_000))
-            ->execute(self::COMPANY_ID, new \DateTimeImmutable(self::REPORT_DATE));
+            ->execute(self::COMPANY_ID, new \DateTimeImmutable($this->reportDate));
 
         self::assertSame(
             [self::STALE_LISTING_ID => 17.0, self::FRESH_LISTING_ID => 4.0],
@@ -112,13 +121,13 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
         // одному маркетплейсу, не должен получать листинги другого.
         $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy())->execute(
             self::COMPANY_ID,
-            new \DateTimeImmutable(self::REPORT_DATE),
+            new \DateTimeImmutable($this->reportDate),
             MarketplaceType::WILDBERRIES->value,
         );
 
         self::assertSame([self::FRESH_LISTING_ID => 4.0], $result->qtyByListingId);
         self::assertSame(
-            [MarketplaceType::WILDBERRIES->value => self::FRESH_SNAPSHOT_DATE],
+            [MarketplaceType::WILDBERRIES->value => $this->freshSnapshotDate],
             $result->snapshotDateBySource,
         );
         self::assertSame([], $result->staleSources, 'Отфильтрованный источник не должен попадать в отчёт вовсе.');
@@ -131,14 +140,14 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
         $this->persistSnapshot(
             MarketplaceType::OZON,
             self::FRESH_OZON_SESSION_ID,
-            self::FRESH_SNAPSHOT_DATE,
+            $this->freshSnapshotDate,
             self::FRESH_OZON_LISTING_ID,
             '9.000',
         );
         $this->em->flush();
 
         $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy())
-            ->execute(self::COMPANY_ID, new \DateTimeImmutable(self::REPORT_DATE), null);
+            ->execute(self::COMPANY_ID, new \DateTimeImmutable($this->reportDate), null);
 
         self::assertSame(
             [
@@ -149,12 +158,38 @@ final class StockQtyByListingOnDateFreshnessTest extends IntegrationTestCase
         );
         self::assertSame(
             [
-                MarketplaceType::OZON->value => self::FRESH_SNAPSHOT_DATE,
-                MarketplaceType::WILDBERRIES->value => self::FRESH_SNAPSHOT_DATE,
+                MarketplaceType::OZON->value => $this->freshSnapshotDate,
+                MarketplaceType::WILDBERRIES->value => $this->freshSnapshotDate,
             ],
             $result->snapshotDateBySource,
         );
         self::assertSame([], $result->staleSources);
+    }
+
+    public function testPeriodEndingInTheFutureStillReturnsTodaysStock(): void
+    {
+        // Регрессия PROD: пресет «текущий месяц» отдаёт последний день месяца, то есть
+        // дату в будущем. Свежий снапшот считался просроченным относительно неё, и
+        // отчёт терял все остатки вместе с капитализацией.
+        $futureReportDate = (new \DateTimeImmutable('today'))->modify('+24 days');
+
+        $result = $this->queryWithPolicy(new StockSnapshotFreshnessPolicy())
+            ->execute(self::COMPANY_ID, $futureReportDate);
+
+        self::assertSame(
+            [self::FRESH_LISTING_ID => 4.0],
+            $result->qtyByListingId,
+            'Сегодняшний остаток обязан попасть в отчёт, даже если период кончается в будущем.',
+        );
+        self::assertSame(
+            [MarketplaceType::WILDBERRIES->value => $this->freshSnapshotDate],
+            $result->snapshotDateBySource,
+        );
+        self::assertSame(
+            [MarketplaceType::OZON->value => $this->staleSnapshotDate],
+            $result->staleSources,
+            'Мёртвая загрузка обязана остаться отброшенной и при периоде в будущем.',
+        );
     }
 
     private function queryWithPolicy(StockSnapshotFreshnessPolicy $policy): StockQtyByListingOnDateQuery

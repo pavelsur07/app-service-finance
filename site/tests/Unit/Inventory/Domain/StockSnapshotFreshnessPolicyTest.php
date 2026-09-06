@@ -79,6 +79,86 @@ final class StockSnapshotFreshnessPolicyTest extends TestCase
         ));
     }
 
+    public function testReferenceDateIsClampedToTodayWhenPeriodEndsInTheFuture(): void
+    {
+        // Регрессия PROD: пресет «текущий месяц» отдаёт последний день месяца, то есть
+        // дату в будущем. Без ограничения сегодняшним днём свежий снапшот считался бы
+        // просроченным, и отчёт оставался бы вовсе без остатков.
+        $policy = new StockSnapshotFreshnessPolicy();
+
+        self::assertSame(
+            '2026-09-06',
+            $policy->referenceDate(
+                new \DateTimeImmutable('2026-09-30'),
+                new \DateTimeImmutable('2026-09-06'),
+            )->format('Y-m-d'),
+        );
+    }
+
+    public function testReferenceDateStaysAtReportDateForPastPeriod(): void
+    {
+        // Для периода в прошлом уместен снапшот того времени, а не сегодняшний.
+        $policy = new StockSnapshotFreshnessPolicy();
+
+        self::assertSame(
+            '2026-05-31',
+            $policy->referenceDate(
+                new \DateTimeImmutable('2026-05-31'),
+                new \DateTimeImmutable('2026-09-06'),
+            )->format('Y-m-d'),
+        );
+    }
+
+    public function testTodaysSnapshotIsFreshForPeriodEndingInTheFuture(): void
+    {
+        $policy = new StockSnapshotFreshnessPolicy();
+        $today = new \DateTimeImmutable('2026-09-06');
+        $reference = $policy->referenceDate(new \DateTimeImmutable('2026-09-30'), $today);
+
+        self::assertFalse(
+            $policy->isStale(new \DateTimeImmutable('2026-09-06'), $reference),
+            'Сегодняшний снапшот не может быть протухшим только потому, что период отчёта кончается в будущем.',
+        );
+    }
+
+    public function testDeadPipelineIsStillStaleWithClamping(): void
+    {
+        // Ограничение опорной даты не должно ослабить исходную защиту.
+        $policy = new StockSnapshotFreshnessPolicy();
+        $today = new \DateTimeImmutable('2026-09-06');
+        $reference = $policy->referenceDate(new \DateTimeImmutable('2026-09-30'), $today);
+
+        self::assertTrue($policy->isStale(new \DateTimeImmutable('2026-05-23'), $reference));
+    }
+
+    public function testCalendarDatesAreComparedRegardlessOfTimezone(): void
+    {
+        // Полночь в разных часовых поясах — разные моменты времени, поэтому
+        // календарно более поздняя дата может оказаться «меньше» по сравнению
+        // объектов. Политика оперирует днями, а не моментами.
+        $policy = new StockSnapshotFreshnessPolicy();
+
+        $reference = $policy->referenceDate(
+            new \DateTimeImmutable('2026-09-07 00:00', new \DateTimeZone('+14:00')),
+            new \DateTimeImmutable('2026-09-06 12:00', new \DateTimeZone('-12:00')),
+        );
+
+        self::assertSame('2026-09-06', $reference->format('Y-m-d'));
+    }
+
+    public function testEqualReportDateAndTodayGiveThatSameDate(): void
+    {
+        $policy = new StockSnapshotFreshnessPolicy();
+
+        self::assertSame(
+            '2026-09-06',
+            $policy->referenceDate(
+                new \DateTimeImmutable('2026-09-06 23:59:59'),
+                new \DateTimeImmutable('2026-09-06 00:00:01'),
+            )->format('Y-m-d'),
+        );
+    }
+
     public function testZeroThresholdAcceptsOnlyTheReportDateItself(): void
     {
         $policy = new StockSnapshotFreshnessPolicy(0);

@@ -34,11 +34,16 @@ final readonly class StockQtyByListingOnDateQuery
      */
     public function execute(string $companyId, \DateTimeImmutable $reportDate, ?string $marketplace = null): StockOnDateResult
     {
+        // Свежесть оценивается относительно min(дата отчёта, сегодня), а не даты
+        // отчёта напрямую: период может заканчиваться в будущем, и тогда сегодняшний
+        // снапшот выглядел бы протухшим, оставляя отчёт вовсе без остатков.
+        $referenceDate = $this->freshnessPolicy->referenceDate($reportDate);
+
         $params = [
             'companyId' => $companyId,
             'reportDate' => $reportDate->format('Y-m-d'),
             'status' => StockStatus::Available->value,
-            'earliestAcceptableDate' => $this->freshnessPolicy->earliestAcceptableDate($reportDate)->format('Y-m-d'),
+            'earliestAcceptableDate' => $this->freshnessPolicy->earliestAcceptableDate($referenceDate)->format('Y-m-d'),
         ];
 
         $sourceFilter = '';
@@ -88,7 +93,7 @@ final readonly class StockQtyByListingOnDateQuery
             $source = (string) $row['source'];
             $snapshotDate = (string) $row['snapshot_date'];
 
-            if ($this->freshnessPolicy->isStale(new \DateTimeImmutable($snapshotDate), $reportDate)) {
+            if ($this->freshnessPolicy->isStale(new \DateTimeImmutable($snapshotDate), $referenceDate)) {
                 $staleSources[$source] = $snapshotDate;
 
                 continue;
