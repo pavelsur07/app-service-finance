@@ -9,6 +9,8 @@ interface UseWidgetsParams {
     marketplace: string;
     periodFrom: string;
     periodTo: string;
+    tagIds?: string[];
+    tagsMatchAll?: boolean;
 }
 
 interface UseWidgetsResult {
@@ -51,6 +53,8 @@ export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
             params.marketplace,
             params.periodFrom,
             params.periodTo,
+            params.tagIds ?? [],
+            params.tagsMatchAll ?? false,
             ac.signal,
         )
             .then((response) => {
@@ -75,7 +79,7 @@ export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
         return () => {
             ac.abort();
         };
-    }, [params.marketplace, params.periodFrom, params.periodTo]);
+    }, [params.marketplace, params.periodFrom, params.periodTo, params.tagIds, params.tagsMatchAll]);
 
     const toggleWidget = useCallback((key: string) => {
         setExpandedKey((prev) => (prev === key ? null : key));

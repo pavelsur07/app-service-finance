@@ -133,14 +133,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
             'roiPercent' => 96.7,
         ];
 
-        $query = $this->createMock(UnitExtendedQuery::class);
-        $query
-            ->expects(self::once())
-            ->method('execute')
-            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', \PHP_INT_MAX)
-            ->willReturn(['items' => $items, 'totals' => $totals]);
-
-        $exporter = new UnitExtendedXlsxExporter($query);
+        $exporter = new UnitExtendedXlsxExporter($this->queryReturning($items, $totals));
         $request = new UnitExtendedExportRequest(
             companyId: self::COMPANY_ID,
             marketplace: 'ozon',
@@ -226,6 +219,114 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertSame('ИТОГО', (string) $totalsRow[0]);
         self::assertSame('26.67', (string) ($totalsRow[$commissionAverageColumnIndex] ?? ''));
         self::assertSame('20', (string) ($totalsRow[$cacColumnIndex] ?? ''));
+    }
+
+    public function testExportWritesTagNamesInDedicatedColumn(): void
+    {
+        $items = [
+            [
+                'listingId' => 'l-1',
+                'title' => 'Товар А',
+                'sku' => 'SKU-A',
+                'sellerArticle' => 'ART-A',
+                'marketplace' => 'ozon',
+                'tags' => [
+                    ['id' => '22222222-2222-2222-2222-222222222222', 'name' => 'Хит'],
+                    ['id' => '33333333-3333-3333-3333-333333333333', 'name' => 'Зима'],
+                ],
+                'revenue' => 1000.0,
+                'quantity' => 5,
+                'profit' => 380.0,
+            ],
+            [
+                'listingId' => 'l-2',
+                'title' => 'Товар Б',
+                'sku' => 'SKU-B',
+                'sellerArticle' => 'ART-B',
+                'marketplace' => 'ozon',
+                'tags' => [],
+                'revenue' => 500.0,
+                'quantity' => 2,
+                'profit' => 200.0,
+            ],
+        ];
+
+        $totals = [
+            'revenue' => 1500.0,
+            'quantity' => 7,
+            'profit' => 580.0,
+        ];
+
+        $exporter = new UnitExtendedXlsxExporter($this->queryReturning($items, $totals));
+        $request = new UnitExtendedExportRequest(
+            companyId: self::COMPANY_ID,
+            marketplace: 'ozon',
+            periodFrom: '2026-01-01',
+            periodTo: '2026-01-31',
+        );
+
+        $this->tempFile = tempnam(sys_get_temp_dir(), 'unit_extended_tags_').'.xlsx';
+
+        $exporter->export($request, $this->tempFile);
+
+        $rows = $this->readXlsxRows($this->tempFile);
+
+        $headerRowIndex = null;
+        foreach ($rows as $index => $row) {
+            if (in_array('SKU', $row, true)) {
+                $headerRowIndex = $index;
+
+                break;
+            }
+        }
+
+        self::assertNotNull($headerRowIndex, 'Header row with "SKU" not found');
+        $header = $rows[$headerRowIndex];
+
+        $tagsColumnIndex = array_search('Теги', $header, true);
+        $marketplaceColumnIndex = array_search('Маркетплейс', $header, true);
+        $revenueColumnIndex = array_search('Выручка', $header, true);
+
+        self::assertNotFalse($tagsColumnIndex, 'В выгрузке нет колонки "Теги"');
+        self::assertNotFalse($marketplaceColumnIndex);
+        self::assertNotFalse($revenueColumnIndex);
+        self::assertSame(
+            $marketplaceColumnIndex + 1,
+            $tagsColumnIndex,
+            '"Теги" должны идти сразу после "Маркетплейс" — так же, как в таблице отчёта теги стоят сразу после блока идентификации',
+        );
+        self::assertLessThan($revenueColumnIndex, $tagsColumnIndex, '"Теги" должны быть перед метриками');
+
+        $dataRows = array_slice($rows, $headerRowIndex + 1, 2);
+        self::assertCount(2, $dataRows, 'Expected exactly 2 data rows');
+
+        self::assertSame('Хит, Зима', (string) ($dataRows[0][$tagsColumnIndex] ?? ''));
+        // Листинг без тегов — пустая ячейка, а не строка "0" или прочерк:
+        // пустое значение фильтруется в Excel как «Пустые».
+        self::assertSame('', (string) ($dataRows[1][$tagsColumnIndex] ?? ''));
+
+        $totalsRow = $rows[$headerRowIndex + 3];
+        self::assertSame('ИТОГО', (string) $totalsRow[0]);
+        self::assertSame('', (string) ($totalsRow[$tagsColumnIndex] ?? ''), 'Теги не суммируются — в строке ИТОГО ячейка пустая');
+    }
+
+    /**
+     * Мок Query держим в одном месте: UnitExtendedQuery — final, и каждый вызов
+     * createMock() даёт PHPStan-ошибку, вынесенную в baseline поштучно.
+     *
+     * @param list<array<string, mixed>> $items
+     * @param array<string, mixed> $totals
+     */
+    private function queryReturning(array $items, array $totals): UnitExtendedQuery
+    {
+        $query = $this->createMock(UnitExtendedQuery::class);
+        $query
+            ->expects(self::once())
+            ->method('execute')
+            ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', \PHP_INT_MAX)
+            ->willReturn(['items' => $items, 'totals' => $totals]);
+
+        return $query;
     }
 
     /**

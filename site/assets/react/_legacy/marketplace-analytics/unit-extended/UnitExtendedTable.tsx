@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
+import type { ListingTag, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
 import { formatMoney, formatQty } from '../utils/utils';
 import { useFixedHeader } from './useFixedHeader';
@@ -9,6 +9,7 @@ type SortField =
     | 'sku'
     | 'title'
     | 'sellerArticle'
+    | 'tags'
     | 'revenue'
     | 'quantity'
     | 'returnsTotal'
@@ -36,6 +37,8 @@ interface UnitExtendedTableProps {
     totals: UnitExtendedTotals | null;
     isLoading: boolean;
     emptyMessage?: string;
+    selectedTagIds: string[];
+    onToggleTag: (tagId: string) => void;
 }
 
 const TABLE_STYLES = `
@@ -99,6 +102,40 @@ const TABLE_STYLES = `
     background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
     pointer-events: none;
 }
+.ue-ext-table td.ue-ext-tags,
+.ue-ext-table th.ue-ext-tags {
+    min-width: 180px;
+    max-width: 180px;
+    width: 180px;
+}
+.ue-ext-tags-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+.ue-ext-tag-chip {
+    display: inline-block;
+    /* flex-shrink + min-width:0 — иначе два длинных имени распирают ячейку
+       и обрезаются по её краю вместо многоточия в каждом чипе. */
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 3px 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* .tag-chip задан для span и font-family не выставляет: на button
+       без inherit браузер подставил бы свой системный шрифт. */
+    font-family: inherit;
+    cursor: pointer;
+}
+.ue-ext-tag-chip.is-active {
+    border-color: var(--tblr-primary);
+    background: rgba(var(--tblr-primary-rgb), 0.1);
+    color: var(--tblr-primary);
+}
 .ue-ext-table tbody tr:hover td {
     background: var(--tblr-bg-surface-secondary);
 }
@@ -139,10 +176,11 @@ function resolveScrollContainer(wrapper: HTMLDivElement | null): HTMLElement | n
     return wrapper;
 }
 
-const HEADERS: { field: SortField; label: React.ReactNode; align?: string; tooltip?: string }[] = [
+const HEADERS: { field: SortField; label: React.ReactNode; align?: string; tooltip?: string; className?: string }[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'sellerArticle', label: 'Артикул' },
+    { field: 'tags', label: 'Теги', className: 'ue-ext-tags' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
     { field: 'quantity', label: 'Кол-во', align: 'text-end' },
     { field: 'returnsTotal', label: 'Возвраты', align: 'text-end' },
@@ -164,7 +202,15 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'roiPercent', label: 'ROI %', align: 'text-end' },
 ];
 
+/** Ключ сортировки по тегам: имена в порядке выдачи API, склеенные как в ячейке и в XLS. */
+function tagsSortKey(item: UnitExtendedItem): string {
+    return item.tags.map((tag) => tag.name).join(', ');
+}
+
 function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField): number {
+    if (field === 'tags') {
+        return tagsSortKey(a).localeCompare(tagsSortKey(b), 'ru');
+    }
     if (field === 'title') {
         return a.title.localeCompare(b.title, 'ru');
     }
@@ -196,11 +242,73 @@ function formatPercent(v: number | null): React.ReactNode {
     return `${v.toFixed(1)}%`;
 }
 
+const MAX_VISIBLE_TAGS = 2;
+/**
+ * Ячейка тегов — 180px. Два коротких имени в неё помещаются, два длинных ужимаются
+ * до нечитаемых огрызков («Возвратн…», «З…»), поэтому при длинной паре показываем
+ * один целый чип и «+N»: узнать один тег полностью полезнее, чем не узнать два.
+ */
+const MAX_VISIBLE_TAGS_NAME_LENGTH = 16;
+
+function visibleTagCount(tags: ListingTag[]): number {
+    if (tags.length < 2) {
+        return tags.length;
+    }
+
+    const pairLength = tags[0].name.length + tags[1].name.length;
+
+    return pairLength <= MAX_VISIBLE_TAGS_NAME_LENGTH ? MAX_VISIBLE_TAGS : 1;
+}
+
+interface TagCellProps {
+    tags: ListingTag[];
+    selectedTagIds: string[];
+    onToggleTag: (tagId: string) => void;
+}
+
+const TagCell: React.FC<TagCellProps> = ({ tags, selectedTagIds, onToggleTag }) => {
+    if (tags.length === 0) {
+        return <td className="ue-ext-tags text-muted">—</td>;
+    }
+
+    const visible = tags.slice(0, visibleTagCount(tags));
+    const hiddenCount = tags.length - visible.length;
+
+    return (
+        <td className="ue-ext-tags" title={tags.map((tag) => tag.name).join(', ')}>
+            <div className="ue-ext-tags-list">
+                {visible.map((tag) => {
+                    const isActive = selectedTagIds.includes(tag.id);
+                    return (
+                        <button
+                            key={tag.id}
+                            type="button"
+                            className={`tag-chip ue-ext-tag-chip${isActive ? ' is-active' : ''}`}
+                            aria-pressed={isActive}
+                            title={isActive
+                                ? `Убрать «${tag.name}» из фильтра`
+                                : `Отфильтровать по «${tag.name}»`}
+                            onClick={() => onToggleTag(tag.id)}
+                        >
+                            {tag.name}
+                        </button>
+                    );
+                })}
+                {hiddenCount > 0 && (
+                    <span className="text-muted small">+{hiddenCount}</span>
+                )}
+            </div>
+        </td>
+    );
+};
+
 const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     items,
     totals,
     isLoading,
     emptyMessage = 'Нет данных за выбранный период',
+    selectedTagIds,
+    onToggleTag,
 }) => {
     const [sortField, setSortField] = useState<SortField>('revenue');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -376,7 +484,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                     return (
                         <th
                             key={h.field}
-                            className={`${h.align ?? ''} ${frozenClass(h.field)}`}
+                            className={`${h.align ?? ''} ${h.className ?? ''} ${frozenClass(h.field)}`}
                             style={{
                                 cursor: 'pointer',
                                 ...getWidthStyle(i),
@@ -485,6 +593,11 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         <td>
                                             <div className="text-truncate">{row.sellerArticle || '—'}</div>
                                         </td>
+                                        <TagCell
+                                            tags={row.tags}
+                                            selectedTagIds={selectedTagIds}
+                                            onToggleTag={onToggleTag}
+                                        />
                                         <td className="text-end">{formatMoney(row.revenue)}</td>
                                         <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
                                         <td className="text-end text-red">{formatMoney(row.returnsTotal)}</td>
@@ -569,6 +682,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
                                 <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>
                                 <td></td>
+                                <td className="ue-ext-tags"></td>
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
                                 <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
