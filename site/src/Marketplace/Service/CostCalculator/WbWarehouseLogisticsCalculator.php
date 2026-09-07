@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
 {
+    private const float MIN_AMOUNT = 0.01;
+
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
 
@@ -22,7 +24,13 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Возмещение издержек по перевозке/по складским операциям с товаром' === $this->normalizer->sellerOperName($item);
+        // Preserve the legacy operation contract. A newly observed alias is claimed
+        // only when its documented amount field is present, so schema drift remains visible.
+        return match ($this->normalizer->sellerOperName($item)) {
+            'Возмещение издержек по перевозке/по складским операциям с товаром' => true,
+            'Возмещение издержек по перемещению и операционной обработке товара' => abs($this->normalizer->rebillLogisticCost($item)) >= self::MIN_AMOUNT,
+            default => false,
+        };
     }
 
     public function requiresListing(): bool
@@ -35,7 +43,7 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
     {
         $rebillLogisticCost = $this->normalizer->rebillLogisticCost($item);
 
-        if (abs($rebillLogisticCost) < 0.01) {
+        if (abs($rebillLogisticCost) < self::MIN_AMOUNT) {
             return [];
         }
 
