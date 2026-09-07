@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
 {
+    private const float MIN_AMOUNT = 0.01;
+
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
 
@@ -22,8 +24,15 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Логистика' === $this->normalizer->sellerOperName($item)
-            && 1 === (int) $this->normalizer->deliveryAmount($item);
+        // New delivery rows omit the legacy counter. Return signals keep the row
+        // visible as unsupported until their financial mapping is confirmed.
+        return match ($this->normalizer->sellerOperName($item)) {
+            'Логистика' => 1 === (int) $this->normalizer->deliveryAmount($item),
+            'Доставка' => 0 === (int) $this->normalizer->returnAmount($item)
+                && !$this->normalizer->isReturn($item)
+                && abs($this->normalizer->deliveryService($item)) >= self::MIN_AMOUNT,
+            default => false,
+        };
     }
 
     public function requiresListing(): bool
@@ -35,7 +44,7 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
     {
         $deliveryRub = $this->normalizer->deliveryService($item);
 
-        if (abs($deliveryRub) < 0.01) {
+        if (abs($deliveryRub) < self::MIN_AMOUNT) {
             return [];
         }
 

@@ -1514,6 +1514,165 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertTrue($calculator->supports($this->supplierOpItem($operation, ['rebill_logistic_cost' => 0.01])));
     }
 
+    public function testWbDeliveryOperationWithoutDeliveryCounterUsesDeliveryCategory(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+        $row = $this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: -180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'rrd_id' => '2001',
+            ],
+        );
+        $camelRow = [
+            'sellerOperName' => 'Доставка',
+            'rrdId' => '2002',
+            'saleDt' => '2026-01-15 10:00:00',
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'deliveryService' => -180.00,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+        self::assertCount(1, array_filter(
+            $this->allWbCostCalculators(),
+            static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($row),
+        ));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_delivery', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(180.00, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:2001:logistics_delivery', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('logistics_delivery', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(180.00, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:2002:logistics_delivery', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbDeliveryOperationWithoutDeliveryServiceAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem('Доставка', ['deduction' => 180.00]);
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbDeliveryOperationRequiresMaterialAmountAndNoReturnCounter(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 0.009,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertTrue($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 0.01,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 1,
+            deliveryRub: 180.00,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'doc_type_name' => 'Возврат',
+            ],
+        )));
+    }
+
+    public function testProcessWbCostsActionClearsDeliveryFromUnprocessedTypes(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+        $row = $this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: -180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'rrd_id' => '2001',
+            ],
+        );
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+        $rawDoc->expects(self::once())->method('setUnprocessedCostsCount')->with(0);
+        $rawDoc->expects(self::once())->method('setUnprocessedCostTypes')->with(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $this->createMock(MarketplaceListingRepository::class),
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            $listingResolver,
+            new MarketplaceCostCategoryResolver($costCategoryRepository, $em),
+            new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class)),
+            $this->createMock(MarketplaceListingBarcodeRepository::class),
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsDeliveryCalculator()],
+        );
+
+        self::assertSame(1, $action($companyId, $rawDocId));
+        self::assertCount(1, $persisted);
+        $category = $persisted[0]->getCategory();
+        self::assertNotNull($category);
+        self::assertSame('logistics_delivery', $category->getCode());
+        self::assertEqualsWithDelta(180.00, (float) $persisted[0]->getAmount(), 0.001);
+        self::assertSame('wb:2001:logistics_delivery', $persisted[0]->getExternalId());
+    }
+
     /**
      * @return list<CostCalculatorInterface>
      */
