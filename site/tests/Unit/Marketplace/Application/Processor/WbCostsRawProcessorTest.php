@@ -1418,4 +1418,122 @@ final class WbCostsRawProcessorTest extends TestCase
             'bonus_type_name' => 'коррекция логистики',
         ];
     }
+
+    public function testWbStorageCorrectionUsesStorageCategory(): void
+    {
+        $calculator = new WbStorageCalculator();
+        $row = $this->supplierOpItem('Коррекция хранения', ['storage_fee' => -125.75]);
+        $camelRow = [
+            'sellerOperName' => 'Коррекция хранения',
+            'rrdId' => '3002',
+            'saleDt' => '2026-01-15 10:00:00',
+            'paidStorage' => -125.75,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('storage', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(125.75, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3001:storage', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('storage', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(125.75, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:3002:storage', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbWarehouseLogisticsNewOperationNameUsesExistingCategory(): void
+    {
+        $calculator = new WbWarehouseLogisticsCalculator();
+        $row = $this->supplierOpItem(
+            'Возмещение издержек по перемещению и операционной обработке товара',
+            ['rebill_logistic_cost' => 88.20],
+        );
+        $camelRow = [
+            'sellerOperName' => 'Возмещение издержек по перемещению и операционной обработке товара',
+            'rrdId' => '3003',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rebillLogisticCost' => 88.20,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('warehouse_logistics', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(88.20, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3001:warehouse_logistics', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('warehouse_logistics', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(88.20, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:3003:warehouse_logistics', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbStorageCorrectionWithoutStorageAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem('Коррекция хранения', ['deduction' => 125.75]);
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbWarehouseLogisticsNewOperationWithoutRebillAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem(
+            'Возмещение издержек по перемещению и операционной обработке товара',
+            ['deduction' => 88.20],
+        );
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbStorageCorrectionUsesCalculationAmountBoundary(): void
+    {
+        $calculator = new WbStorageCalculator();
+
+        self::assertFalse($calculator->supports($this->supplierOpItem('Коррекция хранения', ['storage_fee' => -0.009])));
+        self::assertTrue($calculator->supports($this->supplierOpItem('Коррекция хранения', ['storage_fee' => -0.01])));
+    }
+
+    public function testWbWarehouseLogisticsNewOperationUsesCalculationAmountBoundary(): void
+    {
+        $calculator = new WbWarehouseLogisticsCalculator();
+        $operation = 'Возмещение издержек по перемещению и операционной обработке товара';
+
+        self::assertFalse($calculator->supports($this->supplierOpItem($operation, ['rebill_logistic_cost' => 0.009])));
+        self::assertTrue($calculator->supports($this->supplierOpItem($operation, ['rebill_logistic_cost' => 0.01])));
+    }
+
+    /**
+     * @return list<CostCalculatorInterface>
+     */
+    private function allWbCostCalculators(): array
+    {
+        $calculators = [
+            new WbCommissionCalculator(),
+            new WbAcquiringCalculator(),
+            new WbLogisticsDeliveryCalculator(),
+            new WbLogisticsReturnCalculator(),
+            new WbLogisticsCorrectionCalculator(),
+            new WbStorageCalculator(),
+            new WbPvzProcessingCalculator(),
+            new WbWarehouseLogisticsCalculator(),
+            new WbPenaltyCalculator(),
+            new WbProductProcessingCalculator(),
+            new WbDeductionCalculator(new SlugifyService()),
+            new WbLoyaltyDiscountCalculator(),
+        ];
+
+        return $calculators;
+    }
 }

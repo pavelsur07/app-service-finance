@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 class WbStorageCalculator implements CostCalculatorInterface
 {
+    private const float MIN_AMOUNT = 0.01;
+
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
 
@@ -22,7 +24,13 @@ class WbStorageCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Хранение' === $this->normalizer->sellerOperName($item);
+        // Preserve the legacy operation contract. A newly observed alias is claimed
+        // only when its documented amount field is present, so schema drift remains visible.
+        return match ($this->normalizer->sellerOperName($item)) {
+            'Хранение' => true,
+            'Коррекция хранения' => abs($this->normalizer->paidStorage($item)) >= self::MIN_AMOUNT,
+            default => false,
+        };
     }
 
     public function requiresListing(): bool
@@ -34,7 +42,7 @@ class WbStorageCalculator implements CostCalculatorInterface
     {
         $storageFee = $this->normalizer->paidStorage($item);
 
-        if (abs($storageFee) < 0.01) {
+        if (abs($storageFee) < self::MIN_AMOUNT) {
             return [];
         }
 
