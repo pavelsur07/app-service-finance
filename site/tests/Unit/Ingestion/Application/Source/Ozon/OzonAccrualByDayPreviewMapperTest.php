@@ -278,6 +278,61 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame([], $rows);
     }
 
+    public function testUsesTaxonomyTransactionTypeForKnownNonItemFees(): void
+    {
+        $rows = $this->mapper()->preview(
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            [
+                [
+                    'accrual_id' => 53675409201,
+                    'date' => '2026-08-01',
+                    'accrued_category' => 'NON_ITEM',
+                    'non_item_fee' => [
+                        'type_id' => 1042,
+                        'name' => 'LabelBrandVerified',
+                        'accrued' => ['amount' => '-1500.00', 'currency' => 'RUB'],
+                    ],
+                ],
+                [
+                    'accrual_id' => 53675409202,
+                    'date' => '2026-08-19',
+                    'accrued_category' => 'NON_ITEM',
+                    'non_item_fee' => [
+                        'type_id' => 1005,
+                        'name' => 'Installment',
+                        'accrued' => ['amount' => '-88.88', 'currency' => 'RUB'],
+                    ],
+                ],
+                [
+                    'accrual_id' => 53675409203,
+                    'date' => '2026-09-01',
+                    'accrued_category' => 'NON_ITEM',
+                    'non_item_fee' => [
+                        'type_id' => 76,
+                        'name' => 'StockInsurance',
+                        'accrued' => ['amount' => '-619.84', 'currency' => 'RUB'],
+                    ],
+                ],
+            ],
+        );
+
+        self::assertCount(3, $rows);
+        self::assertSame(
+            [
+                'ozon_brand_verification_labeling',
+                'ozon_installment',
+                'ozon_stock_insurance',
+            ],
+            array_map(static fn (OzonAccrualPreviewTransaction $row): ?string => $row->ozonCategoryCode, $rows),
+        );
+
+        foreach ($rows as $row) {
+            self::assertSame(TransactionType::FEE, $row->type);
+            self::assertSame(TransactionDirection::OUT, $row->direction);
+            self::assertTrue($row->ozonCategoryKnown);
+        }
+    }
+
     public function testFiltersRowsOutsideRequestedDateWindow(): void
     {
         $rows = $this->mapper()->preview(

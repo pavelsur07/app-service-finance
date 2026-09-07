@@ -13,6 +13,7 @@ use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use App\Ingestion\Exception\DoneRawRecordReplayFailedException;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Doctrine\DBAL\ArrayParameterType;
@@ -29,7 +30,7 @@ use Webmozart\Assert\Assert;
 
 #[AsCommand(
     name: 'app:ingestion:wb-finance:normalize-stored',
-    description: 'Safely resets and normalizes stored Wildberries finance raw records by report date.',
+    description: 'Safely normalizes or atomically replays stored Wildberries finance raw records by report date.',
 )]
 final class WbFinanceNormalizeStoredCommand extends Command
 {
@@ -55,7 +56,7 @@ final class WbFinanceNormalizeStoredCommand extends Command
             ->addOption('include-done', null, InputOption::VALUE_NONE, 'Explicitly include already normalized raw records for force replay.')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show selected records without changing them.')
             ->addOption('dispatch', null, InputOption::VALUE_NONE, 'Reset selected records to pending and dispatch async normalization messages.')
-            ->addOption('execute-inline', null, InputOption::VALUE_NONE, 'Reset selected records and normalize them synchronously in this process.');
+            ->addOption('execute-inline', null, InputOption::VALUE_NONE, 'Normalize selected records synchronously; done records are force-replayed atomically.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -224,13 +225,24 @@ final class WbFinanceNormalizeStoredCommand extends Command
                 continue;
             }
 
-            $this->resetRecordToPending($record);
-            $this->entityManager->flush();
+            $replayingDoneRecord = $includeDone
+                && RawNormalizationStatus::DONE === $record->getNormalizationStatus();
+            if (!$replayingDoneRecord) {
+                $this->resetRecordToPending($record);
+                $this->entityManager->flush();
+            }
 
             try {
                 ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId, forceReplay: $includeDone));
             } catch (\Throwable $exception) {
-                $this->markInlineFailure($record, $exception);
+                if (!$exception instanceof DoneRawRecordReplayFailedException) {
+                    $this->markInlineFailure(
+                        $companyId,
+                        $rawRecordId,
+                        $exception,
+                        preserveDoneStatus: $replayingDoneRecord,
+                    );
+                }
 
                 $resultRows[] = [
                     'rawId' => $rawRecordId,
@@ -286,16 +298,24 @@ final class WbFinanceNormalizeStoredCommand extends Command
 
     private function resetRecordToPending(IngestRawRecord $record): void
     {
-        if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
-            $record->markNormalizationFailed();
-        }
-
+        // DONE records are handled by the atomic inline replay branch above.
         $record->markNormalizationPending();
     }
 
-    private function markInlineFailure(IngestRawRecord $record, \Throwable $exception): void
-    {
-        $record->markNormalizationFailed();
+    private function markInlineFailure(
+        string $companyId,
+        string $rawRecordId,
+        \Throwable $exception,
+        bool $preserveDoneStatus = false,
+    ): void {
+        $record = $this->rawRecordRepository->findByIdAndCompany($rawRecordId, $companyId);
+        if (null === $record) {
+            return;
+        }
+
+        if (!$preserveDoneStatus) {
+            $record->markNormalizationFailed();
+        }
         ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
             companyId: $record->getCompanyId(),
             rawRecordId: $record->getId(),

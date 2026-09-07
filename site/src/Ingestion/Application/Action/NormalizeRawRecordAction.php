@@ -10,6 +10,7 @@ use App\Ingestion\Application\Command\UpsertFinancialTransactionCommand;
 use App\Ingestion\Application\DTO\MappedControlSum;
 use App\Ingestion\Application\DTO\MappedPreviewIssue;
 use App\Ingestion\Application\Service\ListingResolverRegistry;
+use App\Ingestion\Application\Service\OzonAccrualStaleComponentVoider;
 use App\Ingestion\Application\Service\OzonAccrualStaleProjectionPruner;
 use App\Ingestion\Application\Service\SystemCounterpartyResolver;
 use App\Ingestion\Application\Service\WbFinanceStaleComponentVoider;
@@ -18,6 +19,7 @@ use App\Ingestion\Domain\Contract\RawRecordAwareControlSumMapperInterface;
 use App\Ingestion\Domain\Service\MapperRegistry;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
+use App\Ingestion\Exception\DoneRawRecordReplayFailedException;
 use App\Ingestion\Exception\RawRecordNotFoundException;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
@@ -39,6 +41,7 @@ final readonly class NormalizeRawRecordAction
         private FinancialTransactionRepository $financialTransactionRepository,
         private NormalizationIssueRepository $normalizationIssueRepository,
         private UpsertFinancialTransactionAction $upsertFinancialTransactionAction,
+        private OzonAccrualStaleComponentVoider $ozonAccrualStaleComponentVoider,
         private OzonAccrualStaleProjectionPruner $ozonAccrualStaleProjectionPruner,
         private WbFinanceStaleComponentVoider $wbFinanceStaleComponentVoider,
         private RecordNormalizationIssueAction $recordNormalizationIssueAction,
@@ -58,6 +61,8 @@ final readonly class NormalizeRawRecordAction
                 throw new RawRecordNotFoundException('Raw record not found for requested company.');
             }
 
+            $replayingDoneRecord = $command->forceReplay
+                && RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus();
             if (RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus() && !$command->forceReplay) {
                 $connection->commit();
 
@@ -77,6 +82,13 @@ final readonly class NormalizeRawRecordAction
                     ? $mapper->previewIssues($rawRecord, $rows)
                     : [];
             } catch (\Throwable $exception) {
+                if ($replayingDoneRecord) {
+                    $this->resolveOpenIssues(
+                        $command->companyId,
+                        $rawRecord->getId(),
+                        NormalizationIssueKind::MAPPER_FAILURE,
+                    );
+                }
                 ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
                     companyId: $command->companyId,
                     rawRecordId: $rawRecord->getId(),
@@ -87,9 +99,15 @@ final readonly class NormalizeRawRecordAction
                         'message' => $exception->getMessage(),
                     ],
                 ));
-                $rawRecord->markNormalizationFailed();
+                if (!$replayingDoneRecord) {
+                    $rawRecord->markNormalizationFailed();
+                }
                 $this->entityManager->flush();
                 $connection->commit();
+
+                if ($replayingDoneRecord) {
+                    throw new DoneRawRecordReplayFailedException('Done raw record replay failed during mapping; the existing normalized projection was preserved.', previous: $exception);
+                }
 
                 return;
             }
@@ -150,6 +168,11 @@ final readonly class NormalizeRawRecordAction
 
             $this->entityManager->flush();
 
+            // Reconciliation and verification commands may legitimately re-normalize
+            // a non-DONE Ozon record without forceReplay. Retyping a component changes
+            // its natural key, so the obsolete same-raw row must always be voided.
+            $this->ozonAccrualStaleComponentVoider->void($rawRecord, $mappedTransactions);
+
             if ($command->forceReplay) {
                 $this->wbFinanceStaleComponentVoider->void($rawRecord, $mappedTransactions);
             }
@@ -175,6 +198,9 @@ final readonly class NormalizeRawRecordAction
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();
             }
+            if ($this->entityManager->isOpen()) {
+                $this->entityManager->clear();
+            }
 
             $this->logger->info('Concurrent normalization detected for raw record; retrying.', [
                 'companyId' => $command->companyId,
@@ -185,6 +211,12 @@ final readonly class NormalizeRawRecordAction
         } catch (\Throwable $exception) {
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();
+            }
+            if ($this->entityManager->isOpen()) {
+                // DB rollback does not rewind Doctrine's in-memory UnitOfWork.
+                // Detach rolled-back inserts and dirty entities before a caller
+                // records the failure with a new flush.
+                $this->entityManager->clear();
             }
 
             throw $exception;
@@ -207,9 +239,16 @@ final readonly class NormalizeRawRecordAction
         }
     }
 
-    private function resolveOpenIssues(string $companyId, string $rawRecordId): void
-    {
+    private function resolveOpenIssues(
+        string $companyId,
+        string $rawRecordId,
+        ?NormalizationIssueKind $kind = null,
+    ): void {
         foreach ($this->normalizationIssueRepository->findOpenByRawRecord($companyId, $rawRecordId) as $issue) {
+            if (null !== $kind && $kind !== $issue->getKind()) {
+                continue;
+            }
+
             $issue->markResolved();
         }
     }

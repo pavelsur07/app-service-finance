@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Ingestion\Application\Service;
 
 use App\Ingestion\Application\DTO\MappedTransaction;
-use App\Ingestion\Application\Source\Wildberries\WbResourceType;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 
-final readonly class WbFinanceStaleComponentVoider
+final readonly class OzonAccrualStaleComponentVoider
 {
     public function __construct(private FinancialTransactionRepository $transactionRepository)
     {
@@ -21,8 +21,8 @@ final readonly class WbFinanceStaleComponentVoider
      */
     public function void(IngestRawRecord $rawRecord, array $mappedTransactions): void
     {
-        if (IngestSource::WILDBERRIES !== $rawRecord->getSource()
-            || WbResourceType::FINANCE_SALES_REPORT_DETAILED !== $rawRecord->getResourceType()) {
+        if (IngestSource::OZON !== $rawRecord->getSource()
+            || OzonResourceType::ACCRUAL_BY_DAY !== $rawRecord->getResourceType()) {
             return;
         }
 
@@ -36,7 +36,7 @@ final readonly class WbFinanceStaleComponentVoider
                 continue;
             }
 
-            $transaction->voidForReplay('wildberries_mapper_component_removed');
+            $transaction->voidForReplay('ozon_mapper_component_retyped');
         }
     }
 

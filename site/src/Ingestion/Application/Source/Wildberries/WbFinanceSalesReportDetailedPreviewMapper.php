@@ -11,7 +11,7 @@ use Ramsey\Uuid\Uuid;
 final readonly class WbFinanceSalesReportDetailedPreviewMapper
 {
     private const SOURCE_TZ = 'UTC';
-    private const MAPPER_VERSION = 3;
+    private const MAPPER_VERSION = 4;
     private const COMPONENT_SALE_PAYOUT_ADJUSTMENT = 'sale_payout_adjustment';
 
     /**
@@ -256,7 +256,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'storage', TransactionType::STORAGE, 'paidStorage', 'storage_fee', 'WB storage fee');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'acceptance', TransactionType::ACCEPTANCE, 'paidAcceptance', 'acceptance', 'WB acceptance fee');
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'penalty', TransactionType::PENALTY, 'penalty', null, 'WB penalty');
-        $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'deduction', TransactionType::ADJUSTMENT, 'deduction', null, 'WB deduction');
+        $this->collectDeduction($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName);
         $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'warehouse_logistics', TransactionType::LOGISTICS, 'rebillLogisticCost', 'rebill_logistic_cost', 'WB warehouse logistics');
         if ($this->isPvzProcessing($sellerOperName)) {
             $this->addCostField($transactions, $row, $operationGroupId, $rowKey, $currency, $occurredAt, $sellerOperName, $docTypeName, 'pvz_processing', TransactionType::LOGISTICS, 'ppvzReward', 'ppvz_reward', 'WB PVZ processing');
@@ -349,6 +349,54 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
      * @param list<WbFinancePreviewTransaction> $transactions
      * @param array<string, mixed> $row
      */
+    private function collectDeduction(
+        array &$transactions,
+        array $row,
+        string $operationGroupId,
+        string $rowKey,
+        string $currency,
+        \DateTimeImmutable $occurredAt,
+        string $sellerOperName,
+        string $docTypeName,
+    ): void {
+        $amountMinor = $this->minor($row, 'deduction');
+        if (0 === $amountMinor) {
+            return;
+        }
+
+        $reason = $this->string($row, 'bonusTypeName', 'bonus_type_name');
+        $category = WbDeductionCategory::resolve($reason);
+        $sourceData = ['bonusTypeName' => $reason];
+        if (null !== $category) {
+            $sourceData += [
+                '_wb_cost_category_code' => $category->code,
+                '_wb_cost_category_label' => $category->label,
+                '_wb_cost_category_group' => $category->group,
+            ];
+        }
+
+        $this->add(
+            transactions: $transactions,
+            operationGroupId: $operationGroupId,
+            rowKey: $rowKey,
+            component: 'deduction',
+            type: TransactionType::ADJUSTMENT,
+            signedAmountMinor: -$amountMinor,
+            currency: $currency,
+            occurredAt: $occurredAt,
+            field: 'deduction',
+            sellerOperName: $sellerOperName,
+            docTypeName: $docTypeName,
+            description: $category->label ?? 'WB deduction',
+            row: $row,
+            additionalSourceData: $sourceData,
+        );
+    }
+
+    /**
+     * @param list<WbFinancePreviewTransaction> $transactions
+     * @param array<string, mixed> $row
+     */
     private function addCost(
         array &$transactions,
         string $operationGroupId,
@@ -393,6 +441,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
      * @param array<string, mixed> $row
+     * @param array<string, mixed> $additionalSourceData
      */
     private function add(
         array &$transactions,
@@ -408,6 +457,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
         string $docTypeName,
         string $description,
         array $row,
+        array $additionalSourceData = [],
     ): void {
         if (0 === $signedAmountMinor) {
             return;
@@ -449,6 +499,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
                 'ppvzVwNds' => $this->raw($row, 'ppvzVwNds', 'vwNds', 'ppvz_vw_nds'),
                 'ppvzReward' => $this->raw($row, 'ppvzReward', 'ppvz_reward'),
                 'cashbackDiscount' => $this->raw($row, 'cashbackDiscount', 'cashback_discount'),
+                ...$additionalSourceData,
             ],
         );
     }

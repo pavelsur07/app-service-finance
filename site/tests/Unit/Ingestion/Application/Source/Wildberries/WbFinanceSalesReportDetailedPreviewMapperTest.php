@@ -41,7 +41,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(TransactionDirection::IN, $sale->direction);
         self::assertSame(100000, $sale->amountMinor);
         self::assertSame('retailPriceWithDisc*quantity', $sale->field);
-        self::assertSame(3, $sale->sourceData['_ingestion_mapper_version']);
+        self::assertSame(4, $sale->sourceData['_ingestion_mapper_version']);
         self::assertSame('2026-06-21 10:15:00', $sale->occurredAt->format('Y-m-d H:i:s'));
 
         $commission = $this->transaction($result->transactions, 'wb:sales-report-detailed:101:commission');
@@ -225,7 +225,7 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(334, $acceptance->amountMinor);
 
         $deduction = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:deduction');
-        self::assertSame(TransactionDirection::OUT, $deduction->direction);
+        self::assertSame(TransactionDirection::IN, $deduction->direction);
         self::assertSame(700, $deduction->amountMinor);
 
         $warehouseLogistics = $this->transaction($result->transactions, 'wb:sales-report-detailed:103:warehouse_logistics');
@@ -291,6 +291,78 @@ final class WbFinanceSalesReportDetailedPreviewMapperTest extends TestCase
         self::assertSame(4210, $transaction->amountMinor);
         self::assertSame('cashbackDiscount', $transaction->field);
         self::assertSame('42.10', $transaction->sourceData['cashbackDiscount']);
+    }
+
+    public function testMapsVoluntaryGoodsPaymentAsEnrichedIncomingAdjustment(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 111,
+            'currency' => 'RUB',
+            'sellerOperName' => 'Удержание',
+            'rrDate' => '2026-07-22',
+            'deduction' => '-49155.00',
+            'bonusTypeName' => 'Добровольная выплата за товары, документ №123',
+        ]]);
+
+        self::assertCount(1, $result->transactions);
+        $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:111:deduction');
+
+        self::assertSame(TransactionType::ADJUSTMENT, $transaction->type);
+        self::assertSame(TransactionDirection::IN, $transaction->direction);
+        self::assertSame(4915500, $transaction->amountMinor);
+        self::assertSame(4915500, $transaction->signedAmountMinor());
+        self::assertSame('Добровольная выплата за товары, документ №123', $transaction->sourceData['bonusTypeName']);
+        self::assertSame('wb_dobrovolnaya_vyplata_za_tovary', $transaction->sourceData['_wb_cost_category_code']);
+        self::assertSame('Добровольная выплата за товары', $transaction->sourceData['_wb_cost_category_label']);
+        self::assertSame('Компенсации и декомпенсации', $transaction->sourceData['_wb_cost_category_group']);
+    }
+
+    public function testKeepsUnknownPositiveDeductionAsUnenrichedOutgoingAdjustment(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrdId' => 113,
+            'currency' => 'RUB',
+            'sellerOperName' => 'Удержание',
+            'rrDate' => '2026-07-22',
+            'deduction' => '150.00',
+            'bonusTypeName' => 'Прочее удержание',
+        ]]);
+
+        self::assertCount(1, $result->transactions);
+        $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:113:deduction');
+
+        self::assertSame(TransactionType::ADJUSTMENT, $transaction->type);
+        self::assertSame(TransactionDirection::OUT, $transaction->direction);
+        self::assertSame(15000, $transaction->amountMinor);
+        self::assertSame('WB deduction', $transaction->description);
+        self::assertSame('Прочее удержание', $transaction->sourceData['bonusTypeName']);
+        self::assertArrayNotHasKey('_wb_cost_category_code', $transaction->sourceData);
+        self::assertArrayNotHasKey('_wb_cost_category_label', $transaction->sourceData);
+        self::assertArrayNotHasKey('_wb_cost_category_group', $transaction->sourceData);
+    }
+
+    public function testMapsMonthlyDisposalReasonToStableEnrichedExpenseCategory(): void
+    {
+        $result = $this->mapper()->preview(self::COMPANY_ID, [[
+            'rrd_id' => 112,
+            'currency' => 'RUB',
+            'supplier_oper_name' => 'Удержание',
+            'rr_dt' => '2026-08-10',
+            'deduction' => '912.00',
+            'bonus_type_name' => 'Отчет об утилизированном товаре (по складу) за июль 2026',
+        ]]);
+
+        self::assertCount(1, $result->transactions);
+        $transaction = $this->transaction($result->transactions, 'wb:sales-report-detailed:112:deduction');
+
+        self::assertSame(TransactionType::ADJUSTMENT, $transaction->type);
+        self::assertSame(TransactionDirection::OUT, $transaction->direction);
+        self::assertSame(91200, $transaction->amountMinor);
+        self::assertSame(-91200, $transaction->signedAmountMinor());
+        self::assertSame('Отчет об утилизированном товаре (по складу) за июль 2026', $transaction->sourceData['bonusTypeName']);
+        self::assertSame('wb_warehouse_disposal', $transaction->sourceData['_wb_cost_category_code']);
+        self::assertSame('Утилизация товара на складе WB', $transaction->sourceData['_wb_cost_category_label']);
+        self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_wb_cost_category_group']);
     }
 
     public function testReportsUnknownRowsWithNoMappedTransactions(): void

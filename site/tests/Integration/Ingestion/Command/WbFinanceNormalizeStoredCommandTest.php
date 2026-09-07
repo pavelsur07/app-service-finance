@@ -21,6 +21,8 @@ use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\Event\OnFlushEventArgs;
+use Doctrine\ORM\Events;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -341,20 +343,39 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
         ));
         $this->em->flush();
 
-        foreach ([1, 2] as $run) {
-            $tester = $this->tester();
-            $exit = $tester->execute([
-                '--company-id' => $companyId,
-                '--from' => '2026-06-22',
-                '--to' => '2026-06-22',
-                '--shop-ref' => $connectionRef,
-                '--include-done' => true,
-                '--execute-inline' => true,
-            ]);
+        $pendingTransitionListener = new class {
+            public int $scheduledPendingTransitions = 0;
 
-            self::assertSame(Command::SUCCESS, $exit, sprintf('Run %d: %s', $run, $tester->getDisplay()));
+            public function onFlush(OnFlushEventArgs $event): void
+            {
+                foreach ($event->getObjectManager()->getUnitOfWork()->getScheduledEntityUpdates() as $entity) {
+                    if ($entity instanceof IngestRawRecord && RawNormalizationStatus::PENDING === $entity->getNormalizationStatus()) {
+                        ++$this->scheduledPendingTransitions;
+                    }
+                }
+            }
+        };
+        $this->em->getEventManager()->addEventListener([Events::onFlush], $pendingTransitionListener);
+
+        try {
+            foreach ([1, 2] as $run) {
+                $tester = $this->tester();
+                $exit = $tester->execute([
+                    '--company-id' => $companyId,
+                    '--from' => '2026-06-22',
+                    '--to' => '2026-06-22',
+                    '--shop-ref' => $connectionRef,
+                    '--include-done' => true,
+                    '--execute-inline' => true,
+                ]);
+
+                self::assertSame(Command::SUCCESS, $exit, sprintf('Run %d: %s', $run, $tester->getDisplay()));
+            }
+        } finally {
+            $this->em->getEventManager()->removeEventListener([Events::onFlush], $pendingTransitionListener);
         }
 
+        self::assertSame(0, $pendingTransitionListener->scheduledPendingTransitions);
         self::assertSame(RawNormalizationStatus::DONE, $this->rawStatusById($companyId, $record->getId()));
         self::assertSame(13000, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:commission'));
         self::assertSame(100000, $this->transactionAmount($companyId, 'wb:sales-report-detailed:301:sale'));
@@ -363,6 +384,42 @@ final class WbFinanceNormalizeStoredCommandTest extends IntegrationTestCase
         self::assertSame(0, $this->openIssueCount($companyId, $record->getId()));
         self::assertSame(1, $this->resolvedIssueCount($companyId, $record->getId()));
         self::assertSame(0, $this->duplicateNaturalKeyCount($companyId));
+    }
+
+    public function testFailedDoneReplayReturnsFailureWithoutDiscardingPreviouslyDoneStatus(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'wb-sales-report-detailed:2026-06-22:rrd-0',
+            fetchedAt: new \DateTimeImmutable('2026-06-23 09:17:43+00:00'),
+            rows: [[
+                'rrdId' => 302,
+                'currency' => 'RUB',
+                'sellerOperName' => 'Удержание',
+                'rrDate' => 'not-a-date',
+                'deduction' => '100.00',
+            ]],
+        );
+        $record->markNormalizationDone();
+        $this->em->flush();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-22',
+            '--to' => '2026-06-22',
+            '--shop-ref' => $connectionRef,
+            '--include-done' => true,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $tester->getDisplay());
+        self::assertSame(RawNormalizationStatus::DONE, $this->rawStatusById($companyId, $record->getId()));
+        self::assertSame(1, $this->openIssueCount($companyId, $record->getId()));
+        self::assertStringContainsString('non-done raw records', $tester->getDisplay());
     }
 
     private function tester(): CommandTester

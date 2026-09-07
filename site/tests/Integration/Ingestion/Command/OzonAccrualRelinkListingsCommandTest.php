@@ -11,6 +11,7 @@ use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
@@ -18,6 +19,7 @@ use App\Ingestion\Infrastructure\Query\OzonAccrualProjectionHealthQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Shared\Domain\ValueObject\Money;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -185,6 +187,40 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
         self::assertStringContainsString('0', $reconcile->getDisplay());
     }
 
+    public function testReconcileReloadsRawRecordBeforeMarkingLateNormalizationFailure(): void
+    {
+        $company = $this->createCompany();
+        $companyId = (string) $company->getId();
+        $shopRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $shopRef,
+            rows: [$this->postingRow(53675409104, '1234567894')],
+        );
+        $this->em->flush();
+
+        /** @var ObjectStorageInterface $objectStorage */
+        $objectStorage = self::getContainer()->get(ObjectStorageInterface::class);
+        $corruptedPayload = gzencode("{bad json}\n", 6);
+        self::assertIsString($corruptedPayload);
+        $objectStorage->write($record->getStoragePath(), $corruptedPayload);
+        $this->em->clear();
+
+        $reconcile = $this->reconcileTester();
+        $exit = $reconcile->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $shopRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-01',
+            '--execute' => true,
+            '--execute-inline-normalization' => true,
+            '--summary-only' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $reconcile->getDisplay());
+        self::assertSame(RawNormalizationStatus::FAILED->value, $this->rawStatus($companyId, $record->getId()));
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
@@ -212,6 +248,14 @@ final class OzonAccrualRelinkListingsCommandTest extends IntegrationTestCase
         $this->em->persist($company);
 
         return $company;
+    }
+
+    private function rawStatus(string $companyId, string $rawRecordId): string
+    {
+        return (string) $this->connection->fetchOne(
+            'SELECT normalization_status FROM ingest_raw_records WHERE company_id = :companyId AND id = :rawRecordId',
+            ['companyId' => $companyId, 'rawRecordId' => $rawRecordId],
+        );
     }
 
     /**

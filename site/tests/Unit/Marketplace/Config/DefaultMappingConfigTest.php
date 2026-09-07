@@ -124,6 +124,29 @@ final class DefaultMappingConfigTest extends TestCase
         }
     }
 
+    public function testWbWarehouseDisposalUsesStableDefaultMappingAndCompensationIsNotAnExpense(): void
+    {
+        $rules = [];
+        foreach ($this->rulesFor(MarketplaceType::WILDBERRIES) as $rule) {
+            $rules[$rule->getCostCode()] = $rule;
+        }
+
+        self::assertArrayHasKey('wb_warehouse_disposal', $rules);
+        self::assertSame('OPEX_WH_MP_DEDUCTIONS', $rules['wb_warehouse_disposal']->getPlCode());
+        self::assertTrue($rules['wb_warehouse_disposal']->isIncludeInPl());
+
+        self::assertArrayNotHasKey('wb_dobrovolnaya_vyplata_za_tovary', $rules);
+
+        foreach (self::EXTRA_WB_CODES as $legacyCode) {
+            if (!str_starts_with($legacyCode, 'wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_')) {
+                continue;
+            }
+
+            self::assertArrayHasKey($legacyCode, $rules);
+            self::assertSame('OPEX_WH_MP_DEDUCTIONS', $rules[$legacyCode]->getPlCode());
+        }
+    }
+
     public function testEveryPlCodeIsFromStandardTree(): void
     {
         foreach (MarketplaceType::cases() as $marketplace) {

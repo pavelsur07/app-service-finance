@@ -398,7 +398,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
                 }
 
                 try {
-                    $this->markInlineFailure($record, $exception);
+                    $this->markInlineFailure($companyId, $rawRecordId, $exception);
                     $resultRows[] = [
                         'rawId' => $rawRecordId,
                         'status' => 'error',
@@ -434,7 +434,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
             }
 
             try {
-                $status = $this->normalizationStatus($record);
+                $status = $this->normalizationStatus($companyId, $rawRecordId);
             } catch (\Throwable $exception) {
                 $status = 'normalized-status-unavailable';
                 $this->logger->warning('Ozon accrual inline normalization status refresh failed after successful action.', [
@@ -539,8 +539,13 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         }
     }
 
-    private function markInlineFailure(IngestRawRecord $record, \Throwable $exception): void
+    private function markInlineFailure(string $companyId, string $rawRecordId, \Throwable $exception): void
     {
+        $record = $this->rawRecordRepository->findByIdAndCompany($rawRecordId, $companyId);
+        if (null === $record) {
+            return;
+        }
+
         $record->markNormalizationFailed();
         ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
             companyId: $record->getCompanyId(),
@@ -556,11 +561,14 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
         $this->entityManager->flush();
     }
 
-    private function normalizationStatus(IngestRawRecord $record): string
+    private function normalizationStatus(string $companyId, string $rawRecordId): string
     {
-        $this->entityManager->refresh($record);
+        $status = $this->entityManager->getConnection()->fetchOne(
+            'SELECT normalization_status FROM ingest_raw_records WHERE company_id = :companyId AND id = :rawRecordId',
+            ['companyId' => $companyId, 'rawRecordId' => $rawRecordId],
+        );
 
-        return $record->getNormalizationStatus()->value;
+        return is_string($status) ? $status : 'missing';
     }
 
     /**
