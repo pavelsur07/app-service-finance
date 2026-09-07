@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Inventory\Infrastructure\Query;
 
+use App\Inventory\Enum\StockSnapshotMappingStatus;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -35,6 +36,10 @@ final readonly class SessionsToRenormalizeQuery
         $params = [
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
+            // «Не привязана» = любой статус, кроме mapped. Значение берётся из enum,
+            // а не пишется строкой: то же определение использует гейт непривязанных
+            // остатков, и расходиться им нельзя.
+            'mappedStatus' => StockSnapshotMappingStatus::Mapped->value,
         ];
 
         $filter = '';
@@ -69,7 +74,7 @@ final readonly class SessionsToRenormalizeQuery
                 to_char(l.snapshot_date, \'YYYY-MM-DD\') AS snapshot_date,
                 l.snapshot_session_id AS snapshot_session_id,
                 count(*) AS total_rows,
-                count(*) FILTER (WHERE s.mapping_status IS DISTINCT FROM \'mapped\') AS unmapped_rows
+                count(*) FILTER (WHERE s.mapping_status IS DISTINCT FROM :mappedStatus) AS unmapped_rows
              FROM latest l
              INNER JOIN inventory_stock_snapshots s
                 ON s.company_id = l.company_id
@@ -77,7 +82,7 @@ final readonly class SessionsToRenormalizeQuery
                AND s.snapshot_date = l.snapshot_date
                AND s.snapshot_session_id = l.snapshot_session_id
              GROUP BY l.company_id, l.source, l.snapshot_date, l.snapshot_session_id
-             HAVING count(*) FILTER (WHERE s.mapping_status IS DISTINCT FROM \'mapped\') > 0
+             HAVING count(*) FILTER (WHERE s.mapping_status IS DISTINCT FROM :mappedStatus) > 0
              ORDER BY l.snapshot_date, l.source, l.company_id',
             $params,
         );
