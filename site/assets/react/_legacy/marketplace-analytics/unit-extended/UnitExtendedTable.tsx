@@ -295,7 +295,14 @@ const TagCell: React.FC<TagCellProps> = ({ tags, selectedTagIds, onToggleTag }) 
                     );
                 })}
                 {hiddenCount > 0 && (
-                    <span className="text-muted small">+{hiddenCount}</span>
+                    <>
+                        <span className="text-muted small" aria-hidden="true">+{hiddenCount}</span>
+                        {/* title у td скринридеру недоступен и клавиатурой не берётся —
+                            имена скрытых тегов отдаём текстом. */}
+                        <span className="visually-hidden">
+                            Ещё теги: {tags.slice(visible.length).map((tag) => tag.name).join(', ')}
+                        </span>
+                    </>
                 )}
             </div>
         </td>
