@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Service\CostCalculator;
 
+use App\Marketplace\Domain\WbCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
@@ -87,16 +88,20 @@ class WbDeductionCalculator implements CostCalculatorInterface
             $categoryName = 'Удержание';
         }
 
-        // Генерируем code через SlugifyService: wb_ + slug
-        $categoryCode = $this->slugify->slugify($categoryName, 'wb_');
-
-        // Обрезаем до 50 символов (лимит поля code в БД)
-        if (strlen($categoryCode) > 50) {
-            $categoryCode = substr($categoryCode, 0, 50);
-            $categoryCode = rtrim($categoryCode, '_'); // Убираем завершающее подчеркивание
+        // Keep the legacy reason-based identity so replaying an already imported
+        // report cannot insert a duplicate after the category becomes stable.
+        $description = $categoryName;
+        $externalIdCategoryCode = $this->categoryCodeFromName($categoryName);
+        $knownCategory = WbCostCategory::forDeductionName($categoryName);
+        if (null !== $knownCategory) {
+            $categoryCode = $knownCategory->code;
+            /** @var non-empty-string $categoryName */
+            $categoryName = $knownCategory->name;
+        } else {
+            $categoryCode = $externalIdCategoryCode;
         }
 
-        $externalId = $this->externalIdBuilder->build($item, $categoryCode);
+        $externalId = $this->externalIdBuilder->build($item, $externalIdCategoryCode);
         if (null === $externalId) {
             return [];
         }
@@ -114,9 +119,20 @@ class WbDeductionCalculator implements CostCalculatorInterface
                     : MarketplaceCostOperationType::CHARGE,
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
-                'description' => $categoryName,
+                'description' => $description,
                 'product' => $product,
             ],
         ];
+    }
+
+    private function categoryCodeFromName(string $categoryName): string
+    {
+        $categoryCode = $this->slugify->slugify($categoryName, 'wb_');
+
+        if (strlen($categoryCode) > 50) {
+            $categoryCode = rtrim(substr($categoryCode, 0, 50), '_');
+        }
+
+        return $categoryCode;
     }
 }

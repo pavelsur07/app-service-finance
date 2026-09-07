@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
+use App\Ingestion\Application\Action\NormalizeRawRecordAction;
+use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\SyncJob;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Enum\SyncJobStatus;
+use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
@@ -21,6 +26,7 @@ use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Ingestion\Repository\NormalizationIssueRepository;
 use App\Ingestion\Repository\SyncJobRepository;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
@@ -219,6 +225,160 @@ final class OzonIngestionFlowTest extends IntegrationTestCase
         self::assertSame('ozon_acquiring', $rowsAfterDictionary[0]->ozonCategoryCode);
         self::assertSame('Эквайринг', $rowsAfterDictionary[0]->ozonCategoryLabel);
         self::assertTrue($rowsAfterDictionary[0]->ozonCategoryKnown);
+    }
+
+    public function testForceReplayVoidsSameRawComponentWhenTaxonomyChangesItsType(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $fetchedAt = new \DateTimeImmutable('2026-09-01 10:00:00');
+        $row = [
+            'accrual_id' => 53675409201,
+            'date' => '2026-08-01',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => 1042,
+                'name' => 'LabelBrandVerified',
+                'accrued' => ['amount' => '-1500.00', 'currency' => 'RUB'],
+            ],
+        ];
+
+        /** @var RawStorageFacade $rawStorageFacade */
+        $rawStorageFacade = self::getContainer()->get(RawStorageFacade::class);
+        [$rawRecord] = $rawStorageFacade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            shopRef: 'ozon-shop',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            externalId: 'accrual-by-day:2026-08-01:2026-08-01',
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: $fetchedAt,
+            rows: [$row],
+        ));
+
+        $externalId = 'ozon:accrual-by-day:53675409201:non_item_fee:type-1042';
+        $legacyTransaction = new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $rawRecord->getConnectionRef(),
+            shopRef: $rawRecord->getShopRef(),
+            source: IngestSource::OZON,
+            externalId: $externalId,
+            externalUpdatedAt: $fetchedAt,
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, '53675409201'))->toString(),
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(150000, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-08-01 00:00:00 Europe/Moscow'),
+            rawRecordId: $rawRecord->getId(),
+            description: 'Ozon: Маркировка проверенного бренда',
+            sourceData: ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY],
+            sourceTz: 'Europe/Moscow',
+        );
+        $rawRecord->markNormalizationDone();
+        $this->em->persist($legacyTransaction);
+        $this->em->flush();
+
+        /** @var NormalizeRawRecordAction $normalize */
+        $normalize = self::getContainer()->get(NormalizeRawRecordAction::class);
+        $command = new NormalizeRawRecordCommand($rawRecord->getId(), $companyId, forceReplay: true);
+        $normalize($command);
+        $normalize($command);
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $transactions = $transactionRepository->findByRawRecordId($companyId, $rawRecord->getId());
+        self::assertCount(2, $transactions);
+
+        $transactionsByType = [];
+        foreach ($transactions as $transaction) {
+            $transactionsByType[$transaction->getType()->value] = $transaction;
+        }
+
+        self::assertArrayHasKey(TransactionType::OTHER->value, $transactionsByType);
+        self::assertArrayHasKey(TransactionType::FEE->value, $transactionsByType);
+        $legacy = $transactionsByType[TransactionType::OTHER->value];
+        $normalized = $transactionsByType[TransactionType::FEE->value];
+
+        self::assertSame(0, $legacy->getAmountMinor());
+        self::assertTrue($legacy->getSourceData()['_ingestion_voided']);
+        self::assertSame('ozon_mapper_component_retyped', $legacy->getSourceData()['_ingestion_void_reason']);
+        self::assertSame(150000, $normalized->getAmountMinor());
+        self::assertSame(TransactionDirection::OUT, $normalized->getDirection());
+    }
+
+    public function testRegularRenormalizationVoidsSameRawComponentWhenTaxonomyChangesItsType(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $fetchedAt = new \DateTimeImmutable('2026-09-01 10:00:00');
+        $row = [
+            'accrual_id' => 53675409202,
+            'date' => '2026-08-01',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => 1042,
+                'name' => 'LabelBrandVerified',
+                'accrued' => ['amount' => '-1500.00', 'currency' => 'RUB'],
+            ],
+        ];
+
+        /** @var RawStorageFacade $rawStorageFacade */
+        $rawStorageFacade = self::getContainer()->get(RawStorageFacade::class);
+        [$rawRecord] = $rawStorageFacade->store(new RawBatch(
+            companyId: $companyId,
+            connectionRef: 'marketplace:ozon:seller',
+            shopRef: 'ozon-shop',
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            externalId: 'accrual-by-day:2026-08-01:2026-08-01',
+            syncJobId: Uuid::uuid7()->toString(),
+            fetchedAt: $fetchedAt,
+            rows: [$row],
+        ));
+
+        $externalId = 'ozon:accrual-by-day:53675409202:non_item_fee:type-1042';
+        $legacyTransaction = new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $rawRecord->getConnectionRef(),
+            shopRef: $rawRecord->getShopRef(),
+            source: IngestSource::OZON,
+            externalId: $externalId,
+            externalUpdatedAt: $fetchedAt,
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, '53675409202'))->toString(),
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(150000, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-08-01 00:00:00 Europe/Moscow'),
+            rawRecordId: $rawRecord->getId(),
+            description: 'Ozon: Маркировка проверенного бренда',
+            sourceData: ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY],
+            sourceTz: 'Europe/Moscow',
+        );
+        $rawRecord->markNormalizationDone();
+        $rawRecord->markNormalizationFailed();
+        $rawRecord->markNormalizationPending();
+        $this->em->persist($legacyTransaction);
+        $this->em->flush();
+
+        /** @var NormalizeRawRecordAction $normalize */
+        $normalize = self::getContainer()->get(NormalizeRawRecordAction::class);
+        $normalize(new NormalizeRawRecordCommand($rawRecord->getId(), $companyId));
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $transactions = $transactionRepository->findByRawRecordId($companyId, $rawRecord->getId());
+        self::assertCount(2, $transactions);
+
+        $amountByType = [];
+        foreach ($transactions as $transaction) {
+            $amountByType[$transaction->getType()->value] = $transaction->getAmountMinor();
+        }
+
+        self::assertArrayHasKey(TransactionType::OTHER->value, $amountByType);
+        self::assertArrayHasKey(TransactionType::FEE->value, $amountByType);
+        self::assertSame(0, $amountByType[TransactionType::OTHER->value]);
+        self::assertSame(150000, $amountByType[TransactionType::FEE->value]);
     }
 
     /**

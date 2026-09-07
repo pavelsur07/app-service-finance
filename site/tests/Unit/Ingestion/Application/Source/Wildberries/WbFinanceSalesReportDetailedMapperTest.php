@@ -55,7 +55,7 @@ final class WbFinanceSalesReportDetailedMapperTest extends TestCase
         self::assertSame('sale-srid', $sale->orderRef);
         self::assertSame('42880202606211', $sale->payoutRef);
         self::assertSame(WbResourceType::FINANCE_SALES_REPORT_DETAILED, $sale->sourceData['_ingestion_resource']);
-        self::assertSame(3, $sale->sourceData['_ingestion_mapper_version']);
+        self::assertSame(4, $sale->sourceData['_ingestion_mapper_version']);
         self::assertSame('sale', $sale->sourceData['_ingestion_component']);
         self::assertSame('123', $sale->sourceData['nmId']);
         self::assertSame('sku-1', $sale->sourceData['sku']);

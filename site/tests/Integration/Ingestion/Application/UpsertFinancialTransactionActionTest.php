@@ -168,6 +168,59 @@ final class UpsertFinancialTransactionActionTest extends IntegrationTestCase
         self::assertEquals(new \DateTimeImmutable('2026-06-18 11:00:00'), $transaction->getExternalUpdatedAt());
     }
 
+    public function testSameRawReplayCanReactivateVoidedNaturalKeyAtSameVersion(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $rawRecordId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+        $externalUpdatedAt = new \DateTimeImmutable('2026-06-18 10:00:00');
+        $sourceData = ['amountMinor' => 10000, 'mapping' => 'other'];
+
+        /** @var UpsertFinancialTransactionAction $action */
+        $action = self::getContainer()->get(UpsertFinancialTransactionAction::class);
+        $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: $externalUpdatedAt,
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+                amountMinor: 10000,
+                sourceData: $sourceData,
+            ),
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $repository */
+        $repository = self::getContainer()->get(FinancialTransactionRepository::class);
+        $voided = $repository->findByNaturalKey($companyId, IngestSource::OZON, 'external-tx-1', TransactionType::SALE);
+        self::assertNotNull($voided);
+        self::assertTrue($voided->voidForReplay('mapping_changed'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $reactivated = $action($this->command(
+            companyId: $companyId,
+            rawRecordId: $rawRecordId,
+            mapped: $this->mapped(
+                operationGroupId: $operationGroupId,
+                externalUpdatedAt: $externalUpdatedAt,
+                occurredAt: new \DateTimeImmutable('2026-06-18 09:00:00'),
+                amountMinor: 10000,
+                sourceData: $sourceData,
+            ),
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        self::assertNotNull($reactivated);
+        $transaction = $repository->findByNaturalKey($companyId, IngestSource::OZON, 'external-tx-1', TransactionType::SALE);
+        self::assertNotNull($transaction);
+        self::assertSame(10000, $transaction->getAmountMinor());
+        self::assertArrayNotHasKey('_ingestion_voided', $transaction->getSourceData());
+    }
+
     public function testCreatesSkipsStaleAndUpdatesOnlyNewerTransactionVersion(): void
     {
         $companyId = Uuid::uuid7()->toString();

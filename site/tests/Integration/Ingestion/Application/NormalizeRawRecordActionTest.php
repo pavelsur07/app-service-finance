@@ -10,11 +10,13 @@ use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
+use App\Ingestion\Entity\NormalizationIssue;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Exception\DoneRawRecordReplayFailedException;
 use App\Ingestion\Facade\IngestionFacade;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
@@ -171,7 +173,7 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
             'occurredAt' => '2026-06-18T09:00:00+00:00',
         ]]);
 
-        $this->em->persist(new \App\Ingestion\Entity\NormalizationIssue(
+        $this->em->persist(new NormalizationIssue(
             $companyId,
             $record->getId(),
             null,
@@ -214,6 +216,105 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame(
             RawNormalizationStatus::FAILED,
             $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
+        );
+    }
+
+    public function testForceReplayMapperFailureKeepsPreviouslyDoneRecordDone(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord($companyId, [[
+            'failMapper' => true,
+        ]]);
+        $record->markNormalizationDone();
+        $this->em->persist(new NormalizationIssue(
+            companyId: $companyId,
+            rawRecordId: $record->getId(),
+            operationGroupId: null,
+            kind: NormalizationIssueKind::SUM_MISMATCH,
+            details: ['expected' => 100, 'actual' => 90],
+        ));
+        $this->em->flush();
+
+        foreach ([1, 2] as $attempt) {
+            try {
+                $this->normalize($record->getId(), $companyId, forceReplay: true);
+                self::fail(sprintf('Failed done-record replay attempt %d must be observable by its caller.', $attempt));
+            } catch (DoneRawRecordReplayFailedException) {
+            }
+        }
+        $this->em->clear();
+
+        /** @var IngestRawRecordRepository $rawRecordRepository */
+        $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
+        self::assertSame(
+            RawNormalizationStatus::DONE,
+            $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId)?->getNormalizationStatus(),
+        );
+
+        /** @var NormalizationIssueRepository $issueRepository */
+        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
+        $issues = $issueRepository->findOpenByRawRecord($companyId, $record->getId());
+        self::assertCount(2, $issues, 'Repeated replay failures must replace only the previous open mapper issue.');
+        self::assertSame(
+            [NormalizationIssueKind::SUM_MISMATCH, NormalizationIssueKind::MAPPER_FAILURE],
+            array_map(static fn (NormalizationIssue $issue): NormalizationIssueKind => $issue->getKind(), $issues),
+        );
+    }
+
+    public function testLateReplayFailureClearsRolledBackUnitOfWorkBeforeCallerFlushes(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $operationGroupId = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord($companyId, [[
+            'externalId' => 'late-replay-sale',
+            'operationGroupId' => $operationGroupId,
+            'amountMinor' => 10000,
+            'controlAmountMinor' => 10000,
+            'failAfterProjectionMutation' => true,
+        ]]);
+        $record->markNormalizationDone();
+        $this->em->persist(new NormalizationIssue(
+            companyId: $companyId,
+            rawRecordId: $record->getId(),
+            operationGroupId: null,
+            kind: NormalizationIssueKind::SUM_MISMATCH,
+            details: ['expected' => 10000, 'actual' => 0],
+        ));
+        $this->em->flush();
+
+        try {
+            $this->normalize($record->getId(), $companyId, forceReplay: true);
+            self::fail('The invalid late preview issue must fail after projection mutation.');
+        } catch (\InvalidArgumentException) {
+        }
+
+        /** @var IngestRawRecordRepository $rawRecordRepository */
+        $rawRecordRepository = self::getContainer()->get(IngestRawRecordRepository::class);
+        $reloadedRecord = $rawRecordRepository->findByIdAndCompany($record->getId(), $companyId);
+        self::assertInstanceOf(IngestRawRecord::class, $reloadedRecord);
+        self::assertSame(RawNormalizationStatus::DONE, $reloadedRecord->getNormalizationStatus());
+
+        // Simulate the command recording the failure after the action rolled back.
+        $this->em->persist(new NormalizationIssue(
+            companyId: $companyId,
+            rawRecordId: $record->getId(),
+            operationGroupId: null,
+            kind: NormalizationIssueKind::MAPPER_FAILURE,
+            details: ['message' => 'late replay failure'],
+        ));
+        $this->em->flush();
+        $this->em->clear();
+
+        /** @var FinancialTransactionRepository $transactionRepository */
+        $transactionRepository = self::getContainer()->get(FinancialTransactionRepository::class);
+        self::assertCount(0, $transactionRepository->findByRawRecordId($companyId, $record->getId()));
+
+        /** @var NormalizationIssueRepository $issueRepository */
+        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
+        $issues = $issueRepository->findOpenByRawRecord($companyId, $record->getId());
+        self::assertSame(
+            [NormalizationIssueKind::SUM_MISMATCH, NormalizationIssueKind::MAPPER_FAILURE],
+            array_map(static fn (NormalizationIssue $issue): NormalizationIssueKind => $issue->getKind(), $issues),
         );
     }
 
@@ -322,10 +423,10 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         ))[0];
     }
 
-    private function normalize(string $rawRecordId, string $companyId): void
+    private function normalize(string $rawRecordId, string $companyId, bool $forceReplay = false): void
     {
         /** @var NormalizeRawRecordAction $action */
         $action = self::getContainer()->get(NormalizeRawRecordAction::class);
-        $action(new NormalizeRawRecordCommand($rawRecordId, $companyId));
+        $action(new NormalizeRawRecordCommand($rawRecordId, $companyId, $forceReplay));
     }
 }

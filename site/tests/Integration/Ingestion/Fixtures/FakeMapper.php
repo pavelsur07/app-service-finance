@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Fixtures;
 
 use App\Ingestion\Application\DTO\MappedControlSum;
+use App\Ingestion\Application\DTO\MappedPreviewIssue;
 use App\Ingestion\Application\DTO\MappedTransaction;
+use App\Ingestion\Domain\Contract\PreviewIssueAwareMapperInterface;
 use App\Ingestion\Domain\Contract\SourceMapperInterface;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Shared\Domain\ValueObject\Money;
 use Ramsey\Uuid\Uuid;
 
-final class FakeMapper implements SourceMapperInterface
+final class FakeMapper implements PreviewIssueAwareMapperInterface, SourceMapperInterface
 {
     public function source(): IngestSource
     {
@@ -83,5 +86,25 @@ final class FakeMapper implements SourceMapperInterface
         }
 
         return $controlSums;
+    }
+
+    /**
+     * @param iterable<array<string, mixed>> $rows
+     *
+     * @return list<MappedPreviewIssue>
+     */
+    public function previewIssues(IngestRawRecord $rawRecord, iterable $rows): array
+    {
+        foreach ($rows as $row) {
+            if (($row['failAfterProjectionMutation'] ?? false) === true) {
+                return [new MappedPreviewIssue(
+                    operationGroupId: 'invalid-operation-group-id',
+                    kind: NormalizationIssueKind::UNKNOWN_FIELD,
+                    details: ['field' => 'fake'],
+                )];
+            }
+        }
+
+        return [];
     }
 }

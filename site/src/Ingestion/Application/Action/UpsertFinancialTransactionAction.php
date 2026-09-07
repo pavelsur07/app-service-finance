@@ -87,6 +87,8 @@ final readonly class UpsertFinancialTransactionAction
         }
 
         $oldOccurredAt = $transaction->getOccurredAt();
+        $reactivatingVoidedSameRaw = $transaction->getRawRecordId() === $command->rawRecordId
+            && true === ($transaction->getSourceData()['_ingestion_voided'] ?? false);
 
         try {
             $transaction->replaceFromNewerVersion(
@@ -103,7 +105,7 @@ final readonly class UpsertFinancialTransactionAction
                 rawRecordId: $command->rawRecordId,
                 listingId: $command->listingId,
                 listingSku: $command->listingSku,
-                allowSameVersion: $command->allowSameVersion,
+                allowSameVersion: $command->allowSameVersion || $reactivatingVoidedSameRaw,
             );
         } catch (StaleTransactionUpdateException) {
             return null;

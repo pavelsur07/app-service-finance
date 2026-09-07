@@ -489,7 +489,9 @@ final readonly class OzonAccrualByDayPreviewMapper
             category: $category,
             accrualId: $accrualId,
             component: sprintf('%s:type-%s', $componentPrefix, $typeId),
-            type: $type,
+            type: TransactionType::OTHER === $type && $ozonCategory->known
+                ? $ozonCategory->transactionType
+                : $type,
             signedAmountMinor: $amount,
             typeId: $typeId,
             externalCode: $externalCode,

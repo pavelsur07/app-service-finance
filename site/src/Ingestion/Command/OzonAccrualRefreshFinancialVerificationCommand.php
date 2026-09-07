@@ -249,7 +249,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
             try {
                 ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId));
             } catch (\Throwable $exception) {
-                $this->markInlineFailure($record, $exception);
+                $this->markInlineFailure($companyId, $rawRecordId, $exception);
             }
 
             if (RawNormalizationStatus::DONE === $this->normalizationStatus($companyId, $rawRecordId)) {
@@ -296,8 +296,13 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
         }
     }
 
-    private function markInlineFailure(IngestRawRecord $record, \Throwable $exception): void
+    private function markInlineFailure(string $companyId, string $rawRecordId, \Throwable $exception): void
     {
+        $record = $this->rawRecordRepository->findByIdAndCompany($rawRecordId, $companyId);
+        if (null === $record) {
+            return;
+        }
+
         $record->markNormalizationFailed();
         ($this->recordNormalizationIssueAction)(new RecordNormalizationIssueCommand(
             companyId: $record->getCompanyId(),

@@ -15,6 +15,7 @@ use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Domain\ValueObject\Money;
+use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -107,6 +108,41 @@ final class OzonAccrualRefreshFinancialVerificationCommandTest extends Integrati
         self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
         self::assertSame(RawNormalizationStatus::DONE, $this->rawStatusById($companyId, $record->getId()));
         self::assertSame(3, $this->transactionCount($companyId, $record->getId()));
+    }
+
+    public function testExecuteReloadsRawRecordBeforeMarkingLateNormalizationFailure(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-01:2026-06-07',
+            fetchedAt: new \DateTimeImmutable('2026-06-08 03:00:00+00:00'),
+            rows: [$this->postingRow()],
+        );
+
+        /** @var ObjectStorageInterface $objectStorage */
+        $objectStorage = self::getContainer()->get(ObjectStorageInterface::class);
+        $corruptedPayload = gzencode("{bad json}\n", 6);
+        self::assertIsString($corruptedPayload);
+        $objectStorage->write($record->getStoragePath(), $corruptedPayload);
+        $this->em->clear();
+
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--shop-ref' => $connectionRef,
+            '--from' => '2026-06-01',
+            '--to' => '2026-06-07',
+            '--raw-limit' => 10,
+            '--relink-limit' => 10,
+            '--max-relink-batches' => 1,
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit, $tester->getDisplay());
+        self::assertSame(RawNormalizationStatus::FAILED, $this->rawStatusById($companyId, $record->getId()));
     }
 
     public function testExecuteReplaysDoneRawRecordForVerificationReports(): void
