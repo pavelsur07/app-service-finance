@@ -9,6 +9,7 @@ use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
@@ -277,13 +278,11 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubReturns([]);
 
         $capturedSql = null;
-        $this->connection
-            ->method('fetchAllAssociative')
-            ->willReturnCallback(static function (string $sql) use (&$capturedSql): array {
-                $capturedSql = $sql;
+        $this->stubCostQuery(static function (string $sql) use (&$capturedSql): array {
+            $capturedSql = $sql;
 
-                return [];
-            });
+            return [];
+        });
 
         $this->executeSummary();
 
@@ -345,6 +344,132 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
+     * Скоуп листингов сужает продажи и возвраты. До фикса виджеты его не знали
+     * и под фильтром по тегам показывали выручку по всей компании, расходясь
+     * со строкой «Итого» таблицы на той же странице.
+     */
+    public function testListingScopeRestrictsSalesAndReturns(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l1', 'В скоупе', 'SKU1', 'ozon', '1000.00', 5, '400.00', 5),
+            new ListingSalesAggregateDTO('l2', 'Вне скоупа', 'SKU2', 'ozon', '9000.00', 9, '3000.00', 9),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l1', '100.00', 1),
+            new ListingReturnAggregateDTO('l2', '700.00', 2),
+        ]);
+        $this->stubCostRows([]);
+
+        $result = $this->executeSummaryScopedTo(['l1']);
+
+        self::assertSame(1000.0, $result['revenue'], 'Выручка должна считаться только по листингам из скоупа');
+        self::assertSame(-100.0, $result['returnsTotal']);
+        self::assertSame(-400.0, $result['costPriceTotal']);
+    }
+
+    /**
+     * Затраты в скоупе берутся только по его листингам. Строки с listing_id IS NULL
+     * (CPC, хранение) к конкретному тегу не относятся и выпадают — то же решение,
+     * что принято для totals.adSpend в UnitExtendedQuery.
+     */
+    public function testListingScopeRestrictsCostsBySqlFilter(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+
+        [$sql, $params, $types] = $this->captureCostQuery(['l1', 'l2']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString('c.listing_id IN (:listingIds)', $sql);
+        self::assertSame(['l1', 'l2'], $params['listingIds'] ?? null);
+        self::assertSame(ArrayParameterType::STRING, $types['listingIds'] ?? null);
+    }
+
+    /**
+     * Без скоупа поведение прежнее: затраты не ограничены листингами, иначе из
+     * виджетов пропали бы категории с listing_id IS NULL.
+     */
+    public function testWithoutListingScopeCostsAreNotRestricted(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+
+        [$sql, $params] = $this->captureCostQuery(null);
+
+        self::assertNotNull($sql);
+        self::assertStringNotContainsString('listing_id', $sql);
+        self::assertArrayNotHasKey('listingIds', $params);
+    }
+
+    /**
+     * Пустой скоуп (тег не выбрал ни одного листинга) — нули, а не полная выручка.
+     * И без похода в БД: `IN ()` Postgres не примет.
+     */
+    public function testEmptyListingScopeYieldsZerosWithoutQuery(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l1', 'Товар', 'SKU1', 'ozon', '1000.00', 5, '400.00', 5),
+        ]);
+        $this->stubReturns([]);
+
+        [$sql] = $this->captureCostQuery([]);
+        self::assertNull($sql, 'При пустом скоупе SQL выполняться не должен');
+
+        $result = $this->executeSummaryScopedTo([]);
+
+        self::assertSame(0.0, $result['revenue']);
+        self::assertSame(0.0, $result['totalCosts']);
+        self::assertSame(0.0, $result['profit']);
+        self::assertNull($result['marginPercent']);
+    }
+
+    /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array{0: string|null, 1: array<string, mixed>, 2: array<string, mixed>}
+     */
+    private function captureCostQuery(?array $listingIds): array
+    {
+        $capturedSql = null;
+        $capturedParams = [];
+        $capturedTypes = [];
+
+        $this->stubCostQuery(
+            static function (string $sql, array $params = [], array $types = []) use (
+                &$capturedSql,
+                &$capturedParams,
+                &$capturedTypes,
+            ): array {
+                $capturedSql = $sql;
+                $capturedParams = $params;
+                $capturedTypes = $types;
+
+                return [];
+            }
+        );
+
+        $this->executeSummaryScopedTo($listingIds);
+
+        return [$capturedSql, $capturedParams, $capturedTypes];
+    }
+
+    /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array<string, mixed>
+     */
+    private function executeSummaryScopedTo(?array $listingIds): array
+    {
+        return $this->query->getSummary(
+            self::COMPANY_ID,
+            'ozon',
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            $listingIds,
+        );
+    }
+
+    /**
      * @param list<ListingSalesAggregateDTO> $sales
      */
     private function stubSales(array $sales): void
@@ -377,7 +502,18 @@ final class WidgetSummaryQueryPnlTest extends TestCase
             $row['marketplace'] = $row['marketplace'] ?? 'ozon';
         }
         unset($row);
-        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+        $this->stubCostQuery(static fn (): array => $rows);
+    }
+
+    /**
+     * Единственное место, где стабится Connection: PHPStan не выводит тип мока
+     * и на каждый такой вызов заводит запись в baseline.
+     *
+     * @param callable(string, array<string, mixed>, array<string, mixed>): list<array<string, mixed>> $handler
+     */
+    private function stubCostQuery(callable $handler): void
+    {
+        $this->connection->method('fetchAllAssociative')->willReturnCallback($handler);
     }
 
     /**

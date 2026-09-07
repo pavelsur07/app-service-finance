@@ -120,6 +120,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
         marketplace: filters.marketplace,
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
+        tagIds: selectedTagIds,
+        tagsMatchAll,
     });
 
     const isSearchActive = searchQuery.trim() !== '';
@@ -256,6 +258,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                     totals={totals}
                     isLoading={isLoading}
                     emptyMessage={tableEmptyMessage}
+                    selectedTagIds={selectedTagIds}
+                    onToggleTag={handleToggleTag}
                 />
             </div>
         </>

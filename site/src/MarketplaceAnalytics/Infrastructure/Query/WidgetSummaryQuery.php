@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -18,6 +19,10 @@ use Doctrine\DBAL\Connection;
  * чтобы захватить категории, не привязанные к листингу (CPC, хранение, кросс-докинг и т.п.).
  * Sales/returns остаются per-listing через MarketplaceFacade — они всегда
  * привязаны к товарам.
+ *
+ * Исключение — фильтр по тегам: тег живёт на листинге, поэтому под фильтром
+ * считаются только затраты отфильтрованных листингов, а строки с
+ * listing_id IS NULL выпадают — распределить их на конкретный тег не на чем.
  */
 final readonly class WidgetSummaryQuery
 {
@@ -38,6 +43,12 @@ final readonly class WidgetSummaryQuery
     }
 
     /**
+     * @param list<string>|null $listingIds ограничение выборки листингами; null = без
+     *                                      ограничения. Теги в листинги резолвит
+     *                                      вызывающий — запрос остаётся агрегацией
+     *                                      над явно заданным набором и не ходит
+     *                                      в чужой модуль посреди подсчёта.
+     *
      * @return array{
      *     revenue: float,
      *     returnsTotal: float,
@@ -53,10 +64,21 @@ final readonly class WidgetSummaryQuery
         ?string $marketplace,
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
+        ?array $listingIds = null,
     ): array {
         $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
-        $costRows = $this->getCostAggregates($companyId, $marketplace, $dateFrom, $dateTo);
+
+        // Под фильтром по тегам виджеты обязаны считать то же, что строка «Итого»
+        // таблицы на этой же странице. Иначе карточка сверху утверждает одно,
+        // а итог под ней — другое, и обе цифры перестают что-либо значить.
+        if (null !== $listingIds) {
+            $allowedKeys = array_flip($listingIds);
+            $sales = array_intersect_key($sales, $allowedKeys);
+            $returns = array_intersect_key($returns, $allowedKeys);
+        }
+
+        $costRows = $this->getCostAggregates($companyId, $marketplace, $dateFrom, $dateTo, $listingIds);
 
         $revenue = 0.0;
         $returnsTotal = 0.0;
@@ -179,6 +201,15 @@ final readonly class WidgetSummaryQuery
      * декомпенсация — всегда расход. Это закрывает дыру в исторических данных,
      * где бэкфилл-миграция сохранила положительные компенсации как charge.
      *
+     * @param list<string>|null $listingIds null = без ограничения по листингам (прежнее
+     *                                      поведение). Непустой список приходит только
+     *                                      из фильтра по тегам и отсекает в том числе
+     *                                      строки с listing_id IS NULL: CPC, хранение и
+     *                                      прочие затраты, которые к конкретному тегу
+     *                                      не относятся и распределить их не на чем.
+     *                                      То же решение принято для totals.adSpend
+     *                                      в UnitExtendedQuery.
+     *
      * @return list<array{
      *     marketplace: string,
      *     category_code: string,
@@ -193,8 +224,16 @@ final readonly class WidgetSummaryQuery
         ?string $marketplace,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
+        ?array $listingIds = null,
     ): array {
+        // Скоуп пуст (тег не выбрал ни одного листинга) — атрибутируемых затрат нет.
+        // Возврат пустого списка здесь, а не `IN ()` в SQL, который Postgres не примет.
+        if ([] === $listingIds) {
+            return [];
+        }
+
         $mpFilter = null !== $marketplace ? 'AND c.marketplace = :marketplace' : '';
+        $listingFilter = null !== $listingIds ? 'AND c.listing_id IN (:listingIds)' : '';
 
         // Effective op type per строке считается в подзапросе — чтобы не
         // дублировать логику compensation/decompensation в трёх SUM(CASE ...).
@@ -227,6 +266,7 @@ final readonly class WidgetSummaryQuery
                   AND c.cost_date >= :periodFrom
                   AND c.cost_date <= :periodTo
                   {$mpFilter}
+                  {$listingFilter}
             ) AS normalized
             GROUP BY marketplace, category_code, category_name
             ORDER BY costs_amount ASC
@@ -236,7 +276,9 @@ final readonly class WidgetSummaryQuery
                 'periodFrom' => $from->format('Y-m-d'),
                 'periodTo' => $to->format('Y-m-d'),
                 'marketplace' => $marketplace,
+                'listingIds' => $listingIds,
             ], static fn ($v) => null !== $v),
+            null !== $listingIds ? ['listingIds' => ArrayParameterType::STRING] : [],
         );
 
         /* @var list<array{
