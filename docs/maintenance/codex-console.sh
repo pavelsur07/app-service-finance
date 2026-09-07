@@ -55,6 +55,7 @@ case "$cmd" in
   app:ingestion:ozon-accrual:rolling-refresh) ;;
   app:cash-auto-rules:assign-general-cfo) ;;
   app:mailer:healthcheck) ;;
+  app:inventory:stock-freshness-check) ;;
   app:cash:verify-transaction-splits)
     if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
     ;;
@@ -79,6 +80,26 @@ case "$cmd" in
       2) if [ "${2}" != "--force" ]; then echo "Only --force is allowed for $cmd: ${2}" >&2; exit 2; fi ;;
       *) echo "Too many arguments for $cmd" >&2; exit 2 ;;
     esac
+    ;;
+  app:inventory:renormalize-snapshots)
+    # Мутирующая команда: пере-нормализует исторические снапшоты остатков.
+    # Разрешены только перечисленные флаги строгой формы; --execute допускается
+    # лишь вместе с обязательным диапазоном дат, чтобы случайный запуск не мог
+    # затронуть неопределённый объём данных. Семантику диапазона (конец строго
+    # раньше сегодняшнего дня) проверяет сама команда — wrapper держит форму.
+    seen_from=0; seen_to=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--from=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_from=1
+      elif [[ "$arg" =~ ^--to=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_to=1
+      elif [[ "$arg" =~ ^--source=(ozon|wildberries)$ ]]; then :
+      elif [[ "$arg" =~ ^--company=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then :
+      elif [ "$arg" = "--execute" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_from" -ne 1 ] || [ "$seen_to" -ne 1 ]; then
+      echo "Both --from=YYYY-MM-DD and --to=YYYY-MM-DD are required for $cmd" >&2; exit 2
+    fi
     ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
