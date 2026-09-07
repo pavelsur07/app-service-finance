@@ -29,6 +29,11 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
     private const TAGGED_REVENUE = 1000.0;
     private const UNTAGGED_REVENUE = 9000.0;
 
+    // Предыдущий период (март) — свои суммы, отличные от апрельских: если фильтр
+    // к нему не применится, ассерт увидит сумму обоих листингов, а не одного.
+    private const TAGGED_PREV_REVENUE = 500.0;
+    private const UNTAGGED_PREV_REVENUE = 7000.0;
+
     public function testWidgetsRevenueCountsOnlyTaggedListings(): void
     {
         $client = static::createClient();
@@ -96,11 +101,19 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
-        $filtered = $this->requestWidgets($client, $tagId);
+        $unfiltered = $this->requestWidgets($client, null);
+        self::assertSame(
+            self::TAGGED_PREV_REVENUE + self::UNTAGGED_PREV_REVENUE,
+            (float) $unfiltered['previous']['revenue'],
+            'Без фильтра предыдущий период считается по всем листингам',
+        );
 
-        // В марте продаж нет ни у одного листинга — но важно, что предыдущий
-        // период вообще посчитан по отфильтрованному набору, а не по всей компании.
-        self::assertSame(0.0, (float) $filtered['previous']['revenue']);
+        $filtered = $this->requestWidgets($client, $tagId);
+        self::assertSame(
+            self::TAGGED_PREV_REVENUE,
+            (float) $filtered['previous']['revenue'],
+            'Предыдущий период обязан считаться по тому же отфильтрованному набору листингов',
+        );
     }
 
     public function testRejectsNonUuidTag(): void
@@ -202,6 +215,32 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
                 ->withQuantity(9)
                 ->withPricePerUnit('1000.00')
                 ->withTotalRevenue('9000.00')
+                ->build(),
+        );
+
+        // Продажи предыдущего периода (март): контроллер считает prev как
+        // [periodFrom − N дней; periodFrom − 1], для апреля это 02.03–31.03.
+        $em->persist(
+            MarketplaceSaleBuilder::aSale()
+                ->forCompany($company)
+                ->forListing($tagged)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withSaleDate(new \DateTimeImmutable('2026-03-15'))
+                ->withQuantity(1)
+                ->withPricePerUnit('500.00')
+                ->withTotalRevenue('500.00')
+                ->build(),
+        );
+
+        $em->persist(
+            MarketplaceSaleBuilder::aSale()
+                ->forCompany($company)
+                ->forListing($untagged)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withSaleDate(new \DateTimeImmutable('2026-03-15'))
+                ->withQuantity(7)
+                ->withPricePerUnit('1000.00')
+                ->withTotalRevenue('7000.00')
                 ->build(),
         );
 
