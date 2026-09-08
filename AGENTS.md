@@ -8,7 +8,7 @@ start of a task. Everything not here lives in a linked document:
 | `CLAUDE.md` | Backend PHP/Symfony rules, quality gates, repository practices |
 | `CLAUDE.frontend.md` | React / TypeScript / UI Kit rules |
 | `PATTERNS.md`, `ARCHITECTURE.md` | Code patterns; live Facade, Enum and Entity contracts |
-| `docs/workflow/external-review.md` | External review: commands, prompt, round budget |
+| `docs/workflow/external-review.md` | External review: script, prompt, failure handling |
 | `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message |
 | `docs/workflow/stage-report.md` | Repository-specific Stage self-review checklist |
 | `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion |
@@ -249,10 +249,13 @@ Policy:
 - **When.** Fast Path: never. Small task: one round at handoff. Large task:
   one round at the end of every HIGH-LOCAL Stage and one round at handoff;
   LOW and MEDIUM Stages get internal review only. Never after a Work item.
-- **How.** One call per round: the diff from the recorded base piped in with
-  the standard prompt, wrapped in `timeout 900`. The reviewer reports BLOCKER
-  and IMPORTANT with `file:line`, evidence, impact and fix; MINOR only when
-  trivially fixable. No re-review requests, no essays.
+- **How.** One call per round: `site/bin/external-review.sh <base_commit>`
+  assembles the filtered diff and the standard prompt, runs the other agent
+  under `timeout 900`, and exits 0 only on `REVIEW_GREEN`. Pass `--context`
+  with the findings already fixed internally and any facts the reviewer
+  cannot obtain itself; `--effort medium` for Small tasks. The reviewer
+  reports BLOCKER and IMPORTANT with `file:line`, evidence, impact and fix;
+  MINOR only when trivially fixable; nothing the machine gates already catch.
 - **Green.** A round is green when the reviewer ends with the exact line
   `REVIEW_GREEN`, **or** when it reported no BLOCKER and every confirmed
   IMPORTANT was fixed and verified by the checks and an internal review pass.

@@ -21,110 +21,68 @@
 один на handoff. Повтор раунда нужен только после исправленного BLOCKER.
 Больше трёх раундов на одну точку ревью — STOP с отчётом, а не четвёртый раунд.
 
-## Стандартный промпт
-
-Один и тот же текст для обоих ревьюеров. Сохранить в scratchpad как
-`prompt.txt`, подставив базовый коммит:
-
-```text
-You are an independent senior reviewer invoked by another agent. Read-only:
-do not edit files, do not change Git state, do not call external services,
-do not start another reviewer. Do not read .env files, credentials, keys or
-production dumps.
-
-Review the diff <stage_base_commit>..HEAD of the repository app-service-finance
-(Symfony 7.4, site/). Project rules: AGENTS.md, CLAUDE.md; patterns in
-PATTERNS.md; contracts in ARCHITECTURE.md — consult only the sections the diff
-touches.
-
-Check, only where relevant to this diff: scope compliance, correctness and
-edge cases, company isolation and IDOR (every Repository query takes
-companyId), authorization, financial calculations and Money, transactions and
-idempotency, migrations and indexes, Messenger retries and concurrency, error
-handling and log levels, N+1, test quality, secrets and PII, unnecessary
-complexity.
-
-Report only BLOCKER and IMPORTANT findings, plus MINOR findings that are
-trivially fixable (at most five). For each: severity, file:line, evidence,
-impact, concrete fix. No general advice, no restating the diff, no requests
-for a re-review.
-
-If there is no BLOCKER and no IMPORTANT finding, end the response with the
-exact standalone line:
-REVIEW_GREEN
-```
-
-Если ревьюер лишён шелла (форма через stdin ниже), факты, которые он не может
-добыть сам — структура схемы, объёмы данных, замеры с прода — дописываются в
-конец промпта, а само ограничение фиксируется в Stage Report или handoff.
-
-## Claude Code ревьюит Codex
-
-Preflight (вывод `claude auth status` не печатать и не сохранять):
+## Один раунд — одна команда
 
 ```bash
-command -v claude >/dev/null && claude auth status >/dev/null
+site/bin/external-review.sh <base_commit> [--effort medium] [--context facts.md]
 ```
 
-Вызов из корня репозитория:
+Скрипт сам: выбирает ревьюера (из Claude Code — Codex, иначе — Claude), собирает
+дифф от базы до рабочего дерева только по `site/src`, `site/tests`,
+`site/config`, `site/migrations`, `site/templates`, `site/assets` без
+lock-файлов, фикстур и снапшотов, подставляет стандартный промпт, запускает
+ревьюера под `timeout 900` и пишет `prompt.txt`, `diff.patch`, `review.txt` в
+`site/var/external-review/<base8>/`. Код возврата 0 — `REVIEW_GREEN`, 1 —
+находки, 3 — ревьюер не завершился. Повторный запуск на неизменённом диффе
+после зелёного раунда возвращает 0 без вызова ревьюера.
 
-```bash
-timeout 900 claude -p \
-  --safe-mode \
-  --permission-mode dontAsk \
-  --effort high \
-  --tools "Read,Glob,Grep,Bash" \
-  --allowedTools "Read" "Glob" "Grep" \
-    "Bash(git status)" "Bash(git status *)" "Bash(git diff)" "Bash(git diff *)" \
-    "Bash(git log)" "Bash(git log *)" "Bash(git show)" "Bash(git show *)" \
-    "Bash(git rev-parse *)" "Bash(git merge-base *)" \
-  --disallowedTools "Edit" "Write" "NotebookEdit" "WebFetch" "WebSearch" "mcp__*" \
-  --strict-mcp-config \
-  --no-session-persistence \
-  --max-turns 40 \
-  --output-format text \
-  "$(cat prompt.txt)" > review.txt
-```
+Стандартный промпт живёт в самом скрипте — там единственная копия. Он просит
+не сообщать о том, что уже ловят гейты (стиль, `strict_types`, границы
+модулей, `companyId` в сигнатурах, debug-вызовы), и отдавать только BLOCKER и
+IMPORTANT с `file:line`, доказательством, влиянием и исправлением.
 
-Не использовать `--dangerously-skip-permissions`; не выдавать `Edit`, `Write`,
-неограниченный `Bash`, web или MCP. `--safe-mode` отключает хуки, плагины,
-skills, MCP и auto-memory ревьюера, чтобы локальные настройки не внесли запись
-или интерактивный запрос.
+`--context` дописывает в промпт файл от реализующего агента: что уже нашёл и
+исправил внутренний review, чтобы ревьюер не повторял это, и факты, которые
+ревьюер без шелла не добудет сам — структура схемы, объёмы данных, замеры с
+прода. Само ограничение фиксируется в Stage Report или handoff.
 
-`Reached max turns` — сбой конфигурации, не гейт: сузить промпт до точного базового
-коммита и изменённых файлов, повторить один раз с `--max-turns 80`.
-
-## Codex ревьюит Claude Code
-
-Базовая форма — дифф передаётся через stdin, ревьюеру не нужен шелл:
-
-```bash
-{ cat prompt.txt; echo; echo '--- DIFF ---'; git diff <stage_base_commit>..HEAD -- site/; } \
-  | timeout 900 codex exec -s read-only --ephemeral -o review.txt -
-```
-
-Из песочницы Bash сеть глушится — вызывать вне песочницы (в Claude Code —
-`dangerouslyDisableSandbox` у этого вызова). Если Codex падает на
-`bwrap: loopback: Failed RTM_NEWADDR`, это песочница внутри песочницы: та же
-stdin-форма — обязательная повторная попытка, а не блокер.
+`--effort medium` — для Small-задач; HIGH-LOCAL Stage идёт с `high`.
 
 Запускать ревью в фоне сразу после зелёного внутреннего review и параллельно
-готовить Stage Report или handoff — так раунд не блокирует остальную работу.
+готовить Stage Report или описание PR — раунд не блокирует остальную работу.
+
+## Что делает скрипт за кулисами
+
+**Claude Code ревьюит Codex** — `claude -p --safe-mode --permission-mode dontAsk`
+с инструментами только `Read`, `Glob`, `Grep` и read-only `git`; `Edit`,
+`Write`, web и MCP запрещены явно; `--no-session-persistence`, `--max-turns 40`.
+`--safe-mode` отключает хуки, плагины, skills, MCP и auto-memory ревьюера. Не
+использовать `--dangerously-skip-permissions`. Preflight, если ревью падает на
+аутентификации: `claude auth status >/dev/null` — вывод не печатать и не
+сохранять.
+
+**Codex ревьюит Claude Code** — `codex exec -s read-only --ephemeral` с диффом
+через stdin, ревьюеру не нужен шелл. Из песочницы Bash сеть глушится — вызывать
+скрипт вне песочницы (в Claude Code — `dangerouslyDisableSandbox` у этого
+вызова). Ошибка `bwrap: loopback: Failed RTM_NEWADDR` — песочница внутри
+песочницы, та же stdin-форма вне песочницы — обязательная повторная попытка,
+а не блокер.
 
 ## Обработка результата
 
-1. Прочитать `review.txt`. Точная отдельная строка `REVIEW_GREEN` — зелёный раунд.
-2. Иначе проверить каждую находку по коду. Ложное срабатывание отклоняется с
+1. Код 0 — зелёный раунд. Код 1 — прочитать `review.txt`.
+2. Проверить каждую находку по коду. Ложное срабатывание отклоняется с
    записанной технической причиной.
 3. Исправить подтверждённые BLOCKER и IMPORTANT, безопасные MINOR. Прогнать
    релевантные проверки и внутренний review исправлений.
-4. Был исправлен BLOCKER → новый раунд на обновлённом полном диффе. Только
-   IMPORTANT/MINOR → повтор не нужен, в отчёте: «fixed without re-run».
+4. Был исправлен BLOCKER → новый раунд той же командой на обновлённом диффе.
+   Только IMPORTANT/MINOR → повтор не нужен, в отчёте: «fixed without re-run».
 5. В Stage Report или handoff: число раундов, подтверждённые и отклонённые
    находки с причинами, ограничения ревьюера.
 
-Упавшая команда, таймаут, отказ в правах, ошибка аутентификации, обрезанный
-вывод или отсутствие маркера зелёным ревью не являются. Одна повторная попытка
-после осмысленного исправления; если и она не завершилась — STOP с
-санитизированным текстом ошибки. Заявлять `REVIEW_GREEN` без маркера или без
-доказательства исправлений нельзя.
+Код 3, таймаут, отказ в правах, ошибка аутентификации, обрезанный вывод или
+отсутствие маркера зелёным ревью не являются; подробности — в `stderr.log`
+рядом с отчётом. `Reached max turns` у Claude — сузить `--context` до точных
+файлов и повторить. Одна повторная попытка после осмысленного исправления;
+если и она не завершилась — STOP с санитизированным текстом ошибки.
+Заявлять `REVIEW_GREEN` без маркера или без доказательства исправлений нельзя.
