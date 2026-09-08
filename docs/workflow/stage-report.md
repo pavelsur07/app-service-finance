@@ -1,6 +1,6 @@
 # Self-review checklist верхнеуровневого Stage
 
-Шаблон самого Stage Report и порядок его сохранения — `AGENTS.md`, «Stage Report».
+Шаблон Stage Report — `docs/workflow/templates.md`; когда он нужен — `AGENTS.md` §4–5.
 Ниже — проверки, специфичные для этого репозитория.
 
 ## Полный self-review checklist верхнеуровневого Stage
@@ -38,7 +38,7 @@
 - [ ] Изменения публичного API → OpenAPI / README модуля обновлены
 
 **Stage Report:**
-- [ ] Создан Stage Report по шаблону ниже, сохранён в `docs/tasks/<id>/stages/stage-<N>.md`
-- [ ] Внешнее ревью другим агентом завершено `REVIEW_GREEN` для executable changes; для documentation-only записано обоснованное N/A
+- [ ] Создан Stage Report по шаблону из `docs/workflow/templates.md`, сохранён в `docs/tasks/<id>/stages/stage-<N>.md`
+- [ ] Внешнее ревью проведено там, где его требует `AGENTS.md` §7.2 (HIGH-LOCAL Stage, handoff); результат — `REVIEW_GREEN` или «fixed without re-run» с доказательством
 - [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель Stage
 
