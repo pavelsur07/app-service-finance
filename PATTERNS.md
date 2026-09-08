@@ -1,7 +1,7 @@
 # PATTERNS.md — VashFinDir
 
 > Читай нужный раздел по задаче, не весь файл.
-> Версия: 1.2 / 2026-07-17
+> Версия: 1.3 / 2026-08-20
 
 ## Навигация
 
@@ -29,6 +29,7 @@
 - [22. Idempotency в Messenger](#22-idempotency-в-messenger)
 - [23. Логирование: выбор уровня (error vs warning)](#23-логирование-выбор-уровня-error-vs-warning)
 - [24. Финансовые типы данных](#24-финансовые-типы-данных)
+- [25. Request / Response DTO](#25-request--response-dto)
 
 ---
 
@@ -493,7 +494,9 @@ final class ProductListFilter
 }
 ```
 
-**Правила:** `readonly` для Command · `fromRequest()` только в Filter DTO · не использовать Entity как DTO
+**Правила:** `readonly` для Command · Command строится из Request DTO (`fromRequest(CreateProductRequest)`), не из `Symfony\...\Request` · Entity как DTO не использовать
+
+> Filter DTO выше — legacy-форма. В новом коде query-параметры принимает Request DTO с `#[MapQueryString]` (§25), ручной `fromRequest(Request $request)` не писать.
 
 ---
 
@@ -1323,4 +1326,188 @@ $entity->setAmount('1 234,56 ₽');
 // ✅
 $amount = Money::fromString($request->amount, $request->currency); // поля Request DTO валидированы как строки
 $vat = $amount->percentage('20', RoundingMode::HALF_UP);
+```
+
+---
+
+## 25. Request / Response DTO
+
+Граница HTTP-слоя: вход — Request DTO, выход — Response DTO. `array` в сигнатуре
+контроллера и `json_decode($request->getContent(), true)` в новом коде запрещены.
+
+```
+src/{Module}/Api/Request/    вход  — тело и query
+src/{Module}/Api/Response/   выход — тело ответа
+```
+
+### Request DTO — тело запроса
+
+```php
+// src/Catalog/Api/Request/CreateProductRequest.php
+#[OA\Schema(schema: 'CreateProductRequest', required: ['name', 'sku'])]
+final readonly class CreateProductRequest
+{
+    public function __construct(
+        #[Assert\NotBlank]
+        #[Assert\Length(max: 255)]
+        public string $name,
+
+        #[Assert\NotBlank]
+        #[Assert\Regex('/^[A-Z0-9\-]+$/')]
+        public string $sku,
+
+        #[Assert\Length(max: 64)]
+        public ?string $barcode = null,
+    ) {}
+}
+```
+
+```php
+public function __invoke(#[MapRequestPayload] CreateProductRequest $request): JsonResponse
+```
+
+Десериализацию и валидацию делает Symfony: невалидное тело → 422 **до** входа в метод.
+Ручной `fromRequest()` для body не писать — это дублирование `MapRequestPayload`.
+
+### Request DTO — query-параметры
+
+```php
+// src/Catalog/Api/Request/ListProductsRequest.php
+final readonly class ListProductsRequest
+{
+    public function __construct(
+        public ?string $search = null,
+        #[Assert\Positive]
+        public int $page = 1,
+        #[Assert\Range(min: 1, max: 200)] // потолок из раздела «Производительность»
+        public int $perPage = 50,
+    ) {}
+}
+```
+
+```php
+public function __invoke(#[MapQueryString] ListProductsRequest $query): JsonResponse
+```
+
+`companyId` полем Request DTO быть не может: он берётся из сессии через
+`ActiveCompanyService` и в OpenAPI не документируется (§14, §19).
+
+### Response DTO
+
+`toArray()` отдаёт **snake_case** — контракт для фронта. Схема пишется руками:
+`#[Model(type: X::class)]` при наличии `toArray()` даёт неверные имена полей (§19).
+
+```php
+// src/Catalog/Api/Response/ProductResponse.php
+#[OA\Schema(
+    schema: 'ProductResponse',
+    required: ['id', 'name', 'sku'],
+    properties: [
+        new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'name', type: 'string'),
+        new OA\Property(property: 'sku', type: 'string'),
+        new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+    ]
+)]
+final readonly class ProductResponse
+{
+    public function __construct(
+        private string $id,
+        private string $name,
+        private string $sku,
+        private \DateTimeImmutable $createdAt,
+    ) {}
+
+    public static function fromEntity(Product $product): self
+    {
+        return new self(
+            $product->getId(),
+            $product->getName(),
+            $product->getSku(),
+            $product->getCreatedAt(),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id'         => $this->id,
+            'name'       => $this->name,
+            'sku'        => $this->sku,
+            'created_at' => $this->createdAt->format(\DATE_ATOM),
+        ];
+    }
+}
+```
+
+### Списочный ответ
+
+Обёртку не изобретать — `data` + `meta`, meta берётся из готовой
+`App\Shared\OpenApi\Schema\PaginationMeta`.
+
+```php
+#[OA\Schema(
+    schema: 'ProductListResponse',
+    required: ['data', 'meta'],
+    properties: [
+        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: ProductResponse::class))),
+        new OA\Property(property: 'meta', ref: new Model(type: PaginationMeta::class)),
+    ]
+)]
+final class ProductListResponse {}
+```
+
+```php
+return $this->json([
+    'data' => array_map(static fn (ProductResponse $r) => $r->toArray(), $items),
+    'meta' => ['total' => $p->getNbResults(), 'page' => $p->getCurrentPage(),
+               'per_page' => $p->getMaxPerPage(), 'pages' => $p->getNbPages()],
+]);
+```
+
+### Поток
+
+```
+HTTP body/query
+  → Request DTO      (Assert-валидация, camelCase, Symfony мапит сам)
+  → Command DTO      (§12; Request не уходит глубже Controller)
+  → Action
+  → Entity / Query
+  → Response DTO     (fromEntity/fromRow → toArray() в snake_case)
+  → JsonResponse
+```
+
+Request DTO живёт только в контроллере: Action принимает Command DTO (§12) или
+скаляры. Это позволяет вызвать тот же Action из Console-команды и Handler'а,
+где `Request` не существует.
+
+### Ошибки валидации
+
+`MapRequestPayload` бросает `HttpException(422)` с телом Symfony по умолчанию —
+это **не** формат проекта `{"error":{"code","message"}}` (§13). Пока в модуле нет
+`ExceptionListener`, переводящего `ValidationFailedException` в этот формат,
+эндпоинт отдаёт два разных контракта ошибки. Образец слушателя:
+`src/Cash/Infrastructure/Http/CashExceptionListener.php`.
+
+### Правила
+
+- Request/Response DTO — `final readonly class`, только скаляры, `enum` и вложенные DTO
+- Entity никогда не сериализуется в ответ напрямую и не принимается на вход
+- `Assert`-атрибуты — на Request DTO, не в контроллере и не в Action
+- Одна пара DTO — один эндпоинт; общий `ProductRequest` на create и update запрещён
+  (разные обязательные поля → валидация становится ложью)
+- Изменение Response DTO = изменение публичного контракта: `make api-types` и
+  коммит `schema.d.ts` в том же Work item (§19)
+
+### Анти-паттерны
+
+```
+json_decode($request->getContent(), true) в контроллере   — MapRequestPayload
+array $payload в сигнатуре __invoke                       — Request DTO
+fromRequest(Request $r) на body-DTO                       — дублирует MapRequestPayload
+ручная проверка isset($data['x']) + return 400            — Assert + 422
+return $this->json($entity)                               — Response DTO
+companyId в Request DTO                                    — из сессии (§14)
+Response DTO с camelCase в toArray()                      — контракт snake_case
 ```
