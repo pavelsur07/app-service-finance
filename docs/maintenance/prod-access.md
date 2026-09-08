@@ -1,8 +1,30 @@
-# PROD-доступ из Claude Code
+# PROD-доступ агентов
 
-Правила доступа, список wrappers, read-only и мутирующие команды, логи на проде и
-порядок добавления разрешений — `AGENTS.md`, «Production access».
-Ниже — специфика запуска именно из Claude Code.
+Модель одобрений — `AGENTS.md` §3.2–3.3 и §9. Этот файл — канонический
+источник по самому доступу: правила, wrappers, allowlist, формы вызова.
+
+## Правила доступа
+
+- Ожидаемый SSH-алиас — `vf-prod-codex`, пользователь `codex-prod`. Root-доступ
+  для работы агента не используется.
+- Пользователя агента не добавлять в группу `docker`; никакого произвольного
+  `sudo docker`, `docker exec` или привилегированного шелла.
+- Только три wrapper'а плюс `codex-cgroup`:
+  `sudo /usr/local/bin/codex-docker-ps`, `sudo /usr/local/bin/codex-psql-ro`,
+  `sudo /usr/local/bin/codex-console <allowed-symfony-command> ...`.
+- Нет нужной команды в wrapper — STOP и запрос узкого wrapper'а или ручного
+  запуска Владельцем. Обходить ограничение более широким Docker/sudo нельзя.
+- Production IP, ключи, пароли, токены и значения окружения не печатать и не
+  коммитить.
+- Логи приложения, воркеров и scheduler — в stdout/stderr контейнера, ротация у
+  Docker; cron-перенаправлений в файлы хоста не добавлять. Ручные артефакты:
+  `/var/log/app-service-finance/maintenance/` — сохраняемые логи,
+  `/var/backups/app-service-finance/` — бэкапы,
+  `/var/tmp/app-service-finance.*` — временные аудиты. Никогда не писать в
+  `/root` или чужой home и не использовать относительный путь вывода. Создание
+  этих путей, установка logrotate, перенос или удаление файлов — production
+  mutation с отдельным одобрением. Подробности —
+  `docs/maintenance/production-logging.md`.
 
 ## Канонические формы вызова
 
@@ -170,7 +192,7 @@ timeout 20 ssh -o BatchMode=yes vf-prod-codex "sudo -n /usr/local/bin/codex-dock
 5. Не расширять sudoers и не выдавать прямой Docker-доступ.
 6. Проверить wrapper: `bash -n /usr/local/bin/codex-console`.
 7. Проверить от restricted user: `sudo -u codex-prod sudo /usr/local/bin/codex-console <command> --help` или другой безопасный read-only вызов.
-8. Durable policy changes фиксировать в `AGENTS.md` и `CLAUDE.md`; временные one-off разрешения не документировать как постоянные.
+8. Durable policy changes фиксировать в этом файле; временные one-off разрешения не документировать как постоянные.
 
 Запрещено добавлять dangerous/general permissions: arbitrary shell, arbitrary `docker exec`, unrestricted `docker`, write-capable `psql`, file editing on production, package installation. Для one-off production writes предпочтителен временный narrowly scoped wrapper, который Владелец удаляет после использования.
 
