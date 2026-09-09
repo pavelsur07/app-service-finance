@@ -77,6 +77,19 @@ That approval covers the whole standard pipeline without further questions:
 Ready for review → merge → wait for CI → automatic deploy → post-deploy
 acceptance through read-only wrappers → report.
 
+**An approval is not spent on a single PR.** Once the owner has said "merge and
+deploy" for the work in hand, do not come back for intermediate or additional
+consent on that same work. Merge the PR that carries it — and any PR split out
+of it for delivery reasons — then deploy and report. Splitting one piece of work
+across several PRs is a delivery decision the agent makes and reports, not a new
+question for the owner. The same holds for the steps inside the pipeline: CI,
+merge order, branch cleanup and post-deploy checks are executed, not asked about.
+
+Ask again only when the answer could differ: work the approval did not cover, a
+PR carrying a migration (see below), or an action listed in §3.3. Those two
+carve-outs are narrow and exist because the owner cannot reverse them afterwards
+— everything else proceeds on the approval already given.
+
 **A PR that adds a migration does not deploy on that approval.** Production
 migrations are a separate, manually dispatched action in this repository, and
 the push-triggered deploy refuses to run until production's schema is current:
