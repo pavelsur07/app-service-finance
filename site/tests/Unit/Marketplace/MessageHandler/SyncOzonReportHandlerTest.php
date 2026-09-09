@@ -27,6 +27,7 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -478,16 +479,143 @@ final class SyncOzonReportHandlerTest extends TestCase
 
         $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo, $logger);
 
-        // Не бросает — сообщение подтверждается без retry.
-        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+        // Retry нет, но и молча день не теряется: Unrecoverable уводит
+        // сообщение в failed-транспорт, откуда его видно и можно перезапустить.
+        $this->expectException(UnrecoverableMessageHandlingException::class);
 
-        self::assertNotNull($connection->getLastSyncError());
+        try {
+            $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+        } finally {
+            self::assertNotNull($connection->getLastSyncError());
+        }
     }
 
-    private function createHttpException(int $statusCode): HttpExceptionInterface
+    public function testHttp400LogsDateStatusAndOzonErrorEnvelope(): void
+    {
+        // Регрессия инцидента 09.09.2026: ночной прогон упал с 400 по всем
+        // кабинетам, а в логе был только "HTTP/2 400 returned for ...".
+        // Ни дня, за который шла загрузка, ни ответа Ozon — диагноза нет.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException(
+            $this->createHttpException(400, '{"code":3,"message":"invalid date range","details":[]}'),
+        );
+
+        $capturedContext = null;
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('warning');
+        $logger->expects(self::once())
+            ->method('error')
+            ->willReturnCallback(static function (string $message, array $context) use (&$capturedContext): void {
+                $capturedContext = $context;
+            });
+
+        $handler = $this->createHandler($em, $adapter, $this->createMock(MessageBusInterface::class), $rawDocRepo, $logger);
+
+        try {
+            $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+            self::fail('Non-transient failure must not be acknowledged silently.');
+        } catch (UnrecoverableMessageHandlingException) {
+            // ожидаемо: сообщение уходит в failed-транспорт
+        }
+
+        self::assertIsArray($capturedContext);
+        self::assertSame(self::DATE, $capturedContext['date']);
+        self::assertSame(400, $capturedContext['http_status']);
+        self::assertStringContainsString('invalid date range', $capturedContext['response_excerpt']);
+    }
+
+    public function testOzonErrorEnvelopeIsTruncatedInLogContext(): void
+    {
+        // Тело внешнего API в логах — узкое исключение ради диагноза 4xx,
+        // поэтому длина обязана быть ограничена.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException(
+            $this->createHttpException(400, str_repeat('x', 5000)),
+        );
+
+        $capturedContext = null;
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->willReturnCallback(static function (string $message, array $context) use (&$capturedContext): void {
+                $capturedContext = $context;
+            });
+
+        $handler = $this->createHandler($em, $adapter, $this->createMock(MessageBusInterface::class), $rawDocRepo, $logger);
+
+        try {
+            $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+        } catch (UnrecoverableMessageHandlingException) {
+            // не предмет этого теста
+        }
+
+        self::assertIsArray($capturedContext);
+        self::assertSame(
+            SyncOzonReportHandler::ERROR_EXCERPT_LIMIT,
+            mb_strlen($capturedContext['response_excerpt']),
+        );
+    }
+
+    public function testTransientFailureAlsoCarriesDateInLogContext(): void
+    {
+        // Тот же пробел был и в warning-ветке: по логу ретрая не понять,
+        // какой из 14 дней окна не загрузился.
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $em = $this->createEmMock($company, $connection);
+
+        $adapter = $this->createMock(MarketplaceAdapterInterface::class);
+        $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
+        $adapter->method('fetchRawReport')->willThrowException(new TransportException('Connection timed out'));
+
+        $capturedContext = null;
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->willReturnCallback(static function (string $message, array $context) use (&$capturedContext): void {
+                $capturedContext = $context;
+            });
+
+        $handler = $this->createHandler($em, $adapter, $this->createMock(MessageBusInterface::class), $rawDocRepo, $logger);
+
+        try {
+            $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+        } catch (RecoverableMessageHandlingException) {
+            // ожидаемо
+        }
+
+        self::assertIsArray($capturedContext);
+        self::assertSame(self::DATE, $capturedContext['date']);
+        self::assertArrayNotHasKey('http_status', $capturedContext);
+    }
+
+    private function createHttpException(int $statusCode, string $body = ''): HttpExceptionInterface
     {
         $response = $this->createMock(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($statusCode);
+        $response->method('getContent')->willReturn($body);
 
         $exception = $this->createMock(HttpExceptionInterface::class);
         $exception->method('getResponse')->willReturn($response);
