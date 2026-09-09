@@ -34,7 +34,7 @@ DATE_TO=""
 MAX_PAGES=0          # 0 = выгрузить всё
 WITH_POSTINGS=1
 POSTINGS_CHUNK=50    # сколько unit_number отдаём в /postings за раз
-MAX_RETRIES=6        # попыток на один вызов при 429
+MAX_RETRIES=8        # попыток на один вызов при 429
 RETRY_BASE_SECONDS=5 # первая пауза; дальше удвоение
 MAX_BACKOFF_SECONDS=120  # потолок паузы, как DEFAULT_RETRY_AFTER_SECONDS в Ingestion
 PACE_SECONDS=1       # пауза между вызовами разных эндпоинтов
@@ -142,11 +142,15 @@ ozon_post() {
         fi
 
         if [[ "$code" == "429" && "$attempt" -lt "$MAX_RETRIES" ]]; then
+            # Retry-After — нижняя граница, а не замена backoff. Ozon на этом
+            # лимите отвечает "Retry-After: 1", и если исполнять его буквально,
+            # шесть попыток укладываются в шесть секунд и все попадают в тот же
+            # лимит: ключ параллельно долбят поллеры приложения (реклама раз в
+            # минуту, заказы ежечасно). Берём максимум из подсказки и удвоения.
             retry_after="$(awk 'tolower($0) ~ /^retry-after:/ {gsub(/[^0-9]/, "", $2); print $2; exit}' "$hdr" 2>/dev/null || true)"
-            if [[ "$retry_after" =~ ^[0-9]+$ && "$retry_after" -gt 0 ]]; then
+            wait=$((RETRY_BASE_SECONDS * 2 ** (attempt - 1)))
+            if [[ "$retry_after" =~ ^[0-9]+$ && "$retry_after" -gt "$wait" ]]; then
                 wait="$retry_after"
-            else
-                wait=$((RETRY_BASE_SECONDS * 2 ** (attempt - 1)))
             fi
             [[ "$wait" -gt "$MAX_BACKOFF_SECONDS" ]] && wait="$MAX_BACKOFF_SECONDS"
 
