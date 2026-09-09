@@ -70,7 +70,18 @@
 40 3 * * * cd /app && php bin/console app:marketplace:ozon-listing-catalog:sync --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Ночная синхронизация отчётов Ozon по реализации.
-0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
+#
+# ОТКЛЮЧЕНО 09.09.2026. Ozon снял POST /v3/finance/transaction/list — единственный
+# источник этой команды. Ответ: HTTP 400 {"code":9,"message":"obsolete method
+# cannot be used"}. Последний успешный прогон — 08.09.2026 04:00.
+#
+# Оставлять включённой нельзя: каждая ночь клала 56 сообщений (4 подключения x
+# 14 дней) в failed-транспорт, и это уже не сигнал, а шум — причина известна и
+# ремонтом не лечится, пока не переписан адаптер.
+#
+# Включить обратно после Stage 4 задачи ozon-accrual-adapter, когда загрузка
+# поедет на /v1/finance/accrual/by-day. Разбор — docs/tasks/ozon-accrual-adapter/plan.md.
+#0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
 # Inventory Ozon snapshot: запуск в 04:05 MSK, команда только инициирует pipeline; HTTP-загрузка выполняется async worker'ом.
 5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
