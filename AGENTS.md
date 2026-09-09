@@ -74,13 +74,40 @@ Reply: "merge and deploy #<n>"
 ```
 
 That approval covers the whole standard pipeline without further questions:
-Ready for review → merge → wait for CI → automatic deploy → migrations shipped
-in the PR and executed by the deploy workflow → post-deploy acceptance through
-read-only wrappers → report.
+Ready for review → merge → wait for CI → automatic deploy → post-deploy
+acceptance through read-only wrappers → report.
 
-If the PR contains an irreversible migration or a destructive data change, say
-so in the request, with the backup or rollback plan. The owner decides with
-that fact in front of them.
+**A PR that adds a migration does not deploy on that approval.** Production
+migrations are a separate, manually dispatched action in this repository, and
+the push-triggered deploy refuses to run until production's schema is current:
+
+| Workflow job | Trigger |
+|---|---|
+| `migrations` | `workflow_dispatch` with `production_action: migrations` only |
+| `Verify production schema is ready` | every push to `master`; fails while any migration is pending |
+| `deploy` | only after that gate is green |
+
+So a merge with a pending migration lands the code and stops there, with the
+deploy job skipped — and the gate then blocks every later deploy too, not just
+that one. When the PR carries a migration, say so in the request and ask for
+both actions at once:
+
+```text
+Ready: PR #<n> "<title>" — the PR adds migration <Version...>: <reversible? data touched? backup needed?>.
+Run the production migration and deploy?
+Reply: "run the migration and deploy #<n>"
+```
+
+Then dispatch them in order and check the schema between the two:
+
+```bash
+gh workflow run deploy.yml --ref master -f production_action=migrations
+gh workflow run deploy.yml --ref master -f production_action=deploy
+```
+
+An irreversible migration or a destructive data change is named explicitly in
+the request, with the backup or rollback plan. The owner decides with that fact
+in front of them.
 
 ### 3.3 Separate approval — outside the pipeline
 
@@ -89,7 +116,8 @@ another:
 
 - manual production commands that mutate or process: `messenger:consume`,
   backfill, recalc, repair, prune, `--execute`, `messenger:failed:remove`;
-- SQL writes on production, migrations run by hand outside the deploy;
+- SQL writes on production; production migrations (see §3.2 — they are a
+  separate dispatch, not part of the deploy);
 - changes to production Docker, Traefik, workers, scheduler, queues, secrets,
   credentials, CI/CD behavior;
 - irreversible transformation or deletion of existing data;
