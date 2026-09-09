@@ -19,6 +19,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -31,6 +32,18 @@ use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 final class SyncOzonReportHandler
 {
     private const LOCK_TTL_SECONDS = 300;
+
+    /**
+     * Потолок фрагмента тела ответа Ozon в контексте лога.
+     *
+     * CLAUDE.md, «Логирование», запрещает писать тело ответа внешних API.
+     * Исключение здесь узкое и намеренное: только конверт ОШИБКИ неуспешного
+     * запроса и только обрезанный. Инцидент 09.09.2026 показал цену обратного:
+     * ночной прогон упал по всем кабинетам, в логе осталось
+     * «HTTP/2 400 returned for ...», и причина 400 не устанавливалась вообще.
+     * Успешные ответы в лог по-прежнему не попадают.
+     */
+    public const ERROR_EXCERPT_LIMIT = 500;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -226,8 +239,11 @@ final class SyncOzonReportHandler
             $context = [
                 'company_id' => $companyId,
                 'connection_id' => $connectionId,
+                // Окно прогона — 14 дней на подключение, поэтому без дня
+                // по логу не понять, какой именно отчёт не загрузился.
+                'date' => $fromDate->format('Y-m-d'),
                 'error' => $e->getMessage(),
-            ];
+            ] + $this->httpErrorContext($e);
 
             if ($transient) {
                 // Ожидаемо и повторяемо (429/5xx/таймаут) → warning (не в GlitchTip) + retry Messenger.
@@ -255,7 +271,12 @@ final class SyncOzonReportHandler
                 throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
             }
 
-            return;
+            // Ретраить бесполезно, но и терять день нельзя: раньше здесь стоял
+            // `return`, сообщение подтверждалось, и пропуск не оставлял следа
+            // ни в очереди, ни в failed-транспорте. Unrecoverable ретраи не
+            // включает и кладёт сообщение в `failed`, откуда его видно и можно
+            // перезапустить через messenger:failed:retry.
+            throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
         }
 
         try {
@@ -275,6 +296,33 @@ final class SyncOzonReportHandler
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Статус и обрезанный конверт ошибки Ozon — то, чего не хватало, чтобы
+     * отличить «сломался контракт API» от «протух ключ» по одному логу.
+     *
+     * @return array{http_status?: int, response_excerpt?: string}
+     */
+    private function httpErrorContext(\Throwable $e): array
+    {
+        if (!$e instanceof HttpExceptionInterface) {
+            return [];
+        }
+
+        $response = $e->getResponse();
+
+        try {
+            // false — не бросать повторно на 4xx/5xx: тело нужно именно от них.
+            $excerpt = mb_substr($response->getContent(false), 0, self::ERROR_EXCERPT_LIMIT);
+        } catch (\Throwable) {
+            $excerpt = '(unavailable)';
+        }
+
+        return [
+            'http_status' => $response->getStatusCode(),
+            'response_excerpt' => $excerpt,
+        ];
     }
 
     /**

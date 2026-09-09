@@ -128,6 +128,22 @@ Read-only проверки можно выполнять после запрос
 - Любая команда с `--execute`.
 - `app:cash:backfill-transaction-splits --execute` — переносит категорию ДДС в строки разбивки. Wrapper допускает у неё только пустой список аргументов или ровно `--execute`, другие флаги отвергает. Без `--execute` команда read-only и только считает объём. Запускать в тихом окне с остановленными воркерами, после бэкапа `cash_transaction`, и сверять результат `app:cash:verify-transaction-splits`.
 - `messenger:failed:remove <id> [--force]` — безвозвратно удаляет сообщение из failed-очереди. Wrapper требует первым аргументом только числовой id и допускает единственный дополнительный флаг `--force`; `--all` отвергается, поэтому очередь целиком снести нельзя. До удаления посмотреть на цель: класс сообщения и текст ошибки читаются через `codex-psql-ro` из `messenger_messages`. Удаление выбрасывает задачу, а не выполняет её.
+- `app:marketplace:ozon-daily-sync` — ставит в `async_sync` загрузку сырых
+  отчётов Ozon за последние 14 дней по всем активным seller-подключениям:
+  внешние вызовы Seller API и перезапись `marketplace_raw_documents`.
+  Существует ради восстановления пропущенного дня — в остальное время этим
+  занимается крон в 04:00. Идемпотентна: документ дня обновляется, дубль не
+  создаётся. Wrapper допускает только служебные флаги Symfony
+  (`--no-interaction`, `-n`, `--quiet`, `-q`); собственных опций у команды нет,
+  и любой другой аргумент отвергается.
+
+  Одобрение на неё — отдельное (`AGENTS.md` §3.3) и не покрывается
+  «merge and deploy». Правила `permissions.allow` в `.claude/settings.local.json`
+  написаны под форму `codex-console *` целиком, поэтому запрос разрешения на
+  неё не всплывёт: если нужен обязательный вопрос перед запуском, Владелец
+  добавляет узкое правило в `ask`, например
+  `Bash(*vf-prod-codex*ozon-daily-sync*)`. Ограничение внутри wrapper от
+  случайного запуска не спасает — оно держит только форму аргументов.
 - Repair, prune, backfill, rebuild, refresh, maintenance.
 - SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
 - Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.
