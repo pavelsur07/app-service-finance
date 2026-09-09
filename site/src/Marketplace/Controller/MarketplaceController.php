@@ -908,15 +908,25 @@ class MarketplaceController extends AbstractController
         return $date;
     }
 
+    /**
+     * Кнопку в разметке мало: страница могла быть открыта до того, как ключ
+     * отвергли, и её CSRF-токен всё ещё действителен. Запрет обязан жить на
+     * сервере, иначе ручной запуск по мёртвому ключу продолжает порождать
+     * заведомо падающие задания.
+     */
     private function canRunManualSync(MarketplaceConnection $connection): bool
     {
-        return $connection->isActive();
+        return $connection->isActive() && !$connection->getAuthStatus()->isFailed();
     }
 
     private function manualSyncBlockedMessage(MarketplaceConnection $connection): string
     {
         if (!$connection->isActive()) {
             return 'Синхронизация недоступна: подключение неактивно.';
+        }
+
+        if ($connection->getAuthStatus()->isFailed()) {
+            return 'Синхронизация недоступна: маркетплейс не принимает ключ. Обновите ключ в настройках подключения.';
         }
 
         return 'Синхронизация недоступна.';

@@ -23,8 +23,10 @@ use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\IngestCursorRepository;
 use App\Ingestion\Repository\SyncJobRepository;
+use App\Marketplace\Facade\MarketplaceFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
@@ -42,6 +44,7 @@ final readonly class RunSyncChunkHandler
         private ConnectorRegistry $connectorRegistry,
         private RawStorageFacade $rawStorageFacade,
         private SyncFacade $syncFacade,
+        private MarketplaceFacade $marketplaceFacade,
         private IngestRateLimitGuard $rateLimitGuard,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $messageBus,
@@ -149,8 +152,10 @@ final readonly class RunSyncChunkHandler
             } while ($result->hasMore);
 
             $this->syncFacade->markJobCompleted(new MarkJobCompletedCommand($job->getId(), $job->getCompanyId()));
+            $this->recordConnectorAuthSuccess($job);
         } catch (ConnectorAuthException $exception) {
             $this->markJobFailed($job->getId(), $job->getCompanyId(), 'auth');
+            $this->recordConnectorAuthFailure($job);
 
             throw new UnrecoverableMessageHandlingException('Ingestion connector authentication failed.', 0, $exception);
         } catch (ConnectorRateLimitedException $exception) {
@@ -235,6 +240,108 @@ final readonly class RunSyncChunkHandler
                 'exceptionClass' => $exception::class,
                 'errorMessage' => $exception->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Отметить отказ аутентификации на подключении.
+     *
+     * `error` пишется ровно один раз — в момент перехода подключения в
+     * сломанное состояние. Это единственное здесь событие, требующее человека:
+     * загрузка остановлена и не возобновится, пока ключ не заменят. Остальные
+     * отказы остаются `warning` и несут контекст (компания, подключение,
+     * ресурс), которого нет в системных записях.
+     *
+     * Важно не обманываться насчёт тишины: сам факт отказа всё равно доедет до
+     * GlitchTip помимо этих строк. Обработчик бросает
+     * `UnrecoverableMessageHandlingException`, а Messenger на неретраящемся
+     * сбое пишет `critical` (`SendFailedMessageForRetryListener`), и Sentry при
+     * `capture_soft_fails: false` ловит именно такие, «жёсткие», сбои. Шум
+     * убирает не уровень записи, а остановка планировщика: после перехода крон
+     * перестаёт ставить задания, и поток сообщений прекращается.
+     */
+    private function recordConnectorAuthFailure(SyncJob $job): void
+    {
+        $becameBroken = $this->guardAuthStateWrite(
+            fn (): bool => $this->marketplaceFacade->recordConnectorAuthFailure(
+                $job->getCompanyId(),
+                $job->getConnectionRef(),
+            ),
+            $job,
+        );
+
+        $context = [
+            'companyId' => $job->getCompanyId(),
+            'jobId' => $job->getId(),
+            'source' => $job->getSource()->value,
+            'resourceType' => $job->getResourceType(),
+            'connectionRef' => $job->getConnectionRef(),
+        ];
+
+        if ($becameBroken) {
+            $this->logger->error('Marketplace connection stopped accepting the API key; ingestion halted for it.', $context);
+
+            return;
+        }
+
+        $this->logger->warning('Ingestion connector rejected the API key.', $context);
+    }
+
+    private function recordConnectorAuthSuccess(SyncJob $job): void
+    {
+        $recovered = $this->guardAuthStateWrite(
+            fn (): bool => $this->marketplaceFacade->recordConnectorAuthSuccess(
+                $job->getCompanyId(),
+                $job->getConnectionRef(),
+            ),
+            $job,
+        );
+
+        if ($recovered) {
+            $this->logger->info('Marketplace connection accepts the API key again; ingestion resumed.', [
+                'companyId' => $job->getCompanyId(),
+                'source' => $job->getSource()->value,
+                'connectionRef' => $job->getConnectionRef(),
+            ]);
+        }
+    }
+
+    /**
+     * Учёт состояния не имеет права подменить исходную причину и не имеет
+     * права шуметь.
+     *
+     * Вызов из ветки отказа идёт внутри `catch`, и брошенное отсюда исключение
+     * заменило бы собой ошибку API — ту самую, ради диагностики которой всё и
+     * пишется. Ловится `\Throwable` — тем же приёмом, что и у
+     * {@see self::markJobFailed()} выше.
+     *
+     * `connectionRef` контрактом задания гарантирован лишь непустым, и не
+     * каждое задание ссылается на строку реестра подключений. Для таких
+     * заданий состояние обновлять просто не на чем, и это НЕ ошибка: путь
+     * успеха проходит на каждом завершённом чанке, поэтому запись `error`
+     * здесь означала бы поток ложных алертов в GlitchTip на каждой удачной
+     * синхронизации. Такие задания молча пропускаются.
+     *
+     * @param callable(): bool $write
+     */
+    private function guardAuthStateWrite(callable $write, SyncJob $job): bool
+    {
+        if (!Uuid::isValid($job->getConnectionRef())) {
+            return false;
+        }
+
+        try {
+            return $write();
+        } catch (\Throwable $exception) {
+            $this->logger->error('Connector auth state could not be recorded on the marketplace connection.', [
+                'companyId' => $job->getCompanyId(),
+                'jobId' => $job->getId(),
+                'connectionRef' => $job->getConnectionRef(),
+                'exceptionClass' => $exception::class,
+                'errorMessage' => $exception->getMessage(),
+            ]);
+
+            return false;
         }
     }
 

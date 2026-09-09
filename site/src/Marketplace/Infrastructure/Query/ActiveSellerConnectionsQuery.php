@@ -46,6 +46,34 @@ final class ActiveSellerConnectionsQuery
     }
 
     /**
+     * Подключения, по которым имеет смысл идти в API маркетплейса.
+     *
+     * Отличается от {@see self::execute()} ровно одним условием: подключения,
+     * чей ключ маркетплейс перестал принимать, отсюда исключены.
+     *
+     * Отдельный метод, а не условие внутри `execute()`, — намеренно. Тот же
+     * реестр читают команды, которые к API не ходят вовсе: пересборка
+     * предварительного ОПиУ обходит пары (компания, маркетплейс) по локальным
+     * данным. Для них сломанный ключ ничего не значит, и глухой фильтр молча
+     * выкинул бы компанию из пересчёта, превратив проблему аутентификации в
+     * расхождение отчётности.
+     *
+     * @return list<array{id: string, company_id: string, marketplace: string}>
+     */
+    public function executeSyncable(): array
+    {
+        return self::shape($this->connection->fetchAllAssociative(
+            "SELECT mc.id, mc.company_id, mc.marketplace
+             FROM marketplace_connections mc
+             WHERE mc.is_active = true
+               AND mc.connection_type = :type
+               AND mc.auth_status <> 'failed'
+             ORDER BY mc.company_id, mc.marketplace",
+            ['type' => 'seller'],
+        ));
+    }
+
+    /**
      * Подключения ОДНОЙ компании. Фильтр выполняет БД, а не вызывающий: отбор
      * после выборки означал бы читать реестр подключений всех компаний ради
      * одной.

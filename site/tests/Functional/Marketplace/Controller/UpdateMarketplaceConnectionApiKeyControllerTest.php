@@ -10,7 +10,9 @@ use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
+use App\Marketplace\Application\RecordConnectionAuthResultAction;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Enum\MarketplaceConnectionAuthStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
@@ -68,6 +70,47 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
         self::assertSame('2026-08-20 10:00:00', $updated->getLastSyncAt()?->format('Y-m-d H:i:s'));
         self::assertSame('2026-08-19 09:00:00', $updated->getLastSuccessfulSyncAt()?->format('Y-m-d H:i:s'));
         self::assertSame(['project_direction_id' => 'project-id'], $updated->getSettings());
+    }
+
+    /**
+     * Обновление ключа снимает признак «ключ не принимается».
+     *
+     * Без этого подключение навсегда осталось бы вне выборки крона: состояние
+     * ставит конвейер, а снять его больше некому — форма обновления ключа и
+     * есть то самое вмешательство человека, ради которого загрузка
+     * останавливалась.
+     */
+    public function testValidKeyClearsBrokenAuthStateAndReturnsConnectionToSync(): void
+    {
+        $this->resetDb();
+        $client = static::createClient();
+        [$user, $company] = $this->seedBaseData();
+        $connection = $this->seedConnection($company, MarketplaceType::OZON);
+        $connection->setClientId('ozon-client-id');
+        $this->em()->flush();
+
+        $recordAuthResult = static::getContainer()->get(RecordConnectionAuthResultAction::class);
+        for ($i = 0; $i < RecordConnectionAuthResultAction::AUTH_FAILURE_THRESHOLD; ++$i) {
+            $recordAuthResult->recordFailure((string) $company->getId(), $connection->getId());
+        }
+        self::assertSame(
+            MarketplaceConnectionAuthStatus::FAILED,
+            $this->reload($connection)->getAuthStatus(),
+        );
+
+        $this->loginWithActiveCompany($client, $user, $company);
+        $client->getContainer()->set('http_client', new MockHttpClient(static fn (): MockResponse => new MockResponse('{}', ['http_code' => 200])));
+
+        $client->request('POST', $this->updateUrl($connection), [
+            '_token' => $this->csrfToken($client, $this->csrfId($connection)),
+            'api_key' => 'new-ozon-key',
+        ]);
+
+        self::assertResponseRedirects('/marketplace/connections');
+        $updated = $this->reload($connection);
+        self::assertSame(MarketplaceConnectionAuthStatus::OK, $updated->getAuthStatus());
+        self::assertSame(0, $updated->getAuthFailureCount());
+        self::assertNull($updated->getAuthFailedAt());
     }
 
     public function testInvalidOzonKeyDoesNotReplaceStoredCredentialsOrState(): void

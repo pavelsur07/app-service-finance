@@ -6,6 +6,7 @@ namespace App\Finance\Controller;
 
 use App\Cash\Enum\FiatCurrency;
 use App\Finance\Application\Service\FinanceDashboardKpiProvider;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\UiModeResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,6 +38,7 @@ class HomeController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly FinanceDashboardKpiProvider $kpiProvider,
+        private readonly MarketplaceFacade $marketplaceFacade,
         private readonly UiModeResolver $uiModeResolver,
     ) {
     }
@@ -111,7 +113,14 @@ class HomeController extends AbstractController
             return $this->redirectToRoute('app_dashboard_index', ['currency' => FiatCurrency::RUB->value]);
         }
 
-        return $this->render('home/dashboard.html.twig', ['cashCurrency' => $cashCurrency]);
+        return $this->render('home/dashboard.html.twig', [
+            'cashCurrency' => $cashCurrency,
+            // Отдельный запрос вместо признака внутри KPI: блок обязан
+            // появляться и тогда, когда всё остальное на дашборде пусто.
+            'brokenConnections' => $this->marketplaceFacade->getBrokenConnections(
+                (string) $this->activeCompanyService->getActiveCompany()->getId(),
+            ),
+        ]);
     }
 
     private function resolveCashCurrency(Request $request): FiatCurrency

@@ -128,10 +128,30 @@ final class UpdateMarketplaceConnectionApiKeyController extends AbstractControll
             return $this->redirectToRoute('marketplace_connection_edit', ['id' => $id]);
         }
 
-        $this->connectionApiKeyCodec->applyApiKey($connection, $apiKey);
-        $connection->setIsActive(true);
-        $connection->setLastSyncError(null);
-        $this->em->flush();
+        // Ключ и снятие признака «ключ не принимается» — одна транзакция.
+        //
+        // Порознь получалась ложь в интерфейсе: ключ уже сохранён, сброс
+        // состояния упал, пользователь читает «Подключение активно», а крон
+        // по-прежнему обходит подключение стороной. Разойтись эти две записи
+        // не имеют права, поэтому обе внутри одной транзакции, и сбой любой
+        // откатывает обе.
+        //
+        // Здесь запись строгая, в отличие от пути загрузки: там подавление
+        // нужно, чтобы учёт состояния не подменил исходную ошибку API, а тут
+        // сбой обязан быть виден — иначе пользователь не узнает, что его
+        // действие не сработало.
+        $this->em->wrapInTransaction(function () use ($connection, $apiKey, $company): void {
+            $this->connectionApiKeyCodec->applyApiKey($connection, $apiKey);
+            $connection->setIsActive(true);
+            $connection->setLastSyncError(null);
+            $this->em->flush();
+
+            $this->connectionRepository->registerAuthSuccess(
+                $connection->getId(),
+                (string) $company->getId(),
+                new \DateTimeImmutable(),
+            );
+        });
 
         $this->logger->info('Marketplace connection API key updated.', [
             'company_id' => (string) $company->getId(),

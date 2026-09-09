@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Enum\MarketplaceConnectionAuthStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -56,6 +57,24 @@ class MarketplaceConnection
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $lastSyncError = null;
+
+    /**
+     * Состояние аутентификации, которым управляет конвейер загрузки.
+     *
+     * Пишется из обработчика синхронизации, а не Владельцем: маркетплейс
+     * отзывает ключ молча, и единственный, кто узнаёт об этом первым, — код,
+     * получивший 401/403 в ответ.
+     */
+    #[ORM\Column(type: 'string', length: 20, enumType: MarketplaceConnectionAuthStatus::class, options: ['default' => 'ok'])]
+    private MarketplaceConnectionAuthStatus $authStatus = MarketplaceConnectionAuthStatus::OK;
+
+    /** Момент ПЕРВОГО отказа в текущей серии — то, что показывается в кабинете. */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $authFailedAt = null;
+
+    /** Отказов подряд; успех обнуляет. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $authFailureCount = 0;
 
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $settings = null;
@@ -229,6 +248,21 @@ class MarketplaceConnection
         $this->lastSyncError = $error;
 
         return $this;
+    }
+
+    public function getAuthStatus(): MarketplaceConnectionAuthStatus
+    {
+        return $this->authStatus;
+    }
+
+    public function getAuthFailedAt(): ?\DateTimeImmutable
+    {
+        return $this->authFailedAt;
+    }
+
+    public function getAuthFailureCount(): int
+    {
+        return $this->authFailureCount;
     }
 
     public function getSettings(): ?array
