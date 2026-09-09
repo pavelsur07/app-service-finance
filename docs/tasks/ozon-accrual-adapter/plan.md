@@ -1,0 +1,137 @@
+# ozon-accrual-adapter: перевести Marketplace на /v1/finance/accrual/by-day
+
+Ozon снял `POST /v3/finance/transaction/list` между 08.09 и 09.09.2026. Ответ —
+HTTP 400 `{"code":9, "message":"obsolete method cannot be used"}`. Подтверждено на
+PROD прогоном `app:marketplace:ozon-daily-sync`: все 56 сообщений ушли в
+failed-транспорт, бизнес-день 08.09 отсутствует у всех четырёх кабинетов.
+
+Цель: вернуть дневную загрузку финансовых данных Ozon в модуле Marketplace,
+переведя `OzonAdapter` на живой `/v1/finance/accrual/by-day`. Ingestion остаётся
+на месте: из него берётся только справочник категорий, read-only, через Facade.
+
+Baseline: `make site-test-unit` — 2356 тестов зелёные; `make site-stan` — No errors;
+`make site-cs-check` / `make site-cs-strict-types` — 0 из 2497. Pre-existing:
+4 deprecations в unit-наборе, к задаче отношения не имеют.
+
+## Что известно и что нет
+
+Форма ответа зафиксирована в `tests/Unit/Ingestion/Application/Source/Ozon/OzonAccrualByDayMapperTest.php`
+и `tests/Integration/Ingestion/Fixtures/FakeOzonAccrualClient.php`:
+
+```
+accrual_id, date, unit_number, accrued_category
+posting.products[]
+  ├─ sku, offer_id, name
+  ├─ commission.{sale_amount, commission, bonus}
+  └─ delivery.services[].{type_id, accrued:{amount,currency}}
+```
+
+Сэмпл рукописный и покрывает только `accrued_category = POSTING` с одной продажей.
+Не отвечает на: какие ещё значения принимает `accrued_category` и какое означает
+возврат; есть ли `quantity` в `posting.products[]`; полный список `type_id`.
+Поэтому Stage 1 — снятие реальной выгрузки, и только после него пишется код.
+
+Закрыто чтением PROD, гадать не нужно: `marketplace_sale_mappings.operation_type`
+принимает ровно два значения — `sale` и `return`. Это внутренний домен, а не
+`operation_type` из API Ozon. Существующие пользовательские маппинги P&L
+миграцию переживают и правок не требуют.
+
+## Stage 1: реальная выгрузка by-day как основа контракта
+Risk: LOW
+stage_base_commit: <записать перед первым Work item>
+Definition of Done:
+- `site/bin/capture-ozon-accrual.sh` снимает `/v1/finance/accrual/by-day`,
+  `/v1/finance/accrual/types` и `/v1/finance/accrual/postings` за указанный день;
+- снимок лежит в `tests/Fixtures/Marketplace/Ozon/captured/` (каталог под
+  `.gitignore` — реальные данные продавца в репозиторий не попадают);
+- в `tests/Fixtures/Marketplace/Ozon/` закоммичена сокращённая обезличенная
+  фикстура, покрывающая продажу, комиссию, услугу доставки и возврат;
+- в этом файле записаны ответы на три открытых вопроса выше — с цифрами;
+- исключено: любые правки `OzonAdapter` и процессоров.
+Work items:
+- 1.1 — скрипт захвата по образцу `bin/capture-ozon-listings.sh`
+- 1.2 — снятие выгрузки (ключи вводит Владелец, в репозиторий не попадают)
+- 1.3 — разбор: значения `accrued_category`, наличие `quantity`, список `type_id`
+- 1.4 — сокращённая обезличенная фикстура + запись выводов в plan.md
+Stage checks:
+- `bash -n site/bin/capture-ozon-accrual.sh`
+- ручной просмотр снимка на предмет полноты кейсов
+Reviewer focus:
+- не утекли ли ключи и реальные данные продавца в отслеживаемые файлы
+
+## Stage 2: справочник type_id → категория затрат через Facade
+Risk: HIGH-LOCAL
+stage_base_commit: <записать перед первым Work item>
+Definition of Done:
+- в `IngestionFacade` добавлен read-only метод разрешения `type_id` в категорию
+  затрат; `ARCHITECTURE.md` обновлён в этом же Stage;
+- Marketplace получает категорию только через Facade, своей копии справочника не
+  заводит — одно доменное понятие в одном месте (`docs/workflow/health-gates.md`);
+- неизвестный `type_id` деградирует в видимую очередь на ручной разбор, а не в
+  `NULL` и не в «прочее»;
+- unit-тесты на известный id, неизвестный id и пустой справочник;
+- исключено: изменение логики самого Ingestion, его загрузчиков и таблиц.
+Work items:
+- 2.1 — метод Facade + DTO контракта
+- 2.2 — потребитель в Marketplace
+- 2.3 — обработка неизвестного id
+Stage checks:
+- `make site-test-unit`, `make site-stan`, `make site-cs-check`
+- `site/tests/Architecture/ModuleBoundaryRules.php` — границы модулей
+Reviewer focus:
+- не протёк ли импорт `Application/`/`Service/` Ingestion мимо Facade
+- поведение на неизвестном `type_id`
+
+## Stage 3: OzonAdapter на by-day
+Risk: HIGH-LOCAL
+stage_base_commit: <записать перед первым Work item>
+Definition of Done:
+- `OzonAdapter::fetchRawReport/fetchSales/fetchCosts/fetchReturns` работают на
+  `/v1/finance/accrual/by-day`, `authenticate()` — на живом эндпоинте;
+- ключ дедупа `MarketplaceStaging.externalId` — составной из `accrual_id`,
+  индекса товара и `type_id` услуги; повторный прогон дня дублей не создаёт;
+- затраты классифицируются через Facade из Stage 2, а не подстроками по имени;
+- тесты на фикстуре из Stage 1: продажа, комиссия, услуга, возврат, пустой день,
+  повторный прогон;
+- `OzonTransactionTotalsClient` (`/v3/finance/transaction/totals`, мёртвый код,
+  снят Ozon тем же решением) удалён вместе со своим тестом;
+- исключено: изменение формы `SaleData`/`CostData`/`ReturnData`, если Stage 1 не
+  докажет, что без этого нельзя.
+Work items:
+- 3.1 — клиент нового эндпоинта в `Infrastructure/Api/Ozon/`
+- 3.2 — `fetchRawReport` + составной ключ дедупа
+- 3.3 — `fetchSales`
+- 3.4 — `fetchCosts` через Facade-справочник
+- 3.5 — `fetchReturns`
+- 3.6 — `authenticate`, удаление мёртвого кода
+Stage checks:
+- `make site-test`, `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`
+Reviewer focus:
+- идемпотентность повторного прогона дня
+- знаки сумм: by-day отдаёт расходы отрицательными, легаси DTO ждёт положительные
+- company scope во всех новых запросах
+
+## Stage 4: восстановление истории и сверка
+Risk: HIGH-LOCAL
+stage_base_commit: <записать перед первым Work item>
+Definition of Done:
+- замеры «до» сняты и записаны: документы в окне, строки `marketplace_sales`;
+- один кабинет перезалит за один день, суммы сверены с независимым источником —
+  `ingest_financial_transactions` за тот же день;
+- расхождение объяснено до массового перезалива, а не после;
+- исключено: массовый перезалив без сверки на одном кабинете.
+Work items:
+- 4.1 — сверочный запрос Marketplace против Ingestion за день
+- 4.2 — перезалив одного кабинета за один день, сверка
+- 4.3 — перезалив 08.09 и далее по всем кабинетам
+Stage checks:
+- read-only сверка через `codex-psql-ro`
+Reviewer focus:
+- совпадение сумм с Ingestion; отсутствие дублей после повторного прогона
+
+## Открытые вопросы Владельцу
+
+- Крон в 04:00 до починки каждую ночь кладёт 56 сообщений в `failed`.
+  Комментировать ли легаси-строку в `docker/cron/app.cron` на время работ —
+  это правка production config, отдельное одобрение по `AGENTS.md` §3.3.
+- 56 сообщений, уже лежащих в `failed`: оставить как опись для Stage 4 или снести.
