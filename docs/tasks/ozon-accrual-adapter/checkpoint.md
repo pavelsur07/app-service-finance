@@ -10,6 +10,12 @@
   установлено, что значений всего два, `sale` и `return`. Это внутренний домен,
   не `operation_type` из API Ozon — пользовательские маппинги P&L миграцию
   переживают, правок не требуют.
+- План перестроен на 5 Stage по требованию Владельца «старые записи — старым
+  обработчиком, новые загрузки — новым»: добавлен Stage 3 (сосуществование
+  форматов через `apiEndpoint` → `$kind` реестра), `OzonAdapter` на месте не
+  переписывается. Дискриминатор проверен на PROD: 967 легаси-документов Ozon
+  несут `ozon::v3/finance/transaction/list`, у WB на одном `document_type` уже
+  живут два формата — прецедент есть.
 - 1.1 — `site/bin/capture-ozon-accrual.sh`: снимает `/v1/finance/accrual/types`,
   `/v1/finance/accrual/by-day` (пагинация по `last_id`) и
   `/v1/finance/accrual/postings`, пишет манифест `_meta-accrual.json`.

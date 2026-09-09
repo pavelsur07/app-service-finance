@@ -36,6 +36,29 @@ posting.products[]
 `operation_type` из API Ozon. Существующие пользовательские маппинги P&L
 миграцию переживают и правок не требуют.
 
+## Требование сосуществования форматов
+
+Старые записи обрабатываются старым обработчиком, новые загрузки — новым.
+`OzonAdapter` не переписывается на месте: 967 существующих документов с
+`api_endpoint = ozon::v3/finance/transaction/list` (01.01–07.09.2026) обязаны
+остаться обрабатываемыми, иначе `ReprocessMarketplaceCommand` и
+`OzonMonthRawRefreshCommand` перестанут работать по истории.
+
+Дискриминатор уже существует и уже заполнен: `MarketplaceRawDocument.apiEndpoint`.
+Реестр `MarketplaceRawProcessorRegistry::get($type, $marketplace, $kind)` третий
+аргумент принимает, но `ProcessMarketplaceRawDocumentAction` сейчас его не
+передаёт — сюда и встраивается выбор формата.
+
+Прецедент в проекте уже есть: у Wildberries на одном `document_type = sales_report`
+живут два формата — `wildberries::reportDetailByPeriod` (до 14.05.2026) и
+`wildberries::finance-sales-reports-detailed` (текущий). Идём тем же путём.
+
+Ловушка, которую обязан проверить ревьюер: `supports()` у существующих
+Ozon-процессоров возвращает `true` для `StagingRecordType::SALE` и `OZON`
+независимо от `$kind`, а реестр берёт **первое** совпадение. Пока оба процессора
+не станут явно различать формат, новый будет затенён старым в зависимости от
+порядка сервисов в контейнере.
+
 ## Stage 1: реальная выгрузка by-day как основа контракта
 Risk: LOW
 stage_base_commit: <записать перед первым Work item>
@@ -82,36 +105,60 @@ Reviewer focus:
 - не протёк ли импорт `Application/`/`Service/` Ingestion мимо Facade
 - поведение на неизвестном `type_id`
 
-## Stage 3: OzonAdapter на by-day
+## Stage 3: сосуществование форматов в конвейере обработки
 Risk: HIGH-LOCAL
 stage_base_commit: <записать перед первым Work item>
 Definition of Done:
-- `OzonAdapter::fetchRawReport/fetchSales/fetchCosts/fetchReturns` работают на
-  `/v1/finance/accrual/by-day`, `authenticate()` — на живом эндпоинте;
+- формат документа выводится из `MarketplaceRawDocument.apiEndpoint` и передаётся
+  в реестр процессоров как `$kind`;
+- существующие Ozon-процессоры явно заявляют легаси-формат в `supports()`;
+  затенения по порядку сервисов не остаётся;
+- регрессионный тест: документ с `ozon::v3/finance/transaction/list`
+  обрабатывается тем же процессором, что и до правки, с тем же результатом;
+- поведение WB не меняется ни на одном из двух её форматов;
+- исключено: новые процессоры Ozon и любые правки `OzonAdapter` — только каркас.
+Work items:
+- 3.1 — вывод формата из `apiEndpoint`, передача в `registry->get()`
+- 3.2 — явный `supports()` по формату у существующих Ozon-процессоров
+- 3.3 — регрессионные тесты на легаси-документах, включая оба формата WB
+Stage checks:
+- `make site-test`, `make site-stan`, `make site-cs-check`
+Reviewer focus:
+- затенение процессоров порядком в контейнере
+- документ с неизвестным `apiEndpoint`: внятная ошибка, а не молчаливый пропуск
+
+## Stage 4: новый путь загрузки и обработки by-day
+Risk: HIGH-LOCAL
+stage_base_commit: <записать перед первым Work item>
+Definition of Done:
+- клиент `/v1/finance/accrual/by-day` и загрузчик пишут документы с
+  `api_endpoint = ozon::v1/finance/accrual/by-day`;
+- новые процессоры продаж, затрат и возвратов работают на by-day; затраты
+  классифицируются через Facade из Stage 2;
 - ключ дедупа `MarketplaceStaging.externalId` — составной из `accrual_id`,
   индекса товара и `type_id` услуги; повторный прогон дня дублей не создаёт;
-- затраты классифицируются через Facade из Stage 2, а не подстроками по имени;
 - тесты на фикстуре из Stage 1: продажа, комиссия, услуга, возврат, пустой день,
   повторный прогон;
 - `OzonTransactionTotalsClient` (`/v3/finance/transaction/totals`, мёртвый код,
   снят Ozon тем же решением) удалён вместе со своим тестом;
-- исключено: изменение формы `SaleData`/`CostData`/`ReturnData`, если Stage 1 не
-  докажет, что без этого нельзя.
+- старый путь остаётся рабочим на старых документах — проверяется тестом;
+- исключено: удаление легаси-процессоров и legacy-кода `OzonAdapter`.
 Work items:
-- 3.1 — клиент нового эндпоинта в `Infrastructure/Api/Ozon/`
-- 3.2 — `fetchRawReport` + составной ключ дедупа
-- 3.3 — `fetchSales`
-- 3.4 — `fetchCosts` через Facade-справочник
-- 3.5 — `fetchReturns`
-- 3.6 — `authenticate`, удаление мёртвого кода
+- 4.1 — клиент нового эндпоинта в `Infrastructure/Api/Ozon/`
+- 4.2 — загрузчик: документ с новым `api_endpoint`, составной ключ дедупа
+- 4.3 — процессор продаж
+- 4.4 — процессор затрат через Facade-справочник
+- 4.5 — процессор возвратов
+- 4.6 — удаление мёртвого `OzonTransactionTotalsClient`
 Stage checks:
 - `make site-test`, `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`
 Reviewer focus:
 - идемпотентность повторного прогона дня
 - знаки сумм: by-day отдаёт расходы отрицательными, легаси DTO ждёт положительные
 - company scope во всех новых запросах
+- что легаси-путь не задет ни одной строкой
 
-## Stage 4: восстановление истории и сверка
+## Stage 5: восстановление истории и сверка
 Risk: HIGH-LOCAL
 stage_base_commit: <записать перед первым Work item>
 Definition of Done:
@@ -121,9 +168,9 @@ Definition of Done:
 - расхождение объяснено до массового перезалива, а не после;
 - исключено: массовый перезалив без сверки на одном кабинете.
 Work items:
-- 4.1 — сверочный запрос Marketplace против Ingestion за день
-- 4.2 — перезалив одного кабинета за один день, сверка
-- 4.3 — перезалив 08.09 и далее по всем кабинетам
+- 5.1 — сверочный запрос Marketplace против Ingestion за день
+- 5.2 — перезалив одного кабинета за один день, сверка
+- 5.3 — перезалив 08.09 и далее по всем кабинетам
 Stage checks:
 - read-only сверка через `codex-psql-ro`
 Reviewer focus:
