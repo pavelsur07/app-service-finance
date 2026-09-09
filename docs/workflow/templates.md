@@ -103,6 +103,17 @@ Backend и frontend — в разных Stage.
 - continue to Stage <N+1> automatically | handoff
 ```
 
+### Фронтовый Stage — отличия
+
+Чеклист перед заполнением — `docs/workflow/stage-report-frontend.md`. В блоке
+Checks перечислять реально существующие команды: `npm run lint`,
+`npm run build`, `npm run check:ui-kit`, `npm run check:uikit-react-mapping`,
+при изменении контракта `npm run api:types:check`. Скриптов `typecheck` и
+`test` в проекте нет, их прогон не заявлять. Вместо автотестов записать, что
+именно проверено ручным smoke. Дополнительно указать новые Vite entry и точки
+монтирования, изменения UI Kit с записью в CHANGELOG и размер бандла до и
+после.
+
 ## handoff.md
 
 ```md

@@ -16,6 +16,7 @@
 | `docs/workflow/external-review.md` | Внешнее ревью: скрипт, промпт, сбои | Перед вызовом второго агента |
 | `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP | Large-задача |
 | `docs/workflow/stage-report.md` | Репозиторный self-review checklist Stage | Закрытие Stage |
+| `docs/workflow/stage-report-frontend.md` | Фронтовый self-review checklist Stage | Закрытие фронтового Stage |
 | `docs/workflow/git-housekeeping.md` | База PR, удаление веток | `gh pr create`, удаление ветки |
 | `docs/workflow/data-migrations.md` | Миграции данных: замеры, слияния, сверка после прода | Миграция с данными |
 | `docs/workflow/health-gates.md` | Мониторы и гейты: охват проверки = охват починки | Cron-проверка, верификатор |

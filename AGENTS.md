@@ -11,6 +11,7 @@ start of a task. Everything not here lives in a linked document:
 | `docs/workflow/external-review.md` | External review: script, prompt, failure handling |
 | `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message |
 | `docs/workflow/stage-report.md` | Repository-specific Stage self-review checklist |
+| `docs/workflow/stage-report-frontend.md` | Frontend Stage self-review checklist |
 | `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion |
 | `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists |
 

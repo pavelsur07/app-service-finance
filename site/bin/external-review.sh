@@ -27,9 +27,11 @@
 #       выводе; повторить один раз после исправления, дальше — STOP
 #
 # В дифф попадают только site/src, site/tests, site/config, site/migrations,
-# site/templates, site/assets — то, что меняет поведение. Документация,
-# lock-файлы, фикстуры и снапшоты ревьюеру не показываются. Сравнение идёт с
-# рабочим деревом, поэтому незакоммиченные и новые файлы тоже входят.
+# site/templates, site/assets, site/bin, site/tools — то, что меняет поведение
+# приложения или оснастки. Документация, lock-файлы, фикстуры и снапшоты
+# ревьюеру не показываются. Сравнение идёт с рабочим деревом, поэтому
+# незакоммиченные и новые файлы тоже входят, включая посторонние untracked-файлы
+# в тех же путях: находки по ним отклоняются как out-of-scope.
 
 set -euo pipefail
 
@@ -83,7 +85,7 @@ base_full=$(git rev-parse "$base")
 [ -n "$out_dir" ] || out_dir="site/var/external-review/${base_full:0:8}"
 mkdir -p "$out_dir"
 
-paths=(site/src site/tests site/config site/migrations site/templates site/assets)
+paths=(site/src site/tests site/config site/migrations site/templates site/assets site/bin site/tools)
 excludes=(':(exclude)**/*.lock' ':(exclude)**/__snapshots__/**' ':(exclude)**/Fixtures/**' ':(exclude)**/fixtures/**')
 
 diff_file="$out_dir/diff.patch"
@@ -121,8 +123,9 @@ consult only the sections the diff touches.
 
 Skip everything the machine gates already enforce: code style and formatting,
 declare(strict_types=1), module boundaries, missing companyId parameters in
-Repository signatures, debug calls. Those are caught by PHP CS Fixer, PHPStan
-and the architecture tests; reporting them wastes the round.
+Repository signatures, debug calls, and CSS classes that do not exist in the UI
+Kit. Those are caught by PHP CS Fixer, PHPStan, the architecture tests and
+npm run check:ui-kit; reporting them wastes the round.
 
 Check, only where relevant to this diff:
 - scope compliance against the task;
@@ -134,6 +137,8 @@ Check, only where relevant to this diff:
 - migrations: indexes on new foreign keys, nullable/default, locks, data safety;
 - N+1 and unbounded lists;
 - test quality: does the test assert behavior, would it fail on the old code;
+- frontend: loading, empty and error states; escaping of Twig data-* attributes;
+  hardcoded colors instead of UI Kit tokens; raw fetch instead of the api client;
 - secrets, PII, unnecessary complexity.
 
 Report only BLOCKER and IMPORTANT findings, plus MINOR findings that are
