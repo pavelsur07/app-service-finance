@@ -14,6 +14,7 @@
 #   bin/capture-ozon-accrual.sh --date 2026-09-08 --pages 1        # только первая страница
 #   bin/capture-ozon-accrual.sh --date 2026-09-08 --no-postings    # без детализации отправлений
 #   bin/capture-ozon-accrual.sh --date 2026-09-08 --pace 3          # реже стучать, если ловится 429
+#   bin/capture-ozon-accrual.sh --from 2026-08-01 --to 2026-08-31   # месяц для сверки с «Реализацией»
 #
 # Ключи можно передать через окружение (OZON_CLIENT_ID / OZON_API_KEY) —
 # тогда они не попадут в history шелла.
@@ -28,6 +29,8 @@ BASE_URL="${OZON_BASE_URL:-https://api-seller.ozon.ru}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="${SCRIPT_DIR}/../tests/Fixtures/Marketplace/Ozon/captured"
 DATE=""
+DATE_FROM=""
+DATE_TO=""
 MAX_PAGES=0          # 0 = выгрузить всё
 WITH_POSTINGS=1
 POSTINGS_CHUNK=50    # сколько unit_number отдаём в /postings за раз
@@ -44,6 +47,8 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --date)         DATE="$2"; shift 2 ;;
+        --from)         DATE_FROM="$2"; shift 2 ;;
+        --to)           DATE_TO="$2"; shift 2 ;;
         --pages)        MAX_PAGES="$2"; shift 2 ;;
         --out)          OUT_DIR="$2"; shift 2 ;;
         --no-postings)  WITH_POSTINGS=0; shift ;;
@@ -57,9 +62,26 @@ done
 command -v jq   >/dev/null || { echo "Нужен jq"   >&2; exit 1; }
 command -v curl >/dev/null || { echo "Нужен curl" >&2; exit 1; }
 
-[[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
-    echo "--date обязателен и должен быть в формате YYYY-MM-DD" >&2; usage 1
-}
+# Либо один день, либо диапазон. by-day принимает ровно одну дату за вызов,
+# поэтому диапазон разворачивается в цикл по дням здесь, а не в запросе.
+if [[ -n "$DATE_FROM" || -n "$DATE_TO" ]]; then
+    [[ -n "$DATE_FROM" && -n "$DATE_TO" ]] || {
+        echo "--from и --to задаются только вместе" >&2; usage 1
+    }
+    [[ -z "$DATE" ]] || { echo "--date несовместим с --from/--to" >&2; usage 1; }
+    for d in "$DATE_FROM" "$DATE_TO"; do
+        [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+            echo "даты задаются в формате YYYY-MM-DD, получено: $d" >&2; usage 1
+        }
+    done
+    [[ "$DATE_FROM" > "$DATE_TO" ]] && { echo "--from позже --to" >&2; usage 1; }
+else
+    [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+        echo "нужен --date YYYY-MM-DD либо пара --from/--to" >&2; usage 1
+    }
+    DATE_FROM="$DATE"
+    DATE_TO="$DATE"
+fi
 
 if [[ -z "${OZON_CLIENT_ID:-}" ]]; then
     read -rp "Ozon Client-Id: " OZON_CLIENT_ID
@@ -89,13 +111,30 @@ ozon_post() {
 
     while :; do
         attempt=$((attempt + 1))
+        # Код curl забираем отдельно: под set -e сетевой сбой (exit 7, таймаут)
+        # убил бы скрипт прямо здесь, до разбора ошибки и до уборки. На прогоне
+        # в 31 день это означало бы обрыв в середине без внятного сообщения.
+        local curl_rc=0
         code="$(curl -sS -o "$out" -D "$hdr" -w '%{http_code}' \
             -X POST "${BASE_URL}${endpoint}" \
             -H "Client-Id: ${OZON_CLIENT_ID}" \
             -H "Api-Key: ${OZON_API_KEY}" \
             -H 'Content-Type: application/json' \
             --max-time 120 \
-            -d "$body")"
+            -d "$body")" || curl_rc=$?
+
+        if [[ "$curl_rc" -ne 0 ]]; then
+            if [[ "$attempt" -lt "$MAX_RETRIES" ]]; then
+                wait=$((RETRY_BASE_SECONDS * 2 ** (attempt - 1)))
+                [[ "$wait" -gt "$MAX_BACKOFF_SECONDS" ]] && wait="$MAX_BACKOFF_SECONDS"
+                echo "  … ${endpoint} → сбой соединения (curl ${curl_rc}), попытка ${attempt}/${MAX_RETRIES}, пауза ${wait}s" >&2
+                sleep "$wait"
+                continue
+            fi
+            echo "  ✗ ${endpoint} → соединение не установлено (curl ${curl_rc}) после ${attempt} попыток" >&2
+            rm -f "$out" "$hdr"
+            exit 1
+        fi
 
         if [[ "$code" == "200" ]]; then
             rm -f "$hdr"
@@ -138,26 +177,33 @@ echo
 pace
 
 # ── 2. /v1/finance/accrual/by-day — начисления за день, пагинация по last_id ──
-echo "2. POST /v1/finance/accrual/by-day (${DATE})"
-last_id=""
-page=0
+echo "2. POST /v1/finance/accrual/by-day (${DATE_FROM} … ${DATE_TO})"
 rows_total=0
+days=0
 : > "${OUT_DIR}/.unit-numbers"
+
+day="$DATE_FROM"
+while [[ "$day" < "$DATE_TO" || "$day" == "$DATE_TO" ]]; do
+    days=$((days + 1))
+    last_id=""
+    page=0
+    day_rows=0
 
 while :; do
     page=$((page + 1))
-    out="${OUT_DIR}/$(printf 'accrual-by-day.page-%02d.json' "$page")"
+    out="${OUT_DIR}/$(printf 'accrual-by-day.%s.page-%02d.json' "$day" "$page")"
 
     if [[ -n "$last_id" ]]; then
-        body="$(jq -nc --arg date "$DATE" --arg last_id "$last_id" '{date: $date, last_id: $last_id}')"
+        body="$(jq -nc --arg date "$day" --arg last_id "$last_id" '{date: $date, last_id: $last_id}')"
     else
-        body="$(jq -nc --arg date "$DATE" '{date: $date}')"
+        body="$(jq -nc --arg date "$day" '{date: $date}')"
     fi
     ozon_post /v1/finance/accrual/by-day "$body" "$out"
 
     count="$(jq '[.accruals // [] | .[]] | length' "$out")"
     last_id="$(jq -r '.last_id // ""' "$out")"
     rows_total=$((rows_total + count))
+    day_rows=$((day_rows + count))
 
     # В /postings уходят только номера отправлений. unit_number несёт их лишь у
     # accrued_category = POSTING; у ITEM и NON_ITEM там идентификаторы другой
@@ -168,13 +214,19 @@ while :; do
             | select(test("^[0-9]{1,32}-[0-9]{1,32}-[0-9]{1,32}$"))] | .[]' "$out" \
         >> "${OUT_DIR}/.unit-numbers" 2>/dev/null || true
 
-    echo "   страница ${page}: ${count} начислений → $(basename "$out")"
+    [[ "$count" -eq 0 && "$page" -eq 1 ]] && rm -f "$out"
 
     [[ "$count" -eq 0 || -z "$last_id" ]] && break
     [[ "$MAX_PAGES" -gt 0 && "$page" -ge "$MAX_PAGES" ]] && break
     pace
 done
-pace
+
+    echo "   ${day}: ${day_rows} начислений, страниц ${page}"
+    day="$(date -u -d "$day +1 day" +%Y-%m-%d)"
+    pace
+done
+echo "   итого за ${days} дн.: ${rows_total} начислений"
+echo
 echo
 
 # ── 3. /v1/finance/accrual/postings — детализация отправлений ──
@@ -199,13 +251,15 @@ fi
 jq -n \
     --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg base_url "$BASE_URL" \
-    --arg date "$DATE" \
+    --arg date_from "$DATE_FROM" \
+    --arg date_to "$DATE_TO" \
     --argjson rows "$rows_total" \
     --argjson types "$types_count" \
     --argjson postings "$postings_count" \
-    --argjson pages "$page" \
-    '{captured_at: $captured_at, base_url: $base_url, business_date: $date,
-      accrual_rows: $rows, accrual_pages: $pages, service_types: $types,
+    --argjson days "$days" \
+    '{captured_at: $captured_at, base_url: $base_url,
+      business_date_from: $date_from, business_date_to: $date_to,
+      accrual_rows: $rows, days: $days, service_types: $types,
       postings_requested: $postings,
       endpoints: ["/v1/finance/accrual/types", "/v1/finance/accrual/by-day"]
                  + (if $postings > 0 then ["/v1/finance/accrual/postings"] else [] end)}' \
