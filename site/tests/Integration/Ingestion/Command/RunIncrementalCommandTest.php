@@ -13,6 +13,7 @@ use App\Ingestion\Enum\SyncJobKind;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\IngestCursorRepository;
+use App\Marketplace\Application\RecordConnectionAuthResultAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -50,6 +51,65 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
 
         self::assertNotNull($cursor);
         self::assertSame('2026-06-18', $cursor->getCursorValue());
+    }
+
+    /**
+     * Главная регрессия задачи: крон перестаёт ставить задания по подключению,
+     * чей ключ маркетплейс отверг.
+     *
+     * До этого он ставил два задания в час бесконечно, каждое падало в
+     * failed-очередь, и за сутки набегало полсотни сообщений — повтор по
+     * мёртвому ключу не лечится ретраем.
+     */
+    public function testDoesNotDispatchForConnectionWithRejectedApiKey(): void
+    {
+        $company = $this->seedCompany(1301);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001301');
+        $this->seedCursor((string) $company->getId(), $connection->getId(), 'ozon_seller_daily_report', 'legacy-shop', '2026-06-18');
+
+        $recordAuthResult = self::getContainer()->get(RecordConnectionAuthResultAction::class);
+        for ($i = 0; $i < RecordConnectionAuthResultAction::AUTH_FAILURE_THRESHOLD; ++$i) {
+            $recordAuthResult->recordFailure((string) $company->getId(), $connection->getId());
+        }
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $exit = $tester->execute(['--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame(0, $this->incrementalJobCount((string) $company->getId()), 'Заданий по сломанному ключу быть не должно');
+        self::assertCount(0, $transport->getSent());
+    }
+
+    /**
+     * Обратная сторона: здоровое подключение продолжает обходиться. Без этой
+     * проверки фильтр, отсекающий вообще всё, выглядел бы рабочим.
+     */
+    public function testStillDispatchesForHealthyConnectionAlongsideBrokenOne(): void
+    {
+        $healthyCompany = $this->seedCompany(1302);
+        $healthyConnection = $this->seedConnection($healthyCompany, '77777777-7777-7777-7777-000000001302');
+        $this->seedCursor((string) $healthyCompany->getId(), $healthyConnection->getId(), 'ozon_seller_daily_report', 'legacy-shop', '2026-06-18');
+
+        $brokenCompany = $this->seedCompany(1303);
+        $brokenConnection = $this->seedConnection($brokenCompany, '77777777-7777-7777-7777-000000001303');
+        $this->seedCursor((string) $brokenCompany->getId(), $brokenConnection->getId(), 'ozon_seller_daily_report', 'legacy-shop', '2026-06-18');
+
+        $recordAuthResult = self::getContainer()->get(RecordConnectionAuthResultAction::class);
+        for ($i = 0; $i < RecordConnectionAuthResultAction::AUTH_FAILURE_THRESHOLD; ++$i) {
+            $recordAuthResult->recordFailure((string) $brokenCompany->getId(), $brokenConnection->getId());
+        }
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        $tester->execute(['--resource' => OzonResourceType::ACCRUAL_BY_DAY]);
+
+        self::assertSame(1, $this->incrementalJobCount((string) $healthyCompany->getId()));
+        self::assertSame(0, $this->incrementalJobCount((string) $brokenCompany->getId()));
     }
 
     public function testSeedsAccrualCursorFromFirstDayOfCurrentMonthWithoutLegacyCursor(): void

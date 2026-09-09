@@ -124,7 +124,11 @@ final class RunIncrementalCommand extends Command
             return Command::SUCCESS;
         }
 
-        $connections = $this->connectionsQuery->execute();
+        // Подключения со сломанным ключом сюда не попадают: повтор по мёртвому
+        // ключу не лечится ретраем, а каждая попытка оставляет сообщение в
+        // failed-очереди. Возврат — автоматический, как только ключ обновят
+        // через форму подключения.
+        $connections = $this->connectionsQuery->executeSyncable();
         $eligibleWork = [];
         $dispatched = 0;
         $skippedWithoutCursor = 0;

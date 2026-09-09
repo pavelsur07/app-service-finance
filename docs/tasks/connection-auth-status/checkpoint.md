@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 1
+**Phase:** Stage 2
 **Status:** done
-**Stage base commit:** `a1330be1`
+**Stage base commit:** `804c40fb` (Stage 1 — `a1330be1`)
 
 ### Completed
 
@@ -17,6 +17,11 @@
   `MarketplaceConnectionRepository::findByIdAndCompanyId`
 - 1.5 — 4 unit-теста на политику Action, 9 интеграционных тестов на машину
   состояний и изоляцию компаний на живой БД
+- 2.1 — запись исхода из `RunSyncChunkHandler` через `MarketplaceFacade`
+- 2.2 — `executeSyncable()`; переключён только `RunIncrementalCommand`
+- 2.3 — снятие состояния при обновлении ключа, одной транзакцией с ключом
+- 2.4 — `warning` на отказ, один `error` на переходе
+- 2.5 — 4 теста обработчика, 2 теста команды крона, 2 теста выборки, 1 функциональный
 - `ARCHITECTURE.md` — поля сущности и методы фасада описаны
 
 ### Checks and baseline
@@ -26,8 +31,10 @@
 - после Stage 1: cs-check `Found 0 of 2494`, cs-strict-types `Found 0 of 2494`,
   stan `No errors`, unit 2353 / 12070 / 4
 - `ConnectionAuthStateTest` — 9 тестов, 43 утверждения, зелёный
-- интеграционный набор целиком — 1286 тестов, 5897 утверждений, зелёный (первый
-  прогон дал 142 ошибки `predis` из-за не поднятого `site-redis`)
+- после Stage 2: cs-check и strict-types `Found 0 of 2496`, stan `No errors`,
+  unit 2353 / 12070 / 4
+- интеграционный набор целиком — 1294 теста, 5928 утверждений, зелёный
+- функциональный `UpdateMarketplaceConnectionApiKeyControllerTest` — 25 / 100
 - миграция применена и откачена на тестовой БД; `down()` — 4 оператора
 - `doctrine:schema:validate`: маппинг корректен; расхождение
   `ALTER connection_type DROP DEFAULT` проверено откатом — предсуществующее
@@ -35,18 +42,19 @@
 
 ### Review status
 
-- internal: iteration 2, открытых нет
-- external: раундов 2, открытых BLOCKER/IMPORTANT нет. Раунд 1 — две IMPORTANT
-  (закрытый EntityManager, гонка), обе исправлены переходом на атомарный
-  оператор. Раунд 2 — MINOR (мёртвый метод) исправлена; IMPORTANT про
-  регрессионный тест на гонку вынесена в FOLLOW-UP с причиной, см. Stage Report
+- internal: Stage 1 — 2 итерации; Stage 2 — 2 итерации (найден ложный алерт на
+  каждом успешном чанке, исправлен предохранителем `Uuid::isValid`)
+- external: Stage 1 — 2 раунда; Stage 2 — 1 раунд, четыре IMPORTANT, все
+  подтверждены и закрыты. Открытых BLOCKER/IMPORTANT нет. Единственное
+  отложенное — FOLLOW-UP про регрессионный тест на гонку из Stage 1
 
 ### Exact next action
 
-Stage 1 закрыт. Дальше Stage 2: запись исхода из `RunSyncChunkHandler`,
-`executeSyncable()` в `ActiveSellerConnectionsQuery` с переключением только
-`RunIncrementalCommand`, снятие состояния в
-`UpdateMarketplaceConnectionApiKeyController`.
+Stage 2 закрыт, цикл замкнут. Дальше Stage 3: пилюля и кнопка «Обновить ключ» в
+строке подключения (`templates/marketplace/connections.html.twig`, условие
+`has_connection_error` сейчас требует `not isActive`), блок «Интеграции» на
+дашборде (`templates/home/dashboard.html.twig` через `HomeController`),
+разметка Tabler, тексты без HTTP-кодов и фрагментов ключа.
 
 ### Files to inspect first on resume
 
