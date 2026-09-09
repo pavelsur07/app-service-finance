@@ -122,6 +122,12 @@ case "$cmd" in
       echo "Both --from=YYYY-MM-DD and --to=YYYY-MM-DD are required for $cmd" >&2; exit 2
     fi
     ;;
+  app:inventory:unmapped-stock-check)
+    # Read-only гейт расхождений «остаток есть, карточки в каталоге нет».
+    # Аргументы запрещены: --window-days нужен только для ручного разбора, а для
+    # регулярного прогона строгий запрет проще и надёжнее проверки формы.
+    if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 
