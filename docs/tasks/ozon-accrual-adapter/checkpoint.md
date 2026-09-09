@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / Work item 1.4
-**Status:** implementing — сверка пройдена, осталась обезличенная фикстура
+**Phase:** Stage 1 закрыт, стадии 2–5 — отдельная ветка
+**Status:** done для этой ветки — Phase 0 и Stage 1 завершены
 **Stage base commit:** <записать перед 1.3, код ещё не менялся>
 
 ### Completed
@@ -26,6 +26,11 @@
 - Исправлены дефекты скрипта, найденные боевым прогоном: обработка 429 и
   фильтрация `unit_number` для `/postings` (Ozon рушит весь батч из-за одного
   элемента не по формату; у ITEM/NON_ITEM там не номера отправлений).
+- 1.5 — сверка за июнь пройдена: продажи и возвраты сходятся с «Реализацией»
+  до копейки, расхождение счётчиков объяснено нулевыми ценами.
+- 1.4 — обезличенные фикстуры `accrual_by_day_cases.json` (5 кейсов) и
+  `accrual_types.json` (4 использованных типа). Проверено: ни один
+  идентификатор фикстуры не встречается в снимке продавца.
 - 1.1 — `site/bin/capture-ozon-accrual.sh`: снимает `/v1/finance/accrual/types`,
   `/v1/finance/accrual/by-day` (пагинация по `last_id`) и
   `/v1/finance/accrual/postings`, пишет манифест `_meta-accrual.json`.
@@ -43,9 +48,10 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- 1.4 — сокращённая обезличенная фикстура в `tests/Fixtures/Marketplace/Ozon/`
-  на четыре кейса: продажа, возврат (POSTING с отрицательным sale_amount),
-  POSTING без выручки, ITEM/NON_ITEM. Затем Stage 2.
+- Эта ветка закрывает Phase 0 и Stage 1 и уходит в merge. Стадии 2–5 ведутся
+  отдельной веткой по указанию Владельца от 09.09.2026.
+- Первое действие в новой ветке — Stage 2: read-only метод `IngestionFacade`
+  для разрешения `type_id` в категорию затрат, плюс `ARCHITECTURE.md`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»
