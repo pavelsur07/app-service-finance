@@ -6,6 +6,7 @@ namespace App\Marketplace\Repository;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Enum\MarketplaceConnectionAuthStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -101,6 +102,95 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
             ->setParameter('active', true)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Отказ аутентификации: один атомарный оператор вместо чтения, правки и
+     * flush.
+     *
+     * Так, а не через сущность, по двум причинам, и обе обязательные.
+     *
+     * Первая — закрытый EntityManager. Doctrine закрывает менеджер в `finally`
+     * при неудачном flush (UnitOfWork::commit). Вызов идёт из обработчика,
+     * который уже обрабатывает ошибку API и продолжает работу с тем же
+     * менеджером: проглоченный сбой flush оставил бы ему мёртвый EM, и
+     * настоящая причина — протухший ключ — утонула бы в каскаде
+     * `EntityManagerClosed`.
+     *
+     * Вторая — гонка. Чтение-правка-запись без блокировки позволяет двум
+     * параллельным отказам прочитать один и тот же счётчик и записать
+     * одинаковое значение, из-за чего порог не достигается никогда, а признак
+     * перехода теряется. Инкремент внутри UPDATE атомарен по определению.
+     *
+     * `company_id` в WHERE — обязательная часть, а не украшение: идентификатор
+     * подключения приходит из очереди, и без проверки владельца чужое задание
+     * останавливало бы загрузку соседней компании.
+     *
+     * @return bool true — подключение ТОЛЬКО ЧТО перешло в FAILED. Счётчик
+     *              монотонно растёт, поэтому равенство порогу истинно ровно
+     *              один раз на серию
+     */
+    public function registerAuthFailure(string $connectionId, string $companyId, int $threshold, \DateTimeImmutable $now): bool
+    {
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'UPDATE marketplace_connections
+                SET auth_failure_count = auth_failure_count + 1,
+                    auth_failed_at = COALESCE(auth_failed_at, :now),
+                    auth_status = CASE WHEN auth_failure_count + 1 >= :threshold THEN :failed ELSE auth_status END,
+                    updated_at = :now
+              WHERE id = :connectionId
+                AND company_id = :companyId
+          RETURNING auth_failure_count',
+            [
+                'now' => $now->format('Y-m-d H:i:s'),
+                'threshold' => $threshold,
+                'failed' => MarketplaceConnectionAuthStatus::FAILED->value,
+                'connectionId' => $connectionId,
+                'companyId' => $companyId,
+            ],
+        );
+
+        return false !== $row && (int) $row['auth_failure_count'] === $threshold;
+    }
+
+    /**
+     * Успешная аутентификация: серия оборвана, состояние снимается целиком.
+     *
+     * Условие в WHERE делает оператор бесплатным для здорового подключения:
+     * успех приходит на каждом удачном обращении к API, и без него каждая
+     * синхронизация писала бы строку заново, двигая `updatedAt`.
+     *
+     * Прежний статус читается из самоприсоединения `FROM`: PostgreSQL отдаёт
+     * там снимок строки ДО обновления, а вызывающему нужно знать именно то,
+     * было ли подключение сломано, — по этому событию пишется запись о
+     * восстановлении.
+     *
+     * @return bool true — подключение ТОЛЬКО ЧТО восстановилось
+     */
+    public function registerAuthSuccess(string $connectionId, string $companyId, \DateTimeImmutable $now): bool
+    {
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'UPDATE marketplace_connections mc
+                SET auth_status = :ok,
+                    auth_failure_count = 0,
+                    auth_failed_at = NULL,
+                    updated_at = :now
+               FROM marketplace_connections previous
+              WHERE mc.id = previous.id
+                AND mc.id = :connectionId
+                AND mc.company_id = :companyId
+                AND (mc.auth_status <> :ok OR mc.auth_failure_count <> 0)
+          RETURNING previous.auth_status AS previous_status',
+            [
+                'ok' => MarketplaceConnectionAuthStatus::OK->value,
+                'now' => $now->format('Y-m-d H:i:s'),
+                'connectionId' => $connectionId,
+                'companyId' => $companyId,
+            ],
+        );
+
+        return false !== $row
+            && MarketplaceConnectionAuthStatus::FAILED->value === $row['previous_status'];
     }
 
     /**

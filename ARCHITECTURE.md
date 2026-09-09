@@ -518,7 +518,10 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 | `isActive` | `bool` | Активно ли подключение |
 | `lastSyncAt` | `?DateTimeImmutable` | — |
 | `lastSuccessfulSyncAt` | `?DateTimeImmutable` | — |
-| `lastSyncError` | `?string` | — |
+| `lastSyncError` | `?string` | Текст последней ошибки синхронизации; перезаписывается любой следующей ошибкой |
+| `authStatus` | `MarketplaceConnectionAuthStatus` | `OK` / `FAILED`. Ставит конвейер загрузки, а не Владелец: маркетплейс отзывает ключ молча. `FAILED` означает «ключ не принимается» и останавливает выборку крона |
+| `authFailedAt` | `?DateTimeImmutable` | Момент ПЕРВОГО отказа в текущей серии — дата, с которой данные перестали грузиться |
+| `authFailureCount` | `int` | Отказов аутентификации подряд; успех обнуляет. Порог перехода в `FAILED` — `RecordConnectionAuthResultAction::AUTH_FAILURE_THRESHOLD` (3) |
 | `settings` | `?array` | JSON с дополнительными настройками (напр. `project_direction_id`) |
 | `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
 
@@ -1376,6 +1379,17 @@ tagsForListings(string $companyId, array $listingIds): array
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php
+// Состояние аутентификации подключения. Точка входа для модуля Ingestion:
+// обработчик синхронизации узнаёт про 401/403 первым, но сущности чужого
+// модуля не трогает. Возвращают true, когда состояние ТОЛЬКО ЧТО
+// изменилось, — по этому событию пишется один агрегированный error.
+recordConnectorAuthFailure(string $companyId, string $connectionId): bool
+recordConnectorAuthSuccess(string $companyId, string $connectionId): bool
+
+// Подключения компании, чей ключ перестал приниматься (баннер в кабинете)
+// @return array{connectionId: string, marketplace: string, connectionType: string, authFailedAt: ?DateTimeImmutable}[]
+getBrokenConnections(string $companyId): array
+
 // Рекламные расходы по листингу и дате
 // @return AdvertisingCostDTO[]
 getAdvertisingCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array

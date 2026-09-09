@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\Application\RecordConnectionAuthResultAction;
 use App\Marketplace\Application\RefreshWbListingCatalogAction;
 use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
@@ -16,6 +17,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
+use App\Marketplace\Infrastructure\Query\BrokenConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
 use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
@@ -48,7 +50,67 @@ final readonly class MarketplaceFacade
         private ActiveOzonPerformanceConnectionsQuery $activeOzonPerformanceConnectionsQuery,
         private ActiveWbConnectionsQuery $activeWbConnectionsQuery,
         private RefreshWbListingCatalogAction $refreshWbListingCatalogAction,
+        private RecordConnectionAuthResultAction $recordConnectionAuthResultAction,
+        private BrokenConnectionsQuery $brokenConnectionsQuery,
     ) {
+    }
+
+    /**
+     * Отметить, что маркетплейс отверг ключ подключения.
+     *
+     * Точка входа для модуля Ingestion: обработчик синхронизации знает про
+     * 401/403 первым, но не имеет права трогать сущности чужого модуля.
+     *
+     * @return bool true — подключение ТОЛЬКО ЧТО перешло в состояние
+     *              «ключ не принимается»; вызывающий пишет по этому событию
+     *              один агрегированный `error`, а не по каждому отказу
+     */
+    public function recordConnectorAuthFailure(string $companyId, string $connectionId): bool
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+
+        return $this->recordConnectionAuthResultAction->recordFailure($companyId, $connectionId);
+    }
+
+    /**
+     * Отметить успешное обращение к API: серия отказов оборвана.
+     *
+     * @return bool true — подключение ТОЛЬКО ЧТО восстановилось
+     */
+    public function recordConnectorAuthSuccess(string $companyId, string $connectionId): bool
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+
+        return $this->recordConnectionAuthResultAction->recordSuccess($companyId, $connectionId);
+    }
+
+    /**
+     * Подключения компании, чей ключ перестал приниматься.
+     *
+     * @return array<int, array{
+     *     connectionId: string,
+     *     marketplace: string,
+     *     connectionType: string,
+     *     authFailedAt: ?\DateTimeImmutable
+     * }>
+     */
+    public function getBrokenConnections(string $companyId): array
+    {
+        Assert::uuid($companyId);
+
+        return array_map(
+            static fn (array $row): array => [
+                'connectionId' => $row['id'],
+                'marketplace' => $row['marketplace'],
+                'connectionType' => $row['connection_type'],
+                'authFailedAt' => null === $row['auth_failed_at']
+                    ? null
+                    : new \DateTimeImmutable($row['auth_failed_at']),
+            ],
+            $this->brokenConnectionsQuery->execute($companyId),
+        );
     }
 
     /**
