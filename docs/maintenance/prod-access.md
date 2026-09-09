@@ -73,6 +73,20 @@ docker compose -f <compose> run --rm --no-deps -T site-php-cli bin/console <cmd>
 `docs/maintenance/codex-cgroup.sh`. Они не применяются автоматически: файлы на проде
 обновляет только Владелец, он же правит sudoers.
 
+Правка, сделанная сразу на проде, обязана вернуться в референсную копию тем же
+днём. Иначе копия отстаёт молча, и следующая установка её поверх **снимает**
+разрешения, добавленные в обход: так 09.09.2026 из-под установки чуть не выпал
+`app:inventory:unmapped-stock-check`, живший на проде с 07.09 и в репозиторий не
+попавший. Перед установкой всегда сверять, а не накатывать вслепую:
+
+```bash
+scp docs/maintenance/codex-console.sh vf-prod:/tmp/codex-console.new
+ssh vf-prod 'diff -u /usr/local/bin/codex-console /tmp/codex-console.new'
+```
+
+Расхождение где-либо, кроме намеренно добавляемого блока, — сигнал сначала
+починить копию.
+
 ## Ручная диагностика Владельца
 
 Provisioner `./provision-vf-prod-deploy.sh` запускает только Владелец с машины,
