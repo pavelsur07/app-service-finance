@@ -130,7 +130,9 @@ pace() { sleep "$PACE_SECONDS"; }
 # Снимается первым: без него type_id в by-day не читаются глазами.
 echo "1. POST /v1/finance/accrual/types"
 ozon_post /v1/finance/accrual/types '{}' "${OUT_DIR}/accrual-types.json"
-types_count="$(jq '[.. | objects | select(has("type_id"))] | length' "${OUT_DIR}/accrual-types.json")"
+# Справочник отдаёт accrual_types[].id — именно id, а не type_id, которым на него
+# ссылается by-day. Расхождение имён проверено на выгрузке 08.09.2026.
+types_count="$(jq '[.accrual_types // [] | .[]] | length' "${OUT_DIR}/accrual-types.json")"
 echo "   услуг в справочнике: ${types_count} → accrual-types.json"
 echo
 pace
@@ -153,11 +155,17 @@ while :; do
     fi
     ozon_post /v1/finance/accrual/by-day "$body" "$out"
 
-    count="$(jq '[.result.rows // .result // .rows // []] | flatten | length' "$out")"
-    last_id="$(jq -r '.result.last_id // .last_id // ""' "$out")"
+    count="$(jq '[.accruals // [] | .[]] | length' "$out")"
+    last_id="$(jq -r '.last_id // ""' "$out")"
     rows_total=$((rows_total + count))
 
-    jq -r '[.. | objects | select(has("unit_number")) | .unit_number] | .[]' "$out" \
+    # В /postings уходят только номера отправлений. unit_number несёт их лишь у
+    # accrued_category = POSTING; у ITEM и NON_ITEM там идентификаторы другой
+    # формы, а иногда пусто, и Ozon отвергает весь запрос целиком с
+    # "value does not match regex pattern" — один чужой элемент рушит батч.
+    jq -r '[.accruals[]? | select(.accrued_category == "POSTING") | .unit_number
+            | select(. != null and . != "")
+            | select(test("^[0-9]{1,32}-[0-9]{1,32}-[0-9]{1,32}$"))] | .[]' "$out" \
         >> "${OUT_DIR}/.unit-numbers" 2>/dev/null || true
 
     echo "   страница ${page}: ${count} начислений → $(basename "$out")"

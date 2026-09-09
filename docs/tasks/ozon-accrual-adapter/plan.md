@@ -13,28 +13,78 @@ Baseline: `make site-test-unit` — 2356 тестов зелёные; `make site
 `make site-cs-check` / `make site-cs-strict-types` — 0 из 2497. Pre-existing:
 4 deprecations в unit-наборе, к задаче отношения не имеют.
 
-## Что известно и что нет
+## Контракт by-day: разобрано на реальной выгрузке
 
-Форма ответа зафиксирована в `tests/Unit/Ingestion/Application/Source/Ozon/OzonAccrualByDayMapperTest.php`
-и `tests/Integration/Ingestion/Fixtures/FakeOzonAccrualClient.php`:
+Источник: снимок за 08.09.2026, кабинет ИП Сухоносов, 342 начисления на одной
+странице (`last_id` пуст), справочник из 124 услуг. Рукописный сэмпл в тестах
+Ingestion форму передавал неполно — ниже то, что подтверждено данными.
 
 ```
-accrual_id, date, unit_number, accrued_category
-posting.products[]
-  ├─ sku, offer_id, name
-  ├─ commission.{sale_amount, commission, bonus}
-  └─ delivery.services[].{type_id, accrued:{amount,currency}}
+accruals[]
+  accrual_id, date, unit_number, accrued_category, total_amount
+  posting.delivery_schema
+  posting.products[].sku
+  posting.products[].commission.{sale_amount, sale_price, seller_price,
+                                 commission, sale_commission, commission_ratio,
+                                 bonus, coinvestment}
+  posting.products[].delivery.services[].{type_id, accrued}
+  posting.products[].delivery.total_accrued
+  item_fees.fees[].sku
+  item_fees.fees[].fees[].{type_id, accrued}
+  non_item_fee.{type_id, accrued}
+last_id
 ```
 
-Сэмпл рукописный и покрывает только `accrued_category = POSTING` с одной продажей.
-Не отвечает на: какие ещё значения принимает `accrued_category` и какое означает
-возврат; есть ли `quantity` в `posting.products[]`; полный список `type_id`.
-Поэтому Stage 1 — снятие реальной выгрузки, и только после него пишется код.
+**Три носителя сумм, а не один.** `accrued_category` ровно им и соответствует:
+POSTING (234), ITEM (101), NON_ITEM (7). Сэмпл Ingestion покрывал только POSTING,
+поэтому `item_fees` и `non_item_fee` из виду выпадали.
 
-Закрыто чтением PROD, гадать не нужно: `marketplace_sale_mappings.operation_type`
-принимает ровно два значения — `sale` и `return`. Это внутренний домен, а не
-`operation_type` из API Ozon. Существующие пользовательские маппинги P&L
-миграцию переживают и правок не требуют.
+**Возврат — это не отдельная категория.** Это POSTING с отрицательным
+`sale_amount` и комиссией обратного знака. За 08.09 такой ровно один: 42
+положительных `sale_amount` против 1 отрицательного, комиссия зеркально 1 плюс
+против 42 минусов. Ответ на открытый вопрос 1.
+
+**191 товар из 234 вообще не несёт `sale_amount`** — это POSTING без выручки,
+только логистика и услуги. Процессор продаж обязан их пропускать, а не заводить
+продажу с нулевой суммой.
+
+**Справочник и ссылка названы по-разному:** `accrual_types[].id` против
+`type_id` в by-day. Использовано 12 разных `type_id`, все 12 разрешаются
+справочником из 124 — очередь на ручной разбор в Stage 2 нужна, но на этих
+данных пуста. `type_id` встречается в трёх местах: `delivery.services` (276),
+`item_fees` (101), `non_item_fee` (7).
+
+**`unit_number` — номер отправления только у POSTING.** У ITEM и NON_ITEM там
+идентификаторы другой формы (двухчастные и одночастные), а два пустые. Из 342
+под формат номера отправления подходят 325. Ozon отвергает весь батч `/postings`
+целиком, если хоть один элемент не по формату — на этом и упал первый захват.
+
+### Открытый вопрос 2 — количество. Не решён, гадать нельзя
+
+`quantity` в выгрузке **отсутствует полностью**: 0 вхождений `quantity`, `qty`,
+`count`. `offer_id` и `name` тоже нет — из идентификаторов товара только `sku`
+(335 вхождений). Между тем `SaleData` требует `quantity` и `pricePerUnit`.
+
+Гипотеза «вывести как `sale_amount / sale_price`» проверена на выгрузке и
+**опровергнута**: у всех 43 пар отношение нецелое (1.84, 2.04, 2.13 … 3.38), и
+`seller_price` отличается от `sale_price` во всех 43 случаях. Значит `sale_price`
+не является ценой за единицу в нужном смысле.
+
+Кандидаты, по убыванию предпочтения:
+1. `/v1/finance/accrual/postings` — первый захват до него не дошёл из-за формата
+   `unit_number`; фильтр исправлен, нужен повторный запуск, чтобы посмотреть;
+2. заказы, уже загружаемые в Marketplace (`MarketplaceOrder`) — связка по
+   номеру отправления;
+3. отдельный вызов `/v3/posting/fbo/get` — лишний обход API, крайний вариант.
+
+До ответа Stage 4 начинать нельзя: `quantity` уходит в `marketplace_sales`,
+оттуда в закрытие месяца и ОПиУ.
+
+### Закрыто чтением PROD
+
+`marketplace_sale_mappings.operation_type` принимает ровно два значения — `sale`
+и `return`. Это внутренний домен, а не `operation_type` из API Ozon.
+Существующие пользовательские маппинги P&L миграцию переживают.
 
 ## Требование сосуществования форматов
 
