@@ -30,7 +30,12 @@
                         {% for connection in connections %}
                             {% set is_seller = connection.connectionType.value == 'seller' %}
                             {% set has_connection_error = connection.lastSyncError is not empty and not connection.isActive %}
-                            {% set can_manual_sync = is_seller and connection.isActive %}
+                            {# Ключ отверг сам маркетплейс. Отдельно от is_active:
+                               то выключает Владелец руками, это ставит конвейер. #}
+                            {% set has_auth_error = connection.authStatus.isFailed %}
+                            {# Ручная синхронизация по мёртвому ключу упадёт так же,
+                               как автоматическая: кнопка обязана быть недоступна. #}
+                            {% set can_manual_sync = is_seller and connection.isActive and not has_auth_error %}
                             <div class="list-group-item">
                                 <div class="row align-items-center">
                                     <div class="col-auto">
@@ -52,9 +57,14 @@
                                             <div class="d-block text-muted mt-1"
                                                  data-connection-id="{{ connection.id }}"
                                                  data-status-url="{{ path('marketplace_connection_status', {id: connection.id}) }}"
-                                                 data-synced="{{ connection.lastSyncAt or has_connection_error or not connection.isActive ? '1' : '0' }}"
+                                                 data-synced="{{ connection.lastSyncAt or has_connection_error or has_auth_error or not connection.isActive ? '1' : '0' }}"
                                                  id="connection-status-{{ connection.id }}">
-                                                {% if has_connection_error %}
+                                                {% if has_auth_error %}
+                                                    <small class="text-danger">
+                                                        Ключ не принимается{% if connection.authFailedAt %} с {{ connection.authFailedAt|date('d.m.Y') }}{% endif %}.
+                                                        Загрузка данных остановлена.
+                                                    </small>
+                                                {% elseif has_connection_error %}
                                                     <small class="text-danger">Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
                                                 {% elseif not connection.isActive %}
                                                     <small>Последняя синхронизация: —</small>
@@ -74,12 +84,19 @@
                                         {% endif %}
                                     </div>
                                     <div class="col-auto">
-                                        <span class="badge bg-{{ has_connection_error ? 'danger' : (connection.isActive ? 'success' : 'secondary') }}">
-                                            {{ has_connection_error ? 'Ошибка подключения' : (connection.isActive ? 'Активно' : 'Неактивно') }}
-                                        </span>
+                                        {% if has_auth_error %}
+                                            <span class="badge bg-danger">Ключ не принимается</span>
+                                        {% else %}
+                                            <span class="badge bg-{{ has_connection_error ? 'danger' : (connection.isActive ? 'success' : 'secondary') }}">
+                                                {{ has_connection_error ? 'Ошибка подключения' : (connection.isActive ? 'Активно' : 'Неактивно') }}
+                                            </span>
+                                        {% endif %}
                                     </div>
                                     <div class="col-auto">
                                         <div class="btn-list">
+                                            {% if has_auth_error %}
+                                                <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-danger">Обновить ключ</a>
+                                            {% endif %}
                                             <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
                                             <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" style="display:inline">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('test' ~ connection.id) }}">

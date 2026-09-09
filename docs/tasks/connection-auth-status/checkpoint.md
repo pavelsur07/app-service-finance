@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2
+**Phase:** handoff
 **Status:** done
-**Stage base commit:** `804c40fb` (Stage 1 — `a1330be1`)
+**Stage base commits:** Stage 1 `a1330be1`, Stage 2 `804c40fb`, Stage 3 `470a8bed`
 
 ### Completed
 
@@ -22,6 +22,11 @@
 - 2.3 — снятие состояния при обновлении ключа, одной транзакцией с ключом
 - 2.4 — `warning` на отказ, один `error` на переходе
 - 2.5 — 4 теста обработчика, 2 теста команды крона, 2 теста выборки, 1 функциональный
+- 3.1 — бейдж, строка с датой и кнопка «Обновить ключ» на странице подключений
+- 3.2 — блок «Загрузка данных остановлена» на дашборде
+- 3.3 — разметка Tabler, как на обеих страницах вокруг
+- 3.4 — тексты без HTTP-кодов и фрагментов ключа
+- серверный запрет ручной синхронизации по отвергнутому ключу (находка ревью)
 - `ARCHITECTURE.md` — поля сущности и методы фасада описаны
 
 ### Checks and baseline
@@ -35,6 +40,9 @@
   unit 2353 / 12070 / 4
 - интеграционный набор целиком — 1294 теста, 5928 утверждений, зелёный
 - функциональный `UpdateMarketplaceConnectionApiKeyControllerTest` — 25 / 100
+- после Stage 3: cs-check и strict-types `Found 0 of 2497`, stan `No errors`,
+  unit 2353 / 12070, интеграционный 1294 / 5928, функциональный 611 / 4993,
+  `lint:twig` зелёный
 - миграция применена и откачена на тестовой БД; `down()` — 4 оператора
 - `doctrine:schema:validate`: маппинг корректен; расхождение
   `ALTER connection_type DROP DEFAULT` проверено откатом — предсуществующее
@@ -44,17 +52,15 @@
 
 - internal: Stage 1 — 2 итерации; Stage 2 — 2 итерации (найден ложный алерт на
   каждом успешном чанке, исправлен предохранителем `Uuid::isValid`)
-- external: Stage 1 — 2 раунда; Stage 2 — 1 раунд, четыре IMPORTANT, все
-  подтверждены и закрыты. Открытых BLOCKER/IMPORTANT нет. Единственное
-  отложенное — FOLLOW-UP про регрессионный тест на гонку из Stage 1
+- external: Stage 1 — 2 раунда, Stage 2 — 1 раунд, Stage 3 — 1 раунд. Всего 10
+  находок: 8 исправлено, 1 отклонена с причиной (модульные права —
+  предсуществующее свойство страниц), 1 в FOLLOW-UP (регрессионный тест на
+  гонку). Открытых BLOCKER/IMPORTANT нет
 
 ### Exact next action
 
-Stage 2 закрыт, цикл замкнут. Дальше Stage 3: пилюля и кнопка «Обновить ключ» в
-строке подключения (`templates/marketplace/connections.html.twig`, условие
-`has_connection_error` сейчас требует `not isActive`), блок «Интеграции» на
-дашборде (`templates/home/dashboard.html.twig` через `HomeController`),
-разметка Tabler, тексты без HTTP-кодов и фрагментов ключа.
+Все три Stage закрыты. PR #2447 помечен Ready, ожидается решение Владельца
+«merge and deploy». Подробности — `handoff.md`.
 
 ### Files to inspect first on resume
 

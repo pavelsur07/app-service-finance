@@ -89,9 +89,14 @@ final readonly class MarketplaceFacade
     /**
      * Подключения компании, чей ключ перестал приниматься.
      *
+     * `marketplaceName` отдаётся вместе с кодом намеренно: читатели —
+     * Twig-шаблоны кабинета, и разворачивать enum в них значило бы тащить
+     * класс чужого модуля в разметку.
+     *
      * @return array<int, array{
      *     connectionId: string,
      *     marketplace: string,
+     *     marketplaceName: string,
      *     connectionType: string,
      *     authFailedAt: ?\DateTimeImmutable
      * }>
@@ -104,6 +109,7 @@ final readonly class MarketplaceFacade
             static fn (array $row): array => [
                 'connectionId' => $row['id'],
                 'marketplace' => $row['marketplace'],
+                'marketplaceName' => MarketplaceType::tryFrom($row['marketplace'])?->getDisplayName() ?? $row['marketplace'],
                 'connectionType' => $row['connection_type'],
                 'authFailedAt' => null === $row['auth_failed_at']
                     ? null

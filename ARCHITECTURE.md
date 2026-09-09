@@ -1387,7 +1387,7 @@ recordConnectorAuthFailure(string $companyId, string $connectionId): bool
 recordConnectorAuthSuccess(string $companyId, string $connectionId): bool
 
 // Подключения компании, чей ключ перестал приниматься (баннер в кабинете)
-// @return array{connectionId: string, marketplace: string, connectionType: string, authFailedAt: ?DateTimeImmutable}[]
+// @return array{connectionId: string, marketplace: string, marketplaceName: string, connectionType: string, authFailedAt: ?DateTimeImmutable}[]
 getBrokenConnections(string $companyId): array
 
 // Рекламные расходы по листингу и дате

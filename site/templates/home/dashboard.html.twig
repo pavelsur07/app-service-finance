@@ -16,6 +16,29 @@
   </div>
 
   <div class="container-xl">
+    {# Сломанный ключ виден с главной, а не только в настройках: пока он не
+       заменён, цифры ниже неполны, и об этом нужно сказать до того, как
+       пользователь начнёт по ним принимать решения. #}
+    {% if brokenConnections is not empty %}
+      <div class="alert alert-danger" role="alert">
+        <h4 class="alert-title">Загрузка данных остановлена</h4>
+        <div class="text-secondary">
+          {% for connection in brokenConnections %}
+            <div>
+              {{ connection.marketplaceName }}: ключ не принимается{% if connection.authFailedAt %} с {{ connection.authFailedAt|date('d.m.Y') }}{% endif %}.
+            </div>
+          {% endfor %}
+          <div class="mt-2">
+            Заказы и начисления по {{ brokenConnections|length == 1 ? 'этому кабинету' : 'этим кабинетам' }} не загружаются.
+            Обновите ключ, чтобы возобновить загрузку.
+          </div>
+        </div>
+        <div class="btn-list mt-3">
+          <a href="{{ path('marketplace_connections_index') }}" class="btn btn-danger">Перейти к подключениям</a>
+        </div>
+      </div>
+    {% endif %}
+
     <div id="react-dashboard-started" data-default-preset="month" data-default-currency="{{ cashCurrency.value }}"></div>
   </div>
 {% endblock %}
