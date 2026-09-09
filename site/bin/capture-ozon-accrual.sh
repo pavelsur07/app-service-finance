@@ -13,6 +13,7 @@
 #   OZON_CLIENT_ID=... OZON_API_KEY=... bin/capture-ozon-accrual.sh --date 2026-09-08
 #   bin/capture-ozon-accrual.sh --date 2026-09-08 --pages 1        # только первая страница
 #   bin/capture-ozon-accrual.sh --date 2026-09-08 --no-postings    # без детализации отправлений
+#   bin/capture-ozon-accrual.sh --date 2026-09-08 --pace 3          # реже стучать, если ловится 429
 #
 # Ключи можно передать через окружение (OZON_CLIENT_ID / OZON_API_KEY) —
 # тогда они не попадут в history шелла.
@@ -30,6 +31,10 @@ DATE=""
 MAX_PAGES=0          # 0 = выгрузить всё
 WITH_POSTINGS=1
 POSTINGS_CHUNK=50    # сколько unit_number отдаём в /postings за раз
+MAX_RETRIES=6        # попыток на один вызов при 429
+RETRY_BASE_SECONDS=5 # первая пауза; дальше удвоение
+MAX_BACKOFF_SECONDS=120  # потолок паузы, как DEFAULT_RETRY_AFTER_SECONDS в Ingestion
+PACE_SECONDS=1       # пауза между вызовами разных эндпоинтов
 
 usage() {
     sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -42,6 +47,8 @@ while [[ $# -gt 0 ]]; do
         --pages)        MAX_PAGES="$2"; shift 2 ;;
         --out)          OUT_DIR="$2"; shift 2 ;;
         --no-postings)  WITH_POSTINGS=0; shift ;;
+        --pace)         PACE_SECONDS="$2"; shift 2 ;;
+        --retries)      MAX_RETRIES="$2"; shift 2 ;;
         -h|--help)      usage 0 ;;
         *) echo "Неизвестный аргумент: $1" >&2; usage 1 ;;
     esac
@@ -67,25 +74,57 @@ mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
 # POST <endpoint> <json-body> <output-file>
+#
 # Падает с телом ответа, если Ozon вернул не 200 — молчаливый пустой файл хуже
 # ошибки. Именно так и был опознан снятый v3: code 9, obsolete method.
+#
+# 429 — исключение: это лимит запросов в секунду, а не отказ. Ключ у нас общий
+# с работающим приложением (почасовой обход заказов, поллеры рекламы каждую
+# минуту), поэтому попасть в лимит на ровном месте — норма. Ждём и повторяем,
+# как это делает OzonAccrualClient в Ingestion: Retry-After, если пришёл, иначе
+# удвоение с потолком.
 ozon_post() {
-    local endpoint="$1" body="$2" out="$3" code
-    code="$(curl -sS -o "$out" -w '%{http_code}' \
-        -X POST "${BASE_URL}${endpoint}" \
-        -H "Client-Id: ${OZON_CLIENT_ID}" \
-        -H "Api-Key: ${OZON_API_KEY}" \
-        -H 'Content-Type: application/json' \
-        --max-time 120 \
-        -d "$body")"
+    local endpoint="$1" body="$2" out="$3" code attempt=0 wait retry_after
+    local hdr="${out}.headers"
 
-    if [[ "$code" != "200" ]]; then
+    while :; do
+        attempt=$((attempt + 1))
+        code="$(curl -sS -o "$out" -D "$hdr" -w '%{http_code}' \
+            -X POST "${BASE_URL}${endpoint}" \
+            -H "Client-Id: ${OZON_CLIENT_ID}" \
+            -H "Api-Key: ${OZON_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            --max-time 120 \
+            -d "$body")"
+
+        if [[ "$code" == "200" ]]; then
+            rm -f "$hdr"
+            return 0
+        fi
+
+        if [[ "$code" == "429" && "$attempt" -lt "$MAX_RETRIES" ]]; then
+            retry_after="$(awk 'tolower($0) ~ /^retry-after:/ {gsub(/[^0-9]/, "", $2); print $2; exit}' "$hdr" 2>/dev/null || true)"
+            if [[ "$retry_after" =~ ^[0-9]+$ && "$retry_after" -gt 0 ]]; then
+                wait="$retry_after"
+            else
+                wait=$((RETRY_BASE_SECONDS * 2 ** (attempt - 1)))
+            fi
+            [[ "$wait" -gt "$MAX_BACKOFF_SECONDS" ]] && wait="$MAX_BACKOFF_SECONDS"
+
+            echo "  … ${endpoint} → HTTP 429 (лимит запросов), попытка ${attempt}/${MAX_RETRIES}, пауза ${wait}s" >&2
+            sleep "$wait"
+            continue
+        fi
+
         echo "  ✗ ${endpoint} → HTTP ${code}" >&2
         head -c 2000 "$out" >&2; echo >&2
-        rm -f "$out"
+        rm -f "$out" "$hdr"
         exit 1
-    fi
+    done
 }
+
+# Пауза между вызовами: лимит у Ozon посекундный, а мы бьём три эндпоинта подряд.
+pace() { sleep "$PACE_SECONDS"; }
 
 # ── 1. /v1/finance/accrual/types — справочник услуг: type_id → имя ──
 # Снимается первым: без него type_id в by-day не читаются глазами.
@@ -94,6 +133,7 @@ ozon_post /v1/finance/accrual/types '{}' "${OUT_DIR}/accrual-types.json"
 types_count="$(jq '[.. | objects | select(has("type_id"))] | length' "${OUT_DIR}/accrual-types.json")"
 echo "   услуг в справочнике: ${types_count} → accrual-types.json"
 echo
+pace
 
 # ── 2. /v1/finance/accrual/by-day — начисления за день, пагинация по last_id ──
 echo "2. POST /v1/finance/accrual/by-day (${DATE})"
@@ -124,7 +164,9 @@ while :; do
 
     [[ "$count" -eq 0 || -z "$last_id" ]] && break
     [[ "$MAX_PAGES" -gt 0 && "$page" -ge "$MAX_PAGES" ]] && break
+    pace
 done
+pace
 echo
 
 # ── 3. /v1/finance/accrual/postings — детализация отправлений ──
