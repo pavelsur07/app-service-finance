@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / Work item 1.3
-**Status:** stopped — нужен повторный захват для /postings (вопрос количества)
+**Phase:** Stage 1 / Work item 1.4
+**Status:** implementing — сверка пройдена, осталась обезличенная фикстура
 **Stage base commit:** <записать перед 1.3, код ещё не менялся>
 
 ### Completed
@@ -43,12 +43,9 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Повторный захват Владельцем — нужен ответ `/v1/finance/accrual/postings`,
-  до которого первый прогон не дошёл. Только он скажет, есть ли там `quantity`.
-  Без количества Stage 4 не начинается: оно уходит в `marketplace_sales`,
-  оттуда в закрытие месяца и ОПиУ.
-- Затем 1.4 — сокращённая обезличенная фикстура на 4 кейса: продажа, возврат
-  (POSTING с отрицательным sale_amount), POSTING без выручки, ITEM/NON_ITEM.
+- 1.4 — сокращённая обезличенная фикстура в `tests/Fixtures/Marketplace/Ozon/`
+  на четыре кейса: продажа, возврат (POSTING с отрицательным sale_amount),
+  POSTING без выручки, ITEM/NON_ITEM. Затем Stage 2.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»
