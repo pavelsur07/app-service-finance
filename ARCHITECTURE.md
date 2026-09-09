@@ -726,6 +726,19 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 > Используй **только** эти методы. Не выдумывай новые без обновления этого файла.
 > Нет нужного метода — спроси, не создавай самостоятельно.
 
+### `OzonAccrualCategoryFacade` (`src/Ingestion/Facade/OzonAccrualCategoryFacade.php`)
+```php
+// Разобрать услугу Ozon из /v1/finance/accrual/by-day в категорию затрат.
+// Read-only, без зависимостей: каталог категорий статический.
+// Разрешает ТОЛЬКО по имени из справочника /v1/finance/accrual/types.
+// Карта typeIds внутри каталога НЕ используется — она расходится со
+// справочником Ozon и на трёх известных значениях даёт неверную категорию
+// (29 LastMileCourier, 45 PickUpPointReturnAcceptance, 77 SupplyInbound).
+// Неразобранная услуга возвращается с known = false и группой
+// «Требует классификации» — видимая очередь на ручной разбор, не NULL и не «прочее».
+resolveByServiceType(?string $typeId, ?string $typeName): App\Ingestion\Application\DTO\OzonAccrualCategoryView
+```
+
 ### `IngestionFacade` (`src/Ingestion/Facade/IngestionFacade.php`)
 ```php
 // Канонические финансовые транзакции за период для P&L rebuild.
@@ -3216,6 +3229,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.87 | 2026-09-09 | Ingestion: `OzonAccrualCategoryFacade` — разбор услуг Ozon accrual в категории затрат по имени из справочника; карта `typeIds` не используется как расходящаяся со справочником Ozon |
 | 1.86 | 2026-09-01 | Ingestion: уборщик зависших `SyncJob` — задача в `OPEN`/`RUNNING` без движения больше не блокирует ресурс навсегда |
 | 1.85 | 2026-09-01 | Marketplace: ручной запуск загрузки каталога Ozon из UI, журнал прогонов `MarketplaceJobLog` и взаимное исключение прогонов по подключению |
 | 1.84 | 2026-09-01 | Marketplace: загрузка каталога товаров Ozon в листинги — товары без продаж, наименование, дата создания на маркетплейсе; сопоставление по всему множеству `sources[].sku` |

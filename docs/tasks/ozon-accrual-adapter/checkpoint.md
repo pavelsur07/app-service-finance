@@ -1,10 +1,13 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 закрыт, стадии 2–5 — отдельная ветка
-**Status:** done для этой ветки — Phase 0 и Stage 1 завершены
-**Stage base commit:** <записать перед 1.3, код ещё не менялся>
+**Phase:** Stage 2 закрыт, дальше Stage 3
+**Status:** implementing — Stage 2 завершён, Stage 3 не начат
+**Stage base commit:** `cc5071d8` (Stage 2)
 
 ### Completed
+- Stage 2 — `OzonAccrualCategoryFacade` + `OzonAccrualCategoryView`, разрешение
+  по имени из справочника, неизвестное уходит в видимую очередь. Отчёт —
+  `stages/stage-2.md`.
 - Phase 0 — `plan.md`: 4 Stage, границы, открытые вопросы.
 - Закрыт вопрос по `marketplace_sale_mappings.operation_type`: чтением PROD
   установлено, что значений всего два, `sale` и `return`. Это внутренний домен,
@@ -48,10 +51,10 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Эта ветка закрывает Phase 0 и Stage 1 и уходит в merge. Стадии 2–5 ведутся
-  отдельной веткой по указанию Владельца от 09.09.2026.
-- Первое действие в новой ветке — Stage 2: read-only метод `IngestionFacade`
-  для разрешения `type_id` в категорию затрат, плюс `ARCHITECTURE.md`.
+- Stage 3: вывести формат документа из `MarketplaceRawDocument.apiEndpoint` и
+  передавать его в `MarketplaceRawProcessorRegistry::get()` третьим аргументом
+  `$kind`; существующие Ozon-процессоры должны явно заявить легаси-формат в
+  `supports()`, иначе новый процессор будет затенён порядком сервисов.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»
