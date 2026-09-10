@@ -98,15 +98,6 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             }
         }
 
-        if ([] === $entries) {
-            return 0;
-        }
-
-        $existing = $this->existingIdsQuery->execute(
-            $companyId,
-            array_values(array_unique(array_column($entries, 'externalId'))),
-        );
-
         $created = 0;
 
         // Удаление и запись — одной транзакцией, и удаление внутри неё. Раньше
@@ -117,6 +108,9 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         //
         // Сносятся только незакрытые затраты: строка, привязанная к документу
         // ОПиУ, относится к закрытому периоду и правке не подлежит.
+        //
+        // Пустой разбор тоже проходит через удаление: день, из которого Ozon
+        // убрал начисления, обязан остаться без затрат, а не сохранить прежние.
         $this->connection->beginTransaction();
 
         try {
@@ -125,6 +119,16 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                  WHERE raw_document_id = :rawDocId
                    AND document_id IS NULL',
                 ['rawDocId' => $rawDocId],
+            );
+
+            // Известные external_id читаются ПОСЛЕ удаления. До него в выборку
+            // попадали бы строки этого же документа, которые только что снесены,
+            // и цикл пропустил бы их как «уже существующие»: замена вышла бы
+            // пустой, а затраты исчезли бы совсем. Оставшиеся совпадения — это
+            // строки других документов, их дублировать нельзя.
+            $existing = [] === $entries ? [] : $this->existingIdsQuery->execute(
+                $companyId,
+                array_values(array_unique(array_column($entries, 'externalId'))),
             );
 
             foreach ($entries as $entry) {
