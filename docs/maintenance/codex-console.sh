@@ -68,6 +68,47 @@ case "$cmd" in
       *) echo "Argument not allowed for $cmd: ${1}" >&2; exit 2 ;;
     esac
     ;;
+  app:marketplace:ozon-financial-reports:sync)
+    # Мутирующая: диспатчит SyncOzonAccrualByDayMessage за окно дней для всех
+    # активных Ozon seller-подключений. Ходит во внешний API и пишет
+    # marketplace_raw_documents, поэтому запуск — отдельное одобрение Владельца
+    # по AGENTS.md §3.3.
+    #
+    # Имя парное к wb-financial-reports:sync — та же работа для другого
+    # маркетплейса. Сегмент ozon-accrual: не используется: под ним пятнадцать
+    # команд Ingestion, и одноимённый сегмент под другим префиксом читался бы
+    # здесь как та же семья.
+    #
+    # Замена app:marketplace:ozon-daily-sync: его источник
+    # /v3/finance/transaction/list Ozon снял 09.09.2026. Обе команды в allowlist
+    # намеренно — легаси нужен, пока не восстановлена история, и его 967
+    # документов остаются переобрабатываемыми.
+    #
+    # Форма аргументов проверяется, а не только имя: --days-back задаёт объём
+    # работы и обращений к API, поэтому допускается лишь строгий числовой вид.
+    # Диапазон значения проверяет сама команда (1..365).
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q) ;;
+        --days-back=[1-9]|--days-back=[1-9][0-9]|--days-back=[1-9][0-9][0-9]) ;;
+        --company-id=[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
+  app:marketplace:ozon-financial-reports:freshness-check)
+    # Read-only гейт: проверяет, что у каждого активного seller-подключения есть
+    # документ начислений за вчера. Ничего не пишет и во внешний API не ходит,
+    # поэтому запускается как рутинная проверка, без отдельного одобрения.
+    #
+    # Ненулевой exit code — рабочий сигнал этой команды, а не сбой wrapper'а.
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   app:marketplace:ozon-daily-sync)
     # Мутирующая: диспатчит SyncOzonReportMessage за последние 14 дней для всех
     # активных Ozon seller-подключений. Ходит во внешний API и переписывает

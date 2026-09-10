@@ -22,23 +22,22 @@ use Ramsey\Uuid\Uuid;
  * Работает рядом с `OzonSalesRawProcessor`, который остаётся обслуживать
  * 967 документов снятого формата v3.
  *
- * Две вещи установлены сверкой с месячным отчётом «Реализация» за июнь 2026 —
- * суммы сошлись до копейки — и менять их без новой сверки нельзя:
+ * **Выручка считается из `sale_amount` — базы цены продавца.** Это та же база,
+ * что у легаси-строк в этой же таблице: сверка за июнь 2026 по одному кабинету
+ * сошлась точно — `marketplace_sales.total_revenue` 1 950 549.00 на 750 строках
+ * против суммы `sale_amount` по продажам 1 950 549 на тех же 750 строках.
  *
- * 1. **Выручка считается из `sale_price`** — цены покупателя со скидками Ozon.
- *    Это прямой аналог `delivery_commission.price_per_instance`, из которого
- *    выручку берёт обработчик «Реализации». `sale_amount` для этого не годится:
- *    он равен `seller_price`, то есть базе цены продавца без СПП, и дал бы за
- *    июнь 1 745 638 вместо 866 631.91.
- * 2. **Количество выводится как `sale_amount / seller_price`** — обе величины в
- *    одной базе. На всей проверенной выгрузке оно равно единице, но формула
- *    переживёт день, когда Ozon пришлёт агрегат.
+ * `sale_price` (цена покупателя со скидками Ozon) для этой таблицы НЕ годится,
+ * хотя и совпадает с базой месячного отчёта «Реализация»: у него другой
+ * потребитель. Записать сюда 866 631.91 вместо 1 950 549 значило бы сменить
+ * базу посреди таблицы и молча занизить выручку в 2.25 раза для всего, что её
+ * читает — закрытия месяца и аналитики.
  *
- * Оговорка, важная для ревью: на проверенных данных количество всегда 1,
- * поэтому «`sale_price` за единицу» и «`sale_price` итогом» неразличимы.
- * Принято за цену единицы — по прямой аналогии с `price_per_instance`
- * «Реализации». Нецелое частное означает, что предположение неверно; такая
- * строка пропускается и логируется, а не округляется молча.
+ * **Количество выводится как `sale_amount / seller_price`** — обе величины в
+ * одной базе. На всей проверенной выгрузке оно равно единице, но формула
+ * переживёт день, когда Ozon пришлёт агрегат. Нецелое частное означает, что
+ * предположение о базе неверно; такая строка пропускается и логируется, а не
+ * округляется молча.
  */
 final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
@@ -212,8 +211,10 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 'sku' => $sku,
                 'date' => $day,
                 'quantity' => $quantity,
-                'pricePerUnit' => $this->money((float) $salePrice),
-                'totalRevenue' => $this->money((float) $salePrice * $quantity),
+                // Цена единицы и итог в одной базе: их произведение обязано
+                // сходиться с sale_amount, иначе строка внутренне противоречива.
+                'pricePerUnit' => $this->money((float) $sellerPrice),
+                'totalRevenue' => $this->money((float) $saleAmount),
                 'raw' => $product,
             ];
         }
@@ -252,12 +253,29 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
         $raw = $saleAmount / $sellerPrice;
         $rounded = (int) round($raw);
 
-        if ($rounded < 1 || abs($raw - $rounded) > 0.001) {
-            // Нецелое частное означает, что допущение о базе неверно. Округлить
+        if ($rounded < 1) {
+            $this->logger->warning('[Ozon by-day] non-integer quantity, sale skipped', [
+                'accrual_id' => $accrualId,
+                'ratio' => $raw,
+            ]);
+
+            return null;
+        }
+
+        // Проверка идёт в деньгах, а не в допуске на частное. Строка записывает
+        // цену единицы и итог по отдельности, поэтому её внутренний инвариант —
+        // seller_price * quantity = sale_amount в копейках. Допуск 0.001 на
+        // частное этому не равносилен: при sale_amount 1000.50 и seller_price
+        // 1000.00 частное 1.0005 прошло бы, и получилась бы строка, где
+        // quantity * pricePerUnit не сходится с totalRevenue.
+        if (0 !== bccomp($this->money($sellerPrice * $rounded), $this->money($saleAmount), self::MONEY_SCALE)) {
+            // Расхождение означает, что допущение о базе неверно. Округлить
             // молча — значит подделать финансовую строку.
             $this->logger->warning('[Ozon by-day] non-integer quantity, sale skipped', [
                 'accrual_id' => $accrualId,
                 'ratio' => $raw,
+                'seller_price' => $this->money($sellerPrice),
+                'sale_amount' => $this->money($saleAmount),
             ]);
 
             return null;

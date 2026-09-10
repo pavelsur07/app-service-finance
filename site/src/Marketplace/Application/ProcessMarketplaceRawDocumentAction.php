@@ -7,6 +7,7 @@ namespace App\Marketplace\Application;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceRawDocument;
@@ -123,13 +124,20 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 : 0;
 
             // Delete existing unfiled costs before reprocessing (WB needs this;
-            // Ozon's process() also does its own DELETE, the double-delete is a safe no-op).
-            $this->connection->executeStatement(
-                'DELETE FROM marketplace_costs
-                 WHERE raw_document_id = :rawDocId
-                   AND document_id IS NULL',
-                ['rawDocId' => $command->rawDocId],
-            );
+            // легаси-процессор Ozon делает свой DELETE, двойное удаление безвредно).
+            //
+            // Затраты by-day исключены намеренно: их процессор сносит прежние
+            // строки внутри собственной транзакции. Удаление здесь легло бы
+            // отдельной транзакцией и зафиксировалось сразу, а сбой при разборе
+            // оставил бы документ вовсе без затрат.
+            if (MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY !== $format) {
+                $this->connection->executeStatement(
+                    'DELETE FROM marketplace_costs
+                     WHERE raw_document_id = :rawDocId
+                       AND document_id IS NULL',
+                    ['rawDocId' => $command->rawDocId],
+                );
+            }
 
             $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace, $command->kind, $format);
             $result = $processor->process($command->companyId, $command->rawDocId);
@@ -172,6 +180,23 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // совсем другую форму, чем операции снятого v3.
         $classifier = $this->classifierRegistry->get($marketplace, $format);
 
+        // Документ by-day перезагружается целиком: Ozon правит начисления задним
+        // числом, и скользящее окно существует ровно ради этих правок. Процессоры
+        // пропускают уже известный external_id, поэтому без удаления прежних строк
+        // документа исправленное начисление не обновилось бы, а отменённое не
+        // исчезло бы — окно ловило бы правки, а таблицы оставались бы прежними.
+        //
+        // Граница замены: строки, уже привязанные к документу ОПиУ, не трогаются.
+        // Для закрытого периода это и требуется. Но текущий месяц ежедневно
+        // закрывается предварительно (`app:marketplace:month-preliminary-rebuild`,
+        // 04:45), и его строки к утру тоже несут document_id — правку Ozon по ним
+        // это окно не донесёт до следующего reopen. Разделение предварительной
+        // привязки и окончательной — отдельная работа: признак предварительности
+        // живёт в `MarketplaceMonthClose.settings`, по месяцу и этапу, а не по
+        // строке, и требует правки конвейера закрытия месяца.
+        $replaceRowsOfDocument = MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY === $format
+            && in_array($command->kind, ['sales', 'returns'], true);
+
         $linkedRows = 0;
         if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $linkedRows = $this->cleanupWbOpenRowsByExternalIds(
@@ -185,15 +210,131 @@ final readonly class ProcessMarketplaceRawDocumentAction
             );
         }
 
-        $totalProcessed = 0;
+        // Замена идёт одной транзакцией. Messenger не оборачивает handler в
+        // транзакцию Doctrine, поэтому сбой между удалением и записью оставил бы
+        // документ вовсе без продаж или с половиной: исчерпанные ретраи закрепили
+        // бы потерю. Так же поступает процессор затрат со своей заменой.
+        if ($replaceRowsOfDocument) {
+            $this->connection->beginTransaction();
 
-        // Reset per-run processor state: one raw document can be split into multiple
-        // batches in this invocation, but reprocessing the same rawDocId in another
-        // invocation must run cleanup again (idempotent replace-by-raw-document).
-        $processor = $this->processorRegistry->get(StagingRecordType::from($targetBucketKey), $marketplace, $command->kind, $format);
+            try {
+                $totalProcessed = $this->replaceRowsOfDocument(
+                    document: $document,
+                    marketplace: $marketplace,
+                    command: $command,
+                    classifier: $classifier,
+                    processor: $this->resolveProcessor($targetBucketKey, $marketplace, $command->kind, $format),
+                    rows: $rows,
+                    buckets: $buckets,
+                    targetBucketKey: $targetBucketKey,
+                );
+
+                $this->connection->commit();
+            } catch (\Throwable $e) {
+                $this->connection->rollBack();
+                // EntityManager после отката держит объекты, которых в базе нет:
+                // дальнейшая работа с ним записала бы их повторно.
+                $this->entityManager->clear();
+                $this->costCategoryResolver->clearCache();
+
+                throw $e;
+            }
+
+            $this->costCategoryResolver->clearCache();
+
+            return $this->buildResult($command->rawDocId, $command->kind, $totalProcessed, $linkedRows);
+        }
+
+        $totalProcessed = $this->processRows(
+            marketplace: $marketplace,
+            command: $command,
+            classifier: $classifier,
+            processor: $this->resolveProcessor($targetBucketKey, $marketplace, $command->kind, $format),
+            rows: $rows,
+            buckets: $buckets,
+            targetBucketKey: $targetBucketKey,
+        );
+
+        $this->costCategoryResolver->clearCache();
+
+        return $this->buildResult($command->rawDocId, $command->kind, $totalProcessed, $linkedRows);
+    }
+
+    /**
+     * Реестр возвращает первый подошедший процессор, поэтому формат обязателен.
+     *
+     * Per-run состояние сбрасывается здесь: один документ может разойтись на
+     * несколько батчей внутри вызова, но повторная обработка того же rawDocId в
+     * другом вызове обязана снова выполнить свою очистку.
+     */
+    private function resolveProcessor(
+        string $targetBucketKey,
+        MarketplaceType $marketplace,
+        string $kind,
+        ?MarketplaceRawFormat $format,
+    ): MarketplaceRawProcessorInterface {
+        $processor = $this->processorRegistry->get(StagingRecordType::from($targetBucketKey), $marketplace, $kind, $format);
+
         if (method_exists($processor, 'resetPerRunState')) {
             $processor->resetPerRunState();
         }
+
+        return $processor;
+    }
+
+    /**
+     * Удаление прежних строк документа и запись новых — одной транзакцией.
+     *
+     * Удаляются только открытые строки: `deleteByRawDocument` не трогает те, что
+     * уже привязаны к документу ОПиУ (`document IS NULL` в условии), — закрытый
+     * период правке не подлежит.
+     *
+     * @param array<int|string, mixed> $rows
+     * @param array<string, list<array<string, mixed>>> $buckets
+     */
+    private function replaceRowsOfDocument(
+        MarketplaceRawDocument $document,
+        MarketplaceType $marketplace,
+        ProcessMarketplaceRawDocumentCommand $command,
+        RowClassifierInterface $classifier,
+        MarketplaceRawProcessorInterface $processor,
+        array $rows,
+        array $buckets,
+        string $targetBucketKey,
+    ): int {
+        $company = $document->getCompany();
+
+        if ('sales' === $command->kind) {
+            $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+        } else {
+            $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+        }
+
+        return $this->processRows(
+            marketplace: $marketplace,
+            command: $command,
+            classifier: $classifier,
+            processor: $processor,
+            rows: $rows,
+            buckets: $buckets,
+            targetBucketKey: $targetBucketKey,
+        );
+    }
+
+    /**
+     * @param array<int|string, mixed> $rows
+     * @param array<string, list<array<string, mixed>>> $buckets
+     */
+    private function processRows(
+        MarketplaceType $marketplace,
+        ProcessMarketplaceRawDocumentCommand $command,
+        RowClassifierInterface $classifier,
+        MarketplaceRawProcessorInterface $processor,
+        array $rows,
+        array $buckets,
+        string $targetBucketKey,
+    ): int {
+        $totalProcessed = 0;
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -241,9 +382,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $this->costCategoryResolver->resetCache();
         }
 
-        $this->costCategoryResolver->clearCache();
-
-        return $this->buildResult($command->rawDocId, $command->kind, $totalProcessed, $linkedRows);
+        return $totalProcessed;
     }
 
     /**

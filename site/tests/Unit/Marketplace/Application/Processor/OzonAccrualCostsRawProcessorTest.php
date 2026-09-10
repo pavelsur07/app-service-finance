@@ -32,7 +32,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     private const COMPANY_ID = 'company-1';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
 
-    /** @var list<array{externalId: string, code: string, amount: string}> */
+    /** @var list<array{externalId: string, code: string, amount: string, operationType: string|null}> */
     private array $persisted = [];
 
     public function testCommissionBecomesPositiveCostWithLegacyCategoryCode(): void
@@ -79,16 +79,91 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         self::assertSame('512.40', $this->find('non-item')['amount']);
     }
 
-    public function testRepeatedRunCreatesNoDuplicates(): void
+    public function testCostsAlreadyOwnedByAnotherDocumentAreNotDuplicated(): void
     {
+        // Строки другого документа удалением этого не сносятся, поэтому остаются
+        // в выборке и после него. Заводить их второй раз нельзя.
         $this->process();
         $ids = array_column($this->persisted, 'externalId');
         self::assertNotSame([], $ids);
 
         $this->persisted = [];
-        $this->process(existingIds: $ids);
+        $this->processWithForeignCosts($ids);
 
         self::assertSame([], $this->persisted);
+    }
+
+    public function testRefreshRecreatesItsOwnRowsInsteadOfLeavingTheDayEmpty(): void
+    {
+        // Регрессия. Известные external_id читались ДО удаления, поэтому на
+        // повторном прогоне цикл видел в них собственные, только что снесённые
+        // строки и пропускал их как существующие: замена выходила пустой, а
+        // затраты дня исчезали насовсем. Выборка идёт после удаления, и она
+        // собственных строк уже не видит — значит день пересобирается целиком.
+        $this->process();
+        $first = $this->persisted;
+        self::assertNotSame([], $first);
+
+        // Второй прогон стартует с этими строками в базе — они принадлежат этому
+        // же документу, и удаление их снимает. Мок это моделирует: до удаления
+        // выборка их видит, после — уже нет.
+        $this->persisted = [];
+        $this->process(existingIds: array_column($first, 'externalId'));
+
+        self::assertSame($first, $this->persisted, 'Повторный прогон обязан пересобрать те же затраты, а не оставить день пустым.');
+    }
+
+    public function testEmptyRefreshStillClearsPreviousCosts(): void
+    {
+        // День, из которого Ozon убрал начисления, обязан остаться без затрат.
+        // Ранний выход до транзакции сохранял бы прежние строки навсегда.
+        $deletes = 0;
+        $processor = $this->processorWithPayload(
+            ['accruals' => [], 'service_types' => []],
+            $deletes,
+        );
+
+        self::assertSame(0, $processor->process(self::COMPANY_ID, self::RAW_DOC_ID));
+        self::assertSame(1, $deletes, 'Пустой разбор обязан пройти через удаление прежних затрат.');
+    }
+
+    public function testPositiveCommissionIsStornoNotAnExtraExpense(): void
+    {
+        // Регрессия. В фикстуре два начисления комиссии: -1379.54 (удержание) и
+        // +1217.62 (возврат по отменённому заказу). Обе суммы хранятся
+        // положительными, поэтому вид операции несёт только operation_type.
+        // Без него UnprocessedCostsQuery считает возврат обычной затратой и
+        // увеличивает расходы вместо того, чтобы их уменьшить.
+        $this->process();
+
+        $byId = [];
+        foreach ($this->persisted as $row) {
+            $byId[$row['externalId']] = $row;
+        }
+
+        $charge = $byId['ozon-accrual-50000000001-commission-product-0'] ?? null;
+        $storno = $byId['ozon-accrual-50000000002-commission-product-0'] ?? null;
+
+        self::assertNotNull($charge);
+        self::assertNotNull($storno);
+        self::assertSame('charge', $charge['operationType'], 'Удержание комиссии — начисление.');
+        self::assertSame('storno', $storno['operationType'], 'Возврат комиссии — сторно.');
+        self::assertSame('1217.62', $storno['amount'], 'Сумма хранится положительной, знак несёт operation_type.');
+    }
+
+    public function testServiceCostsAreChargesByDefault(): void
+    {
+        $this->process();
+
+        $services = array_filter(
+            $this->persisted,
+            static fn (array $row): bool => str_contains($row['externalId'], '-type-'),
+        );
+
+        self::assertNotSame([], $services);
+        foreach ($services as $row) {
+            self::assertSame('charge', $row['operationType'], $row['externalId'].' — удержание Ozon, а не сторно.');
+        }
     }
 
     public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
@@ -100,6 +175,70 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $this->expectExceptionMessageMatches('/refetch the day/');
 
         $this->processorWithPayload([['accrual_id' => 1]])->process(self::COMPANY_ID, self::RAW_DOC_ID);
+    }
+
+    public function testDeleteOfOldCostsIsInsideTheTransactionAndRollsBackOnFailure(): void
+    {
+        // Регрессия. Прежде прежние затраты сносил вызывающий, до этого метода:
+        // DELETE ложился отдельной транзакцией и фиксировался сразу, а Messenger
+        // handler в транзакцию Doctrine не оборачивает. Сбой при разборе оставлял
+        // документ вовсе без затрат, и исчерпанные ретраи закрепляли потерю.
+        $calls = [];
+
+        $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
+        $this->setProperty($company, 'id', self::COMPANY_ID);
+
+        $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
+        $this->setProperty($document, 'id', self::RAW_DOC_ID);
+        $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'rawData', $this->payload());
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static fn (string $class): object => MarketplaceRawDocument::class === $class ? $document : $company,
+        );
+        $em->method('flush')->willThrowException(new \RuntimeException('boom'));
+        $em->expects(self::once())->method('clear');
+
+        $categoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $categoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($categoryRepository, $em);
+
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('executeQuery')->willReturn($result);
+        $connection->method('beginTransaction')->willReturnCallback(static function () use (&$calls): void {
+            $calls[] = 'begin';
+        });
+        $connection->method('executeStatement')->willReturnCallback(static function () use (&$calls): int {
+            $calls[] = 'delete';
+
+            return 1;
+        });
+        $connection->method('rollBack')->willReturnCallback(static function () use (&$calls): void {
+            $calls[] = 'rollback';
+        });
+        $connection->expects(self::never())->method('commit');
+
+        $processor = new OzonAccrualCostsRawProcessor(
+            $em,
+            $connection,
+            new OzonAccrualCategoryFacade(),
+            $categoryResolver,
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            new NullLogger(),
+        );
+
+        try {
+            $processor->process(self::COMPANY_ID, self::RAW_DOC_ID);
+            self::fail('Сбой разбора обязан пробросить исключение.');
+        } catch (\RuntimeException) {
+            // ожидаемо
+        }
+
+        self::assertSame(['begin', 'delete', 'rollback'], $calls, 'Удаление обязано идти внутри транзакции и откатываться вместе с ней.');
     }
 
     public function testProcessorClaimsOnlyByDayCosts(): void
@@ -120,7 +259,61 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * @return array{externalId: string, code: string, amount: string}
+     * Затраты, принадлежащие другому документу: удаление этого документа их не
+     * трогает, поэтому выборка возвращает их и после удаления.
+     *
+     * @param list<string> $externalIds
+     */
+    private function processWithForeignCosts(array $externalIds): void
+    {
+        $this->persisted = [];
+
+        $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
+        $this->setProperty($company, 'id', self::COMPANY_ID);
+
+        $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
+        $this->setProperty($document, 'id', self::RAW_DOC_ID);
+        $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'rawData', $this->payload());
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static fn (string $class): object => MarketplaceRawDocument::class === $class ? $document : $company,
+        );
+        $em->method('persist')->willReturnCallback(function (object $entity): void {
+            if ($entity instanceof MarketplaceCost) {
+                $this->persisted[] = [
+                    'externalId' => (string) $entity->getExternalId(),
+                    'code' => (string) $entity->getCategory()?->getCode(),
+                    'amount' => $entity->getAmount(),
+                    'operationType' => $entity->getOperationType()?->value,
+                ];
+            }
+        });
+
+        $categoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $categoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($categoryRepository, $em);
+
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn($externalIds);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('executeQuery')->willReturn($result);
+        $connection->method('executeStatement')->willReturn(0);
+
+        (new OzonAccrualCostsRawProcessor(
+            $em,
+            $connection,
+            new OzonAccrualCategoryFacade(),
+            $categoryResolver,
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            new NullLogger(),
+        ))->process(self::COMPANY_ID, self::RAW_DOC_ID);
+    }
+
+    /**
+     * @return array{externalId: string, code: string, amount: string, operationType: string|null}
      */
     private function find(string $needle): array
     {
@@ -136,16 +329,16 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     /**
      * @param array<array-key, mixed> $payload
      */
-    private function processorWithPayload(array $payload): OzonAccrualCostsRawProcessor
+    private function processorWithPayload(array $payload, ?int &$deletes = null): OzonAccrualCostsRawProcessor
     {
-        return $this->processor([], $payload);
+        return $this->processor([], $payload, $deletes);
     }
 
     /**
      * @param list<string> $existingIds
      * @param array<string, mixed>|null $payloadOverride
      */
-    private function processor(array $existingIds, ?array $payloadOverride = null): OzonAccrualCostsRawProcessor
+    private function processor(array $existingIds, ?array $payloadOverride = null, ?int &$deletes = null): OzonAccrualCostsRawProcessor
     {
         $this->persisted = [];
 
@@ -167,6 +360,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
                     'externalId' => (string) $entity->getExternalId(),
                     'code' => (string) $entity->getCategory()?->getCode(),
                     'amount' => $entity->getAmount(),
+                    'operationType' => $entity->getOperationType()?->value,
                 ];
             }
         });
@@ -177,10 +371,29 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $categoryRepository->method('findOneBy')->willReturn(null);
         $categoryResolver = new MarketplaceCostCategoryResolver($categoryRepository, $em);
 
+        // Мок ведёт себя как база, а не как константа: удаление действительно
+        // убирает строки этого документа из выборки известных external_id.
+        // Без этого тест не отличил бы выборку до удаления от выборки после, а
+        // разница между ними — это разница между пересобранным днём и стёртым.
+        // Состояние держит объект, а не переменная по ссылке: замыкания делят
+        // один и тот же экземпляр, и статанализ не сводит флаг к константе.
+        /** @var \ArrayObject<string, bool> $state */
+        $state = new \ArrayObject(['deleted' => false]);
+
         $result = $this->createMock(Result::class);
-        $result->method('fetchFirstColumn')->willReturn($existingIds);
+        $result->method('fetchFirstColumn')->willReturnCallback(
+            static fn (): array => true === $state['deleted'] ? [] : $existingIds,
+        );
         $connection = $this->createMock(Connection::class);
         $connection->method('executeQuery')->willReturn($result);
+        $connection->method('executeStatement')->willReturnCallback(static function () use (&$deletes, $state): int {
+            $state['deleted'] = true;
+            if (null !== $deletes) {
+                ++$deletes;
+            }
+
+            return 0;
+        });
         $existingQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
 
         return new OzonAccrualCostsRawProcessor(

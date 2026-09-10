@@ -34,14 +34,15 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     /** @var array<int, array{externalId: string, quantity: int, refund: string}> */
     private array $persisted = [];
 
-    public function testRefundAmountIsPositiveAndBuiltFromSalePrice(): void
+    public function testRefundAmountIsPositiveAndUsesSellerBasis(): void
     {
-        // sale_price у возврата отрицателен (-1477.43). Сумма возврата
-        // хранится положительной: знак несёт сам факт возврата.
+        // Та же база, что у легаси-строк в этой таблице: сверка за июнь сошлась
+        // точно — 204 911.00 против суммы |sale_amount| 204 911 на 77 строках.
+        // Сумма хранится положительной: знак несёт сам факт возврата.
         $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
 
         self::assertCount(1, $this->persisted);
-        self::assertSame('1477.43', $this->persisted[0]['refund']);
+        self::assertSame('2647.00', $this->persisted[0]['refund']);
         self::assertSame(1, $this->persisted[0]['quantity']);
     }
 
@@ -52,6 +53,20 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
 
         self::assertGreaterThan(0, $this->persisted[0]['quantity']);
+    }
+
+    public function testAmountsThatDoNotMultiplyBackAreSkippedNotRounded(): void
+    {
+        // Зеркало регрессии из продаж. Частное 1.0005 попадало в прежний допуск
+        // 0.001 и давало quantity = 1: возврат сторнировал бы себестоимость не
+        // того числа единиц, что было продано.
+        $row = $this->returnRow();
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '-1000.50';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '-1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
     }
 
     public function testSaleRowIsIgnoredByReturnsProcessor(): void

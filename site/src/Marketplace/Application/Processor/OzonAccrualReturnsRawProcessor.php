@@ -209,9 +209,11 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 'sku' => $sku,
                 'date' => $date,
                 'quantity' => $quantity,
-                // Сумма возврата хранится положительной: знак несёт сам факт
-                // возврата, как и в легаси-пути.
-                'refund' => $this->money(abs((float) $salePrice) * $quantity),
+                // База продавца, как у легаси-строк в этой же таблице: сверка
+                // за июнь сошлась точно — marketplace_returns.refund_amount
+                // 204 911.00 на 77 строках против суммы |sale_amount| по
+                // возвратам 204 911 на тех же 77. Сумма хранится положительной.
+                'refund' => $this->money(abs((float) $saleAmount)),
                 'raw' => $product,
             ];
         }
@@ -229,10 +231,25 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         $raw = $saleAmount / $sellerPrice;
         $rounded = (int) round($raw);
 
-        if ($rounded < 1 || abs($raw - $rounded) > 0.001) {
+        if ($rounded < 1) {
             $this->logger->warning('[Ozon by-day] non-integer quantity, return skipped', [
                 'accrual_id' => $accrualId,
                 'ratio' => $raw,
+            ]);
+
+            return null;
+        }
+
+        // Проверка в деньгах, а не допуском на частное: количество сторнирует
+        // себестоимость, и допуск 0.001 на ratio позволил бы вернуть на склад
+        // не то число единиц, что было продано. Инвариант — seller_price *
+        // quantity = sale_amount в копейках.
+        if (0 !== bccomp($this->money($sellerPrice * $rounded), $this->money($saleAmount), self::MONEY_SCALE)) {
+            $this->logger->warning('[Ozon by-day] non-integer quantity, return skipped', [
+                'accrual_id' => $accrualId,
+                'ratio' => $raw,
+                'seller_price' => $this->money($sellerPrice),
+                'sale_amount' => $this->money($saleAmount),
             ]);
 
             return null;

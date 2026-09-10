@@ -9,6 +9,7 @@ use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -98,23 +99,39 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             }
         }
 
-        if ([] === $entries) {
-            return 0;
-        }
-
-        $existing = $this->existingIdsQuery->execute(
-            $companyId,
-            array_values(array_unique(array_column($entries, 'externalId'))),
-        );
-
         $created = 0;
 
-        // Вызывающий удаляет прежние затраты документа до этого метода, поэтому
-        // замена идёт в одной транзакции: сбой после удаления иначе оставил бы
-        // документ вовсе без затрат до следующего успешного прогона.
+        // Удаление и запись — одной транзакцией, и удаление внутри неё. Раньше
+        // прежние затраты сносил вызывающий, до этого метода: DELETE ложился
+        // отдельной транзакцией и фиксировался сразу, а Messenger handler в
+        // транзакцию Doctrine не оборачивает. Любой сбой ниже оставлял документ
+        // вовсе без затрат, и исчерпанные ретраи закрепляли потерю.
+        //
+        // Сносятся только незакрытые затраты: строка, привязанная к документу
+        // ОПиУ, относится к закрытому периоду и правке не подлежит.
+        //
+        // Пустой разбор тоже проходит через удаление: день, из которого Ozon
+        // убрал начисления, обязан остаться без затрат, а не сохранить прежние.
         $this->connection->beginTransaction();
 
         try {
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $rawDocId],
+            );
+
+            // Известные external_id читаются ПОСЛЕ удаления. До него в выборку
+            // попадали бы строки этого же документа, которые только что снесены,
+            // и цикл пропустил бы их как «уже существующие»: замена вышла бы
+            // пустой, а затраты исчезли бы совсем. Оставшиеся совпадения — это
+            // строки других документов, их дублировать нельзя.
+            $existing = [] === $entries ? [] : $this->existingIdsQuery->execute(
+                $companyId,
+                array_values(array_unique(array_column($entries, 'externalId'))),
+            );
+
             foreach ($entries as $entry) {
                 if (isset($existing[$entry['externalId']])) {
                     continue;
@@ -138,6 +155,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 $cost->setRawDocumentId($rawDocId);
                 $cost->setCostDate($entry['date']);
                 $cost->setAmount($entry['amount']);
+                $cost->setOperationType($entry['operationType']);
                 $cost->setDescription($entry['description']);
 
                 $this->em->persist($cost);
@@ -149,6 +167,11 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             $this->connection->commit();
         } catch (\Throwable $e) {
             $this->connection->rollBack();
+            // После отката EntityManager держит затраты, которых в базе нет, а
+            // резолвер — категории, которые тоже откатились. Любой следующий
+            // flush в этом же процессе записал бы их повторно.
+            $this->em->clear();
+            $this->categoryResolver->clearCache();
 
             throw $e;
         }
@@ -173,7 +196,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $accrual
      * @param array<string, string> $serviceTypes
      *
-     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, description: string, date: \DateTimeImmutable}>
+     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable}>
      */
     private function extractEntries(array $accrual, array $serviceTypes): array
     {
@@ -199,6 +222,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                     'categoryCode' => self::COMMISSION_CODE,
                     'categoryName' => self::COMMISSION_NAME,
                     'amount' => $this->money(abs((float) $commission)),
+                    'operationType' => $this->operationType((float) $commission),
                     'description' => (float) $commission > 0 ? 'Возврат комиссии Ozon' : self::COMMISSION_NAME,
                     'date' => $date,
                 ];
@@ -252,7 +276,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $service
      * @param array<string, string> $serviceTypes
      *
-     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, description: string, date: \DateTimeImmutable}|null
+     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable}|null
      */
     private function serviceEntry(array $service, array $serviceTypes, \DateTimeImmutable $date, string $externalIdPrefix): ?array
     {
@@ -279,9 +303,10 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),
             'categoryCode' => $category->code,
             'categoryName' => $category->label,
-            // Затраты хранятся положительными, как в легаси-пути: смысл несут
-            // категория и описание.
+            // Затраты хранятся положительными, как в легаси-пути: знак несёт
+            // operation_type, по которому ОПиУ отличает начисление от сторно.
             'amount' => $this->money(abs((float) $amount)),
+            'operationType' => $this->operationType((float) $amount),
             'description' => $category->label,
             'date' => $date,
         ];
@@ -327,6 +352,22 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         }
 
         return $fees;
+    }
+
+    /**
+     * Знак исходной суммы Ozon — это вид операции, а не свойство числа.
+     *
+     * Отрицательная сумма — начисление в пользу Ozon, то есть расход продавца.
+     * Положительная — возврат ранее удержанного: комиссия за отменённый заказ,
+     * корректировка услуги. Суммы хранятся положительными, как в легаси-пути,
+     * поэтому без operation_type сторно неотличимо от начисления и `UnprocessedCostsQuery`
+     * посчитает возврат расходом, увеличив затраты вместо их уменьшения.
+     */
+    private function operationType(float $rawAmount): MarketplaceCostOperationType
+    {
+        return $rawAmount > 0
+            ? MarketplaceCostOperationType::STORNO
+            : MarketplaceCostOperationType::CHARGE;
     }
 
     private function money(float $value): string
