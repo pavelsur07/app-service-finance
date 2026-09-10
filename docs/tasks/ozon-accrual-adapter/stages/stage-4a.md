@@ -14,6 +14,8 @@
   исключение — именно его отсутствие не дало опознать снятие v3.
 - `SyncOzonAccrualByDayMessage` / `SyncOzonAccrualByDayHandler` /
   `app:marketplace:ozon-accrual:daily-sync` — загрузка дня рядом с легаси-путём.
+  (Переименована позже в `app:marketplace:ozon-financial-reports:sync`; здесь
+  сохранено имя на момент закрытия Stage.)
 - `OzonAccrualByDayClientInterface` — по образцу `OzonAccrualClientInterface` в
   Ingestion: реализация остаётся `final`, обработчику нужен подменяемый контракт.
 

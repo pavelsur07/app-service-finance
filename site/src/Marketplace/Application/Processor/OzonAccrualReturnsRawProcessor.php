@@ -209,9 +209,11 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 'sku' => $sku,
                 'date' => $date,
                 'quantity' => $quantity,
-                // Сумма возврата хранится положительной: знак несёт сам факт
-                // возврата, как и в легаси-пути.
-                'refund' => $this->money(abs((float) $salePrice) * $quantity),
+                // База продавца, как у легаси-строк в этой же таблице: сверка
+                // за июнь сошлась точно — marketplace_returns.refund_amount
+                // 204 911.00 на 77 строках против суммы |sale_amount| по
+                // возвратам 204 911 на тех же 77. Сумма хранится положительной.
+                'refund' => $this->money(abs((float) $saleAmount)),
                 'raw' => $product,
             ];
         }

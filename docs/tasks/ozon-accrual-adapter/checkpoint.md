@@ -60,7 +60,7 @@
 - Ветка `feat/ozon-accrual-by-day-processors` уходит в merge.
 - Stage 5: сверка Marketplace против Ingestion за день, перезалив одного
   кабинета за один день, затем 08.09 и далее по всем; Work item 5.4 —
-  вернуть строку `ozon-accrual:daily-sync` в `docker/cron/app.cron`.
+  вернуть строку `ozon-financial-reports:sync` в `docker/cron/app.cron`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»

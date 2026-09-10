@@ -83,6 +83,24 @@
 # поедет на /v1/finance/accrual/by-day. Разбор — docs/tasks/ozon-accrual-adapter/plan.md.
 #0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
+# Замена: загрузка финансовых отчётов Ozon через /v1/finance/accrual/by-day.
+#
+# Окно 2 дня, а не 14, как у снятой команды. Причина не в экономии запросов:
+# дни по 07.09.2026 включительно уже покрыты документами формата v3
+# (document_type = sales_report), и их продажи лежат в marketplace_sales.
+# Документы by-day с ними не конфликтуют — у by-day свой document_type, — но
+# нормализованные строки не разводятся: уникальность marketplace_sales стоит на
+# external_order_id, а ключи у путей разные (posting_number против
+# ozon-accrual-{posting}-product-{i}). День, обработанный из обоих документов,
+# дал бы двойной учёт продаж. Окно 2 дня до таких дней не дотягивается и
+# при этом переживает суточную правку начислений задним числом.
+0 4 * * * cd /app && php bin/console app:marketplace:ozon-financial-reports:sync --days-back=2 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Гейт свежести под ту же загрузку: у активного seller-подключения обязан быть
+# документ начислений за вчера. Ненулевой exit code = загрузка встала сейчас.
+# Починка под гейт — команда выше, её окно вчерашний день покрывает.
+50 6 * * * cd /app && php bin/console app:marketplace:ozon-financial-reports:freshness-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Inventory Ozon snapshot: запуск в 04:05 MSK, команда только инициирует pipeline; HTTP-загрузка выполняется async worker'ом.
 5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
