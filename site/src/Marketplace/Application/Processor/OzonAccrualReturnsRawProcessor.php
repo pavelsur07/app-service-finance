@@ -12,6 +12,7 @@ use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -35,6 +36,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         private readonly EntityManagerInterface $em,
         private readonly OzonListingEnsureService $listingEnsureService,
         private readonly MarketplaceReturnRepository $returnRepository,
+        private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
     ) {
@@ -113,7 +115,17 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             $entity->setReturnDate($return['date']);
             $entity->setQuantity($return['quantity']);
             $entity->setRefundAmount($return['refund']);
-            $entity->setCostPrice($this->costPriceResolver->resolveForReturn($listing, null, $return['raw'], $return['date']));
+            // Исходная продажа даёт себестоимость, которую надо сторнировать.
+            // Не нашлась — резолвер посчитает по дате возврата, это хуже, но
+            // лучше, чем ничего.
+            $sale = $this->saleRepository->findByMarketplaceOrderAndSku(
+                $company,
+                MarketplaceType::OZON,
+                $return['saleExternalId'],
+                $return['sku'],
+            );
+
+            $entity->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $return['raw'], $return['date']));
             $entity->setRawData($return['raw']);
             if (null !== $rawDocId) {
                 $entity->setRawDocumentId($rawDocId);
@@ -129,7 +141,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
     /**
      * @param array<string, mixed> $row
      *
-     * @return list<array{externalId: string, sku: string, date: \DateTimeImmutable, quantity: int, refund: string, raw: array<string, mixed>}>
+     * @return list<array{externalId: string, saleExternalId: string, sku: string, date: \DateTimeImmutable, quantity: int, refund: string, raw: array<string, mixed>}>
      */
     private function extractReturns(array $row): array
     {
@@ -139,6 +151,13 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         if ('' === $accrualId || !is_string($rawDate)) {
             return [];
         }
+
+        // Номер отправления общий у продажи и её возврата — по нему возврат
+        // находит исходную продажу и отражает ТУ ЖЕ себестоимость. Без этого
+        // при изменении себестоимости между продажей и возвратом ОПиУ сторнирует
+        // не ту сумму.
+        $unitNumber = $row['unit_number'] ?? null;
+        $postingRef = is_string($unitNumber) && '' !== trim($unitNumber) ? trim($unitNumber) : $accrualId;
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $rawDate);
         if (false === $date) {
@@ -176,9 +195,18 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 continue;
             }
 
+            $sku = (string) ($product['sku'] ?? '');
+            if ('' === $sku) {
+                $this->logger->warning('[Ozon by-day] product without sku, return skipped', [
+                    'accrual_id' => $accrualId,
+                ]);
+                continue;
+            }
+
             $returns[] = [
-                'externalId' => sprintf('ozon-accrual-%s-return-product-%d', $accrualId, $index),
-                'sku' => (string) ($product['sku'] ?? ''),
+                'externalId' => sprintf('ozon-accrual-%s-return-product-%d', $postingRef, $index),
+                'saleExternalId' => OzonAccrualSalesRawProcessor::externalId($postingRef, $index),
+                'sku' => $sku,
                 'date' => $date,
                 'quantity' => $quantity,
                 // Сумма возврата хранится положительной: знак несёт сам факт

@@ -70,7 +70,9 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
         $repeat = $this->processor(existingIds: [$first]);
         $repeat->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->saleRow()], self::RAW_DOC_ID);
 
-        self::assertStringContainsString('50000000001', $first, 'Ключ строится на accrual_id.');
+        // Ключ строится на номере отправления, а не на accrual_id: тот же номер
+        // несёт возврат этого товара, и по нему он находит исходную продажу.
+        self::assertStringContainsString('80000001-1001-1', $first);
         self::assertSame([], $this->persisted, 'Повторный прогон не создаёт вторую продажу.');
     }
 

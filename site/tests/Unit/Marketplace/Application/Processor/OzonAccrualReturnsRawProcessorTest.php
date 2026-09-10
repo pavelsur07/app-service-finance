@@ -10,12 +10,14 @@ use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -70,6 +72,20 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertSame([], $this->persisted);
     }
 
+    public function testReturnLooksUpOriginalSaleByPostingNumber(): void
+    {
+        // Себестоимость возврата обязана сторнировать ТУ ЖЕ, что была у продажи.
+        // Связь — номер отправления: он общий у продажи и её возврата, а
+        // accrual_id у них разные.
+        $lookedUp = null;
+        $processor = $this->processor([], $lookedUp);
+        $processor->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
+        self::assertNotNull($lookedUp);
+        self::assertStringContainsString('-product-0', $lookedUp);
+        self::assertStringNotContainsString('-return-', $lookedUp, 'Искать надо ключ продажи, а не возврата.');
+    }
+
     public function testProcessorClaimsOnlyByDayReturns(): void
     {
         $processor = $this->processor();
@@ -113,7 +129,7 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     /**
      * @param list<string> $existingIds
      */
-    private function processor(array $existingIds = []): OzonAccrualReturnsRawProcessor
+    private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null): OzonAccrualReturnsRawProcessor
     {
         $this->persisted = [];
 
@@ -151,10 +167,20 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
         $returnRepository->method('getExistingExternalIds')->willReturn(array_fill_keys($existingIds, true));
 
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $saleRepository->method('findByMarketplaceOrderAndSku')->willReturnCallback(
+            function (Company $c, MarketplaceType $m, string $orderId, string $sku) use (&$lookedUpSaleId): ?MarketplaceSale {
+                $lookedUpSaleId = $orderId;
+
+                return null;
+            },
+        );
+
         return new OzonAccrualReturnsRawProcessor(
             $em,
             $listings,
             $returnRepository,
+            $saleRepository,
             $costPrice,
             new NullLogger(),
         );

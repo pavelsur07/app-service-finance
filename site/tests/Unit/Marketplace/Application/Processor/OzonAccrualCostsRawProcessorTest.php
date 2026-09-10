@@ -91,6 +91,17 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         self::assertSame([], $this->persisted);
     }
 
+    public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
+    {
+        // Документ более ранней версии загрузчика разобрать нечем: справочника
+        // услуг в нём нет. Молчаливый ноль записал бы шаг затрат как успешный
+        // и занизил расходы.
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/refetch the day/');
+
+        $this->processorWithPayload([['accrual_id' => 1]])->process(self::COMPANY_ID, self::RAW_DOC_ID);
+    }
+
     public function testProcessorClaimsOnlyByDayCosts(): void
     {
         $processor = $this->processor([]);
@@ -123,9 +134,18 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * @param list<string> $existingIds
+     * @param array<array-key, mixed> $payload
      */
-    private function processor(array $existingIds): OzonAccrualCostsRawProcessor
+    private function processorWithPayload(array $payload): OzonAccrualCostsRawProcessor
+    {
+        return $this->processor([], $payload);
+    }
+
+    /**
+     * @param list<string> $existingIds
+     * @param array<string, mixed>|null $payloadOverride
+     */
+    private function processor(array $existingIds, ?array $payloadOverride = null): OzonAccrualCostsRawProcessor
     {
         $this->persisted = [];
 
@@ -135,7 +155,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
         $this->setProperty($document, 'id', self::RAW_DOC_ID);
         $this->setProperty($document, 'company', $company);
-        $this->setProperty($document, 'rawData', $this->payload());
+        $this->setProperty($document, 'rawData', $payloadOverride ?? $this->payload());
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
@@ -165,6 +185,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
 
         return new OzonAccrualCostsRawProcessor(
             $em,
+            $connection,
             new OzonAccrualCategoryFacade(),
             $categoryResolver,
             $existingQuery,

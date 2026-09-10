@@ -157,6 +157,12 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             return [];
         }
 
+        // Ключ строится на номере отправления, а не на accrual_id: тот же номер
+        // несёт и возврат этого товара, и по нему возврат находит исходную
+        // продажу, чтобы отразить ту же себестоимость. accrual_id у возврата
+        // другой и связать по нему нечего.
+        $postingRef = $this->postingRef($row, $accrualId);
+
         $day = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
         if (false === $day) {
             return [];
@@ -189,11 +195,21 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 continue;
             }
 
+            $sku = (string) ($product['sku'] ?? '');
+            if ('' === $sku) {
+                // Пустой sku создал бы общий листинг-пустышку, к которому
+                // прицепились бы несвязанные финансовые записи.
+                $this->logger->warning('[Ozon by-day] product without sku, sale skipped', [
+                    'accrual_id' => $accrualId,
+                ]);
+                continue;
+            }
+
             $sales[] = [
                 // Ключ детерминирован: повторный прогон дня даёт те же значения,
                 // поэтому версии вида _v2 из легаси-пути здесь не нужны.
-                'externalId' => sprintf('ozon-accrual-%s-product-%d', $accrualId, $index),
-                'sku' => (string) ($product['sku'] ?? ''),
+                'externalId' => self::externalId($postingRef, $index),
+                'sku' => $sku,
                 'date' => $day,
                 'quantity' => $quantity,
                 'pricePerUnit' => $this->money((float) $salePrice),
@@ -203,6 +219,24 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
         }
 
         return $sales;
+    }
+
+    /**
+     * Ключ продажи, вычислимый и со стороны возврата.
+     */
+    public static function externalId(string $postingRef, int $productIndex): string
+    {
+        return sprintf('ozon-accrual-%s-product-%d', $postingRef, $productIndex);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function postingRef(array $row, string $accrualId): string
+    {
+        $unitNumber = $row['unit_number'] ?? null;
+
+        return is_string($unitNumber) && '' !== trim($unitNumber) ? trim($unitNumber) : $accrualId;
     }
 
     private function quantity(float $saleAmount, float $sellerPrice, string $accrualId): ?int

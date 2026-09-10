@@ -14,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\MessageHandler\SyncOzonAccrualByDayHandler;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -44,6 +45,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly Connection $connection,
         private readonly OzonAccrualCategoryFacade $categoryFacade,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
@@ -71,12 +73,21 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         }
 
         $payload = $document->getRawData();
-        $accruals = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS] ?? [];
-        $serviceTypes = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_SERVICE_TYPES] ?? [];
 
-        if (!is_array($accruals) || !is_array($serviceTypes)) {
-            return 0;
+        // Документ обязан нести конверт с начислениями и справочником. Документ
+        // без него — из более ранней версии загрузчика: разобрать его нечем,
+        // справочника нет. Молчаливый ноль записал бы шаг затрат как успешный и
+        // занизил расходы, поэтому падаем.
+        if (!isset($payload[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS])
+            || !is_array($payload[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS])
+            || !isset($payload[SyncOzonAccrualByDayHandler::PAYLOAD_SERVICE_TYPES])
+            || !is_array($payload[SyncOzonAccrualByDayHandler::PAYLOAD_SERVICE_TYPES])
+        ) {
+            throw new \RuntimeException(sprintf('Raw document %s has no accrual envelope: refetch the day before processing costs.', $rawDocId));
         }
+
+        $accruals = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS];
+        $serviceTypes = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_SERVICE_TYPES];
 
         $entries = [];
         foreach ($accruals as $accrual) {
@@ -98,37 +109,49 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
 
         $created = 0;
 
-        foreach ($entries as $entry) {
-            if (isset($existing[$entry['externalId']])) {
-                continue;
+        // Вызывающий удаляет прежние затраты документа до этого метода, поэтому
+        // замена идёт в одной транзакции: сбой после удаления иначе оставил бы
+        // документ вовсе без затрат до следующего успешного прогона.
+        $this->connection->beginTransaction();
+
+        try {
+            foreach ($entries as $entry) {
+                if (isset($existing[$entry['externalId']])) {
+                    continue;
+                }
+
+                $category = $this->categoryResolver->resolve(
+                    $company,
+                    MarketplaceType::OZON,
+                    $entry['categoryCode'],
+                    $entry['categoryName'],
+                );
+
+                $cost = new MarketplaceCost(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::OZON,
+                    $category,
+                );
+
+                $cost->setExternalId($entry['externalId']);
+                $cost->setRawDocumentId($rawDocId);
+                $cost->setCostDate($entry['date']);
+                $cost->setAmount($entry['amount']);
+                $cost->setDescription($entry['description']);
+
+                $this->em->persist($cost);
+                $existing[$entry['externalId']] = true;
+                ++$created;
             }
 
-            $category = $this->categoryResolver->resolve(
-                $company,
-                MarketplaceType::OZON,
-                $entry['categoryCode'],
-                $entry['categoryName'],
-            );
+            $this->em->flush();
+            $this->connection->commit();
+        } catch (\Throwable $e) {
+            $this->connection->rollBack();
 
-            $cost = new MarketplaceCost(
-                Uuid::uuid4()->toString(),
-                $company,
-                MarketplaceType::OZON,
-                $category,
-            );
-
-            $cost->setExternalId($entry['externalId']);
-            $cost->setRawDocumentId($rawDocId);
-            $cost->setCostDate($entry['date']);
-            $cost->setAmount($entry['amount']);
-            $cost->setDescription($entry['description']);
-
-            $this->em->persist($cost);
-            $existing[$entry['externalId']] = true;
-            ++$created;
+            throw $e;
         }
-
-        $this->em->flush();
 
         return $created;
     }
