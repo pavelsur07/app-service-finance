@@ -31,7 +31,7 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     private const COMPANY_ID = 'company-1';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
 
-    /** @var array<int, array{externalId: string, quantity: int, refund: string}> */
+    /** @var array<int, array{externalId: string, quantity: int, refund: string, sale: MarketplaceSale|null}> */
     private array $persisted = [];
 
     public function testRefundAmountIsPositiveAndUsesSellerBasis(): void
@@ -101,6 +101,34 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertStringNotContainsString('-return-', $lookedUp, 'Искать надо ключ продажи, а не возврата.');
     }
 
+    public function testFoundSaleIsLinkedToTheReturn(): void
+    {
+        // Продажа уже найдена ради себестоимости; поле sale_id у возврата
+        // существует, и WB-процессор его заполняет. Без ссылки связь возврата с
+        // исходным отправлением живёт только внутри метода разбора.
+        $sale = $this->createMock(MarketplaceSale::class);
+        $lookedUp = null;
+
+        $this->processor([], $lookedUp, $sale)
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
+        self::assertCount(1, $this->persisted);
+        self::assertSame($sale, $this->persisted[0]['sale']);
+    }
+
+    public function testReturnWithoutOriginalSaleStaysUnlinked(): void
+    {
+        // Продажи может не быть — например, она в периоде, который не грузили.
+        // Придумывать ссылку нельзя.
+        $lookedUp = null;
+
+        $this->processor([], $lookedUp, null)
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
+        self::assertCount(1, $this->persisted);
+        self::assertNull($this->persisted[0]['sale']);
+    }
+
     public function testProcessorClaimsOnlyByDayReturns(): void
     {
         $processor = $this->processor();
@@ -144,7 +172,7 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     /**
      * @param list<string> $existingIds
      */
-    private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null): OzonAccrualReturnsRawProcessor
+    private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null, ?MarketplaceSale $sale = null): OzonAccrualReturnsRawProcessor
     {
         $this->persisted = [];
 
@@ -163,6 +191,7 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
                     'externalId' => (string) $entity->getExternalReturnId(),
                     'quantity' => $entity->getQuantity(),
                     'refund' => $entity->getRefundAmount(),
+                    'sale' => $entity->getSale(),
                 ];
             }
         });
@@ -184,10 +213,10 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('findByMarketplaceOrderAndSku')->willReturnCallback(
-            function (Company $c, MarketplaceType $m, string $orderId, string $sku) use (&$lookedUpSaleId): ?MarketplaceSale {
+            function (Company $c, MarketplaceType $m, string $orderId, string $sku) use (&$lookedUpSaleId, $sale): ?MarketplaceSale {
                 $lookedUpSaleId = $orderId;
 
-                return null;
+                return $sale;
             },
         );
 

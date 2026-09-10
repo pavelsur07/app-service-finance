@@ -7,6 +7,7 @@ namespace App\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
@@ -50,6 +51,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         private readonly OzonAccrualCategoryFacade $categoryFacade,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
+        private readonly OzonListingEnsureService $listingEnsureService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -132,6 +134,14 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 array_values(array_unique(array_column($entries, 'externalId'))),
             );
 
+            // Листинги резолвятся одним запросом на документ, а не по строке:
+            // затрат за день тысячи, и по одной это дало бы N+1.
+            $skus = array_values(array_unique(array_filter(array_column($entries, 'sku'))));
+            $listings = [] === $skus
+                ? []
+                // by-day не несёт наименования товара — только sku.
+                : $this->listingEnsureService->ensureListings($company, array_fill_keys($skus, null));
+
             foreach ($entries as $entry) {
                 if (isset($existing[$entry['externalId']])) {
                     continue;
@@ -156,6 +166,23 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 $cost->setCostDate($entry['date']);
                 $cost->setAmount($entry['amount']);
                 $cost->setOperationType($entry['operationType']);
+
+                // Товарная затрата получает листинг, общая остаётся без него:
+                // NON_ITEM по устройству ответа sku не несёт. Пустая привязка
+                // при непустом sku — это не «общая затрата», а потерянный
+                // листинг, поэтому такой случай виден в логе.
+                if (null !== $entry['sku']) {
+                    $listing = $listings[$entry['sku']] ?? null;
+
+                    if (null !== $listing) {
+                        $cost->setListing($listing);
+                    } else {
+                        $this->logger->warning('[Ozon by-day] listing not resolved for cost', [
+                            'external_id' => $entry['externalId'],
+                            'sku' => $entry['sku'],
+                        ]);
+                    }
+                }
                 $cost->setDescription($entry['description']);
 
                 $this->em->persist($cost);
@@ -196,7 +223,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $accrual
      * @param array<string, string> $serviceTypes
      *
-     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable}>
+     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}>
      */
     private function extractEntries(array $accrual, array $serviceTypes): array
     {
@@ -212,9 +239,23 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             return [];
         }
 
+        // container_fees — затраты на тару и грузоместо по B2C-схеме. За месяц
+        // выгрузки (31 день, 6889 начислений) поле не было непустым ни разу, и
+        // формы его элементов мы не знаем. Молча пропустить непустой блок значит
+        // занизить расходы и не заметить этого, поэтому падаем с указанием, где
+        // смотреть.
+        $containerFees = $accrual['container_fees'] ?? null;
+        if (is_array($containerFees) && [] !== $containerFees) {
+            throw new \RuntimeException(sprintf('Ozon accrual %s carries a non-empty container_fees block, which has no parser yet: capture the day and add one before processing costs.', $accrualId));
+        }
+
         $entries = [];
 
+        // POSTING: и комиссия, и услуги доставки относятся к конкретному товару
+        // отправления, поэтому несут его sku и получают привязку к листингу.
         foreach ($this->products($accrual) as $index => $product) {
+            $sku = $this->sku($product);
+
             $commission = $product['commission']['commission']['amount'] ?? null;
             if (is_numeric($commission) && 0.0 !== (float) $commission) {
                 $entries[] = [
@@ -225,6 +266,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                     'operationType' => $this->operationType((float) $commission),
                     'description' => (float) $commission > 0 ? 'Возврат комиссии Ozon' : self::COMMISSION_NAME,
                     'date' => $date,
+                    'sku' => $sku,
                 ];
             }
 
@@ -234,6 +276,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                     $serviceTypes,
                     $date,
                     sprintf('ozon-accrual-%s-product-%d-service-%d', $accrualId, $index, $serviceIndex),
+                    $sku,
                 );
 
                 if (null !== $entry) {
@@ -242,12 +285,14 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             }
         }
 
+        // ITEM: sku лежит на группе, а не на самой услуге.
         foreach ($this->itemFees($accrual) as $feeIndex => $fee) {
             $entry = $this->serviceEntry(
-                $fee,
+                $fee['fee'],
                 $serviceTypes,
                 $date,
                 sprintf('ozon-accrual-%s-item-fee-%d', $accrualId, $feeIndex),
+                $fee['sku'],
             );
 
             if (null !== $entry) {
@@ -255,6 +300,8 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             }
         }
 
+        // NON_ITEM: sku нет по устройству ответа — это затрата кабинета целиком
+        // (реклама, подписка, приёмка поставки), и листинга у неё быть не может.
         $nonItemFee = $accrual['non_item_fee'] ?? null;
         if (is_array($nonItemFee)) {
             $entry = $this->serviceEntry(
@@ -262,6 +309,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 $serviceTypes,
                 $date,
                 sprintf('ozon-accrual-%s-non-item', $accrualId),
+                null,
             );
 
             if (null !== $entry) {
@@ -276,9 +324,9 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $service
      * @param array<string, string> $serviceTypes
      *
-     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable}|null
+     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}|null
      */
-    private function serviceEntry(array $service, array $serviceTypes, \DateTimeImmutable $date, string $externalIdPrefix): ?array
+    private function serviceEntry(array $service, array $serviceTypes, \DateTimeImmutable $date, string $externalIdPrefix, ?string $sku): ?array
     {
         $amount = $service['accrued']['amount'] ?? null;
         if (!is_numeric($amount) || 0.0 === (float) $amount) {
@@ -309,6 +357,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             'operationType' => $this->operationType((float) $amount),
             'description' => $category->label,
             'date' => $date,
+            'sku' => $sku,
         ];
     }
 
@@ -333,9 +382,12 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
     }
 
     /**
+     * Услуги по товару вместе с sku своей группы: сам элемент `fees[]` его не
+     * несёт, а без него затрата потеряла бы привязку к листингу.
+     *
      * @param array<string, mixed> $accrual
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<array{sku: string|null, fee: array<string, mixed>}>
      */
     private function itemFees(array $accrual): array
     {
@@ -346,12 +398,37 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
 
         $fees = [];
         foreach ($groups as $group) {
+            if (!is_array($group)) {
+                continue;
+            }
+
+            $sku = $this->sku($group);
+
             foreach ($this->services($group['fees'] ?? null) as $fee) {
-                $fees[] = $fee;
+                $fees[] = ['sku' => $sku, 'fee' => $fee];
             }
         }
 
         return $fees;
+    }
+
+    /**
+     * SKU Ozon приходит и числом, и строкой; пустое значение — это отсутствие
+     * привязки, а не листинг с пустым артикулом.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function sku(array $row): ?string
+    {
+        $sku = $row['sku'] ?? null;
+
+        if (!is_int($sku) && !is_string($sku)) {
+            return null;
+        }
+
+        $sku = trim((string) $sku);
+
+        return '' !== $sku ? $sku : null;
     }
 
     /**

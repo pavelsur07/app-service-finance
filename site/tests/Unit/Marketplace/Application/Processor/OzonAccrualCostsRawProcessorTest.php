@@ -8,13 +8,17 @@ use App\Company\Entity\Company;
 use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Processor\OzonAccrualCostsRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Infrastructure\Query\OzonListingUpsertQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,9 +34,19 @@ use Psr\Log\NullLogger;
 final class OzonAccrualCostsRawProcessorTest extends TestCase
 {
     private const COMPANY_ID = 'company-1';
+    private const LISTING_ID = '22222222-2222-4222-8222-222222222222';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
 
-    /** @var list<array{externalId: string, code: string, amount: string, operationType: string|null}> */
+    private ?MarketplaceListing $listing = null;
+
+    protected function setUp(): void
+    {
+        $listing = (new \ReflectionClass(MarketplaceListing::class))->newInstanceWithoutConstructor();
+        $this->setProperty($listing, 'id', self::LISTING_ID);
+        $this->listing = $listing;
+    }
+
+    /** @var list<array{externalId: string, code: string, amount: string, operationType: string|null, listingId: string|null}> */
     private array $persisted = [];
 
     public function testCommissionBecomesPositiveCostWithLegacyCategoryCode(): void
@@ -166,6 +180,73 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         }
     }
 
+    public function testPostingCostsAreBoundToTheListingOfTheirProduct(): void
+    {
+        // Регрессия. Затраты by-day не привязывались к листингу вообще: на проде
+        // за 08.09 и 09.09 из 9638 строк привязано было 0, тогда как легаси-дни
+        // держат 97–99%. Комиссия и услуги доставки относятся к конкретному
+        // товару отправления и обязаны нести его листинг.
+        $this->process();
+
+        $posting = array_filter(
+            $this->persisted,
+            static fn (array $row): bool => str_contains($row['externalId'], '-commission-product-')
+                || str_contains($row['externalId'], '-product-0-service-'),
+        );
+
+        self::assertNotSame([], $posting);
+        foreach ($posting as $row) {
+            self::assertSame(self::LISTING_ID, $row['listingId'], $row['externalId'].' — товарная затрата без листинга.');
+        }
+    }
+
+    public function testItemFeeTakesSkuFromItsGroup(): void
+    {
+        // sku лежит на группе item_fees.fees[], а не на самой услуге: если брать
+        // его с услуги, привязка теряется молча.
+        $this->process();
+
+        $itemFees = array_filter(
+            $this->persisted,
+            static fn (array $row): bool => str_contains($row['externalId'], '-item-fee-'),
+        );
+
+        self::assertNotSame([], $itemFees);
+        foreach ($itemFees as $row) {
+            self::assertSame(self::LISTING_ID, $row['listingId'], $row['externalId'].' — услуга по товару без листинга.');
+        }
+    }
+
+    public function testNonItemFeeStaysGeneralWithoutListing(): void
+    {
+        // NON_ITEM по устройству ответа sku не несёт: это затрата кабинета
+        // целиком. Привязать её к листингу нельзя, и выдумывать привязку нельзя.
+        $this->process();
+
+        $nonItem = array_filter(
+            $this->persisted,
+            static fn (array $row): bool => str_contains($row['externalId'], '-non-item'),
+        );
+
+        self::assertNotSame([], $nonItem);
+        foreach ($nonItem as $row) {
+            self::assertNull($row['listingId'], $row['externalId'].' — общая затрата не должна получать листинг.');
+        }
+    }
+
+    public function testNonEmptyContainerFeesFailLoudlyInsteadOfBeingSkipped(): void
+    {
+        // За месяц выгрузки поле не было непустым ни разу, разбора для него нет.
+        // Молча пропустить блок значит занизить расходы и не заметить этого.
+        $payload = $this->payload();
+        $payload['accruals'][0]['container_fees'] = [['type_id' => 108, 'accrued' => ['amount' => '-100.00']]];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/container_fees/');
+
+        $this->processorWithPayload($payload)->process(self::COMPANY_ID, self::RAW_DOC_ID);
+    }
+
     public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
     {
         // Документ более ранней версии загрузчика разобрать нечем: справочника
@@ -228,6 +309,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             new OzonAccrualCategoryFacade(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
+            $this->listingEnsureService($this->listing),
             new NullLogger(),
         );
 
@@ -287,6 +369,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
                     'code' => (string) $entity->getCategory()?->getCode(),
                     'amount' => $entity->getAmount(),
                     'operationType' => $entity->getOperationType()?->value,
+                    'listingId' => $entity->getListing()?->getId(),
                 ];
             }
         });
@@ -308,12 +391,13 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             new OzonAccrualCategoryFacade(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
+            $this->listingEnsureService($this->listing),
             new NullLogger(),
         ))->process(self::COMPANY_ID, self::RAW_DOC_ID);
     }
 
     /**
-     * @return array{externalId: string, code: string, amount: string, operationType: string|null}
+     * @return array{externalId: string, code: string, amount: string, operationType: string|null, listingId: string|null}
      */
     private function find(string $needle): array
     {
@@ -361,6 +445,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
                     'code' => (string) $entity->getCategory()?->getCode(),
                     'amount' => $entity->getAmount(),
                     'operationType' => $entity->getOperationType()?->value,
+                    'listingId' => $entity->getListing()?->getId(),
                 ];
             }
         });
@@ -402,8 +487,33 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             new OzonAccrualCategoryFacade(),
             $categoryResolver,
             $existingQuery,
+            $this->listingEnsureService($this->listing),
             new NullLogger(),
         );
+    }
+
+    /**
+     * OzonListingEnsureService объявлен final: собирается рефлексией с
+     * подменённым репозиторием, как в тесте процессора продаж.
+     */
+    private function listingEnsureService(?MarketplaceListing $listing): OzonListingEnsureService
+    {
+        $service = (new \ReflectionClass(OzonListingEnsureService::class))->newInstanceWithoutConstructor();
+
+        $repository = $this->createMock(MarketplaceListingRepository::class);
+        $repository->method('findListingsBySkusIndexed')->willReturnCallback(
+            static fn (Company $c, MarketplaceType $m, array $skus): array => null === $listing
+                ? []
+                : array_fill_keys($skus, $listing),
+        );
+        $this->setProperty($service, 'listingRepository', $repository);
+        // Ветка «листинга нет» доходит до создания недостающих, поэтому её
+        // зависимости тоже подменяются: иначе тест падал бы на неинициализированном
+        // свойстве вместо проверяемого поведения.
+        $this->setProperty($service, 'upsertQuery', (new \ReflectionClass(OzonListingUpsertQuery::class))->newInstanceWithoutConstructor());
+        $this->setProperty($service, 'entityManager', $this->createMock(EntityManagerInterface::class));
+
+        return $service;
     }
 
     /**
