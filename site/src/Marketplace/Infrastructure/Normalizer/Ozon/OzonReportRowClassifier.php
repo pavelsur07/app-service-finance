@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Normalizer\Ozon;
 
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
@@ -12,9 +13,13 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('marketplace.row_classifier')]
 final readonly class OzonReportRowClassifier implements RowClassifierInterface
 {
-    public function supports(MarketplaceType $type): bool
+    public function supports(MarketplaceType $type, ?MarketplaceRawFormat $format = null): bool
     {
-        return MarketplaceType::OZON === $type;
+        // Реестр берёт первый подошедший, и этот классификатор стоит раньше
+        // by-day. Без явного отказа он затенял бы его порядком сервисов, и
+        // начисления разбирались бы правилами снятого формата v3.
+        return MarketplaceType::OZON === $type
+            && MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY !== $format;
     }
 
     public function classify(array $rawRow): StagingRecordType

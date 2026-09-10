@@ -1,10 +1,12 @@
 ## Current checkpoint
 
-**Phase:** Stage 4a закрыт, дальше Stage 4b отдельной веткой
-**Status:** handoff — ветка со стадиями 2, 3 и 4a готова к ревью
-**Stage base commit:** `d77337c1` (Stage 4a)
+**Phase:** Stage 4b закрыт, дальше Stage 5
+**Status:** handoff — ветка Stage 4b готова к ревью
+**Stage base commit:** `0504ffff` (Stage 4b)
 
 ### Completed
+- Stage 4b — классификатор by-day, три процессора, удаление мёртвого клиента.
+  Отчёт — `stages/stage-4b.md`.
 - Stage 4a — клиент by-day, загрузчик, команда-диспетчер. Отчёт —
   `stages/stage-4a.md`. Обработка вынесена в Stage 4b.
 - Stage 3 — `MarketplaceRawFormat`, выбор процессора по формату, громкий отказ
@@ -55,10 +57,10 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Ветка `feat/ozon-accrual-adapter-stages` (стадии 2, 3, 4a) уходит в merge.
-- Stage 4b ведётся отдельной веткой по решению Владельца от 10.09.2026:
-  формат-зависимый классификатор, три процессора, удаление мёртвого
-  `OzonTransactionTotalsClient`.
+- Ветка `feat/ozon-accrual-by-day-processors` уходит в merge.
+- Stage 5: сверка Marketplace против Ingestion за день, перезалив одного
+  кабинета за один день, затем 08.09 и далее по всем; Work item 5.4 —
+  вернуть строку `ozon-accrual:daily-sync` в `docker/cron/app.cron`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Api\Ozon;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\MarketplaceApiException;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
@@ -29,6 +30,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
 {
     private const BASE_URL = 'https://api-seller.ozon.ru';
     private const ENDPOINT = '/v1/finance/accrual/by-day';
+    private const TYPES_ENDPOINT = '/v1/finance/accrual/types';
     private const REQUEST_TIMEOUT = 120;
 
     /** Потолок фрагмента конверта ошибки Ozon, переносимого в исключение. */
@@ -106,6 +108,49 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
     }
 
     /**
+     * Справочник услуг Ozon: идентификатор -> имя.
+     *
+     * Имена приходят английскими кодами (`Acquiring`, `Logistic`,
+     * `LastMileCourier`) — именно по ним разбираются категории затрат: карта
+     * `type_id` расходится со справочником и на трёх известных значениях даёт
+     * неверную категорию.
+     *
+     * @return array<string, string>
+     */
+    public function fetchServiceTypes(string $companyId): array
+    {
+        $response = $this->httpClient->request('POST', self::BASE_URL.self::TYPES_ENDPOINT, [
+            'headers' => $this->buildHeaders($companyId),
+            'json' => new \stdClass(),
+            'timeout' => self::REQUEST_TIMEOUT,
+        ]);
+
+        $status = $response->getStatusCode();
+        if (200 !== $status) {
+            throw $this->apiFailure($status, $response, 'types');
+        }
+
+        $payload = $response->toArray(false);
+        $types = $payload['accrual_types'] ?? null;
+
+        if (!is_array($types)) {
+            throw new MarketplaceInvalidApiResponseException('Ozon accrual types response has no "accrual_types" array.', 200, $this->excerpt($payload), 'types', 'types');
+        }
+
+        $map = [];
+        foreach ($types as $type) {
+            $id = is_array($type) ? ($type['id'] ?? null) : null;
+            $name = is_array($type) ? ($type['name'] ?? null) : null;
+
+            if ((is_int($id) || is_string($id)) && is_string($name) && '' !== $name) {
+                $map[(string) $id] = $name;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * @param array<string, string> $headers
      * @param array<string, mixed> $json
      *
@@ -122,41 +167,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         $status = $response->getStatusCode();
 
         if (200 !== $status) {
-            // Конверт ошибки Ozon переносится в исключение осознанно: именно его
-            // отсутствие не дало опознать снятие v3 в ночь на 09.09.2026. Это
-            // ответ неуспешного запроса, а не данные продавца.
-            $excerpt = mb_substr($response->getContent(false), 0, self::ERROR_EXCERPT_LIMIT);
-
-            throw match (true) {
-                429 === $status => new MarketplaceRateLimitException(
-                    $status,
-                    $excerpt,
-                    $day,
-                    $day,
-                    $this->retryAfterSeconds($response),
-                ),
-                401 === $status, 403 === $status => new MarketplaceAuthException(
-                    'Ozon accrual by-day rejected the API key.',
-                    $status,
-                    $excerpt,
-                    $day,
-                    $day,
-                ),
-                $status >= 500 => new MarketplaceTemporaryApiException(
-                    'Ozon accrual by-day is temporarily unavailable.',
-                    $status,
-                    $excerpt,
-                    $day,
-                    $day,
-                ),
-                default => new MarketplaceBadRequestException(
-                    'Ozon accrual by-day rejected the request.',
-                    $status,
-                    $excerpt,
-                    $day,
-                    $day,
-                ),
-            };
+            throw $this->apiFailure($status, $response, $day);
         }
 
         $payload = $response->toArray(false);
@@ -169,6 +180,23 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         ]);
 
         return $payload;
+    }
+
+    /**
+     * Конверт ошибки Ozon переносится в исключение осознанно: именно его
+     * отсутствие не дало опознать снятие v3 в ночь на 09.09.2026. Это ответ
+     * неуспешного запроса, а не данные продавца.
+     */
+    private function apiFailure(int $status, ResponseInterface $response, string $day): MarketplaceApiException
+    {
+        $excerpt = mb_substr($response->getContent(false), 0, self::ERROR_EXCERPT_LIMIT);
+
+        return match (true) {
+            429 === $status => new MarketplaceRateLimitException($status, $excerpt, $day, $day, $this->retryAfterSeconds($response)),
+            401 === $status, 403 === $status => new MarketplaceAuthException('Ozon accrual API rejected the API key.', $status, $excerpt, $day, $day),
+            $status >= 500 => new MarketplaceTemporaryApiException('Ozon accrual API is temporarily unavailable.', $status, $excerpt, $day, $day),
+            default => new MarketplaceBadRequestException('Ozon accrual API rejected the request.', $status, $excerpt, $day, $day),
+        };
     }
 
     /**

@@ -59,7 +59,10 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         self::assertInstanceOf(MarketplaceRawDocument::class, $persisted);
         self::assertSame('accrual_by_day', $persisted->getDocumentType());
         self::assertSame(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, $persisted->getApiEndpoint());
-        self::assertSame([['accrual_id' => 1]], $persisted->getRawData());
+        self::assertSame(
+            ['accruals' => [['accrual_id' => 1]], 'service_types' => ['29' => 'LastMileCourier']],
+            $persisted->getRawData(),
+        );
         self::assertSame(1, $persisted->getRecordsCount());
         self::assertSame(self::DATE, $persisted->getPeriodFrom()->format('Y-m-d'));
         self::assertSame(self::DATE, $persisted->getPeriodTo()->format('Y-m-d'));
@@ -79,7 +82,7 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
 
         self::assertInstanceOf(MarketplaceRawDocument::class, $persisted);
-        self::assertSame([], $persisted->getRawData());
+        self::assertSame(['accruals' => [], 'service_types' => ['29' => 'LastMileCourier']], $persisted->getRawData());
         self::assertSame(0, $persisted->getRecordsCount());
     }
 
@@ -101,7 +104,10 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
 
         self::assertNull($persisted, 'Повторный прогон не должен создавать второй документ.');
-        self::assertSame([['accrual_id' => 'new']], $existing->getRawData());
+        self::assertSame(
+            ['accruals' => [['accrual_id' => 'new']], 'service_types' => ['29' => 'LastMileCourier']],
+            $existing->getRawData(),
+        );
         self::assertSame(self::EXISTING_DOC_ID, $existing->getId());
     }
 
@@ -207,6 +213,7 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
     {
         $client = $this->createMock(OzonAccrualByDayClientInterface::class);
         $client->method('fetchDay')->willReturn($rows);
+        $client->method('fetchServiceTypes')->willReturn(['29' => 'LastMileCourier']);
 
         return $client;
     }

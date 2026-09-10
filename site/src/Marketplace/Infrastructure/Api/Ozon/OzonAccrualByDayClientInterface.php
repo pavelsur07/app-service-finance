@@ -20,4 +20,15 @@ interface OzonAccrualByDayClientInterface
      * @throws MarketplaceApiException
      */
     public function fetchDay(string $companyId, \DateTimeImmutable $date): array;
+
+    /**
+     * Справочник услуг: `type_id` -> имя. Начисления несут только идентификатор,
+     * а разбор услуги в категорию затрат идёт по имени, поэтому справочник
+     * забирается вместе с днём и хранится в том же документе.
+     *
+     * @return array<string, string>
+     *
+     * @throws MarketplaceApiException
+     */
+    public function fetchServiceTypes(string $companyId): array;
 }
