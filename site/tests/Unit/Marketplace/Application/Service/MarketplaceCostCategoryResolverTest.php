@@ -49,6 +49,69 @@ final class MarketplaceCostCategoryResolverTest extends TestCase
         self::assertSame($companyB, $resultB->getCompany());
     }
 
+    public function testSoftDeletedCategoryIsRevivedInsteadOfInsertedAgain(): void
+    {
+        // Регрессия с прода. Уникальность (company_id, marketplace, code) про
+        // deleted_at ничего не знает. Поиск с фильтром `deletedAt = null` не
+        // находил удалённую категорию, следом INSERT падал на уникальном индексе
+        // и ронял весь шаг затрат: 09.09 по кабинету так и остался без затрат,
+        // потому что код ozon_logistics удалили 28.03, а Ozon снова по нему
+        // начислил.
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-id');
+
+        $deleted = new MarketplaceCostCategory('11111111-1111-4111-8111-111111111111', $company, MarketplaceType::OZON);
+        $deleted->setCode('ozon_logistics');
+        $deleted->setName('Логистика Ozon');
+        $deleted->softDelete();
+        self::assertTrue($deleted->isDeleted());
+
+        $repository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $repository
+            ->expects(self::once())
+            ->method('findOneBy')
+            ->willReturnCallback(function (array $criteria) use ($deleted): MarketplaceCostCategory {
+                self::assertArrayNotHasKey('deletedAt', $criteria, 'Удалённые обязаны попадать в поиск, иначе INSERT упрётся в уникальный индекс.');
+
+                return $deleted;
+            });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('persist');
+
+        $resolver = new MarketplaceCostCategoryResolver($repository, $em);
+        $result = $resolver->resolve($company, MarketplaceType::OZON, 'ozon_logistics', 'Логистика Ozon');
+
+        self::assertSame($deleted, $result);
+        self::assertFalse($result->isDeleted(), 'Услуга, по которой снова пришло начисление, обязана вернуться в справочник.');
+    }
+
+    public function testPreloadedSoftDeletedCategoryIsRevivedOnResolve(): void
+    {
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-id');
+
+        $deleted = new MarketplaceCostCategory('11111111-1111-4111-8111-111111111111', $company, MarketplaceType::OZON);
+        $deleted->setCode('ozon_logistics');
+        $deleted->setName('Логистика Ozon');
+        $deleted->softDelete();
+
+        $repository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $repository->method('findBy')->willReturn([$deleted]);
+        $repository->expects(self::never())->method('findOneBy');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('persist');
+
+        $resolver = new MarketplaceCostCategoryResolver($repository, $em);
+        $resolver->preload($company, MarketplaceType::OZON);
+
+        $result = $resolver->resolve($company, MarketplaceType::OZON, 'ozon_logistics', 'Логистика Ozon');
+
+        self::assertSame($deleted, $result);
+        self::assertFalse($result->isDeleted(), 'Удалённая категория из кеша preload() тоже обязана вернуться, а не спрятать затрату.');
+    }
+
     public function testClearCacheResetsAllEntries(): void
     {
         $company = $this->createMock(Company::class);

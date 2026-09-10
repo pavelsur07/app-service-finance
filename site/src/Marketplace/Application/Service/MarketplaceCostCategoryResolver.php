@@ -36,15 +36,34 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
         $cacheKey = $company->getId().'_'.$marketplace->value.'_'.$code;
 
         if (isset($this->cache[$cacheKey])) {
-            return $this->cache[$cacheKey];
+            $cached = $this->cache[$cacheKey];
+
+            // Кеш наполняет и preload(), который берёт в том числе удалённые:
+            // вернуть удалённую категорию значило бы спрятать затрату из отчётов.
+            if ($cached->isDeleted()) {
+                $cached->restore();
+            }
+
+            return $cached;
         }
 
+        // Мягко удалённые категории тоже участвуют в поиске. Уникальность
+        // (company_id, marketplace, code) в базе про deleted_at ничего не знает,
+        // поэтому фильтр `deletedAt = null` не находил удалённую категорию, а
+        // следом INSERT падал на уникальном индексе и ронял весь шаг затрат.
+        // Так на проде упала загрузка 09.09: код `ozon_logistics` был удалён
+        // 28.03.2026, а Ozon снова начислил по этой услуге.
         $category = $this->costCategoryRepository->findOneBy([
             'company' => $company,
             'marketplace' => $marketplace,
             'code' => $code,
-            'deletedAt' => null,
         ]);
+
+        // Услуга, по которой снова пришло начисление, обязана вернуться в
+        // справочник: затрата с удалённой категорией выпала бы из отчётов молча.
+        if ($category instanceof MarketplaceCostCategory && $category->isDeleted()) {
+            $category->restore();
+        }
 
         if (null === $category) {
             $category = new MarketplaceCostCategory(
@@ -119,10 +138,11 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
      */
     public function preload(Company $company, MarketplaceType $marketplace): void
     {
+        // Удалённые тоже: иначе resolve() промахнётся мимо кеша, сходит в базу,
+        // снова их не увидит и попытается вставить дубль по тому же коду.
         $categories = $this->costCategoryRepository->findBy([
             'company' => $company,
             'marketplace' => $marketplace,
-            'deletedAt' => null,
         ]);
 
         foreach ($categories as $category) {
