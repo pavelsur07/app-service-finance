@@ -104,7 +104,20 @@ final class OzonFinancialReportsSyncCommand extends Command
         }
 
         $companyId = $input->getOption('company-id');
-        $companyFilter = is_string($companyId) && '' !== trim($companyId) ? trim($companyId) : null;
+        $companyFilter = null;
+
+        if (null !== $companyId) {
+            // Явно переданное пустое значение — это не «фильтра нет». Превратить
+            // его в прогон по всем кабинетам значило бы сделать вместо
+            // запрошенного одного все четыре, причём молча.
+            $companyFilter = is_string($companyId) ? trim($companyId) : '';
+
+            if ('' === $companyFilter) {
+                $io->error('--company-id передан пустым. Уберите опцию, если нужен прогон по всем кабинетам.');
+
+                return Command::FAILURE;
+            }
+        }
 
         $connections = $this->connectionsQuery->execute($companyFilter);
 

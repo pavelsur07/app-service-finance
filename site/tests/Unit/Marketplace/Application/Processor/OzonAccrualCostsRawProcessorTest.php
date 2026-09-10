@@ -102,6 +102,70 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $this->processorWithPayload([['accrual_id' => 1]])->process(self::COMPANY_ID, self::RAW_DOC_ID);
     }
 
+    public function testDeleteOfOldCostsIsInsideTheTransactionAndRollsBackOnFailure(): void
+    {
+        // Регрессия. Прежде прежние затраты сносил вызывающий, до этого метода:
+        // DELETE ложился отдельной транзакцией и фиксировался сразу, а Messenger
+        // handler в транзакцию Doctrine не оборачивает. Сбой при разборе оставлял
+        // документ вовсе без затрат, и исчерпанные ретраи закрепляли потерю.
+        $calls = [];
+
+        $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
+        $this->setProperty($company, 'id', self::COMPANY_ID);
+
+        $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
+        $this->setProperty($document, 'id', self::RAW_DOC_ID);
+        $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'rawData', $this->payload());
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static fn (string $class): object => MarketplaceRawDocument::class === $class ? $document : $company,
+        );
+        $em->method('flush')->willThrowException(new \RuntimeException('boom'));
+        $em->expects(self::once())->method('clear');
+
+        $categoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $categoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($categoryRepository, $em);
+
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('executeQuery')->willReturn($result);
+        $connection->method('beginTransaction')->willReturnCallback(static function () use (&$calls): void {
+            $calls[] = 'begin';
+        });
+        $connection->method('executeStatement')->willReturnCallback(static function () use (&$calls): int {
+            $calls[] = 'delete';
+
+            return 1;
+        });
+        $connection->method('rollBack')->willReturnCallback(static function () use (&$calls): void {
+            $calls[] = 'rollback';
+        });
+        $connection->expects(self::never())->method('commit');
+
+        $processor = new OzonAccrualCostsRawProcessor(
+            $em,
+            $connection,
+            new OzonAccrualCategoryFacade(),
+            $categoryResolver,
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            new NullLogger(),
+        );
+
+        try {
+            $processor->process(self::COMPANY_ID, self::RAW_DOC_ID);
+            self::fail('Сбой разбора обязан пробросить исключение.');
+        } catch (\RuntimeException) {
+            // ожидаемо
+        }
+
+        self::assertSame(['begin', 'delete', 'rollback'], $calls, 'Удаление обязано идти внутри транзакции и откатываться вместе с ней.');
+    }
+
     public function testProcessorClaimsOnlyByDayCosts(): void
     {
         $processor = $this->processor([]);

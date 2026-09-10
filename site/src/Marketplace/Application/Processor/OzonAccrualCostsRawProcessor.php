@@ -109,12 +109,24 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
 
         $created = 0;
 
-        // Вызывающий удаляет прежние затраты документа до этого метода, поэтому
-        // замена идёт в одной транзакции: сбой после удаления иначе оставил бы
-        // документ вовсе без затрат до следующего успешного прогона.
+        // Удаление и запись — одной транзакцией, и удаление внутри неё. Раньше
+        // прежние затраты сносил вызывающий, до этого метода: DELETE ложился
+        // отдельной транзакцией и фиксировался сразу, а Messenger handler в
+        // транзакцию Doctrine не оборачивает. Любой сбой ниже оставлял документ
+        // вовсе без затрат, и исчерпанные ретраи закрепляли потерю.
+        //
+        // Сносятся только незакрытые затраты: строка, привязанная к документу
+        // ОПиУ, относится к закрытому периоду и правке не подлежит.
         $this->connection->beginTransaction();
 
         try {
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $rawDocId],
+            );
+
             foreach ($entries as $entry) {
                 if (isset($existing[$entry['externalId']])) {
                     continue;
@@ -149,6 +161,11 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             $this->connection->commit();
         } catch (\Throwable $e) {
             $this->connection->rollBack();
+            // После отката EntityManager держит затраты, которых в базе нет, а
+            // резолвер — категории, которые тоже откатились. Любой следующий
+            // flush в этом же процессе записал бы их повторно.
+            $this->em->clear();
+            $this->categoryResolver->clearCache();
 
             throw $e;
         }

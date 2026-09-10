@@ -124,13 +124,20 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 : 0;
 
             // Delete existing unfiled costs before reprocessing (WB needs this;
-            // Ozon's process() also does its own DELETE, the double-delete is a safe no-op).
-            $this->connection->executeStatement(
-                'DELETE FROM marketplace_costs
-                 WHERE raw_document_id = :rawDocId
-                   AND document_id IS NULL',
-                ['rawDocId' => $command->rawDocId],
-            );
+            // легаси-процессор Ozon делает свой DELETE, двойное удаление безвредно).
+            //
+            // Затраты by-day исключены намеренно: их процессор сносит прежние
+            // строки внутри собственной транзакции. Удаление здесь легло бы
+            // отдельной транзакцией и зафиксировалось сразу, а сбой при разборе
+            // оставил бы документ вовсе без затрат.
+            if (MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY !== $format) {
+                $this->connection->executeStatement(
+                    'DELETE FROM marketplace_costs
+                     WHERE raw_document_id = :rawDocId
+                       AND document_id IS NULL',
+                    ['rawDocId' => $command->rawDocId],
+                );
+            }
 
             $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace, $command->kind, $format);
             $result = $processor->process($command->companyId, $command->rawDocId);

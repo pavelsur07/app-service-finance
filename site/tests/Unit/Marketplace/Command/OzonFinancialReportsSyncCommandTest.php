@@ -89,6 +89,17 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
         self::assertSame([], $messages);
     }
 
+    public function testExplicitlyEmptyCompanyIdIsRefusedNotWidenedToAllCabinets(): void
+    {
+        $messages = [];
+        $tester = new CommandTester($this->command([['company_id' => 'c-1', 'id' => 'conn-1']], $messages));
+
+        $tester->execute(['--days-back' => '1', '--company-id' => '']);
+
+        self::assertSame(1, $tester->getStatusCode());
+        self::assertSame([], $messages, 'Пустой фильтр не должен превращаться в прогон по всем кабинетам.');
+    }
+
     public function testWindowReachingLegacyDaysIsRefusedInsteadOfDoubleCounting(): void
     {
         $messages = [];

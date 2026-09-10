@@ -55,6 +55,20 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertGreaterThan(0, $this->persisted[0]['quantity']);
     }
 
+    public function testAmountsThatDoNotMultiplyBackAreSkippedNotRounded(): void
+    {
+        // Зеркало регрессии из продаж. Частное 1.0005 попадало в прежний допуск
+        // 0.001 и давало quantity = 1: возврат сторнировал бы себестоимость не
+        // того числа единиц, что было продано.
+        $row = $this->returnRow();
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '-1000.50';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '-1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
+    }
+
     public function testSaleRowIsIgnoredByReturnsProcessor(): void
     {
         $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->saleRow()], self::RAW_DOC_ID);
