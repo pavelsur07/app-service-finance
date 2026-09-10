@@ -347,6 +347,31 @@ Reviewer focus:
 - затенение процессоров порядком в контейнере
 - документ с неизвестным `apiEndpoint`: внятная ошибка, а не молчаливый пропуск
 
+### Находка Stage 4: у Ozon sales_report есть частичный уникальный индекс
+
+```sql
+CREATE UNIQUE INDEX uniq_marketplace_raw_documents_active_period
+  ON marketplace_raw_documents (company_id, marketplace, document_type, period_from, period_to)
+  WHERE marketplace = 'ozon' AND document_type = 'sales_report'
+    AND (processing_status IS NULL OR processing_status <> 'failed');
+```
+
+Два активных документа Ozon `sales_report` на один день физически невозможны,
+как бы ни различались `api_endpoint`. Поэтому документы by-day **обязаны** иметь
+другой `document_type` — иначе загрузчик упирается в индекс, а без индекса
+перезаписал бы сырьё легаси-документа того же дня.
+
+Принято: `document_type = 'accrual_by_day'`. Миграция не нужна, индекс
+продолжает защищать 967 легаси-документов, различение форматов из Stage 3
+остаётся в силе как более тонкий признак.
+
+Это же объясняет, почему у WB два формата спокойно сосуществуют под одним
+`document_type`: индекс прицельно ограничен `marketplace = 'ozon'`.
+
+**Follow-up:** у нового `document_type` аналогичной защиты от дублей на уровне БД
+нет — как и у WB сегодня. Идемпотентность держит загрузчик. Расширение частичного
+индекса на `accrual_by_day` — отдельный PR с миграцией, вне этой задачи.
+
 ## Stage 4: новый путь загрузки и обработки by-day
 Risk: HIGH-LOCAL
 stage_base_commit: <записать перед первым Work item>
