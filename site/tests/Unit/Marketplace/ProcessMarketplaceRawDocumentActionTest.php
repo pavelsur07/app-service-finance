@@ -11,6 +11,7 @@ use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
@@ -24,6 +25,7 @@ use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 {
@@ -93,6 +95,101 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $this->expectExceptionMessage('Unknown kind "unknown"');
 
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'unknown'));
+    }
+
+    /**
+     * DoD Stage 3: легаси-документ уходит тому же процессору, что и прежде, и
+     * даёт тот же результат. Проверяется на уровне Action, а не supports():
+     * тест на supports() остался бы зелёным, перестань Action извлекать или
+     * передавать формат.
+     */
+    public function testLegacyOzonDocumentGoesToLegacyProcessorWithItsFormat(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn([['x' => 1]]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn('ozon::v3/finance/transaction/list');
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor->expects(self::once())->method('process')->with('company-1', 'doc-1')->willReturn(7);
+
+        $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
+        $processorRegistry
+            ->expects(self::once())
+            ->method('get')
+            ->with(
+                StagingRecordType::COST,
+                MarketplaceType::OZON,
+                'costs',
+                MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3,
+            )
+            ->willReturn($processor);
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $processorRegistry,
+            $repository,
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
+        );
+
+        $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
+
+        self::assertSame(7, $result->processedRows);
+    }
+
+    /**
+     * Незнакомый непустой endpoint — это не «формат не передали», а документ,
+     * про который мы ничего не знаем. Отдать его легаси-процессору значит
+     * молча создать финансовые записи по чужому формату, поэтому падаем до
+     * любой обработки и без ретраев.
+     */
+    public function testUnknownApiEndpointFailsLoudlyInsteadOfFallingBackToLegacy(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn('ozon::v9/finance/something-new');
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
+        $processorRegistry->expects(self::never())->method('get');
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('executeStatement');
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $processorRegistry,
+            $repository,
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $connection,
+            $this->createMock(AppLogger::class),
+        );
+
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('ozon::v9/finance/something-new');
+
+        $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
     }
 
     public function testOrdinaryWbCostsUseProcessDirectlyWithoutReportingForceConflict(): void

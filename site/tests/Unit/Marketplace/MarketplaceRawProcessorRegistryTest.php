@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Marketplace;
 
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use PHPUnit\Framework\TestCase;
@@ -15,7 +16,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
     public function testReturnsFirstSupportingProcessor(): void
     {
         $target = new class implements MarketplaceRawProcessorInterface {
-            public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+            public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
             {
                 return 'ozon' === $type && 'sales' === $kind;
             }
@@ -32,7 +33,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
 
         $registry = new MarketplaceRawProcessorRegistry([
             new class implements MarketplaceRawProcessorInterface {
-                public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+                public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
                 {
                     return false;
                 }

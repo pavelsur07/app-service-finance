@@ -9,6 +9,8 @@ use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
@@ -54,7 +56,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
     {
         $document = $this->repository->find($command->rawDocId);
 
-        if (null === $document) {
+        if (!$document instanceof MarketplaceRawDocument) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $command->rawDocId));
         }
 
@@ -78,6 +80,21 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $marketplace = $document->getMarketplace();
+
+        // Поколение API, из которого получен документ. Отличает форматы, живущие
+        // под одним document_type: у Ozon это снятый v3 против accrual by-day, у
+        // WB — два поколения отчёта о продажах.
+        $apiEndpoint = trim($document->getApiEndpoint());
+        $format = MarketplaceRawFormat::tryFromApiEndpoint($apiEndpoint);
+
+        // Пустой endpoint и незнакомый — разные вещи. Пустой означает «формат не
+        // проставлен», и конвейер работает как прежде. Незнакомый означает
+        // документ, про который мы ничего не знаем: отдать его легаси-процессору
+        // значит молча создать финансовые записи по чужой схеме. Падаем до любой
+        // обработки и без ретраев — новый endpoint чинится кодом, а не повтором.
+        if (null === $format && '' !== $apiEndpoint) {
+            throw new UnrecoverableMessageHandlingException(sprintf('Unknown raw document format "%s" for document %s. Add it to %s before processing.', $apiEndpoint, $command->rawDocId, MarketplaceRawFormat::class));
+        }
 
         if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $company = $document->getCompany();
@@ -113,7 +130,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 ['rawDocId' => $command->rawDocId],
             );
 
-            $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace);
+            $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace, $command->kind, $format);
             $result = $processor->process($command->companyId, $command->rawDocId);
             $this->costCategoryResolver->clearCache();
 
@@ -158,7 +175,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // Reset per-run processor state: one raw document can be split into multiple
         // batches in this invocation, but reprocessing the same rawDocId in another
         // invocation must run cleanup again (idempotent replace-by-raw-document).
-        $processor = $this->processorRegistry->get(StagingRecordType::from($targetBucketKey), $marketplace);
+        $processor = $this->processorRegistry->get(StagingRecordType::from($targetBucketKey), $marketplace, $command->kind, $format);
         if (method_exists($processor, 'resetPerRunState')) {
             $processor->resetPerRunState();
         }

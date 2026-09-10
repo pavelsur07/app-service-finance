@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Processor;
 
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 
 final readonly class MarketplaceOtherProcessor implements MarketplaceRawProcessorInterface
 {
-    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
     {
         if ($type instanceof StagingRecordType) {
             return StagingRecordType::OTHER === $type;

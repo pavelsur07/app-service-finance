@@ -2256,6 +2256,45 @@ Telegram создаёт ДДС-транзакции только через це
 
 > Используй **только** эти значения. Не придумывай новые без обновления файла.
 
+### `src/Marketplace/Enum/MarketplaceRawFormat.php`
+```php
+enum MarketplaceRawFormat: string
+{
+    case OZON_TRANSACTION_LIST_V3 = 'ozon::v3/finance/transaction/list';        // снят Ozon 09.09.2026, документы остаются
+    case OZON_ACCRUAL_BY_DAY = 'ozon::v1/finance/accrual/by-day';               // замена v3
+    case OZON_REALIZATION_V2 = 'ozon::v2/finance/realization';
+    case OZON_MUTUAL_SETTLEMENT_V1 = '/v1/finance/mutual-settlement';
+    case WB_FINANCE_SALES_REPORTS_DETAILED = 'wildberries::finance-sales-reports-detailed';
+    case WB_REPORT_DETAIL_BY_PERIOD = 'wildberries::reportDetailByPeriod';      // легаси WB, документы до 14.05.2026
+
+    public static function tryFromApiEndpoint(?string $apiEndpoint): ?self;
+}
+```
+
+Поколение API, из которого получен сырой документ. Значения равны
+`marketplace_raw_documents.api_endpoint` — колонка заполнена на всех документах,
+поэтому различение форматов не потребовало миграции. Перечислены все значения,
+реально встречающиеся на PROD.
+
+**Контракт выбора процессора.** `MarketplaceRawProcessorRegistry::get()` и
+`MarketplaceRawProcessorInterface::supports()` принимают четвёртым аргументом
+`?MarketplaceRawFormat $format`:
+
+- `null` — «формат не передан». Так ходят вызывающие, которые о форматах не
+  знают; легаси-процессоры такой документ принимают, поведение прежнее.
+- переданный формат — процессор обязан заявить его явно. Ozon-процессоры
+  продаж, затрат и возвратов принимают только `OZON_TRANSACTION_LIST_V3`:
+  реестр возвращает ПЕРВЫЙ подошедший, и без явного различения они затеняли бы
+  процессоры by-day порядком сервисов в контейнере.
+- WB-процессоры формат игнорируют: у Wildberries два поколения отчёта уже
+  сосуществуют под одним `document_type` и обслуживаются теми же процессорами.
+
+`ProcessMarketplaceRawDocumentAction` выводит формат из `apiEndpoint` документа.
+Пустой `apiEndpoint` даёт `null` и прежнее поведение; **незнакомый непустой**
+бросает `UnrecoverableMessageHandlingException` до любой обработки — отдать
+такой документ легаси-процессору значило бы молча создать финансовые записи по
+чужой схеме.
+
 ### `src/Company/Security/Module.php`
 ```php
 enum Module: string
@@ -3229,6 +3268,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.88 | 2026-09-09 | Marketplace: `MarketplaceRawFormat` и выбор процессора по формату сырого документа — снятый Ozon v3 и accrual by-day сосуществуют под одним `document_type`; незнакомый `api_endpoint` падает громко |
 | 1.87 | 2026-09-09 | Ingestion: `OzonAccrualCategoryFacade` — разбор услуг Ozon accrual в категории затрат по имени из справочника; карта `typeIds` не используется как расходящаяся со справочником Ozon |
 | 1.86 | 2026-09-01 | Ingestion: уборщик зависших `SyncJob` — задача в `OPEN`/`RUNNING` без движения больше не блокирует ресурс навсегда |
 | 1.85 | 2026-09-01 | Marketplace: ручной запуск загрузки каталога Ozon из UI, журнал прогонов `MarketplaceJobLog` и взаимное исключение прогонов по подключению |

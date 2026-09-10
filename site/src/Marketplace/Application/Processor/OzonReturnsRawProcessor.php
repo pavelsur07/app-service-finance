@@ -10,6 +10,7 @@ use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
@@ -40,11 +41,20 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     ) {
     }
 
-    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
     {
         if ($type instanceof StagingRecordType) {
+            // Реестр берёт первый подошедший процессор, поэтому без явного
+            // различения формата этот затенял бы процессоры by-day порядком
+            // сервисов в контейнере.
+            //
+            // null означает «формат не передан» — так ходят вызывающие, которые
+            // о форматах не знают, и так обрабатываются 967 документов v3.
+            // Переданный чужой формат — это документ другого поколения, и брать
+            // его нельзя: молча создадутся финансовые записи по чужой схеме.
             return StagingRecordType::RETURN === $type
-                && MarketplaceType::OZON === $marketplace;
+                && MarketplaceType::OZON === $marketplace
+                && (null === $format || MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3 === $format);
         }
 
         return $type === MarketplaceType::OZON->value && 'returns' === $kind;

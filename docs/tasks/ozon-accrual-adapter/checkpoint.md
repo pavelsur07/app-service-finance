@@ -1,10 +1,12 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 закрыт, дальше Stage 3
-**Status:** implementing — Stage 2 завершён, Stage 3 не начат
-**Stage base commit:** `cc5071d8` (Stage 2)
+**Phase:** Stage 3 закрыт, дальше Stage 4
+**Status:** implementing — Stage 3 завершён, Stage 4 не начат
+**Stage base commit:** `fa9ff506` (Stage 3)
 
 ### Completed
+- Stage 3 — `MarketplaceRawFormat`, выбор процессора по формату, громкий отказ
+  на незнакомом `api_endpoint`. Отчёт — `stages/stage-3.md`.
 - Stage 2 — `OzonAccrualCategoryFacade` + `OzonAccrualCategoryView`, разрешение
   по имени из справочника, неизвестное уходит в видимую очередь. Отчёт —
   `stages/stage-2.md`.
@@ -51,10 +53,11 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Stage 3: вывести формат документа из `MarketplaceRawDocument.apiEndpoint` и
-  передавать его в `MarketplaceRawProcessorRegistry::get()` третьим аргументом
-  `$kind`; существующие Ozon-процессоры должны явно заявить легаси-формат в
-  `supports()`, иначе новый процессор будет затенён порядком сервисов.
+- Stage 4: клиент `/v1/finance/accrual/by-day`, загрузчик, пишущий документ с
+  `api_endpoint = ozon::v1/finance/accrual/by-day`, и новые процессоры продаж,
+  затрат и возвратов рядом со старыми. Выручка — из `sale_price`, НЕ из
+  `sale_amount`. Количество — `sale_amount / seller_price`. Затраты — через
+  `OzonAccrualCategoryFacade`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»
