@@ -6,7 +6,6 @@ namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
-use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -69,21 +68,13 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame('RUB', $transactions[0]->getCurrency());
         self::assertSame($systemCounterpartyId, $transactions[0]->getCounterpartyId());
 
+        // Нормализация не должна оставлять открытых issues — проверяется через
+        // admin-контракт фасада. Чтения транзакций через фасад здесь больше нет:
+        // оно было наследством отменённой проекции в ОПиУ, а сами транзакции
+        // проверены выше напрямую через репозиторий.
         /** @var IngestionFacade $facade */
         $facade = self::getContainer()->get(IngestionFacade::class);
         self::assertSame(0, $facade->countOpenIssues($companyId));
-        self::assertSame(
-            [$transactions[0]->getId()],
-            array_map(
-                static fn (FinancialTransactionView $transaction): string => $transaction->id,
-                iterator_to_array($facade->getTransactions(
-                    $companyId,
-                    new \DateTimeImmutable('2026-06-18 00:00:00'),
-                    new \DateTimeImmutable('2026-06-18 23:59:59'),
-                    'shop-1',
-                )),
-            ),
-        );
 
         foreach (['pl_daily_totals', 'pl_monthly_snapshots'] as $tableName) {
             self::assertSame(

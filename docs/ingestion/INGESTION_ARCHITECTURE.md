@@ -47,7 +47,6 @@
 |---|---|---|
 | `ingest_fetch` | `async_sync` | `RunSyncChunkMessage` — HTTP к источникам |
 | `ingest_normalize` | `async_pipeline` | `NormalizeRawRecordMessage`; старые `MarkPnlPeriodDirtyMessage` поглощаются no-op handler |
-| `pnl_rebuild` | `async_pipeline` | Только compatibility tombstone для уже поставленных `RebuildPnlPeriodMessage` |
 
 Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeline`.
 Отдельных воркеров для Ingestion не нужно — DSN совпадают с существующими.
@@ -214,7 +213,8 @@ Prod-воркеры: `site-messenger-worker-sync`, `site-messenger-worker-pipeli
 
 ### На вход в Ingestion (Facade)
 ```php
-IngestionFacade::getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $shopRef): iterable<FinancialTransaction>
+// getTransactions удалён вместе с отменённой проекцией в ОПиУ: канонические
+// транзакции наружу не отдаются. Запрет закреплён ModuleBoundaryRules.
 IngestionFacade::countOpenIssues(string $companyId): int
 ```
 

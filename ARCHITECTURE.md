@@ -162,7 +162,7 @@
 ### Ingestion: canonical finance layer
 
 - `FinancialTransaction` is the canonical transaction record produced from normalized raw source rows. Natural key: `(companyId, source, externalId, type)`.
-- **Boundary rule:** `FinancialTransaction` and all other `App\Ingestion\Entity\*` types must not cross a module boundary. `IngestionFacade::getTransactions` projects each entity into a read-only `App\Ingestion\Application\DTO\FinancialTransactionView` (enum fields exposed as scalar `value`) so consumers never receive a managed, mutable entity. Enforced by `tests/Unit/Ingestion/Architecture/EntityBoundaryTest`.
+- **Boundary rule:** `FinancialTransaction` and all other `App\Ingestion\Entity\*` types must not cross a module boundary. Канонические транзакции наружу вообще не отдаются: `IngestionFacade::getTransactions` и его DTO удалены вместе с отменённой проекцией в ОПиУ. Остальные методы фасада возвращают read-only DTO из `App\Ingestion\Application\DTO`. Enforced by `tests/Unit/Ingestion/Architecture/EntityBoundaryTest`.
 - Amounts are stored in minor units. Shared `Money` is signed and can represent positive, negative, or zero values; `TransactionDirection` (`IN`/`OUT`) remains the normalized flow classification. `Money` enforces one ISO-4217 currency per arithmetic operation.
 - `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
 - `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
@@ -301,7 +301,9 @@
 
 - Ingestion canonical transactions are not projected into `PLDailyTotal`, `PLMonthlySnapshot`, `Document`, or `DocumentOperation`.
 - The dirty-period table, rebuild actions, batch command, and `PnlFacade` integration have been removed. Finance/Marketplace legacy writers remain responsible for P&L aggregates.
-- `MarkPnlPeriodDirtyMessage` and `RebuildPnlPeriodMessage` plus their routes remain only as deprecated compatibility tombstones. Their handlers consume messages queued before removal without changing database state.
+- Запрет закреплён машинно: правило PHPat `ModuleBoundaryRules::test_ingestion_does_not_create_pnl_operations()` запрещает любую зависимость `App\Ingestion` от `App\Finance`. Один запрет на весь namespace закрывает и прямой путь, и обращение через фасад. Исполняется в составе `make site-stan`.
+- Надгробия удалены: `MarkPnlPeriodDirtyMessage`, `RebuildPnlPeriodMessage`, их обработчики и транспорт `pnl_rebuild` больше не существуют. Очередь была пуста на PROD; ни один воркер транспорт не слушал.
+- Из `IngestionFacade` убран `getTransactions()` — он добавлялся для отменённого этапа ОПиУ и вызывающих не имел; вместе с ним удалён `FinancialTransactionView`. `countOpenIssues()` оставлен: спецификация определяет его как admin-контракт, к ОПиУ он отношения не имеет.
 
 ### Finance: перенос дерева категорий ОПиУ между компаниями
 
@@ -741,26 +743,18 @@ resolveByServiceType(?string $typeId, ?string $typeName): App\Ingestion\Applicat
 
 ### `IngestionFacade` (`src/Ingestion/Facade/IngestionFacade.php`)
 ```php
-// Канонические финансовые транзакции за период для P&L rebuild.
-// Отдаёт read-only DTO (НЕ managed Entity) — Entity не пересекает границу модуля.
-// Генератор-проектор: память не растёт на больших периодах.
-// @return iterable<App\Ingestion\Application\DTO\FinancialTransactionView>
-getTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $shopRef = null): iterable
-
-// Количество открытых normalization issues по компании.
-countOpenIssues(string $companyId): int
-
-// Verification UI/API read models.
+// Verification UI/API read models. Другого контракта у фасада нет: канонические
+// транзакции наружу не отдаются — Ingestion не питает ими ОПиУ.
 // @return array{cells: list<CoverageCellView>, shops: list<ShopOptionView>}
 getCoverage(string $companyId, ?string $shopRef, DateTimeImmutable $from, DateTimeImmutable $to): array
 
 // @return array{summary: ReconciliationSummaryView, byType: list<ReconciliationByTypeView>}
-getReconciliation(string $companyId, string $shopRef, int $year, int $month): array
+getReconciliation(string $companyId, ?string $shopRef, int $year, int $month): array
 
 // @return array{items: list<IssueListItemView>, meta: PaginationMeta}
 listIssues(string $companyId, ?string $shopRef, ?int $year, ?int $month, int $page, int $limit): array
 
-// @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>}
+// @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>, marketplaceCategories: list<FinancialSummaryMarketplaceCategoryView>}
 getFinancialSummary(string $companyId, ?string $shopRef, int $yearFrom, int $monthFrom, int $yearTo, int $monthTo): array
 ```
 
@@ -3286,6 +3280,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.90 | 2026-09-10 | Ingestion: запрет на создание операций ОПиУ закреплён двумя правилами PHPat (в обе стороны); удалён осиротевший `getTransactions`, надгробия `Pnl*Message` и транспорт `pnl_rebuild` |
 | 1.89 | 2026-09-10 | Marketplace: обработка Ozon accrual by-day — классификатор по формату, процессоры продаж, затрат и возвратов рядом с легаси; затраты разбираются через `OzonAccrualCategoryFacade` |
 | 1.88 | 2026-09-09 | Marketplace: `MarketplaceRawFormat` и выбор процессора по формату сырого документа — снятый Ozon v3 и accrual by-day сосуществуют под одним `document_type`; незнакомый `api_endpoint` падает громко |
 | 1.87 | 2026-09-09 | Ingestion: `OzonAccrualCategoryFacade` — разбор услуг Ozon accrual в категории затрат по имени из справочника; карта `typeIds` не используется как расходящаяся со справочником Ozon |
