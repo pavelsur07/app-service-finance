@@ -32,6 +32,9 @@ final readonly class OzonAccrualByDayRowClassifier implements RowClassifierInter
             && MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY === $format;
     }
 
+    /**
+     * @param array<string, mixed> $rawRow
+     */
     public function classify(array $rawRow): StagingRecordType
     {
         if (self::CATEGORY_POSTING !== ($rawRow['accrued_category'] ?? null)) {

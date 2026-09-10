@@ -12,7 +12,6 @@ use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -47,7 +46,6 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly Connection $connection,
         private readonly OzonListingEnsureService $listingEnsureService,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,

@@ -16,7 +16,6 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -168,7 +167,6 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
 
         return new OzonAccrualSalesRawProcessor(
             $em,
-            $this->createMock(Connection::class),
             $listings,
             $saleRepository,
             $costPrice,

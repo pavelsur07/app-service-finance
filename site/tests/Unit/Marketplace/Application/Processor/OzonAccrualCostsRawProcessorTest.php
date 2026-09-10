@@ -139,7 +139,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnCallback(
-            static fn (string $class): ?object => MarketplaceRawDocument::class === $class ? $document : $company,
+            static fn (string $class): object => MarketplaceRawDocument::class === $class ? $document : $company,
         );
         $em->method('persist')->willReturnCallback(function (object $entity): void {
             if ($entity instanceof MarketplaceCost) {

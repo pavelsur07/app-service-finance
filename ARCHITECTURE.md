@@ -2276,6 +2276,24 @@ enum MarketplaceRawFormat: string
 поэтому различение форматов не потребовало миграции. Перечислены все значения,
 реально встречающиеся на PROD.
 
+**Контракт выбора классификатора строк.** `RowClassifierInterface::supports()`
+и `RowClassifierRegistry::get()` принимают тот же `?MarketplaceRawFormat $format`
+и по той же причине: реестр возвращает первый подошедший, а строки by-day имеют
+совсем другую форму, чем операции снятого v3. `OzonReportRowClassifier` отвергает
+`OZON_ACCRUAL_BY_DAY`, `OzonAccrualByDayRowClassifier` claims только его, WB
+формат игнорирует.
+
+**Разбор by-day.** Строка by-day — начисление, а не операция: одно начисление
+`POSTING` несёт и выручку, и комиссию, и услуги. Поэтому классификатор решает
+только «продажа или возврат» (по знаку `sale_amount`), а затраты читает
+`OzonAccrualCostsRawProcessor` из документа целиком — тем же приёмом, каким это
+уже сделано для легаси-формата.
+
+Документ by-day несёт две части: `accruals` — строки конвейера, и
+`service_types` — справочник `/v1/finance/accrual/types`. Справочник хранится в
+документе, а не отдельно: документ переобрабатывается и через месяц, а
+справочник к тому времени изменится.
+
 **Контракт выбора процессора.** `MarketplaceRawProcessorRegistry::get()` и
 `MarketplaceRawProcessorInterface::supports()` принимают четвёртым аргументом
 `?MarketplaceRawFormat $format`:
@@ -3268,6 +3286,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.89 | 2026-09-10 | Marketplace: обработка Ozon accrual by-day — классификатор по формату, процессоры продаж, затрат и возвратов рядом с легаси; затраты разбираются через `OzonAccrualCategoryFacade` |
 | 1.88 | 2026-09-09 | Marketplace: `MarketplaceRawFormat` и выбор процессора по формату сырого документа — снятый Ozon v3 и accrual by-day сосуществуют под одним `document_type`; незнакомый `api_endpoint` падает громко |
 | 1.87 | 2026-09-09 | Ingestion: `OzonAccrualCategoryFacade` — разбор услуг Ozon accrual в категории затрат по имени из справочника; карта `typeIds` не используется как расходящаяся со справочником Ozon |
 | 1.86 | 2026-09-01 | Ingestion: уборщик зависших `SyncJob` — задача в `OPEN`/`RUNNING` без движения больше не блокирует ресурс навсегда |
