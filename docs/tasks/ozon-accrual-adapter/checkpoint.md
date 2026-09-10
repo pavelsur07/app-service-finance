@@ -1,10 +1,12 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 закрыт, дальше Stage 4
-**Status:** implementing — Stage 3 завершён, Stage 4 не начат
-**Stage base commit:** `fa9ff506` (Stage 3)
+**Phase:** Stage 4a закрыт, дальше Stage 4b отдельной веткой
+**Status:** handoff — ветка со стадиями 2, 3 и 4a готова к ревью
+**Stage base commit:** `d77337c1` (Stage 4a)
 
 ### Completed
+- Stage 4a — клиент by-day, загрузчик, команда-диспетчер. Отчёт —
+  `stages/stage-4a.md`. Обработка вынесена в Stage 4b.
 - Stage 3 — `MarketplaceRawFormat`, выбор процессора по формату, громкий отказ
   на незнакомом `api_endpoint`. Отчёт — `stages/stage-3.md`.
 - Stage 2 — `OzonAccrualCategoryFacade` + `OzonAccrualCategoryView`, разрешение
@@ -53,11 +55,10 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Stage 4: клиент `/v1/finance/accrual/by-day`, загрузчик, пишущий документ с
-  `api_endpoint = ozon::v1/finance/accrual/by-day`, и новые процессоры продаж,
-  затрат и возвратов рядом со старыми. Выручка — из `sale_price`, НЕ из
-  `sale_amount`. Количество — `sale_amount / seller_price`. Затраты — через
-  `OzonAccrualCategoryFacade`.
+- Ветка `feat/ozon-accrual-adapter-stages` (стадии 2, 3, 4a) уходит в merge.
+- Stage 4b ведётся отдельной веткой по решению Владельца от 10.09.2026:
+  формат-зависимый классификатор, три процессора, удаление мёртвого
+  `OzonTransactionTotalsClient`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»

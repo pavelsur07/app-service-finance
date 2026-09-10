@@ -179,7 +179,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
             throw new \RuntimeException('Ozon API credentials не найдены для компании.');
         }
 
-        $apiKey = (string) ($credentials['api_key'] ?? '');
+        $apiKey = $credentials['api_key'];
         $clientId = (string) ($credentials['client_id'] ?? '');
 
         if ('' === $apiKey || '' === $clientId) {

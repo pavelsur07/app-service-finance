@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Marketplace\Command;
 use App\Marketplace\Command\OzonAccrualByDaySyncCommand;
 use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -61,8 +62,11 @@ final class OzonAccrualByDaySyncCommandTest extends TestCase
      */
     private function command(array $connections, array &$messages): OzonAccrualByDaySyncCommand
     {
-        $query = $this->createMock(ActiveOzonConnectionsQuery::class);
-        $query->method('execute')->willReturn($connections);
+        // ActiveOzonConnectionsQuery объявлен final: собираем настоящий поверх
+        // мока DBAL, как в соседних тестах, вместо подмены класса.
+        $dbal = $this->createMock(Connection::class);
+        $dbal->method('fetchAllAssociative')->willReturn($connections);
+        $query = new ActiveOzonConnectionsQuery($dbal);
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$messages): Envelope {
