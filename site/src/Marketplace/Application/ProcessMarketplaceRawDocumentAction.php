@@ -155,7 +155,10 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $rows = $rows['result']['operations'];
         }
 
-        $classifier = $this->classifierRegistry->get($marketplace);
+        // Классификатор выбирается с учётом формата по той же причине, что и
+        // процессор: реестр возвращает первый подошедший, а строки by-day имеют
+        // совсем другую форму, чем операции снятого v3.
+        $classifier = $this->classifierRegistry->get($marketplace, $format);
 
         $linkedRows = 0;
         if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {

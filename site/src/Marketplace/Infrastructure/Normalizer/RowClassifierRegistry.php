@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Normalizer;
 
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
@@ -19,14 +20,14 @@ final readonly class RowClassifierRegistry implements RowClassifierRegistryInter
         $this->classifiers = is_array($classifiers) ? $classifiers : iterator_to_array($classifiers, false);
     }
 
-    public function get(MarketplaceType $type): RowClassifierInterface
+    public function get(MarketplaceType $type, ?MarketplaceRawFormat $format = null): RowClassifierInterface
     {
         foreach ($this->classifiers as $classifier) {
-            if ($classifier->supports($type)) {
+            if ($classifier->supports($type, $format)) {
                 return $classifier;
             }
         }
 
-        throw new \RuntimeException(sprintf('No row classifier for marketplace: %s', $type->value));
+        throw new \RuntimeException(sprintf('No row classifier for marketplace: %s, format: %s', $type->value, null !== $format ? $format->value : 'unknown'));
     }
 }

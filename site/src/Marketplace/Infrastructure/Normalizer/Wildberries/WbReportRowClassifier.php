@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Normalizer\Wildberries;
 
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
@@ -12,7 +13,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('marketplace.row_classifier')]
 final readonly class WbReportRowClassifier implements RowClassifierInterface
 {
-    public function supports(MarketplaceType $type): bool
+    public function supports(MarketplaceType $type, ?MarketplaceRawFormat $format = null): bool
     {
         return MarketplaceType::WILDBERRIES === $type;
     }
