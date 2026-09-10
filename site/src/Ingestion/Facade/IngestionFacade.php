@@ -19,6 +19,7 @@ use App\Ingestion\Infrastructure\Query\CoverageQuery;
 use App\Ingestion\Infrastructure\Query\FinancialSummaryQuery;
 use App\Ingestion\Infrastructure\Query\IssuesQuery;
 use App\Ingestion\Infrastructure\Query\ReconciliationQuery;
+use App\Ingestion\Repository\NormalizationIssueRepository;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Pagerfanta\Doctrine\DBAL\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -26,12 +27,24 @@ use Pagerfanta\Pagerfanta;
 final readonly class IngestionFacade
 {
     public function __construct(
+        private NormalizationIssueRepository $normalizationIssueRepository,
         private CoverageQuery $coverageQuery,
         private ReconciliationQuery $reconciliationQuery,
         private IssuesQuery $issuesQuery,
         private FinancialSummaryQuery $financialSummaryQuery,
         private IssueDescriptionFormatter $issueDescriptionFormatter,
     ) {
+    }
+
+    /**
+     * Количество открытых normalization issues по компании.
+     *
+     * Admin-контракт, а не часть ОПиУ: так он и определён в спецификации
+     * `docs/tasks/ingestion/TASK-05-connector-canon.md` — «для admin».
+     */
+    public function countOpenIssues(string $companyId): int
+    {
+        return $this->normalizationIssueRepository->countOpenForCompany($companyId);
     }
 
     /**

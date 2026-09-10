@@ -16,6 +16,7 @@ use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Exception\DoneRawRecordReplayFailedException;
+use App\Ingestion\Facade\IngestionFacade;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -67,12 +68,13 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame('RUB', $transactions[0]->getCurrency());
         self::assertSame($systemCounterpartyId, $transactions[0]->getCounterpartyId());
 
-        // Нормализация не должна оставлять открытых issues. Читаем напрямую из
-        // репозитория модуля: чтение через фасад было наследством отменённой
-        // проекции в ОПиУ, и сами транзакции уже проверены выше.
-        /** @var NormalizationIssueRepository $issueRepository */
-        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
-        self::assertSame(0, $issueRepository->countOpenForCompany($companyId));
+        // Нормализация не должна оставлять открытых issues — проверяется через
+        // admin-контракт фасада. Чтения транзакций через фасад здесь больше нет:
+        // оно было наследством отменённой проекции в ОПиУ, а сами транзакции
+        // проверены выше напрямую через репозиторий.
+        /** @var IngestionFacade $facade */
+        $facade = self::getContainer()->get(IngestionFacade::class);
+        self::assertSame(0, $facade->countOpenIssues($companyId));
 
         foreach (['pl_daily_totals', 'pl_monthly_snapshots'] as $tableName) {
             self::assertSame(
