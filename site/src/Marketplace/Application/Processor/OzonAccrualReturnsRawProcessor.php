@@ -126,6 +126,13 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             );
 
             $entity->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $return['raw'], $return['date']));
+
+            // Ссылка на продажу — то же поле и тот же механизм, что у WB: она
+            // уже найдена выше ради себестоимости, и без неё связь возврата с
+            // исходным отправлением существует только внутри этого метода.
+            if (null !== $sale) {
+                $entity->setSale($sale);
+            }
             $entity->setRawData($return['raw']);
             if (null !== $rawDocId) {
                 $entity->setRawDocumentId($rawDocId);
