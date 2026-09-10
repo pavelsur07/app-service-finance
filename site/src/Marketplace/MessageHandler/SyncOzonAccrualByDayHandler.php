@@ -46,6 +46,12 @@ final class SyncOzonAccrualByDayHandler
 {
     public const DOCUMENT_TYPE = 'accrual_by_day';
 
+    /** Ключ начислений в полезной нагрузке документа. */
+    public const PAYLOAD_ACCRUALS = 'accruals';
+
+    /** Ключ справочника услуг `type_id` -> имя в полезной нагрузке документа. */
+    public const PAYLOAD_SERVICE_TYPES = 'service_types';
+
     private const LOCK_TTL_SECONDS = 900;
 
     /**
@@ -173,13 +179,18 @@ final class SyncOzonAccrualByDayHandler
 
         try {
             $rows = $this->client->fetchDay($message->companyId, $day);
+            // Справочник услуг забирается вместе с днём: начисления несут только
+            // type_id, а разбор услуги в категорию затрат идёт по имени. Хранить
+            // его отдельно от документа значило бы разъехаться во времени —
+            // документ переобрабатывается и через месяц.
+            $serviceTypes = $this->client->fetchServiceTypes($message->companyId);
         } catch (MarketplaceApiException $e) {
             $this->handleApiFailure($e, $message, $connection);
 
             return;
         }
 
-        $document = $this->storeDocument($company, $existing, $day, $rows, $message);
+        $document = $this->storeDocument($company, $existing, $day, $rows, $serviceTypes, $message);
 
         $connection->markSyncSuccess();
         $this->em->flush();
@@ -210,20 +221,29 @@ final class SyncOzonAccrualByDayHandler
 
     /**
      * @param list<array<string, mixed>> $rows
+     * @param array<string, string> $serviceTypes
      */
     private function storeDocument(
         Company $company,
         ?MarketplaceRawDocument $existing,
         \DateTimeImmutable $day,
         array $rows,
+        array $serviceTypes,
         SyncOzonAccrualByDayMessage $message,
     ): MarketplaceRawDocument {
+        // Документ несёт и начисления, и справочник. Конвейер разворачивает
+        // `accruals` в строки — так же, как разворачивает `result.operations`
+        // у легаси-формата.
+        $payload = [
+            self::PAYLOAD_ACCRUALS => $rows,
+            self::PAYLOAD_SERVICE_TYPES => $serviceTypes,
+        ];
         // Пустой день сохраняется документом намеренно. Без него «не загружали»
         // и «загрузили, начислений нет» неотличимы — ровно та слепота, что
         // скрыла сбой 09.09.2026 до утреннего разбора.
         if (null !== $existing) {
             $existing->refreshRawData(
-                rawData: $rows,
+                rawData: $payload,
                 apiEndpoint: MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value,
                 recordsCount: count($rows),
             );
@@ -248,7 +268,7 @@ final class SyncOzonAccrualByDayHandler
         $document->setPeriodFrom($day);
         $document->setPeriodTo($day);
         $document->setApiEndpoint(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
-        $document->setRawData($rows);
+        $document->setRawData($payload);
         $document->setRecordsCount(count($rows));
 
         $this->em->persist($document);

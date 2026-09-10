@@ -15,6 +15,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
+use App\Marketplace\MessageHandler\SyncOzonAccrualByDayHandler;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
@@ -153,6 +154,17 @@ final readonly class ProcessMarketplaceRawDocumentAction
             && is_array($rows['result']['operations'])
         ) {
             $rows = $rows['result']['operations'];
+        }
+
+        // Документ by-day несёт и начисления, и справочник услуг. Строками
+        // конвейера являются начисления; справочник читает процессор затрат,
+        // которому нужен весь документ.
+        if (
+            MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY === $format
+            && isset($rows[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS])
+            && is_array($rows[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS])
+        ) {
+            $rows = $rows[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS];
         }
 
         // Классификатор выбирается с учётом формата по той же причине, что и
