@@ -24,7 +24,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Ответ:  {"accruals": [...], "last_id": "..."} — пагинация продолжается,
  * пока last_id непустой. Форма подтверждена выгрузкой за июнь 2026.
  */
-final readonly class OzonAccrualByDayClient
+final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInterface
 {
     private const BASE_URL = 'https://api-seller.ozon.ru';
     private const ENDPOINT = '/v1/finance/accrual/by-day';
