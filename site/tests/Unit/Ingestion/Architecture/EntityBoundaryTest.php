@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Guards the module boundary: App\Ingestion entities must not leak into other
- * modules. Consumers go through IngestionFacade and receive DTOs
- * (e.g. FinancialTransactionView) instead of managed Doctrine entities.
+ * modules. Consumers go through IngestionFacade and receive read-only DTOs from
+ * App\Ingestion\Application\DTO instead of managed Doctrine entities.
  *
  * Replaces a dedicated boundary tool (deptrac/phparkitect) which is not
  * installed; this keeps the rule enforced without adding a dependency.
@@ -48,7 +48,7 @@ final class EntityBoundaryTest extends TestCase
             }
         }
 
-        self::assertSame([], $offenders, 'FinancialTransaction must only be reachable as FinancialTransactionView outside App\\Ingestion.');
+        self::assertSame([], $offenders, 'FinancialTransaction must never be referenced outside App\\Ingestion.');
     }
 
     /**

@@ -145,6 +145,7 @@ import Application/ чужого модуля         — только Applicati
 EntityType с чужой Entity в формах        — только ChoiceType + Facade
 SELECT * в raw SQL                        — явное перечисление колонок
 циклические зависимости между модулями    — нельзя
+операции ОПиУ из Ingestion                — модуль их не создаёт, гейт ModuleBoundaryRules
 getRepository() чужого модуля             — только через Facade
 ```
 

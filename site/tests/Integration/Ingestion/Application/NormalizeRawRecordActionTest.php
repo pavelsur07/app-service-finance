@@ -6,7 +6,6 @@ namespace App\Tests\Integration\Ingestion\Application;
 
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
-use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\DTO\RawBatch;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
@@ -17,7 +16,6 @@ use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Exception\DoneRawRecordReplayFailedException;
-use App\Ingestion\Facade\IngestionFacade;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -69,21 +67,12 @@ final class NormalizeRawRecordActionTest extends IntegrationTestCase
         self::assertSame('RUB', $transactions[0]->getCurrency());
         self::assertSame($systemCounterpartyId, $transactions[0]->getCounterpartyId());
 
-        /** @var IngestionFacade $facade */
-        $facade = self::getContainer()->get(IngestionFacade::class);
-        self::assertSame(0, $facade->countOpenIssues($companyId));
-        self::assertSame(
-            [$transactions[0]->getId()],
-            array_map(
-                static fn (FinancialTransactionView $transaction): string => $transaction->id,
-                iterator_to_array($facade->getTransactions(
-                    $companyId,
-                    new \DateTimeImmutable('2026-06-18 00:00:00'),
-                    new \DateTimeImmutable('2026-06-18 23:59:59'),
-                    'shop-1',
-                )),
-            ),
-        );
+        // Нормализация не должна оставлять открытых issues. Читаем напрямую из
+        // репозитория модуля: чтение через фасад было наследством отменённой
+        // проекции в ОПиУ, и сами транзакции уже проверены выше.
+        /** @var NormalizationIssueRepository $issueRepository */
+        $issueRepository = self::getContainer()->get(NormalizationIssueRepository::class);
+        self::assertSame(0, $issueRepository->countOpenForCompany($companyId));
 
         foreach (['pl_daily_totals', 'pl_monthly_snapshots'] as $tableName) {
             self::assertSame(

@@ -31,13 +31,6 @@ framework:
                     delay: 5000
                     multiplier: 2
 
-            # Compatibility transport for P&L messages queued before the Ingestion projection was removed.
-            pnl_rebuild:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN_PIPELINE)%'
-                retry_strategy:
-                    max_retries: 3
-                    delay: 30000
-                    multiplier: 2
 
             async_wb_finance:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN_WB_FINANCE)%'
@@ -104,9 +97,6 @@ framework:
             'App\MarketplaceAds\Message\DownloadOzonAdReportMessage': async_pipeline
             'App\Inventory\Message\NormalizeInventorySnapshotMessage': async_pipeline
             'App\Ingestion\Message\NormalizeRawRecordMessage': ingest_normalize
-            # Deprecated compatibility tombstones; handlers intentionally do nothing.
-            'App\Finance\Message\MarkPnlPeriodDirtyMessage': ingest_normalize
-            'App\Finance\Message\RebuildPnlPeriodMessage': pnl_rebuild
 
             # --- async_ads: Ozon Performance polling (may block up to 10 min per message) ---
             'App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage': async_ads

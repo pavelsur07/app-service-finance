@@ -8,21 +8,17 @@ use App\Ingestion\Application\DTO\CoverageCellView;
 use App\Ingestion\Application\DTO\FinancialSummaryCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMarketplaceCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMonthView;
-use App\Ingestion\Application\DTO\FinancialTransactionView;
 use App\Ingestion\Application\DTO\IssueListItemView;
 use App\Ingestion\Application\DTO\PaginationMeta;
 use App\Ingestion\Application\DTO\ReconciliationByTypeView;
 use App\Ingestion\Application\DTO\ReconciliationSummaryView;
 use App\Ingestion\Application\DTO\ShopOptionView;
 use App\Ingestion\Application\Service\IssueDescriptionFormatter;
-use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Infrastructure\Query\CoverageQuery;
 use App\Ingestion\Infrastructure\Query\FinancialSummaryQuery;
 use App\Ingestion\Infrastructure\Query\IssuesQuery;
 use App\Ingestion\Infrastructure\Query\ReconciliationQuery;
-use App\Ingestion\Repository\FinancialTransactionRepository;
-use App\Ingestion\Repository\NormalizationIssueRepository;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Pagerfanta\Doctrine\DBAL\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -30,58 +26,12 @@ use Pagerfanta\Pagerfanta;
 final readonly class IngestionFacade
 {
     public function __construct(
-        private FinancialTransactionRepository $financialTransactionRepository,
-        private NormalizationIssueRepository $normalizationIssueRepository,
         private CoverageQuery $coverageQuery,
         private ReconciliationQuery $reconciliationQuery,
         private IssuesQuery $issuesQuery,
         private FinancialSummaryQuery $financialSummaryQuery,
         private IssueDescriptionFormatter $issueDescriptionFormatter,
     ) {
-    }
-
-    /**
-     * @return iterable<FinancialTransactionView>
-     */
-    public function getTransactions(
-        string $companyId,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
-        ?string $shopRef = null,
-    ): iterable {
-        foreach ($this->financialTransactionRepository->iterateByPeriod($companyId, $from, $to, $shopRef) as $transaction) {
-            yield $this->projectTransactionToView($transaction);
-        }
-    }
-
-    private function projectTransactionToView(FinancialTransaction $transaction): FinancialTransactionView
-    {
-        return new FinancialTransactionView(
-            id: $transaction->getId(),
-            companyId: $transaction->getCompanyId(),
-            shopRef: $transaction->getShopRef(),
-            source: $transaction->getSource()->value,
-            externalId: $transaction->getExternalId(),
-            operationGroupId: $transaction->getOperationGroupId(),
-            type: $transaction->getType()->value,
-            direction: $transaction->getDirection()->value,
-            amountMinor: $transaction->getAmountMinor(),
-            currency: $transaction->getCurrency(),
-            occurredAt: $transaction->getOccurredAt(),
-            sourceTz: $transaction->getSourceTz(),
-            orderRef: $transaction->getOrderRef(),
-            payoutRef: $transaction->getPayoutRef(),
-            counterpartyId: $transaction->getCounterpartyId(),
-            listingId: $transaction->getListingId(),
-            listingSku: $transaction->getListingSku(),
-            description: $transaction->getDescription(),
-            rawRecordId: $transaction->getRawRecordId(),
-        );
-    }
-
-    public function countOpenIssues(string $companyId): int
-    {
-        return $this->normalizationIssueRepository->countOpenForCompany($companyId);
     }
 
     /**
