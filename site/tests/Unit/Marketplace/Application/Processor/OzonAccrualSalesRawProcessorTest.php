@@ -35,7 +35,7 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
     public function testRevenueUsesSellerBasisLikeLegacyRowsInTheSameTable(): void
     {
         // Регрессия. marketplace_sales ведёт базу ПРОДАВЦА: сверка за июнь по
-        // кабинету Вумджой сошлась точно — 1 950 549.00 в таблице против суммы
+        // кабинету сошлась точно — 1 950 549.00 в таблице против суммы
         // sale_amount по продажам 1 950 549 на тех же 750 строках.
         // sale_price (цена покупателя) — база месячной «Реализации», у неё
         // другой потребитель; записать её сюда значило бы сменить базу посреди

@@ -24,11 +24,16 @@ use Symfony\Component\Console\Output\OutputInterface;
  * его вечно красным.
  *
  * Порог — вчера, а не «есть ли дыры в истории»: ненулевой exit code означает
- * «загрузка встала сейчас». Починка под этот гейт — та же команда загрузки с
- * окном 2 дня, которое вчерашний день покрывает.
+ * «загрузка встала сейчас». Сегодняшний день намеренно не требуется: Ozon
+ * закрывает начисления суткам задним числом, и загрузчик ходит за вчера и глубже.
  *
- * Сегодняшний день намеренно не требуется: Ozon закрывает начисления суткам
- * задним числом, и загрузчик ходит за вчера и глубже.
+ * Спрашивается ровно вчерашний день, а не «последний загруженный»: документ за
+ * сегодня не доказывает, что вчерашний на месте.
+ *
+ * Засчитывается только обработанный документ. Под каждое состояние, которое гейт
+ * помечает плохим, есть операция, переводящая его в хорошее: день без документа
+ * чинит `ozon-financial-reports:sync` (её окно вчерашний день покрывает), день с
+ * незавершённой обработкой — `app:marketplace:reprocess`.
  */
 #[AsCommand(
     name: 'app:marketplace:ozon-financial-reports:freshness-check',
@@ -70,42 +75,31 @@ final class OzonFinancialReportsFreshnessCheckCommand extends Command
             ->modify('-1 day')
             ->format('Y-m-d');
 
-        $latestByCompany = $this->latestDocumentQuery->findLatestByCompanyIds(
+        $withProcessedDay = array_flip($this->latestDocumentQuery->findCompaniesWithProcessedDay(
             $companyIds,
             SyncOzonAccrualByDayHandler::DOCUMENT_TYPE,
-        );
+            $expectedDay,
+        ));
 
         $missingCount = 0;
-        $staleCount = 0;
 
         foreach ($companyIds as $companyId) {
-            $lastDay = $latestByCompany[$companyId] ?? null;
-
-            if (null === $lastDay) {
+            if (!isset($withProcessedDay[$companyId])) {
                 ++$missingCount;
-                $output->writeln(sprintf('MISSING company %s: нет ни одного документа начислений', $companyId));
+                $output->writeln(sprintf('MISSING company %s: нет обработанного документа начислений за %s', $companyId, $expectedDay));
 
                 continue;
             }
 
-            if ($lastDay < $expectedDay) {
-                ++$staleCount;
-                $output->writeln(sprintf('STALE company %s: последний день %s, ожидался %s', $companyId, $lastDay, $expectedDay));
-
-                continue;
-            }
-
-            $output->writeln(sprintf('OK company %s: последний день %s', $companyId, $lastDay));
+            $output->writeln(sprintf('OK company %s: день %s закрыт', $companyId, $expectedDay));
         }
 
         $output->writeln(sprintf('checked companies count: %d', count($companyIds)));
         $output->writeln(sprintf('expected day: %s', $expectedDay));
-        $output->writeln(sprintf('stale count: %d', $staleCount));
         $output->writeln(sprintf('missing count: %d', $missingCount));
         $output->writeln('finish');
 
-        $failedCount = $staleCount + $missingCount;
-        if (0 === $failedCount) {
+        if (0 === $missingCount) {
             return self::SUCCESS;
         }
 
@@ -115,7 +109,6 @@ final class OzonFinancialReportsFreshnessCheckCommand extends Command
         $this->logger->error('Ozon financial reports are not loaded for active seller connections.', [
             'checked_companies' => count($companyIds),
             'expected_day' => $expectedDay,
-            'stale_count' => $staleCount,
             'missing_count' => $missingCount,
         ]);
 

@@ -210,6 +210,60 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
     }
 
     /**
+     * Регрессия на потерю строк. Messenger не оборачивает handler в транзакцию
+     * Doctrine, поэтому сбой между удалением и записью оставил бы документ вовсе
+     * без продаж, а исчерпанные ретраи закрепили бы потерю.
+     */
+    public function testFailedReplacementRollsBackInsteadOfLeavingTheDocumentEmpty(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn(['accruals' => [['x' => 1]]]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $saleRepository->expects(self::once())->method('deleteByRawDocument')->willReturn(1);
+
+        $classifier = $this->createMock(RowClassifierInterface::class);
+        $classifier->method('classify')->willReturn(StagingRecordType::SALE);
+        $classifierRegistry = $this->createMock(RowClassifierRegistryInterface::class);
+        $classifierRegistry->method('get')->willReturn($classifier);
+
+        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor->method('processBatch')->willThrowException(new \RuntimeException('boom'));
+        $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
+        $processorRegistry->method('get')->willReturn($processor);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::once())->method('beginTransaction');
+        $connection->expects(self::once())->method('rollBack');
+        $connection->expects(self::never())->method('commit');
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $classifierRegistry,
+            $processorRegistry,
+            $repository,
+            $saleRepository,
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $connection,
+            $this->createMock(AppLogger::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+
+        $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
+    }
+
+    /**
      * Легаси-документ снятого формата под это правило не подпадает: его строки
      * не перезагружаются, и удаление стёрло бы историю, которую нечем восстановить.
      */

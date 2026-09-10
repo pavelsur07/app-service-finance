@@ -10,16 +10,16 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
- * Последний загруженный день начислений Ozon по каждой компании.
+ * Компании, у которых за конкретный день есть обработанный документ начислений.
  *
- * Читает только документы формата by-day: у них собственный `document_type`,
- * поэтому снятый формат v3 в выборку не попадает и «свежесть» не подделывается
- * историческими `sales_report`.
+ * Спрашивается ровно запрошенный день, а не «последний загруженный»: максимум по
+ * периоду принял бы документ за сегодня как доказательство того, что вчерашний
+ * день на месте, и гейт зазеленел бы поверх дыры.
  *
- * Документы в статусе `failed` не считаются загруженными: загрузчик их
- * игнорирует (`findActiveExactDayDocuments`) и заводит день заново, значит и
- * гейт обязан видеть такой день как отсутствующий — иначе проверка утверждала
- * бы шире, чем то, что чинит починка.
+ * Засчитывается только `completed`. Документ в `pending`/`running` означает, что
+ * сырьё скачано, а продаж, возвратов и затрат из него ещё не появилось; `failed`
+ * загрузчик и вовсе игнорирует и заводит день заново. Считать такие дни
+ * загруженными значит утверждать наличие финансовых строк, которых нет.
  */
 final class LatestOzonAccrualDocumentQuery
 {
@@ -31,43 +31,43 @@ final class LatestOzonAccrualDocumentQuery
     /**
      * @param list<string> $companyIds
      *
-     * @return array<string, string> companyId => последний period_from (Y-m-d)
+     * @return list<string> companyId тех, у кого день закрыт обработанным документом
      */
-    public function findLatestByCompanyIds(array $companyIds, string $documentType): array
+    public function findCompaniesWithProcessedDay(array $companyIds, string $documentType, string $day): array
     {
         if ([] === $companyIds) {
             return [];
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT company_id, MAX(period_from) AS last_day
+            'SELECT DISTINCT company_id
              FROM marketplace_raw_documents
              WHERE company_id IN (:companyIds)
                AND marketplace = :marketplace
                AND document_type = :documentType
-               AND (processing_status IS NULL OR processing_status <> :failed)
-             GROUP BY company_id',
+               AND period_from = :day
+               AND period_to = :day
+               AND processing_status = :completed',
             [
                 'companyIds' => $companyIds,
                 'marketplace' => MarketplaceType::OZON->value,
                 'documentType' => $documentType,
-                'failed' => PipelineStatus::FAILED->value,
+                'day' => $day,
+                'completed' => PipelineStatus::COMPLETED->value,
             ],
             [
                 'companyIds' => ArrayParameterType::STRING,
             ],
         );
 
-        $latest = [];
+        $found = [];
         foreach ($rows as $row) {
             $companyId = (string) $row['company_id'];
-            $lastDay = $row['last_day'] ?? null;
-
-            if ('' !== $companyId && null !== $lastDay) {
-                $latest[$companyId] = (new \DateTimeImmutable((string) $lastDay))->format('Y-m-d');
+            if ('' !== $companyId) {
+                $found[] = $companyId;
             }
         }
 
-        return $latest;
+        return $found;
     }
 }

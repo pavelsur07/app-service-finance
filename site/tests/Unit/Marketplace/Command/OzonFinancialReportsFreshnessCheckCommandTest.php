@@ -14,11 +14,11 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class OzonFinancialReportsFreshnessCheckCommandTest extends TestCase
 {
-    public function testDocumentForYesterdayIsGreen(): void
+    public function testProcessedDocumentForYesterdayIsGreen(): void
     {
         $tester = new CommandTester($this->command(
             [['company_id' => 'c-1', 'id' => 'conn-1']],
-            [['company_id' => 'c-1', 'last_day' => $this->yesterday()]],
+            [['company_id' => 'c-1']],
         ));
 
         $tester->execute([]);
@@ -40,31 +40,42 @@ final class OzonFinancialReportsFreshnessCheckCommandTest extends TestCase
         self::assertStringContainsString('MISSING company c-1', $tester->getDisplay());
     }
 
-    public function testStaleDocumentIsFailure(): void
+    public function testOnlyOneOfTwoCabinetsClosedIsFailure(): void
     {
         $tester = new CommandTester($this->command(
-            [['company_id' => 'c-1', 'id' => 'conn-1']],
-            [['company_id' => 'c-1', 'last_day' => '2026-09-07']],
+            [['company_id' => 'c-1', 'id' => 'conn-1'], ['company_id' => 'c-2', 'id' => 'conn-2']],
+            [['company_id' => 'c-1']],
         ));
 
         $tester->execute([]);
 
         self::assertSame(1, $tester->getStatusCode());
-        self::assertStringContainsString('STALE company c-1', $tester->getDisplay());
+        self::assertStringContainsString('OK company c-1', $tester->getDisplay());
+        self::assertStringContainsString('MISSING company c-2', $tester->getDisplay());
+        self::assertStringContainsString('missing count: 1', $tester->getDisplay());
     }
 
-    public function testDocumentNewerThanYesterdayIsStillGreen(): void
+    public function testQueryAsksForYesterdayExactlyAndOnlyProcessedDocuments(): void
     {
-        // Загрузчик за сегодня не ходит, но документ за сегодня может появиться
-        // после ручного прогона: гейт свежести не должен на этом краснеть.
+        // Регрессия. Прежняя версия брала максимум по периоду и любой статус
+        // кроме failed: документ за сегодня выдавался бы за доказательство
+        // вчерашнего, а застрявшая обработка — за готовые финансовые строки.
+        $params = [];
         $tester = new CommandTester($this->command(
             [['company_id' => 'c-1', 'id' => 'conn-1']],
-            [['company_id' => 'c-1', 'last_day' => $this->today()]],
+            [['company_id' => 'c-1']],
+            $params,
         ));
 
         $tester->execute([]);
 
-        self::assertSame(0, $tester->getStatusCode());
+        $yesterday = (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))
+            ->modify('-1 day')
+            ->format('Y-m-d');
+
+        self::assertSame($yesterday, $params['day'] ?? null);
+        self::assertSame('completed', $params['completed'] ?? null);
+        self::assertSame('accrual_by_day', $params['documentType'] ?? null);
     }
 
     public function testNoActiveConnectionsIsSuccessNotFailure(): void
@@ -81,31 +92,26 @@ final class OzonFinancialReportsFreshnessCheckCommandTest extends TestCase
     /**
      * @param list<array<string, mixed>> $connections
      * @param list<array<string, mixed>> $documents
+     * @param array<string, mixed> $capturedParams
      */
-    private function command(array $connections, array $documents): OzonFinancialReportsFreshnessCheckCommand
+    private function command(array $connections, array $documents, array &$capturedParams = []): OzonFinancialReportsFreshnessCheckCommand
     {
         $connectionsDbal = $this->createMock(Connection::class);
         $connectionsDbal->method('fetchAllAssociative')->willReturn($connections);
 
         $documentsDbal = $this->createMock(Connection::class);
-        $documentsDbal->method('fetchAllAssociative')->willReturn($documents);
+        $documentsDbal->method('fetchAllAssociative')->willReturnCallback(
+            static function (string $sql, array $params = []) use ($documents, &$capturedParams): array {
+                $capturedParams = $params;
+
+                return $documents;
+            },
+        );
 
         return new OzonFinancialReportsFreshnessCheckCommand(
             new ActiveOzonConnectionsQuery($connectionsDbal),
             new LatestOzonAccrualDocumentQuery($documentsDbal),
             new NullLogger(),
         );
-    }
-
-    private function yesterday(): string
-    {
-        return (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))
-            ->modify('-1 day')
-            ->format('Y-m-d');
-    }
-
-    private function today(): string
-    {
-        return (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
     }
 }
