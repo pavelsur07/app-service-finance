@@ -15,6 +15,7 @@ use App\Marketplace\Infrastructure\Api\Ozon\OzonAccrualByDayClientInterface;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
 use App\Marketplace\MessageHandler\SyncOzonAccrualByDayHandler;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -74,7 +75,7 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $persisted = null;
         $em = $this->em($persisted);
 
-        $handler = $this->handler($em, $this->client([]), $this->createMock(MessageBusInterface::class), []);
+        $handler = $this->handler($em, $this->client([]), $this->bus(), []);
         $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
 
         self::assertInstanceOf(MarketplaceRawDocument::class, $persisted);
@@ -96,7 +97,7 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $persisted = null;
         $em = $this->em($persisted, $company);
 
-        $handler = $this->handler($em, $this->client([['accrual_id' => 'new']]), $this->createMock(MessageBusInterface::class), [$existing]);
+        $handler = $this->handler($em, $this->client([['accrual_id' => 'new']]), $this->bus(), [$existing]);
         $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
 
         self::assertNull($persisted, 'Повторный прогон не должен создавать второй документ.');
@@ -132,6 +133,71 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $this->expectException(UnrecoverableMessageHandlingException::class);
 
         $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+    }
+
+    public function testConnectionOfAnotherCompanyIsRefused(): void
+    {
+        // IDOR: подключение обязано принадлежать компании из сообщения. Иначе
+        // подменённое сообщение загрузит данные одной компании, а состояние
+        // синхронизации перепишет другой.
+        $persisted = null;
+        $handler = $this->handler(
+            $this->em($persisted),
+            $this->client([['accrual_id' => 1]]),
+            $this->bus(),
+            [],
+            connectionBelongsToCompany: false,
+        );
+
+        $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertNull($persisted, 'Чужое подключение не должно приводить к загрузке.');
+    }
+
+    public function testRateLimitDelayFromOzonIsPassedToMessenger(): void
+    {
+        $persisted = null;
+        $client = $this->createMock(OzonAccrualByDayClientInterface::class);
+        $client->method('fetchDay')->willThrowException(
+            new MarketplaceRateLimitException(429, '{"code":8}', self::DATE, self::DATE, 30),
+        );
+
+        $handler = $this->handler($this->em($persisted), $client, $this->createMock(MessageBusInterface::class), []);
+
+        try {
+            $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+            self::fail('Лимит обязан приводить к повтору.');
+        } catch (RecoverableMessageHandlingException $e) {
+            self::assertSame(30_000, $e->getRetryDelay(), 'Retry-After Ozon передаётся в миллисекундах.');
+        }
+    }
+
+    public function testFailedDispatchIsNotSwallowedSoDayDoesNotStayPendingForever(): void
+    {
+        // refreshRawData()/новый документ выставляют PENDING. Если проглотить
+        // сбой отправки, следующий прогон увидит PENDING и пропустит документ —
+        // день застрянет навсегда без единого сообщения обработки.
+        $persisted = null;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('transport down'));
+
+        $handler = $this->handler($this->em($persisted), $this->client([['accrual_id' => 1]]), $bus, []);
+
+        $this->expectException(RecoverableMessageHandlingException::class);
+
+        $handler(new SyncOzonAccrualByDayMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+    }
+
+    /**
+     * Мок шины, умеющий вернуть Envelope. Голый createMock() этого не может:
+     * Envelope объявлен final, и авто-возврат для dispatch() не генерируется.
+     */
+    private function bus(): MessageBusInterface
+    {
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        return $bus;
     }
 
     /**
@@ -178,6 +244,7 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         OzonAccrualByDayClientInterface $client,
         MessageBusInterface $bus,
         array $existingDocuments,
+        bool $connectionBelongsToCompany = true,
     ): SyncOzonAccrualByDayHandler {
         $lock = $this->createMock(SharedLockInterface::class);
         $lock->method('acquire')->willReturn(true);
@@ -188,6 +255,12 @@ final class SyncOzonAccrualByDayHandlerTest extends TestCase
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('findActiveExactDayDocuments')->willReturn($existingDocuments);
 
-        return new SyncOzonAccrualByDayHandler($em, $client, $lockFactory, new NullLogger(), $bus, $repository);
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connections = $this->createMock(MarketplaceConnectionRepository::class);
+        $connections->method('findByIdAndCompany')->willReturn(
+            $connectionBelongsToCompany ? new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON) : null,
+        );
+
+        return new SyncOzonAccrualByDayHandler($em, $client, $lockFactory, new NullLogger(), $bus, $repository, $connections);
     }
 }

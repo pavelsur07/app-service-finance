@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Infrastructure\Api\Ozon;
 
 use App\Marketplace\Exception\MarketplaceBadRequestException;
+use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonAccrualByDayClient;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
@@ -112,6 +113,29 @@ final class OzonAccrualByDayClientTest extends TestCase
             self::assertSame(400, $e->getStatusCode());
             self::assertStringContainsString('obsolete method cannot be used', $e->getResponseExcerpt());
         }
+    }
+
+    public function testMalformedPayloadIsRejectedInsteadOfLookingLikeAnEmptyDay(): void
+    {
+        // Ответ без accruals — не «день без начислений». Принять его за пустой
+        // значит записать финансовый день как успешно загруженный.
+        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse('{"unexpected":true}', ['http_code' => 200]));
+
+        $this->expectException(MarketplaceInvalidApiResponseException::class);
+
+        $this->client($http)->fetchDay(self::COMPANY_ID, new \DateTimeImmutable('2026-09-08'));
+    }
+
+    public function testRepeatedCursorIsRejectedInsteadOfLoopingOrTruncating(): void
+    {
+        $http = new MockHttpClient(static fn (): MockResponse => new MockResponse(
+            '{"accruals":[{"accrual_id":1}],"last_id":"same-cursor"}',
+            ['http_code' => 200],
+        ));
+
+        $this->expectException(MarketplaceInvalidApiResponseException::class);
+
+        $this->client($http)->fetchDay(self::COMPANY_ID, new \DateTimeImmutable('2026-09-08'));
     }
 
     public function testMissingCredentialsFailFast(): void

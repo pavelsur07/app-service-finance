@@ -7,6 +7,7 @@ namespace App\Marketplace\MessageHandler;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
@@ -16,6 +17,7 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonAccrualByDayClientInterface;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -44,7 +46,13 @@ final class SyncOzonAccrualByDayHandler
 {
     public const DOCUMENT_TYPE = 'accrual_by_day';
 
-    private const LOCK_TTL_SECONDS = 300;
+    private const LOCK_TTL_SECONDS = 900;
+
+    /**
+     * Сколько документ считается «в обработке». Дольше этого срока PENDING
+     * означает не идущую обработку, а потерянное сообщение.
+     */
+    private const IN_PROGRESS_GRACE_SECONDS = 3600;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -53,6 +61,7 @@ final class SyncOzonAccrualByDayHandler
         private readonly LoggerInterface $logger,
         private readonly MessageBusInterface $messageBus,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
+        private readonly MarketplaceConnectionRepository $connectionRepository,
     ) {
     }
 
@@ -91,9 +100,26 @@ final class SyncOzonAccrualByDayHandler
             return;
         }
 
-        $connection = $this->em->find(MarketplaceConnection::class, $message->connectionId);
+        // Подключение ищется в границах компании из сообщения, а не по одному
+        // идентификатору: иначе подменённое сообщение загрузило бы данные одной
+        // компании, а состояние синхронизации переписало бы другой (IDOR).
+        $connection = $this->connectionRepository->findByIdAndCompany($message->connectionId, $company);
         if (!$connection instanceof MarketplaceConnection) {
-            $this->logger->error('MarketplaceConnection not found', ['connection_id' => $message->connectionId]);
+            $this->logger->error('MarketplaceConnection not found for company', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+            ]);
+
+            return;
+        }
+
+        if (MarketplaceType::OZON !== $connection->getMarketplace()
+            || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()
+        ) {
+            $this->logger->error('Connection is not an Ozon seller connection', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+            ]);
 
             return;
         }
@@ -122,9 +148,16 @@ final class SyncOzonAccrualByDayHandler
             $day,
         )[0] ?? null;
 
+        // Охрана «идёт обработка» ограничена возрастом документа. Без этого
+        // единственный сбой отправки оставлял бы день в PENDING навсегда:
+        // следующий прогон видел бы статус и пропускал документ, а обработать
+        // его уже некому.
+        $staleAfter = (new \DateTimeImmutable())->modify(sprintf('-%d seconds', self::IN_PROGRESS_GRACE_SECONDS));
+
         if (
             null !== $existing
             && in_array($existing->getProcessingStatus(), [PipelineStatus::PENDING, PipelineStatus::RUNNING], true)
+            && $existing->getSyncedAt() > $staleAfter
         ) {
             $this->logger->info('Skipping Ozon accrual refresh: pipeline is still in progress', [
                 'company_id' => $message->companyId,
@@ -160,11 +193,18 @@ final class SyncOzonAccrualByDayHandler
                 businessDate: $message->date,
             ));
         } catch (\Throwable $e) {
-            $this->logger->error('Failed to dispatch processing for Ozon accrual by-day', [
+            // Проглотить нельзя: документ уже выставлен в PENDING, и следующий
+            // прогон пропустил бы его как «в обработке» — день застрял бы
+            // навсегда без единого сообщения обработки. Повторяем весь шаг:
+            // загрузка и обновление документа идемпотентны.
+            $this->logger->warning('Failed to dispatch processing for Ozon accrual by-day, will retry', [
                 'company_id' => $message->companyId,
                 'raw_document_id' => $document->getId(),
+                'date' => $message->date,
                 'error' => $e->getMessage(),
             ]);
+
+            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
         }
     }
 
@@ -249,7 +289,13 @@ final class SyncOzonAccrualByDayHandler
         $this->em->flush();
 
         if ($transient) {
-            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
+            // Retry-After от Ozon передаётся дальше в миллисекундах: повторять
+            // раньше, чем разрешил маркетплейс, — гарантированный новый 429.
+            $retryDelayMs = $e instanceof MarketplaceRateLimitException && null !== $e->getRetryAfter()
+                ? $e->getRetryAfter() * 1000
+                : null;
+
+            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e, $retryDelayMs);
         }
 
         // Ретраить бесполезно, но и терять день нельзя: Unrecoverable кладёт

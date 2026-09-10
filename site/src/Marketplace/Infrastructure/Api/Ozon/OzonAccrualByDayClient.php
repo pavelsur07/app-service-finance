@@ -7,6 +7,7 @@ namespace App\Marketplace\Infrastructure\Api\Ozon;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
+use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
@@ -34,11 +35,12 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
     private const ERROR_EXCERPT_LIMIT = 500;
 
     /**
-     * Защитный предел числа страниц: backstop против бесконечного цикла, если
-     * API вернёт неизменный last_id. В штатной работе не достигается — в
-     * выгрузке за июнь ни один день не занял больше одной страницы.
+     * Защитный предел числа страниц. В выгрузке за июнь ни один день не занял
+     * больше одной страницы, поэтому сотня — заведомый запас. Достижение
+     * предела с непустым курсором — не повод молча обрезать финансовый день,
+     * а повод упасть.
      */
-    private const MAX_PAGES = 1000;
+    private const MAX_PAGES = 100;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -63,6 +65,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         $accruals = [];
         $lastId = '';
         $page = 0;
+        $seenCursors = [];
 
         do {
             ++$page;
@@ -74,15 +77,30 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
 
             $payload = $this->request($headers, $json, $companyId, $day, $page);
 
-            $rows = $payload['accruals'] ?? [];
-            foreach (is_array($rows) ? $rows : [] as $row) {
+            // Отсутствующий или не-массивный `accruals` — это не «день без
+            // начислений», а неожиданная форма ответа. Принять её за пустой день
+            // значит записать финансовый день как успешно загруженный.
+            if (!isset($payload['accruals']) || !is_array($payload['accruals'])) {
+                throw new MarketplaceInvalidApiResponseException('Ozon accrual by-day response has no "accruals" array.', 200, $this->excerpt($payload), $day, $day);
+            }
+
+            foreach ($payload['accruals'] as $row) {
                 if (is_array($row)) {
                     $accruals[] = $row;
                 }
             }
 
             $lastId = is_string($payload['last_id'] ?? null) ? trim($payload['last_id']) : '';
-        } while ('' !== $lastId && $page < self::MAX_PAGES);
+
+            if ('' !== $lastId && isset($seenCursors[$lastId])) {
+                throw new MarketplaceInvalidApiResponseException(sprintf('Ozon accrual by-day repeated pagination cursor on page %d.', $page), 200, $this->excerpt($payload), $day, $day);
+            }
+            $seenCursors[$lastId] = true;
+
+            if ('' !== $lastId && $page >= self::MAX_PAGES) {
+                throw new MarketplaceInvalidApiResponseException(sprintf('Ozon accrual by-day exceeded %d pages with a non-empty cursor.', self::MAX_PAGES), 200, $this->excerpt($payload), $day, $day);
+            }
+        } while ('' !== $lastId);
 
         return $accruals;
     }
@@ -151,6 +169,14 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         ]);
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function excerpt(array $payload): string
+    {
+        return mb_substr(json_encode($payload, \JSON_UNESCAPED_UNICODE) ?: '', 0, self::ERROR_EXCERPT_LIMIT);
     }
 
     /**
