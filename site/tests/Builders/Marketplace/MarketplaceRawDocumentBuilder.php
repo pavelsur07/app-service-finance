@@ -6,6 +6,7 @@ namespace App\Tests\Builders\Marketplace;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
 use Ramsey\Uuid\Uuid;
@@ -19,7 +20,7 @@ final class MarketplaceRawDocumentBuilder
     private \DateTimeImmutable $periodFrom;
     private \DateTimeImmutable $periodTo;
     private array $rawData = [];
-    private string $apiEndpoint = '/test/endpoint';
+    private ?string $apiEndpoint = null;
     private ?PipelineStatus $processingStatus = null;
     private ?\DateTimeImmutable $syncedAt = null;
 
@@ -55,7 +56,6 @@ final class MarketplaceRawDocumentBuilder
     {
         $clone = clone $this;
         $clone->id = sprintf('22222222-2222-2222-2222-%012d', $index);
-        $clone->apiEndpoint = sprintf('/test/endpoint/%d', $index);
 
         return $clone;
     }
@@ -127,7 +127,13 @@ final class MarketplaceRawDocumentBuilder
         $doc->setPeriodFrom($this->periodFrom);
         $doc->setPeriodTo($this->periodTo);
         $doc->setRawData($this->rawData);
-        $doc->setApiEndpoint($this->apiEndpoint);
+        // По умолчанию — реальный `api_endpoint` соответствующего маркетплейса,
+        // а не выдуманная строка: конвейер выводит из него формат документа, и
+        // незнакомое значение теперь законно останавливает обработку.
+        $doc->setApiEndpoint($this->apiEndpoint ?? match ($this->marketplace) {
+            MarketplaceType::WILDBERRIES => MarketplaceRawFormat::WB_FINANCE_SALES_REPORTS_DETAILED->value,
+            default => MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3->value,
+        });
 
         if (null !== $this->syncedAt) {
             $syncedAt = new \ReflectionProperty($doc, 'syncedAt');

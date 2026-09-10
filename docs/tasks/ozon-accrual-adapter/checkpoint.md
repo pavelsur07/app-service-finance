@@ -1,10 +1,17 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 закрыт, стадии 2–5 — отдельная ветка
-**Status:** done для этой ветки — Phase 0 и Stage 1 завершены
-**Stage base commit:** <записать перед 1.3, код ещё не менялся>
+**Phase:** Stage 4a закрыт, дальше Stage 4b отдельной веткой
+**Status:** handoff — ветка со стадиями 2, 3 и 4a готова к ревью
+**Stage base commit:** `d77337c1` (Stage 4a)
 
 ### Completed
+- Stage 4a — клиент by-day, загрузчик, команда-диспетчер. Отчёт —
+  `stages/stage-4a.md`. Обработка вынесена в Stage 4b.
+- Stage 3 — `MarketplaceRawFormat`, выбор процессора по формату, громкий отказ
+  на незнакомом `api_endpoint`. Отчёт — `stages/stage-3.md`.
+- Stage 2 — `OzonAccrualCategoryFacade` + `OzonAccrualCategoryView`, разрешение
+  по имени из справочника, неизвестное уходит в видимую очередь. Отчёт —
+  `stages/stage-2.md`.
 - Phase 0 — `plan.md`: 4 Stage, границы, открытые вопросы.
 - Закрыт вопрос по `marketplace_sale_mappings.operation_type`: чтением PROD
   установлено, что значений всего два, `sale` и `return`. Это внутренний домен,
@@ -48,10 +55,10 @@
 - external: не требуется до появления кода
 
 ### Exact next action
-- Эта ветка закрывает Phase 0 и Stage 1 и уходит в merge. Стадии 2–5 ведутся
-  отдельной веткой по указанию Владельца от 09.09.2026.
-- Первое действие в новой ветке — Stage 2: read-only метод `IngestionFacade`
-  для разрешения `type_id` в категорию затрат, плюс `ARCHITECTURE.md`.
+- Ветка `feat/ozon-accrual-adapter-stages` (стадии 2, 3, 4a) уходит в merge.
+- Stage 4b ведётся отдельной веткой по решению Владельца от 10.09.2026:
+  формат-зависимый классификатор, три процессора, удаление мёртвого
+  `OzonTransactionTotalsClient`.
 
 ### Files to inspect first on resume
 - `docs/tasks/ozon-accrual-adapter/plan.md` — раздел «Что известно и что нет»

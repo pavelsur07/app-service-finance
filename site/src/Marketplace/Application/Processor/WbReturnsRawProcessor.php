@@ -10,6 +10,7 @@ use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
@@ -36,7 +37,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
     ) {
     }
 
-    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
     {
         if ($type instanceof StagingRecordType) {
             return StagingRecordType::RETURN === $type

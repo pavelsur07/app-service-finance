@@ -12,6 +12,7 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
@@ -56,11 +57,20 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     private int $currentYear = 0;
     private int $currentMonth = 0;
 
-    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
     {
         if ($type instanceof StagingRecordType) {
+            // Реестр берёт первый подошедший процессор, поэтому без явного
+            // различения формата этот затенял бы процессоры by-day порядком
+            // сервисов в контейнере.
+            //
+            // null означает «формат не передан» — так ходят вызывающие, которые
+            // о форматах не знают, и так обрабатываются 967 документов v3.
+            // Переданный чужой формат — это документ другого поколения, и брать
+            // его нельзя: молча создадутся финансовые записи по чужой схеме.
             return StagingRecordType::COST === $type
-                && MarketplaceType::OZON === $marketplace;
+                && MarketplaceType::OZON === $marketplace
+                && (null === $format || MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3 === $format);
         }
 
         return $type === MarketplaceType::OZON->value && 'costs' === $kind;
