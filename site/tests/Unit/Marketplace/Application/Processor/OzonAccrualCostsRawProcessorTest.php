@@ -32,7 +32,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     private const COMPANY_ID = 'company-1';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
 
-    /** @var list<array{externalId: string, code: string, amount: string}> */
+    /** @var list<array{externalId: string, code: string, amount: string, operationType: string|null}> */
     private array $persisted = [];
 
     public function testCommissionBecomesPositiveCostWithLegacyCategoryCode(): void
@@ -125,6 +125,45 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
 
         self::assertSame(0, $processor->process(self::COMPANY_ID, self::RAW_DOC_ID));
         self::assertSame(1, $deletes, 'Пустой разбор обязан пройти через удаление прежних затрат.');
+    }
+
+    public function testPositiveCommissionIsStornoNotAnExtraExpense(): void
+    {
+        // Регрессия. В фикстуре два начисления комиссии: -1379.54 (удержание) и
+        // +1217.62 (возврат по отменённому заказу). Обе суммы хранятся
+        // положительными, поэтому вид операции несёт только operation_type.
+        // Без него UnprocessedCostsQuery считает возврат обычной затратой и
+        // увеличивает расходы вместо того, чтобы их уменьшить.
+        $this->process();
+
+        $byId = [];
+        foreach ($this->persisted as $row) {
+            $byId[$row['externalId']] = $row;
+        }
+
+        $charge = $byId['ozon-accrual-50000000001-commission-product-0'] ?? null;
+        $storno = $byId['ozon-accrual-50000000002-commission-product-0'] ?? null;
+
+        self::assertNotNull($charge);
+        self::assertNotNull($storno);
+        self::assertSame('charge', $charge['operationType'], 'Удержание комиссии — начисление.');
+        self::assertSame('storno', $storno['operationType'], 'Возврат комиссии — сторно.');
+        self::assertSame('1217.62', $storno['amount'], 'Сумма хранится положительной, знак несёт operation_type.');
+    }
+
+    public function testServiceCostsAreChargesByDefault(): void
+    {
+        $this->process();
+
+        $services = array_filter(
+            $this->persisted,
+            static fn (array $row): bool => str_contains($row['externalId'], '-type-'),
+        );
+
+        self::assertNotSame([], $services);
+        foreach ($services as $row) {
+            self::assertSame('charge', $row['operationType'], $row['externalId'].' — удержание Ozon, а не сторно.');
+        }
     }
 
     public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
@@ -247,6 +286,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
                     'externalId' => (string) $entity->getExternalId(),
                     'code' => (string) $entity->getCategory()?->getCode(),
                     'amount' => $entity->getAmount(),
+                    'operationType' => $entity->getOperationType()?->value,
                 ];
             }
         });
@@ -273,7 +313,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * @return array{externalId: string, code: string, amount: string}
+     * @return array{externalId: string, code: string, amount: string, operationType: string|null}
      */
     private function find(string $needle): array
     {
@@ -320,6 +360,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
                     'externalId' => (string) $entity->getExternalId(),
                     'code' => (string) $entity->getCategory()?->getCode(),
                     'amount' => $entity->getAmount(),
+                    'operationType' => $entity->getOperationType()?->value,
                 ];
             }
         });
