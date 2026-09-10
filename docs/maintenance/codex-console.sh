@@ -91,7 +91,7 @@ case "$cmd" in
       case "$arg" in
         --no-interaction|-n|--quiet|-q) ;;
         --days-back=[1-9]|--days-back=[1-9][0-9]|--days-back=[1-9][0-9][0-9]) ;;
-        --company-id=????????-????-????-????-????????????) ;;
+        --company-id=[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
         *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
       esac
     done
