@@ -24,6 +24,7 @@ use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
@@ -147,6 +148,101 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
 
         self::assertSame(7, $result->processedRows);
+    }
+
+    /**
+     * Регрессия на скользящее окно. Ozon правит начисления задним числом, и окно
+     * существует ровно ради этих правок. Процессор пропускает уже известный
+     * external_id, поэтому без удаления прежних строк документа исправленное
+     * начисление не обновилось бы, а отменённое не исчезло бы: окно ловило бы
+     * правки, а таблицы оставались бы прежними.
+     */
+    #[DataProvider('byDayReplacementCases')]
+    public function testByDayDocumentReplacesItsOwnRowsBeforeProcessing(string $kind): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn(['accruals' => []]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
+
+        if ('sales' === $kind) {
+            $saleRepository->expects(self::once())->method('deleteByRawDocument')
+                ->with($company, MarketplaceType::OZON, 'doc-1')->willReturn(0);
+            $returnRepository->expects(self::never())->method('deleteByRawDocument');
+        } else {
+            $returnRepository->expects(self::once())->method('deleteByRawDocument')
+                ->with($company, MarketplaceType::OZON, 'doc-1')->willReturn(0);
+            $saleRepository->expects(self::never())->method('deleteByRawDocument');
+        }
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
+            $repository,
+            $saleRepository,
+            $returnRepository,
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
+        );
+
+        $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', $kind));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function byDayReplacementCases(): iterable
+    {
+        yield 'sales' => ['sales'];
+        yield 'returns' => ['returns'];
+    }
+
+    /**
+     * Легаси-документ снятого формата под это правило не подпадает: его строки
+     * не перезагружаются, и удаление стёрло бы историю, которую нечем восстановить.
+     */
+    public function testLegacyDocumentRowsAreNotDeleted(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn([]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn('ozon::v3/finance/transaction/list');
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $saleRepository->expects(self::never())->method('deleteByRawDocument');
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
+            $repository,
+            $saleRepository,
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
+        );
+
+        $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
     }
 
     /**

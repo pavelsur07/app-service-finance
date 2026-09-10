@@ -231,10 +231,25 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         $raw = $saleAmount / $sellerPrice;
         $rounded = (int) round($raw);
 
-        if ($rounded < 1 || abs($raw - $rounded) > 0.001) {
+        if ($rounded < 1) {
             $this->logger->warning('[Ozon by-day] non-integer quantity, return skipped', [
                 'accrual_id' => $accrualId,
                 'ratio' => $raw,
+            ]);
+
+            return null;
+        }
+
+        // Проверка в деньгах, а не допуском на частное: количество сторнирует
+        // себестоимость, и допуск 0.001 на ratio позволил бы вернуть на склад
+        // не то число единиц, что было продано. Инвариант — seller_price *
+        // quantity = sale_amount в копейках.
+        if (0 !== bccomp($this->money($sellerPrice * $rounded), $this->money($saleAmount), self::MONEY_SCALE)) {
+            $this->logger->warning('[Ozon by-day] non-integer quantity, return skipped', [
+                'accrual_id' => $accrualId,
+                'ratio' => $raw,
+                'seller_price' => $this->money($sellerPrice),
+                'sale_amount' => $this->money($saleAmount),
             ]);
 
             return null;

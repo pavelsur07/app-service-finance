@@ -10,6 +10,7 @@ use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -32,6 +33,7 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
 
         $dates = array_values(array_unique(array_map(static fn (SyncOzonAccrualByDayMessage $m): string => $m->date, $messages)));
         self::assertCount(3, $dates, 'Три дня окна, каждый по одному разу на подключение.');
+        self::assertSame(['2026-09-19', '2026-09-18', '2026-09-17'], $dates);
     }
 
     public function testRejectsOutOfRangeWindowInsteadOfFloodingTheQueue(): void
@@ -87,6 +89,33 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
         self::assertSame([], $messages);
     }
 
+    public function testWindowReachingLegacyDaysIsRefusedInsteadOfDoubleCounting(): void
+    {
+        $messages = [];
+        $tester = new CommandTester($this->command([['company_id' => 'c-1', 'id' => 'conn-1']], $messages));
+
+        // От 20.09 окно в 20 дней достаёт до 31.08 — дня, уже покрытого снятым
+        // форматом v3. Ключи у путей разные, поэтому повторная нормализация
+        // добавила бы вторую продажу к существующей, а не обновила её.
+        $tester->execute(['--days-back' => '20']);
+
+        self::assertSame(1, $tester->getStatusCode());
+        self::assertSame([], $messages, 'Небезопасное окно не должно отправить ни одной задачи.');
+        self::assertStringContainsString('2026-09-08', $tester->getDisplay());
+    }
+
+    public function testWindowEndingExactlyOnTheFirstSafeDayIsAllowed(): void
+    {
+        $messages = [];
+        $tester = new CommandTester($this->command([['company_id' => 'c-1', 'id' => 'conn-1']], $messages));
+
+        // 20.09 минус 12 дней = 08.09 — ровно граница, она допустима.
+        $tester->execute(['--days-back' => '12']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertCount(12, $messages);
+    }
+
     /**
      * @param list<array<string, mixed>> $connections
      * @param list<object> $messages
@@ -113,6 +142,8 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
             return new Envelope($message);
         });
 
-        return new OzonFinancialReportsSyncCommand($query, $bus, new NullLogger());
+        // Фиксированное «сегодня»: у команды есть нижняя граница по дате, и без
+        // мока тест начал бы зависеть от того, в какой день его запустили.
+        return new OzonFinancialReportsSyncCommand($query, $bus, new NullLogger(), new MockClock('2026-09-20 09:00:00', 'Europe/Moscow'));
     }
 }

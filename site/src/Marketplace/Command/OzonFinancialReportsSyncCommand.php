@@ -7,6 +7,7 @@ namespace App\Marketplace\Command;
 use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,17 +28,15 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Команда тонкая: берёт активные Ozon-подключения и на каждый день окна шлёт
  * сообщение; вся загрузка — в SyncOzonAccrualByDayHandler.
  *
- * Окно по умолчанию 14 дней, как у легаси: Ozon правит начисления задним
- * числом, и однодневное окно эти правки терять.
+ * Окно по умолчанию 2 дня: Ozon правит начисления задним числом, и однодневное
+ * окно эти правки теряет. Строки документа при перезагрузке заменяются целиком
+ * (`ProcessMarketplaceRawDocumentAction`), поэтому правка действительно
+ * доезжает до таблиц, а не только до сырья.
  *
- * ВНИМАНИЕ на переходный период. Дни по 07.09.2026 включительно уже покрыты
- * документами снятого формата v3 (`sales_report`), и их продажи лежат в
- * `marketplace_sales`. Документы by-day с ними не конфликтуют — у них свой
- * `document_type`, — но нормализованные строки не разводятся: уникальность
- * `marketplace_sales` построена на `external_order_id`, а ключи у путей разные
- * (`posting_number` против `ozon-accrual-{posting}-product-{i}`). День,
- * обработанный из обоих документов, даст двойной учёт продаж. Поэтому крон
- * ходит с `--days-back=2`, а широкое окно вручную до 22.09.2026 не запускать.
+ * Окно ограничено снизу датой EARLIEST_SAFE_DAY: до неё дни покрыты снятым
+ * форматом v3, и повторная нормализация дала бы двойной учёт продаж. Запрос,
+ * достающий раньше этой даты, отвергается, а не обрезается молча — обрезка
+ * выдала бы частичную работу за полную.
  *
  * `--company-id` ограничивает прогон одним кабинетом — для пилота и перезалива.
  */
@@ -47,13 +46,30 @@ use Symfony\Component\Messenger\MessageBusInterface;
 )]
 final class OzonFinancialReportsSyncCommand extends Command
 {
-    private const DEFAULT_LOOKBACK_DAYS = 14;
+    private const DEFAULT_LOOKBACK_DAYS = 2;
     private const MAX_LOOKBACK_DAYS = 365;
+
+    /**
+     * Первый день, который by-day имеет право заводить.
+     *
+     * Дни по 07.09.2026 включительно уже покрыты документами снятого формата v3,
+     * и их продажи лежат в `marketplace_sales`. Документы by-day с ними не
+     * конфликтуют — у by-day свой `document_type`, — но нормализованные строки
+     * не разводятся: уникальность `marketplace_sales` стоит на
+     * `external_order_id`, а ключи у путей разные (`posting_number` против
+     * `ozon-accrual-{posting}-product-{i}`). День, обработанный из обоих
+     * документов, дал бы двойной учёт выручки и возвратов.
+     *
+     * Граница снимается вместе с переносом истории на by-day, а не раньше:
+     * перезалив пересекающихся дней требует отдельной сверенной процедуры.
+     */
+    private const EARLIEST_SAFE_DAY = '2026-09-08';
 
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
+        private readonly ClockInterface $clock,
     ) {
         parent::__construct();
     }
@@ -107,7 +123,19 @@ final class OzonFinancialReportsSyncCommand extends Command
             return Command::SUCCESS;
         }
 
-        $today = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
+        $today = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->setTime(0, 0);
+
+        $earliestRequested = $today->modify(sprintf('-%d day', $daysBack))->format('Y-m-d');
+        if ($earliestRequested < self::EARLIEST_SAFE_DAY) {
+            $io->error(sprintf(
+                'Окно достаёт до %s, а by-day разрешён с %s: более ранние дни уже покрыты документами снятого формата v3, и повторная нормализация дала бы двойной учёт продаж. Уменьшите --days-back.',
+                $earliestRequested,
+                self::EARLIEST_SAFE_DAY,
+            ));
+
+            return Command::FAILURE;
+        }
+
         $dispatched = 0;
 
         foreach ($connections as $row) {

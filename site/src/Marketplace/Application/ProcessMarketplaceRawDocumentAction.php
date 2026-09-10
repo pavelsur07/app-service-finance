@@ -172,6 +172,25 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // совсем другую форму, чем операции снятого v3.
         $classifier = $this->classifierRegistry->get($marketplace, $format);
 
+        // Документ by-day перезагружается целиком: Ozon правит начисления задним
+        // числом, и скользящее окно существует ровно ради этих правок. Процессоры
+        // пропускают уже известный external_id, поэтому без удаления прежних строк
+        // документа исправленное начисление не обновилось бы, а отменённое не
+        // исчезло бы — окно ловило бы правки, а таблицы оставались бы прежними.
+        //
+        // Удаляются только открытые строки: `deleteByRawDocument` не трогает те,
+        // что уже привязаны к документу ОПиУ (`document IS NULL` в условии), —
+        // закрытый период правке не подлежит.
+        if (MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY === $format) {
+            $company = $document->getCompany();
+
+            if ('sales' === $command->kind) {
+                $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+            } elseif ('returns' === $command->kind) {
+                $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+            }
+        }
+
         $linkedRows = 0;
         if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $linkedRows = $this->cleanupWbOpenRowsByExternalIds(

@@ -253,12 +253,29 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
         $raw = $saleAmount / $sellerPrice;
         $rounded = (int) round($raw);
 
-        if ($rounded < 1 || abs($raw - $rounded) > 0.001) {
-            // Нецелое частное означает, что допущение о базе неверно. Округлить
+        if ($rounded < 1) {
+            $this->logger->warning('[Ozon by-day] non-integer quantity, sale skipped', [
+                'accrual_id' => $accrualId,
+                'ratio' => $raw,
+            ]);
+
+            return null;
+        }
+
+        // Проверка идёт в деньгах, а не в допуске на частное. Строка записывает
+        // цену единицы и итог по отдельности, поэтому её внутренний инвариант —
+        // seller_price * quantity = sale_amount в копейках. Допуск 0.001 на
+        // частное этому не равносилен: при sale_amount 1000.50 и seller_price
+        // 1000.00 частное 1.0005 прошло бы, и получилась бы строка, где
+        // quantity * pricePerUnit не сходится с totalRevenue.
+        if (0 !== bccomp($this->money($sellerPrice * $rounded), $this->money($saleAmount), self::MONEY_SCALE)) {
+            // Расхождение означает, что допущение о базе неверно. Округлить
             // молча — значит подделать финансовую строку.
             $this->logger->warning('[Ozon by-day] non-integer quantity, sale skipped', [
                 'accrual_id' => $accrualId,
                 'ratio' => $raw,
+                'seller_price' => $this->money($sellerPrice),
+                'sale_amount' => $this->money($saleAmount),
             ]);
 
             return null;

@@ -103,6 +103,36 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
         self::assertSame([], $this->persisted);
     }
 
+    public function testAmountsThatDoNotMultiplyBackAreSkippedNotRounded(): void
+    {
+        // Регрессия на допуск по частному. 1000.50 / 1000.00 = 1.0005 — внутри
+        // прежнего допуска 0.001, поэтому строка проходила как quantity = 1 и
+        // записывала pricePerUnit 1000.00 при totalRevenue 1000.50: строка, где
+        // quantity * pricePerUnit не сходится с собственным итогом. Проверка
+        // идёт в деньгах, поэтому такая строка теперь пропускается.
+        $row = $this->saleRow();
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '1000.50';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
+    }
+
+    public function testAmountsThatMultiplyBackExactlyArePersisted(): void
+    {
+        $row = $this->saleRow();
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '3000.00';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertCount(1, $this->persisted);
+        self::assertSame(3, $this->persisted[0]['quantity']);
+        self::assertSame('1000.00', $this->persisted[0]['pricePerUnit']);
+        self::assertSame('3000.00', $this->persisted[0]['totalRevenue']);
+    }
+
     public function testProcessorClaimsOnlyByDayFormat(): void
     {
         $processor = $this->processor();
