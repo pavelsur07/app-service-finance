@@ -48,6 +48,18 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'BrandCommission' => ['3', 'BrandCommission', 'ozon_brand_commission'];
         yield 'StarsMembership' => ['74', 'StarsMembership', 'ozon_stars_membership'];
         yield 'StockInsurance' => ['76', 'StockInsurance', 'ozon_stock_insurance'];
+        yield 'LabelBrandVerified' => ['118', 'LabelBrandVerified', 'ozon_brand_verified'];
+        yield 'PushCampaign' => ['55', 'PushCampaign', 'ozon_sending_push_notifications'];
+        // Справочник Ozon описывает ItemPacking как «Дополнительная упаковка на
+        // складе Ozon» — слово в слово имя нашей категории, и это отдельная
+        // услуга от PackingFee («Упаковка товара партнёрами»).
+        yield 'ItemPacking' => ['84', 'ItemPacking', 'ozon_additional_packaging_warehouse'];
+        yield 'Promotion' => ['54', 'Promotion', 'ozon_marketing_action'];
+        yield 'SellerReturns' => ['71', 'SellerReturns', 'ozon_return_from_stock'];
+        // Compensation (type_id 10) намеренно НЕ размечена: виджет аналитики
+        // принудительно считает всю категорию ozon_compensation доходом, не глядя
+        // на operation_type — заплатка под исторические данные. Реальное
+        // удержание показалось бы там прибылью.
     }
 
     #[DataProvider('servicesSeenInProduction')]
