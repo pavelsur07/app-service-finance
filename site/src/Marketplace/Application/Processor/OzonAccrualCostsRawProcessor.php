@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\OzonAccrualServiceCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceRawDocument;
@@ -28,13 +28,11 @@ use Ramsey\Uuid\Uuid;
  * Читает документ целиком, а не корзину классификатора: одно начисление
  * POSTING несёт и выручку, и комиссию, и услуги доставки, поэтому «одна строка —
  * одна корзина» здесь не работает. Легаси-путь обходит это тем же приёмом.
+ * Услуги разбираются каталогом Маркетплейса `OzonCostCategory` — тем же, на
+ * котором построен маппинг затрат к категориям ОПиУ. Фасад Ingestion, стоявший
+ * здесь раньше, вёл собственный словарь кодов, и они расходились: за 08–09.09.2026
+ * из 25 пришедших кодов до ОПиУ доходили пять.
  *
- * Услуги разбираются **по имени** из справочника `/v1/finance/accrual/types`
- * через `OzonAccrualCategoryFacade`. Собственный каталог Marketplace писался под
- * русские названия снятого v3 и из английских кодов справочника не разбирает ни
- * одного из встреченных 18; каталог Ingestion разбирает 15. Дублировать его
- * здесь значило бы завести второй словарь того же понятия — он разойдётся, и
- * одна услуга окажется в разных категориях в разных отчётах.
  *
  * Комиссия за продажу — не услуга со справочным `type_id`, а именованное поле,
  * поэтому её код берётся тот же, что в легаси-пути.
@@ -49,7 +47,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
-        private readonly OzonAccrualCategoryFacade $categoryFacade,
+        private readonly OzonAccrualServiceCategoryResolver $serviceCategoryResolver,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
         private readonly OzonListingEnsureService $listingEnsureService,
@@ -368,17 +366,17 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             ]);
         }
 
-        $category = $this->categoryFacade->resolveByServiceType($typeId, $typeName);
+        $category = $this->serviceCategoryResolver->resolve($typeId, $typeName);
 
         return [
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),
-            'categoryCode' => $category->code,
-            'categoryName' => $category->label,
+            'categoryCode' => $category['code'],
+            'categoryName' => $category['name'],
             // Затраты хранятся положительными, как в легаси-пути: знак несёт
             // operation_type, по которому ОПиУ отличает начисление от сторно.
             'amount' => $this->money(abs((float) $amount)),
             'operationType' => $this->operationType((float) $amount),
-            'description' => $category->label,
+            'description' => $category['name'],
             'date' => $date,
             'sku' => $sku,
         ];

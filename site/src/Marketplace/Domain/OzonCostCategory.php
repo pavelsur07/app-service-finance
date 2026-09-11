@@ -21,6 +21,7 @@ final readonly class OzonCostCategory
     /**
      * @param string[] $serviceNames Имена сервисов из services[].name в API Ozon
      * @param string[] $operationTypes Коды operation_type / operation_type_name для операций без services[]
+     * @param string[] $accrualTypeNames Имена из справочника /v1/finance/accrual/types
      */
     public function __construct(
         public string $code,
@@ -29,6 +30,7 @@ final readonly class OzonCostCategory
         public string $xlsxGroup,
         public array $serviceNames = [],
         public array $operationTypes = [],
+        public array $accrualTypeNames = [],
     ) {
     }
 
@@ -64,6 +66,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Вознаграждение',
                 xlsxGroup: 'Вознаграждение Ozon',
                 serviceNames: ['MarketplaceServiceBrandCommission'],
+                accrualTypeNames: ['BrandCommission'],
             ),
 
             // =================================================================
@@ -75,6 +78,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги доставки',
                 serviceNames: ['MarketplaceServiceItemDirectFlowLogistic'],
+                accrualTypeNames: ['Logistic'],
             ),
             new self(
                 code: 'ozon_logistic_direct_vdc',
@@ -110,6 +114,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги доставки',
                 serviceNames: ['MarketplaceServiceItemReturnFlowLogistic'],
+                accrualTypeNames: ['ReturnFlowLogistic'],
             ),
             new self(
                 code: 'ozon_logistic_return_trans',
@@ -166,6 +171,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги доставки',
                 serviceNames: ['MarketplaceServiceItemDeliveryToHandoverPlaceOzon'],
+                accrualTypeNames: ['DeliveryToHandoverPlaceByOzon'],
             ),
             new self(
                 code: 'ozon_delivery',
@@ -229,6 +235,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemCrossdocking'],
+                accrualTypeNames: ['CrossDock'],
             ),
             new self(
                 code: 'ozon_supply_shortage',
@@ -263,6 +270,7 @@ final readonly class OzonCostCategory
                     'Обработка сроков годности на FBO',
                     'Обработка брака с приемки',
                 ],
+                accrualTypeNames: ['SupplyInbound'],
             ),
             new self(
                 code: 'ozon_supply_surplus',
@@ -278,6 +286,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['OperationMarketplaceServiceStorage'],
+                accrualTypeNames: ['Placements'],
             ),
             new self(
                 code: 'ozon_temporary_storage',
@@ -320,6 +329,7 @@ final readonly class OzonCostCategory
                     'MarketplaceServiceItemDelivToCustomer',
                     'MarketplaceServiceItemRedistributionLastMileCourier',
                 ],
+                accrualTypeNames: ['LastMileCourier'],
             ),
             new self(
                 code: 'ozon_return_pvz',
@@ -328,6 +338,7 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Услуги партнёров',
                 serviceNames: ['MarketplaceServiceItemRedistributionReturnsPVZ'],
                 operationTypes: ['SellerReturnsDeliveryToPickupPoint'],
+                accrualTypeNames: ['PickUpPointReturnAcceptance'],
             ),
             new self(
                 code: 'ozon_storage_partner',
@@ -339,6 +350,7 @@ final readonly class OzonCostCategory
                     'OperationMarketplaceItemTemporaryStorageRedistribution',
                 ],
                 operationTypes: ['Временное размещение товара партнерами'],
+                accrualTypeNames: ['TemporaryPlacementsAgent'],
             ),
             new self(
                 code: 'ozon_acquiring',
@@ -346,6 +358,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги партнёров',
                 xlsxGroup: 'Услуги партнёров',
                 serviceNames: ['MarketplaceRedistributionOfAcquiringOperation'],
+                accrualTypeNames: ['Acquiring'],
             ),
             new self(
                 code: 'ozon_fulfillment',
@@ -361,6 +374,7 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemPackageRedistribution'],
                 operationTypes: ['OperationMarketplacePackageRedistribution'],
+                accrualTypeNames: ['PackingFee'],
             ),
             new self(
                 code: 'ozon_dropoff_apvz',
@@ -368,6 +382,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги партнёров',
                 xlsxGroup: 'Услуги партнёров',
                 serviceNames: ['MarketplaceServiceItemRedistributionDropOffApvz'],
+                accrualTypeNames: ['Drop-Off Agent'],
             ),
 
             // =================================================================
@@ -379,6 +394,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
                 serviceNames: ['OperationMarketplaceCostPerClick'],
+                accrualTypeNames: ['PayPerClick'],
             ),
             new self(
                 code: 'ozon_site_advertising',
@@ -431,6 +447,7 @@ final readonly class OzonCostCategory
                     'OperationPointsForReviews',
                     'Баллы за отзывы',
                 ],
+                accrualTypeNames: ['AcceleratedReviewCollection'],
             ),
             new self(
                 code: 'ozon_pin_review',
@@ -481,6 +498,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
                 serviceNames: ['ItemAgentServiceStarsMembership'],
+                accrualTypeNames: ['StarsMembership'],
             ),
 
             // =================================================================
@@ -493,6 +511,7 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemPackageMaterialsProvision'],
                 operationTypes: ['OperationMarketplacePackageMaterialsProvision'],
+                accrualTypeNames: ['PackageCost'],
             ),
             new self(
                 code: 'ozon_additional_packaging_warehouse',
@@ -512,6 +531,7 @@ final readonly class OzonCostCategory
                     'DisposalReasonScattered',
                     'DisposalReasonFailedToPickupOnTime',
                 ],
+                accrualTypeNames: ['Disposal'],
             ),
             new self(
                 code: 'ozon_ovh_processing',
@@ -564,6 +584,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['InsuranceServiceSellerItem'],
+                accrualTypeNames: ['StockInsurance'],
             ),
             new self(
                 code: 'ozon_charity',
@@ -585,6 +606,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['OperationMarketplaceServiceEarlyPaymentAccrual'],
+                accrualTypeNames: ['EarlyPayment'],
             ),
             new self(
                 code: 'ozon_flexible_payment',
@@ -651,6 +673,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['DefectFineShipmentDelayRated'],
+                accrualTypeNames: ['DefectFineShipmentDelay'],
             ),
             new self(
                 code: 'ozon_fines_shipment_delay_rated_cancelled',
@@ -731,6 +754,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Компенсации и декомпенсации',
                 operationTypes: ['AccrualInternalClaim'],
+                accrualTypeNames: ['ItemCompensation'],
             ),
             new self(
                 code: 'ozon_partial_compensation_to_client',
@@ -833,5 +857,39 @@ final readonly class OzonCostCategory
     public static function findByOperationType(string $operationType): ?self
     {
         return self::operationTypeIndex()[$operationType] ?? null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Lookup by accrual type name (/v1/finance/accrual/types)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Отдельный индекс, а не общий с `serviceNames`: там имена сервисов снятого
+     * v3 («MarketplaceServiceItemDirectFlowLogistic»), здесь короткие имена
+     * справочника by-day («Logistic»). Складывать два поколения в один индекс —
+     * значит однажды получить коллизию и разложить услугу не в ту категорию.
+     *
+     * @return array<string, OzonCostCategory> accrualTypeName => category
+     */
+    private static function accrualTypeNameIndex(): array
+    {
+        /** @var array<string, OzonCostCategory>|null $index */
+        static $index = null;
+
+        if (null === $index) {
+            $index = [];
+            foreach (self::all() as $c) {
+                foreach ($c->accrualTypeNames as $typeName) {
+                    $index[$typeName] = $c;
+                }
+            }
+        }
+
+        return $index;
+    }
+
+    public static function findByAccrualTypeName(string $typeName): ?self
+    {
+        return self::accrualTypeNameIndex()[$typeName] ?? null;
     }
 }
