@@ -7,10 +7,10 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Processor\OzonAccrualCostsRawProcessor;
 use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\OzonAccrualServiceCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -33,10 +33,9 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 
 /**
- * Затраты из by-day. Услуги разбираются по ИМЕНИ из справочника
- * /v1/finance/accrual/types через фасад Ingestion: собственный каталог
- * Marketplace писался под русские названия снятого v3 и не разбирает из
- * английских кодов справочника ни одного.
+ * Затраты из by-day. Услуги разбираются по имени из справочника
+ * /v1/finance/accrual/types каталогом Маркетплейса — тем же, на котором построен
+ * маппинг затрат к категориям ОПиУ.
  */
 final class OzonAccrualCostsRawProcessorTest extends TestCase
 {
@@ -61,7 +60,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     {
         // Легаси хранит затраты положительными, смысл несут категория и
         // описание. Комиссия — не услуга со справочным type_id, поэтому её код
-        // берётся тот же, что у легаси-пути, а не через фасад.
+        // берётся тот же, что у легаси-пути, напрямую.
         $this->process();
 
         $commission = $this->find('commission');
@@ -69,25 +68,46 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         self::assertSame('1379.54', $commission['amount']);
     }
 
-    public function testKnownServiceIsResolvedByDictionaryName(): void
+    public function testKnownServiceIsResolvedIntoTheCodeUsedByPlMapping(): void
     {
+        // Регрессия. Услуга обязана получить код каталога Маркетплейса — тот
+        // самый, на котором построен маппинг затрат к категориям ОПиУ. Прежний
+        // разбор давал ozon_logistics, а маппинг ждёт ozon_logistic_direct: за
+        // 08–09.09.2026 это 189 164 рубля мимо отчёта.
         $this->process();
 
-        // type_id 32 -> Logistic -> Логистика
+        // type_id 32 -> Logistic -> Логистика к покупателю
         $logistics = $this->find('type-32');
-        self::assertSame('ozon_logistics', $logistics['code']);
+        self::assertSame('ozon_logistic_direct', $logistics['code']);
         self::assertSame('118.00', $logistics['amount']);
+    }
+
+    public function testLastMileIsResolvedToo(): void
+    {
+        // type_id 29 -> LastMileCourier. Прежний разбор не знал этого имени и
+        // отправлял услугу в ozon_unknown_29 — 1907 строк за два дня.
+        $this->process();
+
+        self::assertSame('ozon_logistic_last_mile', $this->find('type-29')['code']);
     }
 
     public function testUnknownServiceStillBecomesCostInVisibleQueue(): void
     {
-        // type_id 29 -> LastMileCourier, в каталоге его нет. Затрата обязана
-        // появиться с категорией «Требует классификации», а не потеряться:
-        // потерянная затрата занижает расходы и завышает прибыль.
-        $this->process();
+        // Услуга, которой нет в каталоге, обязана появиться под собственным
+        // видимым кодом, а не потеряться: потерянная затрата занижает расходы и
+        // завышает прибыль.
+        $payload = $this->payload();
+        $payload['service_types']['9001'] = 'SomeBrandNewOzonService';
+        $payload['accruals'][0]['posting']['products'][0]['delivery']['services'][] = [
+            'type_id' => 9001,
+            'accrued' => ['amount' => '-42.00', 'currency' => 'RUB'],
+        ];
 
-        $unknown = $this->find('type-29');
-        self::assertStringStartsWith('ozon_unknown_', $unknown['code']);
+        $this->processorWithPayload($payload)->process(self::COMPANY_ID, self::RAW_DOC_ID);
+
+        $unknown = $this->find('type-9001');
+        self::assertSame('ozon_unknown_9001', $unknown['code']);
+        self::assertSame('42.00', $unknown['amount']);
     }
 
     public function testItemAndNonItemFeesAreCharged(): void
@@ -97,7 +117,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         // ITEM: type_id 1 -> Acquiring; NON_ITEM: type_id 96 -> AcceleratedReviewCollection
         self::assertSame('ozon_acquiring', $this->find('item-fee')['code']);
         self::assertSame('20.83', $this->find('item-fee')['amount']);
-        self::assertSame('ozon_accelerated_reviews', $this->find('non-item')['code']);
+        self::assertSame('ozon_reviews', $this->find('non-item')['code']);
         self::assertSame('512.40', $this->find('non-item')['amount']);
     }
 
@@ -326,7 +346,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $processor = new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualCategoryFacade(),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
@@ -410,7 +430,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         (new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualCategoryFacade(),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
@@ -508,7 +528,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         return new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualCategoryFacade(),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             $existingQuery,
             $this->listingEnsureService($this->listing),

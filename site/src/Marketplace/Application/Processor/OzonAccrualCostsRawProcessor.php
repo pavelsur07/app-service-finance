@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\OzonAccrualServiceCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceRawDocument;
@@ -28,13 +28,11 @@ use Ramsey\Uuid\Uuid;
  * Читает документ целиком, а не корзину классификатора: одно начисление
  * POSTING несёт и выручку, и комиссию, и услуги доставки, поэтому «одна строка —
  * одна корзина» здесь не работает. Легаси-путь обходит это тем же приёмом.
+ * Услуги разбираются каталогом Маркетплейса `OzonCostCategory` — тем же, на
+ * котором построен маппинг затрат к категориям ОПиУ. Фасад Ingestion, стоявший
+ * здесь раньше, вёл собственный словарь кодов, и они расходились: за 08–09.09.2026
+ * из 25 пришедших кодов до ОПиУ доходили пять.
  *
- * Услуги разбираются **по имени** из справочника `/v1/finance/accrual/types`
- * через `OzonAccrualCategoryFacade`. Собственный каталог Marketplace писался под
- * русские названия снятого v3 и из английских кодов справочника не разбирает ни
- * одного из встреченных 18; каталог Ingestion разбирает 15. Дублировать его
- * здесь значило бы завести второй словарь того же понятия — он разойдётся, и
- * одна услуга окажется в разных категориях в разных отчётах.
  *
  * Комиссия за продажу — не услуга со справочным `type_id`, а именованное поле,
  * поэтому её код берётся тот же, что в легаси-пути.
@@ -49,7 +47,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
-        private readonly OzonAccrualCategoryFacade $categoryFacade,
+        private readonly OzonAccrualServiceCategoryResolver $serviceCategoryResolver,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
         private readonly OzonListingEnsureService $listingEnsureService,
@@ -102,6 +100,8 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 }
             }
         }
+
+        $this->reportUnknownServices($entries, $rawDocId);
 
         $created = 0;
 
@@ -246,7 +246,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $accrual
      * @param array<string, string> $serviceTypes
      *
-     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}>
+     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}>
      */
     private function extractEntries(array $accrual, array $serviceTypes): array
     {
@@ -290,6 +290,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                     'description' => (float) $commission > 0 ? 'Возврат комиссии Ozon' : self::COMMISSION_NAME,
                     'date' => $date,
                     'sku' => $sku,
+                    'unknownService' => null,
                 ];
             }
 
@@ -347,7 +348,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $service
      * @param array<string, string> $serviceTypes
      *
-     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}|null
+     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}|null
      */
     private function serviceEntry(array $service, array $serviceTypes, \DateTimeImmutable $date, string $externalIdPrefix, ?string $sku): ?array
     {
@@ -360,25 +361,29 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             ? (string) $service['type_id']
             : null;
 
+        // Отсутствие типа в справочнике не логируется здесь: метод зовут на
+        // каждую строку услуги, а пропущенный тип приходит массово. Причина
+        // уезжает в запись и попадает в одно предупреждение на документ.
         $typeName = null !== $typeId ? ($serviceTypes[$typeId] ?? null) : null;
 
-        if (null !== $typeId && null === $typeName) {
-            $this->logger->warning('[Ozon by-day] service type is missing from the dictionary', [
-                'type_id' => $typeId,
-            ]);
-        }
-
-        $category = $this->categoryFacade->resolveByServiceType($typeId, $typeName);
+        $category = $this->serviceCategoryResolver->resolve($typeId, $typeName);
 
         return [
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),
-            'categoryCode' => $category->code,
-            'categoryName' => $category->label,
+            'categoryCode' => $category['code'],
+            'categoryName' => $category['name'],
+            'unknownService' => $category['known']
+                ? null
+                : sprintf(
+                    '%s (type_id %s)',
+                    $typeName ?? 'нет в справочнике услуг',
+                    $typeId ?? '—',
+                ),
             // Затраты хранятся положительными, как в легаси-пути: знак несёт
             // operation_type, по которому ОПиУ отличает начисление от сторно.
             'amount' => $this->money(abs((float) $amount)),
             'operationType' => $this->operationType((float) $amount),
-            'description' => $category->label,
+            'description' => $category['name'],
             'date' => $date,
             'sku' => $sku,
         ];
@@ -452,6 +457,38 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         $sku = trim((string) $sku);
 
         return '' !== $sku ? $sku : null;
+    }
+
+    /**
+     * Одно предупреждение на документ, а не на строку.
+     *
+     * Услуга, которой нет в каталоге, приходит массово: LastMileCourier дал 1907
+     * строк за два дня. Лог по строке утопил бы в повторах всё остальное, а
+     * человеку нужно ровно одно: какие услуги не разобраны и сколько их.
+     *
+     * @param list<array<string, mixed>> $entries
+     */
+    private function reportUnknownServices(array $entries, string $rawDocId): void
+    {
+        $unknown = [];
+        foreach ($entries as $entry) {
+            $service = $entry['unknownService'] ?? null;
+            if (is_string($service)) {
+                $unknown[$service] = ($unknown[$service] ?? 0) + 1;
+            }
+        }
+
+        if ([] === $unknown) {
+            return;
+        }
+
+        arsort($unknown);
+
+        $this->logger->warning('[Ozon by-day] services are not in the Marketplace catalogue', [
+            'raw_document_id' => $rawDocId,
+            'services' => $unknown,
+            'rows' => array_sum($unknown),
+        ]);
     }
 
     /**
