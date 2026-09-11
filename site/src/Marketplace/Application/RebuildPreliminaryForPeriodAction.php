@@ -11,7 +11,9 @@ use App\Marketplace\Application\Command\ReopenMonthStageCommand;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -34,6 +36,8 @@ final class RebuildPreliminaryForPeriodAction
         private readonly ReopenMonthStageAction $reopenAction,
         private readonly MonthClosePreflightAction $preflightAction,
         private readonly CloseMonthStageAction $closeAction,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -54,7 +58,7 @@ final class RebuildPreliminaryForPeriodAction
             : array_map(CloseStage::from(...), $command->stages);
 
         foreach ($stages as $stage) {
-            $this->rebuildStage($command, $marketplace, $stage);
+            $this->rebuildStageAtomically($command, $marketplace, $stage);
         }
 
         $this->logger->info('[PreliminaryRebuild] Finished', [
@@ -63,6 +67,59 @@ final class RebuildPreliminaryForPeriodAction
             'year' => $command->year,
             'month' => $command->month,
         ]);
+    }
+
+    /**
+     * Переоткрытие и повторное закрытие этапа — одной транзакцией.
+     *
+     * Переоткрытие удаляет документ ОПиУ, а закрытие может отказать: например,
+     * когда правка Ozon убрала последние строки этапа и закрывать стало нечего.
+     * Без общей транзакции документ оставался бы удалённым, этап — в REOPENED, а
+     * ночной пересбор такой этап больше не выбирает: документ исчезал бы
+     * насовсем до ручного вмешательства.
+     *
+     * Замок берётся здесь же и покрывает обе операции: `CloseMonthStageAction`
+     * берёт тот же самый, а транзакционный advisory-замок привязан к внешней
+     * транзакции и отпустится только вместе с ней.
+     */
+    private function rebuildStageAtomically(
+        RebuildPreliminaryForPeriodCommand $command,
+        MarketplaceType $marketplace,
+        CloseStage $stage,
+    ): void {
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
+
+        try {
+            $this->monthCloseLock->lock($command->companyId, $marketplace, $command->year, $command->month);
+
+            $this->rebuildStage($command, $marketplace, $stage);
+
+            $connection->commit();
+        } catch (\Throwable $e) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+
+            $this->entityManager->clear();
+
+            $this->logger->error('[PreliminaryRebuild] Stage rolled back, existing documents preserved', [
+                'company_id' => $command->companyId,
+                'marketplace' => $command->marketplace,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $stage->value,
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            // Доменный отказ — состояние данных, ретраить нечего: этап откатан,
+            // документ на месте. Техническую ошибку пробрасываем, чтобы Messenger
+            // повторил.
+            if (!$e instanceof \DomainException) {
+                throw $e;
+            }
+        }
     }
 
     private function rebuildStage(

@@ -35,7 +35,7 @@ final class RebuildPreliminaryForPeriodHandler
                 year: $message->year,
                 month: $message->month,
                 actorUserId: $message->actorUserId,
-                stages: $message->stages,
+                stages: $message->stages(),
             ));
 
             $this->logger->info('[PreliminaryRebuild] Handler completed', [

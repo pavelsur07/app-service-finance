@@ -25,4 +25,18 @@ final readonly class RebuildPreliminaryForPeriodMessage
         public ?array $stages = null,
     ) {
     }
+
+    /**
+     * @return list<string>|null
+     */
+    public function stages(): ?array
+    {
+        // Messenger сериализует сообщения нативно, а нативная десериализация не
+        // выполняет конструктор: у сообщений, попавших в очередь до деплоя,
+        // типизированное свойство осталось бы неинициализированным, и прямое
+        // обращение упало бы Error ещё до обработки — то есть старые задания
+        // ушли бы в failed через ретраи. Тот же приём у
+        // ProcessRawDocumentStepMessage::shouldForceRefresh().
+        return isset($this->stages) ? $this->stages : null;
+    }
 }
