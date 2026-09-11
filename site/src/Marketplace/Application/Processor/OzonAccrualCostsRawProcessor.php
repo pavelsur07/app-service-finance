@@ -101,6 +101,8 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             }
         }
 
+        $this->reportUnknownServices($entries, $rawDocId);
+
         $created = 0;
 
         // Удаление и запись — одной транзакцией, и удаление внутри неё. Раньше
@@ -244,7 +246,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $accrual
      * @param array<string, string> $serviceTypes
      *
-     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}>
+     * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}>
      */
     private function extractEntries(array $accrual, array $serviceTypes): array
     {
@@ -288,6 +290,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                     'description' => (float) $commission > 0 ? 'Возврат комиссии Ozon' : self::COMMISSION_NAME,
                     'date' => $date,
                     'sku' => $sku,
+                    'unknownService' => null,
                 ];
             }
 
@@ -345,7 +348,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
      * @param array<string, mixed> $service
      * @param array<string, string> $serviceTypes
      *
-     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null}|null
+     * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}|null
      */
     private function serviceEntry(array $service, array $serviceTypes, \DateTimeImmutable $date, string $externalIdPrefix, ?string $sku): ?array
     {
@@ -372,6 +375,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),
             'categoryCode' => $category['code'],
             'categoryName' => $category['name'],
+            'unknownService' => $category['known'] ? null : sprintf('%s (type_id %s)', $typeName ?? 'без имени', $typeId ?? '—'),
             // Затраты хранятся положительными, как в легаси-пути: знак несёт
             // operation_type, по которому ОПиУ отличает начисление от сторно.
             'amount' => $this->money(abs((float) $amount)),
@@ -450,6 +454,38 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         $sku = trim((string) $sku);
 
         return '' !== $sku ? $sku : null;
+    }
+
+    /**
+     * Одно предупреждение на документ, а не на строку.
+     *
+     * Услуга, которой нет в каталоге, приходит массово: LastMileCourier дал 1907
+     * строк за два дня. Лог по строке утопил бы в повторах всё остальное, а
+     * человеку нужно ровно одно: какие услуги не разобраны и сколько их.
+     *
+     * @param list<array<string, mixed>> $entries
+     */
+    private function reportUnknownServices(array $entries, string $rawDocId): void
+    {
+        $unknown = [];
+        foreach ($entries as $entry) {
+            $service = $entry['unknownService'] ?? null;
+            if (is_string($service)) {
+                $unknown[$service] = ($unknown[$service] ?? 0) + 1;
+            }
+        }
+
+        if ([] === $unknown) {
+            return;
+        }
+
+        arsort($unknown);
+
+        $this->logger->warning('[Ozon by-day] services are not in the Marketplace catalogue', [
+            'raw_document_id' => $rawDocId,
+            'services' => $unknown,
+            'rows' => array_sum($unknown),
+        ]);
     }
 
     /**

@@ -346,7 +346,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $processor = new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualServiceCategoryResolver(new NullLogger()),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
@@ -430,7 +430,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         (new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualServiceCategoryResolver(new NullLogger()),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
@@ -528,7 +528,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         return new OzonAccrualCostsRawProcessor(
             $em,
             $connection,
-            new OzonAccrualServiceCategoryResolver(new NullLogger()),
+            new OzonAccrualServiceCategoryResolver(),
             $categoryResolver,
             $existingQuery,
             $this->listingEnsureService($this->listing),

@@ -673,7 +673,8 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['DefectFineShipmentDelayRated'],
-                accrualTypeNames: ['DefectFineShipmentDelay'],
+                // В справочнике by-day имя без «d» на конце: DefectFineShipmentDelayRate.
+                accrualTypeNames: ['DefectFineShipmentDelayRate'],
             ),
             new self(
                 code: 'ozon_fines_shipment_delay_rated_cancelled',

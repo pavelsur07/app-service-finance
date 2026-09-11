@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Domain\OzonCostCategory;
-use Psr\Log\LoggerInterface;
 
 /**
  * Разбирает услугу из by-day в категорию затрат Маркетплейса.
@@ -24,19 +23,18 @@ use Psr\Log\LoggerInterface;
  * разложить услугу не в ту категорию.
  *
  * Неизвестная услуга не теряется и не притворяется известной: она получает
- * собственный видимый код `ozon_unknown_<type_id>` и предупреждение в лог.
+ * собственный видимый код `ozon_unknown_<type_id>` и признак `known: false`.
  * Затрата попадает в справочник, её видно в очереди на разбор, и она ждёт
  * правила в `default_cost_mapping.yaml` — а не исчезает молча.
  */
 final readonly class OzonAccrualServiceCategoryResolver
 {
-    public function __construct(
-        private LoggerInterface $logger,
-    ) {
-    }
-
     /**
-     * @return array{code: string, name: string}
+     * Резолвер намеренно ничего не логирует: его зовут на каждую строку услуги,
+     * а одно массовое начисление даёт тысячи строк за документ. Неразобранные
+     * услуги собирает и печатает одним предупреждением вызывающий.
+     *
+     * @return array{code: string, name: string, known: bool}
      */
     public function resolve(?string $typeId, ?string $typeName): array
     {
@@ -45,19 +43,15 @@ final readonly class OzonAccrualServiceCategoryResolver
             : null;
 
         if (null !== $category) {
-            return ['code' => $category->code, 'name' => $category->name];
+            return ['code' => $category->code, 'name' => $category->name, 'known' => true];
         }
-
-        $this->logger->warning('[Ozon by-day] service is not in the Marketplace catalogue', [
-            'type_id' => $typeId,
-            'type_name' => $typeName,
-        ]);
 
         return [
             'code' => sprintf('ozon_unknown_%s', $typeId ?? 'unknown'),
             'name' => null !== $typeName && '' !== $typeName
                 ? sprintf('Неразобранная услуга Ozon: %s', $typeName)
                 : 'Неразобранная услуга Ozon',
+            'known' => false,
         ];
     }
 }

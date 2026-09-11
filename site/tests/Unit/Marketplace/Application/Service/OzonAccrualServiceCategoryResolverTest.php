@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Marketplace\Application\Service;
 use App\Marketplace\Application\Service\OzonAccrualServiceCategoryResolver;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -43,12 +42,15 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'EarlyPayment' => ['18', 'EarlyPayment', 'ozon_early_payment'];
         yield 'Disposal' => ['15', 'Disposal', 'ozon_disposal'];
         yield 'ItemCompensation' => ['25', 'ItemCompensation', 'ozon_compensation'];
+        // В справочнике by-day имя без «d» на конце, а у легаси-операции с ним:
+        // DefectFineShipmentDelayRate против DefectFineShipmentDelayRated.
+        yield 'DefectFineShipmentDelayRate' => ['94', 'DefectFineShipmentDelayRate', 'ozon_fines_shipment_delay_rated'];
     }
 
     #[DataProvider('servicesSeenInProduction')]
     public function testServiceResolvesToItsMarketplaceCode(string $typeId, string $typeName, string $expectedCode): void
     {
-        $resolver = new OzonAccrualServiceCategoryResolver(new NullLogger());
+        $resolver = new OzonAccrualServiceCategoryResolver();
 
         self::assertSame($expectedCode, $resolver->resolve($typeId, $typeName)['code']);
     }
@@ -64,15 +66,25 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         $rules = Yaml::parseFile(__DIR__.'/../../../../../config/marketplace/default_cost_mapping.yaml');
         $codes = array_column($rules['marketplaces']['ozon']['cost_mappings'], 'cost_code');
 
-        $resolver = new OzonAccrualServiceCategoryResolver(new NullLogger());
+        $resolver = new OzonAccrualServiceCategoryResolver();
         $code = $resolver->resolve($typeId, $typeName)['code'];
 
         self::assertContains($code, $codes, sprintf('Для кода "%s" нет правила в default_cost_mapping.yaml.', $code));
     }
 
+    public function testPlainShipmentDelayFineIsNotClaimedByTheRatedOne(): void
+    {
+        // Штраф за просроченную отгрузку и штраф за нерекомендованный слот —
+        // разные категории. Имя справочника принадлежит второму; первый из
+        // by-day не приходит, и выдавать его за второй нельзя.
+        $resolver = new OzonAccrualServiceCategoryResolver();
+
+        self::assertSame('ozon_unknown_93', $resolver->resolve('93', 'DefectFineShipmentDelay')['code']);
+    }
+
     public function testUnknownServiceGetsItsOwnVisibleCode(): void
     {
-        $resolver = new OzonAccrualServiceCategoryResolver(new NullLogger());
+        $resolver = new OzonAccrualServiceCategoryResolver();
 
         $category = $resolver->resolve('9001', 'SomeBrandNewOzonService');
 
@@ -82,7 +94,7 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
 
     public function testServiceWithoutNameIsNotGuessed(): void
     {
-        $resolver = new OzonAccrualServiceCategoryResolver(new NullLogger());
+        $resolver = new OzonAccrualServiceCategoryResolver();
 
         self::assertSame('ozon_unknown_777', $resolver->resolve('777', null)['code']);
     }
