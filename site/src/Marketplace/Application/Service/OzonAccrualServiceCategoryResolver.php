@@ -34,17 +34,42 @@ use App\Marketplace\Domain\OzonCostCategory;
 final readonly class OzonAccrualServiceCategoryResolver
 {
     /**
+     * Услуги, у которых направление кодируется КАТЕГОРИЕЙ, а не только
+     * `operation_type`.
+     *
+     * Так это ведёт легаси-путь с января (`OzonCostsRawProcessor`): компенсация
+     * от Ozon и списание с продавца лежат в разных категориях, и в истории у них
+     * 66 и 51 строка соответственно. Если by-day сложит обе в одну, отчёт по
+     * категориям разорвётся на сентябре: до него направление в имени категории,
+     * после — только в знаке.
+     *
+     * @var array<string, array{positive: string, negative: string}>
+     */
+    private const SIGN_SPLIT_SERVICES = [
+        'Compensation' => ['positive' => 'ozon_compensation', 'negative' => 'ozon_decompensation'],
+    ];
+
+    /**
      * Резолвер намеренно ничего не логирует: его зовут на каждую строку услуги,
      * а одно массовое начисление даёт тысячи строк за документ. Неразобранные
      * услуги собирает и печатает одним предупреждением вызывающий.
      *
+     * @param float $rawAmount сумма как её прислал Ozon, со знаком: у части
+     *                         услуг направление выбирает категорию
+     *
      * @return array{code: string, name: string, known: bool}
      */
-    public function resolve(?string $typeId, ?string $typeName): array
+    public function resolve(?string $typeId, ?string $typeName, float $rawAmount = 0.0): array
     {
         $category = null !== $typeName && '' !== $typeName
             ? OzonCostCategory::findByAccrualTypeName($typeName)
             : null;
+
+        // Знак исходной суммы выбирает категорию, а не только вид операции.
+        if (null !== $typeName && isset(self::SIGN_SPLIT_SERVICES[$typeName])) {
+            $split = self::SIGN_SPLIT_SERVICES[$typeName];
+            $category = OzonCostCategory::findByCode($rawAmount >= 0 ? $split['positive'] : $split['negative']);
+        }
 
         if (null !== $category) {
             return ['code' => $category->code, 'name' => $category->name, 'known' => true];

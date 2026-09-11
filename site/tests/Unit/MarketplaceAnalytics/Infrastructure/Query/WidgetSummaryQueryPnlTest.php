@@ -272,7 +272,16 @@ final class WidgetSummaryQueryPnlTest extends TestCase
      * для ozon_compensation / ozon_decompensation. Это страховка от случайного
      * отката до pre-fix формулы на чисто-operation_type CASE.
      */
-    public function testSqlContainsCompensationSpecialCase(): void
+    /**
+     * Направление берётся из operation_type у всех строк без исключений.
+     *
+     * Раньше здесь стоял обход по коду категории — заплатка под исторические
+     * данные, где бэкфилл сохранил положительные компенсации как charge. Дыры
+     * больше нет: на 11.09.2026 ни одной строки, где обход менял бы исход. А
+     * новым данным он навредил бы: разбор by-day пишет знак по каждой записи, и
+     * настоящее списание показалось бы доходом.
+     */
+    public function testSqlTakesDirectionFromOperationTypeOnly(): void
     {
         $this->stubSales([]);
         $this->stubReturns([]);
@@ -287,9 +296,9 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->executeSummary();
 
         self::assertNotNull($capturedSql);
-        self::assertStringContainsString("cc.code = 'ozon_compensation'", $capturedSql);
-        self::assertStringContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
-        self::assertStringContainsString('effective_op', $capturedSql);
+        self::assertStringNotContainsString("cc.code = 'ozon_compensation'", $capturedSql);
+        self::assertStringNotContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
+        self::assertStringContainsString('c.operation_type AS effective_op', $capturedSql);
         self::assertStringContainsString('c.marketplace AS marketplace', $capturedSql);
         self::assertStringContainsString('GROUP BY marketplace, category_code, category_name', $capturedSql);
     }

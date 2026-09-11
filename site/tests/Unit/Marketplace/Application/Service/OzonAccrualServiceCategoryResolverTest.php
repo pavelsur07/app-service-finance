@@ -56,10 +56,27 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'ItemPacking' => ['84', 'ItemPacking', 'ozon_additional_packaging_warehouse'];
         yield 'Promotion' => ['54', 'Promotion', 'ozon_marketing_action'];
         yield 'SellerReturns' => ['71', 'SellerReturns', 'ozon_return_from_stock'];
-        // Compensation (type_id 10) намеренно НЕ размечена: виджет аналитики
-        // принудительно считает всю категорию ozon_compensation доходом, не глядя
-        // на operation_type — заплатка под исторические данные. Реальное
-        // удержание показалось бы там прибылью.
+        // Compensation разводится по знаку отдельными тестами ниже: направление
+        // у неё кодируется категорией, а не только видом операции.
+    }
+
+    public function testPositiveCompensationIsIncomeCategory(): void
+    {
+        // Легаси-путь с января разводит компенсацию по знаку на две категории:
+        // 66 строк дохода и 51 расхода. Сложить их в одну значило бы разорвать
+        // отчёт по категориям на сентябре.
+        $resolver = new OzonAccrualServiceCategoryResolver();
+
+        self::assertSame('ozon_compensation', $resolver->resolve('10', 'Compensation', 1954.0)['code']);
+    }
+
+    public function testNegativeCompensationIsExpenseCategory(): void
+    {
+        // Единственная запись by-day за 10.09.2026 пришла именно такой: −1954,
+        // то есть Ozon списал с продавца.
+        $resolver = new OzonAccrualServiceCategoryResolver();
+
+        self::assertSame('ozon_decompensation', $resolver->resolve('10', 'Compensation', -1954.0)['code']);
     }
 
     #[DataProvider('servicesSeenInProduction')]
