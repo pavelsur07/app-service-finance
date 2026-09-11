@@ -45,6 +45,9 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         // В справочнике by-day имя без «d» на конце, а у легаси-операции с ним:
         // DefectFineShipmentDelayRate против DefectFineShipmentDelayRated.
         yield 'DefectFineShipmentDelayRate' => ['94', 'DefectFineShipmentDelayRate', 'ozon_fines_shipment_delay_rated'];
+        yield 'BrandCommission' => ['3', 'BrandCommission', 'ozon_brand_commission'];
+        yield 'StarsMembership' => ['74', 'StarsMembership', 'ozon_stars_membership'];
+        yield 'StockInsurance' => ['76', 'StockInsurance', 'ozon_stock_insurance'];
     }
 
     #[DataProvider('servicesSeenInProduction')]

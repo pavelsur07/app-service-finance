@@ -90,6 +90,49 @@ final class OzonCostCategoryTest extends TestCase
     }
 
     /**
+     * Каждое имя справочника by-day встречается ровно один раз.
+     *
+     * Опечатка или дубль здесь молча отправят затрату в чужую категорию, а
+     * оттуда — в чужую строку ОПиУ.
+     */
+    public function testNoDuplicateAccrualTypeNames(): void
+    {
+        $seen = [];
+        foreach (OzonCostCategory::all() as $c) {
+            foreach ($c->accrualTypeNames as $name) {
+                $this->assertArrayNotHasKey(
+                    $name,
+                    $seen,
+                    sprintf(
+                        'accrual type name "%s" дублируется: в "%s" и "%s"',
+                        $name,
+                        $seen[$name] ?? '?',
+                        $c->code,
+                    ),
+                );
+                $seen[$name] = $c->code;
+            }
+        }
+    }
+
+    /**
+     * Каждое имя справочника by-day находится обратным поиском и приводит
+     * ровно к той категории, в которой объявлено.
+     */
+    public function testEveryAccrualTypeNameResolvesBackToItsCategory(): void
+    {
+        $checked = 0;
+        foreach (OzonCostCategory::all() as $c) {
+            foreach ($c->accrualTypeNames as $name) {
+                self::assertSame($c->code, OzonCostCategory::findByAccrualTypeName($name)?->code, $name);
+                ++$checked;
+            }
+        }
+
+        self::assertGreaterThan(0, $checked, 'Справочник by-day не размечен ни одной услугой.');
+    }
+
+    /**
      * Каждый operation_type встречается ровно один раз во всём справочнике.
      */
     public function testNoDuplicateOperationTypes(): void

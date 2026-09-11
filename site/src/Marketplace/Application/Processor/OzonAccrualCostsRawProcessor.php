@@ -361,13 +361,10 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             ? (string) $service['type_id']
             : null;
 
+        // Отсутствие типа в справочнике не логируется здесь: метод зовут на
+        // каждую строку услуги, а пропущенный тип приходит массово. Причина
+        // уезжает в запись и попадает в одно предупреждение на документ.
         $typeName = null !== $typeId ? ($serviceTypes[$typeId] ?? null) : null;
-
-        if (null !== $typeId && null === $typeName) {
-            $this->logger->warning('[Ozon by-day] service type is missing from the dictionary', [
-                'type_id' => $typeId,
-            ]);
-        }
 
         $category = $this->serviceCategoryResolver->resolve($typeId, $typeName);
 
@@ -375,7 +372,13 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),
             'categoryCode' => $category['code'],
             'categoryName' => $category['name'],
-            'unknownService' => $category['known'] ? null : sprintf('%s (type_id %s)', $typeName ?? 'без имени', $typeId ?? '—'),
+            'unknownService' => $category['known']
+                ? null
+                : sprintf(
+                    '%s (type_id %s)',
+                    $typeName ?? 'нет в справочнике услуг',
+                    $typeId ?? '—',
+                ),
             // Затраты хранятся положительными, как в легаси-пути: знак несёт
             // operation_type, по которому ОПиУ отличает начисление от сторно.
             'amount' => $this->money(abs((float) $amount)),

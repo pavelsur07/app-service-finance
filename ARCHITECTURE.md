@@ -729,6 +729,13 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 > Нет нужного метода — спроси, не создавай самостоятельно.
 
 ### `OzonAccrualCategoryFacade` (`src/Ingestion/Facade/OzonAccrualCategoryFacade.php`)
+
+> Marketplace этим фасадом больше не пользуется: с 11.09.2026 услуги by-day
+> разбирает `OzonAccrualServiceCategoryResolver` по каталогу
+> `Marketplace\Domain\OzonCostCategory` — тому же, на котором построен маппинг
+> затрат к категориям ОПиУ. Словари расходились, и затрата заводилась, но до
+> отчёта не доходила. Фасад остаётся контрактом Ingestion для его собственных нужд.
+
 ```php
 // Разобрать услугу Ozon из /v1/finance/accrual/by-day в категорию затрат.
 // Read-only, без зависимостей: каталог категорий статический.
@@ -3280,8 +3287,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.91 | 2026-09-11 | Marketplace: услуги by-day разбираются `OzonAccrualServiceCategoryResolver` по каталогу `OzonCostCategory` — коды сведены с теми, на которых построен маппинг ОПиУ; имена справочника by-day живут в `accrualTypeNames` отдельным индексом от имён снятого v3 |
 | 1.90 | 2026-09-10 | Ingestion: запрет на создание операций ОПиУ закреплён двумя правилами PHPat (в обе стороны); удалён осиротевший `getTransactions`, надгробия `Pnl*Message` и транспорт `pnl_rebuild` |
-| 1.89 | 2026-09-10 | Marketplace: обработка Ozon accrual by-day — классификатор по формату, процессоры продаж, затрат и возвратов рядом с легаси; затраты разбираются через `OzonAccrualCategoryFacade` |
+| 1.89 | 2026-09-10 | Marketplace: обработка Ozon accrual by-day — классификатор по формату, процессоры продаж, затрат и возвратов рядом с легаси; затраты разбирались через `OzonAccrualCategoryFacade` (заменён в 1.91) |
 | 1.88 | 2026-09-09 | Marketplace: `MarketplaceRawFormat` и выбор процессора по формату сырого документа — снятый Ozon v3 и accrual by-day сосуществуют под одним `document_type`; незнакомый `api_endpoint` падает громко |
 | 1.87 | 2026-09-09 | Ingestion: `OzonAccrualCategoryFacade` — разбор услуг Ozon accrual в категории затрат по имени из справочника; карта `typeIds` не используется как расходящаяся со справочником Ozon |
 | 1.86 | 2026-09-01 | Ingestion: уборщик зависших `SyncJob` — задача в `OPEN`/`RUNNING` без движения больше не блокирует ресурс навсегда |
