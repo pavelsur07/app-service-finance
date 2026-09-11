@@ -195,15 +195,14 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * Регрессия: бэкфилл-миграция Version20260413120000 сохранила положительные
-     * исторические компенсации как operation_type='charge'. Под P&L-формулой
-     * widget-а (storno=+ABS, charge=-ABS) они стали давать -ABS вместо +ABS.
-     * После фикса SQL спец-кейсит category_code = 'ozon_compensation' →
-     * всегда ABS(amount) как доход. Здесь мы стабим агрегированную строку,
-     * какую возвращает уже пофикшенный SQL: net = +5480 даже если исходный
-     * operation_type был charge.
+     * Компенсация, пришедшая как storno, показывается доходом.
+     *
+     * Раньше этот тест утверждал другое: что доходом показывается и компенсация
+     * с operation_type = 'charge', потому что SQL спец-кейсил код категории. Тот
+     * обход убран — направление берётся из operation_type, — и утверждение стало
+     * неверным. Проверяется именно storno-строка, какую отдаёт SQL.
      */
-    public function testCompensationChargePositiveAmountShownAsIncome(): void
+    public function testCompensationStornoShownAsIncome(): void
     {
         $this->stubSales([]);
         $this->stubReturns([]);
@@ -224,7 +223,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * Декомпенсация — всегда расход (−ABS) вне зависимости от operation_type.
+     * Декомпенсация приходит как charge и показывается расходом (−ABS).
      */
     public function testDecompensationShownAsExpense(): void
     {

@@ -59,7 +59,7 @@ final readonly class OzonAccrualServiceCategoryResolver
      *
      * @return array{code: string, name: string, known: bool}
      */
-    public function resolve(?string $typeId, ?string $typeName, float $rawAmount = 0.0): array
+    public function resolve(?string $typeId, ?string $typeName, float $rawAmount): array
     {
         $category = null !== $typeName && '' !== $typeName
             ? OzonCostCategory::findByAccrualTypeName($typeName)
