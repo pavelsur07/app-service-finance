@@ -49,24 +49,25 @@ final class ByDayRowReplacementTest extends TestCase
         self::assertSame(self::RAW_DOC_ID, $captured['rawDocumentId'] ?? null, 'Снимать привязку можно только со строк перезагруженного дня, а не всего месяца.');
     }
 
-    public function testPreliminaryClosedPastMonthIsNotReplaced(): void
+    public function testPastPreliminaryMonthIsProcessedButLinksAreKept(): void
     {
-        // У прошлого месяца нет ночного пересбора предварительного ОПиУ: снятая
-        // привязка не восстановилась бы, и документ остался бы расходиться с
-        // источником. Такие месяцы остаются неизменными.
+        // Регрессия. Крон забирает вчерашний день, а прошлый месяц в проде
+        // всегда закрыт предварительно: отказ означал бы, что последний день
+        // месяца не завёлся вовсе — и так каждый месяц, причём шаг конвейера
+        // отчитался бы успехом.
+        //
+        // Обработка идёт, но привязку не снимаем: у прошлого месяца нет ночного
+        // пересбора, и документ остался бы расходиться с источником.
         $captured = [];
         $replacement = $this->service($this->monthClose([CloseStage::COSTS->value => true]), null, $captured);
 
-        self::assertFalse($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable('2026-08-31'), self::RAW_DOC_ID));
-        self::assertSame([], $captured);
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable('2026-08-31'), self::RAW_DOC_ID));
+        self::assertSame([], $captured, 'Привязки прошлого месяца снимать нельзя.');
     }
 
     public function testFirstImportOfLastDayOfPreviousMonthIsAllowed(): void
     {
-        // Регрессия. Крон забирает вчерашний день, поэтому первого числа он
-        // приносит последний день прошлого месяца. Отказать здесь значило бы
-        // вовсе не завести его продажи, возвраты и затраты — причём шаг
-        // конвейера всё равно отчитался бы успехом.
+        // Тот же день, но месяц ещё ни разу не закрывали.
         $captured = [];
         $replacement = $this->service(null, null, $captured);
 
