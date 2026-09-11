@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
+use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
@@ -52,6 +53,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
         private readonly OzonListingEnsureService $listingEnsureService,
+        private readonly PreliminaryCloseRowUnlinker $preliminaryRowUnlinker,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -117,6 +119,17 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         $this->connection->beginTransaction();
 
         try {
+            // Привязка к предварительному закрытию снимается до удаления: без
+            // этого условие `document_id IS NULL` обошло бы такие строки, и
+            // правка Ozon по ним не доехала бы до следующего reopen.
+            // Окончательно закрытый период остаётся нетронутым.
+            $this->preliminaryRowUnlinker->unlinkCosts(
+                $companyId,
+                MarketplaceType::OZON,
+                $document->getPeriodFrom(),
+                $rawDocId,
+            );
+
             $this->connection->executeStatement(
                 'DELETE FROM marketplace_costs
                  WHERE raw_document_id = :rawDocId

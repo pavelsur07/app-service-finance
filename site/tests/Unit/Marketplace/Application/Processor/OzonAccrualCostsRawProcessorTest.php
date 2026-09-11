@@ -9,6 +9,7 @@ use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Processor\OzonAccrualCostsRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
+use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
@@ -17,8 +18,10 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Infrastructure\Query\OzonListingUpsertQuery;
+use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use Doctrine\ORM\EntityManagerInterface;
@@ -272,6 +275,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
         $this->setProperty($document, 'id', self::RAW_DOC_ID);
         $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'periodFrom', new \DateTimeImmutable('2026-09-09'));
         $this->setProperty($document, 'rawData', $this->payload());
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -310,6 +314,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
+            $this->rowUnlinker(),
             new NullLogger(),
         );
 
@@ -356,6 +361,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
         $this->setProperty($document, 'id', self::RAW_DOC_ID);
         $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'periodFrom', new \DateTimeImmutable('2026-09-09'));
         $this->setProperty($document, 'rawData', $this->payload());
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -392,6 +398,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             $categoryResolver,
             new MarketplaceCostExistingExternalIdsQuery($connection),
             $this->listingEnsureService($this->listing),
+            $this->rowUnlinker(),
             new NullLogger(),
         ))->process(self::COMPANY_ID, self::RAW_DOC_ID);
     }
@@ -432,6 +439,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $document = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
         $this->setProperty($document, 'id', self::RAW_DOC_ID);
         $this->setProperty($document, 'company', $company);
+        $this->setProperty($document, 'periodFrom', new \DateTimeImmutable('2026-09-09'));
         $this->setProperty($document, 'rawData', $payloadOverride ?? $this->payload());
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -488,8 +496,24 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             $categoryResolver,
             $existingQuery,
             $this->listingEnsureService($this->listing),
+            $this->rowUnlinker(),
             new NullLogger(),
         );
+    }
+
+    /**
+     * Заглушка снятия предварительных привязок: сам разбор от неё не зависит,
+     * а её поведение проверяется в тесте Action и в собственном тесте сервиса.
+     */
+    private function rowUnlinker(): PreliminaryCloseRowUnlinker
+    {
+        $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
+        $this->setProperty($query, 'connection', $this->createMock(Connection::class));
+
+        $repository = $this->createMock(MarketplaceMonthCloseRepository::class);
+        $repository->method('findByPeriod')->willReturn(null);
+
+        return new PreliminaryCloseRowUnlinker($repository, $query, new NullLogger());
     }
 
     /**

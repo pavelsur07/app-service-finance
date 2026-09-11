@@ -10,6 +10,7 @@ use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
@@ -49,6 +50,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private MarketplaceCostRepository $costRepository,
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
+        private PreliminaryCloseRowUnlinker $preliminaryRowUnlinker,
         private Connection $connection,
         private AppLogger $appLogger,
     ) {
@@ -303,10 +305,19 @@ final readonly class ProcessMarketplaceRawDocumentAction
         string $targetBucketKey,
     ): int {
         $company = $document->getCompany();
+        $companyId = (string) $company->getId();
+        $day = $document->getPeriodFrom();
 
+        // Привязка к предварительному закрытию снимается до удаления: иначе
+        // `deleteByRawDocument` с его условием `document IS NULL` обошёл бы
+        // такие строки, и правка Ozon по ним не доехала бы до следующего reopen.
+        // Окончательно закрытый период остаётся нетронутым — там привязка не
+        // предварительная и не снимается.
         if ('sales' === $command->kind) {
+            $this->preliminaryRowUnlinker->unlinkSales($companyId, $marketplace, $day, $command->rawDocId);
             $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
         } else {
+            $this->preliminaryRowUnlinker->unlinkReturns($companyId, $marketplace, $day, $command->rawDocId);
             $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
         }
 

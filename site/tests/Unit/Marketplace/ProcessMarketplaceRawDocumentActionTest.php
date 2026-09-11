@@ -10,14 +10,18 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
+use App\Marketplace\Entity\MarketplaceMonthClose;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
+use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostRepository;
+use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -26,10 +30,35 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 {
+    /**
+     * PreliminaryCloseRowUnlinker и UnlinkDocumentRowsQuery объявлены final:
+     * настоящий объект собирается рефлексией с подменёнными зависимостями, как
+     * это уже делается для других final-сервисов в тестах модуля.
+     */
+    private function createRowUnlinker(?MarketplaceMonthClose $monthClose = null, ?int &$unlinked = null): PreliminaryCloseRowUnlinker
+    {
+        $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
+        $queryConnection = $this->createMock(Connection::class);
+        $queryConnection->method('executeStatement')->willReturnCallback(static function () use (&$unlinked): int {
+            if (null !== $unlinked) {
+                ++$unlinked;
+            }
+
+            return 1;
+        });
+        (new \ReflectionProperty($query, 'connection'))->setValue($query, $queryConnection);
+
+        $repository = $this->createMock(MarketplaceMonthCloseRepository::class);
+        $repository->method('findByPeriod')->willReturn($monthClose);
+
+        return new PreliminaryCloseRowUnlinker($repository, $query, new NullLogger());
+    }
+
     private function createCostCategoryResolver(): MarketplaceCostCategoryResolver
     {
         return new MarketplaceCostCategoryResolver(
@@ -52,6 +81,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -88,6 +118,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -141,6 +172,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -193,6 +225,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -254,6 +287,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $connection,
             $this->createMock(AppLogger::class),
         );
@@ -261,6 +295,58 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
 
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
+    }
+
+    /**
+     * Регрессия. Замена строк не трогает те, у которых проставлен document_id, а
+     * текущий месяц закрывается предварительно каждую ночь: на проде 11.09.2026
+     * из 915 продаж за 08.09 было привязано 787. Без снятия предварительной
+     * привязки правка Ozon по ним не доехала бы до следующего reopen, а гейт
+     * свежести при этом был бы зелёным.
+     */
+    public function testPreliminaryLinksAreRemovedBeforeReplacement(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn(['accruals' => []]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $document->method('getPeriodFrom')->willReturn(new \DateTimeImmutable('2026-09-08'));
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $monthClose = new MarketplaceMonthClose(
+            '22222222-2222-4222-8222-222222222222',
+            '19621cff-b028-45d9-9193-11f47ad9a8b2',
+            MarketplaceType::OZON,
+            2026,
+            9,
+        );
+        $monthClose->setSettings(['last_close_was_preliminary' => ['sales_returns' => true]]);
+        (new \ReflectionProperty($monthClose, 'stageSalesReturnsPLDocumentIds'))->setValue($monthClose, ['doc-sales']);
+
+        $unlinked = 0;
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
+            $repository,
+            $this->createMock(MarketplaceSaleRepository::class),
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createRowUnlinker($monthClose, $unlinked),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
+        );
+
+        $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
+
+        self::assertSame(1, $unlinked, 'Привязка к предварительному закрытию обязана сниматься до удаления строк.');
     }
 
     /**
@@ -292,6 +378,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -332,6 +419,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $connection,
             $this->createMock(AppLogger::class),
         );
@@ -383,6 +471,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $costRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -432,6 +521,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -478,6 +568,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
@@ -529,6 +620,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $costRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $connection,
             $logger,
         );
@@ -578,6 +670,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceCostRepository::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(),
             $this->createMock(Connection::class),
             $this->createMock(AppLogger::class),
         );
