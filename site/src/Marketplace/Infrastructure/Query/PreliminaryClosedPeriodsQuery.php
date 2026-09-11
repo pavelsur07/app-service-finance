@@ -16,8 +16,9 @@ use Doctrine\DBAL\Connection;
  * дефект, ради которого всё это и делается.
  *
  * Поэтому список берётся из состояния, а не из календаря: пересобираем каждый
- * период, который сейчас закрыт предварительно. Окончательно закрытые сюда не
- * попадают — их замена не трогает вовсе.
+ * период, который сейчас ЗАКРЫТ предварительно. Окончательно закрытые сюда не
+ * попадают — их замена не трогает вовсе; переоткрытые тоже, иначе пересбор
+ * закрыл бы обратно период, который открыли руками ради правок.
  */
 final class PreliminaryClosedPeriodsQuery
 {
@@ -32,10 +33,20 @@ final class PreliminaryClosedPeriodsQuery
     public function execute(): array
     {
         $rows = $this->connection->fetchAllAssociative(
+            // Флаг предварительности проверяется В ПАРЕ со статусом этапа.
+            // `reopenStage()` переводит этап в REOPENED, но флаг не сбрасывает:
+            // без пары ночной пересбор закрыл бы обратно период, который
+            // человек намеренно открыл для правок, — возможно, посреди работы.
+            //
+            // Сравнение идёт через `->>`, а не оператором `@>`: колонка
+            // `settings` объявлена как `json`, а containment есть только у
+            // `jsonb`, и запрос падал бы целиком, обрушая весь пересбор.
             "SELECT company_id, marketplace, year, month
              FROM marketplace_month_closes
-             WHERE settings->'last_close_was_preliminary' @> '{\"sales_returns\": true}'
-                OR settings->'last_close_was_preliminary' @> '{\"costs\": true}'
+             WHERE (stage_sales_returns_status = 'closed'
+                    AND settings->'last_close_was_preliminary'->>'sales_returns' = 'true')
+                OR (stage_costs_status = 'closed'
+                    AND settings->'last_close_was_preliminary'->>'costs' = 'true')
              ORDER BY year, month, company_id, marketplace",
         );
 
