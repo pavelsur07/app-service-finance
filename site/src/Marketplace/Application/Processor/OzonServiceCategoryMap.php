@@ -25,7 +25,7 @@ final class OzonServiceCategoryMap
      * маппинг менялся. Прежде отдавалась эндпоинтом /marketplace/costs/debug/map-version,
      * удалённым как неиспользуемый.
      */
-    public const VERSION = '2026-09-11.1';
+    public const VERSION = '2026-09-11.2';
 
     /**
      * Service names из API Ozon, которые являются нулевыми маркерами (price = 0).

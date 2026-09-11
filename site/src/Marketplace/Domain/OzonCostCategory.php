@@ -256,6 +256,7 @@ final readonly class OzonCostCategory
                     'MarketplaceServiceItemReturnFromStock',
                     'MarketplaceServiceSellerReturnsCargoAssortment',
                 ],
+                accrualTypeNames: ['SellerReturns'],
             ),
             new self(
                 code: 'ozon_supply_additional',
@@ -409,6 +410,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
                 operationTypes: ['OperationMarketplaceSendingPushNotifications'],
+                accrualTypeNames: ['PushCampaign'],
             ),
             new self(
                 code: 'ozon_premium_promotion',
@@ -477,6 +479,7 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Продвижение и реклама',
                 serviceNames: ['MarketplaceMarketingActionCostItem'],
                 operationTypes: ['OperationPromotionWithCostPerOrder'],
+                accrualTypeNames: ['Promotion'],
             ),
             new self(
                 code: 'ozon_marketing_action_operation',
@@ -519,6 +522,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['OperationMarketplaceItemAdditionalPackagingAtWarehouse'],
+                accrualTypeNames: ['ItemPacking'],
             ),
             new self(
                 code: 'ozon_disposal',
@@ -577,6 +581,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['OperationLabelBrandVerified'],
+                accrualTypeNames: ['LabelBrandVerified'],
             ),
             new self(
                 code: 'ozon_stock_insurance',
@@ -755,7 +760,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Компенсации и декомпенсации',
                 operationTypes: ['AccrualInternalClaim'],
-                accrualTypeNames: ['ItemCompensation'],
+                accrualTypeNames: ['ItemCompensation', 'Compensation'],
             ),
             new self(
                 code: 'ozon_partial_compensation_to_client',

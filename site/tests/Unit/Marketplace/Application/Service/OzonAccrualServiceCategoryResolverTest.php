@@ -48,6 +48,15 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'BrandCommission' => ['3', 'BrandCommission', 'ozon_brand_commission'];
         yield 'StarsMembership' => ['74', 'StarsMembership', 'ozon_stars_membership'];
         yield 'StockInsurance' => ['76', 'StockInsurance', 'ozon_stock_insurance'];
+        yield 'LabelBrandVerified' => ['118', 'LabelBrandVerified', 'ozon_brand_verified'];
+        yield 'PushCampaign' => ['55', 'PushCampaign', 'ozon_sending_push_notifications'];
+        yield 'ItemPacking' => ['84', 'ItemPacking', 'ozon_additional_packaging_warehouse'];
+        yield 'Promotion' => ['54', 'Promotion', 'ozon_marketing_action'];
+        yield 'SellerReturns' => ['71', 'SellerReturns', 'ozon_return_from_stock'];
+        // Ozon присылает и общую Compensation, и товарную ItemCompensation —
+        // обе в одну категорию. Направление берётся из знака каждой записи, а не
+        // из категории: в истории у неё 66 строк сторно и встречаются удержания.
+        yield 'Compensation' => ['10', 'Compensation', 'ozon_compensation'];
     }
 
     #[DataProvider('servicesSeenInProduction')]
