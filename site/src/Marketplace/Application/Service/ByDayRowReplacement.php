@@ -9,10 +9,10 @@ use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
-use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\ClockInterface;
 
 /**
  * Решает, можно ли заменить строки перезагруженного дня, и готовит их к замене.
@@ -46,7 +46,7 @@ final readonly class ByDayRowReplacement
         private CompanyFacade $companyFacade,
         private UnlinkDocumentRowsQuery $unlinkQuery,
         private MonthCloseAdvisoryLockQuery $lockQuery,
-        private PreliminaryRebuildFlagQuery $rebuildFlagQuery,
+        private ClockInterface $clock,
         private LoggerInterface $logger,
     ) {
     }
@@ -88,6 +88,23 @@ final readonly class ByDayRowReplacement
         // этапа: иначе параллельное закрытие месяца успело бы собрать документ
         // по строкам, которые замена тут же перезапишет.
         $this->lockQuery->lock($companyId, $marketplace, $year, $month);
+
+        // Только текущий месяц. Его предварительное закрытие пересобирается
+        // ночью в любом случае, поэтому снятая привязка восстановится сама.
+        // Для прошлых месяцев такого пересбора нет: их документ остался бы
+        // расходиться с источником, а чтобы это чинить, закрытие месяца должно
+        // уметь представлять опустевший этап и восстанавливать id документов у
+        // старых закрытий. Это отдельная работа, и до неё прошлые месяцы
+        // остаются неизменными — как и сейчас.
+        if (!$this->isCurrentMonth($day)) {
+            $this->logger->info('[Ozon by-day] replacement skipped: day belongs to a past month', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocId,
+                'day' => $day->format('Y-m-d'),
+            ]);
+
+            return false;
+        }
 
         if ($this->isDayLocked($companyId, $day)) {
             $this->logger->warning('[Ozon by-day] replacement skipped: finance period is locked', [
@@ -131,23 +148,23 @@ final readonly class ByDayRowReplacement
         // быть последовательными.
         $documentIds = array_values($monthClose->getStagePLDocumentIds($stage));
 
-        // Пустой список id — не «привязок нет». У старых и повреждённых закрытий
-        // id не сохранены, а строки привязаны; `ReopenMonthStageAction` ровно
-        // поэтому умеет снимать привязки по периоду. Отчитаться об успешной
-        // замене, оставив такие строки привязанными, значит промолчать о том,
-        // что правка Ozon не доехала.
-        $unlinked = [] === $documentIds
-            ? $this->unlinkQuery->executeAllLinked($table, $companyId, $rawDocId)
-            : $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
+        // Пустой список id — не «привязок нет», а закрытие, у которого id
+        // документов не сохранены: такие встречаются у старых и повреждённых.
+        // Снять привязку у их строк нельзя: переоткрытие потом не найдёт, какой
+        // документ ОПиУ удалять, и рядом с новым останется старый — двойной
+        // счёт. Замена отказывается, состояние видно в логе.
+        if ([] === $documentIds) {
+            $this->logger->warning('[Ozon by-day] replacement skipped: preliminary close has no stored document ids', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocId,
+                'stage' => $stage->value,
+                'period' => sprintf('%d-%02d', $year, $month),
+            ]);
 
-        // Отметка ставится на любой разрешённой замене предварительно закрытого
-        // этапа, а не только когда что-то отвязали. День может не иметь ни одной
-        // привязанной строки и при этом принести новую, попадающую в ОПиУ:
-        // агрегат изменится, а документ остался бы прежним навсегда.
-        //
-        // Ставится в той же транзакции, что и сама замена: откатится замена —
-        // уйдёт и отметка.
-        $this->rebuildFlagQuery->mark($companyId, $marketplace, $year, $month, $stage);
+            return false;
+        }
+
+        $unlinked = $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
 
         if ($unlinked > 0) {
             $this->logger->info('[Ozon by-day] preliminary rows unlinked before replacement', [
@@ -159,6 +176,11 @@ final readonly class ByDayRowReplacement
         }
 
         return true;
+    }
+
+    private function isCurrentMonth(\DateTimeImmutable $day): bool
+    {
+        return $day->format('Y-m') === $this->clock->now()->format('Y-m');
     }
 
     private function isDayLocked(string $companyId, \DateTimeImmutable $day): bool

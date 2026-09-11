@@ -21,7 +21,6 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\OzonListingUpsertQuery;
-use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -31,6 +30,7 @@ use Doctrine\DBAL\Result;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 
 /**
  * Затраты из by-day. Услуги разбираются по ИМЕНИ из справочника
@@ -40,6 +40,7 @@ use Psr\Log\NullLogger;
  */
 final class OzonAccrualCostsRawProcessorTest extends TestCase
 {
+    private const MOCK_NOW = '2026-09-09 10:00:00';
     private const COMPANY_ID = 'company-1';
     private const LISTING_ID = '22222222-2222-4222-8222-222222222222';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
@@ -540,10 +541,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $lock = (new \ReflectionClass(MonthCloseAdvisoryLockQuery::class))->newInstanceWithoutConstructor();
         (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
 
-        $rebuildFlag = (new \ReflectionClass(PreliminaryRebuildFlagQuery::class))->newInstanceWithoutConstructor();
-        (new \ReflectionProperty($rebuildFlag, 'connection'))->setValue($rebuildFlag, $this->createMock(Connection::class));
-
-        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, $rebuildFlag, new NullLogger());
+        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, new MockClock(self::MOCK_NOW), new NullLogger());
     }
 
     /**

@@ -21,7 +21,6 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
-use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostRepository;
@@ -35,10 +34,13 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 {
+    private const MOCK_NOW = '2026-09-08 10:00:00';
+
     /**
      * ByDayRowReplacement и UnlinkDocumentRowsQuery объявлены final:
      * настоящий объект собирается рефлексией с подменёнными зависимостями, как
@@ -72,10 +74,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $lock = (new \ReflectionClass(MonthCloseAdvisoryLockQuery::class))->newInstanceWithoutConstructor();
         (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
 
-        $rebuildFlag = (new \ReflectionClass(PreliminaryRebuildFlagQuery::class))->newInstanceWithoutConstructor();
-        (new \ReflectionProperty($rebuildFlag, 'connection'))->setValue($rebuildFlag, $this->createMock(Connection::class));
-
-        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, $rebuildFlag, new NullLogger());
+        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, new MockClock(self::MOCK_NOW), new NullLogger());
     }
 
     private function createCostCategoryResolver(): MarketplaceCostCategoryResolver
@@ -215,6 +214,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document->method('getRawData')->willReturn(['accruals' => []]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
         $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $document->method('getPeriodFrom')->willReturn(new \DateTimeImmutable(self::MOCK_NOW));
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
@@ -272,6 +272,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $document->method('getRawData')->willReturn(['accruals' => [['x' => 1]]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
         $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $document->method('getPeriodFrom')->willReturn(new \DateTimeImmutable(self::MOCK_NOW));
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
