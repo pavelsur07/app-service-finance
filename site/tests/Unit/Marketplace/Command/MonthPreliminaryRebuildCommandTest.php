@@ -9,6 +9,8 @@ use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
 use App\Marketplace\Message\RebuildPreliminaryForPeriodMessage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Envelope;
@@ -18,8 +20,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
 {
     public function testDispatchesMessagePerActiveSellerConnection(): void
     {
-        $query = $this->createMock(ActiveSellerConnectionsQuery::class);
-        $query->method('execute')->willReturn([
+        $query = $this->connectionsQuery([
             ['id' => 'c1', 'company_id' => 'company-a', 'marketplace' => 'ozon'],
             ['id' => 'c2', 'company_id' => 'company-a', 'marketplace' => 'wildberries'],
             ['id' => 'c3', 'company_id' => 'company-b', 'marketplace' => 'ozon'],
@@ -42,7 +43,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
 
         $logger = $this->createMock(LoggerInterface::class);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -54,17 +55,51 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         self::assertSame(['companyId' => 'company-b', 'marketplace' => 'ozon'], $dispatched[2]);
     }
 
+    public function testFirstDaysOfMonthAlsoRebuildThePreviousMonth(): void
+    {
+        // Загрузка by-day ходит окном в два дня и в начале месяца достаёт до
+        // предыдущего: она снимает там привязку к предварительному ОПиУ и
+        // заменяет строки. Если пересбор ходит только по текущему месяцу,
+        // документ прошлого месяца остаётся расходиться с источником до самого
+        // финального закрытия.
+        $dispatched = [];
+        $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
+        $bus = $this->bus($dispatched);
+
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-02 04:45:00'));
+        (new CommandTester($command))->execute([]);
+
+        $periods = array_map(
+            static fn (RebuildPreliminaryForPeriodMessage $m): string => sprintf('%d-%02d', $m->year, $m->month),
+            $dispatched,
+        );
+
+        self::assertSame(['2026-09', '2026-08'], $periods);
+    }
+
+    public function testMidMonthRebuildsOnlyTheCurrentMonth(): void
+    {
+        $dispatched = [];
+        $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
+        $bus = $this->bus($dispatched);
+
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-15 04:45:00'));
+        (new CommandTester($command))->execute([]);
+
+        self::assertCount(1, $dispatched);
+        self::assertSame(9, $dispatched[0]->month);
+    }
+
     public function testEmptyConnectionListExitsSuccess(): void
     {
-        $query = $this->createMock(ActiveSellerConnectionsQuery::class);
-        $query->method('execute')->willReturn([]);
+        $query = $this->connectionsQuery([]);
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
         $logger = $this->createMock(LoggerInterface::class);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -75,8 +110,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
 
     public function testContinuesAfterDispatchFailureOnOneConnection(): void
     {
-        $query = $this->createMock(ActiveSellerConnectionsQuery::class);
-        $query->method('execute')->willReturn([
+        $query = $this->connectionsQuery([
             ['id' => 'c1', 'company_id' => 'company-a', 'marketplace' => 'ozon'],
             ['id' => 'c2', 'company_id' => 'company-b', 'marketplace' => 'wildberries'],
             ['id' => 'c3', 'company_id' => 'company-c', 'marketplace' => 'ozon'],
@@ -106,7 +140,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
                 self::callback(static fn (array $ctx): bool => ($ctx['company_id'] ?? null) === 'company-b'),
             );
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger);
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -115,5 +149,31 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         self::assertSame(['company-a', 'company-b', 'company-c'], $attempted);
         self::assertStringContainsString('Отправлено 2', $tester->getDisplay());
         self::assertStringContainsString('ошибок: 1', $tester->getDisplay());
+    }
+
+    /**
+     * @param list<array<string, mixed>> $connections
+     */
+    private function connectionsQuery(array $connections): ActiveSellerConnectionsQuery
+    {
+        $query = $this->createMock(ActiveSellerConnectionsQuery::class);
+        $query->method('execute')->willReturn($connections);
+
+        return $query;
+    }
+
+    /**
+     * @param list<RebuildPreliminaryForPeriodMessage> $dispatched
+     */
+    private function bus(array &$dispatched): MessageBusInterface
+    {
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
+            $dispatched[] = $message;
+
+            return new Envelope($message);
+        });
+
+        return $bus;
     }
 }

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace;
 
 use App\Company\Entity\Company;
+use App\Company\Facade\CompanyFacade;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
-use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
 use App\Marketplace\Entity\MarketplaceMonthClose;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
@@ -36,11 +38,11 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 {
     /**
-     * PreliminaryCloseRowUnlinker и UnlinkDocumentRowsQuery объявлены final:
+     * ByDayRowReplacement и UnlinkDocumentRowsQuery объявлены final:
      * настоящий объект собирается рефлексией с подменёнными зависимостями, как
      * это уже делается для других final-сервисов в тестах модуля.
      */
-    private function createRowUnlinker(?MarketplaceMonthClose $monthClose = null, ?int &$unlinked = null): PreliminaryCloseRowUnlinker
+    private function createRowUnlinker(?MarketplaceMonthClose $monthClose = null, ?int &$unlinked = null): ByDayRowReplacement
     {
         $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
         $queryConnection = $this->createMock(Connection::class);
@@ -56,7 +58,14 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $repository = $this->createMock(MarketplaceMonthCloseRepository::class);
         $repository->method('findByPeriod')->willReturn($monthClose);
 
-        return new PreliminaryCloseRowUnlinker($repository, $query, new NullLogger());
+        // Блокировки периода нет: её граница проверяется отдельным тестом сервиса.
+        // CompanyFacade объявлен final — собирается рефлексией.
+        $companyFacade = (new \ReflectionClass(CompanyFacade::class))->newInstanceWithoutConstructor();
+        $companyRepository = $this->createMock(CompanyRepository::class);
+        $companyRepository->method('findById')->willReturn(null);
+        (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
+
+        return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
     }
 
     private function createCostCategoryResolver(): MarketplaceCostCategoryResolver

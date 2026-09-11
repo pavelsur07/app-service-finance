@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
+use App\Company\Facade\CompanyFacade;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Ingestion\Facade\OzonAccrualCategoryFacade;
 use App\Marketplace\Application\Processor\OzonAccrualCostsRawProcessor;
+use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
-use App\Marketplace\Application\Service\PreliminaryCloseRowUnlinker;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
@@ -505,7 +507,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
      * Заглушка снятия предварительных привязок: сам разбор от неё не зависит,
      * а её поведение проверяется в тесте Action и в собственном тесте сервиса.
      */
-    private function rowUnlinker(): PreliminaryCloseRowUnlinker
+    private function rowUnlinker(): ByDayRowReplacement
     {
         $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
         $this->setProperty($query, 'connection', $this->createMock(Connection::class));
@@ -513,7 +515,14 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $repository = $this->createMock(MarketplaceMonthCloseRepository::class);
         $repository->method('findByPeriod')->willReturn(null);
 
-        return new PreliminaryCloseRowUnlinker($repository, $query, new NullLogger());
+        // Блокировки периода нет: её граница проверяется отдельным тестом сервиса.
+        // CompanyFacade объявлен final — собирается рефлексией.
+        $companyFacade = (new \ReflectionClass(CompanyFacade::class))->newInstanceWithoutConstructor();
+        $companyRepository = $this->createMock(CompanyRepository::class);
+        $companyRepository->method('findById')->willReturn(null);
+        (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
+
+        return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
     }
 
     /**
