@@ -95,12 +95,14 @@ final class RebuildPreliminaryForPeriodAction
         try {
             $this->monthCloseLock->lock($command->companyId, $marketplace, $command->year, $command->month);
 
-            $this->rebuildStage($command, $marketplace, $stage);
+            $completed = $this->rebuildStage($command, $marketplace, $stage);
 
-            // Отметка снимается в той же транзакции, что и сам пересбор: иначе
-            // период либо пересобирался бы вечно, либо потерял бы отметку при
-            // откате и остался расходиться с источником.
-            $this->rebuildFlagQuery->clear($command->companyId, $marketplace, $command->year, $command->month, $stage);
+            // Отметка снимается только если работа действительно сделана, и в той
+            // же транзакции: иначе период либо пересобирался бы вечно, либо
+            // потерял бы отметку при откате и остался расходиться с источником.
+            if ($completed) {
+                $this->rebuildFlagQuery->clear($command->companyId, $marketplace, $command->year, $command->month, $stage);
+            }
 
             $connection->commit();
         } catch (\Throwable $e) {
@@ -129,11 +131,15 @@ final class RebuildPreliminaryForPeriodAction
         }
     }
 
+    /**
+     * @return bool этап доведён до закрытого состояния; false означает, что
+     *              работа не сделана и отметку о пересборе снимать нельзя
+     */
     private function rebuildStage(
         RebuildPreliminaryForPeriodCommand $command,
         MarketplaceType $marketplace,
         CloseStage $stage,
-    ): void {
+    ): bool {
         $monthClose = $this->monthCloseRepository->findByPeriod(
             $command->companyId,
             $marketplace,
@@ -155,7 +161,8 @@ final class RebuildPreliminaryForPeriodAction
                 'stage' => $stage->value,
             ]);
 
-            return;
+            // Финальному закрытию пересбор не нужен: отметку можно снять.
+            return true;
         }
 
         // Если этап CLOSED и предыдущее закрытие было предварительным —
@@ -187,7 +194,10 @@ final class RebuildPreliminaryForPeriodAction
                     'errors' => array_map(static fn ($check): string => $check->key, $blockingErrors),
                 ]);
 
-                return;
+                // Отметку не снимаем: данные не готовы, но документ расходится с
+                // источником. Снять её значило бы потерять период навсегда —
+                // выборка его больше не вернёт, даже когда причину устранят.
+                return false;
             }
 
             try {
@@ -254,7 +264,7 @@ final class RebuildPreliminaryForPeriodAction
                 throw new \DomainException(sprintf('Preliminary rebuild cannot be completed after reopen for stage "%s": blocking preflight errors.', $stage->value));
             }
 
-            return;
+            return false;
         }
 
         // Запускаем закрытие этапа в режиме предзакрытия.
@@ -268,6 +278,8 @@ final class RebuildPreliminaryForPeriodAction
                 actorUserId: $command->actorUserId,
                 preliminary: true,
             ));
+
+            return true;
         } catch (\DomainException $e) {
             $this->logger->warning('[PreliminaryRebuild] Close skipped (domain)', [
                 'company_id' => $command->companyId,
@@ -280,20 +292,24 @@ final class RebuildPreliminaryForPeriodAction
                 'exception_message' => $e->getMessage(),
             ]);
 
-            if ($wasReopened) {
-                $this->logger->error('[PreliminaryRebuild] Close failed after reopen', [
-                    'company_id' => $command->companyId,
-                    'marketplace' => $command->marketplace,
-                    'year' => $command->year,
-                    'month' => $command->month,
-                    'stage' => $stage->value,
-                    'preliminary' => true,
-                    'exception_class' => $e::class,
-                    'exception_message' => $e->getMessage(),
-                ]);
-
-                throw $e;
+            // Переоткрытия не было — документ на месте, но работа не сделана:
+            // отметку сохраняем, чтобы период вернулся в следующую ночь.
+            if (!$wasReopened) {
+                return false;
             }
+
+            $this->logger->error('[PreliminaryRebuild] Close failed after reopen', [
+                'company_id' => $command->companyId,
+                'marketplace' => $command->marketplace,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $stage->value,
+                'preliminary' => true,
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->error(
                 $wasReopened

@@ -140,12 +140,16 @@ final readonly class ByDayRowReplacement
             ? $this->unlinkQuery->executeAllLinked($table, $companyId, $rawDocId)
             : $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
 
-        if ($unlinked > 0) {
-            // Документ этапа с этого момента расходится с источником — отмечаем
-            // период, чтобы ночной пересбор его переделал. Отметка ставится в той
-            // же транзакции, что и сама замена: откатится замена — уйдёт и она.
-            $this->rebuildFlagQuery->mark($companyId, $marketplace, $year, $month, $stage);
+        // Отметка ставится на любой разрешённой замене предварительно закрытого
+        // этапа, а не только когда что-то отвязали. День может не иметь ни одной
+        // привязанной строки и при этом принести новую, попадающую в ОПиУ:
+        // агрегат изменится, а документ остался бы прежним навсегда.
+        //
+        // Ставится в той же транзакции, что и сама замена: откатится замена —
+        // уйдёт и отметка.
+        $this->rebuildFlagQuery->mark($companyId, $marketplace, $year, $month, $stage);
 
+        if ($unlinked > 0) {
             $this->logger->info('[Ozon by-day] preliminary rows unlinked before replacement', [
                 'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,

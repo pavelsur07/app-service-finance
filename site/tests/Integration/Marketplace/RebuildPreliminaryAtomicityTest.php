@@ -18,6 +18,7 @@ use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
+use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -75,6 +76,10 @@ final class RebuildPreliminaryAtomicityTest extends IntegrationTestCase
         );
         self::assertSame(1, $documentsAfterClose, 'Предзакрытие должно было создать документ.');
 
+        // Период отмечен к пересбору — так его помечает замена строк.
+        $flagQuery = self::getContainer()->get(PreliminaryRebuildFlagQuery::class);
+        $flagQuery->mark(self::COMPANY_ID, self::MARKETPLACE, self::YEAR, self::MONTH, CloseStage::COSTS);
+
         // Правка Ozon убрала последние строки этапа.
         $connection->executeStatement(
             'DELETE FROM marketplace_costs WHERE company_id = :c',
@@ -109,6 +114,14 @@ final class RebuildPreliminaryAtomicityTest extends IntegrationTestCase
             $monthClose->getStageStatus(CloseStage::COSTS),
             'Этап не должен застрять в REOPENED: иначе ночной пересбор его больше не выберет.',
         );
+
+        // Отметка обязана пережить неудачу: снять её значило бы потерять период
+        // навсегда — выборка его больше не вернёт, даже когда причину устранят.
+        $flag = $connection->fetchOne(
+            "SELECT settings->'needs_preliminary_rebuild'->>'costs' FROM marketplace_month_closes WHERE company_id = :c",
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame('true', $flag, 'Отметка о пересборе не должна сниматься при неудаче.');
 
         unset($category);
     }

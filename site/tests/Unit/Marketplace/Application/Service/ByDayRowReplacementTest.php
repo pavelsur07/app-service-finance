@@ -34,6 +34,8 @@ final class ByDayRowReplacementTest extends TestCase
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
     private const DAY = '2026-09-08';
 
+    private int $marks = 0;
+
     public function testPreliminaryStageRowsAreUnlinkedAndReplacementAllowed(): void
     {
         $captured = [];
@@ -42,6 +44,31 @@ final class ByDayRowReplacementTest extends TestCase
         self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
         self::assertSame(['doc-costs'], $captured['documentIds'] ?? null);
         self::assertSame(self::RAW_DOC_ID, $captured['rawDocumentId'] ?? null, 'Снимать привязку можно только со строк перезагруженного дня, а не всего месяца.');
+    }
+
+    public function testReplacementIsMarkedEvenWhenNothingWasUnlinked(): void
+    {
+        // День может не иметь ни одной привязанной строки и при этом принести
+        // новую, попадающую в ОПиУ: агрегат изменится, а документ остался бы
+        // прежним навсегда, если отметку ставить только по факту отвязки.
+        $captured = [];
+        $monthClose = $this->monthClose([CloseStage::COSTS->value => true], costDocumentIds: ['doc-costs']);
+        $replacement = $this->service($monthClose, null, $captured);
+        $this->marks = 0;
+
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertSame(1, $this->marks, 'Разрешённая замена предварительного этапа обязана отмечать период.');
+    }
+
+    public function testForbiddenReplacementDoesNotMarkAnything(): void
+    {
+        $captured = [];
+        $monthClose = $this->monthClose([CloseStage::COSTS->value => false], status: MonthCloseStageStatus::CLOSED);
+        $replacement = $this->service($monthClose, null, $captured);
+        $this->marks = 0;
+
+        self::assertFalse($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertSame(0, $this->marks);
     }
 
     public function testFinallyClosedStageForbidsReplacementEntirely(): void
@@ -203,7 +230,13 @@ final class ByDayRowReplacementTest extends TestCase
         (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
 
         $rebuildFlag = (new \ReflectionClass(PreliminaryRebuildFlagQuery::class))->newInstanceWithoutConstructor();
-        (new \ReflectionProperty($rebuildFlag, 'connection'))->setValue($rebuildFlag, $this->createMock(Connection::class));
+        $flagConnection = $this->createMock(Connection::class);
+        $flagConnection->method('executeStatement')->willReturnCallback(function (): int {
+            ++$this->marks;
+
+            return 1;
+        });
+        (new \ReflectionProperty($rebuildFlag, 'connection'))->setValue($rebuildFlag, $flagConnection);
 
         return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, $rebuildFlag, new NullLogger());
     }
