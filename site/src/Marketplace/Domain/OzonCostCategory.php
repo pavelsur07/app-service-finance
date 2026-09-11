@@ -375,7 +375,9 @@ final readonly class OzonCostCategory
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemPackageRedistribution'],
                 operationTypes: ['OperationMarketplacePackageRedistribution'],
-                accrualTypeNames: ['PackingFee'],
+                // ItemPacking и PackingFee — одна и та же услуга: так их и ведёт
+                // таксономия Ozon («Упаковка товара партнёрами»).
+                accrualTypeNames: ['PackingFee', 'ItemPacking'],
             ),
             new self(
                 code: 'ozon_dropoff_apvz',
@@ -522,7 +524,6 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['OperationMarketplaceItemAdditionalPackagingAtWarehouse'],
-                accrualTypeNames: ['ItemPacking'],
             ),
             new self(
                 code: 'ozon_disposal',
@@ -760,7 +761,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Компенсации и декомпенсации',
                 operationTypes: ['AccrualInternalClaim'],
-                accrualTypeNames: ['ItemCompensation', 'Compensation'],
+                accrualTypeNames: ['ItemCompensation'],
             ),
             new self(
                 code: 'ozon_partial_compensation_to_client',
