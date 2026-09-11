@@ -131,14 +131,21 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 $rawDocId,
             );
 
-            if ($mayReplace) {
-                $this->connection->executeStatement(
-                    'DELETE FROM marketplace_costs
-                     WHERE raw_document_id = :rawDocId
-                       AND document_id IS NULL',
-                    ['rawDocId' => $rawDocId],
-                );
+            // Заблокированный период не меняется вообще: ни удалением прежних
+            // затрат, ни записью новых. Продолжить разбор значило бы обойти
+            // блокировку кодом, который про неё знает.
+            if (!$mayReplace) {
+                $this->connection->commit();
+
+                return 0;
             }
+
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $rawDocId],
+            );
 
             // Известные external_id читаются ПОСЛЕ удаления. До него в выборку
             // попадали бы строки этого же документа, которые только что снесены,

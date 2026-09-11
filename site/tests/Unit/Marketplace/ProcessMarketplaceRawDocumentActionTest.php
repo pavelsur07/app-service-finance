@@ -42,7 +42,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
      * настоящий объект собирается рефлексией с подменёнными зависимостями, как
      * это уже делается для других final-сервисов в тестах модуля.
      */
-    private function createRowUnlinker(?MarketplaceMonthClose $monthClose = null, ?int &$unlinked = null): ByDayRowReplacement
+    private function createRowUnlinker(?MarketplaceMonthClose $monthClose = null, ?int &$unlinked = null, ?\DateTimeImmutable $lockBefore = null): ByDayRowReplacement
     {
         $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
         $queryConnection = $this->createMock(Connection::class);
@@ -61,8 +61,10 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         // Блокировки периода нет: её граница проверяется отдельным тестом сервиса.
         // CompanyFacade объявлен final — собирается рефлексией.
         $companyFacade = (new \ReflectionClass(CompanyFacade::class))->newInstanceWithoutConstructor();
+        $lockedCompany = $this->createMock(Company::class);
+        $lockedCompany->method('getFinanceLockBefore')->willReturn($lockBefore);
         $companyRepository = $this->createMock(CompanyRepository::class);
-        $companyRepository->method('findById')->willReturn(null);
+        $companyRepository->method('findById')->willReturn($lockedCompany);
         (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
 
         return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
@@ -356,6 +358,56 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
 
         self::assertSame(1, $unlinked, 'Привязка к предварительному закрытию обязана сниматься до удаления строк.');
+    }
+
+    /**
+     * Регрессия. Заблокированный период обязан остаться неизменным целиком: не
+     * только прежние строки не удаляются, но и новые не появляются. Иначе
+     * начисление с ранее не виденным external_id легло бы в закрытый на замок
+     * месяц — причём кодом, который про блокировку уже знает.
+     */
+    public function testLockedPeriodIsNotTouchedAtAll(): void
+    {
+        $document = $this->createMock(MarketplaceRawDocument::class);
+        $document->method('getRawData')->willReturn(['accruals' => [['x' => 1]]]);
+        $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
+        $document->method('getApiEndpoint')->willReturn(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $document->method('getPeriodFrom')->willReturn(new \DateTimeImmutable('2026-06-15'));
+        $company = $this->createMock(Company::class);
+        $company->method('getId')->willReturn('company-1');
+        $document->method('getCompany')->willReturn($company);
+
+        $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repository->method('find')->willReturn($document);
+
+        $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
+        $saleRepository->expects(self::never())->method('deleteByRawDocument');
+
+        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor->expects(self::never())->method('processBatch');
+        $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
+        $processorRegistry->method('get')->willReturn($processor);
+
+        $unlinked = 0;
+
+        $action = new ProcessMarketplaceRawDocumentAction(
+            $this->createMock(RowClassifierRegistryInterface::class),
+            $processorRegistry,
+            $repository,
+            $saleRepository,
+            $this->createMock(MarketplaceReturnRepository::class),
+            $this->createMock(MarketplaceCostRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createRowUnlinker(null, $unlinked, new \DateTimeImmutable('2026-06-30')),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
+        );
+
+        $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'sales'));
+
+        self::assertSame(0, $result->processedRows);
+        self::assertSame(0, $unlinked, 'В заблокированном периоде нельзя снимать привязку.');
     }
 
     /**

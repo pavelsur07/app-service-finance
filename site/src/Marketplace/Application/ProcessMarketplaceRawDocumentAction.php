@@ -313,11 +313,21 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // такие строки, и правка Ozon по ним не доехала бы до следующего reopen.
         // Окончательно закрытый период остаётся нетронутым, а заблокированный
         // не заменяется вовсе — тогда prepare* возвращает false.
+        $mayReplace = 'sales' === $command->kind
+            ? $this->byDayRowReplacement->prepareSales($companyId, $marketplace, $day, $command->rawDocId)
+            : $this->byDayRowReplacement->prepareReturns($companyId, $marketplace, $day, $command->rawDocId);
+
+        // Заблокированный период не меняется вообще: не только удаление, но и
+        // разбор. Иначе строка с ранее не виденным external_id всё равно легла бы
+        // в закрытый на замок месяц — то есть код, который про блокировку знает,
+        // сам бы её и обошёл.
+        if (!$mayReplace) {
+            return 0;
+        }
+
         if ('sales' === $command->kind) {
-            if ($this->byDayRowReplacement->prepareSales($companyId, $marketplace, $day, $command->rawDocId)) {
-                $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
-            }
-        } elseif ($this->byDayRowReplacement->prepareReturns($companyId, $marketplace, $day, $command->rawDocId)) {
+            $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+        } else {
             $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
         }
 

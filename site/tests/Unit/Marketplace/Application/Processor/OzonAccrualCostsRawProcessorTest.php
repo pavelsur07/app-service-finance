@@ -252,6 +252,17 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $this->processorWithPayload($payload)->process(self::COMPANY_ID, self::RAW_DOC_ID);
     }
 
+    public function testLockedPeriodProducesNoCostsAtAll(): void
+    {
+        // Регрессия. Раньше при блокировке пропускалось только удаление, а разбор
+        // шёл дальше: затрата с ранее не виденным external_id всё равно легла бы
+        // в закрытый на замок месяц.
+        $processor = $this->processor([], null, new \DateTimeImmutable('2026-09-30'));
+
+        self::assertSame(0, $processor->process(self::COMPANY_ID, self::RAW_DOC_ID));
+        self::assertSame([], $this->persisted);
+    }
+
     public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
     {
         // Документ более ранней версии загрузчика разобрать нечем: справочника
@@ -424,14 +435,14 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
      */
     private function processorWithPayload(array $payload, ?int &$deletes = null): OzonAccrualCostsRawProcessor
     {
-        return $this->processor([], $payload, $deletes);
+        return $this->processor([], $payload, null, $deletes);
     }
 
     /**
      * @param list<string> $existingIds
      * @param array<string, mixed>|null $payloadOverride
      */
-    private function processor(array $existingIds, ?array $payloadOverride = null, ?int &$deletes = null): OzonAccrualCostsRawProcessor
+    private function processor(array $existingIds, ?array $payloadOverride = null, ?\DateTimeImmutable $lockBefore = null, ?int &$deletes = null): OzonAccrualCostsRawProcessor
     {
         $this->persisted = [];
 
@@ -498,7 +509,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
             $categoryResolver,
             $existingQuery,
             $this->listingEnsureService($this->listing),
-            $this->rowUnlinker(),
+            $this->rowUnlinker($lockBefore),
             new NullLogger(),
         );
     }
@@ -507,7 +518,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
      * Заглушка снятия предварительных привязок: сам разбор от неё не зависит,
      * а её поведение проверяется в тесте Action и в собственном тесте сервиса.
      */
-    private function rowUnlinker(): ByDayRowReplacement
+    private function rowUnlinker(?\DateTimeImmutable $lockBefore = null): ByDayRowReplacement
     {
         $query = (new \ReflectionClass(UnlinkDocumentRowsQuery::class))->newInstanceWithoutConstructor();
         $this->setProperty($query, 'connection', $this->createMock(Connection::class));
@@ -518,8 +529,10 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         // Блокировки периода нет: её граница проверяется отдельным тестом сервиса.
         // CompanyFacade объявлен final — собирается рефлексией.
         $companyFacade = (new \ReflectionClass(CompanyFacade::class))->newInstanceWithoutConstructor();
+        $lockedCompany = $this->createMock(Company::class);
+        $lockedCompany->method('getFinanceLockBefore')->willReturn($lockBefore);
         $companyRepository = $this->createMock(CompanyRepository::class);
-        $companyRepository->method('findById')->willReturn(null);
+        $companyRepository->method('findById')->willReturn($lockedCompany);
         (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
 
         return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
