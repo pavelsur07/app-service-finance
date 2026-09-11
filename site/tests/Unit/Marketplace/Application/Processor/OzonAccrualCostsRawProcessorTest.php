@@ -21,6 +21,7 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\OzonListingUpsertQuery;
+use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -539,7 +540,10 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         $lock = (new \ReflectionClass(MonthCloseAdvisoryLockQuery::class))->newInstanceWithoutConstructor();
         (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
 
-        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, new NullLogger());
+        $rebuildFlag = (new \ReflectionClass(PreliminaryRebuildFlagQuery::class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty($rebuildFlag, 'connection'))->setValue($rebuildFlag, $this->createMock(Connection::class));
+
+        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, $rebuildFlag, new NullLogger());
     }
 
     /**

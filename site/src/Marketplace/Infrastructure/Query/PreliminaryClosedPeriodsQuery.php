@@ -16,18 +16,18 @@ use Doctrine\DBAL\Connection;
  * оставил бы документ такого месяца расходиться с источником навсегда: ровно тот
  * дефект, ради которого всё это и делается.
  *
- * Только Ozon: исторические строки умеет отвязывать и заменять только разбор
- * by-day. Брать сюда остальные маркетплейсы значило бы каждую ночь переоткрывать
- * и пересобирать их давние закрытия без единой причины со стороны источника.
+ * Выбираются только ОТМЕЧЕННЫЕ периоды: отметку ставит замена строк, когда сняла
+ * привязку к предварительному ОПиУ, и снимает успешный пересбор. Сканировать
+ * «все предварительно закрытые» нельзя — успешный пересбор снова выставляет флаг
+ * предварительности, период остался бы в выборке вечно, и нетронутые
+ * исторические документы удалялись бы и пересоздавались каждую ночь. По отметке
+ * же в выборку не попадают ни заблокированные периоды (замена их не трогает, а
+ * значит и не пачкает), ни те, где ничего не менялось.
  *
- * Вместе с периодом возвращается точный список предварительно закрытых этапов:
- * период попадает в выборку из-за одного конкретного этапа, и соседний трогать
- * нельзя — он может быть открыт человеком ради правок.
- *
- * Поэтому список берётся из состояния, а не из календаря: пересобираем каждый
- * период, который сейчас ЗАКРЫТ предварительно. Окончательно закрытые сюда не
- * попадают — их замена не трогает вовсе; переоткрытые тоже, иначе пересбор
- * закрыл бы обратно период, который открыли руками ради правок.
+ * Вместе с периодом возвращается точный список этапов: период попадает в выборку
+ * из-за одного конкретного, и соседний трогать нельзя — он может быть открыт
+ * человеком ради правок. Поэтому отметка проверяется В ПАРЕ со статусом и
+ * флагом предварительности этапа.
  */
 final class PreliminaryClosedPeriodsQuery
 {
@@ -52,15 +52,18 @@ final class PreliminaryClosedPeriodsQuery
             // `jsonb`, и запрос падал бы целиком, обрушая весь пересбор.
             "SELECT company_id, marketplace, year, month,
                     (stage_sales_returns_status = 'closed'
-                     AND settings->'last_close_was_preliminary'->>'sales_returns' = 'true') AS sales_returns_preliminary,
+                     AND settings->'last_close_was_preliminary'->>'sales_returns' = 'true'
+                     AND settings->'needs_preliminary_rebuild'->>'sales_returns' = 'true') AS sales_returns_preliminary,
                     (stage_costs_status = 'closed'
-                     AND settings->'last_close_was_preliminary'->>'costs' = 'true') AS costs_preliminary
+                     AND settings->'last_close_was_preliminary'->>'costs' = 'true'
+                     AND settings->'needs_preliminary_rebuild'->>'costs' = 'true') AS costs_preliminary
              FROM marketplace_month_closes
-             WHERE marketplace = 'ozon'
-               AND ((stage_sales_returns_status = 'closed'
-                    AND settings->'last_close_was_preliminary'->>'sales_returns' = 'true')
+             WHERE (stage_sales_returns_status = 'closed'
+                    AND settings->'last_close_was_preliminary'->>'sales_returns' = 'true'
+                    AND settings->'needs_preliminary_rebuild'->>'sales_returns' = 'true')
                 OR (stage_costs_status = 'closed'
-                    AND settings->'last_close_was_preliminary'->>'costs' = 'true'))
+                    AND settings->'last_close_was_preliminary'->>'costs' = 'true'
+                    AND settings->'needs_preliminary_rebuild'->>'costs' = 'true')
              ORDER BY year, month, company_id, marketplace",
         );
 

@@ -9,6 +9,7 @@ use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
+use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
@@ -45,6 +46,7 @@ final readonly class ByDayRowReplacement
         private CompanyFacade $companyFacade,
         private UnlinkDocumentRowsQuery $unlinkQuery,
         private MonthCloseAdvisoryLockQuery $lockQuery,
+        private PreliminaryRebuildFlagQuery $rebuildFlagQuery,
         private LoggerInterface $logger,
     ) {
     }
@@ -79,6 +81,14 @@ final readonly class ByDayRowReplacement
         string $rawDocId,
         CloseStage $stage,
     ): bool {
+        $year = (int) $day->format('Y');
+        $month = (int) $day->format('n');
+
+        // Замок берётся первым — до чтения и блокировки периода, и состояния
+        // этапа: иначе параллельное закрытие месяца успело бы собрать документ
+        // по строкам, которые замена тут же перезапишет.
+        $this->lockQuery->lock($companyId, $marketplace, $year, $month);
+
         if ($this->isDayLocked($companyId, $day)) {
             $this->logger->warning('[Ozon by-day] replacement skipped: finance period is locked', [
                 'company_id' => $companyId,
@@ -88,14 +98,6 @@ final readonly class ByDayRowReplacement
 
             return false;
         }
-
-        $year = (int) $day->format('Y');
-        $month = (int) $day->format('n');
-
-        // Блокировка берётся до чтения состояния этапа и внутри транзакции
-        // вызывающего: иначе закрытие месяца, идущее параллельно, успело бы
-        // собрать документ по строкам, которые замена тут же перезапишет.
-        $this->lockQuery->lock($companyId, $marketplace, $year, $month);
 
         $monthClose = $this->monthCloseRepository->findByPeriod($companyId, $marketplace, $year, $month);
 
@@ -139,6 +141,11 @@ final readonly class ByDayRowReplacement
             : $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
 
         if ($unlinked > 0) {
+            // Документ этапа с этого момента расходится с источником — отмечаем
+            // период, чтобы ночной пересбор его переделал. Отметка ставится в той
+            // же транзакции, что и сама замена: откатится замена — уйдёт и она.
+            $this->rebuildFlagQuery->mark($companyId, $marketplace, $year, $month, $stage);
+
             $this->logger->info('[Ozon by-day] preliminary rows unlinked before replacement', [
                 'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,

@@ -12,6 +12,7 @@ use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
+use App\Marketplace\Infrastructure\Query\PreliminaryRebuildFlagQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -38,6 +39,7 @@ final class RebuildPreliminaryForPeriodAction
         private readonly CloseMonthStageAction $closeAction,
         private readonly EntityManagerInterface $entityManager,
         private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
+        private readonly PreliminaryRebuildFlagQuery $rebuildFlagQuery,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -94,6 +96,11 @@ final class RebuildPreliminaryForPeriodAction
             $this->monthCloseLock->lock($command->companyId, $marketplace, $command->year, $command->month);
 
             $this->rebuildStage($command, $marketplace, $stage);
+
+            // Отметка снимается в той же транзакции, что и сам пересбор: иначе
+            // период либо пересобирался бы вечно, либо потерял бы отметку при
+            // откате и остался расходиться с источником.
+            $this->rebuildFlagQuery->clear($command->companyId, $marketplace, $command->year, $command->month, $stage);
 
             $connection->commit();
         } catch (\Throwable $e) {
@@ -193,14 +200,18 @@ final class RebuildPreliminaryForPeriodAction
                 ));
                 $wasReopened = true;
             } catch (\DomainException $e) {
-                $this->logger->warning('[PreliminaryRebuild] Reopen failed, skip stage', [
+                $this->logger->warning('[PreliminaryRebuild] Reopen failed, stage rolled back', [
                     'company_id' => $command->companyId,
                     'marketplace' => $command->marketplace,
                     'stage' => $stage->value,
                     'error' => $e->getMessage(),
                 ]);
 
-                return;
+                // Пробрасываем, а не выходим тихо: переоткрытие успевает удалить
+                // часть документов ОПиУ до того, как отказать на следующем, и
+                // выход с return зафиксировал бы наполовину переоткрытый этап
+                // вопреки атомарности. Внешняя транзакция откатит удаления.
+                throw $e;
             }
         }
 
