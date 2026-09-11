@@ -9,6 +9,7 @@ use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\DTO\ProcessRawDocumentResult;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
@@ -49,6 +50,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private MarketplaceCostRepository $costRepository,
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
+        private ByDayRowReplacement $byDayRowReplacement,
         private Connection $connection,
         private AppLogger $appLogger,
     ) {
@@ -303,6 +305,25 @@ final readonly class ProcessMarketplaceRawDocumentAction
         string $targetBucketKey,
     ): int {
         $company = $document->getCompany();
+        $companyId = (string) $company->getId();
+        $day = $document->getPeriodFrom();
+
+        // Привязка к предварительному закрытию снимается до удаления: иначе
+        // `deleteByRawDocument` с его условием `document IS NULL` обошёл бы
+        // такие строки, и правка Ozon по ним не доехала бы до следующего reopen.
+        // Окончательно закрытый период остаётся нетронутым, а заблокированный
+        // не заменяется вовсе — тогда prepare* возвращает false.
+        $mayReplace = 'sales' === $command->kind
+            ? $this->byDayRowReplacement->prepareSales($companyId, $marketplace, $day, $command->rawDocId)
+            : $this->byDayRowReplacement->prepareReturns($companyId, $marketplace, $day, $command->rawDocId);
+
+        // Заблокированный период не меняется вообще: не только удаление, но и
+        // разбор. Иначе строка с ранее не виденным external_id всё равно легла бы
+        // в закрытый на замок месяц — то есть код, который про блокировку знает,
+        // сам бы её и обошёл.
+        if (!$mayReplace) {
+            return 0;
+        }
 
         if ('sales' === $command->kind) {
             $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);

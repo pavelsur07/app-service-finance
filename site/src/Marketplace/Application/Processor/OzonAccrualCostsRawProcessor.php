@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Ingestion\Facade\OzonAccrualCategoryFacade;
+use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceCost;
@@ -52,6 +53,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $existingIdsQuery,
         private readonly OzonListingEnsureService $listingEnsureService,
+        private readonly ByDayRowReplacement $byDayRowReplacement,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -117,6 +119,27 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         $this->connection->beginTransaction();
 
         try {
+            // Привязка к предварительному закрытию снимается до удаления: без
+            // этого условие `document_id IS NULL` обошло бы такие строки, и
+            // правка Ozon по ним не доехала бы до следующего reopen.
+            // Окончательно закрытый период остаётся нетронутым, а
+            // заблокированный не заменяется вовсе.
+            $mayReplace = $this->byDayRowReplacement->prepareCosts(
+                $companyId,
+                MarketplaceType::OZON,
+                $document->getPeriodFrom(),
+                $rawDocId,
+            );
+
+            // Заблокированный период не меняется вообще: ни удалением прежних
+            // затрат, ни записью новых. Продолжить разбор значило бы обойти
+            // блокировку кодом, который про неё знает.
+            if (!$mayReplace) {
+                $this->connection->commit();
+
+                return 0;
+            }
+
             $this->connection->executeStatement(
                 'DELETE FROM marketplace_costs
                  WHERE raw_document_id = :rawDocId

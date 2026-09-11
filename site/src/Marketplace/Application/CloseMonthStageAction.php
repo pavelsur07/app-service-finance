@@ -15,6 +15,7 @@ use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
@@ -47,6 +48,7 @@ final class CloseMonthStageAction
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
         private readonly iterable $dataSources,
+        private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
     ) {
     }
 
@@ -66,6 +68,17 @@ final class CloseMonthStageAction
         $connection->beginTransaction();
 
         try {
+            // Тот же замок, что берёт замена строк перезагруженного дня: иначе
+            // закрытие соберёт документ по прежним строкам, а замена
+            // закоммитится после него, и документ ОПиУ останется расходиться с
+            // источником навсегда. Блокировка транзакционная и снимется сама.
+            $this->monthCloseLock->lock(
+                $command->companyId,
+                MarketplaceType::from($command->marketplace),
+                $command->year,
+                $command->month,
+            );
+
             $result = $this->doInvoke($command);
             $connection->commit();
 
