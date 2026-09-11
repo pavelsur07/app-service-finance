@@ -66,7 +66,7 @@ final class MonthPreliminaryRebuildCommand extends Command
      *
      * @param array<int, array<string, mixed>> $connections
      *
-     * @return list<array{companyId: string, marketplace: string, year: int, month: int}>
+     * @return list<array{companyId: string, marketplace: string, year: int, month: int, stages: list<string>|null}>
      */
     private function periodsToRebuild(\DateTimeImmutable $now, array $connections): array
     {
@@ -78,6 +78,8 @@ final class MonthPreliminaryRebuildCommand extends Command
                 'marketplace' => (string) $row['marketplace'],
                 'year' => (int) $now->format('Y'),
                 'month' => (int) $now->format('n'),
+                // Текущий месяц пересобирается целиком, как и раньше.
+                'stages' => null,
             ];
         }
 
@@ -87,13 +89,19 @@ final class MonthPreliminaryRebuildCommand extends Command
                 'marketplace' => $row['marketplace'],
                 'year' => $row['year'],
                 'month' => $row['month'],
+                'stages' => $row['stages'],
             ];
         }
 
+        // Дубли схлопываются. Запись текущего месяца идёт первой и покрывает все
+        // этапы, поэтому она выигрывает у точечной: пересобрать больше здесь
+        // безопасно, а вот заменить «все этапы» на один — нет.
         $unique = [];
         foreach ($periods as $period) {
             $key = sprintf('%s|%s|%d-%02d', $period['companyId'], $period['marketplace'], $period['year'], $period['month']);
-            $unique[$key] = $period;
+            if (!isset($unique[$key])) {
+                $unique[$key] = $period;
+            }
         }
 
         return array_values($unique);
@@ -135,6 +143,7 @@ final class MonthPreliminaryRebuildCommand extends Command
                         year: $year,
                         month: $month,
                         actorUserId: self::SYSTEM_ACTOR_USER_ID,
+                        stages: $period['stages'],
                     ));
 
                     ++$dispatched;

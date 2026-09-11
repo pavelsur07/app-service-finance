@@ -38,20 +38,27 @@ final class PreliminaryClosedPeriodsQueryTest extends IntegrationTestCase
         $this->persistMonthClose($em, 2026, 9, MonthCloseStageStatus::REOPENED, ['costs' => true]);
         // Ни разу не закрывали — не попадает.
         $this->persistMonthClose($em, 2026, 10, MonthCloseStageStatus::PENDING, []);
+        // Другой маркетплейс — не попадает: исторические строки умеет отвязывать
+        // только разбор Ozon by-day, и переоткрывать чужие давние закрытия
+        // каждую ночь не за что.
+        $this->persistMonthClose($em, 2026, 6, MonthCloseStageStatus::CLOSED, ['costs' => true], MarketplaceType::WILDBERRIES);
 
         $em->flush();
 
         $query = self::getContainer()->get(PreliminaryClosedPeriodsQuery::class);
 
+        $rows = array_values(array_filter(
+            $query->execute(),
+            static fn (array $row): bool => self::COMPANY_ID === $row['company_id'],
+        ));
+
         $periods = array_map(
             static fn (array $row): string => sprintf('%d-%02d', $row['year'], $row['month']),
-            array_values(array_filter(
-                $query->execute(),
-                static fn (array $row): bool => self::COMPANY_ID === $row['company_id'],
-            )),
+            $rows,
         );
 
         self::assertSame(['2026-07'], $periods);
+        self::assertSame(['costs'], $rows[0]['stages'], 'Возвращаться должен точный список предварительно закрытых этапов.');
     }
 
     /**
@@ -63,11 +70,12 @@ final class PreliminaryClosedPeriodsQueryTest extends IntegrationTestCase
         int $month,
         MonthCloseStageStatus $status,
         array $preliminary,
+        MarketplaceType $marketplace = MarketplaceType::OZON,
     ): void {
         $monthClose = new MarketplaceMonthClose(
             \Ramsey\Uuid\Uuid::uuid7()->toString(),
             self::COMPANY_ID,
-            MarketplaceType::OZON,
+            $marketplace,
             $year,
             $month,
         );

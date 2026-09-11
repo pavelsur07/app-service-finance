@@ -67,7 +67,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
         $bus = $this->bus($dispatched);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-02 04:45:00'), $this->preliminaryPeriods([['company_id' => 'c-1', 'marketplace' => 'ozon', 'year' => 2026, 'month' => 8]]));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-02 04:45:00'), $this->preliminaryPeriods([['company_id' => 'c-1', 'marketplace' => 'ozon', 'year' => 2026, 'month' => 8, 'sales_returns_preliminary' => false, 'costs_preliminary' => true]]));
         (new CommandTester($command))->execute([]);
 
         $periods = array_map(
@@ -76,6 +76,54 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         );
 
         self::assertSame(['2026-09', '2026-08'], $periods);
+    }
+
+    public function testHistoricalPeriodRebuildsOnlyItsPreliminaryStages(): void
+    {
+        // Период попадает в выборку из-за одного конкретного этапа. Соседний
+        // трогать нельзя: он может быть в PENDING или открыт человеком ради
+        // правок, и ночной пересбор закрыл бы его посреди работы.
+        $dispatched = [];
+        $query = $this->connectionsQuery([]);
+        $bus = $this->bus($dispatched);
+
+        $command = new MonthPreliminaryRebuildCommand(
+            $query,
+            $bus,
+            new NullLogger(),
+            new MockClock('2026-09-15 04:45:00'),
+            $this->preliminaryPeriods([[
+                'company_id' => 'c-1',
+                'marketplace' => 'ozon',
+                'year' => 2026,
+                'month' => 7,
+                'sales_returns_preliminary' => false,
+                'costs_preliminary' => true,
+            ]]),
+        );
+        (new CommandTester($command))->execute([]);
+
+        self::assertCount(1, $dispatched);
+        self::assertSame(['costs'], $dispatched[0]->stages);
+    }
+
+    public function testCurrentMonthRebuildsAllStages(): void
+    {
+        $dispatched = [];
+        $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
+        $bus = $this->bus($dispatched);
+
+        $command = new MonthPreliminaryRebuildCommand(
+            $query,
+            $bus,
+            new NullLogger(),
+            new MockClock('2026-09-15 04:45:00'),
+            $this->preliminaryPeriods(),
+        );
+        (new CommandTester($command))->execute([]);
+
+        self::assertCount(1, $dispatched);
+        self::assertNull($dispatched[0]->stages, 'Текущий месяц пересобирается целиком, как и раньше.');
     }
 
     public function testWithoutPreliminaryPeriodsOnlyTheCurrentMonthIsRebuilt(): void
@@ -179,7 +227,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
     }
 
     /**
-     * @param list<array{company_id: string, marketplace: string, year: int, month: int}> $periods
+     * @param list<array<string, mixed>> $periods
      */
     private function preliminaryPeriods(array $periods = []): PreliminaryClosedPeriodsQuery
     {
