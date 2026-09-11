@@ -109,8 +109,11 @@ final class MonthPreliminaryRebuildCommand extends Command
                 $companyId = (string) $row['company_id'];
                 $marketplace = (string) $row['marketplace'];
 
-                try {
-                    foreach ($periods as [$year, $month]) {
+                foreach ($periods as [$year, $month]) {
+                    // Ловим внутри цикла: сбой по текущему месяцу не должен
+                    // отменять пересбор предыдущего — ровно ради него цикл и
+                    // появился.
+                    try {
                         $this->messageBus->dispatch(new RebuildPreliminaryForPeriodMessage(
                             companyId: $companyId,
                             marketplace: $marketplace,
@@ -127,16 +130,17 @@ final class MonthPreliminaryRebuildCommand extends Command
                             'year' => $year,
                             'month' => $month,
                         ]);
-                    }
-                } catch (\Throwable $e) {
-                    // Сбой одного диспатча не должен прерывать остальные.
-                    ++$failed;
+                    } catch (\Throwable $e) {
+                        ++$failed;
 
-                    $this->logger->error('[PreliminaryRebuild] Dispatch failed', [
-                        'company_id' => $companyId,
-                        'marketplace' => $marketplace,
-                        'error' => $e->getMessage(),
-                    ]);
+                        $this->logger->error('[PreliminaryRebuild] Dispatch failed', [
+                            'company_id' => $companyId,
+                            'marketplace' => $marketplace,
+                            'year' => $year,
+                            'month' => $month,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
 

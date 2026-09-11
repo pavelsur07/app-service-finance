@@ -20,6 +20,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostRepository;
@@ -67,7 +68,10 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $companyRepository->method('findById')->willReturn($lockedCompany);
         (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
 
-        return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
+        $lock = (new \ReflectionClass(MonthCloseAdvisoryLockQuery::class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
+
+        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, new NullLogger());
     }
 
     private function createCostCategoryResolver(): MarketplaceCostCategoryResolver

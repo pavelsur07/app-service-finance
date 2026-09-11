@@ -11,6 +11,8 @@ use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Entity\MarketplaceMonthClose;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\MonthCloseStageStatus;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Doctrine\DBAL\Connection;
@@ -41,26 +43,52 @@ final class ByDayRowReplacementTest extends TestCase
         self::assertSame(self::RAW_DOC_ID, $captured['rawDocumentId'] ?? null, 'Снимать привязку можно только со строк перезагруженного дня, а не всего месяца.');
     }
 
-    public function testFinallyClosedStageKeepsItsLinks(): void
+    public function testFinallyClosedStageForbidsReplacementEntirely(): void
     {
-        // Окончательно закрытый период правке не подлежит: привязка остаётся, и
-        // удаление с условием document_id IS NULL такие строки не тронет.
+        // Окончательно закрытый этап неизменен так же, как заблокированный
+        // период. Разрешить замену значило бы впустить в него строку с ранее не
+        // виденным external_id, которой нет в итоговом документе ОПиУ.
         $captured = [];
-        $replacement = $this->service($this->monthClose([CloseStage::COSTS->value => false]), null, $captured);
+        $monthClose = $this->monthClose([CloseStage::COSTS->value => false], status: MonthCloseStageStatus::CLOSED);
+        $replacement = $this->service($monthClose, null, $captured);
+
+        self::assertFalse($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertSame([], $captured);
+    }
+
+    public function testOpenStageAllowsReplacementWithoutUnlinking(): void
+    {
+        // Этап ещё не закрывали — привязок нет, снимать нечего, заменять можно.
+        $captured = [];
+        $monthClose = $this->monthClose([], status: MonthCloseStageStatus::PENDING);
+        $replacement = $this->service($monthClose, null, $captured);
 
         self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
-        self::assertSame([], $captured, 'К базе обращаться незачем, если этап закрыт окончательно.');
+        self::assertSame([], $captured);
+    }
+
+    public function testReopenedStageAllowsReplacement(): void
+    {
+        $captured = [];
+        $monthClose = $this->monthClose([CloseStage::COSTS->value => false], status: MonthCloseStageStatus::REOPENED);
+        $replacement = $this->service($monthClose, null, $captured);
+
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertSame([], $captured);
     }
 
     public function testPreliminaryFlagOfOneStageDoesNotUnlockAnother(): void
     {
         // Флаг ведётся per-stage именно затем, чтобы предварительность затрат не
-        // маскировала финальное закрытие продаж того же месяца.
+        // маскировала финальное закрытие продаж того же месяца: продажи здесь
+        // закрыты окончательно, и замена по ним запрещена, хотя затраты
+        // предварительные.
         $captured = [];
         $replacement = $this->service($this->monthClose([CloseStage::COSTS->value => true]), null, $captured);
 
-        self::assertTrue($replacement->prepareSales(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
-        self::assertSame([], $captured);
+        self::assertFalse($replacement->prepareSales(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
+        self::assertSame(['doc-costs'], $captured['documentIds'] ?? null);
     }
 
     public function testLockedPeriodForbidsReplacementEntirely(): void
@@ -115,8 +143,11 @@ final class ByDayRowReplacementTest extends TestCase
      * @param array<string, bool> $preliminary
      * @param list<string>|null $costDocumentIds
      */
-    private function monthClose(array $preliminary, ?array $costDocumentIds = ['doc-costs']): MarketplaceMonthClose
-    {
+    private function monthClose(
+        array $preliminary,
+        ?array $costDocumentIds = ['doc-costs'],
+        MonthCloseStageStatus $status = MonthCloseStageStatus::CLOSED,
+    ): MarketplaceMonthClose {
         $monthClose = new MarketplaceMonthClose(
             '22222222-2222-4222-8222-222222222222',
             self::COMPANY_ID,
@@ -127,6 +158,8 @@ final class ByDayRowReplacementTest extends TestCase
         $monthClose->setSettings(['last_close_was_preliminary' => $preliminary]);
         (new \ReflectionProperty($monthClose, 'stageCostsPLDocumentIds'))->setValue($monthClose, $costDocumentIds);
         (new \ReflectionProperty($monthClose, 'stageSalesReturnsPLDocumentIds'))->setValue($monthClose, ['doc-sales']);
+        (new \ReflectionProperty($monthClose, 'stageCostsStatus'))->setValue($monthClose, $status);
+        (new \ReflectionProperty($monthClose, 'stageSalesReturnsStatus'))->setValue($monthClose, $status);
 
         return $monthClose;
     }
@@ -160,6 +193,9 @@ final class ByDayRowReplacementTest extends TestCase
         $companyRepository->method('findById')->willReturn($company);
         (new \ReflectionProperty($companyFacade, 'repository'))->setValue($companyFacade, $companyRepository);
 
-        return new ByDayRowReplacement($repository, $companyFacade, $query, new NullLogger());
+        $lock = (new \ReflectionClass(MonthCloseAdvisoryLockQuery::class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty($lock, 'connection'))->setValue($lock, $this->createMock(Connection::class));
+
+        return new ByDayRowReplacement($repository, $companyFacade, $query, $lock, new NullLogger());
     }
 }

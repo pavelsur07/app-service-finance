@@ -7,6 +7,8 @@ namespace App\Marketplace\Application\Service;
 use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\MonthCloseStageStatus;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\UnlinkDocumentRowsQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
@@ -42,6 +44,7 @@ final readonly class ByDayRowReplacement
         private MarketplaceMonthCloseRepository $monthCloseRepository,
         private CompanyFacade $companyFacade,
         private UnlinkDocumentRowsQuery $unlinkQuery,
+        private MonthCloseAdvisoryLockQuery $lockQuery,
         private LoggerInterface $logger,
     ) {
     }
@@ -86,14 +89,39 @@ final readonly class ByDayRowReplacement
             return false;
         }
 
-        $monthClose = $this->monthCloseRepository->findByPeriod(
-            $companyId,
-            $marketplace,
-            (int) $day->format('Y'),
-            (int) $day->format('n'),
-        );
+        $year = (int) $day->format('Y');
+        $month = (int) $day->format('n');
 
-        if (null === $monthClose || !$monthClose->isStageLastCloseWasPreliminary($stage)) {
+        // Блокировка берётся до чтения состояния этапа и внутри транзакции
+        // вызывающего: иначе закрытие месяца, идущее параллельно, успело бы
+        // собрать документ по строкам, которые замена тут же перезапишет.
+        $this->lockQuery->lock($companyId, $marketplace, $year, $month);
+
+        $monthClose = $this->monthCloseRepository->findByPeriod($companyId, $marketplace, $year, $month);
+
+        if (null === $monthClose) {
+            return true;
+        }
+
+        // Окончательно закрытый этап неизменен так же, как заблокированный
+        // период: иначе в него попала бы строка с ранее не виденным
+        // external_id, которой нет в итоговом документе ОПиУ.
+        $closedFinally = MonthCloseStageStatus::CLOSED === $monthClose->getStageStatus($stage)
+            && !$monthClose->isStageLastCloseWasPreliminary($stage);
+
+        if ($closedFinally) {
+            $this->logger->warning('[Ozon by-day] replacement skipped: stage is closed finally', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocId,
+                'stage' => $stage->value,
+                'period' => sprintf('%d-%02d', $year, $month),
+            ]);
+
+            return false;
+        }
+
+        // Этап открыт или переоткрыт — привязок нет, снимать нечего.
+        if (!$monthClose->isStageLastCloseWasPreliminary($stage)) {
             return true;
         }
 
