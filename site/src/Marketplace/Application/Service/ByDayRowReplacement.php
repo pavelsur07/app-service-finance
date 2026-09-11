@@ -89,23 +89,6 @@ final readonly class ByDayRowReplacement
         // по строкам, которые замена тут же перезапишет.
         $this->lockQuery->lock($companyId, $marketplace, $year, $month);
 
-        // Только текущий месяц. Его предварительное закрытие пересобирается
-        // ночью в любом случае, поэтому снятая привязка восстановится сама.
-        // Для прошлых месяцев такого пересбора нет: их документ остался бы
-        // расходиться с источником, а чтобы это чинить, закрытие месяца должно
-        // уметь представлять опустевший этап и восстанавливать id документов у
-        // старых закрытий. Это отдельная работа, и до неё прошлые месяцы
-        // остаются неизменными — как и сейчас.
-        if (!$this->isCurrentMonth($day)) {
-            $this->logger->info('[Ozon by-day] replacement skipped: day belongs to a past month', [
-                'company_id' => $companyId,
-                'raw_document_id' => $rawDocId,
-                'day' => $day->format('Y-m-d'),
-            ]);
-
-            return false;
-        }
-
         if ($this->isDayLocked($companyId, $day)) {
             $this->logger->warning('[Ozon by-day] replacement skipped: finance period is locked', [
                 'company_id' => $companyId,
@@ -117,18 +100,25 @@ final readonly class ByDayRowReplacement
         }
 
         $monthClose = $this->monthCloseRepository->findByPeriod($companyId, $marketplace, $year, $month);
+        $status = $monthClose?->getStageStatus($stage) ?? MonthCloseStageStatus::PENDING;
 
-        if (null === $monthClose) {
+        // Этап не закрыт: привязок к ОПиУ нет, отбирать нечего и защищать
+        // нечего. Сюда попадает и первичная загрузка дня — в том числе
+        // последнего дня прошлого месяца, который крон забирает первого числа.
+        // Отказать здесь значило бы вовсе не завести его продажи, возвраты и
+        // затраты: шаг конвейера всё равно отчитался бы успехом.
+        //
+        // Проверяется именно статус, а не флаг предварительности: настоящий
+        // reopenStage() переводит этап в REOPENED и очищает список документов,
+        // но флаг предварительности не сбрасывает.
+        if (MonthCloseStageStatus::CLOSED !== $status) {
             return true;
         }
 
         // Окончательно закрытый этап неизменен так же, как заблокированный
         // период: иначе в него попала бы строка с ранее не виденным
         // external_id, которой нет в итоговом документе ОПиУ.
-        $closedFinally = MonthCloseStageStatus::CLOSED === $monthClose->getStageStatus($stage)
-            && !$monthClose->isStageLastCloseWasPreliminary($stage);
-
-        if ($closedFinally) {
+        if (!$monthClose?->isStageLastCloseWasPreliminary($stage)) {
             $this->logger->warning('[Ozon by-day] replacement skipped: stage is closed finally', [
                 'company_id' => $companyId,
                 'raw_document_id' => $rawDocId,
@@ -139,9 +129,20 @@ final readonly class ByDayRowReplacement
             return false;
         }
 
-        // Этап открыт или переоткрыт — привязок нет, снимать нечего.
-        if (!$monthClose->isStageLastCloseWasPreliminary($stage)) {
-            return true;
+        // Предварительно закрытый этап заменяем только в текущем месяце: его
+        // закрытие пересобирается ночью в любом случае, поэтому снятая привязка
+        // восстановится сама. Для прошлых месяцев такого пересбора нет — их
+        // документ остался бы расходиться с источником, а чинить это надо
+        // вместе с семантикой опустевшего этапа. Отдельная работа.
+        if (!$this->isCurrentMonth($day)) {
+            $this->logger->warning('[Ozon by-day] replacement skipped: preliminary close of a past month', [
+                'company_id' => $companyId,
+                'raw_document_id' => $rawDocId,
+                'stage' => $stage->value,
+                'period' => sprintf('%d-%02d', $year, $month),
+            ]);
+
+            return false;
         }
 
         // array_values: список приходит из JSON-поля, и его ключи не обязаны

@@ -17,6 +17,7 @@ use App\Marketplace\Entity\MarketplaceMonthClose;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
@@ -347,6 +348,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         );
         $monthClose->setSettings(['last_close_was_preliminary' => ['sales_returns' => true]]);
         (new \ReflectionProperty($monthClose, 'stageSalesReturnsPLDocumentIds'))->setValue($monthClose, ['doc-sales']);
+        // Привязки снимаются только у ЗАКРЫТОГО предварительно этапа: у
+        // незакрытого их просто нет.
+        (new \ReflectionProperty($monthClose, 'stageSalesReturnsStatus'))->setValue($monthClose, MonthCloseStageStatus::CLOSED);
 
         $unlinked = 0;
 

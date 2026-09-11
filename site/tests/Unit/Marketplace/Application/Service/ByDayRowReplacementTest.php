@@ -49,7 +49,7 @@ final class ByDayRowReplacementTest extends TestCase
         self::assertSame(self::RAW_DOC_ID, $captured['rawDocumentId'] ?? null, 'Снимать привязку можно только со строк перезагруженного дня, а не всего месяца.');
     }
 
-    public function testPastMonthIsNotReplaced(): void
+    public function testPreliminaryClosedPastMonthIsNotReplaced(): void
     {
         // У прошлого месяца нет ночного пересбора предварительного ОПиУ: снятая
         // привязка не восстановилась бы, и документ остался бы расходиться с
@@ -58,6 +58,33 @@ final class ByDayRowReplacementTest extends TestCase
         $replacement = $this->service($this->monthClose([CloseStage::COSTS->value => true]), null, $captured);
 
         self::assertFalse($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable('2026-08-31'), self::RAW_DOC_ID));
+        self::assertSame([], $captured);
+    }
+
+    public function testFirstImportOfLastDayOfPreviousMonthIsAllowed(): void
+    {
+        // Регрессия. Крон забирает вчерашний день, поэтому первого числа он
+        // приносит последний день прошлого месяца. Отказать здесь значило бы
+        // вовсе не завести его продажи, возвраты и затраты — причём шаг
+        // конвейера всё равно отчитался бы успехом.
+        $captured = [];
+        $replacement = $this->service(null, null, $captured);
+
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable('2026-08-31'), self::RAW_DOC_ID));
+        self::assertSame([], $captured);
+    }
+
+    public function testReallyReopenedStageAllowsReplacement(): void
+    {
+        // Настоящий reopenStage() переводит этап в REOPENED и очищает список
+        // документов, но флаг предварительности не сбрасывает. Решение по флагу,
+        // а не по статусу, отвергало бы такие правки — и записывало бы их как
+        // успешно применённые.
+        $captured = [];
+        $monthClose = $this->monthClose([CloseStage::COSTS->value => true], costDocumentIds: [], status: MonthCloseStageStatus::REOPENED);
+        $replacement = $this->service($monthClose, null, $captured);
+
+        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, $this->today(), self::RAW_DOC_ID));
         self::assertSame([], $captured);
     }
 
@@ -92,16 +119,6 @@ final class ByDayRowReplacementTest extends TestCase
         // Этап ещё не закрывали — привязок нет, снимать нечего, заменять можно.
         $captured = [];
         $monthClose = $this->monthClose([], status: MonthCloseStageStatus::PENDING);
-        $replacement = $this->service($monthClose, null, $captured);
-
-        self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, $this->today(), self::RAW_DOC_ID));
-        self::assertSame([], $captured);
-    }
-
-    public function testReopenedStageAllowsReplacement(): void
-    {
-        $captured = [];
-        $monthClose = $this->monthClose([CloseStage::COSTS->value => false], status: MonthCloseStageStatus::REOPENED);
         $replacement = $this->service($monthClose, null, $captured);
 
         self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, $this->today(), self::RAW_DOC_ID));
