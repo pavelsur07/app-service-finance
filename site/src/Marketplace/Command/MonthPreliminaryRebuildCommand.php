@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Command;
 
 use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
+use App\Marketplace\Infrastructure\Query\PreliminaryClosedPeriodsQuery;
 use App\Marketplace\Message\RebuildPreliminaryForPeriodMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
@@ -40,44 +41,62 @@ final class MonthPreliminaryRebuildCommand extends Command
 
     public const SYSTEM_ACTOR_USER_ID = '00000000-0000-0000-0000-000000000001';
 
-    /** Сколько первых дней месяца пересобирать ещё и предыдущий месяц. */
-    private const PREVIOUS_MONTH_TAIL_DAYS = 4;
-
     public function __construct(
         private readonly ActiveSellerConnectionsQuery $connectionsQuery,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly ClockInterface $clock,
+        private readonly PreliminaryClosedPeriodsQuery $preliminaryPeriodsQuery,
     ) {
         parent::__construct();
     }
 
     /**
-     * Периоды, которые пересобираем этой ночью.
+     * Что пересобираем этой ночью: текущий месяц по каждому активному
+     * подключению плюс каждый период, закрытый предварительно.
      *
-     * Текущий месяц — всегда. Предыдущий — в первые дни месяца, пока окно
-     * загрузки by-day ещё достаёт до него: загрузка снимает привязку к
-     * предварительному ОПиУ и заменяет строки, а пересобрать документ некому,
-     * если пересбор ходит только по текущему месяцу. Так документ прошлого
-     * месяца остался бы расходиться с источником до самого финального закрытия.
+     * Текущий месяц берётся по подключениям, потому что у ни разу не закрытого
+     * месяца записи закрытия ещё нет. Остальное берётся из состояния, а не из
+     * календаря: загрузка by-day умеет перезаливать день окном до 365 суток, и
+     * привязанный к календарному окну пересбор оставил бы документ такого месяца
+     * расходиться с источником навсегда — ровно тот дефект, ради которого всё
+     * это и делается.
      *
-     * Хвост взят с запасом относительно окна загрузки (2 дня), чтобы не зависеть
-     * от точного совпадения двух констант в разных командах. Лишние прогоны
-     * безвредны: `RebuildPreliminaryForPeriodAction` пропускает этап, закрытый
-     * окончательно.
+     * Дубли схлопываются: период, попавший в оба списка, пересобирается один раз.
      *
-     * @return list<array{int, int}>
+     * @param array<int, array<string, mixed>> $connections
+     *
+     * @return list<array{companyId: string, marketplace: string, year: int, month: int}>
      */
-    private function periodsToRebuild(\DateTimeImmutable $now): array
+    private function periodsToRebuild(\DateTimeImmutable $now, array $connections): array
     {
-        $periods = [[(int) $now->format('Y'), (int) $now->format('n')]];
+        $periods = [];
 
-        if ((int) $now->format('j') <= self::PREVIOUS_MONTH_TAIL_DAYS) {
-            $previous = $now->modify('first day of previous month');
-            $periods[] = [(int) $previous->format('Y'), (int) $previous->format('n')];
+        foreach ($connections as $row) {
+            $periods[] = [
+                'companyId' => (string) $row['company_id'],
+                'marketplace' => (string) $row['marketplace'],
+                'year' => (int) $now->format('Y'),
+                'month' => (int) $now->format('n'),
+            ];
         }
 
-        return $periods;
+        foreach ($this->preliminaryPeriodsQuery->execute() as $row) {
+            $periods[] = [
+                'companyId' => $row['company_id'],
+                'marketplace' => $row['marketplace'],
+                'year' => $row['year'],
+                'month' => $row['month'],
+            ];
+        }
+
+        $unique = [];
+        foreach ($periods as $period) {
+            $key = sprintf('%s|%s|%d-%02d', $period['companyId'], $period['marketplace'], $period['year'], $period['month']);
+            $unique[$key] = $period;
+        }
+
+        return array_values($unique);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -91,13 +110,11 @@ final class MonthPreliminaryRebuildCommand extends Command
         }
 
         try {
-            $now = $this->clock->now();
-            $periods = $this->periodsToRebuild($now);
-
             $connections = $this->connectionsQuery->execute();
+            $periods = $this->periodsToRebuild($this->clock->now(), $connections);
 
-            if (empty($connections)) {
-                $io->info('Нет активных SELLER-подключений для пересборки.');
+            if ([] === $periods) {
+                $io->info('Нет активных SELLER-подключений и предварительно закрытых периодов.');
 
                 return Command::SUCCESS;
             }
@@ -105,50 +122,48 @@ final class MonthPreliminaryRebuildCommand extends Command
             $dispatched = 0;
             $failed = 0;
 
-            foreach ($connections as $row) {
-                $companyId = (string) $row['company_id'];
-                $marketplace = (string) $row['marketplace'];
+            foreach ($periods as $period) {
+                $companyId = $period['companyId'];
+                $marketplace = $period['marketplace'];
+                $year = $period['year'];
+                $month = $period['month'];
 
-                foreach ($periods as [$year, $month]) {
-                    // Ловим внутри цикла: сбой по текущему месяцу не должен
-                    // отменять пересбор предыдущего — ровно ради него цикл и
-                    // появился.
-                    try {
-                        $this->messageBus->dispatch(new RebuildPreliminaryForPeriodMessage(
-                            companyId: $companyId,
-                            marketplace: $marketplace,
-                            year: $year,
-                            month: $month,
-                            actorUserId: self::SYSTEM_ACTOR_USER_ID,
-                        ));
+                try {
+                    $this->messageBus->dispatch(new RebuildPreliminaryForPeriodMessage(
+                        companyId: $companyId,
+                        marketplace: $marketplace,
+                        year: $year,
+                        month: $month,
+                        actorUserId: self::SYSTEM_ACTOR_USER_ID,
+                    ));
 
-                        ++$dispatched;
+                    ++$dispatched;
 
-                        $this->logger->info('[PreliminaryRebuild] Dispatched', [
-                            'company_id' => $companyId,
-                            'marketplace' => $marketplace,
-                            'year' => $year,
-                            'month' => $month,
-                        ]);
-                    } catch (\Throwable $e) {
-                        ++$failed;
+                    $this->logger->info('[PreliminaryRebuild] Dispatched', [
+                        'company_id' => $companyId,
+                        'marketplace' => $marketplace,
+                        'year' => $year,
+                        'month' => $month,
+                    ]);
+                } catch (\Throwable $e) {
+                    // Сбой одного диспатча не должен прерывать остальные.
+                    ++$failed;
 
-                        $this->logger->error('[PreliminaryRebuild] Dispatch failed', [
-                            'company_id' => $companyId,
-                            'marketplace' => $marketplace,
-                            'year' => $year,
-                            'month' => $month,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
+                    $this->logger->error('[PreliminaryRebuild] Dispatch failed', [
+                        'company_id' => $companyId,
+                        'marketplace' => $marketplace,
+                        'year' => $year,
+                        'month' => $month,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
 
             $io->success(sprintf(
-                'Отправлено %d задач предзакрытия (ошибок: %d), периоды: %s.',
+                'Отправлено %d задач предзакрытия (ошибок: %d), периодов: %d.',
                 $dispatched,
                 $failed,
-                implode(', ', array_map(static fn (array $p): string => sprintf('%d-%02d', $p[0], $p[1]), $periods)),
+                count($periods),
             ));
 
             return Command::SUCCESS;

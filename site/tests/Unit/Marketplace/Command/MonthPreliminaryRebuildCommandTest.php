@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Marketplace\Command;
 
 use App\Marketplace\Command\MonthPreliminaryRebuildCommand;
 use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
+use App\Marketplace\Infrastructure\Query\PreliminaryClosedPeriodsQuery;
 use App\Marketplace\Message\RebuildPreliminaryForPeriodMessage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -43,7 +44,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
 
         $logger = $this->createMock(LoggerInterface::class);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'), $this->preliminaryPeriods());
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -55,18 +56,18 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         self::assertSame(['companyId' => 'company-b', 'marketplace' => 'ozon'], $dispatched[2]);
     }
 
-    public function testFirstDaysOfMonthAlsoRebuildThePreviousMonth(): void
+    public function testPreliminaryPeriodsAreRebuiltRegardlessOfCalendar(): void
     {
-        // Загрузка by-day ходит окном в два дня и в начале месяца достаёт до
-        // предыдущего: она снимает там привязку к предварительному ОПиУ и
-        // заменяет строки. Если пересбор ходит только по текущему месяцу,
-        // документ прошлого месяца остаётся расходиться с источником до самого
-        // финального закрытия.
+        // Загрузка by-day умеет перезалить день окном до 365 суток: она снимает
+        // там привязку к предварительному ОПиУ и заменяет строки. Пересбор,
+        // привязанный к календарному окну, оставил бы документ такого месяца
+        // расходиться с источником навсегда, поэтому список берётся из
+        // состояния — каждый период, закрытый предварительно.
         $dispatched = [];
         $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
         $bus = $this->bus($dispatched);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-02 04:45:00'));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-02 04:45:00'), $this->preliminaryPeriods([['company_id' => 'c-1', 'marketplace' => 'ozon', 'year' => 2026, 'month' => 8]]));
         (new CommandTester($command))->execute([]);
 
         $periods = array_map(
@@ -77,13 +78,13 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         self::assertSame(['2026-09', '2026-08'], $periods);
     }
 
-    public function testMidMonthRebuildsOnlyTheCurrentMonth(): void
+    public function testWithoutPreliminaryPeriodsOnlyTheCurrentMonthIsRebuilt(): void
     {
         $dispatched = [];
         $query = $this->connectionsQuery([['company_id' => 'c-1', 'marketplace' => 'ozon']]);
         $bus = $this->bus($dispatched);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-15 04:45:00'));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, new NullLogger(), new MockClock('2026-09-15 04:45:00'), $this->preliminaryPeriods());
         (new CommandTester($command))->execute([]);
 
         self::assertCount(1, $dispatched);
@@ -99,7 +100,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
 
         $logger = $this->createMock(LoggerInterface::class);
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'), $this->preliminaryPeriods());
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -140,7 +141,7 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
                 self::callback(static fn (array $ctx): bool => ($ctx['company_id'] ?? null) === 'company-b'),
             );
 
-        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'));
+        $command = new MonthPreliminaryRebuildCommand($query, $bus, $logger, new MockClock('2026-09-15 04:45:00'), $this->preliminaryPeriods());
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([]);
@@ -175,5 +176,19 @@ final class MonthPreliminaryRebuildCommandTest extends TestCase
         });
 
         return $bus;
+    }
+
+    /**
+     * @param list<array{company_id: string, marketplace: string, year: int, month: int}> $periods
+     */
+    private function preliminaryPeriods(array $periods = []): PreliminaryClosedPeriodsQuery
+    {
+        $query = (new \ReflectionClass(PreliminaryClosedPeriodsQuery::class))->newInstanceWithoutConstructor();
+
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn($periods);
+        (new \ReflectionProperty($query, 'connection'))->setValue($query, $connection);
+
+        return $query;
     }
 }

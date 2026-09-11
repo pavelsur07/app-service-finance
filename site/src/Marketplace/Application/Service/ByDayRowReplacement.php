@@ -128,11 +128,15 @@ final readonly class ByDayRowReplacement
         // array_values: список приходит из JSON-поля, и его ключи не обязаны
         // быть последовательными.
         $documentIds = array_values($monthClose->getStagePLDocumentIds($stage));
-        if ([] === $documentIds) {
-            return true;
-        }
 
-        $unlinked = $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
+        // Пустой список id — не «привязок нет». У старых и повреждённых закрытий
+        // id не сохранены, а строки привязаны; `ReopenMonthStageAction` ровно
+        // поэтому умеет снимать привязки по периоду. Отчитаться об успешной
+        // замене, оставив такие строки привязанными, значит промолчать о том,
+        // что правка Ozon не доехала.
+        $unlinked = [] === $documentIds
+            ? $this->unlinkQuery->executeAllLinked($table, $companyId, $rawDocId)
+            : $this->unlinkQuery->execute($table, $companyId, $rawDocId, $documentIds);
 
         if ($unlinked > 0) {
             $this->logger->info('[Ozon by-day] preliminary rows unlinked before replacement', [

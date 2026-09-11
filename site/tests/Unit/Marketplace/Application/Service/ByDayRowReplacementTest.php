@@ -129,14 +129,19 @@ final class ByDayRowReplacementTest extends TestCase
         self::assertSame([], $captured);
     }
 
-    public function testStageWithoutDocumentIdsIsSkipped(): void
+    public function testStageWithoutDocumentIdsUnlinksEverythingLinked(): void
     {
+        // У старых и повреждённых закрытий список id документов не сохранён, а
+        // строки привязаны — ReopenMonthStageAction ровно поэтому умеет снимать
+        // привязки по периоду. Отчитаться об успешной замене, оставив такие
+        // строки привязанными, значит промолчать о том, что правка не доехала.
         $captured = [];
         $monthClose = $this->monthClose([CloseStage::COSTS->value => true], costDocumentIds: []);
         $replacement = $this->service($monthClose, null, $captured);
 
         self::assertTrue($replacement->prepareCosts(self::COMPANY_ID, MarketplaceType::OZON, new \DateTimeImmutable(self::DAY), self::RAW_DOC_ID));
-        self::assertSame([], $captured);
+        self::assertSame(self::RAW_DOC_ID, $captured['rawDocumentId'] ?? null, 'Привязки обязаны сниматься и без сохранённых id документов.');
+        self::assertArrayNotHasKey('documentIds', $captured);
     }
 
     /**
