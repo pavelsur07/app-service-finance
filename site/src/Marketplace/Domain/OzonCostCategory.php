@@ -122,6 +122,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги доставки',
                 serviceNames: ['MarketplaceServiceItemReturnFlowTrans'],
+                accrualTypeNames: ['BackwardShipment'],
             ),
             new self(
                 code: 'ozon_logistic_inbound',
@@ -367,6 +368,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги партнёров',
                 xlsxGroup: 'Услуги партнёров',
                 serviceNames: ['MarketplaceServiceItemFulfillment'],
+                accrualTypeNames: ['Fulfillment'],
             ),
             new self(
                 code: 'ozon_package_labor',
@@ -461,6 +463,7 @@ final readonly class OzonCostCategory
                     'OperationMarketplaceItemPinReview',
                     'OperationMarketPlaceItemPinReview',
                 ],
+                accrualTypeNames: ['ReviewsPin'],
             ),
             new self(
                 code: 'ozon_seller_bonus',
@@ -546,6 +549,7 @@ final readonly class OzonCostCategory
                     'MarketplaceServiceVolumeWeightCharacsProcessing',
                     'OperationMarketplaceServiceVolumeWeightCharacsProcessing',
                 ],
+                accrualTypeNames: ['VolumeWeightCharacteristicsProcessing'],
             ),
             new self(
                 code: 'ozon_penalty_undeliverable',
@@ -619,6 +623,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['MarketplaceServiceItemFlexiblePaymentSchedule'],
+                accrualTypeNames: ['FlexiblePayments'],
             ),
             new self(
                 code: 'ozon_installment',
@@ -640,6 +645,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['Корректировки стоимости услуг'],
+                accrualTypeNames: ['RealizationReportCorrection'],
             ),
             new self(
                 code: 'ozon_correction_point',
