@@ -286,6 +286,43 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
         self::assertSame([], $this->persisted);
     }
 
+    public function testNegativeCompensationBecomesDecompensationCharge(): void
+    {
+        // Проверка именно через процессор, а не резолвер: знак обязан дойти до
+        // него из разбора. Забытый аргумент отправил бы списание в категорию
+        // дохода, а тест резолвера этого не заметил бы.
+        $payload = $this->payload();
+        $payload['service_types']['10'] = 'Compensation';
+        $payload['accruals'][0]['posting']['products'][0]['delivery']['services'][] = [
+            'type_id' => 10,
+            'accrued' => ['amount' => '-1954.00', 'currency' => 'RUB'],
+        ];
+
+        $this->processorWithPayload($payload)->process(self::COMPANY_ID, self::RAW_DOC_ID);
+
+        $row = $this->find('type-10');
+        self::assertSame('ozon_decompensation', $row['code'], 'Списание с продавца — расходная категория.');
+        self::assertSame('charge', $row['operationType']);
+        self::assertSame('1954.00', $row['amount'], 'Сумма хранится положительной, знак несёт operation_type.');
+    }
+
+    public function testPositiveCompensationBecomesCompensationStorno(): void
+    {
+        $payload = $this->payload();
+        $payload['service_types']['10'] = 'Compensation';
+        $payload['accruals'][0]['posting']['products'][0]['delivery']['services'][] = [
+            'type_id' => 10,
+            'accrued' => ['amount' => '1954.00', 'currency' => 'RUB'],
+        ];
+
+        $this->processorWithPayload($payload)->process(self::COMPANY_ID, self::RAW_DOC_ID);
+
+        $row = $this->find('type-10');
+        self::assertSame('ozon_compensation', $row['code'], 'Выплата продавцу — доходная категория.');
+        self::assertSame('storno', $row['operationType']);
+        self::assertSame('1954.00', $row['amount']);
+    }
+
     public function testDocumentWithoutEnvelopeFailsLoudlyInsteadOfReportingZero(): void
     {
         // Документ более ранней версии загрузчика разобрать нечем: справочника

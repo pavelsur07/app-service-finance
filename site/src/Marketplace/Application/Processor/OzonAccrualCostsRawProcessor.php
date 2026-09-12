@@ -366,7 +366,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         // уезжает в запись и попадает в одно предупреждение на документ.
         $typeName = null !== $typeId ? ($serviceTypes[$typeId] ?? null) : null;
 
-        $category = $this->serviceCategoryResolver->resolve($typeId, $typeName);
+        $category = $this->serviceCategoryResolver->resolve($typeId, $typeName, (float) $amount);
 
         return [
             'externalId' => sprintf('%s-type-%s', $externalIdPrefix, $typeId ?? 'unknown'),

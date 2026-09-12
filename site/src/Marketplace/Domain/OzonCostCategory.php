@@ -760,7 +760,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Компенсации и декомпенсации',
                 operationTypes: ['AccrualInternalClaim'],
-                accrualTypeNames: ['ItemCompensation'],
+                accrualTypeNames: ['ItemCompensation', 'Compensation'],
             ),
             new self(
                 code: 'ozon_partial_compensation_to_client',

@@ -195,15 +195,14 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * Регрессия: бэкфилл-миграция Version20260413120000 сохранила положительные
-     * исторические компенсации как operation_type='charge'. Под P&L-формулой
-     * widget-а (storno=+ABS, charge=-ABS) они стали давать -ABS вместо +ABS.
-     * После фикса SQL спец-кейсит category_code = 'ozon_compensation' →
-     * всегда ABS(amount) как доход. Здесь мы стабим агрегированную строку,
-     * какую возвращает уже пофикшенный SQL: net = +5480 даже если исходный
-     * operation_type был charge.
+     * Компенсация, пришедшая как storno, показывается доходом.
+     *
+     * Раньше этот тест утверждал другое: что доходом показывается и компенсация
+     * с operation_type = 'charge', потому что SQL спец-кейсил код категории. Тот
+     * обход убран — направление берётся из operation_type, — и утверждение стало
+     * неверным. Проверяется именно storno-строка, какую отдаёт SQL.
      */
-    public function testCompensationChargePositiveAmountShownAsIncome(): void
+    public function testCompensationStornoShownAsIncome(): void
     {
         $this->stubSales([]);
         $this->stubReturns([]);
@@ -224,7 +223,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * Декомпенсация — всегда расход (−ABS) вне зависимости от operation_type.
+     * Декомпенсация приходит как charge и показывается расходом (−ABS).
      */
     public function testDecompensationShownAsExpense(): void
     {
@@ -268,11 +267,15 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * SQL-контракт: getCostAggregates обязан спец-кейсить category_code
-     * для ozon_compensation / ozon_decompensation. Это страховка от случайного
-     * отката до pre-fix формулы на чисто-operation_type CASE.
+     * Направление берётся из operation_type у всех строк без исключений.
+     *
+     * Раньше здесь стоял обход по коду категории — заплатка под исторические
+     * данные, где бэкфилл сохранил положительные компенсации как charge. Дыры
+     * больше нет: на 11.09.2026 ни одной строки, где обход менял бы исход. А
+     * новым данным он навредил бы: разбор by-day пишет знак по каждой записи, и
+     * настоящее списание показалось бы доходом.
      */
-    public function testSqlContainsCompensationSpecialCase(): void
+    public function testSqlTakesDirectionFromOperationTypeOnly(): void
     {
         $this->stubSales([]);
         $this->stubReturns([]);
@@ -287,9 +290,9 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->executeSummary();
 
         self::assertNotNull($capturedSql);
-        self::assertStringContainsString("cc.code = 'ozon_compensation'", $capturedSql);
-        self::assertStringContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
-        self::assertStringContainsString('effective_op', $capturedSql);
+        self::assertStringNotContainsString("cc.code = 'ozon_compensation'", $capturedSql);
+        self::assertStringNotContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
+        self::assertStringContainsString('c.operation_type AS effective_op', $capturedSql);
         self::assertStringContainsString('c.marketplace AS marketplace', $capturedSql);
         self::assertStringContainsString('GROUP BY marketplace, category_code, category_name', $capturedSql);
     }

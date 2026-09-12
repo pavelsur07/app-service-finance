@@ -196,10 +196,15 @@ final readonly class WidgetSummaryQuery
      * В отличие от ListingCostAggregateQuery (per-listing) сюда попадают
      * категории затрат с listing_id = NULL (CPC, хранение, кросс-докинг и т.п.).
      *
-     * Знак для ozon_compensation / ozon_decompensation определяется
-     * category_code, а не operation_type: компенсация от Ozon — всегда доход,
-     * декомпенсация — всегда расход. Это закрывает дыру в исторических данных,
-     * где бэкфилл-миграция сохранила положительные компенсации как charge.
+     * Знак берётся из operation_type — как у всех остальных строк.
+     *
+     * Раньше здесь стоял обход: ozon_compensation принудительно считался
+     * доходом, ozon_decompensation расходом, независимо от operation_type. Он
+     * закрывал дыру в исторических данных, где бэкфилл сохранил положительные
+     * компенсации как charge. Дыры больше нет: на 11.09.2026 все 66 компенсаций
+     * имеют storno, все 51 декомпенсация — charge, и ни одной строки, где обход
+     * менял бы исход. При этом он маскировал бы настоящее направление у новых
+     * данных: разбор by-day пишет знак по каждой записи.
      *
      * @param list<string>|null $listingIds null = без ограничения по листингам (прежнее
      *                                      поведение). Непустой список приходит только
@@ -235,11 +240,6 @@ final readonly class WidgetSummaryQuery
         $mpFilter = null !== $marketplace ? 'AND c.marketplace = :marketplace' : '';
         $listingFilter = null !== $listingIds ? 'AND c.listing_id IN (:listingIds)' : '';
 
-        // Effective op type per строке считается в подзапросе — чтобы не
-        // дублировать логику compensation/decompensation в трёх SUM(CASE ...).
-        // Семантика: ozon_compensation всегда ведёт себя как storno (доход),
-        // ozon_decompensation всегда как charge (расход). Остальные строки —
-        // по фактическому operation_type.
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
             SELECT
@@ -255,11 +255,7 @@ final readonly class WidgetSummaryQuery
                     cc.code  AS category_code,
                     cc.name  AS category_name,
                     c.amount AS amount,
-                    CASE
-                        WHEN cc.code = 'ozon_compensation'   THEN 'storno'
-                        WHEN cc.code = 'ozon_decompensation' THEN 'charge'
-                        ELSE c.operation_type
-                    END AS effective_op
+                    c.operation_type AS effective_op
                 FROM marketplace_costs c
                 JOIN marketplace_cost_categories cc ON cc.id = c.category_id
                 WHERE c.company_id = :companyId
