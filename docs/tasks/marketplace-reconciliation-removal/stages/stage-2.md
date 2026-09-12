@@ -33,9 +33,31 @@ SELECT stored_file_path FROM marketplace_reconciliation_sessions ORDER BY create
 
 Список путей нужен до дропа: после него связь «сессия → файл» восстановить нечем.
 
-## Файлы в объектном хранилище
+## Файлы в объектном хранилище — удалять ТОЛЬКО поштучно
 
-Префикс `marketplace/reconciliation/{marketplace}/{period}/{uuid}.xlsx`.
-`ObjectStorageInterface` не умеет листать префикс, поэтому удаление — ручная
-операция на хранилище (§3.3), а не код. Порядок: замеры → удаление префикса →
-сверка числа объектов со счётчиком строк → дроп таблицы.
+**Префикс `marketplace/reconciliation/` — общий, удалять его целиком нельзя.**
+В него пишет сохранённый `ReconcileCostsAction` («Закрытие месяца»,
+`site/src/Marketplace/Application/ReconcileCostsAction.php:51-59`), а путь хранит в
+`MarketplaceMonthClose.settings['costsReconciliation']['file_path']`.
+
+Форматы путей совпадают посимвольно:
+
+| Источник | Формат |
+|---|---|
+| удалённый `ReconciliationUploadController` | `marketplace/reconciliation/{marketplace}/{Y-m}/{uuid}.xlsx` |
+| сохранённый `ReconcileCostsAction` | `marketplace/reconciliation/{marketplace}/{Y-m}/{uuid}.xlsx` |
+
+Отличить файлы по пути невозможно — принадлежность знает только БД. Поэтому
+удаляются **ровно те объекты**, что перечислены в `stored_file_path` таблицы
+`marketplace_reconciliation_sessions`, и никакие другие.
+
+Порядок (обязателен именно такой):
+
+1. Выгрузить `stored_file_path` (раздел «Замеры до») — после дропа список взять негде.
+2. Сверить, что ни один путь из списка не встречается в
+   `MarketplaceMonthClose.settings->'costsReconciliation'->>'file_path'`.
+3. Удалить объекты по списку поштучно, сверив число удалённых со счётчиком строк.
+4. Только после этого — дроп таблицы.
+
+Найдено внешним ревью; до правки процедура предписывала снос всего префикса и
+уничтожила бы вложения «Закрытия месяца».

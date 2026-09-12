@@ -42,5 +42,9 @@ cashflow `reconcile=dashboard` (`src/Report/Cashflow/`), Ozon accrual reconcile-
 ## Handoff
 
 PR несёт миграцию → запрос владельцу по форме AGENTS.md §3.2
-(«run the migration and deploy #N»), плюс отдельным пунктом — удаление префикса
-`marketplace/reconciliation/` в объектном хранилище (§3.3).
+(«run the migration and deploy #N»), плюс отдельным пунктом — удаление файлов
+сверки в объектном хранилище (§3.3).
+
+**Файлы удаляются поштучно по списку `stored_file_path`, а не по префиксу:**
+префикс `marketplace/reconciliation/` делят с сохранённым `ReconcileCostsAction`
+(«Закрытие месяца»), форматы путей идентичны. Детали — `stages/stage-2.md`.
