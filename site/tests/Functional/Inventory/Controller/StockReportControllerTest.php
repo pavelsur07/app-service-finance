@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Inventory\Entity\Location;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -16,6 +17,7 @@ use App\Tests\Builders\Inventory\StockSnapshotBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 
 final class StockReportControllerTest extends WebTestCaseBase
 {
@@ -212,6 +214,133 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('7.000', $html);
     }
 
+    public function testRowsAreGroupedBySkuWithFulfillmentTypeBreakdown(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-rollup@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112011')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId($company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '111', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-ROLLUP')
+                ->withFulfillmentType('fbo')
+                ->withQuantity('10.000')
+                ->withReservedQuantity('3.000'),
+            $this->snapshot($company, $location, '112', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-ROLLUP')
+                ->withFulfillmentType('fbs')
+                ->withQuantity('5.000')
+                ->withReservedQuantity('1.000'),
+        );
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            ['Дата-время snapshot', 'Marketplace/source', 'SKU', 'Offer ID', 'Остаток', 'Зарезервировано', 'Доступно расчётно', 'FBO', 'FBS', 'mappingStatus'],
+            $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
+        );
+
+        // Две записи снимка одного SKU схлопнуты в одну строку.
+        self::assertCount(1, $crawler->filter('table tbody tr'));
+
+        $cells = $crawler->filter('table tbody tr td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame('SKU-ROLLUP', $cells[2]);
+        self::assertSame('15.000', $cells[4]);
+        self::assertSame('4.000', $cells[5]);
+        // Доступно расчётно = сумма по обоим типам склада, и она сходится с разбивкой.
+        self::assertSame('11.000', $cells[6]);
+        self::assertSame('7.000', $cells[7]);
+        self::assertSame('4.000', $cells[8]);
+    }
+
+    public function testWildberriesBreaksDownByStockStatus(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-wb-breakdown@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112012')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '121', MarketplaceType::WILDBERRIES, $this->daysAgo(1), 'SKU-WB-ROLLUP')
+                ->withFulfillmentType('fbw')
+                ->withQuantity('8.000'),
+            $this->snapshot($company, $location, '122', MarketplaceType::WILDBERRIES, $this->daysAgo(1), 'SKU-WB-ROLLUP')
+                ->withFulfillmentType('fbw')
+                ->withStatus(StockStatus::InTransitToCustomer)
+                ->withQuantity('2.000'),
+            $this->snapshot($company, $location, '123', MarketplaceType::WILDBERRIES, $this->daysAgo(1), 'SKU-WB-ROLLUP')
+                ->withFulfillmentType('fbw')
+                ->withStatus(StockStatus::InTransitFromCustomer)
+                ->withQuantity('1.000'),
+        );
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/inventory/stocks?source=wildberries&date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        // У Wildberries fulfillment_type всегда один, поэтому разбивка идёт по статусам остатка.
+        self::assertSame(
+            ['Дата-время snapshot', 'Marketplace/source', 'SKU', 'Offer ID', 'Остаток', 'Зарезервировано', 'Доступно расчётно', 'На складе', 'В пути к клиенту', 'В пути от клиента', 'mappingStatus'],
+            $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
+        );
+
+        self::assertCount(1, $crawler->filter('table tbody tr'));
+
+        $cells = $crawler->filter('table tbody tr td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame('11.000', $cells[6]);
+        self::assertSame('8.000', $cells[7]);
+        self::assertSame('2.000', $cells[8]);
+        self::assertSame('1.000', $cells[9]);
+    }
+
+    public function testPaginationCountsSkuNotSnapshotRows(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-pagination@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112013')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $snapshots = [];
+        foreach (['SKU-P1', 'SKU-P2'] as $index => $sku) {
+            foreach (['fbo', 'fbs'] as $typeIndex => $fulfillmentType) {
+                $snapshots[] = $this->snapshot(
+                    $company,
+                    $location,
+                    '9'.$index.$typeIndex,
+                    MarketplaceType::OZON,
+                    $this->daysAgo(1),
+                    $sku,
+                )->withFulfillmentType($fulfillmentType);
+            }
+        }
+
+        $this->persist($owner, $company, $location, ...$snapshots);
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        // Четыре записи снимка, но страниц и позиций считается по двум SKU.
+        self::assertCount(2, $crawler->filter('table tbody tr'));
+        self::assertSame(
+            'Показано 1–2 из 2',
+            preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
+        );
+    }
+
     private function seedTwoOzonDays(string $email, string $companyId, string $suffix): KernelBrowser
     {
         $client = static::createClient();
@@ -219,7 +348,7 @@ final class StockReportControllerTest extends WebTestCaseBase
 
         $owner = UserBuilder::aUser()->withEmail($email)->build();
         $company = CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build();
-        $location = LocationBuilder::aLocation()->withCompanyId($company->getId())->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
 
         $this->persist(
             $owner,

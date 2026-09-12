@@ -35,16 +35,21 @@ final class StockReportController extends AbstractController
 
         $effectiveDate = $this->stockReportQuery->findEffectiveSnapshotDate($companyId, $source, $date);
 
+        $snapshotDate = $effectiveDate ?? $date;
+        $breakdownColumns = $this->stockReportQuery->getBreakdownColumns($companyId, $source, $snapshotDate);
+
         $pager = $this->stockReportQuery->getPage(
             companyId: $companyId,
             page: max(1, $request->query->getInt('page', 1)),
             perPage: InventoryStockReportQuery::PER_PAGE,
             source: $source,
-            snapshotDate: $effectiveDate ?? $date,
+            snapshotDate: $snapshotDate,
+            breakdownColumns: $breakdownColumns,
         );
 
         return $this->render('inventory/stocks/index.html.twig', [
             'pager' => $pager,
+            'breakdownColumns' => $breakdownColumns,
             'source' => $source,
             'sources' => self::SOURCES,
             'date' => $date,

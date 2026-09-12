@@ -2176,13 +2176,24 @@ buildQueryBuilder(
 - `findEffectiveSnapshotDate(companyId, source, date): ?\DateTimeImmutable` —
   `MAX(snapshot_date)` при `snapshot_date <= :date`, то есть семантика «остатки **на** дату»:
   в день без синхронизации берётся ближайший предыдущий снимок. `null` — снимков на эту дату и раньше нет;
-- `getPage(companyId, page, perPage, source, snapshotDate)` — выборка одного дня
+- `getPage(companyId, page, perPage, source, snapshotDate, breakdownColumns = [])` — выборка одного дня
   (`snapshot_date = :snapshotDate`); на день по источнику существует ровно один срез
   за счёт уникального ключа `uniq_inventory_stock_snapshot_day_item` и `upsertDaySnapshot()`;
-- pagination через Pagerfanta;
-- `available_for_sale = quantity - reserved_quantity`;
-- склад читается через company-scoped join с `inventory_locations`;
-- `SELECT *` не используется.
+- строка результата — **один `source_sku`** (`GROUP BY s.source_sku`): записи снимка по всем
+  складам, типам и статусам суммируются. `quantity`, `reserved_quantity` и
+  `available_for_sale = SUM(quantity - reserved_quantity)` — агрегаты, `snapshot_at`,
+  `source_offer_id`, `mapping_status` — `MAX()` внутри группы;
+- pagination через Pagerfanta; count-модификатор считает
+  `COUNT(DISTINCT COALESCE(s.source_sku, ''))`, то есть страницы считаются по SKU,
+  а не по записям снимка;
+- `getBreakdownColumns(companyId, source, snapshotDate): array<string, array{value, label}>` —
+  колонки разбивки «Доступно расчётно» по типам склада, ключ = алиас колонки в строке
+  (`bd_<value>`). Набор строится по данным дня: у Ozon разбивка по `fulfillment_type`
+  (`fbo`, `fbs`, `unknown` → «Без типа»), у Wildberries `fulfillment_type` всегда один,
+  поэтому разбивка идёт по `StockStatus` в порядке объявления enum. Результат передаётся
+  в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
+- `SELECT *` не используется; join с `inventory_locations` не нужен — склад в отчёте
+  не выводится.
 
 **Потребители:**
 - `MarketplaceSalesController` (`GET /marketplace/sales`, route `marketplace_sales_index`) —
@@ -2394,6 +2405,8 @@ enum StockStatus: string
     case OnAcceptance = 'on_acceptance';
     case Defect = 'defect';
     case Blocked = 'blocked';
+
+    public function label(): string; // «На складе», «В пути к клиенту», «В пути от клиента», …
 }
 ```
 
