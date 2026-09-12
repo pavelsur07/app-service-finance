@@ -82,21 +82,15 @@
             </table>
         </div>
 
-        <div class="card-footer d-flex align-items-center">
-            <p class="m-0 text-muted">
-                Показано <strong>{{ pager.currentPageOffsetStart }}–{{ pager.currentPageOffsetEnd }}</strong>
-                из <strong>{{ pager.nbResults }}</strong>
-            </p>
-            {% if pager.nbPages > 1 %}
-                <div class="ms-auto">
-                    {% include 'partials/_pagerfanta.html.twig' with {
-                        pager: pager,
-                        route: 'inventory_stocks_index',
-                        params: {source: source.value, date: date|date('Y-m-d')}
-                    } %}
-                </div>
-            {% endif %}
-        </div>
+        {% if pager.nbResults > 0 %}
+            <div class="card-footer d-flex align-items-center">
+                {{ include('partials/_pagerfanta.html.twig', {pager: pager}) }}
+                <p class="m-0 ms-auto text-muted">
+                    Показано <strong>{{ pager.currentPageOffsetStart }}–{{ pager.currentPageOffsetEnd }}</strong>
+                    из <strong>{{ pager.nbResults }}</strong>
+                </p>
+            </div>
+        {% endif %}
     </div>
 
     </div>

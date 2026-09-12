@@ -9,6 +9,7 @@ use App\Company\Entity\User;
 use App\Inventory\Entity\Location;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
+use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -65,13 +66,15 @@ final class StockReportControllerTest extends WebTestCaseBase
     {
         $client = $this->seedTwoOzonDays('stocks-empty@example.test', '11111111-1111-1111-1111-111111112003', '03');
 
-        $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(30)->format('Y-m-d'));
+        $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(30)->format('Y-m-d'));
 
         self::assertResponseIsSuccessful();
         $html = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('Нет остатков на выбранную дату', $html);
         self::assertStringNotContainsString('SKU-OLD', $html);
         self::assertStringNotContainsString('SKU-LATEST', $html);
+        // Пустой отчёт не показывает футер со счётчиком «Показано 0–0 из 0».
+        self::assertCount(0, $crawler->filter('.card-footer'));
     }
 
     #[DataProvider('brokenQueryProvider')]
@@ -339,6 +342,52 @@ final class StockReportControllerTest extends WebTestCaseBase
             'Показано 1–2 из 2',
             preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
         );
+        // Одна страница: счётчик есть, навигации нет.
+        self::assertCount(0, $crawler->filter('.card-footer nav'));
+    }
+
+    public function testPaginationKeepsFiltersInPageLinks(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-page-links@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112014')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        // На страницу выводится InventoryStockReportQuery::PER_PAGE SKU, поэтому нужен хотя бы один сверх.
+        $snapshots = [];
+        for ($index = 0; $index < InventoryStockReportQuery::PER_PAGE + 1; ++$index) {
+            $snapshots[] = $this->snapshot(
+                $company,
+                $location,
+                sprintf('%03d', 200 + $index),
+                MarketplaceType::WILDBERRIES,
+                $this->daysAgo(1),
+                sprintf('SKU-PAGE-%02d', $index),
+            );
+        }
+
+        $this->persist($owner, $company, $location, ...$snapshots);
+        $this->login($client, $owner, $company);
+
+        $date = $this->daysAgo(1)->format('Y-m-d');
+        $crawler = $client->request('GET', '/inventory/stocks?source=wildberries&date='.$date);
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(InventoryStockReportQuery::PER_PAGE, $crawler->filter('table tbody tr'));
+        self::assertSame(
+            sprintf('Показано 1–%d из %d', InventoryStockReportQuery::PER_PAGE, InventoryStockReportQuery::PER_PAGE + 1),
+            preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
+        );
+
+        // Ссылки страниц берут фильтры из текущего query string, а не из белого списка шаблона.
+        $links = $crawler->filter('.card-footer nav a')->each(static fn (Crawler $link): string => (string) $link->attr('href'));
+        $secondPage = array_values(array_filter($links, static fn (string $href): bool => str_contains($href, 'page=2')));
+
+        self::assertNotEmpty($secondPage);
+        self::assertStringContainsString('source=wildberries', $secondPage[0]);
+        self::assertStringContainsString('date='.$date, $secondPage[0]);
     }
 
     private function seedTwoOzonDays(string $email, string $companyId, string $suffix): KernelBrowser
