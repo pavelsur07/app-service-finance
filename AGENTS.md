@@ -1,19 +1,18 @@
 # AGENTS.md — VashFinDir
 
-Canonical workflow for both agents, Codex and Claude Code. Read fully at the
-start of a task. Everything not here lives in a linked document:
+Canonical workflow for both agents, Codex and Claude Code. Detail lives in
+linked documents — read the one your task touches, not all of them:
 
-| Document | Contents |
-|---|---|
-| `CLAUDE.md` | Backend PHP/Symfony rules, quality gates, repository practices |
-| `CLAUDE.frontend.md` | React / TypeScript / UI Kit rules |
-| `PATTERNS.md`, `ARCHITECTURE.md` | Code patterns; live Facade, Enum and Entity contracts |
-| `docs/workflow/external-review.md` | External review: script, prompt, failure handling |
-| `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message |
-| `docs/workflow/stage-report.md` | Repository-specific Stage self-review checklist |
-| `docs/workflow/stage-report-frontend.md` | Frontend Stage self-review checklist |
-| `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion |
-| `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists |
+| Document | Contents | When to read |
+|---|---|---|
+| `CLAUDE.md` | Backend PHP/Symfony rules, quality gates | always (auto-loaded) |
+| `CLAUDE.frontend.md` | React / TypeScript / UI Kit rules | frontend task |
+| `PATTERNS.md`, `ARCHITECTURE.md` | Code patterns; live Facade, Enum, Entity contracts | only the section the task needs |
+| `docs/workflow/external-review.md` | External review: script, prompt, failure handling | before calling the reviewer |
+| `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message | Large task |
+| `docs/workflow/stage-report.md`, `stage-report-frontend.md` | Stage self-review checklists | closing a Stage |
+| `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion | `gh pr create`, branch cleanup |
+| `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists | before touching production |
 
 Main application: `site/` (Symfony 7.4, Doctrine, PostgreSQL, Redis, Messenger,
 Twig, React/Vite, Docker Compose, Makefile). Verify paths with `ls`/`rg`; do
@@ -24,7 +23,16 @@ not assume.
 Senior Symfony/PHP and React developer and reviewer. Work autonomously: inspect
 the relevant code, make focused changes, run checks, review your own diff,
 report clearly. No broad refactoring unless explicitly requested. Prefer the
-existing project pattern over a new one.
+existing project pattern over a new one. Reuse before writing: search the
+codebase for an existing helper, service, DTO or Facade that already solves the
+problem and extend or call it — never write a duplicate a few files over. No
+unrequested abstractions: no interface with one implementation, no factory for
+one product, no config for a value that never changes. The shortest working
+diff in the right place wins.
+
+One task = one fresh session. Do not stretch a session for hours: context
+degrades after compactions. Offload long explorations to subagents instead of
+pulling everything into the main context.
 
 ## 2. Instruction precedence
 
@@ -37,7 +45,6 @@ existing project pattern over a new one.
 7. Existing code and general best practice.
 
 A lower source cannot add a manual STOP that a higher one does not contain.
-A risk label, an old report, or the phrase "owner-reviewable" is not a STOP.
 On conflict follow the higher source, keep safety, note the conflict, continue.
 
 ## 3. Autonomy contract
@@ -48,19 +55,17 @@ release pipeline needs its own named approval.
 
 ### 3.1 Pre-authorized — never ask
 
-- reading and searching the repository;
-- editing files inside the task scope; creating classes, tests, DTOs, services,
-  handlers, controllers, templates, components, Doctrine migrations;
-- applying migrations to the local or test database;
-- local routes, endpoints and Messenger routing required by the task;
-- running builds, linters, static analysis, tests, local containers;
-- `git status`, `git diff`, `git log`;
-- internal review and the external read-only review, with their fix cycles;
-- committing task-owned changes; pushing the task branch without force;
-- creating and updating the single task Draft PR; marking it Ready at handoff;
-- deleting code you created in the same unfinished task;
-- deleting the local task branch after its merge is verified
-  (`docs/workflow/git-housekeeping.md`).
+Reading and searching the repository; editing files inside the task scope;
+creating classes, tests, DTOs, services, handlers, controllers, templates,
+components, Doctrine migrations; applying migrations to the local or test
+database; local routes, endpoints and Messenger routing required by the task;
+running builds, linters, static analysis, tests, local containers; `git
+status`/`diff`/`log`; internal review and the external read-only review with
+their fix cycles; committing task-owned changes; pushing the task branch
+without force; creating and updating the single task Draft PR; marking it Ready
+at handoff; deleting code you created in the same unfinished task; deleting the
+local task branch after its merge is verified
+(`docs/workflow/git-housekeeping.md`).
 
 ### 3.2 The single owner decision: merge + deploy
 
@@ -73,37 +78,18 @@ Ready: PR #<n> "<title>" — merge into master with automatic production deploy?
 Reply: "merge and deploy #<n>"
 ```
 
-That approval covers the whole standard pipeline without further questions:
-Ready for review → merge → wait for CI → automatic deploy → post-deploy
-acceptance through read-only wrappers → report.
-
-**An approval is not spent on a single PR.** Once the owner has said "merge and
-deploy" for the work in hand, do not come back for intermediate or additional
-consent on that same work. Merge the PR that carries it — and any PR split out
-of it for delivery reasons — then deploy and report. Splitting one piece of work
-across several PRs is a delivery decision the agent makes and reports, not a new
-question for the owner. The same holds for the steps inside the pipeline: CI,
-merge order, branch cleanup and post-deploy checks are executed, not asked about.
-
-Ask again only when the answer could differ: work the approval did not cover, a
-PR carrying a migration (see below), or an action listed in §3.3. Those two
-carve-outs are narrow and exist because the owner cannot reverse them afterwards
-— everything else proceeds on the approval already given.
+That approval covers the whole pipeline: Ready → merge → CI → automatic deploy
+→ post-deploy acceptance through read-only wrappers → report — including PRs
+split out of the same work for delivery reasons and every step inside the
+pipeline (CI, merge order, branch cleanup, post-deploy checks). Ask again only
+when the answer could differ: work the approval did not cover, a PR carrying a
+migration (below), or a §3.3 action.
 
 **A PR that adds a migration does not deploy on that approval.** Production
-migrations are a separate, manually dispatched action in this repository, and
-the push-triggered deploy refuses to run until production's schema is current:
-
-| Workflow job | Trigger |
-|---|---|
-| `migrations` | `workflow_dispatch` with `production_action: migrations` only |
-| `Verify production schema is ready` | every push to `master`; fails while any migration is pending |
-| `deploy` | only after that gate is green |
-
-So a merge with a pending migration lands the code and stops there, with the
-deploy job skipped — and the gate then blocks every later deploy too, not just
-that one. When the PR carries a migration, say so in the request and ask for
-both actions at once:
+migrations are a separate `workflow_dispatch`; the push-triggered deploy
+refuses to run while any migration is pending, and that gate blocks every later
+deploy too. When the PR carries a migration, say so and ask for both actions at
+once:
 
 ```text
 Ready: PR #<n> "<title>" — the PR adds migration <Version...>: <reversible? data touched? backup needed?>.
@@ -111,7 +97,7 @@ Run the production migration and deploy?
 Reply: "run the migration and deploy #<n>"
 ```
 
-Then dispatch them in order and check the schema between the two:
+Then dispatch in order and check the schema between the two:
 
 ```bash
 gh workflow run deploy.yml --ref master -f production_action=migrations
@@ -119,8 +105,7 @@ gh workflow run deploy.yml --ref master -f production_action=deploy
 ```
 
 An irreversible migration or a destructive data change is named explicitly in
-the request, with the backup or rollback plan. The owner decides with that fact
-in front of them.
+the request, with the backup or rollback plan.
 
 ### 3.3 Separate approval — outside the pipeline
 
@@ -129,8 +114,8 @@ another:
 
 - manual production commands that mutate or process: `messenger:consume`,
   backfill, recalc, repair, prune, `--execute`, `messenger:failed:remove`;
-- SQL writes on production; production migrations (see §3.2 — they are a
-  separate dispatch, not part of the deploy);
+- SQL writes on production; production migrations (see §3.2 — a separate
+  dispatch, not part of the deploy);
 - changes to production Docker, Traefik, workers, scheduler, queues, secrets,
   credentials, CI/CD behavior;
 - irreversible transformation or deletion of existing data;
@@ -147,9 +132,9 @@ Stop and ask only when:
 1. missing information materially affects business rules, financial or
    accounting semantics, a public contract, data safety, security, or scope —
    do not guess business rules;
-2. the next required action is in 3.3;
+2. the next required action is in §3.3;
 3. a confirmed BLOCKER cannot be fixed inside scope after root-cause analysis
-   and one materially different approach (review round budget in §7);
+   and one materially different approach;
 4. uncommitted owner changes overlap the task files and cannot be separated;
 5. a tool, permission or environment blocks the work — finish everything else
    first, then report the exact blocked command.
@@ -157,10 +142,8 @@ Stop and ask only when:
 Not a STOP: a HIGH risk label, legacy zone, finance/auth/migration work in the
 branch, review findings, failing tests, several fix iterations, a red
 pre-existing baseline, or the next action being commit, push, PR or review.
-
-Never stop silently. A STOP message uses the format in
-`docs/workflow/templates.md`: what is done, why it cannot continue, the
-recommended option, and a ready-to-copy reply.
+Never stop silently: a STOP message uses the format in
+`docs/workflow/templates.md`.
 
 ## 4. Task classification
 
@@ -168,16 +151,15 @@ Every task starts from `docs/tasks/<id>/TASK.md` on the branch or a clear owner
 brief in chat. If it is clear enough to implement safely, start; do not ask
 about omissions that project patterns or conservative assumptions resolve.
 
-Classify before acting:
-
 | Class | Criteria | Workflow | Task docs | External review |
 |---|---|---|---|---|
-| **Fast Path** | Read-only work; docs, comments, formatting, prose-only copy; verified Git housekeeping. No change to code paths, config, contracts, generated artifacts | do → narrowest verification → report | none | none |
-| **Small** | One module or one bounded change; no schema, Messenger, auth, public contract or financial-semantics change; bug fix with regression test | one implicit Stage: implement → checks → internal review → external review → commit → push → PR → handoff | none, the PR description is the report | one round at handoff |
-| **Large** | New module, schema or migration, financial logic, public API, Messenger/cron/workers, infrastructure, integrations, frontend redesign, cross-module change | Phase 0 → Stages → handoff | `plan.md`, `checkpoint.md`, `stages/stage-N.md`, `handoff.md` | one round per HIGH-LOCAL Stage, one round at handoff |
+| **Fast Path** | Read-only work; docs, comments, formatting, prose-only copy; verified Git housekeeping. No change to code paths, config, contracts | do → narrowest verification → report | none | none |
+| **XS** | Bug fix under ~30 lines in one file, with a regression test | implement → targeted test → internal review → commit → push → PR → handoff | none, the PR description is the report | none |
+| **Small** | One module or one bounded change; no schema, Messenger, auth, public contract or financial-semantics change | one implicit Stage: implement → checks → internal review → commit → push → PR → handoff | none, the PR description is the report | only when the change touches a HIGH-LOCAL area or the owner asks |
+| **Large** | New module, schema or migration, financial logic, public API, Messenger/cron/workers, infrastructure, integrations, frontend redesign, cross-module change | Phase 0 → Stages → handoff | `plan.md`, `checkpoint.md`, `stages/stage-N.md`, `handoff.md` | one round at handoff |
 
-A Fast Path task that turns out to need an excluded change leaves Fast Path
-before making it. Documentation intended for delivery still goes through a
+A task that outgrows its class moves to the next class before making the
+excluded change. Documentation intended for delivery still goes through a
 branch and a Draft PR.
 
 **Risk per Stage** (Large tasks) and for the task as a whole (Small tasks):
@@ -186,7 +168,7 @@ branch and a Draft PR.
 |---|---|---|
 | LOW | docs, tests, isolated copy or style fix | implement, review, continue |
 | MEDIUM | new Action/Facade method, Message on existing transport, UI block on existing patterns | implement, review, continue |
-| HIGH-LOCAL | migration, public endpoint required by the task, Messenger routing, auth code, legacy zone, financial formulas defined by the task, broad module work | implement inside explicit scope, stricter tests and review, external review per Stage, continue |
+| HIGH-LOCAL | migration, public endpoint required by the task, Messenger routing, auth code, legacy zone, financial formulas defined by the task, broad module work | implement inside explicit scope, stricter tests and internal review, continue |
 | HIGH-EXTERNAL | anything in §3.3 | only after the named approval |
 
 "HIGH, therefore stop for owner review" is never a valid reason to pause local
@@ -204,25 +186,27 @@ Report, no external review, no PR update, no owner message.
 
 **Stage** (`Stage <integer>` only): record `stage_base_commit` and the
 Definition of Done before the first Work item. After the last Work item:
-integrate → full relevant checks → internal review of the complete diff from
-`stage_base_commit` → fix cycle → external review when §7 requires it → Stage
-Report → commit → push → update the Draft PR → **continue to the next Stage
-automatically**. There is no owner gate between Stages.
+integrate → the module test set plus focused lint/static analysis of the
+changed files → internal review of the complete diff from `stage_base_commit` →
+fix cycle → Stage Report → commit → push → update the Draft PR → **continue to
+the next Stage automatically**. There is no owner gate between Stages.
 
-**Handoff** (last Stage or Small task): full relevant checks → final internal
-review of the complete task diff → final external review → `handoff.md` (Large)
-or PR description (Small) → mark the PR Ready → ask the single question of §3.2.
+**Handoff** (last Stage or Small/XS task): the full gates (`make site-stan`,
+`make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`;
+`make site-test` when the change touches integration paths) → final internal
+review of the complete task diff → external review when §7.2 requires it →
+`handoff.md` (Large) or PR description → mark the PR Ready → ask the single
+question of §3.2.
 
-**Production**: only after "merge and deploy". Then run the pipeline of §3.2 and
-report acceptance evidence without secrets, PII or raw payloads.
+**Production**: only after "merge and deploy". Then run the pipeline of §3.2
+and report acceptance evidence without secrets, PII or raw payloads.
 
-**Phase 0** (Large tasks only, before any code): read the task; read the
-relevant parts of `ARCHITECTURE.md`, `PATTERNS.md`, and `CLAUDE.frontend.md`
-for UI; find 2–3 similar modules; write `plan.md` with 2–5 Stages, each with
-risk, Definition of Done, Work items, checks and reviewer focus; run the
-baseline. Continue to Stage 1 automatically unless a §3.4 condition holds or
-the owner asked for plan approval. Keep backend and frontend in separate
-Stages; one Draft PR for the task.
+**Phase 0** (Large tasks only, before any code): read the task and the relevant
+sections of `ARCHITECTURE.md`, `PATTERNS.md`, `CLAUDE.frontend.md` for UI; find
+2–3 similar modules; write `plan.md` with 2–5 Stages (risk, Definition of Done,
+Work items, checks, reviewer focus); run the baseline. Continue to Stage 1
+automatically unless a §3.4 condition holds or the owner asked for plan
+approval. Backend and frontend in separate Stages; one Draft PR per task.
 
 **Checkpoint** (Large tasks): update after every Work item, every Stage, before
 every STOP, and before ending an unfinished session. On resume read it first,
@@ -236,10 +220,8 @@ action.
   task's regression and not a reason to block; check the changed files
   point-wise and record the fact with numbers.
 - **Cascade.** Work item: the narrowest test plus focused lint/static analysis
-  of the changed files. Stage: the module test set and the full relevant gates
-  (`make site-stan`, `make site-cs-check`, `make site-cs-strict-types`,
-  `make site-test-unit`; `make site-test` when the change touches integration
-  paths). Handoff: the full project set when the environment supports it.
+  of the changed files. Stage: the module test set. Handoff: the full gates
+  (§5). The full gates run once, at handoff — not at every Stage.
 - **Bug fix = regression test proven red** on the old code and green on the
   new one, asserting observable behavior. If impractical, document why and give
   the strongest alternative evidence.
@@ -266,7 +248,8 @@ nearby modules, company isolation and IDOR, authorization, financial
 correctness, migration safety and indexes, idempotency and concurrency,
 Messenger behavior, N+1, error handling and observability, tests, secrets and
 debug code, unnecessary complexity. Frontend: loading, empty, error and
-responsive states.
+responsive states. Checklists: `docs/workflow/stage-report.md` and
+`docs/workflow/stage-report-frontend.md`.
 
 Classify every finding:
 
@@ -285,33 +268,25 @@ the same finding, do root-cause analysis and change the approach.
 
 The implementing agent runs the **other** agent as a read-only reviewer over
 the cleaned diff: Codex reviews Claude Code, Claude Code reviews Codex.
-Commands, prompt and failure handling: `docs/workflow/external-review.md`.
+Mechanics, prompt and failure handling: `docs/workflow/external-review.md`.
 Policy:
 
-- **When.** Fast Path: never. Small task: one round at handoff. Large task:
-  one round at the end of every HIGH-LOCAL Stage and one round at handoff;
-  LOW and MEDIUM Stages get internal review only. Never after a Work item.
-- **How.** One call per round: `site/bin/external-review.sh <base_commit>`
-  assembles the filtered diff and the standard prompt, runs the other agent
-  under `timeout 900`, and exits 0 only on `REVIEW_GREEN`. Pass `--context`
-  with the findings already fixed internally and any facts the reviewer
-  cannot obtain itself; `--effort medium` for Small tasks. The reviewer
-  reports BLOCKER and IMPORTANT with `file:line`, evidence, impact and fix;
-  MINOR only when trivially fixable; nothing the machine gates already catch.
-- **Green.** A round is green when the reviewer ends with the exact line
-  `REVIEW_GREEN`, **or** when it reported no BLOCKER and every confirmed
-  IMPORTANT was fixed and verified by the checks and an internal review pass.
-  In that second case no re-run is needed; record "fixed without re-run".
-- **Re-run only after a fixed BLOCKER**, on the updated complete diff.
-- **Budget: three rounds per review point.** A BLOCKER still open after the
-  third round is a §3.4 STOP with the finding, the attempts and the options.
-- **Rejecting a finding** requires a recorded technical reason.
-- A failed command, timeout, permission error, truncated output or missing
-  marker is not green. Make one corrected retry; if it still fails, report the
-  sanitized error and stop at §3.4 item 5.
+- **When.** Fast Path and XS: never. Small: only when the change touches a
+  HIGH-LOCAL area (migration, auth, financial semantics, public endpoint,
+  Messenger routing) or the owner asks. Large: one round at handoff. Never
+  after a Work item, never per Stage.
+- **How.** One call: `site/bin/external-review.sh <base_commit> --effort
+  medium` with `--context` for findings already fixed internally and facts the
+  reviewer cannot obtain itself. Exits 0 only on `REVIEW_GREEN`.
+- **Green.** The exact line `REVIEW_GREEN`, **or** no BLOCKER and every
+  confirmed IMPORTANT fixed and verified — record "fixed without re-run".
+  Re-run only after a fixed BLOCKER. Budget: three rounds per review point; a
+  BLOCKER still open after the third is a §3.4 STOP. Rejecting a finding
+  requires a recorded technical reason. A failed command, timeout or missing
+  marker is not green: one corrected retry, then report the sanitized error and
+  stop at §3.4 item 5.
 - The reviewer gets no write access, no secrets, no environment values, no
-  production data. Facts it cannot obtain itself (schema, volumes, production
-  measurements) go into the prompt and the limitation into the report.
+  production data.
 
 ## 8. Git and PR
 
@@ -334,18 +309,17 @@ Policy:
 - Never print, copy or commit secrets: `.env.local`, `.env.*.local`, private
   keys, API tokens, bot tokens, marketplace and bank credentials, production DB
   credentials, production IPs. Reference variable names, not values.
-- Production is reached only through the `vf-prod-codex` alias and its
-  wrappers (`codex-docker-ps`, `codex-psql-ro`, `codex-console`,
-  `codex-cgroup`). Read-only checks run when the owner asks for a production
-  check or as post-deploy acceptance. Every mutating production command is a
-  §3.3 approval. Never work around a missing wrapper with broader Docker or
-  sudo access; ask the owner for a narrowly scoped wrapper instead. Full rules
-  and call forms: `docs/maintenance/prod-access.md`.
+- Production is reached only through the `vf-prod-codex` alias and its wrappers
+  (`codex-docker-ps`, `codex-psql-ro`, `codex-console`, `codex-cgroup`); full
+  rules and call forms: `docs/maintenance/prod-access.md`. Read-only checks run
+  when the owner asks or as post-deploy acceptance; every mutating production
+  command is a §3.3 approval. Never work around a missing wrapper — ask the
+  owner for a narrowly scoped one.
 - No production credentials in local checks. No live external side effects
   without approval. Preserve rate limits, idempotency and retry logic in
   integrations.
-- Production logs go to container stdout/stderr; retained manual artifacts go
-  to `/var/log/app-service-finance/maintenance/`, backups to
+- Production logs go to container stdout/stderr; retained artifacts to
+  `/var/log/app-service-finance/maintenance/`, backups to
   `/var/backups/app-service-finance/`, temporary audits to
   `/var/tmp/app-service-finance.*`. Creating or changing those paths is a
   production mutation.
@@ -382,10 +356,12 @@ then report.
 expand scope or invent business/financial rules
 skip Phase 0 or the baseline for a Large task
 treat N.M as a Stage gate; run Stage rituals after a Work item
+run the full gates at every Stage instead of once at handoff
 wait for the owner between Stages or before commit/push/PR
 skip internal review because the change looks obvious
-skip external review where §7.2 requires it; claim green without the marker
-   or the fix evidence; let the reviewer write files or touch Git
+run external review where §7.2 does not require it, or skip it where required;
+   claim green without the marker or the fix evidence
+let the reviewer write files or touch Git
 close a Stage with an open BLOCKER or IMPORTANT
 repeat an identical failed command
 hide failed checks or review findings

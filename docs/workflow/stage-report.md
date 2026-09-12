@@ -39,6 +39,6 @@
 
 **Stage Report:**
 - [ ] Создан Stage Report по шаблону из `docs/workflow/templates.md`, сохранён в `docs/tasks/<id>/stages/stage-<N>.md`
-- [ ] Внешнее ревью проведено там, где его требует `AGENTS.md` §7.2 (HIGH-LOCAL Stage, handoff); результат — `REVIEW_GREEN` или «fixed without re-run» с доказательством
+- [ ] Внешнее ревью проведено там, где его требует `AGENTS.md` §7.2 (только handoff); результат — `REVIEW_GREEN` или «fixed without re-run» с доказательством
 - [ ] Коммит сделан с Conventional Commits префиксом, сообщение отражает цель Stage
 
