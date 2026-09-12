@@ -12,4 +12,16 @@ enum StockStatus: string
     case OnAcceptance = 'on_acceptance';
     case Defect = 'defect';
     case Blocked = 'blocked';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Available => 'На складе',
+            self::InTransitToCustomer => 'В пути к клиенту',
+            self::InTransitFromCustomer => 'В пути от клиента',
+            self::OnAcceptance => 'На приёмке',
+            self::Defect => 'Брак',
+            self::Blocked => 'Заблокировано',
+        };
+    }
 }

@@ -220,17 +220,36 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         self::assertSame(4.0, $stockByListing[$listing42->getId()]);
         self::assertSame(6.0, $stockByListing[$listing44->getId()]);
 
-        $reportPager = self::getContainer()->get(InventoryStockReportQuery::class)->getPage(
+        $reportQuery = self::getContainer()->get(InventoryStockReportQuery::class);
+        $breakdownColumns = $reportQuery->getBreakdownColumns(
+            (string) $company->getId(),
+            MarketplaceType::WILDBERRIES,
+            $session->getStartedAt(),
+        );
+        $reportPager = $reportQuery->getPage(
             companyId: $company->getId(),
             page: 1,
             perPage: 30,
             source: MarketplaceType::WILDBERRIES,
             snapshotDate: $session->getStartedAt(),
+            breakdownColumns: $breakdownColumns,
         );
         $reportRows = iterator_to_array($reportPager->getCurrentPageResults());
-        self::assertCount(6, $reportRows);
-        self::assertSame(['Коледино'], array_values(array_unique(array_column($reportRows, 'location_name'))));
-        self::assertContains(StockStatus::Available->value, array_column($reportRows, 'status'));
+        // Шесть записей снимка схлопываются в строку на SKU, разбивка у Wildberries идёт по статусам.
+        self::assertCount(2, $reportRows);
+        self::assertSame(2, $reportPager->getNbResults());
+        self::assertSame(
+            ['bd_available' => 'На складе', 'bd_in_transit_to_customer' => 'В пути к клиенту', 'bd_in_transit_from_customer' => 'В пути от клиента'],
+            array_map(static fn (array $column): string => $column['label'], $breakdownColumns),
+        );
+
+        $reportBySku = array_column($reportRows, null, 'source_sku');
+        self::assertSame('7.000', $reportBySku['1']['available_for_sale']);
+        self::assertSame('4.000', $reportBySku['1']['bd_available']);
+        self::assertSame('2.000', $reportBySku['1']['bd_in_transit_to_customer']);
+        self::assertSame('1.000', $reportBySku['1']['bd_in_transit_from_customer']);
+        self::assertSame('11.000', $reportBySku['2']['available_for_sale']);
+        self::assertSame('6.000', $reportBySku['2']['bd_available']);
 
         $locations = $this->em->getRepository(Location::class)->findBy([
             'companyId' => $company->getId(),
