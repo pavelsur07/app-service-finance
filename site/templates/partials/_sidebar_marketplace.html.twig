@@ -15,7 +15,7 @@
     {% set marketplace_menu_show = marketplace_menu_active ? 'show' : '' %}
     <div class="dropdown-menu {{ marketplace_menu_show }}">
         <div class="dropdown-menu-column">
-            {% set mp_charges_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_') and not (current_route starts with 'marketplace_inventory_') and current_route != 'marketplace_reconciliation' and current_route != 'marketplace_listing_tags_manage' and current_route != 'marketplace_listings_index' %}
+            {% set mp_charges_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_') and not (current_route starts with 'marketplace_inventory_') and current_route != 'marketplace_listing_tags_manage' and current_route != 'marketplace_listings_index' %}
             <a class="dropdown-item {{ mp_charges_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
                 <span>Начисления</span>
             </a>
@@ -30,11 +30,6 @@
             {% set mp_stocks_active = current_route starts with 'inventory_' or current_route starts with 'marketplace_inventory_' or current_route == 'marketplace_listings_index' or current_route == 'marketplace_listing_tags_manage' %}
             <a class="dropdown-item {{ mp_stocks_active ? 'active' : '' }}" href="{{ path('marketplace_listings_index') }}">
                 <span>Товары и остатки</span>
-            </a>
-
-            {% set mp_reconciliation_active = current_route == 'marketplace_reconciliation' %}
-            <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_reconciliation') }}">
-                <span>Сверка</span>
             </a>
             {% if is_granted('ROLE_SUPER_ADMIN') %}
                 {% set mp_ads_debug_active = current_route == 'marketplace_ads_admin_debug' %}

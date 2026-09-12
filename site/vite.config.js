@@ -31,7 +31,6 @@ export default defineConfig({
                 dashboard: "./assets/react/_legacy/dashboard_started.tsx", // Точка ./ обязательна!
                 finance_balance_dynamics: "./assets/react/_legacy/finance-balance-dynamics-page.tsx",
                 marketplace_analytics_page: "./assets/react/_legacy/marketplace-analytics-page.tsx",
-                reconciliation_page: "./assets/react/_legacy/reconciliation-page.tsx",
                 unit_extended_page: "./assets/react/_legacy/unit-extended-page.tsx",
                 ad_efficiency_page: "./assets/react/_legacy/ad-efficiency-page.tsx",
                 ingestion_verification_coverage_page: "./assets/react/_legacy/ingestion-verification-coverage-page.tsx",

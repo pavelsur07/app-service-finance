@@ -5023,12 +5023,6 @@ parameters:
 			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\RunUserReconciliationAction\:\:enrichWithSalesAndReturns\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Application/RunUserReconciliationAction.php
-
-		-
 			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -5375,30 +5369,6 @@ parameters:
 			identifier: method.nonObject
 			count: 2
 			path: src/Marketplace/Controller/Api/MonthPreliminaryRebuildController.php
-
-		-
-			message: '#^Cannot call method getDecodedResult\(\) on App\\Marketplace\\Entity\\ReconciliationSession\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Marketplace/Controller/Api/ReconciliationUploadController.php
-
-		-
-			message: '#^Cannot call method getErrorMessage\(\) on App\\Marketplace\\Entity\\ReconciliationSession\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Marketplace/Controller/Api/ReconciliationUploadController.php
-
-		-
-			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\ReconciliationSession\|null\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: src/Marketplace/Controller/Api/ReconciliationUploadController.php
-
-		-
-			message: '#^Cannot call method getStatus\(\) on App\\Marketplace\\Entity\\ReconciliationSession\|null\.$#'
-			identifier: method.nonObject
-			count: 4
-			path: src/Marketplace/Controller/Api/ReconciliationUploadController.php
 
 		-
 			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
@@ -7745,18 +7715,6 @@ parameters:
 			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Class App\\Marketplace\\Repository\\ReconciliationSessionRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationSessionRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\ReconciliationSessionRepository\:\:findByIdAndCompany\(\) should return App\\Marketplace\\Entity\\ReconciliationSession\|null but returns object\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationSessionRepository.php
 
 		-
 			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
