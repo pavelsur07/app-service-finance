@@ -267,11 +267,6 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * SQL-контракт: getCostAggregates обязан спец-кейсить category_code
-     * для ozon_compensation / ozon_decompensation. Это страховка от случайного
-     * отката до pre-fix формулы на чисто-operation_type CASE.
-     */
-    /**
      * Направление берётся из operation_type у всех строк без исключений.
      *
      * Раньше здесь стоял обход по коду категории — заплатка под исторические
