@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Domain;
 
 use App\Marketplace\Domain\OzonCostCategory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -130,6 +131,109 @@ final class OzonCostCategoryTest extends TestCase
         }
 
         self::assertGreaterThan(0, $checked, 'Справочник by-day не размечен ни одной услугой.');
+    }
+
+    /**
+     * Ни одно размеченное имя не выдумано: каждое есть в справочнике Ozon
+     * /v1/finance/accrual/types, снятом с боевого кабинета.
+     *
+     * Опечатка в имени не ломает ничего видимого — услуга просто не находится
+     * и молча уходит в «неразобранные», минуя ОПиУ. Один такой случай уже был:
+     * DefectFineShipmentDelay вместо DefectFineShipmentDelayRate.
+     */
+    public function testEveryAccrualTypeNameExistsInOzonDictionary(): void
+    {
+        $dictionary = self::ozonAccrualDictionary();
+
+        foreach (OzonCostCategory::all() as $c) {
+            foreach ($c->accrualTypeNames as $name) {
+                self::assertArrayHasKey(
+                    $name,
+                    $dictionary,
+                    sprintf('accrual type name "%s" (категория "%s") отсутствует в справочнике Ozon', $name, $c->code),
+                );
+            }
+        }
+    }
+
+    /**
+     * Услуги, размеченные по дословному совпадению описания Ozon с именем
+     * нашей категории, остаются закреплёнными именно за ней.
+     *
+     * Разметка этих шести сделана механически: description из справочника
+     * совпадает с name категории с точностью до нашего суффикса « Ozon».
+     * Тест перепроверяет это по самому справочнику, а не по копии решения,
+     * поэтому переименование категории или переезд услуги в другую сразу
+     * станут видны.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function exactDictionaryMatches(): iterable
+    {
+        yield 'BackwardShipment' => ['BackwardShipment', 'ozon_logistic_return_trans'];
+        yield 'FlexiblePayments' => ['FlexiblePayments', 'ozon_flexible_payment'];
+        yield 'Fulfillment' => ['Fulfillment', 'ozon_fulfillment'];
+        yield 'RealizationReportCorrection' => ['RealizationReportCorrection', 'ozon_service_correction'];
+        yield 'ReviewsPin' => ['ReviewsPin', 'ozon_pin_review'];
+        yield 'VolumeWeightCharacteristicsProcessing' => ['VolumeWeightCharacteristicsProcessing', 'ozon_ovh_processing'];
+    }
+
+    #[DataProvider('exactDictionaryMatches')]
+    public function testExactDictionaryMatchKeepsItsCategory(string $typeName, string $expectedCode): void
+    {
+        $dictionary = self::ozonAccrualDictionary();
+
+        self::assertArrayHasKey($typeName, $dictionary, sprintf('услуги "%s" нет в справочнике Ozon', $typeName));
+
+        $category = OzonCostCategory::findByAccrualTypeName($typeName);
+
+        self::assertNotNull($category, sprintf('услуга "%s" не размечена', $typeName));
+        self::assertSame($expectedCode, $category->code);
+
+        $withoutSuffix = preg_replace('/ Ozon$/u', '', $category->name) ?? $category->name;
+
+        self::assertSame(
+            $dictionary[$typeName],
+            $withoutSuffix,
+            sprintf(
+                'разметка "%s" перестала быть дословной: Ozon называет услугу «%s», категория — «%s»',
+                $typeName,
+                $dictionary[$typeName],
+                $category->name,
+            ),
+        );
+    }
+
+    /**
+     * Справочник услуг Ozon, снятый с боевого кабинета: имя услуги → описание.
+     *
+     * @return array<string, string>
+     */
+    private static function ozonAccrualDictionary(): array
+    {
+        $path = __DIR__.'/../../../Fixtures/Marketplace/Ozon/accrual_types.json';
+        $raw = file_get_contents($path);
+
+        self::assertIsString($raw, 'не прочитан справочник услуг Ozon: '.$path);
+
+        $decoded = json_decode($raw, true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+        self::assertArrayHasKey('accrual_types', $decoded);
+        self::assertIsArray($decoded['accrual_types']);
+
+        $dictionary = [];
+        foreach ($decoded['accrual_types'] as $type) {
+            self::assertIsArray($type);
+            self::assertIsString($type['name'] ?? null);
+            self::assertIsString($type['description'] ?? null);
+
+            $dictionary[$type['name']] = $type['description'];
+        }
+
+        self::assertNotSame([], $dictionary, 'справочник услуг Ozon пуст');
+
+        return $dictionary;
     }
 
     /**
