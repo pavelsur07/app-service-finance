@@ -2,7 +2,9 @@
 
 - **Ветка:** `chore/remove-marketplace-reconciliation`
 - **stage_base_commit:** `260765fc`
-- **Состояние:** Stage 1 и Stage 2 закрыты, гейты зелёные. Следующее действие — commit → push → Draft PR → handoff.
+- **Состояние:** Stage 1 и Stage 2 закрыты, гейты зелёные, внешнее ревью пройдено
+  (3 раунда, оба BLOCKER исправлены, раунд 3 без BLOCKER). Закоммичено 4 коммитами.
+  Следующее действие — push → Draft PR → Ready → запрос «run the migration and deploy».
 
 ## Сделано
 

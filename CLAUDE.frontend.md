@@ -146,11 +146,11 @@ Twig отдаёт shell, React монтируется точечно. Контр
 
 ```twig
 <div
-  data-island="reconciliation-kpi"
+  data-island="verification-coverage"
   data-props="{{ { period: period }|json_encode|e('html_attr') }}"
 ></div>
 
-{{ vite_entry_script_tags('reconciliation_page') }}
+{{ vite_entry_script_tags('ingestion_verification_coverage_page') }}
 ```
 
 Правила:
@@ -198,7 +198,7 @@ _legacy        ← карантин, импортируется только и�
 | Zod-схема | camelCase с `.schema` | `plan-selection.schema.ts` |
 | CSS Module | `.module.css` | `KpiSummaryView.module.css` |
 | Vite entry | snake_case, как в существующих | `marketplace_analytics_page` |
-| Имя острова | kebab-case | `reconciliation-kpi` |
+| Имя острова | kebab-case | `verification-coverage` |
 | Папка модуля и фичи | kebab-case | `marketplace-analytics/`, `kpi-summary/` |
 | Константы маршрутов API | SCREAMING_SNAKE | `API_RECONCILIATION_KPI` |
 
