@@ -38,7 +38,8 @@ SELECT stored_file_path FROM marketplace_reconciliation_sessions ORDER BY create
 **Префикс `marketplace/reconciliation/` — общий, удалять его целиком нельзя.**
 В него пишет сохранённый `ReconcileCostsAction` («Закрытие месяца»,
 `site/src/Marketplace/Application/ReconcileCostsAction.php:51-59`), а путь хранит в
-`MarketplaceMonthClose.settings['costsReconciliation']['file_path']`.
+`MarketplaceMonthClose.settings['costs_reconciliation']['file_path']`
+(ключ в JSON — snake_case, см. `MarketplaceMonthClose::setCostsReconciliation()`).
 
 Форматы путей совпадают посимвольно:
 
@@ -54,8 +55,18 @@ SELECT stored_file_path FROM marketplace_reconciliation_sessions ORDER BY create
 Порядок (обязателен именно такой):
 
 1. Выгрузить `stored_file_path` (раздел «Замеры до») — после дропа список взять негде.
-2. Сверить, что ни один путь из списка не встречается в
-   `MarketplaceMonthClose.settings->'costsReconciliation'->>'file_path'`.
+2. Сверить, что ни один путь из списка не занят «Закрытием месяца». Готовый
+   запрос (ключ `costs_reconciliation`, snake_case — не camelCase):
+
+   ```sql
+   SELECT s.stored_file_path
+   FROM marketplace_reconciliation_sessions s
+   JOIN marketplace_month_closes mc
+     ON mc.settings -> 'costs_reconciliation' ->> 'file_path' = s.stored_file_path;
+   ```
+
+   Ожидаемый результат — ноль строк. Любая строка означает общий файл: его из
+   списка на удаление исключить.
 3. Удалить объекты по списку поштучно, сверив число удалённых со счётчиком строк.
 4. Только после этого — дроп таблицы.
 
