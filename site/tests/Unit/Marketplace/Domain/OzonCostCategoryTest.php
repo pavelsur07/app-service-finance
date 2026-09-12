@@ -211,7 +211,7 @@ final class OzonCostCategoryTest extends TestCase
      */
     private static function ozonAccrualDictionary(): array
     {
-        $path = __DIR__.'/../../../Fixtures/Marketplace/Ozon/captured/accrual-types.json';
+        $path = __DIR__.'/../../../Fixtures/Marketplace/Ozon/accrual_types.json';
         $raw = file_get_contents($path);
 
         self::assertIsString($raw, 'не прочитан справочник услуг Ozon: '.$path);
