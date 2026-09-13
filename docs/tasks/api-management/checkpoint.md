@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** handoff — awaiting owner decision
-**Status:** implementation, verification and reviews complete; PR Ready
+**Phase:** release approved — awaiting verified backup
+**Status:** PR Ready; owner approved migrations and deploy; preflight complete, backup evidence missing
 **Stage base commit:** 17de7b7f
 **Stage 4 implementation commit:** 958d0167
 
@@ -23,7 +23,14 @@
 - Internal reported1BLOCKER/4IMPORTANT across task, all fixed; no open confirmed findings.
 
 ### Exact next action
-Wait for the owner's explicit `run the migration and deploy #2474`. Approval must cover the three irreversible forward-fix migrations and deploy; a verified database/companies backup is required before dispatch and is not automatically made by the workflow. After approval follow docs/workflow/release.md and prod-access.md, including required CI, backup confirmation, baseline read-only measurements, merge, migrations dispatch, schema gate, deploy and read-only acceptance. Do not merge or touch production before that approval.
+The owner explicitly approved `run the migration and deploy #2474` on 2026-09-13. Do not ask for that approval again. Await only confirmation of an up-to-date verified production database backup including companies; async question is pending. There is no backup operation in the release workflow or approved wrappers. Once confirmed, recheck PR head/CI, merge into master, dispatch migrations, verify schema/UUID invariants, dispatch deploy, and perform read-only acceptance per release.md. No merge, production writes or dispatch performed yet.
+
+Release preflight:
+- Implementation head92b02300: all CI checks passed, PR Ready/MERGEABLE/CLEAN/base master. origin/master22399152 remains unchanged.
+- Production wrappers work with `ssh -o BatchMode=yes -o IdentityAgent=none vf-prod-codex ... < /dev/null`. The default local SSH agent hangs before offering the key (timeout124); disabling that agent uses the already configured dedicated identity, without changing credentials or permissions.
+- Production containers healthy, current application image22399152.
+- Baseline read-only companies: count1344; UUID checksum `b8a63779d772bb53e011e3327b6ad0da` using md5(string_agg(id::text, ',' ORDER BY id::text)); total relation size655360bytes. Latest recorded migration20260912120000. No financial data read or changed.
+- Backup prerequisite from docs/workflow/data-migrations.md remains unverified; neither create a backup nor broaden wrapper permissions without a separately named approval. Missing backup evidence is the only release blocker.
 
 ### Files to inspect first on resume
 This checkpoint, handoff.md, TASK.md; git status; PR2474/latesthead/checks. Detailed local evidence in /tmp/api-management-handoff-*.log and /tmp/api-management-final-api.log. Stage reports preserve history; current status above is authoritative.
