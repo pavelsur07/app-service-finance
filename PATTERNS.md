@@ -1,35 +1,36 @@
 # PATTERNS.md — VashFinDir
 
 > Читай нужный раздел по задаче, не весь файл.
+> Новые разделы — только в конец файла; номера существующих разделов не менять (CLAUDE.md ссылается на них по номерам).
 > Версия: 1.3 / 2026-08-20
 
 ## Навигация
 
-- [1. Слои и ответственность](#1-слои-и-ответственность)
-- [2. Controller](#2-controller)
-- [3. Action](#3-action)
-- [4. Domain: Policy и Value Object](#4-domain-policy-и-value-object)
-- [5. Infrastructure: Contracts](#5-infrastructure-contracts)
-- [6. Infrastructure: Query](#6-infrastructure-query)
-- [7. Facade](#7-facade)
-- [8. Формы с данными чужого модуля](#8-формы-с-данными-чужого-модуля)
-- [9. Tagged Services](#9-tagged-services)
-- [10. Messenger: Message и Handler](#10-messenger-message-и-handler)
-- [11. Entity](#11-entity)
-- [12. DTO](#12-dto)
-- [13. Обработка ошибок](#13-обработка-ошибок)
-- [14. Multi-tenancy: изоляция данных](#14-multi-tenancy-изоляция-данных)
-- [15. Doctrine Listeners](#15-doctrine-listeners)
-- [16. Тесты](#16-тесты)
-- [17. Entity Builder](#17-entity-builder)
-- [18. Decision Matrix](#18-decision-matrix)
-- [19. OpenAPI / Nelmio](#19-openapi--nelmio)
-- [20. Событийная модель: Доменные события](#20-событийная-модель-доменные-события)
-- [21. Оптимистичная блокировка](#21-оптимистичная-блокировка)
-- [22. Idempotency в Messenger](#22-idempotency-в-messenger)
-- [23. Логирование: выбор уровня (error vs warning)](#23-логирование-выбор-уровня-error-vs-warning)
-- [24. Финансовые типы данных](#24-финансовые-типы-данных)
-- [25. Request / Response DTO](#25-request--response-dto)
+- [1. Слои и ответственность](#1-слои-и-ответственность) — куда положить код, любая новая задача
+- [2. Controller](#2-controller) — новый endpoint, HTTP-вход/выход
+- [3. Action](#3-action) — оркестрация, транзакция, flush
+- [4. Domain: Policy и Value Object](#4-domain-policy-и-value-object) — бизнес-правило, инвариант
+- [5. Infrastructure: Contracts](#5-infrastructure-contracts) — внешний API, адаптер
+- [6. Infrastructure: Query](#6-infrastructure-query) — чтение из БД, списки, пагинация
+- [7. Facade](#7-facade) — вызов чужого модуля, новый публичный метод
+- [8. Формы с данными чужого модуля](#8-формы-с-данными-чужого-модуля) — форма со справочником другого модуля
+- [9. Tagged Services](#9-tagged-services) — коллекция обработчиков, плагинная точка
+- [10. Messenger: Message и Handler](#10-messenger-message-и-handler) — async-задача, новый Message
+- [11. Entity](#11-entity) — новая сущность, поля, UUID, companyId
+- [12. DTO](#12-dto) — перенос данных между слоями
+- [13. Обработка ошибок](#13-обработка-ошибок) — исключения, HTTP-статусы, error-формат
+- [14. Multi-tenancy: изоляция данных](#14-multi-tenancy-изоляция-данных) — любой Repository-запрос, Controller с данными
+- [15. Doctrine Listeners](#15-doctrine-listeners) — автодействие при сохранении Entity
+- [16. Тесты](#16-тесты) — новый тест, структура, данные
+- [17. Entity Builder](#17-entity-builder) — тестовые данные для Entity
+- [18. Decision Matrix](#18-decision-matrix) — выбор слоя для логики
+- [19. OpenAPI / Nelmio](#19-openapi--nelmio) — публичный API, документация endpoint
+- [20. Событийная модель: Доменные события](#20-событийная-модель-доменные-события) — реакция на смену состояния
+- [21. Оптимистичная блокировка](#21-оптимистичная-блокировка) — конкурентное редактирование
+- [22. Idempotency в Messenger](#22-idempotency-в-messenger) — webhook, ретраи, повторная обработка
+- [23. Логирование: выбор уровня (error vs warning)](#23-логирование-выбор-уровня-error-vs-warning) — уровень лога, GlitchTip-алерты
+- [24. Финансовые типы данных](#24-финансовые-типы-данных) — деньги, проценты, округление
+- [25. Request / Response DTO](#25-request--response-dto) — API-контракты
 
 ---
 
@@ -113,6 +114,8 @@ final class CreateProductAction
 
 **Правила:** без `Request`/`Response` · flush только в Action · максимум ~100 строк · побочные эффекты → Messenger dispatch
 
+Эталон: `CreateProductAction`, проверено 2026-09-13
+
 ---
 
 ## 4. Domain: Policy и Value Object
@@ -157,6 +160,8 @@ final readonly class ListingKey
 
 **Когда выделять:** логика нужна в нескольких Actions · правило сложнее одного `if` · есть понятие из предметной области
 
+Эталон: `ProductSkuPolicy`, `ListingKey`, проверено 2026-09-13
+
 ---
 
 ## 5. Infrastructure: Contracts
@@ -194,6 +199,8 @@ App\Catalog\Domain\ProductSkuUniquenessChecker:
 
 Для внешних API — та же структура: `Infrastructure/Api/Contract/` → `Infrastructure/Api/Wildberries/`.
 
+Эталон: `ProductSkuUniquenessChecker`, `ProductSkuUniquenessCheckerDoctrine`, проверено 2026-09-13
+
 ---
 
 ## 6. Infrastructure: Query
@@ -230,6 +237,8 @@ final class ProductQuery
 
 **Когда Query вместо Repository:** сложные JOIN · агрегации (COUNT, SUM, GROUP BY) · отчёты · нужны только скалярные данные
 
+Эталон: `ProductQuery`, `ProductListFilter`, проверено 2026-09-13
+
 ---
 
 ## 7. Facade
@@ -255,6 +264,8 @@ final readonly class CounterpartyFacade
 ```
 
 **Правила:** `final readonly class` · принимает скаляры/DTO, не Entity чужого модуля · без бизнес-логики · минимальный публичный интерфейс
+
+Эталон: `CounterpartyFacade`, проверено 2026-09-13
 
 ---
 
@@ -317,6 +328,8 @@ final class ProcessWbCostsAction
 | `app.notification.sender` | Каналы отправки уведомлений |
 
 **Когда:** набор однотипных обработчиков · новый обработчик = новый класс + тег (OCP)
+
+Эталон: `WbCommissionCalculator`, `ProcessWbCostsAction`, проверено 2026-09-13
 
 ---
 
@@ -385,6 +398,8 @@ final class SyncWbReportMessageHandler
 
 **Правила:** нет `Request`/`Session`/`Security` · Entity загружать заново по ID из Message · catch → log → rethrow
 
+Эталон: `SyncWbReportMessage`, проверено 2026-09-13
+
 ---
 
 ## 11. Entity
@@ -441,6 +456,8 @@ class MarketplaceMonthClose
 ```
 
 **Правила:** `new Entity()` только в Action · guard-методы бросают `\DomainException` · нет Repository/Messenger внутри · `DateTimeImmutable` везде
+
+Эталон: `MarketplaceMonthClose`, проверено 2026-09-13
 
 ---
 
@@ -502,14 +519,34 @@ final class ProductListFilter
 
 ## 13. Обработка ошибок
 
-### Стратегия по слоям
+### Поток
 
-| Слой | Действие |
-|---|---|
-| Domain / Entity | `throw new \DomainException(...)` |
-| Action | `throw new \DomainException(...)` или кастомное из `Exception/` |
-| Infrastructure | Оборачивает техническое в `\DomainException` |
-| Controller | Ловит `\DomainException` → JSON 422 или flash-redirect |
+Domain/Action бросает конкретное доменное исключение → ExceptionListener маппит класс в HTTP-статус и JSON → Controller остаётся чистым, без try/catch (кроме технических кейсов: stream, lock).
+
+### Доменное исключение
+
+```php
+// src/{Module}/Exception/DocumentNotFoundException.php
+final class DocumentNotFoundException extends \RuntimeException
+{
+    public function __construct(string $documentId)
+    {
+        parent::__construct(sprintf('Документ %s не найден.', $documentId));
+    }
+}
+```
+
+- `final class`, имя — причина (`...NotFoundException`, `...ExpiredException`).
+- extends `\RuntimeException` или `AppException`.
+- Место — `src/{Module}/Exception/`.
+
+### Формат ответа (новый код — только так)
+
+```json
+{ "error": { "code": "document_not_found", "message": "Документ не найден" } }
+```
+
+`code` — стабильный snake_case-идентификатор (фронт завязывается на него), `message` — человекочитаемое. HTTP-статус несёт семантику: 404 — нет сущности, 422 — нарушено бизнес-правило, 403 — нет доступа, 500 — инцидент.
 
 ### Инфраструктурная ошибка → доменная
 
@@ -517,30 +554,20 @@ final class ProductListFilter
 try {
     $this->em->flush();
 } catch (UniqueConstraintViolationException) {
-    throw new \DomainException('Товар с таким SKU уже существует.');
+    throw new DuplicateSkuException($sku);
 }
 ```
 
-### Кастомные исключения
+Техническое исключение инфраструктуры не протекает наружу — оборачивается в доменное на границе слоя.
 
-```php
-// src/Deals/Exception/DealNotFoundException.php
-final class DealNotFoundException extends \DomainException
-{
-    public function __construct(string $dealId)
-    {
-        parent::__construct(sprintf('Сделка %s не найдена.', $dealId));
-    }
-}
-```
+### Антипаттерны
 
-### Формат ответа (новый код — только так)
+- `try/catch` с пустым телом — глотать исключения нельзя.
+- `throw new \Exception('ошибка')` — только конкретные доменные классы.
+- `return null` там, где сущность обязана существовать — бросай исключение.
+- Бизнес-ошибки через try/catch в Controller — маппинг делает ExceptionListener.
 
-```json
-{ "error": { "code": "deal_not_found", "message": "Сделка не найдена." } }
-```
-
-`code` — snake_case, стабильный идентификатор (фронт завязывается на него).
+> Историческая версия раздела описывала поток «Controller ловит \DomainException → JSON 422» — устарела, в старом коде встречается, не применять в новом. Актуальные правила — CLAUDE.md «Обработка ошибок».
 
 ---
 
@@ -671,6 +698,8 @@ final class CreateProductActionTest extends KernelTestCase
 | Facade | Integration | 🟡 Средний |
 | Controller | Functional (WebTestCase) | 🟡 Средний |
 | Infrastructure (Query) | Integration | 🟢 Низкий |
+
+Эталон: `ProductSkuPolicyTest`, `CompanyBuilder`, проверено 2026-09-13
 
 ---
 
@@ -847,6 +876,8 @@ const { data, error } = await api.GET('/api/marketplace-analytics/snapshots', {
 Менять логику контроллера «заодно с документацией»             — отдельный PR
 Строковый ref: '#/components/schemas/X' для PHP-классов        — Nelmio не зарегистрирует
 ```
+
+Эталон: `SnapshotShowController`, проверено 2026-09-13
 
 ---
 
@@ -1093,6 +1124,8 @@ if ($failures !== []) {
 
 `before_send` (`EventScrubber`) чистит `extra`/`tags`/`request` по ключам, но это страховка. Не клади токены/пароли/ИНН/ФИО в context логов — см. запреты в `CLAUDE.md`.
 
+Эталон: `SyncWbFinancialReportDayHandler`, `MarketplaceRateLimitException`, `MarketplaceTemporaryApiException`, `MarketplaceAuthException`, `MarketplaceBadRequestException`, `SentryRateLimiter`, `EventScrubber`, проверено 2026-09-13
+
 ---
 
 ## 24. Финансовые типы данных
@@ -1328,6 +1361,8 @@ $amount = Money::fromString($request->amount, $request->currency); // поля R
 $vat = $amount->percentage('20', RoundingMode::HALF_UP);
 ```
 
+Эталон: `Money`, `MoneyAmountType`, `MoneyMismatchException`, `MoneyOverflowException`, проверено 2026-09-13
+
 ---
 
 ## 25. Request / Response DTO
@@ -1511,3 +1546,5 @@ return $this->json($entity)                               — Response DTO
 companyId в Request DTO                                    — из сессии (§14)
 Response DTO с camelCase в toArray()                      — контракт snake_case
 ```
+
+Эталон: `PaginationMeta`, `CashExceptionListener`, проверено 2026-09-13
