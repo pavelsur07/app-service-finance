@@ -1,0 +1,17 @@
+{% extends 'api/settings/layout.html.twig' %}
+{% form_theme form 'api/settings/_form_theme.html.twig' %}
+{% block content %}
+<div class="wz-head"><h1 class="wz-title">{{ title }}</h1></div>
+<div class="wz-row"><section class="card">
+    <div class="alert alert--warning"><div class="a-body"><p class="a-text">{{ warning }}</p></div></div>
+    {% if key is defined %}<div class="form-field"><label class="form-label" for="api-key-current-name">Ключ</label><input id="api-key-current-name" class="input" readonly value="{{ key.name }}"></div>{% endif %}
+    {{ form_start(form) }}
+    {{ form_errors(form) }}
+    {{ form_rest(form) }}
+    <div class="wz-head-actions">
+        <button type="submit" class="btn btn-md btn-primary">{{ submit }}</button>
+        <a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">Отмена</a>
+    </div>
+    {{ form_end(form) }}
+</section></div>
+{% endblock %}

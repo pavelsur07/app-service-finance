@@ -41,6 +41,7 @@ final class ModuleAccessMap
      * @var array<string, Module>
      */
     private const PREFIXES = [
+        'App\\Api\\Controller\\Settings\\' => Module::ADMIN,
         'App\\Cash\\Controller\\' => Module::FINANCE,
         'App\\Finance\\' => Module::FINANCE,
         'App\\Balance\\' => Module::FINANCE,

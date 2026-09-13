@@ -1,0 +1,47 @@
+{% extends 'api/settings/layout.html.twig' %}
+{% block content %}
+<div class="wz-row">
+    <h1 class="wz-title">API<span class="wz-sub">Ключи доступа для подключений вашей компании</span></h1>
+    <div class="wz-head-actions">
+        <a class="btn btn-md btn-secondary" href="{{ path('settings_api_check') }}">Проверить ключ</a>
+        <a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать ключ</a>
+    </div>
+</div>
+<div class="wz-row"><section class="card">
+    <h2 class="card-head">Подключение</h2>
+    <p>Публичный ID компании: <strong>{{ activeCompany.publicId }}</strong></p>
+    <p>Передавайте ключ в Authorization: Bearer и ID компании в X-Company-Id. Ключ действует 90 суток.</p>
+    <label class="form-label" for="api-curl">Пример проверки подключения</label>
+    <textarea id="api-curl" class="textarea" rows="4" readonly spellcheck="false">curl '{{ url('external_api_auth_check') }}' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'X-Company-Id: {{ activeCompany.publicId }}'</textarea>
+    <p class="field-helper">Замените YOUR_API_KEY своим ключом. Предметные разделы API пока не подключены.</p>
+</section></div>
+<div class="wz-row"><section class="card card--flush">
+    <h2 class="card-head">API-ключи <span class="card-head-aside">{{ pager.nbResults }}</span></h2>
+    {% if pager.nbResults == 0 %}
+        <div class="empty"><h3 class="empty-title">API-ключей пока нет</h3><p class="empty-text">Создайте отдельный именованный ключ для каждого подключения.</p><a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать первый ключ</a></div>
+    {% else %}
+        <div class="report-scroll" role="region" aria-label="Список API-ключей" tabindex="0">
+        <table class="t-table">
+            <thead><tr><th scope="col">Название</th><th scope="col">Ключ</th><th scope="col">Действует до (UTC)</th><th scope="col">Последнее использование (UTC)</th><th scope="col">Статус</th><th scope="col">Действия</th></tr></thead>
+            <tbody>{% for key in pager %}
+                <tr>
+                    <td>{{ key.name }}</td><td><code>vfd_{{ key.publicIdentifier|slice(0, 8) }}…</code></td>
+                    <td>{{ key.expiresAt|date('d.m.Y H:i', 'UTC') }}</td>
+                    <td>{{ key.lastUsedAt ? key.lastUsedAt|date('d.m.Y H:i', 'UTC') : 'Ещё не использовался' }}</td>
+                    <td>{% if key.revokedAt %}<span class="status status--danger">Отозван</span>{% elseif key.expiresAt <= now %}<span class="status status--warning">Истёк</span>{% else %}<span class="status status--success">Действует</span>{% endif %}</td>
+                    <td><a class="btn btn-sm btn-secondary" href="{{ path('settings_api_rename', {id: key.id}) }}">Переименовать</a> {% if not key.revokedAt %}<a class="btn btn-sm btn-danger" href="{{ path('settings_api_revoke', {id: key.id}) }}">Отозвать</a>{% endif %}</td>
+                </tr>
+            {% endfor %}</tbody>
+        </table></div>
+        <nav class="t-pagination" aria-label="Страницы API-ключей">
+            <span class="t-pagination-info">Страница {{ pager.currentPage }} из {{ pager.nbPages }}</span>
+            <div class="t-pagination-pages">
+                {% if pager.hasPreviousPage %}<a class="t-pg-btn" href="{{ path('settings_api_index', {page: pager.previousPage, limit: pager.maxPerPage}) }}">Назад</a>{% endif %}
+                {% if pager.hasNextPage %}<a class="t-pg-btn" href="{{ path('settings_api_index', {page: pager.nextPage, limit: pager.maxPerPage}) }}">Далее</a>{% endif %}
+            </div>
+        </nav>
+    {% endif %}
+</section></div>
+{% endblock %}

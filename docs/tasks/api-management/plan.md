@@ -14,7 +14,7 @@ Checks: Company/Api targeted unit, integration, functional; focused PHPStan/styl
 Review focus: IDOR, owner A/member B, секреты, atomicity, expiry, migration compatibility, stateless fail-closed.
 
 ## Stage 2: UI создания, списка, проверки, переименования, отзыва
-Risk: MEDIUM. stage_base_commit: record before work.
+Risk: MEDIUM. stage_base_commit:3edbb656.
 DoD: owner-only Twig + Forms, no-store one-time secret, CSRF, existing UI Kit, empty/error/mobile.
 Work items: 2.1 controllers/forms/pagination; 2.2 templates/navigation/copy and functional verification.
 Checks: Api UI functional, Twig/YAML lint, UI Kit lint/build.

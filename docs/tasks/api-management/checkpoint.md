@@ -1,7 +1,7 @@
 ## Current checkpoint
-**Phase:** Stage 2 / Work item 2.1
-**Status:** planned
-**Stage base commit:** 22399152
+**Phase:** Stage 2 complete
+**Status:** verified; preparing Stage 3
+**Stage base commit:** 3edbb656
 
 ### Completed
 - Read owner plan and relevant rules; isolated worktree/branch created. Unrelated files stay in original checkout.
@@ -44,3 +44,16 @@ TASK.md, plan.md, this checkpoint; git status; Company Entity/Facade, Shared Aud
 - External Claude round1:0BLOCKER2IMPORTANT3MINOR, all confirmed/fixed/verified; fixed without re-run. Fresh internal focused review confirms0open.
 - Final fix verification22tests457assertions PASS;8exception/facade tests PASS; focusedPHPStan/style PASS. Public-ID accepted DBAL drift documented; version default synchronized; throwable retained for monitoring.
 - Stage1 report saved. Exact next action: commit/push Stage1 and create single Draft PR, record its commit as Stage2 base, implement UI2.1/2.2.
+
+### Stage2 in progress
+- Stage1 committed3edbb656 and pushed origin/feat/api-management. Stage2 base3edbb656; UI agent implementing2.1/2.2 after TDD.
+- Draft PR creation currently external service issue: gh pr create --base master --head feat/api-management --draft ... returned GitHub GraphQL server error; REST gh api repos/pavelsur07/app-service-finance/pulls --method POST --input /tmp/api-management-pr.json returned unexpected end of JSON input. Both subsequent PR-list checks empty, no duplicate PR. Finish implementation/checks before reporting any remaining blocker; retry only after diagnostic/service change.
+- Browser environment ready: api-management-cli test HTTP8000 (internal container network only), api-management-browser existing Playwright1.62.1 image; dependencies borrowed read-only from existing analytics node_modules, no install/new app dependency.
+- Exact next action: integrate Stage2 UI, targeted tests and browser smoke, retry Draft PR after availability check.
+
+### Stage2 complete
+- Work items2.1/2.2 complete: owner-only settings, Symfony Forms/CSRF, scoped pagination, direct one-time secret, copy/history clearing, pasted shared validation, rename/revoke and safe errors.
+- Api module plus write-gate coverage:50tests651assertions PASS. Focused PHPStan0, CS0/11, Twig/YAML PASS, npm lint/build PASS. UI Kit9107 baseline violations unchanged; React mapping47 pre-existing failures unchanged.
+- Real Chromium desktop/mobile smoke PASS: login, empty/list, creation201/no-store, clipboard, no local/sessionStorage, navigation-back clears secret, rename, pasted check/no echo, mobile390px no page overflow, revoke. Screenshots inspected. Synthetic fixture and temporary native-session override removed before final tests.
+- Fresh independent Stage2 review0BLOCKER/0IMPORTANT/0MINOR. Implementation fixed missing-form POST status and long-name overflow; open0. External review not required for MEDIUM Stage2.
+- Exact next action: commit/push Stage2; record Stage3 base; implement backend catalog, prepared/effective policy and audited versioned save. Draft PR service remains unavailable; retry after new branch head is pushed.
