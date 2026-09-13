@@ -26,17 +26,30 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[PublicAccess]
 final class TelegramWebhookController extends AbstractController
 {
+    /**
+     * Отказы Bot API, которые по таблице логирования `CLAUDE.md` проходят сами:
+     * 403 — бот заблокирован или удалён из чата (адресно, остальные ответы уходят),
+     * 429 — flood control, снимается со следующим сообщением.
+     *
+     * 400 сюда намеренно НЕ входит: Bot API отдаёт его и на «chat not found», и на нашу
+     * же сломанную сборку сообщения (пустой текст, невалидный reply_markup), а такая
+     * поломка ответит 400 всем сразу — это отказ канала, и он должен будить человека.
+     */
+    private const TELEGRAM_SELF_HEALING_ERROR_CODES = [403, 429];
+
     public function __construct(
         private readonly TelegramBotRepository $botRepository,
         private readonly BotLinkRepository $botLinkRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly HttpClientInterface $httpClient,
-        private readonly LoggerInterface $logger,
+        private readonly LoggerInterface $telegramLogger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
         private readonly ObjectStorageInterface $storage,
         private readonly string $telegramWebhookSecret = '',
@@ -64,7 +77,7 @@ final class TelegramWebhookController extends AbstractController
             // Проверяем подлинность запроса: Telegram шлёт заданный secret_token в заголовке.
             // Это защищает публичный endpoint от поддельных апдейтов (создание чужих операций, спам).
             if (!$this->isValidSecretToken($request)) {
-                $this->logger->warning('Telegram webhook: invalid secret token', [
+                $this->telegramLogger->warning('Telegram webhook: invalid secret token', [
                     'update_id' => $update['update_id'] ?? null,
                 ]);
 
@@ -86,10 +99,12 @@ final class TelegramWebhookController extends AbstractController
             $editedMessage = is_array($update['edited_message'] ?? null) ? $update['edited_message'] : null;
             $rawText = is_string($message['text'] ?? null) ? $message['text'] : null;
             $chatId = $this->extractChatId($message, $callbackQuery, $editedMessage);
-            $this->logger->info('Telegram update получен', [
+            // Текст сообщения в лог не идёт: в нём суммы, контрагенты и назначения платежей.
+            // Для диагностики достаточно того, что апдейт принят и какого он вида.
+            $this->telegramLogger->info('Telegram update получен', [
                 'update_keys' => array_keys($update),
                 'chat_id' => $chatId,
-                'text' => $this->shortenText($rawText),
+                'has_text' => null !== $rawText,
             ]);
 
             if ($callbackQuery) {
@@ -128,7 +143,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->handleTextMessage($bot, $update, $message, $text);
         } catch (\Throwable $e) {
             // Telegram требует ответ 200, иначе апдейт будет ретраиться. Ошибку отдаём в Sentry через logger.
-            $this->logger->error('Telegram webhook unhandled exception', [
+            $this->telegramLogger->error('Telegram webhook unhandled exception', [
                 'exception' => $e,
                 'update_id' => $update['update_id'] ?? null,
             ]);
@@ -157,10 +172,10 @@ final class TelegramWebhookController extends AbstractController
                 return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
             }
 
-            // для диагностики проблем привязки
-            $this->logger->info('Парсинг /start', [
-                'raw_text' => $this->shortenText($normalizedText),
-                'token' => $startToken,
+            // Для диагностики проблем привязки важно, какой ветвью разобран deep-link.
+            // Сам $startToken — секрет привязки аккаунта к компании, в лог он не идёт
+            // ни на каком уровне; текст сообщения — тоже.
+            $this->telegramLogger->info('Парсинг /start', [
                 'parse_path' => $parsePath,
             ]);
 
@@ -249,9 +264,8 @@ final class TelegramWebhookController extends AbstractController
         $requestedMoneyAccountId = isset($parts[1]) ? trim($parts[1]) : null;
         $requestedMoneyAccountId = '' === $requestedMoneyAccountId ? null : $requestedMoneyAccountId;
 
-        $this->logger->info('Обработка /set_cash', [
+        $this->telegramLogger->info('Обработка /set_cash', [
             'chat_id' => $chatId,
-            'raw_text' => $this->shortenText($normalizedText),
             'money_account_id' => $requestedMoneyAccountId,
         ]);
 
@@ -306,7 +320,7 @@ final class TelegramWebhookController extends AbstractController
             $this->entityManager->flush();
 
             // Логируем удачную установку кассы для быстрой диагностики
-            $this->logger->info('Касса установлена через /set_cash', [
+            $this->telegramLogger->info('Касса установлена через /set_cash', [
                 'chat_id' => $chatId,
                 'company_id' => $clientBinding->getCompany()->getId(),
                 'money_account_id' => $moneyAccount->getId(),
@@ -522,7 +536,7 @@ final class TelegramWebhookController extends AbstractController
         $this->entityManager->flush();
 
         // Логируем выбор кассы через inline-кнопку для быстрой диагностики
-        $this->logger->info('Касса установлена через callback set_cash', [
+        $this->telegramLogger->info('Касса установлена через callback set_cash', [
             'chat_id' => $this->extractChatId(null, $callbackQuery, null),
             'company_id' => $clientBinding->getCompany()->getId(),
             'money_account_id' => $moneyAccount->getId(),
@@ -642,17 +656,9 @@ final class TelegramWebhookController extends AbstractController
                 $statusCode = $response->getStatusCode();
                 $content = $response->getContent(false);
 
-                if (200 !== $statusCode) {
-                    error_log(sprintf('Telegram editMessageText HTTP error: %d, chat=%s', $statusCode, $chatId));
-                } else {
-                    $decoded = json_decode($content, true);
-                    if (is_array($decoded) && isset($decoded['ok']) && false === $decoded['ok']) {
-                        $description = $decoded['description'] ?? 'unknown error';
-                        error_log(sprintf('Telegram editMessageText API error: %s, chat=%s', $description, $chatId));
-                    }
-                }
+                $this->logTelegramApiOutcome('editMessageText', $chatId, $statusCode, $content);
             } catch (\Throwable $exception) {
-                error_log(sprintf('Telegram editMessageText exception: %s', $exception->getMessage()));
+                $this->logTelegramApiFailure('editMessageText', $chatId, $exception);
             }
 
             return $this->respondWithMessage($bot, $callbackQuery, 'Настройки обновлены');
@@ -710,8 +716,17 @@ final class TelegramWebhookController extends AbstractController
                     ],
                 ],
             );
-            $fileInfo = $fileInfoResponse->toArray(false);
-        } catch (\Throwable) {
+            // Статус и тело берём явно: toArray(false) глушит исключение по статусу, и
+            // отказ Bot API ушёл бы дальше как «нет file_path» — без единой записи в логе
+            $statusCode = $fileInfoResponse->getStatusCode();
+            $content = $fileInfoResponse->getContent(false);
+            $this->logTelegramApiOutcome('getFile', $this->extractChatId($message, null, null), $statusCode, $content);
+
+            $decoded = json_decode($content, true);
+            $fileInfo = is_array($decoded) ? $decoded : [];
+        } catch (\Throwable $exception) {
+            $this->logTelegramApiFailure('getFile', $this->extractChatId($message, null, null), $exception);
+
             return $this->respondWithMessage($bot, $message, 'Не удалось запросить файл, попробуйте позже.');
         }
 
@@ -729,8 +744,25 @@ final class TelegramWebhookController extends AbstractController
                 'GET',
                 sprintf('%s/file/bot%s/%s', $this->telegramApiBaseUrl, $bot->getToken(), $filePath),
             );
-            $fileContent = $fileResponse->getContent();
-        } catch (\Throwable) {
+            // getContent() без false бросает исключение по 4xx/5xx, а Symfony собирает его
+            // текст из тела ответа (title/detail) — тело внешнего API логировать нельзя.
+            // Поэтому статус разбираем сами, тем же классификатором.
+            $downloadStatus = $fileResponse->getStatusCode();
+            $fileContent = $fileResponse->getContent(false);
+
+            if (200 !== $downloadStatus) {
+                $this->logTelegramApiOutcome(
+                    'downloadFile',
+                    $this->extractChatId($message, null, null),
+                    $downloadStatus,
+                    '',
+                );
+
+                return $this->respondWithMessage($bot, $message, 'Не удалось скачать файл, попробуйте позже.');
+            }
+        } catch (\Throwable $exception) {
+            $this->logTelegramApiFailure('downloadFile', $this->extractChatId($message, null, null), $exception);
+
             return $this->respondWithMessage($bot, $message, 'Не удалось скачать файл, попробуйте позже.');
         }
 
@@ -868,7 +900,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $message, $e->getMessage());
         } catch (\Throwable $e) {
             // Прочие сбои не глушим: пишем в Sentry и сообщаем пользователю, что операция не сохранена
-            $this->logger->error('Telegram cash transaction failed', [
+            $this->telegramLogger->error('Telegram cash transaction failed', [
                 'exception' => $e,
                 'company_id' => $clientBinding->getCompany()->getId(),
                 'money_account_id' => $moneyAccount->getId(),
@@ -882,22 +914,41 @@ final class TelegramWebhookController extends AbstractController
         }
 
         if ($result->skippedMissingMessageIdentity) {
-            $this->logger->warning('Telegram cash transaction skipped: message identity is incomplete.', [
+            $this->telegramLogger->warning('Telegram cash transaction skipped: message identity is incomplete.', [
                 'update_id' => $update['update_id'] ?? null,
                 'chat_id' => $message['chat']['id'] ?? null,
                 'message_id' => $message['message_id'] ?? null,
             ]);
 
-            return new JsonResponse(['status' => 'ok']);
+            // Та же немота, что и в ветке duplicate ниже: операции нет, ответа нет, 200.
+            // Отвечаем; если chat.id тоже отсутствует, respondWithMessage это заметит и залогирует.
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                'Не удалось разобрать сообщение — отправьте операцию ещё раз.'
+            );
         }
 
         if ($result->duplicate) {
-            $this->logger->info('Telegram duplicate cash transaction skipped.', [
+            // Дедуп по external_id = sha256(botId|chatId|messageId). Штатный случай —
+            // ретрай апдейта самим Telegram после нашего таймаута. Нештатный — счётчик
+            // message_id в чате обнулился (пользователь очистил историю), и новое сообщение
+            // столкнулось со старой операцией. Оба неотличимы здесь, поэтому WARNING и
+            // обязательный ответ пользователю: молчание в этой ветке и выглядит как
+            // «бот не отвечает и операций не создаёт».
+            $this->telegramLogger->warning('Telegram: операция по этому сообщению уже существует, дубль не создан.', [
                 'company_id' => $clientBinding->getCompany()->getId(),
                 'money_account_id' => $moneyAccount->getId(),
+                'chat_id' => $message['chat']['id'] ?? null,
+                'message_id' => $message['message_id'] ?? null,
             ]);
 
-            return new JsonResponse(['status' => 'ok']);
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                'Операция по этому сообщению уже записана — повтор не создан. '
+                .'Если это новая операция, проверьте ДДС и отправьте её другим сообщением.'
+            );
         }
 
         $formattedAmount = $this->formatAmountForMessage($result->amount, $moneyAccount->getCurrency());
@@ -1057,18 +1108,6 @@ final class TelegramWebhookController extends AbstractController
         return [$token, $path];
     }
 
-    private function shortenText(?string $text): ?string
-    {
-        // Безопасно обрезаем текст для логов, чтобы не заливать длинные payload в stderr
-        if (null === $text) {
-            return null;
-        }
-
-        $trimmed = trim($text);
-
-        return mb_strlen($trimmed) > 200 ? mb_substr($trimmed, 0, 200).'…' : $trimmed;
-    }
-
     private function extractChatId(?array $message, ?array $callbackQuery, ?array $editedMessage): ?int
     {
         // Пробуем достать chat_id из разных типов апдейтов
@@ -1117,7 +1156,11 @@ final class TelegramWebhookController extends AbstractController
         }
 
         if (null === $chatId) {
-            error_log('[TELEGRAM] chat_id not found, skip sendMessage');
+            // Ответить некуда: апдейт пришёл без chat.id. Обрабатывается само (ответ просто
+            // не уходит), но это аномалия формата — нужна в логах, чтобы не искать её вслепую.
+            $this->telegramLogger->warning('Telegram ответ не отправлен: в апдейте нет chat_id.', [
+                'update_keys' => array_keys($message),
+            ]);
 
             return new JsonResponse(['status' => 'ok']);
         }
@@ -1144,20 +1187,101 @@ final class TelegramWebhookController extends AbstractController
             $statusCode = $response->getStatusCode();
             $content = $response->getContent(false);
 
-            if (200 !== $statusCode) {
-                error_log(sprintf('Telegram sendMessage HTTP error: %d, chat=%s, text="%s"', $statusCode, $chatId, $text));
-            } else {
-                $decoded = json_decode($content, true);
-                if (is_array($decoded) && isset($decoded['ok']) && false === $decoded['ok']) {
-                    $description = $decoded['description'] ?? 'unknown error';
-                    error_log(sprintf('Telegram sendMessage API error: %s, chat=%s, text="%s"', $description, $chatId, $text));
-                }
-            }
+            $this->logTelegramApiOutcome('sendMessage', $chatId, $statusCode, $content);
         } catch (\Throwable $exception) {
-            error_log(sprintf('Telegram sendMessage exception: %s', $exception->getMessage()));
+            $this->logTelegramApiFailure('sendMessage', $chatId, $exception);
         }
 
         return new JsonResponse(['status' => 'ok']);
+    }
+
+    /**
+     * Классифицирует ответ Bot API по одному признаку: чей это отказ.
+     *
+     * Валидный JSON с `ok:false` — отказ самого Telegram по конкретному сообщению
+     * (чат не найден, бот заблокирован пользователем): ожидаемо, обрабатывается само,
+     * поэтому WARNING. Любой другой не-200 — ответ пришёл не от Telegram, а от шлюза
+     * `tg-gateway` или прокси (ipAllowList, 5xx, HTML вместо JSON): канал сломан целиком
+     * и ни один пользователь ответа не получит, поэтому ERROR и подъём в GlitchTip.
+     *
+     * URL не логируется — в нём токен бота; текст сообщения тоже — в нём деловые данные.
+     */
+    private function logTelegramApiOutcome(string $method, ?int $chatId, int $statusCode, string $content): void
+    {
+        $decoded = json_decode($content, true);
+        $isAccepted = false;
+        $telegramErrorCode = null;
+
+        if (is_array($decoded) && array_key_exists('ok', $decoded)) {
+            $isAccepted = true === $decoded['ok'];
+            $rawErrorCode = $decoded['error_code'] ?? null;
+            $telegramErrorCode = is_int($rawErrorCode) ? $rawErrorCode : null;
+        }
+
+        // Успех — это положительный признак `ok:true`, а не «статус 200 и вроде не отказ».
+        // Прокси со сбитым location отдаёт 200 и HTML: ответ пользователю потерян, а по
+        // отсутствию признака отказа это выглядело бы как удачная отправка.
+        if (200 === $statusCode && $isAccepted) {
+            return;
+        }
+
+        // Классифицируем по числовому коду. `description` — тело ответа внешнего API,
+        // его CLAUDE.md логировать запрещает, и в нём может приехать что угодно.
+        $errorCode = $telegramErrorCode ?? $statusCode;
+
+        $context = [
+            'method' => $method,
+            'chat_id' => $chatId,
+            'status' => $statusCode,
+            'error_code' => $errorCode,
+        ];
+
+        if (null !== $telegramErrorCode && \in_array($telegramErrorCode, self::TELEGRAM_SELF_HEALING_ERROR_CODES, true)) {
+            $this->telegramLogger->warning('Telegram отклонил сообщение, канал при этом жив.', $context);
+
+            return;
+        }
+
+        // Всё остальное каналу не адресно: неверный токен (401), 400 на нашей же сборке
+        // сообщения (пустой текст, невалидный reply_markup), 5xx Telegram, и ответ не от
+        // Telegram вовсе — от шлюза tg-gateway или прокси (ipAllowList, HTML вместо JSON).
+        // Ретраев здесь нет, само это не рассосётся, и ответа не получит уже никто.
+        $this->telegramLogger->error('Канал Telegram сломан: ответ не доставлен пользователю.', $context);
+    }
+
+    private function logTelegramApiFailure(string $method, ?int $chatId, \Throwable $exception): void
+    {
+        $context = [
+            'method' => $method,
+            'chat_id' => $chatId,
+            'error' => $exception::class,
+        ];
+
+        // Throwable целиком отдавать логгеру нельзя: HttpClient подставляет в текст
+        // исключения эффективный URL («Idle timeout reached for "..."»), а в URL Bot API
+        // лежит токен бота. Через sentry-хендлер он стал бы ещё и заголовком события и
+        // ключом дедупа в GlitchTip. У HTTP-исключений текст Symfony собирает из тела
+        // ответа (title/detail) — тело внешнего API запрещено логировать вовсе, поэтому
+        // от них остаётся только класс: он сам говорит 4xx это или 5xx.
+        if (!$exception instanceof HttpExceptionInterface) {
+            $context['error_message'] = $this->redactBotToken($exception->getMessage());
+        }
+
+        // Таймаут таблица логирования CLAUDE.md называет самопроходящим: одна упавшая
+        // попытка ещё не значит, что канал недоступен всем.
+        if ($exception instanceof TimeoutExceptionInterface) {
+            $this->telegramLogger->warning('Запрос к Bot API не уложился в таймаут.', $context);
+
+            return;
+        }
+
+        $this->telegramLogger->error('Канал Telegram сломан: запрос к Bot API не выполнен.', $context);
+    }
+
+    // Вырезает токен из любого вида ссылки на Bot API: и /bot<token>/method, и /file/bot<token>/path.
+    private function redactBotToken(string $message): string
+    {
+        return (string) preg_replace('~/bot[^/\s"\']+~', '/bot***', $message);
     }
 
     private function sendMoneyAccountSelection(TelegramBot $bot, array $message, ClientBinding $clientBinding): Response
@@ -1207,7 +1331,7 @@ final class TelegramWebhookController extends AbstractController
         $lines[] = 'Выберите кассу командой: /set_cash <ID>';
 
         // Логируем текущий список касс, чтобы понимать, что увидит пользователь
-        $this->logger->info('Показываем список касс для /set_cash', [
+        $this->telegramLogger->info('Показываем список касс для /set_cash', [
             'chat_id' => $this->extractChatId($message, null, null),
             'company_id' => $clientBinding->getCompany()->getId(),
         ]);

@@ -76,6 +76,26 @@ docker compose -f docker-compose.prod.yml logs --since 1h --tail 200 \
     | grep -F marketplace_ads
 ```
 
+The production `telegram` channel works the same way and for the same reason: the
+webhook answers HTTP 200 on every branch, so `main` (`fingers_crossed`,
+`action_level: error`) never flushes its `info` records and a dead channel leaves no
+trace at all. It emits JSON at `info` and above to `site-php-fpm` stderr. Unlike
+`marketplace_ads`, its `error` records do reach Sentry/GlitchTip — the Sentry handler
+restricts no channel. Read it the same way:
+
+```bash
+docker compose -f docker-compose.prod.yml logs --since 1h --tail 200 \
+    site-php-fpm 2>&1 | grep -F '"channel":"telegram"'
+```
+
+What the channel says: `Telegram update получен` means an update reached the
+controller at all — its absence while the user insists they are writing to the bot
+points at delivery, not at the application. `Канал Telegram сломан` is the incident
+level: the reply never reached the user, and every user is affected.
+`Telegram отклонил сообщение` is one chat only (blocked bot, flood control) and needs
+no action. Message texts, `/start` binding tokens and the bot token never appear
+there by design.
+
 Manual `site-php-cli` runs write to the invoking terminal. Redirect them to the
 maintenance log below when their output must be retained.
 

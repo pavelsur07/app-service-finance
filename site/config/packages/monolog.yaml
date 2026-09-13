@@ -7,6 +7,12 @@ monolog:
         # ERROR in this channel is intentionally routed to Sentry by the prod sentry handler.
         # Use event marker legacy_wb_sync_fail_fast as the alert/query key during quarantine.
         - legacy_wb_sync
+        # Канал приёма Telegram-апдейтов. Нужен отдельным, потому что на проде `main` —
+        # fingers_crossed с action_level: error: INFO о принятом апдейте оседает в буфере
+        # и до stderr не доходит, пока в том же запросе не случится ошибка. А вебхук
+        # отвечает 200 на все ветки, поэтому ошибки может не быть вовсе — и отказ канала
+        # становится невидимым. ERROR отсюда по-прежнему уходит в sentry-хендлер.
+        - telegram
 
 when@dev:
     monolog:
@@ -63,7 +69,7 @@ when@prod:
                 handler: nested
                 excluded_http_codes: [404, 405]
                 buffer_size: 50
-                channels: ["!marketplace_ads"]
+                channels: ["!marketplace_ads", "!telegram"]
 
             nested:
                 type: stream
@@ -76,6 +82,19 @@ when@prod:
                 path: php://stderr
                 level: info
                 channels: [marketplace_ads]
+                formatter: monolog.formatter.json
+
+            # Размен осознанный и такой же, как у marketplace_ads: канал исключён из `main`,
+            # поэтому при ошибке в stderr больше не вываливается буфер fingers_crossed на 50
+            # записей запроса — зато INFO о принятом апдейте виден всегда, а не только когда
+            # в том же запросе случилась ошибка. Для вебхука, который отвечает 200 на все
+            # ветки, второе важнее: без него отказ канала не виден вообще.
+            # ERROR отсюда по-прежнему уходит в sentry-хендлер — он не ограничен каналами.
+            telegram:
+                type: stream
+                path: php://stderr
+                level: info
+                channels: [telegram]
                 formatter: monolog.formatter.json
 
             sentry:

@@ -71,6 +71,51 @@ final class SentryChannelCoverageTest extends TestCase
     }
 
     /**
+     * Второй инвариант наблюдаемости: канал, исключённый из прод-`main`, обязан иметь
+     * собственный handler.
+     *
+     * Исключение из `main` — единственный способ вывести INFO канала мимо
+     * fingers_crossed, но оно же и отрезает канал от вывода целиком. Убрать handler,
+     * оставив "!channel" в `main`, — значит молча потерять INFO и WARNING этого канала;
+     * ERROR ещё будет виден через sentry, поэтому в GlitchTip такая потеря не заметна.
+     */
+    public function testChannelExcludedFromProdMainHasItsOwnHandler(): void
+    {
+        $handlers = $this->config()['when@prod']['monolog']['handlers'] ?? [];
+        self::assertIsArray($handlers);
+
+        $mainChannels = $handlers['main']['channels'] ?? [];
+        self::assertIsArray($mainChannels);
+
+        foreach ($mainChannels as $channel) {
+            self::assertIsString($channel);
+            if (!str_starts_with($channel, '!')) {
+                continue;
+            }
+
+            $excluded = substr($channel, 1);
+            $covered = false;
+
+            foreach ($handlers as $name => $handler) {
+                if ('main' === $name || !is_array($handler)) {
+                    continue;
+                }
+
+                if (in_array($excluded, $handler['channels'] ?? [], true)) {
+                    $covered = true;
+                    break;
+                }
+            }
+
+            self::assertTrue($covered, sprintf(
+                'Канал %s исключён из прод-main, но своего handler-а не имеет: его INFO и WARNING '
+                .'никуда не пишутся, и отказ этого канала снова становится невидимым.',
+                $excluded,
+            ));
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function config(): array
