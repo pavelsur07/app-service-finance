@@ -13,7 +13,7 @@
 ### Verification
 - Final Api module: 351 tests / 1458 assertions PASS; real Chromium lifecycle, secret copy/history/storage, presets, two-tab409/reload and mobile390 PASS.
 - Full PHPStan2550files0errors, canonicalCS/strictTypes0/2565, unit2839/15897 (4deprecations), OpenAPItypes, npm lint/build, Twig/YAML PASS. Post-review fixes verified by targeted tests/static/style and whole Api module.
-- Fullsuite4815/27782:2confirmed pre-existing Ingestion fixture-aging failures; causal reproduction/temporarydate-only control in handoff. No financial code changed to hide failures.
+- Final full suite PASS: 4819 tests / 27838 assertions, 6 deprecations, no failures/warnings. Two initial aged Ingestion fixture failures repaired by changing only default fetchedAt to now; financial dates/assertions and production code unchanged. Class6/95, focused static/style and fresh review PASS.
 - UI Kit9108=9107baseline+one explicit legacy dropdown-item compatibility use; Reactmapping47baseline unchanged.
 - CI runs against final PR head; inspect latest checks before merge. Previously failing task style/static diagnostics were fixed locally and full gates passed.
 
@@ -114,3 +114,9 @@ This checkpoint, handoff.md, TASK.md; git status; PR2474/latesthead/checks. Deta
 - Final Api module351tests1458assertionsPASS; reviewfixPHPStan/canonicalCS/TwigPASS. Externalhandoffaccepted fixedwithout rerun, 1IMPORTANTrejectedbyactualSymfonydispatcherproof/3MINORfixed. Exactnextaction: finalizeStage4/handoff, commit/push, updatePRbody, verifyCI, markReady, askmigration+deployapproval.
 
 - Stage4 DONE; all authorized implementation/verification/review work complete. Committing/pushingfinalstage and updatingPR2474; nextcheckCIandReady. No merge/deployauthorization received.
+
+### Final release-gate repair
+- Finalhead4858bab2 CI confirmedmandatorychecks, builds, integrations, migrations,APItypesPASS; functional2/3failedexactsame2fixture-agingcases.
+- Furtherworkflowinspection showedbackend-tests.failureblocks schema-ready/deploy despiteadvisorymergeprotection. Narrowverification repair requiredfordeliverabletask: ONLY existingtest rawRecord fallbackfetchedAt changedto now, preservingoperationdates/financialassertions/productionquery/CIconfig. This is test-fixture maintenance for requiredreleasegate, notfinancialsemanticschange.
+- Originalclassred2/6; finalclass6tests95assertionsPASS; focusedPHPStan/canonicalCSPASS. Fresh scoped review: 0 BLOCKER / IMPORTANT / MINOR. Full make site-test PASS: 4819 tests / 27838 assertions, 6 deprecations, exit 0 (log /tmp/api-management-full-fixed.log).
+- Exact next action: commit/push fixture repair and updated handoff; verify final CI and update PR evidence; then owner decision. No production action.

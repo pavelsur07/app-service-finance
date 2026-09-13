@@ -23,7 +23,7 @@ Branch: `feat/api-management`. PR: https://github.com/pavelsur07/app-service-fin
 | `make site-cs-check` | PASS: 0/2565; canonical `.php-cs-fixer.php` |
 | `make site-cs-strict-types` | PASS: 0/2565 |
 | `make site-test-unit` | PASS: 2839 тестов / 15897 проверок, 4 deprecations |
-| `make site-test` | 4815 тестов / 27782 проверки; 2 существующих падения, 2 warnings, 6 deprecations |
+| `make site-test` | PASS: 4819 тестов / 27838 проверок, 6 deprecations; 0 failures/warnings |
 | `npm run lint`, `npm run build`, Twig/YAML | PASS |
 | `make api-types-check` | PASS |
 | `npm run check:ui-kit` | 9108 нарушений:9107baseline +1явное legacy-исключение |
@@ -32,7 +32,7 @@ Branch: `feat/api-management`. PR: https://github.com/pavelsur07/app-service-fin
 
 Makefile выполнялся с локальным `DOCKER_COMPOSE=/tmp/api-management-compose-exec`: адаптер передаёт неизменённые команды targets в уже работающие контейнеры изолированного worktree. Новых зависимостей нет. Миграции применены только в локальном TEST; CI подтвердил migration-empty-db и API types на Stage3.
 
-Два падения общего набора — `VerificationApiControllerTest`: фиксированная дата fetchedAt 2026-06-15 13:00MSK вышла за окно `now -90days` (cutoff 2026-06-15 14:53MSK при диагностике). Query/facade/controller/tests не менялись от 22399152; исходный класс воспроизводит 2 failures (6tests/68assertions). Временная копия с единственным изменением даты на now проходит оба метода (2tests/37assertions), затем удалена. Это отдельный FOLLOW-UP: стабилизировать часы/фикстуры, без изменения финансовых правил.
+Первый запуск полного набора выявил два существующих падения `VerificationApiControllerTest`: фиксированная дата fetchedAt вышла за окно `now -90days`. Исходный класс воспроизвёл 2 failures; диагностика установила, что это блокирует backend-tests и deploy. Включено узкое исправление тестовой фикстуры: только fallback fetchedAt теперь использует now; явные даты, периоды операций, суммы и production query не менялись. После исправления класс: 6 тестов / 95 проверок PASS, focused PHPStan/CS PASS, независимый review: 0 BLOCKER / IMPORTANT / MINOR. Повторный полный `make site-test`: exit 0, 4819 тестов / 27838 проверок, 6 deprecations, без failures/warnings. Лог: `/tmp/api-management-full-fixed.log`.
 
 Браузер подтвердил 201/no-store, копирование с чтением clipboard, очистку секрета при уходе и возврате назад, отсутствие localStorage/sessionStorage, невозврат вставленного ключа. Матрица: наборы 16/10, все 10 ресурсов отключены, auth/check показывает prepared при effective=[], две вкладки дают 409 и перечитывание без потери нового выбора. Мобильный overflow исправлен и воспроизведение стало зелёным: document/workzone/viewport 390 px. Временные account/session config удалены до итоговых тестов.
 
@@ -70,4 +70,4 @@ Legacy-совместимость: старый layout загружает Tabler
 
 Полные gates выполнены до последних review-исправлений; после них повторены относящиеся к изменениям проверки, включая весь Api module351/1458, focused PHPStan/CS, Twig и UI Kit.
 
-Публикация: Stage4 implementation958d0167 отправлен в ветку; PR2474 отмечен Ready, base master проверен. CI проверяет финальный head; его актуальный статус доступен в PR и повторно проверяется перед merge.
+Публикация: Stage4 implementation958d0167 отправлен в ветку; PR2474 отмечен Ready, base master проверен. После ремонта тестовой фикстуры CI проверяется на новом head; итоговый статус и ссылка на run фиксируются в PR перед решением владельца.
