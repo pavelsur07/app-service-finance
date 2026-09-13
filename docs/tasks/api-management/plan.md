@@ -21,7 +21,7 @@ Checks: Api UI functional, Twig/YAML lint, UI Kit lint/build.
 Review focus: CSRF, secret response caching/reopen, scope, failures.
 
 ## Stage 3: Каталог и подготовленные разрешения
-Risk: HIGH-LOCAL. stage_base_commit: record before work.
+Risk: HIGH-LOCAL. stage_base_commit:36b773b3.
 DoD: explicit catalog, selected/enabled/effective, default deny policy, versioned audited owner save, 409, tests with test-only controllers.
 Work items: 3.1 catalog + policy + independent permissions tests; 3.2 save action/conflict/audit; 3.3 endpoint policy enforcement tests.
 Checks: Api module tests; targeted static/style; external if >500 lines.

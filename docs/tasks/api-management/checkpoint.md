@@ -1,27 +1,29 @@
 ## Current checkpoint
-**Phase:** Stage 2 complete
-**Status:** verified; preparing Stage 3
-**Stage base commit:** 3edbb656
+**Phase:** Stage 3 complete
+**Status:** verified; preparing Stage 4
+**Stage base commit:** 36b773b3
 
 ### Completed
-- Read owner plan and relevant rules; isolated worktree/branch created. Unrelated files stay in original checkout.
-- TASK.md and four-Stage plan saved; no application code/database changes yet.
-- Reviewed Company/ReportApiKey, ModuleAccess gates, Shared audit and module boundaries.
+- Phase 0 and Stages 1–2 committed and pushed. Stage 3 implementation/checks/internal review complete; external round 1 pending.
+- Draft PR: https://github.com/pavelsur07/app-service-finance/pull/2474 (base master verified).
+- Isolated worktree retains all task changes; unrelated original checkout files untouched.
 
-### Checks and baseline
-- docker exec api-management-cli php vendor/bin/phpunit tests/Unit/Company/Security — PASS 29 tests, 119 assertions.
-- docker exec api-management-cli php vendor/bin/phpunit tests/Unit/Shared/EventSubscriber/AuditLogSubscriberTest.php — PASS 1 test, 1 assertion.
-- docker exec api-management-cli php vendor/bin/phpunit tests/Integration/Company/Security/ModuleWriteGateCoverageTest.php — PASS 1 test, 12 assertions.
-- Architecture focused PHPStan running; /tmp/api-management-baseline-stan.log (outside repo).
+### Current verification
+- Stage 3 Api module + route coverage: 338 tests / 1354 assertions PASS.
+- Focused Api PHPStan and style PASS. Production route collection excludes test fixtures.
+- Full handoff gates reserved for Stage 4 completion.
 
 ### Review status
-Internal implementation review pending; external 0 rounds (not yet due).
+- Stage 1 external: round 1, fixed without re-run; Stage 2 internal clean.
+- Stage 3 fresh internal: 0 BLOCKER / 0 IMPORTANT / 0 MINOR; external round 1 running.
 
 ### Exact next action
-Finish external HTTP tests and key Actions integration, focused static/style; Stage 1 review and required external review before commit.
+- Finish external review from base 36b773b3, fix/verify findings, commit/push Stage 3 and update Draft PR. Then implement Stage 4 UI automatically.
 
 ### Files to inspect first on resume
-TASK.md, plan.md, this checkpoint; git status; Company Entity/Facade, Shared AuditLog, Api readme.
+TASK.md, plan.md, this checkpoint, git status, Stage 3 report, site/var/external-review/36b773b3/review.txt.
+
+### Earlier execution evidence
 
 ### Work item 1.1 completed
 - Generated INTEGER public ID/sequence/backfill+legacy compatibility/Facade owner check implemented. Isolated migration and facade tests: 11 tests / 35 assertions PASS; focused PHPStan/style PASS.
@@ -57,3 +59,16 @@ TASK.md, plan.md, this checkpoint; git status; Company Entity/Facade, Shared Aud
 - Real Chromium desktop/mobile smoke PASS: login, empty/list, creation201/no-store, clipboard, no local/sessionStorage, navigation-back clears secret, rename, pasted check/no echo, mobile390px no page overflow, revoke. Screenshots inspected. Synthetic fixture and temporary native-session override removed before final tests.
 - Fresh independent Stage2 review0BLOCKER/0IMPORTANT/0MINOR. Implementation fixed missing-form POST status and long-name overflow; open0. External review not required for MEDIUM Stage2.
 - Exact next action: commit/push Stage2; record Stage3 base; implement backend catalog, prepared/effective policy and audited versioned save. Draft PR service remains unavailable; retry after new branch head is pushed.
+
+- Stage2 committed/pushed36b773b3. Stage3 DoD/risk/work items recorded in plan before code. Selected scopes may be prepared; enabling disconnected resources is rejected so future connection cannot silently activate permissions.
+
+- Draft PR created after Stage2 push: https://github.com/pavelsur07/app-service-finance/pull/2474; verified baseRefName=master,isDraft=true. External service blockage resolved. Stage3 principal/policy regression baseline2 failures observed before implementation.
+
+### Work items3.1–3.3 implemented
+- Explicit16scope catalog/presets, disconnected effective policy, JSON selected/enabled migration90200 appliedTEST, owner/version/atomic-audit save implemented. Test-only controllers exercise full16×16 policy matrix and HTTP disconnected/fresh-read behavior.
+- Integrated Api module+write gate338tests1354assertions PASS. Focused wholeApi PHPStan0. CS identified importordering in exception subscriber; fixed locally. Own principal regression2red→8tests23assertions green; backendpolicy/save23tests60assertions green.
+- Fresh independent Stage3 review running; next required external review after internal green (>500line Stage). PR2474 Draftbasemaster, Stage2 body updated via REST because installed gh edit queries retired projectCards.
+
+### Stage3 complete
+- External round1 REVIEW_GREEN, 0BLOCKER/0IMPORTANT/2MINOR. Both minor fixes verified14tests42assertions, focusedPHPStan/style PASS; no external rerun needed.
+- Exact next action: commit/push Stage3 and update PR2474; record newbase and implement Stage4 matrix. Full gates and whole-task fresh internal/external review remain required at handoff.

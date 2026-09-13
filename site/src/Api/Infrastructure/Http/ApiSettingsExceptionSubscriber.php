@@ -6,7 +6,9 @@ namespace App\Api\Infrastructure\Http;
 
 use App\Api\Exception\ApiKeyNotFoundException;
 use App\Api\Exception\ApiKeyOwnerRequiredException;
+use App\Api\Exception\ApiKeyPermissionsConflictException;
 use App\Api\Exception\InvalidApiKeyNameException;
+use App\Api\Exception\InvalidApiKeyPermissionsException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -35,7 +37,8 @@ final readonly class ApiSettingsExceptionSubscriber implements EventSubscriberIn
         $status = match (true) {
             $error instanceof ApiKeyOwnerRequiredException => 403,
             $error instanceof ApiKeyNotFoundException => 404,
-            $error instanceof InvalidApiKeyNameException, $error instanceof UnprocessableEntityHttpException => 422,
+            $error instanceof ApiKeyPermissionsConflictException => 409,
+            $error instanceof InvalidApiKeyNameException, $error instanceof InvalidApiKeyPermissionsException, $error instanceof UnprocessableEntityHttpException => 422,
             default => null,
         };
         if (null !== $status) {

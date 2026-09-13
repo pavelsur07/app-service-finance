@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Api\Security;
 
+use App\Api\Domain\ApiScopeCatalog;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
@@ -37,7 +38,8 @@ final readonly class ApiAccessSubscriber implements EventSubscriberInterface
         }
         $method = new \ReflectionMethod($object, \is_array($controller) ? $controller[1] : '__invoke');
         $attributes = $method->getAttributes(ApiAccess::class);
-        if ([] === $attributes || ApiAccess::CONNECTION !== $attributes[0]->newInstance()->scope) {
+        $scope = [] === $attributes ? null : $attributes[0]->newInstance()->scope;
+        if (null === $scope || (ApiAccess::CONNECTION !== $scope && (!\in_array($scope, ApiScopeCatalog::scopes(), true) || !\in_array($scope, $principal->effectiveScopes, true)))) {
             throw new AccessDeniedHttpException('Endpoint permission is not available.');
         }
         $event->getRequest()->attributes->set(ApiRequestContext::class, new ApiRequestContext(

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Api\Application;
 
 use App\Api\Domain\ApiKeySecret;
+use App\Api\Domain\ApiScopeCatalog;
+use App\Api\Domain\ApiScopePolicy;
 use App\Api\Repository\ApiKeyRepository;
 use App\Api\Security\ApiPrincipal;
 use App\Api\Security\ApiRateLimiter;
@@ -48,6 +50,10 @@ final readonly class AuthenticateApiKeyAction
             throw new AccessDeniedHttpException('API key does not belong to this company.');
         }
 
-        return new ApiPrincipal($key->getCompanyId(), (int) $publicCompanyId, $key->getId(), $key->getExpiresAt());
+        return new ApiPrincipal(
+            $key->getCompanyId(), (int) $publicCompanyId, $key->getId(), $key->getExpiresAt(),
+            $key->getSelectedScopes(),
+            ApiScopePolicy::effectiveScopes($key->getSelectedScopes(), $key->getEnabledResources(), ApiScopeCatalog::connectedResources()),
+        );
     }
 }

@@ -18,7 +18,7 @@ final readonly class ApiKeyAudit
     /** @param array<string, mixed> $diff */
     public function record(ApiKey $key, string $actorId, AuditLogAction $action, array $diff): void
     {
-        $allowed = array_intersect_key($diff, array_flip(['name', 'expiresAt', 'revokedAt']));
+        $allowed = array_intersect_key($diff, array_flip(['name', 'expiresAt', 'revokedAt', 'selectedScopes', 'enabledResources']));
         if ([] === $allowed) {
             return;
         }

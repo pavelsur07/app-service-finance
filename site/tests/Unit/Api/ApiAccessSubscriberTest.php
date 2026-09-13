@@ -49,11 +49,27 @@ final class ApiAccessSubscriberTest extends TestCase
         yield ['unknown', true];
     }
 
-    private function subscriber(bool $authenticated): ApiAccessSubscriber
+    public function testEffectiveScopeAllowsOnlyItsOwnAction(): void
+    {
+        $this->subscriber(true, ['cash_transactions.read'])->onController($this->event('read', Request::create('/api/external/v1/test')));
+        $this->expectException(AccessDeniedHttpException::class);
+        $this->subscriber(true, ['cash_transactions.read'])->onController($this->event('create', Request::create('/api/external/v1/test')));
+    }
+
+    public function testPreparedScopeCannotAuthorizeAnEndpoint(): void
+    {
+        $this->expectException(AccessDeniedHttpException::class);
+        $this->subscriber(true, [], ['cash_transactions.read'])->onController($this->event('read', Request::create('/api/external/v1/test')));
+    }
+
+    /** @param list<string> $effectiveScopes
+     * @param list<string> $preparedScopes
+     */
+    private function subscriber(bool $authenticated, array $effectiveScopes = [], array $preparedScopes = []): ApiAccessSubscriber
     {
         $storage = new TokenStorage();
         if ($authenticated) {
-            $principal = new ApiPrincipal('company', 100025, 'key', new \DateTimeImmutable());
+            $principal = new ApiPrincipal('company', 100025, 'key', new \DateTimeImmutable(), $preparedScopes, $effectiveScopes);
             $storage->setToken(new UsernamePasswordToken($principal, 'external_api', $principal->getRoles()));
         }
 
@@ -77,6 +93,16 @@ final class ApiPolicyFixture
     }
 
     public function missing(): void
+    {
+    }
+
+    #[ApiAccess('cash_transactions.read')]
+    public function read(): void
+    {
+    }
+
+    #[ApiAccess('cash_transactions.create')]
+    public function create(): void
     {
     }
 

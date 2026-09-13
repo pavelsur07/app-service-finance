@@ -6,6 +6,7 @@ namespace App\Api\Entity;
 
 use App\Api\Domain\ApiKeyName;
 use App\Api\Domain\ApiKeySecret;
+use App\Api\Domain\ApiScopeCatalog;
 use App\Api\Repository\ApiKeyRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -40,6 +41,35 @@ class ApiKey
     #[ORM\Version]
     #[ORM\Column(type: 'integer', options: ['default' => 1])]
     private int $version = 1;
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $selectedScopes = [];
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $enabledResources = [];
+
+    /** @return list<string> */
+    public function getSelectedScopes(): array
+    {
+        return $this->selectedScopes;
+    }
+
+    /** @return list<string> */
+    public function getEnabledResources(): array
+    {
+        return $this->enabledResources;
+    }
+
+    /** @param list<string> $selectedScopes
+     * @param list<string> $enabledResources
+     */
+    public function setPermissions(array $selectedScopes, array $enabledResources): void
+    {
+        $this->selectedScopes = ApiScopeCatalog::normalizeScopes($selectedScopes);
+        $this->enabledResources = ApiScopeCatalog::normalizeResources($enabledResources);
+    }
 
     public function __construct(
         #[ORM\Column(type: 'guid')]

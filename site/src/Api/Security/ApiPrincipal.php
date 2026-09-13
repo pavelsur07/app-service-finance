@@ -9,11 +9,17 @@ use Symfony\Component\Security\Core\User\UserInterface;
 /** Authenticated company/key identity, never the user who created the key. */
 final readonly class ApiPrincipal implements UserInterface
 {
+    /**
+     * @param list<string> $preparedScopes
+     * @param list<string> $effectiveScopes
+     */
     public function __construct(
         public string $companyId,
         public int $publicCompanyId,
         public string $keyId,
         public \DateTimeImmutable $expiresAt,
+        public array $preparedScopes = [],
+        public array $effectiveScopes = [],
     ) {
     }
 
@@ -38,8 +44,8 @@ final readonly class ApiPrincipal implements UserInterface
             'company_id' => $this->publicCompanyId,
             'key_id' => $this->keyId,
             'expires_at' => $this->expiresAt->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM),
-            'prepared_scopes' => [],
-            'effective_scopes' => [],
+            'prepared_scopes' => $this->preparedScopes,
+            'effective_scopes' => $this->effectiveScopes,
         ];
     }
 }
