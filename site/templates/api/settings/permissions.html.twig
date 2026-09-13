@@ -1,0 +1,43 @@
+{% extends 'api/settings/layout.html.twig' %}
+{% form_theme form 'api/settings/_form_theme.html.twig' %}
+{% block content %}
+<div class="wz-row"><h1 class="wz-title">Права API-ключа<span class="wz-sub">Подготовьте доступ отдельно для каждого подключения</span></h1><div class="wz-head-actions"><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">К списку ключей</a></div></div>
+<div class="wz-row"><section class="card">
+    <div class="form-field"><label class="form-label" for="api-key-current-name">Ключ</label><input id="api-key-current-name" class="input" readonly value="{{ key.name }}"></div>
+    {% for message in app.flashes('api_permissions_success') %}<div class="alert alert--success" role="status"><div class="a-body"><p class="a-text">{{ message }}</p></div></div>{% endfor %}
+    <div class="alert alert--warning"><div class="a-body"><p class="a-text">Права подготовлены. Доступ появится после подключения раздела и вашего включения</p></div></div>
+    <p>Подготовлено прав: {{ key.selectedScopes|length }}. Действующих прав: {{ effectiveScopes|length }}.</p>
+    <p>Новые разделы и права не выдаются автоматически. Сохранение прав не продлевает срок действия ключа.</p>
+</section></div>
+{{ form_start(form, {attr: {'data-api-permissions': ''}}) }}
+{{ form_errors(form) }}{{ form_errors(form.selectedScopes) }}{{ form_errors(form.enabledResources) }}{{ form_errors(form.version) }}
+{% set scope_fields = {} %}{% for field in form.selectedScopes %}{% set scope_fields = scope_fields|merge({(field.vars.value): field}) %}{% endfor %}
+{% set enable_fields = {} %}{% for field in form.enabledResources %}{% set enable_fields = enable_fields|merge({(field.vars.value): field}) %}{% endfor %}
+{% set action_labels = {read: 'Чтение', create: 'Создание', update: 'Изменение', soft_delete: 'Мягкое удаление'} %}
+<div class="wz-row">
+    <button class="btn btn-md btn-secondary" type="button" data-api-preset="{{ presets.read_only|json_encode|e('html_attr') }}">Только чтение</button>
+    <button class="btn btn-md btn-secondary" type="button" data-api-preset="{{ presets.all_scopes|json_encode|e('html_attr') }}">Все действия</button>
+</div>
+<p class="field-helper" role="status" aria-live="polite" data-api-preset-status>Выбор набора меняет только отметки. Сохраните изменения отдельной кнопкой.</p>
+<div class="wz-row"><section class="card card--flush">
+    <div class="report-scroll" role="region" aria-label="Матрица прав API" tabindex="0">
+        <table class="t-table">
+            <thead><tr><th scope="col">Раздел</th>{% for label in action_labels %}<th scope="col">{{ label }}</th>{% endfor %}<th scope="col">Включить доступ</th><th scope="col">Подключение</th></tr></thead>
+            <tbody>{% for resource, definition in resources %}
+                <tr><th scope="row">{{ definition.label }}</th>
+                    {% for action, label in action_labels %}
+                        <td>{% if action in definition.actions %}
+                            <label class="checkbox-label">{{ form_widget(scope_fields[resource ~ '.' ~ action], {attr: {class: 'checkbox', 'data-api-scope': '', 'aria-label': definition.label ~ ': ' ~ label}}) }}</label>
+                        {% else %}<span aria-label="Право не предусмотрено">—</span>{% endif %}</td>
+                    {% endfor %}
+                    <td><label class="checkbox-label">{% if definition.connected %}{{ form_widget(enable_fields[resource], {attr: {class: 'checkbox', 'data-api-resource-enable': '', 'aria-label': 'Включить доступ: ' ~ definition.label}}) }}{% else %}<input class="checkbox" type="checkbox" disabled data-api-resource-enable aria-label="{{ definition.label }}: раздел ещё не подключён">{% endif %}</label></td>
+                    <td>{% if definition.connected %}<span class="status status--success">Подключён</span>{% else %}<span class="status status--warning">Не подключён</span>{% endif %}</td>
+                </tr>
+            {% endfor %}</tbody>
+        </table>
+    </div>
+</section></div>
+{{ form_widget(form.version) }}{{ form_widget(form._token) }}
+<div class="wz-row"><button class="btn btn-md btn-primary" type="submit">Сохранить права</button><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">Отмена</a></div>
+{{ form_end(form, {render_rest: false}) }}
+{% endblock %}

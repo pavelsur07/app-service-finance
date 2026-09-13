@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Audit;
 
+use App\Api\Security\ApiPrincipal;
 use App\Company\Entity\User;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -42,6 +43,11 @@ class AuditContextProvider
         // так как он наверняка полезет в сессию
         if (null === $this->requestStack->getMainRequest()) {
             return null;
+        }
+
+        $principal = $this->security->getUser();
+        if ($principal instanceof ApiPrincipal) {
+            return $principal->companyId;
         }
 
         try {

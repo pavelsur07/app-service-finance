@@ -1,5 +1,13 @@
 framework:
     rate_limiter:
+        external_api_key:
+            policy: fixed_window
+            limit: 60
+            interval: '1 minute'
+        external_api_failures:
+            policy: fixed_window
+            limit: 20
+            interval: '1 minute'
         reports_api:
             policy: fixed_window
             limit: 60

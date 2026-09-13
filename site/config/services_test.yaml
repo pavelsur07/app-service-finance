@@ -54,3 +54,7 @@ services:
     App\Ingestion\Application\Service\IngestRateLimitGuard:
         arguments:
             $lockFactory: '@test.ingestion_lock_factory'
+
+    App\Tests\Functional\Api\Fixtures\PermissionController:
+        public: true
+        tags: ['controller.service_arguments']

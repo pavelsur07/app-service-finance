@@ -491,7 +491,8 @@ final class VerificationApiControllerTest extends WebTestCaseBase
             storagePath: sprintf('%s/%s.ndjson.gz', $companyId, $externalId),
             hash: hash('sha256', $companyId.$externalId),
             byteSize: 100,
-            fetchedAt: $fetchedAt ?? new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            // Shop choices use a rolling 90-day fetch window; operation dates stay fixed below.
+            fetchedAt: $fetchedAt ?? new \DateTimeImmutable('now'),
             syncJobId: $syncJobId ?? 'job-'.$externalId,
         );
     }

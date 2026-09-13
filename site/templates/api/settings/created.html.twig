@@ -1,0 +1,12 @@
+{% extends 'api/settings/layout.html.twig' %}
+{% block content %}
+<div class="wz-head"><h1 class="wz-title">API-ключ создан</h1></div>
+<div class="wz-row"><section class="card">
+    <div class="alert alert--warning"><div class="a-body"><h2 class="a-title">Сохраните ключ сейчас</h2><p class="a-text">Секрет показан только в этом ответе. После ухода со страницы его нельзя открыть снова.</p></div></div>
+    <div class="form-field"><label class="form-label" for="api-key-current-name">Название ключа</label><input id="api-key-current-name" class="input" readonly value="{{ key.name }}"></div>
+    <p>Действует до {{ key.expiresAt|date('d.m.Y H:i', 'UTC') }} UTC</p>
+    <div class="form-field"><label class="form-label" for="api-secret">Секрет API-ключа</label><input id="api-secret" class="input" type="text" readonly autocomplete="off" spellcheck="false" value="{{ secret }}" data-api-secret></div>
+    <div class="wz-head-actions"><button class="btn btn-md btn-primary" type="button" data-api-copy>Скопировать</button><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">Готово</a></div>
+    <p class="field-helper" role="status" aria-live="polite" data-api-copy-status>Скопируйте ключ в безопасное место.</p>
+</section></div>
+{% endblock %}

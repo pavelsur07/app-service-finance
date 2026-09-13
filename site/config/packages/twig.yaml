@@ -5,6 +5,7 @@ twig:
         - 'form/project_direction_picker_theme.html.twig'
         - 'form/counterparty_picker_theme.html.twig'
     paths:
+        '%kernel.project_dir%/templates/api': Api
         '%kernel.project_dir%/templates/balance': Balance
         '%kernel.project_dir%/templates/loan': Loan
         '%kernel.project_dir%/templates/telegram': Telegram

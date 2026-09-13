@@ -19,6 +19,11 @@ parameters:
         - src
         - tests
 
+    # The public-ID migration is referenced by its regression test. Discover its
+    # symbols without adding historical migrations to the analysis paths.
+    scanFiles:
+        - migrations/Version20260913090000.php
+
     # migrations сознательно вне охвата: 242 сгенерированных one-shot файла,
     # уже прогнанных на проде. Их анализ дал бы вечный балласт в baseline.
     # bin/, config/, public/ — точки входа, вне охвата по той же причине.

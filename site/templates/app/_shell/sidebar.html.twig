@@ -14,6 +14,10 @@
                 </svg>
                 <span class="lbl">Обзор</span>
             </a>
+            {% if activeCompany|default(null) and app.user and activeCompany.user.id == app.user.id %}
+                <div class="sb-group-title">Настройки</div>
+                <a class="sb-item {{ app_nav_active|default('') == 'api' ? 'is-active' : '' }}" href="{{ path('settings_api_index') }}"><span class="lbl">API</span></a>
+            {% endif %}
         </nav>
         <div class="sb-foot">
             <span class="avatar avatar--md avatar--tint-3" aria-hidden="true">

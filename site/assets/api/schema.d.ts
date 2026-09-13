@@ -172,6 +172,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/external/v1/auth/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Проверка Bearer-ключа без cookies */
+        get: operations["get_external_api_auth_check"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -908,6 +925,72 @@ export interface operations {
                         /** @example Снимок не найден */
                         message?: string;
                     };
+                };
+            };
+        };
+    };
+    get_external_api_auth_check: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Company-Id": number;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Действующий ключ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        company_id?: number;
+                        /** Format: uuid */
+                        key_id?: string;
+                        /** Format: date-time */
+                        expires_at?: string;
+                        prepared_scopes?: string[];
+                        effective_scopes?: string[];
+                    };
+                };
+            };
+            /** @description Отсутствующий или недействующий ключ; WWW-Authenticate: Bearer */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Ключ другой компании */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Неверный X-Company-Id */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Лимит запросов */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
