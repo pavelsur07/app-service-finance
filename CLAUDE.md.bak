@@ -1,34 +1,92 @@
 # CLAUDE.md — VashFinDir
 
-> Читается Claude Code автоматически. Workflow и полномочия — `AGENTS.md`
-> (читается всегда: там же единая карта файлов с триггерами «когда читать»),
+> Читается Claude Code автоматически. Workflow и полномочия — `AGENTS.md`,
 > паттерны с кодом — `PATTERNS.md`, живые контракты — `ARCHITECTURE.md`.
 > Здесь только backend-правила и то, чего нет в `AGENTS.md`.
 
-## Workflow — `AGENTS.md`, здесь не дублируется
+## Карта файлов
 
-Ключевое: один вопрос Владельцу за задачу — «merge and deploy #N» на handoff
-(§3.2); всё до handoff pre-authorized (§3.1); STOP только по списку §3.4.
-`CLAUDE.md` ниже `AGENTS.md` и не может вводить ручной STOP, которого там нет.
-Задача по React / TypeScript / Vite / UI Kit → прочитать `CLAUDE.frontend.md`;
-правила ниже к фронту не применяются, workflow — тот же.
+| Файл | Назначение | Когда читать |
+|---|---|---|
+| `AGENTS.md` | Канонический workflow обоих агентов: полномочия, STOP, ревью, git, PROD | Всегда |
+| `CLAUDE.md` | Backend PHP/Symfony правила | Всегда автоматически |
+| `CLAUDE.frontend.md` | React / TypeScript / UI Kit | Фронтенд-задача |
+| `PATTERNS.md` | Паттерны с примерами кода | Нужный раздел по задаче |
+| `ARCHITECTURE.md` | Живые Facade, Enum, Entity | Перед написанием кода |
+| `docs/workflow/external-review.md` | Внешнее ревью: скрипт, промпт, сбои | Перед вызовом второго агента |
+| `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP | Large-задача |
+| `docs/workflow/stage-report.md` | Репозиторный self-review checklist Stage | Закрытие Stage |
+| `docs/workflow/stage-report-frontend.md` | Фронтовый self-review checklist Stage | Закрытие фронтового Stage |
+| `docs/workflow/git-housekeeping.md` | База PR, удаление веток | `gh pr create`, удаление ветки |
+| `docs/workflow/data-migrations.md` | Миграции данных: замеры, слияния, сверка после прода | Миграция с данными |
+| `docs/workflow/health-gates.md` | Мониторы и гейты: охват проверки = охват починки | Cron-проверка, верификатор |
+| `docs/workflow/new-module.md` | Конфигурация нового модуля | Создание `src/{Module}` |
+| `docs/maintenance/quality-gates.md` | PHPStan-baseline, cs-check, branch protection: устройство и история | Красный гейт, CI |
+| `docs/maintenance/prod-access.md` | PROD-доступ: правила, wrappers, формы вызова | До обращения к production |
+
+## Workflow и полномочия — `AGENTS.md`
+
+- Иерархия: `Work item → Stage → Handoff → merge + deploy`.
+- **Один вопрос Владельцу за задачу** — «merge and deploy #N» на handoff
+  (`AGENTS.md` §3.2). Одобрение покрывает весь конвейер: Ready for review →
+  merge → CI → авто-деплой → post-deploy acceptance → отчёт. Внутри конвейера
+  ничего не переспрашивать. Отдельное одобрение только для действий вне
+  конвейера (§3.3): ручные мутации прода, инфра, секреты, необратимые данные,
+  remote-ветки, расширение прав.
+- **PR с миграцией по этому одобрению не деплоится.** Миграции на проде —
+  отдельный `workflow_dispatch`, а push-деплой не идёт, пока схема не
+  актуальна, и гейт блокирует все последующие деплои тоже. Просить оба
+  действия сразу — `AGENTS.md` §3.2.
+- Всё до handoff pre-authorized (§3.1): правки в scope, локальные миграции,
+  проверки, оба ревью, commit, push, Draft PR, Ready на handoff.
+- STOP только по списку §3.4. HIGH-метка, легаси-зона, красные тесты, итерации
+  фикса, отказ в правах — не STOP: доделать остальное и отдать точную команду.
+- Приоритет источников — §2. `CLAUDE.md` ниже `AGENTS.md` и не может вводить
+  ручной STOP, которого там нет.
+- Внешнее ревью: когда и сколько раундов — §7.2; запуск —
+  `site/bin/external-review.sh <base_commit>` (`docs/workflow/external-review.md`).
+- Задача по React / TypeScript / Vite / UI Kit → прочитать `CLAUDE.frontend.md`;
+  правила ниже к фронту не применяются, workflow — тот же.
 
 ## Перед кодом
 
 1. `ARCHITECTURE.md` — актуальные Facade-методы, Enum, Entity. Существующие
    контракты не выдумывать.
-2. Модуль вывести из соседнего кода; спросить только при материальной
+2. **Повторное использование прежде нового кода.** Перед написанием функции,
+   helper'а, DTO или сервиса — поискать существующее решение в кодовой базе
+   (Grep по модулю и соседним, `PATTERNS.md`, Facade'и). Уже есть — расширить
+   или вызвать, а не написать дубликат в паре файлов рядом. Не создавать
+   абстракции без запроса: интерфейс с одной реализацией, фабрика одного
+   продукта, конфиг неизменяемого значения — не нужны. Выигрывает кратчайший
+   рабочий дифф в правильном месте.
+3. Модуль вывести из соседнего кода; спросить только при материальной
    неоднозначности.
-3. Новый Facade, метод, Enum или Entity, однозначно следующий из ТЗ, — создать
+4. Новый Facade, метод, Enum или Entity, однозначно следующий из ТЗ, — создать
    в scope и обновить `ARCHITECTURE.md` в том же Stage.
-4. Нужен паттерн — соответствующий раздел `PATTERNS.md`.
+5. Нужен паттерн — соответствующий раздел `PATTERNS.md`.
 
-## Legacy-зона
+## Структура модуля
 
-`src/Entity/`, `src/Service/`, `src/Repository/`, `src/Controller/`: новые
-файлы не создавать. Правка там — HIGH-LOCAL: только когда прямо требуется
-задачей, с усиленными тестами и review; не STOP. Структура нового модуля —
-`docs/workflow/new-module.md`.
+```
+src/{Module}/Controller/          src/{Module}/Application/
+src/{Module}/Controller/Api/      src/{Module}/Application/Command/
+src/{Module}/Entity/              src/{Module}/Application/DTO/
+src/{Module}/Repository/          src/{Module}/Application/Processor/
+src/{Module}/Facade/              src/{Module}/Application/Service/
+src/{Module}/Enum/                src/{Module}/Application/Source/
+src/{Module}/Form/                src/{Module}/Domain/
+src/{Module}/DTO/                 src/{Module}/Domain/ValueObject/
+src/{Module}/Message/             src/{Module}/Domain/Service/
+src/{Module}/MessageHandler/      src/{Module}/Infrastructure/
+src/{Module}/EventSubscriber/     src/{Module}/Infrastructure/Api/
+src/{Module}/Exception/           src/{Module}/Infrastructure/Query/
+tests/Builders/{Module}/          src/{Module}/Infrastructure/Normalizer/
+src/{Module}/Api/Request/         src/{Module}/Api/Response/
+```
+
+Legacy-зона `src/Entity/`, `src/Service/`, `src/Repository/`, `src/Controller/`:
+новые файлы не создавать. Правка там — HIGH-LOCAL: только когда прямо требуется
+задачей, с усиленными тестами и review; не STOP.
 
 ## Правила PHP
 
@@ -148,19 +206,20 @@ INFO/DEBUG.
 | Уровень | Когда |
 |---|---|
 | `ERROR` | Инцидент: неустранимый сбой, баг, повреждение данных — нужно будить человека |
-| `WARNING` | Ожидаемо и обрабатывается само: retry, 429, таймаут, невалидный вход + skip |
+| `WARNING` | Ожидаемо и обрабатывается само: retry, 429, таймаут, невалидный вход + skip, «данные не готовы» |
 | `INFO` | Бизнес-события: старт/финиш async-задачи, отправка документа, импорт завершён |
 | `DEBUG` | Только локально |
 
 - Messenger: `warning` + `RecoverableMessageHandlingException` пока ретраим;
   `error` + `UnrecoverableMessageHandlingException` только на неустранимом.
-- Обязательно: старт и финиш каждого MessageHandler с ID и `companyId`;
-  внешние HTTP — метод, URL, статус, время, без тела. В циклах — один
-  агрегированный `error` со счётчиком, не по записи.
+- В циклах — один агрегированный `error` со счётчиком, не по записи.
+- Обязательно: старт и финиш каждого MessageHandler с ID сообщения и
+  `companyId`; внешние HTTP — метод, URL, статус, время, без тела; смена
+  критичных статусов Entity.
 - Запрещено: пароли, токены, ключи даже в DEBUG; ФИО и ИНН без явного
   требования; тело ответа внешних API.
-- Детали и примеры — `PATTERNS.md` §23; мониторы —
-  `docs/workflow/health-gates.md`.
+- Мониторы и гейты с exit code — `docs/workflow/health-gates.md`. Примеры —
+  `PATTERNS.md` §23.
 
 ## Производительность
 
@@ -187,7 +246,10 @@ INFO/DEBUG.
   ratchet — не использовать вместо починки.
 - Красный baseline до задачи — не регресс и не индульгенция: проверять
   изменённые файлы точечно и записать факт с цифрой.
-- Устройство гейтов, обязательные job'ы и branch protection —
+- На `master` обязательны три проверки: `🔬 Static analysis`,
+  `🎨 PHP code style`, `🧪 Unit tests`. Имя job'а в `deploy.yml` — контракт с
+  защитой ветки: переименовал — обнови список в том же PR.
+- Устройство, история и почему матричный job нельзя сделать обязательным —
   `docs/maintenance/quality-gates.md`.
 
 ## Практики

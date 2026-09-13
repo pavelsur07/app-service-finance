@@ -9,15 +9,10 @@ linked documents — read the one your task touches, not all of them:
 | `CLAUDE.frontend.md` | React / TypeScript / UI Kit rules | frontend task |
 | `PATTERNS.md`, `ARCHITECTURE.md` | Code patterns; live Facade, Enum, Entity contracts | only the section the task needs |
 | `docs/workflow/external-review.md` | External review: script, prompt, failure handling | before calling the reviewer |
-| `docs/workflow/release.md` | Migration deploy: dispatch, gates, request templates | PR carries a migration |
 | `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message | Large task |
 | `docs/workflow/stage-report.md`, `stage-report-frontend.md` | Stage self-review checklists | closing a Stage |
 | `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion | `gh pr create`, branch cleanup |
-| `docs/workflow/data-migrations.md` | Data migrations: measurements, merges, post-deploy reconciliation | migration touching data |
-| `docs/workflow/health-gates.md` | Monitors and gates: check coverage = fix coverage | cron check, verifier |
-| `docs/workflow/new-module.md` | New module configuration and directory layout | creating `src/{Module}` |
-| `docs/maintenance/quality-gates.md` | PHPStan baseline, cs-check, branch protection: design and history | red gate, CI trouble |
-| `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists, log/backup paths | before touching production |
+| `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists | before touching production |
 
 Main application: `site/` (Symfony 7.4, Doctrine, PostgreSQL, Redis, Messenger,
 Twig, React/Vite, Docker Compose, Makefile). Verify paths with `ls`/`rg`; do
@@ -88,13 +83,29 @@ That approval covers the whole pipeline: Ready → merge → CI → automatic de
 split out of the same work for delivery reasons and every step inside the
 pipeline (CI, merge order, branch cleanup, post-deploy checks). Ask again only
 when the answer could differ: work the approval did not cover, a PR carrying a
-migration, or a §3.3 action.
+migration (below), or a §3.3 action.
 
 **A PR that adds a migration does not deploy on that approval.** Production
-migrations are a separate manual dispatch, and the push-triggered deploy gate
-blocks every deploy while a migration is pending. When the PR carries a
-migration — read `docs/workflow/release.md` before the handoff request and ask
-for both actions at once.
+migrations are a separate `workflow_dispatch`; the push-triggered deploy
+refuses to run while any migration is pending, and that gate blocks every later
+deploy too. When the PR carries a migration, say so and ask for both actions at
+once:
+
+```text
+Ready: PR #<n> "<title>" — the PR adds migration <Version...>: <reversible? data touched? backup needed?>.
+Run the production migration and deploy?
+Reply: "run the migration and deploy #<n>"
+```
+
+Then dispatch in order and check the schema between the two:
+
+```bash
+gh workflow run deploy.yml --ref master -f production_action=migrations
+gh workflow run deploy.yml --ref master -f production_action=deploy
+```
+
+An irreversible migration or a destructive data change is named explicitly in
+the request, with the backup or rollback plan.
 
 ### 3.3 Separate approval — outside the pipeline
 
@@ -145,7 +156,7 @@ about omissions that project patterns or conservative assumptions resolve.
 | **Fast Path** | Read-only work; docs, comments, formatting, prose-only copy; verified Git housekeeping. No change to code paths, config, contracts | do → narrowest verification → report | none | none |
 | **XS** | Bug fix under ~30 lines in one file, with a regression test | implement → targeted test → internal review → commit → push → PR → handoff | none, the PR description is the report | none |
 | **Small** | One module or one bounded change; no schema, Messenger, auth, public contract or financial-semantics change | one implicit Stage: implement → checks → internal review → commit → push → PR → handoff | none, the PR description is the report | only when the change touches a HIGH-LOCAL area or the owner asks |
-| **Large** | New module, schema or migration, financial logic, public API, Messenger/cron/workers, infrastructure, integrations, frontend redesign, cross-module change | Phase 0 → Stages → handoff | `plan.md`, `checkpoint.md`, `stages/stage-N.md`, `handoff.md` | §7.2: handoff + HIGH-LOCAL Stage with diff >500 lines |
+| **Large** | New module, schema or migration, financial logic, public API, Messenger/cron/workers, infrastructure, integrations, frontend redesign, cross-module change | Phase 0 → Stages → handoff | `plan.md`, `checkpoint.md`, `stages/stage-N.md`, `handoff.md` | one round at handoff |
 
 A task that outgrows its class moves to the next class before making the
 excluded change. Documentation intended for delivery still goes through a
@@ -210,10 +221,7 @@ action.
   point-wise and record the fact with numbers.
 - **Cascade.** Work item: the narrowest test plus focused lint/static analysis
   of the changed files. Stage: the module test set. Handoff: the full gates
-  (§5). The full gates run once, at handoff — not at every Stage. On Fast
-  Path/XS/Small the full suite runs only at handoff and only when integration
-  paths are touched — running `make site-test` mid-task is a workflow
-  violation, not diligence.
+  (§5). The full gates run once, at handoff — not at every Stage.
 - **Bug fix = regression test proven red** on the old code and green on the
   new one, asserting observable behavior. If impractical, document why and give
   the strongest alternative evidence.
@@ -243,11 +251,6 @@ debug code, unnecessary complexity. Frontend: loading, empty, error and
 responsive states. Checklists: `docs/workflow/stage-report.md` and
 `docs/workflow/stage-report-frontend.md`.
 
-The final internal review at handoff runs in a **fresh session** holding only
-the task spec, the complete diff and the checklist — not the implementation
-history. Reviewing in the session that wrote the code anchors the reviewer on
-its own decisions and misses its own mistakes.
-
 Classify every finding:
 
 ```text
@@ -270,9 +273,8 @@ Policy:
 
 - **When.** Fast Path and XS: never. Small: only when the change touches a
   HIGH-LOCAL area (migration, auth, financial semantics, public endpoint,
-  Messenger routing) or the owner asks. Large: one round at handoff, plus one
-  round at the end of a HIGH-LOCAL Stage whose diff exceeds ~500 lines — a
-  diff too large to review well at handoff. Never after a Work item.
+  Messenger routing) or the owner asks. Large: one round at handoff. Never
+  after a Work item, never per Stage.
 - **How.** One call: `site/bin/external-review.sh <base_commit> --effort
   medium` with `--context` for findings already fixed internally and facts the
   reviewer cannot obtain itself. Exits 0 only on `REVIEW_GREEN`.
@@ -309,25 +311,24 @@ Policy:
   credentials, production IPs. Reference variable names, not values.
 - Production is reached only through the `vf-prod-codex` alias and its wrappers
   (`codex-docker-ps`, `codex-psql-ro`, `codex-console`, `codex-cgroup`); full
-  rules, call forms and log/backup paths: `docs/maintenance/prod-access.md`.
-  Read-only checks run when the owner asks or as post-deploy acceptance; every
-  mutating production command is a §3.3 approval. Never work around a missing
-  wrapper — ask the owner for a narrowly scoped one.
+  rules and call forms: `docs/maintenance/prod-access.md`. Read-only checks run
+  when the owner asks or as post-deploy acceptance; every mutating production
+  command is a §3.3 approval. Never work around a missing wrapper — ask the
+  owner for a narrowly scoped one.
 - No production credentials in local checks. No live external side effects
   without approval. Preserve rate limits, idempotency and retry logic in
   integrations.
+- Production logs go to container stdout/stderr; retained artifacts to
+  `/var/log/app-service-finance/maintenance/`, backups to
+  `/var/backups/app-service-finance/`, temporary audits to
+  `/var/tmp/app-service-finance.*`. Creating or changing those paths is a
+  production mutation.
 
 ## 10. Commands
 
 Docker Compose and Makefile; `make help` lists targets. Do not run host-level
 `php`, `composer`, `npm` unless the environment clearly supports it. Do not
 install system packages.
-
-Long commands (full test suites, builds): launch once with an adequate timeout
-or in the background and wait on the task result — never poll with manual
-`docker ps`/`sleep` loops. Repeated targeted test runs: `docker compose exec`
-into the running container, not `run --rm` — container startup dominates a
-15–20 s test.
 
 ```bash
 make site-test-unit          # unit tests
@@ -341,10 +342,9 @@ make codex-prepare && make codex-test-unit   # Codex Cloud
 ## 11. Reporting
 
 Final response of every task: what changed; files; checks run and results;
-internal review result; external review result and rounds; review metrics —
-BLOCKER/IMPORTANT counts found internally and externally (one line, feeds the
-monthly review-policy check); commit, branch and PR URL; risks and follow-ups;
-anything not completed; and at handoff the single §3.2 question. Be concise.
+internal review result; external review result and rounds; commit, branch and
+PR URL; risks and follow-ups; anything not completed; and at handoff the
+single §3.2 question. Be concise.
 
 Never end a runnable task with review, commit, push or PR as a "next step",
 and never ask the owner to start or conduct a review — perform those actions,
