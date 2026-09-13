@@ -1,33 +1,32 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 / Work item 4.3 — handoff
-**Status:** verified; delivery in progress
+**Phase:** handoff — awaiting owner decision
+**Status:** implementation, verification and reviews complete; PR Ready
 **Stage base commit:** 17de7b7f
+**Stage 4 implementation commit:** 958d0167
 
-### Completed
-- Stages 1–3 committed and pushed; Stage 4 implementation and browser checks complete.
-- Branch `feat/api-management`, isolated worktree `/home/deploy/projects/app-service-finance-api-management`.
-- Draft PR https://github.com/pavelsur07/app-service-finance/pull/2474, base master verified.
-- No production actions; synthetic browser fixtures and temporary config removed.
+### Delivered
+- All four Stages complete on `feat/api-management`; isolated worktree `/home/deploy/projects/app-service-finance-api-management`.
+- PR https://github.com/pavelsur07/app-service-finance/pull/2474 is Ready, base master verified. Final PR description contains gates, review results and release constraints.
+- No production commands, merge or deploy performed. Browser fixtures/config removed; no unrelated owner files included.
 
-### Current verification
-- Api module 347 tests / 1429 assertions PASS; desktop/mobile and two-tab conflict smoke PASS.
-- Full unit 2839 / 15897 PASS, 4 deprecations. Full canonical style and strict types: 0/2565 PASS. OpenAPI types PASS.
-- Full suite 4815 / 27782: 2 pre-existing time-dependent Ingestion failures, causal diagnostic confirmed (see below). No task regression confirmed.
-- PHPStan found 6 missing-migration-symbol errors; scanFiles fix passes targeted analysis; full rerun PASS (0 errors).
-- UI lint/build PASS; baseline UI Kit 9107 and React mapping 47 violations unchanged.
+### Verification
+- Final Api module: 351 tests / 1458 assertions PASS; real Chromium lifecycle, secret copy/history/storage, presets, two-tab409/reload and mobile390 PASS.
+- Full PHPStan2550files0errors, canonicalCS/strictTypes0/2565, unit2839/15897 (4deprecations), OpenAPItypes, npm lint/build, Twig/YAML PASS. Post-review fixes verified by targeted tests/static/style and whole Api module.
+- Fullsuite4815/27782:2confirmed pre-existing Ingestion fixture-aging failures; causal reproduction/temporarydate-only control in handoff. No financial code changed to hide failures.
+- UI Kit9108=9107baseline+one explicit legacy dropdown-item compatibility use; Reactmapping47baseline unchanged.
+- CI runs against final PR head; inspect latest checks before merge. Previously failing task style/static diagnostics were fixed locally and full gates passed.
 
-### Review status
-- Stage 1: internal findings fixed, external round 1 fixed without re-run.
-- Stage 2: independent internal clean; 2 implementation MINOR fixed.
-- Stage 3: independent internal clean, external round 1 REVIEW_GREEN; 2 MINOR fixed and checked.
-- Stage 4: 1 browser MINOR fixed. Final whole-task review and scoped fix reviews complete: 0 open findings; external round 1 resolved (IMPORTANT rejected with proof, 3 MINOR fixed).
+### Reviews
+- Fresh whole-task internal review and scoped fix review:0open BLOCKER/IMPORTANT/MINOR.
+- External3rounds total (Stage1,Stage3,handoff). Reported0BLOCKER/3IMPORTANT:2confirmed fixed,1false finding rejected with actualSymfony dispatcher/ErrorListener proof. All safeMINOR fixed. No externalrerun required afternonBLOCKER fixes.
+- Internal reported1BLOCKER/4IMPORTANT across task, all fixed; no open confirmed findings.
 
 ### Exact next action
-Finish external whole-task review through standard script (session9547, log /tmp/api-management-handoff-external.log); fix/verify findings; update handoff/Stage4 docs; commit/push task files; verify CI, mark PR Ready and ask migration+deploy approval.
+Wait for the owner's explicit `run the migration and deploy #2474`. Approval must cover the three irreversible forward-fix migrations and deploy; a verified database/companies backup is required before dispatch and is not automatically made by the workflow. After approval follow docs/workflow/release.md and prod-access.md, including required CI, backup confirmation, baseline read-only measurements, merge, migrations dispatch, schema gate, deploy and read-only acceptance. Do not merge or touch production before that approval.
 
 ### Files to inspect first on resume
-TASK.md, plan.md, this checkpoint, git status, handoff.md. Verification logs: /tmp/api-management-handoff-*.log. Active PHPStan session47973 (if tool session still available); source of truth log /tmp/api-management-handoff-stan-fixed.log.
+This checkpoint, handoff.md, TASK.md; git status; PR2474/latesthead/checks. Detailed local evidence in /tmp/api-management-handoff-*.log and /tmp/api-management-final-api.log. Stage reports preserve history; current status above is authoritative.
 
 ### Earlier execution evidence
 

@@ -1,6 +1,6 @@
 # api-management — handoff
 
-Branch: `feat/api-management`. PR: https://github.com/pavelsur07/app-service-finance/pull/2474 (base master).
+Branch: `feat/api-management`. PR: https://github.com/pavelsur07/app-service-finance/pull/2474 (Ready, base master).
 
 ## Результат
 
@@ -69,3 +69,5 @@ Ready: PR #2474 «feat(api): управление Bearer-ключами комп
 Legacy-совместимость: старый layout загружает Tabler, а не UI Kit menu.css. Ссылка API использует тот же dropdown-item, что соседние пункты. Это одно явное дополнительное срабатывание UI Kit checker (9108 вместо9107), без нового CSS/зависимостей. Основание: root AGENTS.md §1 — существующий паттерн при интеграции; новый интерфейс API остаётся на UI Kit. Попытка menu-item выявлена scoped review как MINOR и исправлена; открытых замечаний0.
 
 Полные gates выполнены до последних review-исправлений; после них повторены относящиеся к изменениям проверки, включая весь Api module351/1458, focused PHPStan/CS, Twig и UI Kit.
+
+Публикация: Stage4 implementation958d0167 отправлен в ветку; PR2474 отмечен Ready, base master проверен. CI проверяет финальный head; его актуальный статус доступен в PR и повторно проверяется перед merge.
