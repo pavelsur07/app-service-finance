@@ -306,7 +306,7 @@ Open each URL in dev/staging, confirm visual identity vs production:
 - [ ] `/dashboard`
 - [ ] `/marketplace-analytics`
 - [ ] `/marketplace-analytics/unit-extended`
-- [ ] `/marketplace/reconciliation`
+- [x] ~~`/marketplace/reconciliation`~~ — отчёт удалён (см. `docs/tasks/marketplace-reconciliation-removal/`)
 - [ ] `/marketplace-ads/efficiency`
 - [ ] `/ingestion/verification/coverage`
 - [ ] `/ingestion/verification/reconciliation`

@@ -77,7 +77,7 @@
 | `marketplace_analytics_page` | `templates/marketplace_analytics/index.html.twig` | 24 | `vite_entry_script_tags` |
 | `marketplace_analytics_kpi` | `templates/marketplace/analytics/_kpi_cards.html.twig` | 4 | `vite_entry_script_tags` |
 | `unit_extended_page` | `templates/marketplace_analytics/unit_extended/index.html.twig` | 24 | `vite_entry_script_tags` |
-| `reconciliation_page` | `templates/marketplace/reconciliation.html.twig` | 13 | `vite_entry_script_tags` |
+| ~~`reconciliation_page`~~ | удалён вместе с отчётом «Сверка» | — | — |
 | `ad_efficiency_page` | `templates/marketplace_ads/efficiency/index.html.twig` | 30 | `vite_entry_script_tags` |
 | `ingestion_verification_coverage_page` | `templates/ingestion/verification/coverage.html.twig` | 23 | `vite_entry_script_tags` |
 | `ingestion_verification_reconciliation_page` | `templates/ingestion/verification/reconciliation.html.twig` | 16 | `vite_entry_script_tags` |
@@ -279,7 +279,7 @@ node tools/check-uikit-react-mapping.mjs     # ожидаемо: 0 наруше�
 | `/dashboard` | `dashboard` | Дашборд рендерится, KPI видны | ✅ |
 | `/marketplace-analytics` | `marketplace_analytics_page` + `marketplace_analytics_kpi` | Таблица снапшотов + KPI-карточки | ✅ |
 | `/marketplace-analytics/unit-extended` | `unit_extended_page` | Unit-extended таблица, фильтры | ✅ |
-| `/marketplace/reconciliation` | `reconciliation_page` | Виджет загрузки и история | ✅ |
+| ~~`/marketplace/reconciliation`~~ | — | Отчёт удалён целиком | н/д |
 | `/marketplace-ads/efficiency` | `ad_efficiency_page` | Таблица эффективности, пагинация | ✅ |
 | `/ingestion/verification/coverage` | `ingestion_verification_coverage_page` | Heatmap ковержа | ✅ |
 | `/ingestion/verification/reconciliation` | `ingestion_verification_reconciliation_page` | Таблица сводки | ✅ |
