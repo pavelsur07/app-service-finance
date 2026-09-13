@@ -13,6 +13,7 @@ use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -96,13 +97,32 @@ final class CompanyFacadeTest extends TestCase
         self::assertFalse($facade->userHasAccess((string) $foreignCompany->getId(), (string) $user->getId()));
     }
 
+    public function testOwnerCheckUsesActualCompanyOwnerAndRejectsForeignOrMissingCompany(): void
+    {
+        $owner = UserBuilder::aUser()->withIndex(901)->build();
+        $otherOwner = UserBuilder::aUser()->withIndex(902)->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $repository = $this->createMock(CompanyRepository::class);
+        $repository->method('findById')->willReturnCallback(
+            static fn (string $id) => $id === $company->getId() ? $company : null,
+        );
+        $facade = $this->facade([], [], $repository);
+
+        self::assertTrue($facade->isOwner((string) $company->getId(), (string) $owner->getId()));
+        self::assertFalse($facade->isOwner((string) $company->getId(), (string) $otherOwner->getId()));
+        self::assertFalse($facade->isOwner(Uuid::uuid7()->toString(), (string) $owner->getId()));
+        self::assertFalse($facade->isOwner('invalid', (string) $owner->getId()));
+        self::assertFalse($facade->isOwner((string) $company->getId(), 'invalid'));
+    }
+
     /**
      * @param array<string, list<\App\Company\Entity\Company>> $findByUserId
-     * @param array<string, list<CompanyMember>> $findActiveByUserId
+     * @param array<string, list<CompanyMember>>               $findActiveByUserId
+     * @param (CompanyRepository&MockObject)|null              $repository
      */
-    private function facade(array $findByUserId, array $findActiveByUserId): CompanyFacade
+    private function facade(array $findByUserId, array $findActiveByUserId, ?CompanyRepository $repository = null): CompanyFacade
     {
-        $companyRepository = $this->createMock(CompanyRepository::class);
+        $companyRepository = $repository ?? $this->createMock(CompanyRepository::class);
         $companyRepository->method('findByUserId')->willReturnCallback(
             static fn (string $userId): array => $findByUserId[$userId] ?? [],
         );

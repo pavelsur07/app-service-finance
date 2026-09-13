@@ -17,6 +17,9 @@ class Company
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
 
+    #[ORM\Column(name: 'public_id', type: 'integer', unique: true, insertable: false, updatable: false, options: ['default' => "nextval('companies_public_id_seq'::regclass)"], generated: 'INSERT')]
+    private int $publicId;
+
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
@@ -47,6 +50,11 @@ class Company
     public function getId(): ?string
     {
         return $this->id;
+    }
+
+    public function getPublicId(): ?int
+    {
+        return $this->publicId ?? null;
     }
 
     public function getName(): ?string

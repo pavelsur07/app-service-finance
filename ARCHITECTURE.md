@@ -796,8 +796,14 @@ activeSellerConnectionsPage(int $limit, ?string $afterConnectionRef = null): lis
 // Используется внешними модулями, включая Admin, вместо прямого вызова Company Service/Application.
 createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
 
-// Найти компанию по ID
+// Найти компанию по внутреннему UUID
 findById(string $companyId): ?Company
+
+// Глобальное разрешение публичного ID; само по себе не предоставляет доступ к данным.
+findByPublicId(int $publicId): ?Company
+
+// Только фактический владелец companies.user_id; роли участника и admin.write не подходят.
+isOwner(string $companyId, string $userId): bool
 
 // Глобально разрешить точное название без учёта регистра в единственный ID.
 // InvalidArgumentException — пустое название; DomainException — совпадений нет или несколько.
@@ -824,6 +830,14 @@ listAccessibleCompaniesForUser(string $userId): array
 // Владелец компании либо активный CompanyMember — иначе доступа нет.
 userHasAccess(string $companyId, string $userId): bool
 ```
+
+`Company::getPublicId(): ?int` — постоянный публичный номер, `null` до первого flush.
+PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, начало 100000, NO CYCLE);
+существующие компании получают backfill при добавлении колонки. UNIQUE + NOT NULL,
+постоянный DB default сохраняет совместимость старых INSERT. ORM получает значение
+после INSERT, не пишет его при UPDATE; setter отсутствует. UUID и внешние ссылки
+остаются прежними. Пропуски последовательности допустимы, удалённые номера не выдаются
+повторно; после публикации номеров откат только forward-fix.
 
 ### Справочник контрагентов (`Company`)
 
@@ -3346,3 +3360,15 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-05-11 | Inventory | `present` хранится как `quantity`, `reserved` как `reservedQuantity`, без `StockStatus::Reserved` | `reserved` — количественная компонента текущего остатка, а не отдельное физическое состояние товара |
 | 2026-05-11 | Inventory | Нормализация raw snapshot запускается через `async_pipeline` после completed raw-загрузки | Raw-загрузка = внешний HTTP, нормализация = локальная DB-heavy обработка |
 | 2026-05-11 | Inventory | Маппинг Inventory → Marketplace идёт через MarketplaceFacade по `sourceSku` | Соблюдение границ модулей и запрет прямого импорта Marketplace repository/service |
+
+## Api — внешние Bearer-ключи (api-management, Stage 1)
+
+`Api/Entity/ApiKey`: UUID v7, scalar companyId, publicIdentifier unique, SHA-256 secretHash (не сериализуется/не журналируется), name, createdBy, UTC createdAt/expiresAt/revokedAt/lastUsedAt; optimistic version. PostgreSQL timezone-aware timestamps сохраняют абсолютную границу90 суток при hydration в любой зоне.
+
+`CreateApiKeyAction(companyId,userId,name): CreatedApiKey`, `RenameApiKeyAction(companyId,userId,keyId,name): ApiKey`, `RevokeApiKeyAction(companyId,userId,keyId): ApiKey` сверяют фактического владельца через CompanyFacade внутри транзакции; Shared AuditLog пишется атомарно по allowlist. No-op не создаёт аудит. Отзыв не восстанавливается. DTO выдачи секрета запрещает PHP serialization; SECRET лишь в непосредственном no-store ответе.
+
+`AuthenticateApiKeyAction(token,publicCompanyId,ip): ApiPrincipal` — общий validator для UI и stateless firewall `/api/external/v1/`. Bootstrap `ApiKeyRepository::findOneByPublicIdentifier` — документированное company-scope исключение; проверяет secret/expiry/revoke и CompanyFacade resolution, затем все операции scoped. Principal несёт company/key, роль ROLE_EXTERNAL_API без пользовательской роли. Request context создаётся сервером и не принимает actor/channel/request ID клиента. `auth/check` требует ApiAccess(CONNECTION); отсутствие политики закрывает endpoint. Все предметные scopes пока пусты. 60/min/key, failed-auth20/min/IP; no-store + Problem Details. Старый ReportApiKey полностью независим.
+
+`Ingestion` session filter обслуживает только User; Shared AuditContext берёт API company из principal и не читает сессию. Подключение предметных модулей через Facade→общий Action и дальнейший аудит каналов — отдельная задача; [обязательный контракт](site/src/Api/readme.md).
+
+Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/default-null, unlike the non-PK generated ORM mapping. The resulting `companies.public_id` schema difference is accepted and MUST NOT be applied. Keep its explicit mapping/DB default: removing it can generate DROP DEFAULT and break old inserts omitting public_id. See Version20260913090000 docblock.

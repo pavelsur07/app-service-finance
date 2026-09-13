@@ -84,6 +84,9 @@ final class ModuleAccessMap
      * @var list<string>
      */
     private const EXEMPT_PREFIXES = [
+        // ApiAccessSubscriber requires the external firewall principal and an explicit endpoint policy.
+        'App\\Api\\Controller\\External\\',
+
         'App\\Admin\\',                          // админка под ROLE_ADMIN
         'App\\Mcp\\',                            // MCP-интеграции со своей авторизацией
         'App\\Analytics\\',                      // общий дашборд/health; Stage 5 разделит виджеты

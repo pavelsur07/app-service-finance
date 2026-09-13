@@ -21,6 +21,9 @@ use Ramsey\Uuid\Uuid;
  */
 final class CompanyFacade
 {
+    // Must match companies_public_id_seq in Version20260913090000.
+    private const MIN_PUBLIC_ID = 100_000;
+
     public function __construct(
         private readonly CompanyRepository $repository,
         private readonly CompanyOwnerAccountCreator $accountCreator,
@@ -33,6 +36,23 @@ final class CompanyFacade
     public function findById(string $companyId): ?Company
     {
         return $this->repository->findById($companyId);
+    }
+
+    /**
+     * Global public identity lookup; this does not grant access to company data.
+     */
+    public function findByPublicId(int $publicId): ?Company
+    {
+        return $publicId < self::MIN_PUBLIC_ID ? null : $this->repository->findByPublicId($publicId);
+    }
+
+    public function isOwner(string $companyId, string $userId): bool
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($userId)) {
+            return false;
+        }
+
+        return $this->repository->findById($companyId)?->getUser()?->getId() === $userId;
     }
 
     /**

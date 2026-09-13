@@ -42,6 +42,17 @@ class CompanyRepository extends ServiceEntityRepository
         return $this->find($companyId);
     }
 
+    /**
+     * Global identity resolution only; callers must authorize the resolved company.
+     */
+    public function findByPublicId(int $publicId): ?Company
+    {
+        /** @var Company|null $company */
+        $company = $this->findOneBy(['publicId' => $publicId]);
+
+        return $company;
+    }
+
     public function findOneByName(string $name): ?Company
     {
         return $this->findOneBy(['name' => $name]);
