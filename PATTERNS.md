@@ -2,6 +2,7 @@
 
 > Читай нужный раздел по задаче, не весь файл.
 > Новые разделы — только в конец файла; номера существующих разделов не менять (CLAUDE.md ссылается на них по номерам).
+> Примеры на Product/Deal/Order и т.п. — иллюстративные, не из кодовой базы. Реальные эталоны помечены строкой «Эталон: ..., проверено <дата>» и подтверждены grep по коду.
 > Версия: 1.3 / 2026-08-20
 
 ## Навигация
@@ -52,6 +53,8 @@ Controller → Action → Domain Policy → Infrastructure (Checker/Query)
 ---
 
 ## 2. Controller
+
+> Примеры в разделе иллюстративные, не из кодовой базы.
 
 ```php
 // src/Catalog/Controller/Api/ProductCreateController.php
@@ -334,6 +337,8 @@ final class ProcessWbCostsAction
 ---
 
 ## 10. Messenger: Message и Handler
+
+> Примеры в разделе иллюстративные, не из кодовой базы.
 
 ### Выбор транспорта
 
@@ -634,6 +639,8 @@ final class AuditLogSubscriber
 
 ## 16. Тесты
 
+> Примеры в разделе иллюстративные, не из кодовой базы.
+
 ### Unit — Domain Policy
 
 ```php
@@ -704,6 +711,8 @@ final class CreateProductActionTest extends KernelTestCase
 ---
 
 ## 17. Entity Builder
+
+> Примеры в разделе иллюстративные, не из кодовой базы.
 
 ```php
 // tests/Builders/Catalog/ProductBuilder.php
@@ -986,6 +995,8 @@ public function __invoke(string $id, string $companyId, int $expectedVersion, Up
 ---
 
 ## 22. Idempotency в Messenger
+
+> **Статус: спецификация, инфраструктура не реализована.** Классов `ProcessedMessage`, `IdempotentHandlerTrait`, `ImportBankStatementHandler` в кодовой базе нет (проверено 2026-09-13). Не импортировать их в новый код. Применять паттерны раздела только после реализации Shared-компонентов либо реализовать их в scope задачи, явно указав это в плане.
 
 Защита от дублирования при retry — если Handler упал после flush, но до успешного ack.
 
@@ -1366,6 +1377,8 @@ $vat = $amount->percentage('20', RoundingMode::HALF_UP);
 ---
 
 ## 25. Request / Response DTO
+
+> Примеры в разделе иллюстративные, не из кодовой базы.
 
 Граница HTTP-слоя: вход — Request DTO, выход — Response DTO. `array` в сигнатуре
 контроллера и `json_decode($request->getContent(), true)` в новом коде запрещены.
