@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** release and backup approved — blocked by backup command access
-**Status:** PR Ready; owner approved backup, migrations and deploy; no backup command exists in approved production wrappers
+**Phase:** release in progress — backup verified
+**Status:** backup executed by owner and verified; proceed with approved release
 **Stage base commit:** 17de7b7f
 **Stage 4 implementation commit:** 958d0167
 
@@ -23,16 +23,16 @@
 - Internal reported1BLOCKER/4IMPORTANT across task, all fixed; no open confirmed findings.
 
 ### Exact next action
-The owner approved migrations/deploy and subsequently explicitly authorized the agent to create the necessary backup. No more operation approval is needed. Technical blocker: approved production wrappers have no pg_dump/backup capability; prod-access.md forbids bypass through unrestricted Docker/sudo or another account. Prepared operator script `docs/tasks/api-management/backup-production.sh` (bash -n PASS): fixed symfony-postgres container, full custom-format database dump on production under /var/backups/app-service-finance, root0700 directory/0600 files, complete archive read via pg_restore --file=/dev/null and checksum verification, no DB restore/mutation. This is archive validation, not a restore rehearsal. No backup was executed or copied locally.
+Backup prerequisite satisfied by the owner's production execution: `/var/backups/app-service-finance/pr-2474-20260913T153750Z.dxY7XG.dump`, 242593750 bytes, root/0600, complete archive read and SHA256 verification OK. No database restore rehearsal was performed. Owner approval covers backup, migrations and deploy; do not ask again.
 
-Exact next action: owner/DevOps runs the prepared script on production through their existing operator access, or provides an approved narrowly scoped backup wrapper. Do not broaden permissions autonomously. On successful backup, recheck current baseline and PR CI, merge, dispatch migrations, verify schema/UUID invariants, dispatch deploy and perform acceptance; release approval persists. No merge or production writes performed yet.
+Pre-merge recheck: head861d42b0 all CI green, PR MERGEABLE/base master; production count1344 and UUID checksum unchanged. Next: merge PR2474 after final docs-head checks, dispatch migrations, verify schema/invariants, dispatch deploy and perform read-only acceptance. No production data has changed yet. Final run IDs and acceptance evidence will be recorded in the PR release report.
 
 Release preflight:
 - Implementation head92b02300: all CI checks passed, PR Ready/MERGEABLE/CLEAN/base master. origin/master22399152 remains unchanged.
 - Production wrappers work with `ssh -o BatchMode=yes -o IdentityAgent=none vf-prod-codex ... < /dev/null`. The default local SSH agent hangs before offering the key (timeout124); disabling that agent uses the already configured dedicated identity, without changing credentials or permissions.
 - Production containers healthy, current application image22399152.
 - Baseline read-only companies: count1344; UUID checksum `b8a63779d772bb53e011e3327b6ad0da` using md5(string_agg(id::text, ',' ORDER BY id::text)); total relation size655360bytes. Latest recorded migration20260912120000. No financial data read or changed.
-- Backup operation is now explicitly authorized. Only the missing technical backup execution path blocks release; no new permissions were granted or requested for unrestricted access.
+- Owner executed the prepared backup script through operator access. Technical backup blocker resolved without granting any new agent permissions.
 
 ### Files to inspect first on resume
 This checkpoint, handoff.md, TASK.md; git status; PR2474/latesthead/checks. Detailed local evidence in /tmp/api-management-handoff-*.log and /tmp/api-management-final-api.log. Stage reports preserve history; current status above is authoritative.
