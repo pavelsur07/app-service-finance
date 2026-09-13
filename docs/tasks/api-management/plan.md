@@ -4,7 +4,7 @@ Base: 22399152. Изолированный worktree: /home/deploy/projects/app-s
 Дизайн утверждён исходным планом; повторное согласование не требуется по AGENTS.md §3.
 Референсы: Company/ReportApiKeyController (только legacy contract), Company role Actions (owner checks), Inventory (новый модуль), Shared AuditLog. Legacy flash выдача report secret не переиспользуется.
 
-Baseline: Company/Security unit 29 tests / 119 assertions PASS; Shared AuditLogSubscriber 1 test / 1 assertion PASS; ModuleWriteGateCoverage 1 test / 12 assertions PASS. Architecture PHPStan pending.
+Baseline: Company/Security unit 29 tests / 119 assertions PASS; Shared AuditLogSubscriber 1 test / 1 assertion PASS; ModuleWriteGateCoverage 1 test / 12 assertions PASS. Architecture focused PHPStan PASS; full handoff PHPStan also PASS after explicit discovery of the new migration symbol.
 
 ## Stage 1: Backend ключей, company public ID, auth/check, аудит и OpenAPI
 Risk: HIGH-LOCAL. stage_base_commit: 22399152.
@@ -28,7 +28,7 @@ Checks: Api module tests; targeted static/style; external if >500 lines.
 Review focus: disconnected and newly-connected remain ineffective; unknown scopes; lost updates.
 
 ## Stage 4: Матрица прав и handoff
-Risk: MEDIUM. stage_base_commit: record before work.
+Risk: MEDIUM. stage_base_commit:17de7b7f.
 DoD: editable prepared scopes/status/presets, clear disconnected warning and conflict reload; docs complete.
 Work items: 4.1 matrix forms/templates; 4.2 functional/UI verification; 4.3 full gates + fresh internal review + external review + Ready PR/handoff.
 Checks: full gates listed in TASK.md, applicable UI and OpenAPI generated types.

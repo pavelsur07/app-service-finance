@@ -50,7 +50,7 @@ final class CheckController extends AbstractController
                 $status = 200;
             } catch (HttpExceptionInterface $exception) {
                 $status = $exception->getStatusCode();
-                $headers = $exception->getHeaders();
+                $headers = array_intersect_key($exception->getHeaders(), ['Retry-After' => null]);
                 $message = match ($status) {
                     401 => 'Ключ недействителен, отозван или срок его действия истёк.',
                     403 => 'Ключ не принадлежит активной компании.',

@@ -31,7 +31,7 @@
                     <td>{{ key.expiresAt|date('d.m.Y H:i', 'UTC') }}</td>
                     <td>{{ key.lastUsedAt ? key.lastUsedAt|date('d.m.Y H:i', 'UTC') : 'Ещё не использовался' }}</td>
                     <td>{% if key.revokedAt %}<span class="status status--danger">Отозван</span>{% elseif key.expiresAt <= now %}<span class="status status--warning">Истёк</span>{% else %}<span class="status status--success">Действует</span>{% endif %}</td>
-                    <td><a class="btn btn-sm btn-secondary" href="{{ path('settings_api_rename', {id: key.id}) }}">Переименовать</a> {% if not key.revokedAt %}<a class="btn btn-sm btn-danger" href="{{ path('settings_api_revoke', {id: key.id}) }}">Отозвать</a>{% endif %}</td>
+                    <td><a class="btn btn-sm btn-secondary" href="{{ path('settings_api_permissions', {id: key.id}) }}">Права</a> <a class="btn btn-sm btn-secondary" href="{{ path('settings_api_rename', {id: key.id}) }}">Переименовать</a> {% if not key.revokedAt %}<a class="btn btn-sm btn-danger" href="{{ path('settings_api_revoke', {id: key.id}) }}">Отозвать</a>{% endif %}</td>
                 </tr>
             {% endfor %}</tbody>
         </table></div>

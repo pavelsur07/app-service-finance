@@ -131,6 +131,7 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         self::assertNotNull($key->getLastUsedAt());
         $this->clock->modify('+90 days');
         $this->check($token, 401);
+        self::assertFalse($this->client->getResponse()->headers->has('WWW-Authenticate'));
         self::assertSelectorTextContains('.alert', 'недействителен');
         $this->client->request('POST', '/settings/api/check', ['api_key_check' => ['secret' => $token]]);
         self::assertResponseStatusCodeSame(422);

@@ -29,7 +29,7 @@ final readonly class RevokeApiKeyAction
             }
             $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
             $key->revoke($now);
-            $this->audit->record($key, $userId, AuditLogAction::UPDATE, ['revokedAt' => [null, $now->format(DATE_ATOM)]]);
+            $this->audit->record($key, $userId, AuditLogAction::UPDATE, ['revokedAt' => [null, $now->format(\DATE_ATOM)]]);
 
             return $key;
         });

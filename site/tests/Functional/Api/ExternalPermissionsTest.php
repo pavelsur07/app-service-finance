@@ -112,6 +112,6 @@ final class ExternalPermissionsTest extends WebTestCaseBase
     /** @return array<string, mixed> */
     private function json(Response $response): array
     {
-        return json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        return json_decode((string) $response->getContent(), true, flags: \JSON_THROW_ON_ERROR);
     }
 }

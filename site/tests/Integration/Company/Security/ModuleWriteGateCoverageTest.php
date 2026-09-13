@@ -58,6 +58,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
+        'settings_api_permissions' => ['owner', 'App\Api\Controller\Settings\PermissionsController::__invoke'],
         'settings_api_create' => ['owner', 'App\Api\Controller\Settings\CreateController::__invoke'],
         'settings_api_rename' => ['owner', 'App\Api\Controller\Settings\RenameController::__invoke'],
         'settings_api_revoke' => ['owner', 'App\Api\Controller\Settings\RevokeController::__invoke'],

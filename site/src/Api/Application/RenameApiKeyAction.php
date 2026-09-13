@@ -23,7 +23,7 @@ final readonly class RenameApiKeyAction
     {
         return $this->em->wrapInTransaction(function () use ($companyId, $userId, $keyId, $name): ApiKey {
             $this->owner->assertOwner($companyId, $userId);
-            $key = $this->repository->findOneByIdAndCompany($keyId, $companyId) ?? throw new ApiKeyNotFoundException();
+            $key = $this->repository->findOneByIdAndCompany($keyId, $companyId, forUpdate: true) ?? throw new ApiKeyNotFoundException();
             $name = ApiKeyName::normalize($name);
             if ($key->getName() === $name) {
                 return $key;

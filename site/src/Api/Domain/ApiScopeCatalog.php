@@ -85,7 +85,7 @@ final class ApiScopeCatalog
             $normalized[] = $value;
         }
         $normalized = array_unique($normalized);
-        sort($normalized, SORT_STRING);
+        sort($normalized, \SORT_STRING);
 
         return $normalized;
     }

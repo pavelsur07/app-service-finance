@@ -51,7 +51,7 @@ final class SaveApiKeyPermissionsActionTest extends IntegrationTestCase
         self::assertSame($expiry, $key->getExpiresAt()->getTimestamp());
         $rawAudit = $this->connection->fetchOne('SELECT diff FROM audit_log WHERE entity_id = ?', [$key->getId()]);
         self::assertIsString($rawAudit);
-        self::assertSame(['selectedScopes' => [[], ['accounts.read', 'projects.read']]], json_decode($rawAudit, true, 512, JSON_THROW_ON_ERROR));
+        self::assertSame(['selectedScopes' => [[], ['accounts.read', 'projects.read']]], json_decode($rawAudit, true, 512, \JSON_THROW_ON_ERROR));
         $this->em->clear();
         $saved = self::getContainer()->get(ApiKeyRepository::class)->findOneByIdAndCompany($key->getId(), $key->getCompanyId());
         self::assertNotNull($saved);

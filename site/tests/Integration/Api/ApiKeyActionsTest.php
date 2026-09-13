@@ -53,7 +53,7 @@ final class ApiKeyActionsTest extends IntegrationTestCase
         self::assertSame(ApiKeySecret::hash($parsed['secret']), $rows[0]['secret_hash']);
         $audit = $this->connection->fetchOne('SELECT diff FROM audit_log WHERE entity_id = ?', [$first->key->getId()]);
         self::assertIsString($audit);
-        self::assertSame(['name', 'expiresAt'], array_keys(json_decode($audit, true, 512, JSON_THROW_ON_ERROR)));
+        self::assertSame(['name', 'expiresAt'], array_keys(json_decode($audit, true, 512, \JSON_THROW_ON_ERROR)));
         self::assertStringNotContainsString($parsed['secret'], $audit);
         self::assertStringNotContainsString(ApiKeySecret::hash($parsed['secret']), $audit);
         self::assertStringNotContainsString($parsed['secret'], (string) json_encode($first));
@@ -111,11 +111,29 @@ final class ApiKeyActionsTest extends IntegrationTestCase
         $key = $this->createKey();
         $revokedAt = new \DateTimeImmutable('2026-09-13T11:00:00Z');
         // Simulate another transaction winning the race after this manager loaded the key.
-        $this->connection->executeStatement('UPDATE api_keys SET revoked_at = ?, version = version + 1 WHERE company_id = ? AND id = ?', [$revokedAt->format(DATE_ATOM), $this->companyId(), $key->getId()]);
+        $this->connection->executeStatement('UPDATE api_keys SET revoked_at = ?, version = version + 1 WHERE company_id = ? AND id = ?', [$revokedAt->format(\DATE_ATOM), $this->companyId(), $key->getId()]);
         self::assertNull($key->getRevokedAt());
         $result = $this->revokeAction()($this->companyId(), $this->ownerId, $key->getId());
         self::assertSame($revokedAt->getTimestamp(), $result->getRevokedAt()?->getTimestamp());
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(id) FROM audit_log WHERE entity_id = ?', [$key->getId()]));
+    }
+
+    public function testRenameRefreshesConcurrentChangesAndPreservesPermissions(): void
+    {
+        $key = $this->createKey();
+        $this->connection->executeStatement('UPDATE api_keys SET name = ?, selected_scopes = ?, version = version + 1 WHERE company_id = ? AND id = ?', ['Concurrent name', '["accounts.read"]', $this->companyId(), $key->getId()]);
+        self::assertSame('Test key', $key->getName());
+        self::assertSame([], $key->getSelectedScopes());
+        $result = $this->renameAction()($this->companyId(), $this->ownerId, $key->getId(), 'Final name');
+        self::assertSame('Final name', $result->getName());
+        self::assertSame(['accounts.read'], $result->getSelectedScopes());
+        $saved = $this->connection->fetchAssociative('SELECT name, selected_scopes FROM api_keys WHERE company_id = ? AND id = ?', [$this->companyId(), $key->getId()]);
+        self::assertIsArray($saved);
+        self::assertSame('Final name', $saved['name']);
+        self::assertSame('["accounts.read"]', $saved['selected_scopes']);
+        $audit = $this->connection->fetchOne('SELECT diff FROM audit_log WHERE entity_id = ? AND action = ?', [$key->getId(), 'UPDATE']);
+        self::assertIsString($audit);
+        self::assertSame(['name' => ['Concurrent name', 'Final name']], json_decode($audit, true, 512, \JSON_THROW_ON_ERROR));
     }
 
     public function testScopedRepositoryNeverReturnsOtherCompanyKey(): void

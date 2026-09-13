@@ -288,7 +288,7 @@
                         </a>
 
                         {% if active_company and active_company.user.id == app.user.id %}
-                        <a class="btn btn-sm btn-secondary" aria-current="{{ current_route starts with 'settings_api_' ? 'page' : 'false' }}" href="{{ path('settings_api_index') }}"><span>API</span></a>
+                        <a class="dropdown-item" aria-current="{{ current_route starts with 'settings_api_' ? 'page' : 'false' }}" href="{{ path('settings_api_index') }}"><span>API</span></a>
                         {% endif %}
 
                         {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}

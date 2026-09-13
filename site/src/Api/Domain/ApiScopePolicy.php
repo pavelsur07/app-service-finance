@@ -22,7 +22,7 @@ final class ApiScopePolicy
                 $effective[] = $scope;
             }
         }
-        sort($effective, SORT_STRING);
+        sort($effective, \SORT_STRING);
 
         return $effective;
     }

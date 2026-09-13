@@ -117,8 +117,8 @@ final class CompanyFacadeTest extends TestCase
 
     /**
      * @param array<string, list<\App\Company\Entity\Company>> $findByUserId
-     * @param array<string, list<CompanyMember>>               $findActiveByUserId
-     * @param (CompanyRepository&MockObject)|null              $repository
+     * @param array<string, list<CompanyMember>> $findActiveByUserId
+     * @param (CompanyRepository&MockObject)|null $repository
      */
     private function facade(array $findByUserId, array $findActiveByUserId, ?CompanyRepository $repository = null): CompanyFacade
     {

@@ -56,7 +56,7 @@ final class ExternalAuthenticationTest extends WebTestCaseBase
             'expires_at' => '2026-12-12T12:00:00+00:00',
             'prepared_scopes' => [],
             'effective_scopes' => [],
-        ], json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        ], json_decode((string) $response->getContent(), true, flags: \JSON_THROW_ON_ERROR));
         self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
         self::assertFalse($response->headers->has('Set-Cookie'));
         self::assertSame([], $this->client->getCookieJar()->all());
@@ -122,7 +122,7 @@ final class ExternalAuthenticationTest extends WebTestCaseBase
     public function testLegacyReportKeyCannotAuthenticateExternalApi(): void
     {
         $raw = 'rk_live_'.bin2hex(random_bytes(16));
-        $legacy = new ReportApiKey($this->company, 'rk_live_', password_hash($raw, PASSWORD_ARGON2ID));
+        $legacy = new ReportApiKey($this->company, 'rk_live_', password_hash($raw, \PASSWORD_ARGON2ID));
         $this->em()->persist($legacy);
         $this->em()->flush();
         $this->assertProblem($this->request(authorization: 'Bearer '.$raw), 401);
@@ -133,7 +133,7 @@ final class ExternalAuthenticationTest extends WebTestCaseBase
     {
         $this->client->request('GET', '/api/public/reports/cashflow.json', ['token' => $this->token], server: ['REMOTE_ADDR' => self::IP]);
         self::assertResponseStatusCodeSame(401);
-        self::assertSame(['error' => 'unauthorized'], json_decode((string) $this->client->getResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(['error' => 'unauthorized'], json_decode((string) $this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR));
         self::assertNull($this->lastUsed());
     }
 
@@ -208,7 +208,7 @@ final class ExternalAuthenticationTest extends WebTestCaseBase
         self::assertSame('application/problem+json', $response->headers->get('Content-Type'));
         self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
         self::assertFalse($response->headers->has('Set-Cookie'));
-        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $data = json_decode((string) $response->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame($status, $data['status']);
         self::assertSame('about:blank', $data['type']);
         self::assertArrayHasKey('title', $data);

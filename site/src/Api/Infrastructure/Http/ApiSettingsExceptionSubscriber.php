@@ -42,7 +42,7 @@ final readonly class ApiSettingsExceptionSubscriber implements EventSubscriberIn
             default => null,
         };
         if (null !== $status) {
-            $event->setResponse(new Response($this->twig->render('api/settings/error.html.twig', ['message' => $error->getMessage()]), $status));
+            $event->setResponse(new Response($this->twig->render('api/settings/error.html.twig', ['message' => $error->getMessage(), 'reloadKeyId' => $error instanceof ApiKeyPermissionsConflictException ? $event->getRequest()->attributes->get('id') : null]), $status));
         }
     }
 }

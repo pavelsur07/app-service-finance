@@ -1,27 +1,33 @@
 ## Current checkpoint
-**Phase:** Stage 3 complete
-**Status:** verified; preparing Stage 4
-**Stage base commit:** 36b773b3
+
+**Phase:** Stage 4 / Work item 4.3 — handoff
+**Status:** verified; delivery in progress
+**Stage base commit:** 17de7b7f
 
 ### Completed
-- Phase 0 and Stages 1–2 committed and pushed. Stage 3 implementation/checks/internal review complete; external round 1 pending.
-- Draft PR: https://github.com/pavelsur07/app-service-finance/pull/2474 (base master verified).
-- Isolated worktree retains all task changes; unrelated original checkout files untouched.
+- Stages 1–3 committed and pushed; Stage 4 implementation and browser checks complete.
+- Branch `feat/api-management`, isolated worktree `/home/deploy/projects/app-service-finance-api-management`.
+- Draft PR https://github.com/pavelsur07/app-service-finance/pull/2474, base master verified.
+- No production actions; synthetic browser fixtures and temporary config removed.
 
 ### Current verification
-- Stage 3 Api module + route coverage: 338 tests / 1354 assertions PASS.
-- Focused Api PHPStan and style PASS. Production route collection excludes test fixtures.
-- Full handoff gates reserved for Stage 4 completion.
+- Api module 347 tests / 1429 assertions PASS; desktop/mobile and two-tab conflict smoke PASS.
+- Full unit 2839 / 15897 PASS, 4 deprecations. Full canonical style and strict types: 0/2565 PASS. OpenAPI types PASS.
+- Full suite 4815 / 27782: 2 pre-existing time-dependent Ingestion failures, causal diagnostic confirmed (see below). No task regression confirmed.
+- PHPStan found 6 missing-migration-symbol errors; scanFiles fix passes targeted analysis; full rerun PASS (0 errors).
+- UI lint/build PASS; baseline UI Kit 9107 and React mapping 47 violations unchanged.
 
 ### Review status
-- Stage 1 external: round 1, fixed without re-run; Stage 2 internal clean.
-- Stage 3 fresh internal: 0 BLOCKER / 0 IMPORTANT / 0 MINOR; external round 1 running.
+- Stage 1: internal findings fixed, external round 1 fixed without re-run.
+- Stage 2: independent internal clean; 2 implementation MINOR fixed.
+- Stage 3: independent internal clean, external round 1 REVIEW_GREEN; 2 MINOR fixed and checked.
+- Stage 4: 1 browser MINOR fixed. Final whole-task review and scoped fix reviews complete: 0 open findings; external round 1 resolved (IMPORTANT rejected with proof, 3 MINOR fixed).
 
 ### Exact next action
-- Finish external review from base 36b773b3, fix/verify findings, commit/push Stage 3 and update Draft PR. Then implement Stage 4 UI automatically.
+Finish external whole-task review through standard script (session9547, log /tmp/api-management-handoff-external.log); fix/verify findings; update handoff/Stage4 docs; commit/push task files; verify CI, mark PR Ready and ask migration+deploy approval.
 
 ### Files to inspect first on resume
-TASK.md, plan.md, this checkpoint, git status, Stage 3 report, site/var/external-review/36b773b3/review.txt.
+TASK.md, plan.md, this checkpoint, git status, handoff.md. Verification logs: /tmp/api-management-handoff-*.log. Active PHPStan session47973 (if tool session still available); source of truth log /tmp/api-management-handoff-stan-fixed.log.
 
 ### Earlier execution evidence
 
@@ -72,3 +78,40 @@ TASK.md, plan.md, this checkpoint, git status, Stage 3 report, site/var/external
 ### Stage3 complete
 - External round1 REVIEW_GREEN, 0BLOCKER/0IMPORTANT/2MINOR. Both minor fixes verified14tests42assertions, focusedPHPStan/style PASS; no external rerun needed.
 - Exact next action: commit/push Stage3 and update PR2474; record newbase and implement Stage4 matrix. Full gates and whole-task fresh internal/external review remain required at handoff.
+
+- Stage3 commit17de7b7f; Stage4 base/DoD recorded before edits. Matrix implementer started4.1; parent prepares handoff verification/release documentation.
+
+- CI Stage3 head style found9 task-owned files: targeted checks mistakenly selected .php-cs-fixer.dist.php instead of canonical .php-cs-fixer.php. Root cause confirmed from CI log/config; fixed constant namespace prefixes in9 files, focused canonical recheck underway. All Stage4 checks use canonical config. No CI behavior/config change. Earlier targeted style evidence has this limitation; full canonical gate remains required at handoff.
+- Stage2 implementation finding metrics clarified:0BLOCKER/0IMPORTANT/2MINOR (empty POST response status, long-name overflow), bothfixed.
+
+### Work items4.1–4.2
+- Matrix/form/controller/presets/version409reload implemented. Targeted10tests87assertions, PHPStan/canonicalCS/Twig/npm lint/build PASS; UI Kit9107baseline unchanged.
+- Real Chromium found1MINOR mobileoverflow390→466: redundant absolute sr-only spans escaped table clipping. Removed spans (checkbox aria-label remains); same browserregressiongreen390/390.
+- Browser PASS: explicit16/all and10/read presets, disabled10resources, preparedsave/authcheck effective[], two-tab409/reload preservesnew16, no secretstorage, desktop/mobile. Syntheticfixture/native-sessionoverride removed before module/fulltests.
+- Exact next action: final Api moduleset, full handoff gates (Makefile using /tmp/api-management-compose-exec to existingtaskcontainers), then fresh whole-task internalreview and externalreview. Stage4 commit/push/Ready afterallchecks/fixcycles.
+
+### Handoff verification running
+- Final Api module suite347tests1429assertions PASS after browserfix.
+- make site-test-unit PASS2839tests15897assertions,4deprecations (exit0); make api-types-check PASS. Makefile executes unchanged target commands via local /tmp/api-management-compose-exec adapter into existingcontainers, avoiding duplicatecontainer startup.
+- make site-stan, site-cs-check/site-cs-strict-types, site-test stillrunning. Reactmapping remains47pre-existing failures. Canonical stylefix follow-up18files0issues.
+
+### Handoff gate findings
+- Canonical full cs-check0/2565 and strict-types0/2565 PASS.
+- Full stan6errors: new CompanyPublicIdTest references migration outside analysedpaths, unlike focused Stage1 command that named migrationexplicitly. Added symbol-onlyscanFiles for thisone migration; focusedtestanalysis0errors. Fullstan rerun afterconfigfix underway; no baseline growth/analysis weakening.
+- Fullsuite4815tests27782assertions:2failures in pre-existing VerificationApiControllerTest shopsmetadata;6deprecations/2warnings. Investigation/reproduction and sourcebasecomparison delegated; do not classify as pre-existing without evidence. No API test failure.
+
+- Ingestion RCA confirms pre-existing time-bound fixture aging: CoverageQuery::shops filters now-90days; fixture fetchedAt June15 13:00MSK < current cutoffJune15 14:53MSK onSep13. Query/facade/controller/test unchanged from22399152. Originalclass6tests68assertions reproduces2failures; temporarycopy changingonly fetchedAt to now passes2tests37assertions, removed afterward. Record FOLLOW-UP; do not change unrelatedfinancial/query/testcode.
+
+- make site-stan after symbol-discoveryfix PASS2550files0errors. Final reviewer /root/final_review startedfreshwithspec+diff+checklists only; no implementationreports/history supplied.
+
+- Fresh final internalreview0findings; externalwhole-task round1 startedstandardwrapper from22399152. Handoff andStage4 report prepared, pendingexternalresult beforecommit/push/Ready.
+
+### Handoff external round1 resolved
+- Report0BLOCKER/1IMPORTANT/3MINOR. IMPORTANT false: Symfony installed RequestEvent::setResponse stopspropagation; verifiedactualdispatcher+ErrorListener+loggernever for5domainerrors5tests25assertions. Recordedrejection, no unnecessaryframeworkexceptionconfig.
+- MINORfixes: rename scopedfreshrowlock withredOptimisticLock→green regression; UIpasted401 noBearerchallenge (Retry-After retained), red→green regression; legacymenuUIkitmenu-item insteadofbutton (notBootstrapdropdown-item).
+- Fixset25tests188assertions/PHPStan/canonicalCS/TwigPASS, UIkit9107unchanged. Fresh scopedreviewrunning; finalApimodule rerunrunning afterfixes. Noexternalrerun required (noBLOCKER).
+
+- Final scopedreview found1MINOR in attemptedUIkitmenu-item: legacy shell loadsTabler, notUIkitCSS. Fixedexistingdropdown-item; rootAGENTS existingpatterncompatibilityruling recorded. UIKitfinal9108=9107baseline+1explicitlegacyentry, not hidden. Freshrecheck0open.
+- Final Api module351tests1458assertionsPASS; reviewfixPHPStan/canonicalCS/TwigPASS. Externalhandoffaccepted fixedwithout rerun, 1IMPORTANTrejectedbyactualSymfonydispatcherproof/3MINORfixed. Exactnextaction: finalizeStage4/handoff, commit/push, updatePRbody, verifyCI, markReady, askmigration+deployapproval.
+
+- Stage4 DONE; all authorized implementation/verification/review work complete. Committing/pushingfinalstage and updatingPR2474; nextcheckCIandReady. No merge/deployauthorization received.

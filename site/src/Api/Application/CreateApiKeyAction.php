@@ -26,7 +26,7 @@ final readonly class CreateApiKeyAction
             $secret = ApiKeySecret::generate();
             $key = new ApiKey($companyId, $name, $secret['publicIdentifier'], ApiKeySecret::hash($secret['secret']), $userId, $this->clock->now());
             $this->em->persist($key);
-            $this->audit->record($key, $userId, AuditLogAction::CREATE, ['name' => [null, $key->getName()], 'expiresAt' => [null, $key->getExpiresAt()->format(DATE_ATOM)]]);
+            $this->audit->record($key, $userId, AuditLogAction::CREATE, ['name' => [null, $key->getName()], 'expiresAt' => [null, $key->getExpiresAt()->format(\DATE_ATOM)]]);
 
             return new CreatedApiKey($key, ApiKeySecret::format($secret['publicIdentifier'], $secret['secret']));
         });

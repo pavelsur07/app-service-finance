@@ -36,3 +36,18 @@ if (checkInput instanceof HTMLInputElement) {
         if (event.persisted) clearCheckInput();
     });
 }
+
+const permissionsForm = document.querySelector('form[data-api-permissions]');
+if (permissionsForm instanceof HTMLFormElement) {
+    permissionsForm.querySelectorAll('[data-api-preset]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const selected = JSON.parse(button.getAttribute('data-api-preset') ?? '[]');
+            if (!Array.isArray(selected) || !selected.every((scope) => typeof scope === 'string')) return;
+            permissionsForm.querySelectorAll('input[data-api-scope]').forEach((input) => {
+                if (input instanceof HTMLInputElement) input.checked = selected.includes(input.value);
+            });
+            const presetStatus = permissionsForm.querySelector('[data-api-preset-status]');
+            if (presetStatus instanceof HTMLElement) presetStatus.textContent = 'Набор выбран. Нажмите «Сохранить права», чтобы применить изменения.';
+        });
+    });
+}
