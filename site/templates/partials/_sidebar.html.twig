@@ -264,13 +264,13 @@
                 or current_route starts with 'company_member_'
                 or current_route starts with 'company_invite_'
             %}
-            {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or company_users_active %}
+            {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or current_route starts with 'settings_api_' or company_users_active %}
             <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-building-community"></i></span>
                     <span class="nav-link-title">Компания и доступы</span>
                 </a>
-                {% set company_show = (company_active or current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or company_users_active) ? 'show' : '' %}
+                {% set company_show = (company_active or current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or current_route starts with 'settings_api_' or company_users_active) ? 'show' : '' %}
                 <div class="dropdown-menu {{ company_show }}">
                     <div class="dropdown-menu-column">
                         {% set company_profile_active = current_route in ['company_index', 'company_new', 'company_show', 'company_edit'] %}
@@ -286,6 +286,10 @@
                         <a class="dropdown-item {{ company_price_active ? 'active' : '' }}" href="{{ path('company_price_index') }}">
                             <span>Тарифы</span>
                         </a>
+
+                        {% if active_company and active_company.user.id == app.user.id %}
+                        <a class="btn btn-sm btn-secondary" aria-current="{{ current_route starts with 'settings_api_' ? 'page' : 'false' }}" href="{{ path('settings_api_index') }}"><span>API</span></a>
+                        {% endif %}
 
                         {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
                         <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">

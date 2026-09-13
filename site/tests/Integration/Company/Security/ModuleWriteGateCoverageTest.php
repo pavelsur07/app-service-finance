@@ -58,6 +58,11 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
+        'settings_api_create' => ['owner', 'App\Api\Controller\Settings\CreateController::__invoke'],
+        'settings_api_rename' => ['owner', 'App\Api\Controller\Settings\RenameController::__invoke'],
+        'settings_api_revoke' => ['owner', 'App\Api\Controller\Settings\RevokeController::__invoke'],
+        'settings_api_check' => ['owner', 'App\Api\Controller\Settings\CheckController::__invoke'],
+
         // Шаблоны ролей и участники: owner-only, проверка в теле экшена.
         'company_role_new' => ['owner', 'App\Company\Controller\CompanyRoleController::new'],
         'company_role_create' => ['owner', 'App\Company\Controller\CompanyRoleController::new'],

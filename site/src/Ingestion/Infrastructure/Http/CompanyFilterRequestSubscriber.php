@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Infrastructure\Http;
 
+use App\Company\Entity\User;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -34,7 +35,7 @@ final class CompanyFilterRequestSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if (null === $this->security->getUser()) {
+        if (!$this->security->getUser() instanceof User) {
             return;
         }
 

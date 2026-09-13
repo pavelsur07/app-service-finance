@@ -17,6 +17,10 @@ nelmio_api_doc:
               description: 'Local development'
         components:
             securitySchemes:
+                ExternalBearer:
+                    type: http
+                    scheme: bearer
+                    description: 'Новый внешний API: Bearer + X-Company-Id; без сессии, отдельно от ключей отчётов'
                 SessionCookie:
                     type: apiKey
                     in: cookie
@@ -55,6 +59,8 @@ nelmio_api_doc:
         security:
             - SessionCookie: []
         tags:
+            - name: External API
+              description: 'Внешнее подключение, отдельный stateless Bearer firewall'
             - name: Health
               description: 'Проверки жизнеспособности сервиса (liveness/readiness)'
             - name: Marketplace Analytics

@@ -1,0 +1,3 @@
+test_api_permissions:
+    resource: '../../../tests/Functional/Api/Fixtures/PermissionController.php'
+    type: attribute

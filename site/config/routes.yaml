@@ -124,3 +124,9 @@ marketplace_admin_controllers:
         path: ../src/Marketplace/Controller/Admin/
         namespace: App\Marketplace\Controller\Admin
     type: attribute
+
+api_management_controllers:
+    resource:
+        path: ../src/Api/Controller/
+        namespace: App\Api\Controller
+    type: attribute

@@ -1,0 +1,5 @@
+{% extends '_layout/app.html.twig' %}
+{% set app_breadcrumb = 'Настройки → API' %}
+{% set app_nav_active = 'api' %}
+{% block title %}API — Настройки{% endblock %}
+{% block javascripts %}{{ vite_entry_script_tags('api_settings') }}{% endblock %}
