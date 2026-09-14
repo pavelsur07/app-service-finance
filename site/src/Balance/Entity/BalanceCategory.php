@@ -6,6 +6,7 @@ namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Exception\BalanceDepthExceededException;
+use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Repository\BalanceCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -14,7 +15,10 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: BalanceCategoryRepository::class)]
-#[ORM\Table(name: 'balance_categories')]
+#[ORM\Table(name: 'balance_articles')]
+#[ORM\UniqueConstraint(name: 'uniq_balance_article_company_id', columns: ['company_id', 'id'])]
+#[ORM\UniqueConstraint(name: 'uniq_balance_article_code', columns: ['company_id', 'code'])]
+#[ORM\Index(name: 'idx_balance_article_parent', columns: ['company_id', 'parent_id'])]
 class BalanceCategory
 {
     #[ORM\Id]
@@ -43,6 +47,12 @@ class BalanceCategory
 
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
     private int $level = 1;
+
+    #[ORM\Column(length: 20)]
+    private string $kind = 'group';
+
+    #[ORM\Column(type: Types::BOOLEAN)]
+    private bool $isArchived = false;
 
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $sortOrder = 0;
@@ -100,11 +110,18 @@ class BalanceCategory
 
     public function setParent(?self $parent): self
     {
-        $this->parent = $parent;
-        $this->level = $parent ? $parent->getLevel() + 1 : 1;
-        if ($this->level > 5) {
-            throw new BalanceDepthExceededException();
+        $level = $parent ? $parent->getLevel() + 1 : 1;
+        if ($level > 4) {
+            throw new BalanceDepthExceededException(4);
         }
+        if (null !== $parent && ($parent->getCompanyId() !== $this->companyId || $parent->getType() !== $this->type)) {
+            throw new BalanceLedgerException('Родитель должен принадлежать той же компании и стороне баланса.');
+        }
+        if (null !== $parent && ('group' !== $parent->getKind() || $parent->isArchived())) {
+            throw new BalanceLedgerException('Родитель должен быть активной группой.');
+        }
+        $this->parent = $parent;
+        $this->level = $level;
         $this->touch();
 
         return $this;
@@ -116,6 +133,16 @@ class BalanceCategory
     public function getChildren(): Collection
     {
         return $this->children;
+    }
+
+    public function refreshLevel(): void
+    {
+        $level = null === $this->parent ? 1 : $this->parent->getLevel() + 1;
+        if ($level > 4) {
+            throw new BalanceDepthExceededException(4);
+        }
+        $this->level = $level;
+        $this->touch();
     }
 
     public function getLevel(): int
@@ -183,6 +210,33 @@ class BalanceCategory
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getKind(): string
+    {
+        return $this->kind;
+    }
+
+    public function setKind(string $kind): self
+    {
+        Assert::inArray($kind, ['group', 'article']);
+        $this->kind = $kind;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->isArchived;
+    }
+
+    public function setIsArchived(bool $archived): self
+    {
+        $this->isArchived = $archived;
+        $this->touch();
+
+        return $this;
     }
 
     private function touch(): void

@@ -297,20 +297,6 @@ services:
     App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface: '@App\MarketplaceAds\Application\DispatchOzonAdLoadAction'
     App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface: '@App\MarketplaceAds\Infrastructure\Query\AdDocumentQuery'
 
-    # ---------- Balance value providers ------------ #
-    App\Balance\Provider\:
-        resource: '../src/Balance/Provider/'
-
-    App\Balance\Provider\CashTotalsProvider:
-        tags: ['app.balance.value_provider']
-
-    App\Balance\Provider\FundsTotalsProvider:
-        tags: ['app.balance.value_provider']
-
-    App\Balance\Provider\BalanceValueProviderRegistry:
-        arguments:
-            $providers: !tagged_iterator app.balance.value_provider
-
     # ---------- Marketplace adapters ------------ #
     App\Marketplace\Service\Integration\WildberriesAdapter:
         tags: ['app.marketplace.adapter']

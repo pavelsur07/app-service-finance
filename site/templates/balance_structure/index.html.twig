@@ -1,83 +1,63 @@
-{% extends 'base.html.twig' %}
-{% block title %}Настройка баланса{% endblock %}
-
-{% macro render_items(items) %}
-    {% for item in items %}
-        <li class="list-group-item">
-            <div class="d-flex align-items-center gap-2">
-                <div class="d-flex align-items-center gap-2 ps-{{ (item.level - 1) * 2 }}">
-                    {% set type_label = {
-                        'asset': 'Актив',
-                        'liability': 'Обязательство',
-                        'equity': 'Капитал'
-                    }[item.type] ?? item.type %}
-                    {% set badge_class = {
-                        'asset': 'bg-green',
-                        'liability': 'bg-red',
-                        'equity': 'bg-blue'
-                    }[item.type] ?? 'bg-secondary' %}
-                    <span class="badge {{ badge_class }} text-uppercase">{{ type_label }}</span>
-                    <span class="fw-semibold">{{ item.name }}</span>
-                </div>
-                <div class="ms-auto d-flex flex-wrap gap-1">
-                    <form method="post" action="{{ path('balance_structure_move') }}" class="d-inline">
-                        <input type="hidden" name="_token" value="{{ csrf_token('move' ~ item.id) }}">
-                        <input type="hidden" name="category_id" value="{{ item.id }}">
-                        <input type="hidden" name="direction" value="up">
-                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Вверх">↑</button>
-                    </form>
-                    <form method="post" action="{{ path('balance_structure_move') }}" class="d-inline">
-                        <input type="hidden" name="_token" value="{{ csrf_token('move' ~ item.id) }}">
-                        <input type="hidden" name="category_id" value="{{ item.id }}">
-                        <input type="hidden" name="direction" value="down">
-                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Вниз">↓</button>
-                    </form>
-                    <a class="btn btn-sm btn-outline-primary" href="{{ path('balance_structure_edit', {'id': item.id}) }}">Редактировать</a>
-                    <form method="post" action="{{ path('balance_structure_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить категорию?');">
-                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                        <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
-                    </form>
-                </div>
-            </div>
-            {% if item.children|length > 0 %}
-                <ul class="list-group list-group-flush mt-2 ms-3">
-                    {{ _self.render_items(item.children) }}
-                </ul>
-            {% endif %}
-        </li>
-    {% endfor %}
-{% endmacro %}
-
-{% import _self as macros %}
-
-{% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Настройка структуры баланса</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('balance_structure_new') }}" class="btn btn-primary">+ Добавить категорию</a>
-                </div>
-            </div>
-        </div>
+{% extends 'balance/layout.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Статьи баланса<span class="wz-sub">Четыре уровня внутри сторон Актив и Пассив. Счета находятся в конечных статьях.</span>
+        </h1>
+        {% if permissions.manage %}
+            <a class="btn btn-md btn-primary" href="{{ path('balance_structure_new') }}">Создать статью</a>
+        {% endif %}
     </div>
-
-    <div class="container-xl mt-3">
-        <div class="alert alert-info" role="alert">
-            Баланс считается, когда у строки задан источник суммы. Рекомендуем начать с: «Деньги → все счета» и «Фонды → все фонды».
-        </div>
-        <div class="card">
-            <div class="card-body">
-                {% if items|length > 0 %}
-                    <ul class="list-group list-group-flush">
-                        {{ macros.render_items(items) }}
-                    </ul>
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Статья</th>
+                    <th>Тип</th>
+                    <th>Назначение</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td>
+                            {% for n in 1..item.level %}
+                                {% if n > 1 %}— {% endif %}
+                            {% endfor %}
+                            <a href="{{ path('balance_article_card',{id:item.id}) }}">{{ item.name }}
+                            </a>
+                            {% if item.is_archived %} · Архив{% endif %}
+                            <p>{{ item.code }}
+                            </p>
+                        </td>
+                        <td>{{ item.type == 'asset' ? 'Актив':'Пассив' }}
+                        </td>
+                        <td>{{ item.kind == 'group' ? 'Группа':'Конечная статья' }}
+                        </td>
+                        <td>
+                            {% if permissions.manage %}
+                                <a class="btn btn-sm btn-secondary" href="{{ path('balance_structure_edit',{id:item.id}) }}">Изменить</a>
+                                <form method="post" action="{{ path('balance_structure_move') }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('category_move_'~item.id) }}">
+                                    <input type="hidden" name="category_id" value="{{ item.id }}">
+                                    <button class="btn btn-sm btn-secondary" name="direction" value="up" aria-label="Поднять {{ item.name }}">↑</button>
+                                    <button class="btn btn-sm btn-secondary" name="direction" value="down" aria-label="Опустить {{ item.name }}">↓</button>
+                                </form>
+                                <form method="post" action="{{ path('balance_structure_archive',{id:item.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('category_archive_'~item.id) }}">
+                                    <input type="hidden" name="archive" value="{{ item.is_archived ? '0':'1' }}">
+                                    <button class="btn btn-sm btn-secondary">{{ item.is_archived ? 'Вернуть из архива':'Архивировать' }}
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
                 {% else %}
-                    <p class="text-muted mb-0">Пока нет категорий баланса.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+                    <tr>
+                        <td colspan="4">Структура еще не создана.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
 {% endblock %}

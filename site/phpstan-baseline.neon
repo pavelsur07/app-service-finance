@@ -367,66 +367,6 @@ parameters:
 			path: src/Analytics/Command/AnalyticsDashboardWarmupCommand.php
 
 		-
-			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Balance/Application/LinkBalanceCategoryAction.php
-
-		-
-			message: '#^Binary operation "\+" between int\|string and 1 results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: src/Balance/Application/MoveBalanceCategoryAction.php
-
-		-
-			message: '#^Binary operation "\-" between int\<1, max\>\|string and 1 results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: src/Balance/Application/MoveBalanceCategoryAction.php
-
-		-
-			message: '#^Method App\\Balance\\Application\\SeedBalanceStructureAction\:\:ensureCategory\(\) should return App\\Balance\\Entity\\BalanceCategory but returns object\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Balance/Application/SeedBalanceStructureAction.php
-
-		-
-			message: '#^Property App\\Balance\\Application\\SeedBalanceStructureAction\:\:\$balanceCategoryLinkRepository is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Balance/Application/SeedBalanceStructureAction.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Balance\\Facade\\BalanceFacade\:\:getReportForCompany\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Controller/BalanceController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of callable App\\Balance\\Application\\CreateBalanceCategoryAction expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Controller/BalanceStructureController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of callable App\\Balance\\Application\\MoveBalanceCategoryAction expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Controller/BalanceStructureController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Balance\\Facade\\BalanceFacade\:\:getCategoriesForCompany\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Controller/BalanceStructureController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Balance\\Facade\\BalanceFacade\:\:getCategoryChoicesForCompany\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Controller/BalanceStructureController.php
-
-		-
 			message: '#^Parameter \#1 \$byId of method App\\Balance\\Facade\\BalanceFacade\:\:buildTree\(\) expects array\<string, array\{id\: string, name\: string, level\: int, type\: string, children\: list\<mixed\>\}\>, array\<string, array\{children\: non\-empty\-list\<mixed\>\}\|array\{id\: string, name\: string, level\: int, type\: string, children\: list\<mixed\>\}\> given\.$#'
 			identifier: argument.type
 			count: 1
@@ -437,42 +377,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: src/Balance/Form/BalanceCategoryFormType.php
-
-		-
-			message: '#^Parameter \#1 \$links of method App\\Balance\\Infrastructure\\Query\\BalanceReportQuery\:\:groupLinksByCategoryId\(\) expects list\<App\\Balance\\Entity\\BalanceCategoryLink\>, array\<App\\Balance\\Entity\\BalanceCategoryLink\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Infrastructure/Query/BalanceReportQuery.php
-
-		-
-			message: '#^Parameter \#1 \$company of method App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository\:\:getLatestClosingTotalsUpToDate\(\) expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Balance/Provider/CashTotalsProvider.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Balance\\Provider\\CashTotalsProvider should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Balance/Provider/CashTotalsProvider.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Balance\\Provider\\FundsTotalsProvider should not depend on App\\Cash\\Service\\Accounts\\FundBalanceService$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Balance/Provider/FundsTotalsProvider.php
-
-		-
-			message: '#^Class App\\Balance\\Repository\\BalanceCategoryLinkRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/Balance/Repository/BalanceCategoryLinkRepository.php
-
-		-
-			message: '#^Method App\\Balance\\Repository\\BalanceCategoryLinkRepository\:\:findByIdAndCompany\(\) should return App\\Balance\\Entity\\BalanceCategoryLink\|null but returns object\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Balance/Repository/BalanceCategoryLinkRepository.php
 
 		-
 			message: '#^Class App\\Balance\\Repository\\BalanceCategoryRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'

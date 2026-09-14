@@ -78,25 +78,4 @@ final readonly class BalanceFacade
     {
         return $this->balanceReportQuery->buildForCompanyAndDate($companyId, $date);
     }
-
-    /**
-     * @param list<string> $excludeCategoryIds
-     *
-     * @return array<string, string> display label => id
-     */
-    public function getCategoryChoicesForCompany(string $companyId, array $excludeCategoryIds = []): array
-    {
-        $excludeCategoryIds = array_flip($excludeCategoryIds);
-        $choices = [];
-        foreach ($this->balanceCategoryRepository->findTreeByCompany($companyId) as $category) {
-            if (isset($excludeCategoryIds[$category->getId()])) {
-                continue;
-            }
-
-            $label = str_repeat('—', max($category->getLevel() - 1, 0)).' '.$category->getName();
-            $choices[$label] = $category->getId();
-        }
-
-        return $choices;
-    }
 }

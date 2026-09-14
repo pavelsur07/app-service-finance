@@ -28,10 +28,10 @@ final class BalanceCategoryFormType extends AbstractType
                 'constraints' => [new NotNull()],
                 'choices' => [
                     'Актив' => BalanceCategoryType::ASSET,
-                    'Обязательство' => BalanceCategoryType::LIABILITY,
-                    'Капитал' => BalanceCategoryType::EQUITY,
+                    'Пассив' => BalanceCategoryType::PASSIVE,
                 ],
             ])
+            ->add('kind', ChoiceType::class, ['label' => 'Назначение', 'choices' => ['Группа статей' => 'group', 'Конечная статья со счетами' => 'article']])
             ->add('parentId', ChoiceType::class, [
                 'label' => 'Родитель',
                 'choices' => $options['parent_choices'],

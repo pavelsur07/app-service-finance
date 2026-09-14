@@ -111,12 +111,12 @@ final class BalanceCategoryBuilder
 
     public function asLiability(): self
     {
-        return $this->withType(BalanceCategoryType::LIABILITY);
+        return $this->withType(BalanceCategoryType::PASSIVE);
     }
 
     public function asEquity(): self
     {
-        return $this->withType(BalanceCategoryType::EQUITY);
+        return $this->withType(BalanceCategoryType::PASSIVE);
     }
 
     public function build(): BalanceCategory

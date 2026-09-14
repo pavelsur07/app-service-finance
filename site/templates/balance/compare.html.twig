@@ -1,0 +1,44 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Сравнение двух дат</h1>
+    </div>{{ ui.period(from,to) }}
+    {% if not comparison.before.initialized or not comparison.after.initialized %}
+        <p>На одной из выбранных дат учет еще не начат.</p>
+    {% endif %}
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Счет / статья</th>
+                    <th>{{ from }}
+                    </th>
+                    <th>{{ to }}
+                    </th>
+                    <th>Изменение</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in comparison.after.accounts %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}
+                            </a>
+                            <p>{{ row.article_name }}
+                            </p>
+                        </td>
+                        {% for key in ['before','closing','change'] %}
+                            <td class="t-cell--right">{{ attribute(row,key)|format_minor_currency(currency) }}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">Нет учетных счетов.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

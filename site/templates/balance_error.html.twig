@@ -1,0 +1,10 @@
+{% extends '_layout/app.html.twig' %}
+{% block title %}Операция не выполнена{% endblock %}
+{% block body %}
+<section class="card">
+    <h1 class="wz-title">Операция не выполнена</h1>
+    <p role="alert">{{ message }}</p>
+    <p>Исправьте данные и отправьте форму повторно.</p>
+    <a class="btn btn-md btn-primary" href="{{ path('balance_index') }}">Вернуться в баланс</a>
+</section>
+{% endblock %}

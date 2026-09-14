@@ -326,7 +326,6 @@ final class ProcessWbCostsAction
 |---|---|
 | `app.marketplace.cost_calculator` | Калькуляторы WB-затрат |
 | `app.marketplace.adapter` | Адаптеры маркетплейсов |
-| `app.balance.value_provider` | Провайдеры значений баланса |
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 

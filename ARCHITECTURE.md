@@ -16,7 +16,7 @@
 | `Deals` | Сделки | `Company $company` (legacy) |
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
-| `Balance` | Управленческий баланс, провайдеры значений | `string $companyId` ✅ |
+| `Balance` | Автономный управленческий баланс, счета и журнал движений | `string $companyId` ✅ |
 | `Billing` | Биллинг и подписки | — |
 | `Loan` | Кредиты и займы | legacy |
 | `Ai` | Интеграция с LLM | — |
@@ -1037,22 +1037,62 @@ updatePLRegisterForDocument(string $documentId): void
 построения производных документов.
 
 ### `BalanceFacade` (`src/Balance/Facade/BalanceFacade.php`)
+
+Автономный учет: финансовые провайдеры Cash/Funds и старые ссылки не используются.
+`BalanceCategoryType`: `ASSET = asset`, `PASSIVE = passive`; капитал входит в пассив.
+Статьи `balance_articles`: group/article, четыре уровня без виртуальных сторон.
+Отдельные `BalanceAccount` принадлежат конечным статьям; счета не уровень дерева.
+
 ```php
-// Дерево категорий баланса компании (вложенные children)
-// @return list<array{id: string, name: string, level: int, type: string, children: list<mixed>}>
 getCategoriesForCompany(string $companyId): array
-
-// Плоский список категорий для ChoiceType: "— Название" => id
-// @return array<string, string>
-getCategoryChoicesForCompany(string $companyId, array $excludeCategoryIds = []): array
-
-// Отчёт «Баланс» на дату
 getReportForCompany(string $companyId, \DateTimeImmutable $date): BalanceReport
-
-// Создать дефолтную структуру баланса, если у компании её ещё нет.
-// Вызывать после flush компании. true — структура создана, false — уже была.
 seedDefaultStructure(string $companyId): bool
 ```
+
+`BalanceReport`: `getRoots()` (каждая `BalanceRowView` имеет точный `amountMinor`),
+`getCurrency()`, `isInitialized()`, `getAssetMinor()`, `getPassiveMinor()`,
+`getDifferenceMinor()`. Совместимые decimal-карты: `getAssetTotals()`,
+`getPassiveTotals()`, `getDifferences()`, `getTotals()` (только актив, не сумма сторон).
+Дерево и суммы строятся из одного снимка. Архив/видимость не исключают остатки из итогов.
+
+Сущности: `BalanceBook`, `BalanceCategory`, `BalanceAccount`, `BalanceOperation`,
+`BalanceOperationLine`, `BalanceAccountState`, `BalancePeriod`, `BalanceAccessGrant`,
+`BalanceAuditEvent`. Все принадлежат компании; новые таблицы и составные FK описаны
+в `docs/tasks/balance-ledger/schema.md`. Legacy `balance_categories` и
+`balance_category_links` остаются нетронутым техническим архивом без ORM runtime.
+
+`BalanceLedgerService`: configureBook, saveDraft, post, reverse, deleteDraft,
+prepareTargetCorrection, postTargetCorrection и rebuildCurrentStates (владелец, основание). Инициатор проверяется `BalanceAccess`.
+Проведение берет company FOR SHARE перед book FOR UPDATE, проверяет свежие финансовые права,
+ожидаемую версию черновика и явное подтверждение нулевого открытия. Использует точные минимальные единицы валюты,
+сбалансированные изменения, защиту повторов, версии черновиков и проверку всей
+последующей истории затронутых остатков и агрегатов; обычное добавление использует текущие состояния.
+Восстановление состояний отдельно проверяет весь проведенный журнал и сверяет результат.
+Удаленный черновик сохраняет защиту ключа запроса через индексированный audit tombstone. Проведенные данные неизменяемы;
+сторно и оригинал оба участвуют в суммах. Установка остатка создает корректировку
+с проверяемым снимком расчета, без автоматического изменения капитала.
+
+`LedgerQuery`: book, articles/categories/category, accounts/account, document,
+balance, journal, accountCard, articleCard, statement, compare, periods, grants,
+audit. Каждый запрос принимает `companyId`; суммы — строки минимальных единиц.
+Обороты могут превышать диапазон отдельного BIGINT остатка и форматируются без float.
+Журнал, карточки движений и аудит используют Pagerfanta; карточки сохраняют итоги всего периода и сквозной остаток. Многозапросные отчеты читают согласованный снимок.
+
+`BalancePeriodAction`: последовательное закрытие завершенных месяцев после сверки,
+переоткрытие только последнего закрытого месяца с основанием. Черновики предупреждаются,
+но не влияют на суммы. Финансовые мутации и период используют единый порядок company → book, совместимый с отзывом членства и прав.
+Закрытие и повторное открытие имеют разные разрешения.
+`BalanceAccess`: активная компания + свежие финансовые права Company + prepare/post/manage_periods/reopen_periods;
+manage — только владелец. Новые права автоматически сотрудникам не назначаются.
+
+`CompanyFacade::listMembers(string $companyId): list<array{id:string,label:string}>`
+возвращает владельца и активных участников для выбора прав. Авторизация выполняется
+вызывающим контроллером; финансовых данных этот инфраструктурный контракт не передает.
+
+`CompanyFacade::financialAccess(string $companyId, string $userId, bool $lock = false)`
+возвращает owner/read/write из актуальных членства и шаблона прав. При lock=true требует
+транзакцию и берет company FOR SHARE, согласованную с существующим PESSIMISTIC_WRITE
+операций изменения членства и ролей. Запросы с неверными идентификаторами закрыты.
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
@@ -2782,7 +2822,6 @@ $money->amountMinor(): int;  $money->currency(): string
 |---|---|
 | `app.marketplace.cost_calculator` | Калькуляторы WB-затрат (priority в services.yaml) |
 | `app.marketplace.adapter` | Адаптеры маркетплейсов (WB, Ozon) |
-| `app.balance.value_provider` | Провайдеры значений баланса |
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 | `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |

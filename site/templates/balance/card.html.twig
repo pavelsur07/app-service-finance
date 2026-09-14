@@ -1,0 +1,86 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">{{ item.name }}
+            <span class="wz-sub">{{ article ? 'Карточка статьи':'Карточка счета' }}
+            </span>
+        </h1>
+    </div>{{ ui.period(from,to) }}
+    {% if not card.accounting_started %}
+        <section class="card">Учет не начат в выбранном периоде.</section>
+    {% elseif card.effective_from != from %}
+        <section class="card">Фактическое начало периода учета: {{ card.effective_from }}. Начальные остатки показаны на эту дату.</section>
+    {% endif %}
+    <div class="wz-row">
+        <section class="card">
+            <h2>На начало</h2>{{ card.opening|format_minor_currency(currency) }}
+        </section>
+        <section class="card">
+            <h2>На конец</h2>{{ card.closing|format_minor_currency(currency) }}
+        </section>
+    </div>
+    {% if article %}
+        <section class="card report-scroll">
+            <h2>Счета статьи</h2>
+            <table class="t-table">
+                <tbody>
+                    {% for row in card.accounts %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}
+                                </a>
+                            </td>
+                            <td>{{ row.closing|format_minor_currency(currency) }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td>Нет счетов.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+    <section class="card report-scroll">
+        <h2>Движения</h2>
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Дата / документ</th>
+                    <th>Счет</th>
+                    <th>Основание</th>
+                    <th>Изменение</th>
+                    <th>Остаток</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in card.entries %}
+                    <tr>
+                        <td>{{ entry.operation_date }} · <a href="{{ path('balance_document',{id:entry.id}) }}">№ {{ entry.number }}
+                            </a>
+                        </td>
+                        <td>{{ entry.account_name }}
+                        </td>
+                        <td>{{ entry.reason }}
+                        </td>
+                        <td>{{ entry.direction == 'increase' ? '+':'−' }}{{ entry.amount|format_minor_currency(currency) }}
+                        </td>
+                        <td>{{ entry.balance|format_minor_currency(currency) }}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5">За период движений нет.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{{ path('balance_audit',{type:article ? 'article':'account',id:item.id}) }}">История изменений</a>
+        {% if not article and permissions.prepare and not item.is_archived %}
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
+        {% endif %}
+    </section>
+{{ ui.pager(card.pager) }}
+{% endblock %}

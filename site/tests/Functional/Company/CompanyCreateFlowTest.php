@@ -55,11 +55,11 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         $balance = $client->getContainer()->get(BalanceFacade::class);
         $balanceTree = $balance->getCategoriesForCompany((string) $company->getId());
         self::assertSame(
-            ['Активы', 'Обязательства', 'Капитал'],
+            ['Оборотные активы', 'Внеоборотные активы', 'Капитал', 'Обязательства'],
             array_column($balanceTree, 'name'),
         );
-        // «Деньги» создаётся после первого линка — доказывает, что seeder дошёл дальше него.
-        self::assertSame(['Деньги', 'Фонды и резервы'], array_column($balanceTree[0]['children'], 'name'));
+        self::assertSame(['Денежные средства'], array_column($balanceTree[0]['children'], 'name'));
+        self::assertSame(['Внесенный капитал', 'Накопленный финансовый результат'], array_column($balanceTree[2]['children'], 'name'));
         self::assertFalse($balance->seedDefaultStructure((string) $company->getId()));
 
         $member = $em->getRepository(CompanyMember::class)->findOneByCompanyAndUser($company, $owner);

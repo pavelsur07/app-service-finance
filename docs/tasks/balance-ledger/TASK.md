@@ -1,0 +1,21 @@
+# Autonomous management balance ledger
+
+Approved owner brief and decisions (2026-09-14): implement the detailed plan from this conversation. Independent management balance, Assets = Passive (liabilities + equity); no financial integrations until a later task. Production Balance has not been used. Preserve legacy tables/data; new categories map to balance_articles. Existing Company infrastructure and shared Money/UI Kit remain in use.
+
+## Required behavior
+- Exactly asset/passive sides, four article levels excluding virtual sides; group nodes versus terminal articles. Separate non-hierarchical accounts under terminal articles. All references company scoped.
+- Codes unique within company; prevent cycles/deep subtrees. Used accounts/articles/ancestors cannot move even after zeroing. Rename/sort audited; reports show current names. Delete only never-referenced empty objects; archive keeps report totals and disallows new movements.
+- One book/company, configurable ISO currency (RUB default), opening date; immutable after opening. Opening is one balanced document, negative opening only for permitted accounts, explicit zero opening allowed. No ordinary posting before opening or before its date.
+- Documents: opening, operation, correction, reversal; draft/posted. At least two distinct accounts for ordinary documents; positive exact amount plus increase/decrease. Drafts may be incomplete/unbalanced. Mandatory accounting date and reason to post. Immutable posted values; original and reversal both count. One direct reversal, opening cannot reverse. Correction and target balance helpers never auto-plug equity.
+- Creation request keys prevent duplicates and reject different payload reuse; optimistic draft revision. Company-book transaction lock serializes financial posting, structure mutations, permissions, closing and reopening. Exact minor units, range checks, no float or silent precision rounding.
+- Source of truth posted lines; materialized current account states rebuildable. Order opening first, then effective date and posting sequence; backdated postings validate every later document balance of affected accounts. Forbidden negative balances cause rollback. Negative allowance immutable after first use.
+- Company timezone Europe/Moscow. Future dated drafts allowed, posting future dates prohibited. Start balances at beginning of opening day; period opening excludes regular same-day movements; initial balances not ordinary turnover.
+- Monthly sequential closing of completed months, integrity/equation checks, drafts warned not counted/blocking. Reopen last closed month only with reason and separate permission; correct closed months in open month.
+- Read requires FINANCE_READ, mutations FINANCE_WRITE plus Balance permission. Owner manages structure/config/grants; separate prepare/post/period permissions, no second approver, no grants automatically to other users. Membership revocation effective immediately. Author comes from authenticated server context.
+- Audit structure/config/grants/draft lifecycle/posting/reversal/periods, no raw payloads in logs.
+- Screens: setup, articles, accounts, document editor, journal, account/article cards, balance/date, movement statement, date comparison, periods, grants, object audit. Twig/Symfony Forms/UI Kit/Stimulus, no dependencies; CSRF, strict dates, pagination.
+- Facade existing tree/report/seed entrypoints adapted; report explicit asset/passive/difference/initialized; no cash/fund providers called; legacy financial-link routes unavailable. Future adapters use same command/core, no speculative external-source tables/queues.
+- New ledger schema additive, no legacy data migration or deletion, no destructive automatic down. Existing seed at company creation only standalone structure.
+
+## Acceptance
+Opening money 100000 / equity 100000; loan +50000 both; equipment +30000/money -30000; repay money and loan -10000 => asset 140000 (money110000 equipment30000), passive140000 (equity100000 loan40000). Reversal of equipment purchase restores money140000/equipment0. Duplicate posting no-op. Close month prevents new postings. Negative profit allowed only configured account. Cards/statements/report/journal reconcile. Foreign-company IDs rejected; stale/repeated/concurrent writes safe.

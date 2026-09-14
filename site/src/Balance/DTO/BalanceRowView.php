@@ -19,6 +19,7 @@ final class BalanceRowView
         public bool $isVisible,
         public array $amountsByCurrency,
         public array $children = [],
+        public string $amountMinor = '0',
     ) {
     }
 }

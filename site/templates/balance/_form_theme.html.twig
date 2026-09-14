@@ -1,0 +1,13 @@
+{% use 'api/settings/_form_theme.html.twig' %}
+{% block checkbox_row %}
+    <div class="form-field">
+        <label class="checkbox-label" for="{{ id }}">{{ form_widget(form, {attr: {class: 'checkbox'}}) }} {{ label|trans }}
+        </label>{{ form_help(form) }}{{ form_errors(form) }}
+    </div>
+{% endblock %}
+{% block form_help %}
+    {% if help is not empty %}
+        <p id="{{ id }}_help" class="field-helper">{{ help|trans }}
+        </p>
+    {% endif %}
+{% endblock %}

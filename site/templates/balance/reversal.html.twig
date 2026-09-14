@@ -1,0 +1,13 @@
+{% extends 'balance/layout.html.twig' %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Сторно документа № {{ document.number }}
+        </h1>
+    </div>
+    <section class="card">
+        <p>Будет проведен документ с обратными изменениями всех счетов. Исходный документ останется в истории.</p>{{ form_start(form) }}{{ form_widget(form) }}
+        <button class="btn btn-md btn-danger">Провести сторно</button>
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_document',{id:document.id}) }}">Отмена</a>{{ form_end(form) }}
+    </section>
+{% endblock %}

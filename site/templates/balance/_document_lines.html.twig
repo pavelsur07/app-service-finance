@@ -1,0 +1,21 @@
+{% import 'balance/_macros.html.twig' as ui %}
+{% set nextIndex = 0 %}
+{% for line in form.lines %}
+    {% if line.vars.name matches '/^[0-9]+$/' %}
+        {% set nextIndex = max(nextIndex, line.vars.name + 1) %}
+    {% endif %}
+{% endfor %}
+<div data-controller="balance-lines" data-balance-lines-currency-value="{{ currency }}" data-balance-lines-index-value="{{ nextIndex }}" data-action="input->balance-lines#update change->balance-lines#update">
+    <div data-balance-lines-target="rows">
+        {% for line in form.lines %}
+            {{ ui.line(line) }}
+        {% endfor %}
+    </div>
+    <template data-balance-lines-target="prototype">{{ ui.line(form.lines.vars.prototype) }}
+    </template>
+    {% do form.lines.setRendered %}
+    <p>
+        <button class="btn btn-md btn-secondary" type="button" data-action="balance-lines#add">Добавить строку</button>
+    </p>
+    <p class="field-helper" data-balance-lines-target="totals" aria-live="polite">Итоги будут проверены при проведении документа.</p>
+</div>

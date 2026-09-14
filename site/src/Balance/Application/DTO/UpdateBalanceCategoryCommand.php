@@ -15,6 +15,7 @@ final readonly class UpdateBalanceCategoryCommand
         public ?string $parentId,
         public ?string $code,
         public bool $isVisible,
+        public string $kind = 'group',
     ) {
     }
 }
