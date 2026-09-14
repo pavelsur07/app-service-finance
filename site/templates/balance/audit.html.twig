@@ -1,0 +1,42 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">История изменений</h1>
+    </div>
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Действие</th>
+                    <th>Автор</th>
+                    <th>Изменения</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in audit.items %}
+                    <tr>
+                        <td>{{ event.created_at }}
+                        </td>
+                        <td>{{ {'create':'Создание','update':'Изменение','archive':'Архивирование','restore':'Возврат из архива','delete':'Удаление','sort':'Изменение порядка','configure':'Настройка учета','create_draft':'Создание черновика','update_draft':'Изменение черновика','delete_draft':'Удаление черновика','post':'Проведение','target_prepared':'Расчет корректировки','close':'Закрытие периода','reopen':'Переоткрытие периода','grant':'Изменение прав','system_seed':'Создание базовой структуры'}[event.action]|default(event.action) }}
+                        </td>
+                        <td>{{ event.author_id ? members[event.author_id]|default('Бывший участник') : 'Система' }}
+                        </td>
+                        <td>
+                            <details>
+                                <summary>Показать</summary>
+                                <pre>{{ event.changes is iterable ? event.changes|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_UNICODE')) : event.changes }}
+                                </pre>
+                            </details>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">История пуста.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>{{ ui.pager(audit.pager) }}
+{% endblock %}

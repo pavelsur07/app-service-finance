@@ -23,6 +23,7 @@ parameters:
     # symbols without adding historical migrations to the analysis paths.
     scanFiles:
         - migrations/Version20260913090000.php
+        - migrations/Version20260914120000.php
 
     # migrations сознательно вне охвата: 242 сгенерированных one-shot файла,
     # уже прогнанных на проде. Их анализ дал бы вечный балласт в baseline.

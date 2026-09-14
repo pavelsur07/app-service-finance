@@ -1,0 +1,78 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Учетные счета<span class="wz-sub">Остатки на {{ 'now'|date('d.m.Y', 'Europe/Moscow') }}
+            </span>
+        </h1>
+        {% if permissions.manage %}
+            <a class="btn btn-md btn-primary" href="{{ path('balance_account_new') }}">Создать счет</a>
+        {% endif %}
+    </div>
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Счет</th>
+                    <th>Статья</th>
+                    <th>Остаток</th>
+                    <th>Правила</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('balance_account_card',{id:item.id}) }}">{{ item.name }}
+                            </a>
+                            <p>{{ item.code }}
+                                {% if item.is_archived %} · Архив{% endif %}
+                            </p>
+                        </td>
+                        <td>
+                            <a href="{{ path('balance_article_card',{id:item.article_id}) }}">{{ item.article_name }}
+                            </a>
+                        </td>
+                        <td class="t-cell--right">{{ item.balance|format_minor_currency(currency) }}
+                        </td>
+                        <td>{{ item.allow_negative ? 'Отрицательный остаток разрешен' : 'Отрицательный остаток запрещен' }}
+                        </td>
+                        <td>
+                            {% if permissions.manage %}
+                                <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_edit',{id:item.id}) }}">Изменить</a>
+                                <form method="post" action="{{ path('balance_account_archive',{id:item.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('account_archive_'~item.id) }}">
+                                    <input type="hidden" name="archive" value="{{ item.is_archived ? '0':'1' }}">
+                                    <button class="btn btn-sm btn-secondary">{{ item.is_archived ? 'Вернуть из архива':'Архивировать' }}
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if permissions.prepare and not item.is_archived %}
+                                <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5">Счетов пока нет. Создайте конечную статью, затем добавьте в нее счет.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>{{ ui.pager(pager) }}
+{% if permissions.manage %}
+    <section class="card">
+        <h2>Восстановление текущих остатков</h2>
+        <p>Сохраненные остатки будут сверены с проведенными документами и восстановлены из журнала. История операций не изменится.</p>
+        <form method="post" action="{{ path('balance_rebuild') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('balance_rebuild') }}">
+            <div class="form-field">
+                <label class="form-label" for="balance-rebuild-reason">Основание восстановления</label>
+                <input class="input" id="balance-rebuild-reason" name="reason" required>
+            </div>
+            <button class="btn btn-md btn-secondary">Восстановить остатки из журнала</button>
+        </form>
+    </section>
+{% endif %}
+{% endblock %}

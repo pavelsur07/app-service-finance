@@ -1,0 +1,107 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Документы баланса</h1>
+        {% if permissions.prepare %}
+            <a class="btn btn-md btn-primary" href="{{ path('balance_document_new') }}">Новый документ</a>
+        {% endif %}
+    </div>
+    <form method="get" class="wz-row">
+        <div class="form-field">
+            <label class="form-label" for="journal-search">Номер или основание</label>
+            <input class="input" id="journal-search" name="search" value="{{ filters.search }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-status">Статус</label>
+            <select class="input" id="journal-status" name="status">
+                <option value="">Все</option>
+                {% for value,label in {'draft':'Черновик','posted':'Проведен'} %}
+                    <option value="{{ value }}" {{ filters.status == value ? 'selected':'' }}>{{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-kind">Вид</label>
+            <select class="input" id="journal-kind" name="kind">
+                <option value="">Все</option>
+                {% for value,label in {'opening':'Начальные остатки','operation':'Операция','correction':'Корректировка','reversal':'Сторно'} %}
+                    <option value="{{ value }}" {{ filters.kind == value ? 'selected':'' }}>{{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-account">Счет</label>
+            <select class="input" id="journal-account" name="account_id">
+                <option value="">Все</option>
+                {% for account in accounts %}
+                    <option value="{{ account.id }}" {{ filters.account_id == account.id ? 'selected':'' }}>{{ account.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-from">С даты</label>
+            <input class="input" type="date" name="from" id="journal-from" value="{{ filters.from }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-to">По дату</label>
+            <input class="input" type="date" name="to" id="journal-to" value="{{ filters.to }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="journal-author">Автор</label>
+            <select class="input" id="journal-author" name="author_id">
+                <option value="">Все</option>
+                {% for id,label in members %}
+                    <option value="{{ id }}" {{ filters.author_id == id ? 'selected':'' }}>{{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <button class="btn btn-md btn-primary">Найти</button>
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_journal') }}">Сбросить</a>
+        </div>
+    </form>
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Вид</th>
+                    <th>Статус</th>
+                    <th>Основание</th>
+                    <th>Автор</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in journal.items %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('balance_document',{id:item.id}) }}">{{ item.number }}
+                            </a>
+                        </td>
+                        <td>{{ item.operation_date }}
+                        </td>
+                        <td>{{ {'opening':'Начальные остатки','operation':'Операция','correction':'Корректировка','reversal':'Сторно'}[item.kind] }}
+                        </td>
+                        <td>{{ item.status == 'draft' ? 'Черновик':'Проведен' }}
+                            {% if item.is_reversed %} · Сторнирован{% endif %}
+                        </td>
+                        <td>{{ item.reason }}
+                        </td>
+                        <td>{{ members[item.author_id]|default('Бывший участник') }}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6">Документы не найдены.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>{{ ui.pager(journal.pager) }}
+{% endblock %}

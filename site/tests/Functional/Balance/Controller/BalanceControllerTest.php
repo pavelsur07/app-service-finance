@@ -34,6 +34,6 @@ final class BalanceControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $client->request('GET', '/balance/');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h2.page-title', 'Баланс');
+        self::assertSelectorTextContains('h1.wz-title', 'Баланс');
     }
 }

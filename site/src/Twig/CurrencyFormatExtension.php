@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Twig;
 
-use App\Shared\Domain\ValueObject\Money;
 use Symfony\Component\Intl\Currencies;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
@@ -33,10 +32,15 @@ class CurrencyFormatExtension extends AbstractExtension
         return trim(sprintf('%s %s', $formatted, $symbol));
     }
 
-    public function formatMinorCurrency(int $amountMinor, string $currency): string
+    public function formatMinorCurrency(int|string $amountMinor, string $currency): string
     {
         $currency = strtoupper($currency);
-        $decimal = Money::fromMinor($amountMinor, $currency)->toDecimalString();
+        $minor = (string) $amountMinor;
+        if (!preg_match('/^-?\\d+$/D', $minor)) {
+            throw new \InvalidArgumentException('Invalid minor currency amount.');
+        }
+        $digits = $this->getFractionDigits($currency);
+        $decimal = bcdiv($minor, bcpow('10', (string) $digits, 0), $digits);
         $negative = str_starts_with($decimal, '-');
         $unsigned = ltrim($decimal, '-');
         [$whole, $fraction] = array_pad(explode('.', $unsigned, 2), 2, '');

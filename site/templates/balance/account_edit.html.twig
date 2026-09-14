@@ -1,0 +1,22 @@
+{% extends 'balance/layout.html.twig' %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">{{ item ? 'Настройка счета':'Новый счет' }}
+        </h1>
+    </div>
+    <section class="card">{{ form_start(form) }}{{ form_widget(form) }}
+        <button class="btn btn-md btn-primary">Сохранить</button>
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_accounts') }}">Отмена</a>{{ form_end(form) }}
+        {% if item %}
+            <p>
+                <a href="{{ path('balance_audit',{type:'account',id:item.id}) }}">История счета</a>
+            </p>
+            <form method="post" action="{{ path('balance_account_delete',{id:item.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('account_delete_'~item.id) }}">
+                <p>Удалить можно только счет без ссылок на документы.</p>
+                <button class="btn btn-md btn-danger">Удалить неиспользованный счет</button>
+            </form>
+        {% endif %}
+    </section>
+{% endblock %}

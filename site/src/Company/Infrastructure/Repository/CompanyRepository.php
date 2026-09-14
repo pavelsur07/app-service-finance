@@ -17,6 +17,36 @@ class CompanyRepository extends ServiceEntityRepository
         parent::__construct($registry, Company::class);
     }
 
+    /** @return array{owner:bool,read:bool,write:bool} */
+    public function financialAccess(string $companyId, string $userId, bool $lock = false): array
+    {
+        if ($lock && !$this->connection->isTransactionActive()) {
+            throw new \LogicException('Company permission locks require a transaction.');
+        }
+        $company = $this->connection->fetchAssociative('SELECT user_id FROM companies WHERE id=?'.($lock ? ' FOR SHARE' : ''), [$companyId]);
+        $none = ['owner' => false, 'read' => false, 'write' => false];
+        if (false === $company) {
+            return $none;
+        }
+        if ($company['user_id'] === $userId) {
+            return ['owner' => true, 'read' => true, 'write' => true];
+        }
+        $member = $this->connection->fetchAssociative("SELECT m.role,r.company_id AS role_company_id,r.permissions FROM company_members m LEFT JOIN company_role r ON r.id=m.role_id WHERE m.company_id=? AND m.user_id=? AND m.status='ACTIVE'", [$companyId, $userId]);
+        if (false === $member) {
+            return $none;
+        }
+        if ('OWNER' === $member['role']) {
+            return ['owner' => false, 'read' => true, 'write' => true];
+        }
+        if (null !== $member['role_company_id'] && $member['role_company_id'] !== $companyId) {
+            return $none;
+        }
+        $permissions = null === $member['permissions'] ? [] : json_decode((string) $member['permissions'], true, 512, \JSON_THROW_ON_ERROR);
+        $level = is_array($permissions) ? ($permissions['finance'] ?? null) : null;
+
+        return ['owner' => false, 'read' => in_array($level, ['read', 'write'], true), 'write' => 'write' === $level];
+    }
+
     public function findByUser(User $user): array
     {
         return $this->createQueryBuilder('c')

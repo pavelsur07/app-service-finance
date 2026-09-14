@@ -1,0 +1,47 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Учетные периоды</h1>
+    </div>
+    <section class="card">
+        <p>Месяцы закрываются последовательно после их окончания. Черновики не входят в суммы. Переоткрыть можно только последний закрытый месяц.</p>
+        {% if permissions.manage_periods or permissions.reopen_periods %}
+            {{ form_start(form) }}{{ form_widget(form) }}
+            <button class="btn btn-md btn-primary">Применить</button>{{ form_end(form) }}
+        {% endif %}
+    </section>
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Месяц</th>
+                    <th>Состояние</th>
+                    <th>Основание</th>
+                    <th>Обновлен</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('balance_audit',{type:'period',id:item.id}) }}">{{ item.month|date('m.Y') }}
+                            </a>
+                        </td>
+                        <td>{{ item.is_closed ? 'Закрыт':'Открыт' }}
+                        </td>
+                        <td>{{ item.reason }}
+                        </td>
+                        <td>{{ item.changed_at }}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">Закрытых периодов пока нет.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>{{ ui.pager(pager) }}
+{% endblock %}

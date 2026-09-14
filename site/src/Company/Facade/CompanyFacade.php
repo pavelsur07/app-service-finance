@@ -46,6 +46,40 @@ final class CompanyFacade
         return $publicId < self::MIN_PUBLIC_ID ? null : $this->repository->findByPublicId($publicId);
     }
 
+    /** @return list<array{id: string, label: string}> */
+    public function listMembers(string $companyId): array
+    {
+        $company = $this->repository->findById($companyId);
+        if (null === $company) {
+            return [];
+        }
+        $choices = [];
+        $owner = $company->getUser();
+        if (null !== $owner && null !== $owner->getId()) {
+            $choices[$owner->getId()] = ['id' => $owner->getId(), 'label' => (string) $owner->getEmail()];
+        }
+        foreach ($this->companyMemberRepository->findActiveUserChoicesByCompany($companyId) as $choice) {
+            $choices[$choice['id']] = $choice;
+        }
+
+        return array_values($choices);
+    }
+
+    /**
+     * Fresh financial rights, optionally serialized with membership/role changes.
+     * Lock order for callers: company first, then module-specific resources.
+     *
+     * @return array{owner:bool,read:bool,write:bool}
+     */
+    public function financialAccess(string $companyId, string $userId, bool $lock = false): array
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($userId)) {
+            return ['owner' => false, 'read' => false, 'write' => false];
+        }
+
+        return $this->repository->financialAccess($companyId, $userId, $lock);
+    }
+
     public function isOwner(string $companyId, string $userId): bool
     {
         if (!Uuid::isValid($companyId) || !Uuid::isValid($userId)) {

@@ -1,0 +1,42 @@
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Ведомость изменений</h1>
+    </div>{{ ui.period(from,to) }}
+    <section class="card report-scroll">
+        <table class="t-table">
+            <thead>
+                <tr>
+                    <th>Счет / статья</th>
+                    <th>На начало</th>
+                    <th>Увеличение</th>
+                    <th>Уменьшение</th>
+                    <th>На конец</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in statement.accounts %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}
+                            </a>
+                            <p>{{ row.article_name }}
+                                {% if row.is_archived %} · Архив{% endif %}
+                            </p>
+                        </td>
+                        {% for key in ['opening','increase','decrease','closing'] %}
+                            <td class="t-cell--right">{{ attribute(row,key)|format_minor_currency(currency) }}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5">Нет учетных счетов.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p>Начальные остатки не включены в обороты периода.</p>
+    </section>
+{% endblock %}

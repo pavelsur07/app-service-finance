@@ -52,6 +52,23 @@ class CompanyMemberRepository extends ServiceEntityRepository
         return $rows;
     }
 
+    /** @return list<array{id: string, label: string}> */
+    public function findActiveUserChoicesByCompany(string $companyId): array
+    {
+        /** @var list<array{id: string, label: string}> $rows */
+        $rows = $this->createQueryBuilder('cm')
+            ->select('user.id AS id', 'user.email AS label')
+            ->innerJoin('cm.user', 'user')
+            ->andWhere('IDENTITY(cm.company) = :company')
+            ->andWhere('cm.status = :status')
+            ->setParameter('company', $companyId)
+            ->setParameter('status', CompanyMember::STATUS_ACTIVE)
+            ->orderBy('user.email', 'ASC')
+            ->getQuery()->getArrayResult();
+
+        return $rows;
+    }
+
     /**
      * @return list<CompanyMember>
      */

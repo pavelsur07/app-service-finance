@@ -1,0 +1,43 @@
+{% extends 'balance/layout.html.twig' %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">{{ document ? 'Черновик № '~document.number : 'Новый документ' }}
+        </h1>
+    </div>
+    {% if document.target_preparation|default(null) %}
+        <section class="card">
+            <p>Это корректировка до заданного остатка. Если учет изменился после расчета, обновите корректировку перед проведением.</p>
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target',{id:document.target_preparation.accountId,document:document.id}) }}">Обновить расчет остатка</a>
+        </section>
+    {% endif %}
+    <section class="card">{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.kind) }}{{ form_row(form.date) }}{{ form_row(form.reason) }}
+        {% include 'balance/_document_lines.html.twig' %}
+        {{ form_rest(form) }}
+        <p>Черновик не меняет остатки. Сначала сохраните изменения, затем проведите документ.</p>
+        <button class="btn btn-md btn-primary">Сохранить черновик</button>{{ form_end(form) }}
+    </section>
+    {% if document %}
+        <div class="wz-row">
+            <section class="card">
+                {% if permissions.post %}
+                    <form method="post" action="{{ path('balance_document_post',{id:document.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('document_post_'~document.id) }}">
+<input type="hidden" name="version" value="{{ document.version }}">
+                        {% if document.kind == 'opening' and document.lines is empty %}
+                            <label class="checkbox-label">
+                                <input class="checkbox" type="checkbox" name="confirm_zero" value="1" required> Подтверждаю начало учета с нулевыми остатками</label>
+                        {% endif %}
+                        <button class="btn btn-md btn-primary">Провести сохраненный документ</button>
+                    </form>
+                {% endif %}
+                <form method="post" action="{{ path('balance_document_delete',{id:document.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('document_delete_'~document.id) }}">
+                    <input type="hidden" name="version" value="{{ document.version }}">
+                    <button class="btn btn-md btn-danger">Удалить черновик</button>
+                </form>
+                <a href="{{ path('balance_audit',{type:'operation',id:document.id}) }}">История документа</a>
+            </section>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'balance/layout.html.twig' %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Начало учета</h1>
+    </div>
+    <div class="wz-row">
+        <section class="card">
+            <p>Выберите валюту и дату, настройте статьи и счета, затем проведите начальные остатки. Стороны баланса должны быть равны.</p>
+            {% if book.initialized|default(false) %}
+                <p>Учет начат. Валюта и начальная дата зафиксированы.</p>
+            {% endif %}
+            {{ form_start(form) }}{{ form_widget(form) }}
+            {% if not book.initialized|default(false) %}
+                <button class="btn btn-md btn-primary">Сохранить настройки</button>
+            {% endif %}
+            {{ form_end(form) }}
+        </section>
+    </div>
+    {% if book %}
+        <p>
+            <a href="{{ path('balance_audit',{type:'book',id:book.id}) }}">История настроек учета</a>
+        </p>
+    {% endif %}
+    <form method="post" action="{{ path('balance_structure_seed') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('balance_seed') }}">
+        <p>Если статей еще нет, можно создать базовую структуру. Существующие статьи не изменятся.</p>
+        <button class="btn btn-md btn-secondary">Создать базовую структуру</button>
+    </form>
+    <div class="wz-row">
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_structure_index') }}">1. Структура статей</a>
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_accounts') }}">2. Учетные счета</a>
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_document_new') }}">3. Начальные остатки</a>
+    </div>
+{% endblock %}
