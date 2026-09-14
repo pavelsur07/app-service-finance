@@ -14,6 +14,10 @@
                 </svg>
                 <span class="lbl">Обзор</span>
             </a>
+            {% if is_granted('module.finance.read') %}
+                <div class="sb-group-title">Финансы</div>
+                <a class="sb-item {{ app_nav_active|default('') == 'balance' ? 'is-active' : '' }}" href="{{ path('balance_index') }}"><span class="lbl">Управленческий баланс</span></a>
+            {% endif %}
             {% if activeCompany|default(null) and app.user and activeCompany.user.id == app.user.id %}
                 <div class="sb-group-title">Настройки</div>
                 <a class="sb-item {{ app_nav_active|default('') == 'api' ? 'is-active' : '' }}" href="{{ path('settings_api_index') }}"><span class="lbl">API</span></a>

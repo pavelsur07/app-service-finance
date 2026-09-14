@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Exception;
 
-final class BalanceCategoryCycleException extends \DomainException
+final class BalanceCategoryCycleException extends BalanceLedgerException
 {
     public function __construct(string $categoryId, string $parentId)
     {

@@ -1,97 +1,70 @@
-{% extends 'base.html.twig' %}
-{% block title %}Баланс{% endblock %}
-
-{% macro render_rows(items, currencies) %}
-    {% for item in items %}
-        {% if item.isVisible %}
-            <tr>
-                <td class="ps-{{ (item.level - 1) * 4 }}">
-                    <span class="fw-semibold">{{ item.name }}</span>
-                </td>
-                {% for currency in currencies %}
-                    <td class="text-end">{{ (item.amountsByCurrency[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
-                {% endfor %}
-            </tr>
-        {% endif %}
-        {% if item.children|length > 0 %}
-            {{ _self.render_rows(item.children, currencies) }}
-        {% endif %}
-    {% endfor %}
-{% endmacro %}
-
-{% import _self as macros %}
-
-{% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Баланс</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <form class="d-flex align-items-center" method="get" action="{{ path('balance_index') }}">
-                        <label class="me-2 mb-0" for="balance-date">Дата:</label>
-                        <input id="balance-date" class="form-control" type="date" name="date" value="{{ date|date('Y-m-d') }}">
-                        <button class="btn btn-primary ms-2" type="submit">Показать</button>
-                    </form>
-                </div>
-            </div>
-        </div>
+{% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">Баланс<span class="wz-sub">Состояние на конец выбранной даты</span>
+        </h1>
     </div>
-
-    <div class="container-xl mt-3">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Итоги</h3>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table card-table">
-                            <thead>
+    <form method="get" class="wz-row">
+        <div class="form-field">
+            <label class="form-label" for="balance-date">Дата</label>
+            <input class="input" id="balance-date" type="date" name="date" required value="{{ date }}">
+        </div>
+        <div>
+            <button class="btn btn-md btn-primary">Показать</button>
+        </div>
+    </form>
+    {% if not report.initialized %}
+        <section class="card empty">
+            <h2 class="empty-title">Учет не начат</h2>
+            <p class="empty-text">На выбранную дату нет проведенных начальных остатков.</p>
+            {% if permissions.manage %}
+                <a class="btn btn-md btn-primary" href="{{ path('balance_setup') }}">Настроить учет</a>
+            {% endif %}
+            {% if permissions.prepare and book.currency|default(null) %}
+                <a class="btn btn-md btn-secondary" href="{{ path('balance_document_new') }}">Ввести начальные остатки</a>
+            {% endif %}
+        </section>
+    {% else %}
+        <div class="wz-row">
+            <section class="card">
+                <h2>Актив</h2>
+                <p>{{ report.assetMinor|format_minor_currency(currency) }}
+                </p>
+            </section>
+            <section class="card">
+                <h2>Пассив</h2>
+                <p>{{ report.passiveMinor|format_minor_currency(currency) }}
+                </p>
+            </section>
+            <section class="card">
+                <h2>Расхождение</h2>
+                <p>{{ report.differenceMinor|format_minor_currency(currency) }}
+                </p>
+            </section>
+        </div>
+        <div class="wz-row">
+            {% for side,label in {'asset':'Актив','passive':'Пассив'} %}
+                <section class="card report-scroll">
+                    <h2>{{ label }}
+                    </h2>
+                    <table class="t-table">
+                        <thead>
                             <tr>
-                                <th>Валюта</th>
-                                <th class="text-end">Сумма</th>
+                                <th>Статья</th>
+                                <th class="t-cell--right">Остаток</th>
                             </tr>
-                            </thead>
-                            <tbody>
-                            {% for currency in currencies %}
-                                <tr>
-                                    <td>{{ currency }}</td>
-                                    <td class="text-end">{{ (totals[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="2" class="text-muted">Нет данных</td>
-                                </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in report.roots %}
+                                {% if item.type == side %}
+                                    {{ ui.tree([item], currency) }}
+                                {% endif %}
                             {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Структура</h3>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table card-table">
-                            <thead>
-                            <tr>
-                                <th>Категория</th>
-                                {% for currency in currencies %}
-                                    <th class="text-end">{{ currency }}</th>
-                                {% endfor %}
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {{ macros.render_rows(roots, currencies) }}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+                        </tbody>
+                    </table>
+                </section>
+            {% endfor %}
         </div>
-    </div>
+    {% endif %}
 {% endblock %}

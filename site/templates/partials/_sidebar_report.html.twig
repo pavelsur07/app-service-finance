@@ -5,7 +5,7 @@
     {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
     {% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
     {% set wb_commissioner_reports_active = current_route starts with 'wb_commissioner_reports_' %}
-    {% set balance_report_active = current_route == 'balance_index' %}
+    {% set balance_report_active = current_route starts with 'balance_' %}
     {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active or wb_commissioner_reports_active or balance_report_active or report_account_balances_active %}
     <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
         <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">

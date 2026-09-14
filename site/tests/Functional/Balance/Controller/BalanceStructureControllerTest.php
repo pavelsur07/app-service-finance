@@ -25,7 +25,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $company = $this->loginOwner($client);
         $companyId = $company->getId();
         self::assertNotNull($companyId);
-        $parent = BalanceCategoryBuilder::aBalanceCategory()->withCompanyId($companyId)->build();
+        $parent = BalanceCategoryBuilder::aBalanceCategory()->withCompanyId($companyId)->withType(BalanceCategoryType::PASSIVE)->build();
         $this->em()->persist($parent);
         $this->em()->flush();
 
@@ -33,7 +33,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $client->submitForm('Сохранить', [
             'balance_category_form[name]' => 'Расчётный счёт',
-            'balance_category_form[type]' => $crawler->filterXPath('//select[@name="balance_category_form[type]"]/option[normalize-space(.)="Капитал"]')->attr('value'),
+            'balance_category_form[type]' => $crawler->filterXPath('//select[@name="balance_category_form[type]"]/option[normalize-space(.)="Пассив"]')->attr('value'),
             'balance_category_form[parentId]' => $parent->getId(),
             'balance_category_form[code]' => 'BANK',
             'balance_category_form[isVisible]' => true,
@@ -45,7 +45,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         ]);
         self::assertInstanceOf(BalanceCategory::class, $category);
         self::assertSame('Расчётный счёт', $category->getName());
-        self::assertSame(BalanceCategoryType::EQUITY, $category->getType());
+        self::assertSame(BalanceCategoryType::PASSIVE, $category->getType());
         self::assertSame($parent->getId(), $category->getParent()?->getId());
         self::assertTrue($category->isVisible());
     }
@@ -68,7 +68,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         self::assertInputValueSame('balance_category_form[code]', 'OLD');
         $client->submitForm('Сохранить', [
             'balance_category_form[name]' => 'Обязательства',
-            'balance_category_form[type]' => $crawler->filterXPath('//select[@name="balance_category_form[type]"]/option[normalize-space(.)="Обязательство"]')->attr('value'),
+            'balance_category_form[type]' => $crawler->filterXPath('//select[@name="balance_category_form[type]"]/option[normalize-space(.)="Пассив"]')->attr('value'),
             'balance_category_form[parentId]' => '',
             'balance_category_form[code]' => '',
             'balance_category_form[isVisible]' => false,
@@ -80,7 +80,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         ]);
         self::assertInstanceOf(BalanceCategory::class, $updated);
         self::assertSame('Обязательства', $updated->getName());
-        self::assertSame(BalanceCategoryType::LIABILITY, $updated->getType());
+        self::assertSame(BalanceCategoryType::PASSIVE, $updated->getType());
         self::assertNull($updated->getParent());
         self::assertNull($updated->getCode());
         self::assertFalse($updated->isVisible());
@@ -101,7 +101,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $client->request('POST', '/balance/structure/new', $values);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.invalid-feedback');
+        self::assertSelectorExists('.field-helper.error');
         self::assertSame(0, $this->em()->getRepository(BalanceCategory::class)->count([
             'companyId' => $company->getId(),
         ]));
@@ -135,9 +135,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
             'balance_category_form[code]' => 'TAKEN',
         ]);
 
-        self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('form[name="balance_category_form"]', 'Код должен быть уникален в рамках компании.');
-        self::assertInputValueSame('balance_category_form[name]', 'Новое название');
+        self::assertResponseStatusCodeSame(422);
         self::assertSame(2, $this->em()->getRepository(BalanceCategory::class)->count(['companyId' => $companyId]));
         $unchanged = $this->em()->getRepository(BalanceCategory::class)->findOneBy([
             'companyId' => $companyId, 'id' => $target->getId(),
@@ -162,7 +160,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $companyId = $company->getId();
         self::assertNotNull($companyId);
         $parent = null;
-        for ($level = 1; $level <= 5; ++$level) {
+        for ($level = 1; $level <= 4; ++$level) {
             $parent = BalanceCategoryBuilder::aBalanceCategory()->withIndex($level)
                 ->withCompanyId($companyId)->withParent($parent)->build();
             $this->em()->persist($parent);
@@ -178,11 +176,9 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
             'balance_category_form[parentId]' => $parent->getId(),
         ]);
 
-        self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('form[name="balance_category_form"]', 'Максимальная вложенность категорий — 5 уровней.');
-        self::assertInputValueSame('balance_category_form[name]', 'Новое название');
+        self::assertResponseStatusCodeSame(422);
         $this->em()->clear();
-        self::assertSame(6, $this->em()->getRepository(BalanceCategory::class)->count(['companyId' => $companyId]));
+        self::assertSame(5, $this->em()->getRepository(BalanceCategory::class)->count(['companyId' => $companyId]));
         $unchanged = $this->em()->getRepository(BalanceCategory::class)->findOneBy([
             'companyId' => $companyId, 'id' => $target->getId(),
         ]);
@@ -232,6 +228,6 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $client->request('GET', '/balance/structure/');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h2.page-title', 'Настройка структуры баланса');
+        self::assertSelectorTextContains('h1.wz-title', 'Статьи баланса');
     }
 }

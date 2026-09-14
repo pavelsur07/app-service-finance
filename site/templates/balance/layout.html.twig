@@ -1,0 +1,31 @@
+{% extends '_layout/app.html.twig' %}
+{% set app_nav_active = 'balance' %}
+{% set app_breadcrumb = 'Управленческий баланс' %}
+{% set currency = book.currency|default('RUB') %}
+{% block title %}Управленческий баланс{% endblock %}
+{% block content %}
+    <nav class="wz-row" aria-label="Разделы баланса">
+        {% for route, label in {'balance_index':'Баланс','balance_structure_index':'Статьи','balance_accounts':'Счета','balance_journal':'Документы','balance_statement':'Движения','balance_compare':'Сравнение','balance_periods':'Периоды'} %}
+            <a class="btn btn-md btn-secondary" href="{{ path(route) }}" {% if app.request.attributes.get('_route') == route %}aria-current="page"{% endif %}>{{ label }}
+            </a>
+        {% endfor %}
+        {% if permissions.manage %}
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_setup') }}">Настройка</a>
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_access') }}">Права</a>
+        {% endif %}
+    </nav>
+    {% for label, messages in app.flashes %}
+        {% for message in messages %}
+            <div class="wz-row">
+                <div class="alert alert--{{ label == 'success' ? 'success' : 'warning' }}" role="status">
+                    <div class="a-body">
+                        <p class="a-text">{{ message }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% endfor %}
+    {% block balance_content %}
+    {% endblock %}
+{% endblock %}

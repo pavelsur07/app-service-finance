@@ -44,11 +44,10 @@ final class BalanceStructurePolicyTest extends TestCase
         $root = BalanceCategoryBuilder::aBalanceCategory()->withIndex(1)->build();
         $level2 = BalanceCategoryBuilder::aBalanceCategory()->withIndex(2)->withParent($root)->build();
         $level3 = BalanceCategoryBuilder::aBalanceCategory()->withIndex(3)->withParent($level2)->build();
-        $level4 = BalanceCategoryBuilder::aBalanceCategory()->withIndex(4)->withParent($level3)->build();
-        $parent = BalanceCategoryBuilder::aBalanceCategory()->withIndex(5)->withParent($level4)->build();
+        $parent = BalanceCategoryBuilder::aBalanceCategory()->withIndex(4)->withParent($level3)->build();
 
         $repository = new InMemoryBalanceCategoryRepository();
-        foreach ([$root, $level2, $level3, $level4, $parent] as $category) {
+        foreach ([$root, $level2, $level3, $parent] as $category) {
             $repository->save($category);
         }
 
@@ -74,6 +73,42 @@ final class BalanceStructurePolicyTest extends TestCase
         $policy = new BalanceStructurePolicy($repository);
 
         $policy->assertCanSetParent($root, $grandchild->getId(), $root->getCompanyId());
+    }
+
+    public function testMovingSubtreeCannotPushDescendantsBeyondFourLevels(): void
+    {
+        $root = BalanceCategoryBuilder::aBalanceCategory()->withIndex(1)->build();
+        $child = BalanceCategoryBuilder::aBalanceCategory()->withIndex(2)->withParent($root)->build();
+        $targetRoot = BalanceCategoryBuilder::aBalanceCategory()->withIndex(3)->build();
+        $target2 = BalanceCategoryBuilder::aBalanceCategory()->withIndex(4)->withParent($targetRoot)->build();
+        $target3 = BalanceCategoryBuilder::aBalanceCategory()->withIndex(5)->withParent($target2)->build();
+        $repository = new InMemoryBalanceCategoryRepository();
+        foreach ([$root, $child, $targetRoot, $target2, $target3] as $category) {
+            $repository->save($category);
+        }
+        $policy = new BalanceStructurePolicy($repository);
+        $this->expectException(BalanceDepthExceededException::class);
+        $policy->assertCanSetParent($root, $target3->getId(), $root->getCompanyId());
+    }
+
+    public function testArchivedDescendantsDoNotPreventRenamingOrMovingTheirActiveAncestor(): void
+    {
+        $root = BalanceCategoryBuilder::aBalanceCategory()->withIndex(1)->build();
+        $group = BalanceCategoryBuilder::aBalanceCategory()->withIndex(2)->withParent($root)->build();
+        $leaf = BalanceCategoryBuilder::aBalanceCategory()->withIndex(3)->withParent($group)->build();
+        $target = BalanceCategoryBuilder::aBalanceCategory()->withIndex(4)->build();
+        $leaf->setIsArchived(true);
+        $group->setIsArchived(true);
+        $repository = new InMemoryBalanceCategoryRepository();
+        foreach ([$root, $group, $leaf, $target] as $category) {
+            $repository->save($category);
+        }
+        $policy = new BalanceStructurePolicy($repository);
+        $policy->assertCanSetParent($root, null, $root->getCompanyId());
+        self::assertSame(3, $leaf->getLevel());
+        $policy->assertCanSetParent($root, $target->getId(), $root->getCompanyId());
+        self::assertSame(4, $leaf->getLevel());
+        self::assertTrue($group->isArchived());
     }
 
     public function testAssertCodeIsUniqueThrowsOnDuplicate(): void

@@ -1,0 +1,54 @@
+{% macro period(from, to) %}
+    <form method="get" class="wz-row">
+        <div class="form-field">
+            <label class="form-label" for="balance-from">С даты</label>
+            <input class="input" id="balance-from" type="date" name="from" required value="{{ from }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="balance-to">По дату</label>
+            <input class="input" id="balance-to" type="date" name="to" required value="{{ to }}">
+        </div>
+        <div>
+            <button class="btn btn-md btn-primary">Показать</button>
+        </div>
+    </form>
+{% endmacro %}
+{% macro pager(pager) %}
+    {% if pager.haveToPaginate %}
+        <nav class="wz-row" aria-label="Страницы">
+            <div>
+                {% if pager.hasPreviousPage %}
+                    <a class="btn btn-md btn-secondary" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|merge(app.request.query.all)|merge({page:pager.previousPage})) }}">Назад</a>
+                {% endif %} Страница {{ pager.currentPage }} из {{ pager.nbPages }} {% if pager.hasNextPage %}
+                    <a class="btn btn-md btn-secondary" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|merge(app.request.query.all)|merge({page:pager.nextPage})) }}">Вперед</a>
+                {% endif %}
+            </div>
+        </nav>
+    {% endif %}
+{% endmacro %}
+{% macro line(line) %}
+    <fieldset class="card" data-balance-lines-target="row">
+        <legend>Строка операции</legend>
+        <div class="wz-row">{{ form_row(line.accountId) }}{{ form_row(line.direction) }}{{ form_row(line.amount) }}
+        </div>
+        <button class="btn btn-sm btn-danger" type="button" data-action="balance-lines#remove">Убрать строку</button>{{ form_rest(line) }}
+    </fieldset>
+{% endmacro %}
+{% macro tree(items, currency) %}
+    {% for item in items %}
+        {% if item.isVisible %}
+            <tr>
+                <td>
+                    {% for n in 1..item.level %}
+                        {% if n > 1 %}— {% endif %}
+                    {% endfor %}
+                    <a href="{{ path('balance_article_card',{id:item.id}) }}">{{ item.name }}
+                    </a>
+                </td>
+                <td class="t-cell--right">{{ item.amountMinor|format_minor_currency(currency) }}
+                </td>
+            </tr>
+        {% endif %}
+        {{ _self.tree(item.children, currency) }}
+    {% endfor %}
+{% endmacro %}

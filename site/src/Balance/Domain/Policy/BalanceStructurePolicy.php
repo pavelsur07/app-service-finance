@@ -7,6 +7,7 @@ namespace App\Balance\Domain\Policy;
 use App\Balance\Entity\BalanceCategory;
 use App\Balance\Exception\BalanceCategoryCycleException;
 use App\Balance\Exception\BalanceDepthExceededException;
+use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Repository\BalanceCategoryRepositoryInterface;
 use Webmozart\Assert\Assert;
 
@@ -20,32 +21,56 @@ final readonly class BalanceStructurePolicy
         BalanceCategory $category,
         ?string $parentId,
         string $companyId,
-        int $maxLevel = 5,
+        int $maxLevel = 4,
     ): void {
-        if (null === $parentId) {
-            if ($category->getLevel() > 1) {
-                $category->setParent(null);
+        Assert::uuid($companyId);
+        if ($category->getCompanyId() !== $companyId) {
+            throw new BalanceLedgerException('Статья другой компании.');
+        }
+        $parent = null;
+        if (null !== $parentId) {
+            if (!\Ramsey\Uuid\Uuid::isValid($parentId)) {
+                throw new BalanceLedgerException('Родительская статья не найдена.', 404);
             }
+            if ($parentId === $category->getId()) {
+                throw new BalanceCategoryCycleException($category->getId(), $parentId);
+            }
+            $parent = $this->balanceCategoryRepository->findByIdAndCompany($parentId, $companyId);
+            if (null === $parent) {
+                throw new BalanceLedgerException('Родительская статья не найдена.');
+            }
+            $this->assertNotAncestor($category, $parent);
+        }
+        $newLevel = null === $parent ? 1 : $parent->getLevel() + 1;
+        if ($newLevel === $category->getLevel() && $category->getParent()?->getId() === $parentId) {
+            $category->setParent($parent);
 
             return;
         }
-
-        if ($parentId === $category->getId()) {
-            throw new BalanceCategoryCycleException($category->getId(), $parentId);
+        $descendants = [];
+        foreach ($this->balanceCategoryRepository->findTreeByCompany($companyId) as $candidate) {
+            $current = $candidate->getParent();
+            $distance = 1;
+            while (null !== $current) {
+                if ($current->getId() === $category->getId()) {
+                    if ($newLevel + $distance > $maxLevel) {
+                        throw new BalanceDepthExceededException($maxLevel);
+                    }
+                    $descendants[] = $candidate;
+                    break;
+                }
+                $current = $current->getParent();
+                ++$distance;
+            }
         }
-
-        $parent = $this->balanceCategoryRepository->findByIdAndCompany($parentId, $companyId);
-        if (null === $parent) {
-            throw new \DomainException(sprintf('Родительская категория %s не найдена.', $parentId));
-        }
-
-        if ($parent->getLevel() >= $maxLevel) {
+        if ($newLevel > $maxLevel) {
             throw new BalanceDepthExceededException($maxLevel);
         }
-
-        $this->assertNotAncestor($category, $parent);
-
+        usort($descendants, static fn (BalanceCategory $a, BalanceCategory $b): int => $a->getLevel() <=> $b->getLevel());
         $category->setParent($parent);
+        foreach ($descendants as $descendant) {
+            $descendant->refreshLevel();
+        }
     }
 
     public function assertCodeIsUnique(
@@ -60,7 +85,7 @@ final readonly class BalanceStructurePolicy
         Assert::uuid($companyId);
 
         if ($this->balanceCategoryRepository->existsWithCode($companyId, $code, $excludeCategoryId)) {
-            throw new \DomainException('Код должен быть уникален в рамках компании.');
+            throw new BalanceLedgerException('Код должен быть уникален в рамках компании.');
         }
     }
 

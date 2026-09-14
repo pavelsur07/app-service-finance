@@ -1,0 +1,16 @@
+{% extends 'balance/layout.html.twig' %}
+{% form_theme form 'balance/_form_theme.html.twig' %}
+{% block balance_content %}
+    <div class="wz-head">
+        <h1 class="wz-title">{{ document ? 'Обновить расчет остатка':'Установить остаток' }}: {{ account.name }}
+        </h1>
+    </div>
+    <section class="card">
+        <p>Текущий остаток: {{ account.balance|format_minor_currency(currency) }}. Разница на выбранную дату станет строкой корректировки. Укажите остальные изменения самостоятельно.</p>{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.date) }}{{ form_row(form.target) }}{{ form_row(form.reason) }}
+        <h2>Остальные строки корректировки</h2>
+        <p>Предварительные итоги ниже относятся только к введенным строкам. Изменение выбранного счета будет рассчитано при сохранении.</p>
+        {% include 'balance/_document_lines.html.twig' %}
+        {{ form_rest(form) }}
+        <button class="btn btn-md btn-primary">Подготовить корректировку</button>{{ form_end(form) }}
+    </section>
+{% endblock %}

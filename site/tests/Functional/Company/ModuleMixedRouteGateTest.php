@@ -22,6 +22,7 @@ use Symfony\Component\Routing\RouterInterface;
  * Статический инвариант (ModuleWriteGateCoverageTest) может только увидеть текст вызова
  * `denyAccessUnlessGranted()`, но не доказать, что он исполняется именно на POST и до мутации.
  * Здесь это проверяется запросами: 403 на POST и отсутствие 403 на GET по каждому такому маршруту.
+ * Для явно перечисленных редакторов Balance более строгий GET-гейт также проверяется: ровно 403.
  *
  * Параметры пути подставляются случайным UUID, поэтому на POST допустимы два исхода:
  * 403 (сработал гейт) и 404 (сущности нет или эндпоинт закрыт биллинговым флагом —
@@ -44,6 +45,25 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
      * @var list<string>
      */
     private const FEATURE_GATED_ROUTES = ['finance_funds_new'];
+
+    /**
+     * Экраны редактирования Balance требуют владельца (manage) или отдельного права
+     * подготовки/проведения уже при GET. Чтение документов и отчетов остается доступным.
+     * Это проверяемая политика каждого маршрута, а не исключение из проверки.
+     *
+     * @var array<string, string>
+     */
+    private const RESTRICTED_READ_ROUTES = [
+        'balance_document_new' => 'prepare',
+        'balance_account_new' => 'manage',
+        'balance_account_edit' => 'manage',
+        'balance_structure_new' => 'manage',
+        'balance_structure_edit' => 'manage',
+        'balance_access' => 'manage',
+        'balance_document_reverse' => 'post',
+        'balance_setup' => 'manage',
+        'balance_account_target' => 'prepare',
+    ];
 
     public function testMixedRoutesAllowReadAndDenyWriteForReadOnlyRole(): void
     {
@@ -82,6 +102,9 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
         }
 
         self::assertNotSame([], $byModule, 'Смешанные маршруты не найдены — проверьте обход RouteCollection.');
+        foreach (self::RESTRICTED_READ_ROUTES as $routeName => $permission) {
+            self::assertArrayHasKey($routeName, $byModule['finance'] ?? [], 'Ожидаемый редактор с правом '.$permission.' должен участвовать в проверке.');
+        }
 
         $problems = [];
         $checked = 0;
@@ -102,7 +125,12 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
                 $url = $this->fillPlaceholders($path);
 
                 $client->request('GET', $url);
-                if (403 === $client->getResponse()->getStatusCode()) {
+                $readStatus = $client->getResponse()->getStatusCode();
+                if (isset(self::RESTRICTED_READ_ROUTES[$routeName])) {
+                    if (403 !== $readStatus) {
+                        $problems[] = sprintf('%s — GET отдал %d без отдельного права %s; ожидалось 403', $routeName, $readStatus, self::RESTRICTED_READ_ROUTES[$routeName]);
+                    }
+                } elseif (403 === $readStatus) {
                     $problems[] = sprintf('%s — GET отдал 403 участнику с %s:read (гейт отрезал чтение)', $routeName, $moduleValue);
                 }
 

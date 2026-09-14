@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Balance\Application;
 
+use App\Balance\Application\BalanceStructureService;
 use App\Balance\Application\CreateBalanceCategoryAction;
 use App\Balance\Application\DTO\CreateBalanceCategoryCommand;
 use App\Balance\Entity\BalanceCategory;
 use App\Balance\Enum\BalanceCategoryType;
+use App\Balance\Security\BalanceAccess;
 use App\Company\Entity\Company;
+use App\Company\Facade\CompanyFacade;
+use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Bundle\SecurityBundle\Security;
 
 final class CreateBalanceCategoryActionTest extends IntegrationTestCase
 {
@@ -21,7 +26,7 @@ final class CreateBalanceCategoryActionTest extends IntegrationTestCase
         $company = $this->createCompany();
 
         /** @var CreateBalanceCategoryAction $action */
-        $action = self::getContainer()->get(CreateBalanceCategoryAction::class);
+        $action = new CreateBalanceCategoryAction(self::getContainer()->get(BalanceStructureService::class), self::getContainer()->get(BalanceAccess::class));
 
         $id = ($action)($company->getId(), new CreateBalanceCategoryCommand(
             name: 'Деньги',
@@ -47,7 +52,7 @@ final class CreateBalanceCategoryActionTest extends IntegrationTestCase
         $company = $this->createCompany();
 
         /** @var CreateBalanceCategoryAction $action */
-        $action = self::getContainer()->get(CreateBalanceCategoryAction::class);
+        $action = new CreateBalanceCategoryAction(self::getContainer()->get(BalanceStructureService::class), self::getContainer()->get(BalanceAccess::class));
 
         ($action)($company->getId(), new CreateBalanceCategoryCommand(
             name: 'Деньги',
@@ -82,6 +87,13 @@ final class CreateBalanceCategoryActionTest extends IntegrationTestCase
         $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->flush();
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($owner);
+        $security->method('isGranted')->willReturn(true);
+        $active = $this->createMock(ActiveCompanyService::class);
+        $active->method('getActiveCompany')->willReturn($company);
+        self::getContainer()->set(BalanceAccess::class, new BalanceAccess($security, self::getContainer()->get(CompanyFacade::class), $this->connection, $active));
 
         return $company;
     }
