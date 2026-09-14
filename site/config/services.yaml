@@ -506,3 +506,12 @@ services:
     App\Marketplace\Infrastructure\Provider\DefaultSaleMappingYamlProvider:
         arguments:
             $configPath: "%kernel.project_dir%/config/marketplace/default_sale_mapping.yaml"
+
+    # Dedicated untraceable transport: credentials must not enter the HTTP profiler.
+    moysklad.http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
+
+    App\MoySklad\Infrastructure\Api\MoySkladClient:
+        arguments:
+            $httpClient: '@moysklad.http_client'

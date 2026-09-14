@@ -8737,34 +8737,10 @@ parameters:
 			path: src/MarketplaceAnalytics/Repository/UnitEconomyCostMappingRepository.php
 
 		-
-			message: '#^Method App\\MoySklad\\Controller\\MoySkladConnectionsController\:\:renderPage\(\) has parameter \$createForm with generic interface Symfony\\Component\\Form\\FormInterface but does not specify its types\: TData$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/MoySklad/Controller/MoySkladConnectionsController.php
-
-		-
-			message: '#^Method App\\MoySklad\\Controller\\MoySkladConnectionsController\:\:renderPage\(\) has parameter \$editForm with generic interface Symfony\\Component\\Form\\FormInterface but does not specify its types\: TData$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/MoySklad/Controller/MoySkladConnectionsController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/MoySklad/Controller/MoySkladConnectionsController.php
-
-		-
 			message: '#^Class App\\MoySklad\\Form\\MoySkladConnectionType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/MoySklad/Form/MoySkladConnectionType.php
-
-		-
-			message: '#^Method App\\MoySklad\\Infrastructure\\Query\\MoySkladConnectionsQuery\:\:allByCompanyId\(\) should return list\<array\{id\: string, name\: string, baseUrl\: string, isActive\: bool, lastSyncAt\: string\|null, updatedAt\: string\}\> but returns array\<int, array\{id\: string, name\: string, baseUrl\: string, isActive\: bool, lastSyncAt\: string\|null, updatedAt\: string\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/MoySklad/Infrastructure/Query/MoySkladConnectionsQuery.php
 
 		-
 			message: '#^Class App\\MoySklad\\Infrastructure\\Repository\\MoySkladConnectionWriteRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'

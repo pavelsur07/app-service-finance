@@ -139,6 +139,19 @@
 
             {% include "partials/_sidebar_marketplace.html.twig" %}
 
+            {% if is_granted('module.marketplace.read') %}
+                {% set moysklad_active = current_route starts with 'moysklad_' %}
+                <li class="nav-item dropdown {{ moysklad_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ moysklad_active ? 'show active' : '' }}" href="#navbar-moysklad" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ moysklad_active ? 'true' : 'false' }}">
+                        <span class="nav-link-icon"><i class="ti ti-building-warehouse" aria-hidden="true"></i></span>
+                        <span class="nav-link-title">МойСклад</span>
+                    </a>
+                    <div class="dropdown-menu {{ moysklad_active ? 'show' : '' }}" id="navbar-moysklad">
+                        <a class="dropdown-item {{ moysklad_active ? 'active' : '' }}" href="{{ path('moysklad_connections_index') }}">Интеграция</a>
+                    </div>
+                </li>
+            {% endif %}
+
             {% include "partials/_sidebar_report.html.twig" %}
 
             <!-- Справочники -->

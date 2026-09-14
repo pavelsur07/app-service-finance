@@ -1,73 +1,19 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}МойСклад{% endblock %}
+{% block title %}МойСклад — Интеграция{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
+    <div class="container-xl">
+        <div class="page-header d-print-none mb-4">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">МойСклад</h2>
+                    <div class="page-pretitle">МойСклад</div>
+                    <h1 class="page-title">Интеграция</h1>
                 </div>
+                {% block page_actions %}{% endblock %}
             </div>
         </div>
+        {% block integration_content %}{% endblock %}
     </div>
-
-    <div class="page-body">
-        <div class="container-xl">
-            {% for label, messages in app.flashes %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
-                        <div class="d-flex">
-                            <div>{{ message }}</div>
-                        </div>
-                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
-                    </div>
-                {% endfor %}
-            {% endfor %}
-
-            <div class="card">
-                <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
-                        <li class="nav-item">
-                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'overview' ? 'active' : '' }}">
-                                <i class="ti ti-chart-line icon me-1"></i>
-                                Обзор
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('moysklad_connections_index') }}" class="nav-link {{ active_tab == 'connections' ? 'active' : '' }}">
-                                <i class="ti ti-plug-connected icon me-1"></i>
-                                Подключения
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'listings' ? 'active' : '' }}">
-                                <i class="ti ti-layout-grid icon me-1"></i>
-                                Листинги
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'sync' ? 'active' : '' }}">
-                                <i class="ti ti-refresh icon me-1"></i>
-                                Синхронизация
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'raw_documents' ? 'active' : '' }}">
-                                <i class="ti ti-file-description icon me-1"></i>
-                                Raw документы
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="card-body p-0">
-                    {% block tab_content %}{% endblock %}
-                </div>
-            </div>
-        </div>
-    </div>
-
     {% block modals %}{% endblock %}
 {% endblock %}

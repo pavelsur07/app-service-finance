@@ -1,100 +1,134 @@
 {% extends 'moy_sklad/layout.html.twig' %}
 
-{% set active_tab = 'connections' %}
-
-{% block tab_content %}
-    <div class="p-3">
-
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">Подключения МойСклад</h3>
-                <div class="card-actions">
-                    <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-connection">
-                        <i class="ti ti-plus me-1"></i>
-                        Добавить подключение
-                    </a>
-                </div>
-            </div>
-
-            {% if connections is empty %}
-                <div class="card-body">
-                    <div class="empty">
-                        <p class="empty-title">Подключения пока не созданы</p>
-                        <p class="empty-subtitle text-muted">Добавьте первое подключение МойСклад для вашей компании.</p>
-                    </div>
-                </div>
-            {% else %}
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
-                        <thead>
-                        <tr>
-                            <th>Название</th>
-                            <th>Base URL</th>
-                            <th>Статус</th>
-                            <th>Последняя синхронизация</th>
-                            <th>Обновлено</th>
-                            <th class="w-1"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for connection in connections %}
-                            <tr>
-                                <td><strong>{{ connection.name }}</strong></td>
-                                <td><code>{{ connection.baseUrl }}</code></td>
-                                <td>
-                                    <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
-                                        {{ connection.isActive ? 'Активно' : 'Неактивно' }}
-                                    </span>
-                                </td>
-                                <td>{{ connection.lastSyncAt ? connection.lastSyncAt|date('d.m.Y H:i') : '—' }}</td>
-                                <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>
-                                <td>
-                                    <div class="btn-list">
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('moysklad_connections_edit', {id: connection.id}) }}">Редактировать</a>
-                                        <form method="post" action="{{ path('moysklad_connections_delete', {id: connection.id}) }}" onsubmit="return confirm('Удалить подключение?');">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endif %}
+{% block page_actions %}
+    {% if is_granted('module.marketplace.write') %}
+        <div class="col-12 col-md-auto">
+            <a href="{{ path('moysklad_connections_create') }}" class="btn btn-primary">Добавить подключение</a>
         </div>
+    {% endif %}
+{% endblock %}
 
-        {% if isEdit and editForm %}
-            {% include 'moy_sklad/connections/_form.html.twig' with {form: editForm, isEdit: true} %}
-        {% endif %}
-    </div>
+{% block integration_content %}
+    <p class="text-secondary">Подключите аккаунты МойСклад вашей компании. Проверка подтверждает доступ; обмен данными пока не выполняется.</p>
+    {% if pager.nbResults == 0 %}
+        <div class="card">
+            <div class="card-body empty">
+                <h2 class="empty-title">Подключения пока не созданы</h2>
+                <p class="empty-subtitle text-secondary">Для подключения понадобится токен пользователя МойСклад.</p>
+            </div>
+        </div>
+    {% else %}
+        <div class="row row-cards mb-3">
+            {% for connection in pager %}
+                {% set status = connection.checkStatus.value %}
+                <div class="col-12 col-xl-6">
+                    <section class="card h-100" aria-labelledby="connection-title-{{ connection.id }}">
+                        <div class="card-header flex-wrap gap-2">
+                            <h2 class="card-title text-break" id="connection-title-{{ connection.id }}">{{ connection.name }}</h2>
+                            {% if not connection.isActive %}
+                                <span class="badge bg-secondary-lt">Отключено</span>
+                            {% elseif status == 'connected' and connection.accountId %}
+                                <span class="badge bg-success-lt">Подключено</span>
+                            {% elseif status == 'unverified' or not connection.accountId %}
+                                <span class="badge bg-warning-lt">Требуется проверка</span>
+                            {% else %}
+                                <span class="badge bg-warning-lt">Ошибка проверки</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">Аккаунт МойСклад</dt>
+                                <dd class="col-sm-7 text-break">{{ connection.accountId ?? 'Не подтверждён' }}</dd>
+                                <dt class="col-sm-5">Последняя проверка</dt>
+                                <dd class="col-sm-7">{{ connection.lastCheckedAt ? connection.lastCheckedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялась' }}</dd>
+                                <dt class="col-sm-5">Успешная проверка</dt>
+                                <dd class="col-sm-7">{{ connection.lastSuccessfulCheckAt ? connection.lastSuccessfulCheckAt|date('d.m.Y H:i:s') : 'Ещё не выполнялась' }}</dd>
+                            </dl>
+                            {% if status != 'connected' %}
+                                <p class="text-secondary mt-3 mb-0">{{ status == 'unverified' ? 'Требуется проверка' : connection.checkStatus.message() }}</p>
+                            {% endif %}
+                        </div>
+                        {% if is_granted('module.marketplace.write') %}
+                            <div class="card-footer">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <form method="post" action="{{ path('moysklad_connections_check', {id: connection.id}) }}" data-moysklad-check>
+                                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_check' ~ connection.id) }}">
+                                        <input type="hidden" name="version" value="{{ connection.version }}">
+                                        <button type="submit" class="btn btn-outline-primary">Проверить подключение</button>
+                                    </form>
+                                    <a class="btn" href="{{ path('moysklad_connections_edit', {id: connection.id}) }}">Изменить название</a>
+                                    <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#replace-token-{{ connection.id }}">Заменить токен</button>
+                                    {% set operation = connection.isActive ? 'disable' : 'enable' %}
+                                    <form method="post" action="{{ path('moysklad_connections_' ~ operation, {id: connection.id}) }}" {% if not connection.isActive %}data-moysklad-check{% endif %}>
+                                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_' ~ operation ~ connection.id) }}">
+                                        <input type="hidden" name="version" value="{{ connection.version }}">
+                                        <button type="submit" class="btn">{{ connection.isActive ? 'Отключить' : 'Проверить и включить' }}</button>
+                                    </form>
+                                    {% if not connection.isActive %}
+                                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delete-connection-{{ connection.id }}">Удалить</button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </section>
+                </div>
+            {% endfor %}
+        </div>
+        {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
+    {% endif %}
 {% endblock %}
 
 {% block modals %}
-    <div class="modal modal-blur fade" id="modal-add-connection" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                {{ form_start(createForm, {action: path('moysklad_connections_create')}) }}
-                <div class="modal-header">
-                    <h5 class="modal-title">Новое подключение</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    {% if is_granted('module.marketplace.write') %}
+        {% for connection in pager %}
+            <div class="modal modal-blur fade" id="replace-token-{{ connection.id }}" tabindex="-1" aria-labelledby="replace-token-title-{{ connection.id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" action="{{ path('moysklad_connections_replace_token', {id: connection.id}) }}" data-moysklad-check>
+                            <input type="hidden" name="_token" value="{{ csrf_token('moysklad_replace-token' ~ connection.id) }}">
+                            <input type="hidden" name="version" value="{{ connection.version }}">
+                            <div class="modal-header">
+                                <h2 class="modal-title" id="replace-token-title-{{ connection.id }}">Заменить токен — {{ connection.name }}</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>{{ connection.accountId ? 'Новый токен будет сохранён после проверки доступа к тому же аккаунту.' : 'После успешной проверки аккаунт будет закреплён за подключением.' }} При ошибке текущий токен останется без изменений.</p>
+                                {% include 'moy_sklad/connections/_token_help.html.twig' %}
+                                <label class="form-label" for="replacement-token-{{ connection.id }}">Новый токен пользователя</label>
+                                <input type="password" id="replacement-token-{{ connection.id }}" name="token" class="form-control" autocomplete="new-password" required maxlength="4096" spellcheck="false">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                                <button type="submit" class="btn btn-primary">Проверить и сохранить</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3">{{ form_row(createForm.name) }}</div>
-                    <div class="mb-3">{{ form_row(createForm.baseUrl) }}</div>
-                    <div class="mb-3">{{ form_row(createForm.login) }}</div>
-                    <div class="mb-3">{{ form_row(createForm.accessToken) }}</div>
-                    <div class="mb-3">{{ form_row(createForm.refreshToken) }}</div>
-                    <div class="mb-3">{{ form_row(createForm.tokenExpiresAt) }}</div>
-                    <div class="mb-0">{{ form_row(createForm.isActive) }}</div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Добавить</button>
-                </div>
-                {{ form_end(createForm) }}
             </div>
-        </div>
-    </div>
+            {% if not connection.isActive %}
+                <div class="modal modal-blur fade" id="delete-connection-{{ connection.id }}" tabindex="-1" aria-labelledby="delete-title-{{ connection.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="{{ path('moysklad_connections_delete', {id: connection.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('moysklad_delete' ~ connection.id) }}">
+                                <input type="hidden" name="version" value="{{ connection.version }}">
+                                <div class="modal-header">
+                                    <h2 class="modal-title" id="delete-title-{{ connection.id }}">Удалить подключение?</h2>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Подключение «{{ connection.name }}» и сохранённый здесь токен будут удалены.</p>
+                                    <p class="mb-0">Это не отзывает токен в МойСклад. При необходимости отзовите его в настройках МойСклад.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                                    <button type="submit" class="btn btn-danger">Удалить подключение</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
 {% endblock %}

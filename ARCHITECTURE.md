@@ -3374,3 +3374,21 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/default-null, unlike the non-PK generated ORM mapping. The resulting `companies.public_id` schema difference is accepted and MUST NOT be applied. Keep its explicit mapping/DB default: removing it can generate DROP DEFAULT and break old inserts omitting public_id. See Version20260913090000 docblock.
 
 `ApiScopeCatalog`: explicit resources/actions/presets, all disconnected. `ApiScopePolicy::effectiveScopes(selected,enabled,connected)` даёт только известное пересечение. ApiKey хранит JSON selectedScopes/enabledResources с пустыми defaults. `SaveApiKeyPermissionsAction(companyId,userId,keyId,selectedScopes,enabledResources,expectedVersion): ApiKey` проверяет владельца и optimistic version под scoped row lock;409 требует перечитать, unknown scope/enable disconnected422, no-op без аудита. Отдельная миграция20260913090200; подключение модуля не включает ресурс старого ключа. Principal несёт preparedScopes/effectiveScopes, ApiAccessSubscriber требует известный effective scope либо auth.check; тестовые endpoints толькоenv=test.
+
+## MoySklad: подключение и проверка доступа
+
+Legacy Twig/Tabler UI: `/moy-sklad/connections`, права `MARKETPLACE_READ/WRITE`.
+`MoySkladConnection` сохраняет неизменяемый `companyId`, nullable глобально уникальный
+`accountId`, зашифрованные access/refresh payloads (Shared EncryptedPayload),
+`checkStatus`, `lastCheckedAt`, `lastSuccessfulCheckAt`, Doctrine optimistic `version`.
+Старые записи UNVERIFIED независимо от `isActive`; accountId связывается только после
+успешной проверки пользовательского Bearer через GET `/context/employee`.
+`ConnectionCheckStatus`: UNVERIFIED, CONNECTED, INVALID_TOKEN, FORBIDDEN,
+TARIFF_RESTRICTED, UNSUPPORTED_TOKEN, RATE_LIMITED, UNAVAILABLE, INVALID_RESPONSE.
+Включение отдельно от проверки; транспортная ошибка не означает истечение токена.
+`ManageMoySkladConnectionAction` управляет tenant-scoped create/edit/check/replace-token/
+disable/enable/delete, HTTP вне транзакции, версия проверяется перед сохранением.
+Повторный аккаунт отклоняется DB constraint без раскрытия чужой компании.
+`ConnectionTokenCodec` использует Shared encryption; новые секреты только encrypted,
+legacy fallback доступен лишь codec до одобренного переноса. Страница и profiler секреты не получают.
+Синхронизация, финансовые преобразования и публичный интеграционный API отсутствуют.

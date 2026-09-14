@@ -1,5 +1,9 @@
 framework:
     rate_limiter:
+        moysklad_connection_check:
+            policy: fixed_window
+            limit: 1
+            interval: '10 seconds'
         external_api_key:
             policy: fixed_window
             limit: 60

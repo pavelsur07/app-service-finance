@@ -22,10 +22,8 @@ final class MoySkladController extends AbstractController
     #[Route('', name: 'moysklad_index', methods: ['GET'])]
     public function index(): Response
     {
-        $company = $this->activeCompanyService->getActiveCompany();
+        $this->activeCompanyService->getActiveCompany();
 
-        return $this->render('moy_sklad/index.html.twig', [
-            'activeCompanyId' => (string) $company->getId(),
-        ]);
+        return $this->redirectToRoute('moysklad_connections_index');
     }
 }
