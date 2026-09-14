@@ -11,6 +11,8 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\NotNull;
 
 final class BalanceCategoryFormType extends AbstractType
 {
@@ -19,9 +21,11 @@ final class BalanceCategoryFormType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'label' => 'Наименование',
+                'constraints' => [new NotBlank()],
             ])
             ->add('type', ChoiceType::class, [
                 'label' => 'Тип',
+                'constraints' => [new NotNull()],
                 'choices' => [
                     'Актив' => BalanceCategoryType::ASSET,
                     'Обязательство' => BalanceCategoryType::LIABILITY,
