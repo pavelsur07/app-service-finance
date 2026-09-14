@@ -15,20 +15,6 @@ final class MoySkladConnectionWriteRepository extends ServiceEntityRepository
         parent::__construct($registry, MoySkladConnection::class);
     }
 
-    public function save(MoySkladConnection $connection): void
-    {
-        $em = $this->getEntityManager();
-        $em->persist($connection);
-        $em->flush();
-    }
-
-    public function remove(MoySkladConnection $connection): void
-    {
-        $em = $this->getEntityManager();
-        $em->remove($connection);
-        $em->flush();
-    }
-
     public function findByIdAndCompanyId(string $id, string $companyId): ?MoySkladConnection
     {
         return $this->createQueryBuilder('c')
@@ -54,5 +40,20 @@ final class MoySkladConnectionWriteRepository extends ServiceEntityRepository
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    /** @return list<MoySkladConnection> */
+    public function findBatchForCompany(string $companyId, ?string $afterId, int $limit = 100): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.companyId = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->orderBy('c.id', 'ASC')
+            ->setMaxResults(max(1, min(100, $limit)));
+        if (null !== $afterId) {
+            $qb->andWhere('c.id > :afterId')->setParameter('afterId', $afterId);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

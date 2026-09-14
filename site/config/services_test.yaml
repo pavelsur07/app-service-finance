@@ -58,3 +58,8 @@ services:
     App\Tests\Functional\Api\Fixtures\PermissionController:
         public: true
         tags: ['controller.service_arguments']
+
+    moysklad.http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
+        public: true

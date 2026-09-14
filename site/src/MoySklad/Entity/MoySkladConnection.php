@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoySklad\Entity;
 
+use App\MoySklad\Enum\ConnectionCheckStatus;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -13,6 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'is_active'], name: 'idx_moysklad_connections_company_active')]
 #[ORM\Index(columns: ['company_id', 'name'], name: 'idx_moysklad_connections_company_name')]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_company_name', columns: ['company_id', 'name'])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_account', columns: ['account_id'])]
 class MoySkladConnection
 {
     #[ORM\Id]
@@ -36,6 +38,28 @@ class MoySkladConnection
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $refreshToken = null;
+
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $accountId = null;
+
+    #[ORM\Column(type: 'string', length: 32, enumType: ConnectionCheckStatus::class, options: ['default' => 'unverified'])]
+    private ConnectionCheckStatus $checkStatus = ConnectionCheckStatus::UNVERIFIED;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastCheckedAt = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastSuccessfulCheckAt = null;
+
+    #[ORM\Version]
+    #[ORM\Column(type: 'integer', options: ['default' => 1])]
+    private int $version = 1;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $accessTokenEncrypted = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $refreshTokenEncrypted = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $tokenExpiresAt = null;
@@ -192,6 +216,84 @@ class MoySkladConnection
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getAccountId(): ?string
+    {
+        return $this->accountId;
+    }
+
+    public function bindAccount(string $accountId): void
+    {
+        Assert::uuid($accountId);
+        $accountId = strtolower($accountId);
+        if (null !== $this->accountId && $this->accountId !== $accountId) {
+            throw new \LogicException('Connection account cannot be changed.');
+        }
+
+        $this->accountId = $accountId;
+        $this->touch();
+    }
+
+    public function getVersion(): int
+    {
+        return $this->version;
+    }
+
+    public function isVerified(): bool
+    {
+        return null !== $this->accountId;
+    }
+
+    public function getCheckStatus(): ConnectionCheckStatus
+    {
+        return $this->checkStatus;
+    }
+
+    public function getLastCheckedAt(): ?\DateTimeImmutable
+    {
+        return $this->lastCheckedAt;
+    }
+
+    public function getLastSuccessfulCheckAt(): ?\DateTimeImmutable
+    {
+        return $this->lastSuccessfulCheckAt;
+    }
+
+    public function recordCheck(ConnectionCheckStatus $status, \DateTimeImmutable $checkedAt): void
+    {
+        $this->checkStatus = $status;
+        $this->lastCheckedAt = $checkedAt;
+        if (ConnectionCheckStatus::CONNECTED === $status) {
+            $this->lastSuccessfulCheckAt = $checkedAt;
+        }
+        $this->touch();
+    }
+
+    public function getAccessTokenEncrypted(): ?string
+    {
+        return $this->accessTokenEncrypted;
+    }
+
+    public function setAccessTokenEncrypted(?string $payload): self
+    {
+        $this->accessTokenEncrypted = $payload;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getRefreshTokenEncrypted(): ?string
+    {
+        return $this->refreshTokenEncrypted;
+    }
+
+    public function setRefreshTokenEncrypted(?string $payload): self
+    {
+        $this->refreshTokenEncrypted = $payload;
+        $this->touch();
+
+        return $this;
     }
 
     private function touch(): void

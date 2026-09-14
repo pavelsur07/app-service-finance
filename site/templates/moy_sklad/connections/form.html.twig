@@ -1,0 +1,9 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% block integration_content %}
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            {% include 'moy_sklad/connections/_form.html.twig' with {form: form, isEdit: isEdit} %}
+        </div>
+    </div>
+{% endblock %}
