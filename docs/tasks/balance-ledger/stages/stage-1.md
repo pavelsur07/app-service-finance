@@ -1,40 +1,27 @@
-# Stage 1 — Autonomous ledger backend (reviewing)
+# Stage 1 — Autonomous ledger backend
 
-Risk: HIGH-LOCAL. Base:238dd997. Consolidates approved original backend work packages1–3; all requirements retained.
+Status: complete. Risk: HIGH-LOCAL. Task base `238dd997`; implementation checkpoint `e380f4ca`. Consolidates approved backend work packages1–3; frontend verification is separate Stage2.
 
-Implemented:
-- Additive schema, same-company FK constraints, original tables preserved, no destructive down.
-- Two sides/four article levels, separate accounts, used hierarchy locks, archives, audited changes.
-- Book configuration, balanced opening, draft lifecycle, posting/reversal/correction, exact Money, idempotency and versioning.
-- Historical individual and aggregate validation, per-company row locks, atomic rollback/current state.
-- Period closing/reopening, granular membership-aware access, queries/cards/reports, precise arbitrary-size turnover formatting.
-- Legacy financial providers removed; Company member labels reused through a scoped Facade query.
+## Result
 
-Verification:
-- Baseline14 tests18 assertions.
-- Combined backend unit/integration + formatter:89 tests220 assertions green.
-- Focused PHPStan on all Balance source + backend tests and touched Company/formatter files:green.
-- Focused CS fixer applied. Doctrine mapping validation --skip-sync:green; full DB synchronization intentionally not asserted (legacy archival tables and migration-managed composite FKs).
-- Actual migration applied in dedicated local test DB; separate migration tests verify foreign company and restrictive deletion behavior.
+- Additive ledger schema, same-company constraints, legacy tables preserved, no destructive down.
+- Two balance sides, four article levels, terminal accounts, immutable used classification, durable reference history, safe deletion and archive, audited changes and sorting.
+- Configurable book and balanced opening; exact minor-unit documents, draft versions, immutable posting/reversal/correction, request idempotency surviving deletion.
+- Serialized company → book mutations and fresh financial permissions; separate prepare/post/close/reopen grants. Backdated validation checks suffix balances; append does not replay journal prefix.
+- Owner state recovery validates journal, restores all states including zeros, reconciles and audits. Every supported writer preserves state=posted-journal atomically.
+- Date-consistent reports, explicit effective opening date, SQL-paginated cards and journal, full-period totals, audit and exact oversized turnover display.
+- Old external Balance amount providers removed. Existing Company tree/seed/report infrastructure retained and adapted; no financial integrations added.
 
-Internal reviews and fixes:
-- BLOCKER1: active-company permissions leaking across companies — fixed and tested.
-- IMPORTANT: archived ancestor posting; target correction stale snapshot; renamed root with archived descendants; historical aggregate overflow; transient intra-document group-card balance; oversized cumulative turnover; consistent nested report transactions; silent audit truncation — all fixed with targeted evidence.
-- MINOR: malformed UUIDs, pagination overflow, exact formatter strings and stale baseline suppression — fixed.
+## Verification
 
-External review:round1 running, context explicitly backend only; UI pending Stage2.
-Open findings:await external result; do not mark DONE until resolved.
-Next:complete external fixes, commit/push backend and create Draft PR; continue frontend Stage2.
+Baseline14tests18assertions green. Final backend module112tests307assertions green; new reference/sort and later corrections have focused evidence in review-findings.md. Company onboarding and root structure/access adaptations also passed. Migration applied from scratch through all260versions in dedicated local final DB. Doctrine mapping validation --skip-sync green; full schema synchronization not claimed because archival tables and composite migration-managed constraints are intentional.
 
-## External round 1 disposition
+Full project gate results belong to Stage3. Frontend evidence belongs to Stage2.
 
-Reviewer returned BLOCKER1 / IMPORTANT2 plus MINOR findings. Although the context requested backend, it also inspected UI; the UI blocker is accepted and corrected.
-- BLOCKER: target form account loop shadowing selected account. Fixed with distinct names and balances UI regression (red→green).
-- IMPORTANT: error listener swallowed/log-suppressed arbitrary Domain/InvalidArgument errors. Narrowed to explicit BalanceLedgerException/unique; expected business failures typed; priority -1 after logging; red→green listener tests.
-- IMPORTANT: posting replayed entire company/account history under lock. Changed to current states + candidate delta and backwards future suffix. Changed aggregate targets only; guarded-history tests fail if old amounts read. Core30 tests74 assertions green including concurrent rollback.
-- MINOR: permission check before lock now added with in-lock recheck; descendants excluded parent choices; invisible report rows omitted without changing totals; obsolete EquationPolicy and Facade choice method removed. Facade tree method retained as Company onboarding uses it; empty directories not Git content.
-- Root additional IMPORTANT: failed ORM structure mutation survived DB rollback in memory. Entity manager clears on transactional failure; regression proves rejected type/parent change cannot leak into next flush. Structure+listener+policy16 tests38 assertions green.
+## Review
 
-Round2 launched on complete backend+frontend integrated diff; output site/var/external-review/balance-round2/review.txt. No green claim yet.
+Early internal review fixed active-company permission leakage, archived-ancestor posting, stale target calculation, archived-descendant rename, historical aggregate bounds, atomic group cards, oversized turnover, nested consistent snapshots, audit pagination and ORM in-memory changes surviving rollback. All known application-triggered findings resolved with focused regressions.
 
-Delivery note: backend/frontend were prepared concurrently in the same isolated worktree. They are kept in one implementation commit after both reviews to avoid a checkpoint whose removed providers and old controllers cannot compile together. Stage verification and scope remain distinct; one commit per Stage is a norm rather than a requirement to publish a broken intermediate revision.
+External round1 B1/I2 fixed: selected target account shadow, overly broad/log-suppressed exceptions, full-history posting scan. Round2 exhausted40turns without a conclusion. Corrected retry returned REVIEW_GREEN; two safe UI MINOR findings fixed. Whole-task fresh internal review/fix cycles and remaining follow-ups are recorded in review-findings.md. No confirmed open BLOCKER/IMPORTANT remains at Stage closure.
+
+Backend/frontend were prepared in one isolated worktree and checkpointed together to avoid an intermediate revision with removed providers but old controllers. Stage scopes and checks remained distinct; one task branch and one Draft PR.

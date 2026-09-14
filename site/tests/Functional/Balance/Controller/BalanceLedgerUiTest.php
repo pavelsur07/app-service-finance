@@ -212,6 +212,28 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         self::assertSelectorExists('[name="balance_document[lines][2][amount]"]');
     }
 
+    public function testInvalidCurrencyPrecisionPreservesDraftForCorrection(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset] = $this->accounts($companyId);
+        $client->request('GET', '/balance/documents/new');
+        $values = $client->getCrawler()->selectButton('Сохранить черновик')->form()->getPhpValues();
+        $values['balance_document']['reason'] = 'Сохранить введенное основание';
+        $values['balance_document']['lines'] = [['accountId' => $asset, 'direction' => 'increase', 'amount' => '1.001']];
+        $client->request('POST', '/balance/documents/new', $values);
+        self::assertResponseStatusCodeSame(422);
+        self::assertInputValueSame('balance_document[lines][0][amount]', '1.001');
+        self::assertInputValueSame('balance_document[date]', $values['balance_document']['date']);
+        self::assertInputValueSame('balance_document[requestKey]', $values['balance_document']['requestKey']);
+        self::assertSelectorTextContains('textarea[name="balance_document[reason]"]', 'Сохранить введенное основание');
+        self::assertSelectorTextContains('main', 'Сумма должна быть положительной и иметь точность валюты учета.');
+        $client->submitForm('Сохранить черновик', ['balance_document[lines][0][amount]' => '1.00']);
+        self::assertResponseRedirects();
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_operations WHERE company_id=? AND request_key=?', [$companyId, $values['balance_document']['requestKey']]));
+    }
+
     public function testRecoveryRequiresCsrf(): void
     {
         $client = static::createClient();

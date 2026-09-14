@@ -145,6 +145,10 @@ SQL, ['company' => $companyId, 'from' => $effectiveFrom ?? $from, 'to' => $to]);
     }
 
     /**
+     * Newest accounting date first. Within a date: drafts by descending number,
+     * posted documents by descending posting sequence, then the opening document.
+     * Cards retain ascending posting order for their running balances.
+     *
      * @param array<string,string> $filters
      *
      * @return array<string,mixed>
@@ -186,7 +190,7 @@ SQL, ['company' => $companyId, 'from' => $effectiveFrom ?? $from, 'to' => $to]);
             $total = (int) $this->db->fetchOne('SELECT COUNT(*) FROM balance_operations o WHERE '.$where, $params);
             $this->assertPage($page, $total);
             $offset = ($page - 1) * 50;
-            $items = $this->db->fetchAllAssociative('SELECT o.id,o.number,o.kind,o.operation_date,o.status,o.reason,o.author_id,o.posted_at,o.version,o.original_operation_id, EXISTS(SELECT 1 FROM balance_operations r WHERE r.company_id=o.company_id AND r.original_operation_id=o.id AND r.status=\'posted\') AS is_reversed FROM balance_operations o WHERE '.$where.' ORDER BY o.operation_date DESC,o.number DESC LIMIT 50 OFFSET '.$offset, $params);
+            $items = $this->db->fetchAllAssociative('SELECT o.id,o.number,o.kind,o.operation_date,o.status,o.reason,o.author_id,o.posted_at,o.version,o.original_operation_id, EXISTS(SELECT 1 FROM balance_operations r WHERE r.company_id=o.company_id AND r.original_operation_id=o.id AND r.status=\'posted\') AS is_reversed FROM balance_operations o WHERE '.$where.' ORDER BY o.operation_date DESC,CASE WHEN o.status=\'draft\' THEN 0 WHEN o.kind=\'opening\' THEN 2 ELSE 1 END,o.posting_sequence DESC NULLS LAST,o.number DESC LIMIT 50 OFFSET '.$offset, $params);
 
             return $this->page($items, $total, $page);
         });

@@ -6,12 +6,14 @@ namespace App\Balance\Controller;
 
 use App\Balance\Application\BalanceLedgerService;
 use App\Balance\Domain\Policy\LedgerAmount;
+use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Form\BalanceDocumentType;
 use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\Security\BalanceAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -64,14 +66,23 @@ final class BalanceDocumentController extends AbstractController
         }
         $form = $this->createForm(BalanceDocumentType::class, ['kind' => $document['kind'] ?? ($book['initialized'] ? 'operation' : 'opening'), 'date' => $document['operation_date'] ?? ($book['initialized'] ? (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d') : $book['start_date']), 'reason' => $document['reason'] ?? '', 'requestKey' => $document['request_key'] ?? Uuid::uuid7()->toString(), 'version' => $document['version'] ?? '', 'lines' => $lines], ['account_choices' => $choices, 'account_attributes' => $attributes]);
         $form->handleRequest($request);
+        $status = Response::HTTP_OK;
         if ($form->isSubmitted() && $form->isValid()) {
             /** @var array{kind:string,date:string,reason:string,requestKey:string,version:string|int,lines:array<int,array{accountId:string,direction:string,amount:string}>} $data */
             $data = $form->getData();
-            $saved = $this->ledger->saveDraft($companyId, $actor, $data['requestKey'], $data['kind'], $data['date'], $data['reason'], array_values($data['lines']), $id, null === $id ? null : (int) $data['version']);
+            try {
+                $saved = $this->ledger->saveDraft($companyId, $actor, $data['requestKey'], $data['kind'], $data['date'], $data['reason'], array_values($data['lines']), $id, null === $id ? null : (int) $data['version']);
 
-            return $this->redirectToRoute('balance_document', ['id' => $saved]);
+                return $this->redirectToRoute('balance_document', ['id' => $saved]);
+            } catch (BalanceLedgerException $error) {
+                if (Response::HTTP_UNPROCESSABLE_ENTITY !== $error->statusCode) {
+                    throw $error;
+                }
+                $form->addError(new FormError($error->getMessage()));
+                $status = Response::HTTP_UNPROCESSABLE_ENTITY;
+            }
         }
 
-        return $this->render('balance/document_edit.html.twig', ['form' => $form->createView(), 'document' => $document, 'permissions' => $this->access->permissions($companyId), 'book' => $this->query->book($companyId)]);
+        return $this->render('balance/document_edit.html.twig', ['form' => $form->createView(), 'document' => $document, 'permissions' => $this->access->permissions($companyId), 'book' => $this->query->book($companyId)], new Response(status: $status));
     }
 }

@@ -75,7 +75,7 @@ final class BalanceAccess
             return;
         }
         $column = match ($permission) {
-            'prepare' => 'can_prepare','post' => 'can_post','manage_periods' => 'can_manage_periods','reopen_periods' => 'can_reopen_periods',default => null
+            'prepare' => 'can_prepare','post' => 'can_post','manage_periods' => 'can_manage_periods','reopen_periods' => 'can_reopen_periods',default => null,
         };
         if (null === $column || !$this->db->fetchOne('SELECT '.$column.' FROM balance_access_grants WHERE company_id=? AND user_id=?', [$companyId, $actorId])) {
             throw new AccessDeniedException('Действие не разрешено для пользователя.');

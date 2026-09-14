@@ -340,6 +340,26 @@ final class LedgerReadAndPeriodTest extends IntegrationTestCase
         self::assertSame('15000', $after['accounts'][0]['opening']);
     }
 
+    public function testJournalReversesPostingOrderAndPlacesDraftsBeforeOpening(): void
+    {
+        $this->connection->executeStatement('UPDATE balance_books SET next_document_number=3,next_posting_sequence=3,version=2 WHERE company_id=?', [$this->company]);
+        $ledger = new BalanceLedgerService($this->connection, $this->access);
+        $lines = [['accountId' => $this->asset, 'direction' => 'increase', 'amount' => '1.00'], ['accountId' => $this->passive, 'direction' => 'increase', 'amount' => '1.00']];
+        $first = $ledger->saveDraft($this->company, $this->actor, 'order-a', 'operation', '2026-01-01', 'A', $lines);
+        $second = $ledger->saveDraft($this->company, $this->actor, 'order-b', 'operation', '2026-01-01', 'B', $lines);
+        $ledger->post($this->company, $this->actor, $second, 1);
+        $ledger->post($this->company, $this->actor, $first, 1);
+        $draft = $ledger->saveDraft($this->company, $this->actor, 'order-c', 'operation', '2026-01-01', 'Draft', $lines);
+        $opening = (string) $this->connection->fetchOne("SELECT id FROM balance_operations WHERE company_id=? AND kind='opening'", [$this->company]);
+        $journal = $this->query->journal($this->company, ['from' => '2026-01-01', 'to' => '2026-01-01']);
+        self::assertSame([$draft, $first, $second, $opening], array_column($journal['items'], 'id'));
+        $posted = $this->query->journal($this->company, ['from' => '2026-01-01', 'to' => '2026-01-01', 'status' => 'posted']);
+        self::assertSame([$first, $second, $opening], array_column($posted['items'], 'id'));
+        $card = $this->query->accountCard($this->company, $this->asset, '2026-01-01', '2026-01-01');
+        self::assertSame([$second, $first], array_column($card['entries'], 'id'));
+        self::assertSame(['10100', '10200'], array_column($card['entries'], 'balance'));
+    }
+
     public function testActiveCompanyBoundaryCannotBeBypassed(): void
     {
         $this->expectException(AccessDeniedException::class);
