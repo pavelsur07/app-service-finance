@@ -39,12 +39,14 @@ One IMPORTANT classification rejected with technical evidence and recorded FOLLO
 - Round1: B1/I2 confirmed and fixed.
 - Round2: tool failed with Reached max turns(40), not green.
 - Corrected retry: exact-file/embedded-diff guidance prevented repeated broad exploration; Claude returned REVIEW_GREEN, B0/I0. Two MINOR: reopen grant cell already fixed; audit labels corrected to actual action names and Twig lint passed.
-- Subsequent IMPORTANT-only corrections above verified internally; no new BLOCKER requiring another external invocation. Fresh acceptance internal review remains in progress at this checkpoint.
+- Subsequent IMPORTANT-only corrections above verified internally; no new BLOCKER requiring another external invocation. Fresh acceptance internal review subsequently returned INTERNAL_REVIEW_GREEN.
 
 Global module-gate failures were task regressions, not dismissed as baseline. Balance editors retain exact manage/prepare/post GET restrictions; mixed-route runtime tests now assert403 for named restricted routes, still exercise POST on every route, and assert mapping coverage. Period POST read-only path fixed before form handling. Static route policies are exact controller/permission matches with executable token checks, not namespace exemptions. Final full suite is rerunning after these corrections.
 
 ## Fresh acceptance internal completion
 
-Third fresh ephemeral read-only session reviewed complete11113-line task diff and relevant source. Returned INTERNAL_REVIEW_GREEN, B0/I0. Two safe MINOR corrections: align journal same-date posted ordering with posting sequence, and preserve populated document form for expected amount-validation errors; targeted checks pending at this checkpoint.
+Third fresh ephemeral read-only session reviewed complete11113-line task diff and relevant source. Returned INTERNAL_REVIEW_GREEN, B0/I0. Two safe MINOR corrections: align journal same-date posted ordering with posting sequence, and preserve populated document form for expected amount-validation errors; targeted checks green: journal2tests16assertions; document precision/form preservation3tests67assertions, focused static/style checks passed.
 
 Final external REVIEW_GREEN precedes these IMPORTANT/MINOR-only corrections; all confirmed findings are resolved through focused test/review cycles without another external round as required by policy. No new BLOCKER appeared after the external snapshot.
+
+Final verification: isolated full suite4942tests28335assertions green, full PHPStan/style/strict gates green, CI code4b9df397 all checks green. No confirmed open BLOCKER/IMPORTANT.
