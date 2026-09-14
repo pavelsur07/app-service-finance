@@ -19,13 +19,16 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
+#[IsGranted(ModuleAccess::MARKETPLACE_READ)]
 final class MoySkladConnectionFormController extends AbstractController
 {
     #[Route('/moy-sklad/connections/create', name: 'moysklad_connections_create', methods: ['GET', 'POST'])]
     #[Route('/moy-sklad/connections/{id}/edit', name: 'moysklad_connections_edit', methods: ['GET', 'POST'])]
     public function __invoke(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $repository, ManageMoySkladConnectionAction $action, ?string $id = null): Response
     {
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::MARKETPLACE_WRITE);
+        }
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
         $connection = null !== $id ? $repository->findByIdAndCompanyId($id, $companyId) : null;
         if (null !== $id && null === $connection) {

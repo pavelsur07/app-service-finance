@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoySklad\Command;
 
 use App\MoySklad\Application\Action\EncryptConnectionSecretsAction;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -16,8 +17,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:moysklad:encrypt-secrets', description: 'Шифрование старых токенов МойСклад одной компании (dry-run по умолчанию).')]
 final class EncryptConnectionSecretsCommand extends Command
 {
-    public function __construct(private readonly EncryptConnectionSecretsAction $action)
-    {
+    public function __construct(
+        private readonly EncryptConnectionSecretsAction $action,
+        private readonly ?LoggerInterface $logger = null,
+    ) {
         parent::__construct();
     }
 
@@ -39,8 +42,13 @@ final class EncryptConnectionSecretsCommand extends Command
         $execute = (bool) $input->getOption('execute');
         try {
             $counts = ($this->action)($companyId, $execute);
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
             // Exceptions can contain encrypted payloads or database parameters.
+            $this->logger?->error('MoySklad secret encryption failed', [
+                'exceptionClass' => $exception::class,
+                'exceptionCode' => $exception->getCode(),
+                'companyId' => $companyId,
+            ]);
             $io->error('Шифрование остановлено: ошибка проверки или сохранения. Текущее подключение не изменено. Предыдущие подключения могли быть обработаны; повторный запуск безопасен.');
 
             return Command::FAILURE;

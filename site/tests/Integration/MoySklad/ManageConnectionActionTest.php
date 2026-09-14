@@ -30,6 +30,7 @@ final class ManageConnectionActionTest extends WebTestCaseBase
         $connection = ($this->action())(new ManageConnectionCommand(self::COMPANY, 'actor', 'create', name: 'Склад', token: 'new-secret'));
         self::assertNotNull($connection);
         self::assertSame(self::ACCOUNT, $connection->getAccountId());
+        self::assertSame('https://api.moysklad.ru/api/remap/1.2', $connection->getBaseUrl());
         self::assertNull($connection->getAccessToken());
         self::assertSame('new-secret', static::getContainer()->get(ConnectionTokenCodec::class)->accessTokenFor($connection));
         self::assertSame('connected', $connection->getCheckStatus()->value);
@@ -178,6 +179,7 @@ final class ManageConnectionActionTest extends WebTestCaseBase
             self::fail('Concurrent enable must prevent deletion');
         } catch (ConnectionOperationException $e) {
             self::assertSame('stale_connection', $e->reason);
+            self::assertTrue($em->isOpen(), 'Expected validation must not close the EntityManager');
             self::assertSame(1, (int) $em->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_connections WHERE id = ? AND company_id = ? AND is_active = true', [$connection->getId(), self::COMPANY]));
         }
     }
@@ -201,6 +203,7 @@ final class ManageConnectionActionTest extends WebTestCaseBase
             static::getContainer()->get(ConnectionTokenCodec::class),
             new RateLimiterFactory(['id' => 'test', 'policy' => 'fixed_window', 'limit' => 1, 'interval' => '10 seconds'], new InMemoryStorage()),
             new NullLogger(),
+            'https://api.moysklad.ru/api/remap/1.2',
         );
     }
 }

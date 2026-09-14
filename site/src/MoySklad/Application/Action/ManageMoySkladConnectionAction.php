@@ -31,6 +31,8 @@ final readonly class ManageMoySkladConnectionAction
         #[Autowire(service: 'limiter.moysklad_connection_check')]
         private RateLimiterFactory $limiter,
         private LoggerInterface $logger,
+        #[Autowire(env: 'MOYSKLAD_API_BASE_URL')]
+        private string $baseUrl,
     ) {
     }
 
@@ -87,7 +89,7 @@ final readonly class ManageMoySkladConnectionAction
                 throw new \LogicException('Successful connection check requires an account.');
             }
             if (null === $connection) {
-                $connection = new MoySkladConnection(Uuid::uuid7()->toString(), $command->companyId, trim($command->name), 'https://api.moysklad.ru/api/remap/1.2');
+                $connection = new MoySkladConnection(Uuid::uuid7()->toString(), $command->companyId, trim($command->name), $this->baseUrl);
             }
             if (null !== $connection->getAccountId() && $connection->getAccountId() !== $result->accountId) {
                 throw new ConnectionOperationException('account_mismatch', 'Токен относится к другому аккаунту. Создайте отдельное подключение.');
@@ -128,14 +130,21 @@ final readonly class ManageMoySkladConnectionAction
         try {
             if (!$persist) {
                 // Doctrine DELETE does not enforce the version column: lock and recheck.
-                $this->em->wrapInTransaction(function () use ($connection, $version): void {
+                $validationError = $this->em->wrapInTransaction(function () use ($connection, $version): ?ConnectionOperationException {
                     $this->em->refresh($connection, LockMode::PESSIMISTIC_WRITE);
-                    $this->assertVersion($connection, $version);
+                    if ($connection->getVersion() !== $version) {
+                        return new ConnectionOperationException('stale_connection', 'Подключение изменилось. Обновите страницу и повторите действие.');
+                    }
                     if ($connection->isActive()) {
-                        throw new ConnectionOperationException('active_connection', 'Сначала отключите подключение.');
+                        return new ConnectionOperationException('active_connection', 'Сначала отключите подключение.');
                     }
                     $this->em->remove($connection);
+
+                    return null;
                 });
+                if (null !== $validationError) {
+                    throw $validationError;
+                }
             } else {
                 $this->em->persist($connection);
                 $this->em->flush();

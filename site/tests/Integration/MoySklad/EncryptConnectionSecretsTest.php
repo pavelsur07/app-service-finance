@@ -10,8 +10,10 @@ use App\MoySklad\Entity\MoySkladConnection;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\MoySklad\Infrastructure\Security\ConnectionTokenCodec;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
+use App\Shared\Security\Exception\InvalidEncryptedPayloadException;
 use App\Shared\Security\ValueObject\EncryptedPayload;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -61,7 +63,13 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
         $connection = $this->existing();
         $connection->setRefreshTokenEncrypted('private-invalid-payload');
         $this->em()->flush();
-        $tester = new CommandTester(new EncryptConnectionSecretsCommand($this->action()));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with('MoySklad secret encryption failed', [
+            'exceptionClass' => InvalidEncryptedPayloadException::class,
+            'exceptionCode' => 0,
+            'companyId' => self::COMPANY,
+        ]);
+        $tester = new CommandTester(new EncryptConnectionSecretsCommand($this->action(), $logger));
         $status = $tester->execute(['--company' => self::COMPANY, '--execute' => true]);
         $connection = $this->reload($connection);
 

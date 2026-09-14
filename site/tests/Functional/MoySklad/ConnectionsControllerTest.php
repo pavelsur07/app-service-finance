@@ -15,7 +15,6 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
 
 final class ConnectionsControllerTest extends WebTestCaseBase
 {
@@ -90,8 +89,30 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('a[href="/moy-sklad/connections/create"]');
         self::assertSelectorNotExists('form[action$="/replace-token"]');
-        $client->request('POST', '/moy-sklad/connections/'.$connection->getId().'/disable');
+        $client->request('POST', '/moy-sklad/connections/'.$connection->getId().'/disable', [
+            '_token' => $this->csrfToken($client, 'moysklad_disable'.$connection->getId()),
+            'version' => $connection->getVersion(),
+        ]);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testReadMemberCanOpenFormsButCannotSave(): void
+    {
+        [$client, $connection] = $this->seed();
+        $this->loginMember($client, $connection->getCompanyId(), ['marketplace' => 'read']);
+        $crawler = $client->request('GET', '/moy-sklad/connections/create');
+        self::assertResponseIsSuccessful();
+        $client->submit($crawler->selectButton('Проверить и подключить')->form([
+            'moy_sklad_connection[name]' => 'Запрещённое создание',
+            'moy_sklad_connection[token]' => 'read-member-token',
+        ]));
+        self::assertResponseStatusCodeSame(403);
+        $crawler = $client->request('GET', '/moy-sklad/connections/'.$connection->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        $client->submit($crawler->selectButton('Сохранить')->form(['moy_sklad_connection[name]' => 'Запрещённое изменение']));
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_connections'));
+        self::assertSame($connection->getName(), $this->em()->getConnection()->fetchOne('SELECT name FROM moysklad_connections WHERE id = ?', [$connection->getId()]));
     }
 
     public function testMemberWithoutReadCannotList(): void
