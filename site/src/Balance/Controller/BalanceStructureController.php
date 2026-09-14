@@ -22,6 +22,7 @@ use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -63,23 +64,33 @@ final class BalanceStructureController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        $command = new CreateBalanceCategoryCommand(
-            name: '',
-            type: BalanceCategoryType::ASSET,
-            parentId: null,
-            code: null,
-            isVisible: true,
-        );
-
-        $form = $this->createForm(BalanceCategoryFormType::class, $command, [
+        $form = $this->createForm(BalanceCategoryFormType::class, [
+            'name' => '',
+            'type' => BalanceCategoryType::ASSET,
+            'parentId' => null,
+            'code' => null,
+            'isVisible' => true,
+        ], [
             'parent_choices' => $this->balanceFacade->getCategoryChoicesForCompany($companyId),
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            ($this->createBalanceCategoryAction)($companyId, $command);
+            /** @var array{name: string, type: BalanceCategoryType, parentId: ?string, code: ?string, isVisible: bool} $data */
+            $data = $form->getData();
+            try {
+                ($this->createBalanceCategoryAction)($companyId, new CreateBalanceCategoryCommand(
+                    name: $data['name'],
+                    type: $data['type'],
+                    parentId: $data['parentId'],
+                    code: $data['code'],
+                    isVisible: $data['isVisible'],
+                ));
 
-            return $this->redirectToRoute('balance_structure_index');
+                return $this->redirectToRoute('balance_structure_index');
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
+            }
         }
 
         return $this->render('balance_structure/new.html.twig', [
@@ -100,25 +111,35 @@ final class BalanceStructureController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        $command = new UpdateBalanceCategoryCommand(
-            id: $category->getId(),
-            name: $category->getName(),
-            type: $category->getType(),
-            parentId: $category->getParent()?->getId(),
-            code: $category->getCode(),
-            isVisible: $category->isVisible(),
-        );
-
         $excludeIds = array_merge([$category->getId()], $this->collectDescendantIds($category));
-        $form = $this->createForm(BalanceCategoryFormType::class, $command, [
+        $form = $this->createForm(BalanceCategoryFormType::class, [
+            'name' => $category->getName(),
+            'type' => $category->getType(),
+            'parentId' => $category->getParent()?->getId(),
+            'code' => $category->getCode(),
+            'isVisible' => $category->isVisible(),
+        ], [
             'parent_choices' => $this->balanceFacade->getCategoryChoicesForCompany($companyId, $excludeIds),
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            ($this->updateBalanceCategoryAction)($companyId, $command);
+            /** @var array{name: string, type: BalanceCategoryType, parentId: ?string, code: ?string, isVisible: bool} $data */
+            $data = $form->getData();
+            try {
+                ($this->updateBalanceCategoryAction)($companyId, new UpdateBalanceCategoryCommand(
+                    id: $category->getId(),
+                    name: $data['name'],
+                    type: $data['type'],
+                    parentId: $data['parentId'],
+                    code: $data['code'],
+                    isVisible: $data['isVisible'],
+                ));
 
-            return $this->redirectToRoute('balance_structure_index');
+                return $this->redirectToRoute('balance_structure_index');
+            } catch (\DomainException $exception) {
+                $form->addError(new FormError($exception->getMessage()));
+            }
         }
 
         $links = $this->balanceCategoryLinkRepository->findByCompanyAndCategory($companyId, $category);
