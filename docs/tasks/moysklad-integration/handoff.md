@@ -2,7 +2,7 @@
 
 Branch: `feat/moysklad-integration` · PR: https://github.com/pavelsur07/app-service-finance/pull/2478 · Base: master.
 Implementation commit:335acaca (plus prior7100b57b, ccf6bf9f and upstream mergec1ce6e5c).
-CI on335acaca: all checks passed (run34823718485; eslint34823718476). Local full-run reconciliation pending before Ready.
+CI on335acaca: all checks passed (run34823718485; eslint34823718476). Focused local reconciliation passed after the final permission and sync fixes.
 
 ## Результат
 
@@ -21,7 +21,7 @@ Legacy URLs create/edit/delete сохранены; добавлены POST check
 - `composer stan` (=make site-stan):2620files PASS; focused final MoySklad static PASS.
 - `composer cs:check` и `composer cs:strict-types`:PASS после исправления unused import; CI также проверяет финальный код.
 - `composer test:unit`:2911tests16192assertions, exit0;4deprecations.
-- CI full suite in canonical shards:2911unit/16192assertions,1410integration/6324,214functional/3370,265functional/1484,216functional/1331: total5016tests28701assertions, all jobs PASS. Unit4 and functional shard1 two deprecation notices. Local combined run of the pre-permission-fix snapshot:5015tests,4failures. Two known route failures fixed; two Cash failures caused by temporary source sync omitting a Cyrillic fixture. Sync corrected; local focused reconciliation recorded below. All four pass in final CI; local combined run is not claimed green.
+- CI full suite in canonical shards:2911unit/16192assertions,1410integration/6324,214functional/3370,265functional/1484,216functional/1331: total5016tests28701assertions, all jobs PASS. Unit4 and functional shard1 two deprecation notices. Local combined run of the pre-permission-fix snapshot had5015tests and4failures; the two route failures were fixed and two Cash failures came from a temporary sync omission of a Cyrillic fixture. Corrected focused reconciliation:81tests/424assertions PASS, PHPStan and CS PASS.
 - Frontend `npm run lint` и `npm run build`:PASS после синхронизации upstream и существующего UX Turbo vendor package; build5.34s, legacy JS11.16kB/gzip4.20kB.
 - Chromium desktop1440/mobile375: cards/no overflow, modals/Escape, empty token fields, submit spinner/duplicate prevention, no JS errors. Six screenshots `/tmp/moysklad-browser-artifacts`. Browser used rendered authenticated fixture; HTTP mutation behavior covered by functional tests.
 - UI Kit scanners remain red: classes8958 vs baseline8964; mapping47 vs baseline47. They include legacy Tabler and outdated React mappings. No UI Kit used per owner instruction; unrelated scanners/components left intact.
