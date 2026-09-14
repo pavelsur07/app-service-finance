@@ -7,6 +7,11 @@
             </span>
         </h1>
     </div>{{ ui.period(from,to) }}
+    {% if not card.accounting_started %}
+        <section class="card">Учет не начат в выбранном периоде.</section>
+    {% elseif card.effective_from != from %}
+        <section class="card">Фактическое начало периода учета: {{ card.effective_from }}. Начальные остатки показаны на эту дату.</section>
+    {% endif %}
     <div class="wz-row">
         <section class="card">
             <h2>На начало</h2>{{ card.opening|format_minor_currency(currency) }}

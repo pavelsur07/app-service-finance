@@ -38,7 +38,7 @@ final class LedgerAmount
 
     public static function assertRange(string $minor): void
     {
-        if (bccomp($minor, (string) PHP_INT_MAX, 0) > 0 || bccomp($minor, (string) PHP_INT_MIN, 0) < 0) {
+        if (bccomp($minor, (string) \PHP_INT_MAX, 0) > 0 || bccomp($minor, (string) \PHP_INT_MIN, 0) < 0) {
             throw new BalanceLedgerException('Сумма выходит за допустимый диапазон.');
         }
     }

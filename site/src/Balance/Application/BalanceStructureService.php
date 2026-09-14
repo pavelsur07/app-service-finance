@@ -56,8 +56,10 @@ final readonly class BalanceStructureService
             $category->setType($type);
             $this->policy->assertCanSetParent($category, $parentId, $companyId);
             $category->setName(trim($name))->setCode($code)->setKind($kind)->setIsVisible($visible);
-            if (null === $id) {
+            if (null === $before || $before['parentId'] !== $parentId) {
                 $category->setSortOrder($this->categories->getNextSortOrder($companyId, $category->getParent()));
+            }
+            if (null === $id) {
                 $this->em->persist($category);
             }
             $this->em->flush();
@@ -91,8 +93,8 @@ final readonly class BalanceStructureService
         $this->transaction(function () use ($companyId, $actorId, $id): void {
             $this->lock($companyId, $actorId);
             $category = $this->category($companyId, $id);
-            if ($this->hasContents($companyId, $id)) {
-                throw new BalanceLedgerException('Статья содержит счета или дочерние статьи. Используйте архив.');
+            if ($this->hasContents($companyId, $id) || $this->hasDocumentReference($companyId, 'article', $id)) {
+                throw new BalanceLedgerException('Статья использовалась в документах или содержит счета или дочерние статьи. Используйте архив.');
             }
             $this->em->remove($category);
             $this->em->flush();
@@ -115,9 +117,22 @@ final readonly class BalanceStructureService
                 if ($sibling->getId() === $id) {
                     $other = $siblings[$i + ('up' === $direction ? -1 : 1)] ?? null;
                     if (null !== $other) {
+                        $beforeOrder = [];
+                        foreach ($siblings as $item) {
+                            $beforeOrder[$item->getId()] = $item->getSortOrder();
+                        }
+                        if ($category->getSortOrder() === $other->getSortOrder()) {
+                            foreach ($siblings as $position => $item) {
+                                $item->setSortOrder(($position + 1) * 10);
+                            }
+                        }
                         $this->categories->swapSortOrder($category, $other);
                         $this->em->flush();
-                        $this->audit($companyId, $actorId, 'article', $id, 'sort', ['direction' => $direction]);
+                        $afterOrder = [];
+                        foreach ($siblings as $item) {
+                            $afterOrder[$item->getId()] = $item->getSortOrder();
+                        }
+                        $this->audit($companyId, $actorId, 'article', $id, 'sort', ['direction' => $direction, 'before' => $beforeOrder, 'after' => $afterOrder]);
                     }
                     break;
                 }
@@ -183,7 +198,7 @@ final readonly class BalanceStructureService
         $this->transaction(function () use ($companyId, $actorId, $id): void {
             $this->lock($companyId, $actorId);
             $this->account($companyId, $id);
-            if ($this->db->fetchOne('SELECT 1 FROM balance_operation_lines WHERE company_id=? AND account_id=? LIMIT 1', [$companyId, $id])) {
+            if ($this->hasDocumentReference($companyId, 'account', $id) || $this->db->fetchOne('SELECT 1 FROM balance_operation_lines WHERE company_id=? AND account_id=? LIMIT 1', [$companyId, $id])) {
                 throw new BalanceLedgerException('Счет используется в документах. Используйте архив.');
             }
             $this->db->delete('balance_account_states', ['company_id' => $companyId, 'account_id' => $id]);
@@ -234,6 +249,11 @@ final readonly class BalanceStructureService
         }
 
         return $this->db->fetchAssociative('SELECT id,article_id,name,code,allow_negative,is_archived FROM balance_accounts WHERE company_id=? AND id=?', [$companyId, $id]) ?: throw new BalanceLedgerException('Счет не найден.', 404);
+    }
+
+    private function hasDocumentReference(string $companyId, string $type, string $id): bool
+    {
+        return false !== $this->db->fetchOne("SELECT 1 FROM balance_audit_events WHERE company_id=? AND object_type=? AND object_id=? AND action='document_referenced' LIMIT 1", [$companyId, $type, $id]);
     }
 
     private function accountUsed(string $companyId, string $id): bool

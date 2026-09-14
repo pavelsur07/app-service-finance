@@ -14,6 +14,7 @@ final class LedgerQueryTest extends TestCase
     public function testStatementPreservesExactLargeTotalsAndOpening(): void
     {
         $db = $this->createMock(Connection::class);
+        $db->method('isTransactionActive')->willReturn(true);
         $db->expects(self::once())->method('fetchAllAssociative')->willReturn([
             ['id' => 'a', 'type' => 'asset', 'opening' => '9007199254740993', 'increase' => '7', 'decrease' => '2'],
             ['id' => 'p', 'type' => 'passive', 'opening' => '9007199254740993', 'increase' => '5', 'decrease' => '0'],

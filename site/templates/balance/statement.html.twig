@@ -4,6 +4,11 @@
     <div class="wz-head">
         <h1 class="wz-title">Ведомость изменений</h1>
     </div>{{ ui.period(from,to) }}
+    {% if not statement.accounting_started %}
+        <section class="card">Учет не начат в выбранном периоде.</section>
+    {% elseif statement.effective_from != from %}
+        <section class="card">Фактическое начало периода учета: {{ statement.effective_from }}. Начальные остатки показаны на эту дату.</section>
+    {% endif %}
     <section class="card report-scroll">
         <table class="t-table">
             <thead>

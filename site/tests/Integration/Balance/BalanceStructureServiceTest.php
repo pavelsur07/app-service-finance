@@ -138,6 +138,48 @@ final class BalanceStructureServiceTest extends IntegrationTestCase
         self::assertSame('asset', $this->connection->fetchOne('SELECT type FROM balance_articles WHERE company_id=? AND id=?', [$this->companyId, $id]));
     }
 
+    public function testReparentedArticlesRemainSortable(): void
+    {
+        $firstParent = $this->article('First group', 'G1', 'group');
+        $secondParent = $this->article('Second group', 'G2', 'group');
+        $moving = $this->article('Moving', 'MOVE', 'article', $firstParent);
+        $existing = $this->article('Existing', 'STAY', 'article', $secondParent);
+        $this->structure->saveCategory($this->companyId, $this->actorId, 'Moving', BalanceCategoryType::ASSET, $secondParent, 'MOVE', 'article', $moving);
+        $orders = $this->connection->fetchFirstColumn('SELECT id FROM balance_articles WHERE company_id=? AND parent_id=? ORDER BY sort_order,id', [$this->companyId, $secondParent]);
+        self::assertSame([$existing, $moving], $orders);
+        // Also recover old ties without skipping multiple siblings.
+        $this->connection->executeStatement('UPDATE balance_articles SET sort_order=10 WHERE company_id=? AND parent_id=?', [$this->companyId, $secondParent]);
+        $this->em->clear();
+        $this->structure->moveCategory($this->companyId, $this->actorId, $moving, 'down');
+        self::assertSame([$existing, $moving], $this->connection->fetchFirstColumn('SELECT id FROM balance_articles WHERE company_id=? AND parent_id=? ORDER BY sort_order,id', [$this->companyId, $secondParent]));
+    }
+
+    public function testRemovedDraftReferencesStillPreventObjectDeletion(): void
+    {
+        $group = $this->article('Group', 'GROUP', 'group');
+        $article = $this->article('Old article', 'OLD', 'article', $group);
+        $other = $this->article('New article', 'NEW', 'article');
+        $account = $this->structure->saveAccount($this->companyId, $this->actorId, $article, 'Bank', 'BANK', false);
+        $this->ledger->configureBook($this->companyId, 'RUB', '2025-01-01', $this->actorId);
+        $draft = $this->ledger->saveDraft($this->companyId, $this->actorId, 'draft', 'opening', '2025-01-01', 'Draft', [['accountId' => $account, 'direction' => 'increase', 'amount' => '100']]);
+        $this->ledger->saveDraft($this->companyId, $this->actorId, 'draft', 'opening', '2025-01-01', 'Draft', [], $draft, 1);
+        $this->ledger->deleteDraft($this->companyId, $this->actorId, $draft, 2);
+        $this->structure->saveAccount($this->companyId, $this->actorId, $other, 'Bank', 'BANK', false, $account);
+        $this->structure->saveCategory($this->companyId, $this->actorId, 'Old article', BalanceCategoryType::ASSET, null, 'OLD', 'article', $article);
+        foreach ([['account', $account], ['article', $article], ['article', $group]] as [$kind, $id]) {
+            try {
+                if ('account' === $kind) {
+                    $this->structure->deleteAccount($this->companyId, $this->actorId, $id);
+                } else {
+                    $this->structure->deleteCategory($this->companyId, $this->actorId, $id);
+                }
+                self::fail('Historical document references must prevent deletion.');
+            } catch (BalanceLedgerException $exception) {
+                self::assertStringContainsString('архив', $exception->getMessage());
+            }
+        }
+    }
+
     private function article(string $name, string $code, string $kind, ?string $parent = null): string
     {
         return $this->structure->saveCategory($this->companyId, $this->actorId, $name, BalanceCategoryType::ASSET, $parent, $code, $kind);

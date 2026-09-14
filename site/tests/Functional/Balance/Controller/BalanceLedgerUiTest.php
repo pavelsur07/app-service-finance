@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Balance\Controller;
 use App\Balance\Enum\BalanceCategoryType;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
+use App\Tests\Builders\Balance\BalanceAccessGrantBuilder;
 use App\Tests\Builders\Balance\BalanceAccountBuilder;
 use App\Tests\Builders\Balance\BalanceCategoryBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -18,6 +19,19 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class BalanceLedgerUiTest extends WebTestCaseBase
 {
+    public function testGrantTableDisplaysReopeningPermission(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $grant = BalanceAccessGrantBuilder::aBalanceAccessGrant()->withCompanyId($companyId)->withReopenPeriods()->build();
+        $this->em()->persist($grant);
+        $this->em()->flush();
+        $crawler = $client->request('GET', '/balance/access');
+        self::assertResponseIsSuccessful();
+        self::assertCount(5, $crawler->filter('tbody tr')->first()->filter('td'));
+        self::assertSame('Да', trim($crawler->filter('tbody tr')->first()->filter('td')->eq(4)->text()));
+    }
+
     public function testOwnerCanConfigureBookThroughSetupForm(): void
     {
         $client = static::createClient();
@@ -102,6 +116,14 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         foreach (['/balance/accounts/'.$asset.'/card', '/balance/statement?from=2026-08-01&to=2026-08-31', '/balance/compare?from=2026-08-01&to=2026-08-31'] as $path) {
             $client->request('GET', $path);
             self::assertResponseIsSuccessful($path);
+        }
+        foreach (['/balance/accounts/'.$asset.'/card', '/balance/statement'] as $path) {
+            $client->request('GET', $path.'?from=2026-07-01&to=2026-08-31');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorTextContains('main', 'Фактическое начало периода учета: 2026-08-01');
+            $client->request('GET', $path.'?from=2026-07-01&to=2026-07-31');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorTextContains('main', 'Учет не начат в выбранном периоде');
         }
         self::assertSame('10000000', (string) $this->em()->getConnection()->fetchOne('SELECT balance FROM balance_account_states WHERE company_id=? AND account_id=?', [$companyId, $asset]));
         $articleId = (string) $this->em()->getConnection()->fetchOne('SELECT article_id FROM balance_accounts WHERE company_id=? AND id=?', [$companyId, $asset]);
@@ -245,6 +267,10 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         self::assertSelectorTextContains('main', 'Черновик для проверки доступа');
         self::assertSelectorNotExists('form[action$="/post"]');
         $client->request('GET', '/balance/documents/new');
+        self::assertResponseStatusCodeSame(403);
+        $client->request('GET', '/balance/periods');
+        self::assertResponseIsSuccessful();
+        $client->request('POST', '/balance/periods');
         self::assertResponseStatusCodeSame(403);
         $client->request('POST', $location.'/post');
         self::assertResponseStatusCodeSame(403);

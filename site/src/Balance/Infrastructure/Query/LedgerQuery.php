@@ -78,7 +78,12 @@ final class LedgerQuery
         if ($from > $to) {
             throw new BalanceLedgerException('Начало периода позже окончания.');
         }
-        $rows = $this->db->fetchAllAssociative(<<<'SQL'
+
+        return $this->snapshot(function () use ($companyId, $from, $to): array {
+            $book = $this->book($companyId);
+            $started = null !== $book && (bool) $book['initialized'] && $book['start_date'] <= $to;
+            $effectiveFrom = $started ? max($from, (string) $book['start_date']) : null;
+            $rows = $this->db->fetchAllAssociative(<<<'SQL'
 SELECT a.id,a.name,a.code,a.article_id,a.is_archived,c.type,c.name AS article_name,
  COALESCE(SUM(CASE WHEN o.operation_date < :from OR o.kind='opening' THEN CASE WHEN l.direction='increase' THEN l.amount::numeric ELSE -l.amount::numeric END ELSE 0 END),0)::text AS opening,
  COALESCE(SUM(CASE WHEN o.operation_date >= :from AND o.kind<>'opening' AND l.direction='increase' THEN l.amount::numeric ELSE 0 END),0)::text AS increase,
@@ -86,27 +91,28 @@ SELECT a.id,a.name,a.code,a.article_id,a.is_archived,c.type,c.name AS article_na
 FROM balance_accounts a JOIN balance_articles c ON c.company_id=a.company_id AND c.id=a.article_id
 LEFT JOIN (balance_operation_lines l JOIN balance_operations o ON o.company_id=l.company_id AND o.id=l.operation_id AND o.status='posted' AND o.operation_date<=:to) ON l.company_id=a.company_id AND l.account_id=a.id
 WHERE a.company_id=:company GROUP BY a.id,c.type,c.name ORDER BY c.name,a.name,a.id
-SQL, ['company' => $companyId, 'from' => $from, 'to' => $to]);
-        $asset = '0';
-        $passive = '0';
-        foreach ($rows as &$row) {
-            $row['closing'] = bcsub(bcadd((string) $row['opening'], (string) $row['increase'], 0), (string) $row['decrease'], 0);
-            if ('asset' === $row['type']) {
-                $asset = bcadd($asset, $row['closing'], 0);
-            } else {
-                $passive = bcadd($passive, $row['closing'], 0);
+SQL, ['company' => $companyId, 'from' => $effectiveFrom ?? $from, 'to' => $to]);
+            $asset = '0';
+            $passive = '0';
+            foreach ($rows as &$row) {
+                $row['closing'] = bcsub(bcadd((string) $row['opening'], (string) $row['increase'], 0), (string) $row['decrease'], 0);
+                if ('asset' === $row['type']) {
+                    $asset = bcadd($asset, $row['closing'], 0);
+                } else {
+                    $passive = bcadd($passive, $row['closing'], 0);
+                }
             }
-        }
-        unset($row);
-        LedgerAmount::assertRange($asset);
-        LedgerAmount::assertRange($passive);
-        foreach ($rows as $row) {
-            foreach (['opening', 'closing'] as $key) {
-                LedgerAmount::assertRange((string) $row[$key]);
+            unset($row);
+            LedgerAmount::assertRange($asset);
+            LedgerAmount::assertRange($passive);
+            foreach ($rows as $row) {
+                foreach (['opening', 'closing'] as $key) {
+                    LedgerAmount::assertRange((string) $row[$key]);
+                }
             }
-        }
 
-        return ['from' => $from, 'to' => $to, 'accounts' => $rows, 'asset' => $asset, 'passive' => $passive, 'difference' => bcsub($asset, $passive, 0)];
+            return ['from' => $from, 'to' => $to, 'effective_from' => $effectiveFrom, 'accounting_started' => $started, 'accounts' => $rows, 'asset' => $asset, 'passive' => $passive, 'difference' => bcsub($asset, $passive, 0)];
+        });
     }
 
     /** @return array<string, mixed> */
@@ -308,7 +314,7 @@ SQL, ['company' => $companyId, 'from' => $from, 'to' => $to]);
                 $opening = bcadd($opening, $r['opening'], 0);
                 $closing = bcadd($closing, $r['closing'], 0);
             }
-            $params = ['company' => $companyId, 'from' => $from, 'to' => $to, 'accounts' => $ids];
+            $params = ['company' => $companyId, 'from' => $statement['effective_from'] ?? $from, 'to' => $to, 'accounts' => $ids];
             $types = ['accounts' => \Doctrine\DBAL\ArrayParameterType::STRING];
             $source = "FROM balance_operations o JOIN balance_operation_lines l ON l.company_id=o.company_id AND l.operation_id=o.id JOIN balance_accounts a ON a.company_id=l.company_id AND a.id=l.account_id WHERE o.company_id=:company AND o.status='posted' AND o.kind<>'opening' AND o.operation_date BETWEEN :from AND :to AND l.account_id IN (:accounts)";
             $total = (int) $this->db->fetchOne('SELECT COUNT(*) '.$source, $params, $types);
@@ -327,7 +333,7 @@ SQL, ['company' => $companyId, 'from' => $from, 'to' => $to]);
             LedgerAmount::assertRange($opening);
             LedgerAmount::assertRange($closing);
 
-            return ['accounts' => $rows, 'opening' => $opening, 'closing' => $closing, 'entries' => $entries, 'from' => $from, 'to' => $to, 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'pager' => $pager];
+            return ['accounts' => $rows, 'opening' => $opening, 'closing' => $closing, 'entries' => $entries, 'from' => $from, 'to' => $to, 'effective_from' => $statement['effective_from'], 'accounting_started' => $statement['accounting_started'], 'total' => $total, 'page' => $page, 'per_page' => $perPage, 'pager' => $pager];
         });
     }
 

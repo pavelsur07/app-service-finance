@@ -17,7 +17,7 @@
                     <th>Подготовка</th>
                     <th>Проведение</th>
                     <th>Закрытие</th>
-<th>Переоткрытие</th>
+                    <th>Переоткрытие</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,6 +33,7 @@
                         </td>
                         <td>{{ item.can_manage_periods ? 'Да':'Нет' }}
                         </td>
+                        <td>{{ item.can_reopen_periods ? 'Да':'Нет' }}</td>
                     </tr>
                 {% else %}
                     <tr>

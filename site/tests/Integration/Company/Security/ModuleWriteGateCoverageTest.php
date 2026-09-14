@@ -51,6 +51,9 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * `inline-owner`      — сверка владельца сравнением `$company->getUser()` прямо в теле.
      * `authenticated-self`— личная настройка пользователя, компания не при чём.
      * `firewall`          — доступ ограничен access_control в security.yaml (админка).
+     * `balance-*`         — свежий FINANCE_WRITE + конкретное право BalanceAccess;
+     *                       `balance-disabled` — старый endpoint всегда отвечает 410.
+     *                       Точный actor-вызов дополнительно проверяется по PHP-токенам.
      *
      * Негативное поведение этих маршрутов покрыто функционально: CompanyRoleControllerTest
      * (`testNonOwnerCannotAccessRoles`), CompanyMemberAccessRoleTest, CompanyMemberAccessTest.
@@ -58,6 +61,33 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
+        // BalanceAccess reads fresh FINANCE rights and applies company-scoped grants.
+        // Every route remains individually bound to its controller and exact actor gate.
+        // Negative behavior: ModuleMixedRouteGateTest, BalanceLedgerUiTest and
+        // LedgerReadAndPeriodTest (revocation, delegated rights, owner-only mutation).
+        'balance_document_new' => ['balance-prepare', 'App\Balance\Controller\BalanceDocumentController::__invoke'],
+        'balance_document' => ['balance-prepare', 'App\Balance\Controller\BalanceDocumentController::__invoke'],
+        'balance_account_new' => ['balance-manage', 'App\Balance\Controller\BalanceAccountEditController::__invoke'],
+        'balance_account_edit' => ['balance-manage', 'App\Balance\Controller\BalanceAccountEditController::__invoke'],
+        'balance_account_delete' => ['balance-manage', 'App\Balance\Controller\BalanceAccountMutationController::__invoke'],
+        'balance_account_archive' => ['balance-manage', 'App\Balance\Controller\BalanceAccountMutationController::__invoke'],
+        'balance_structure_new' => ['balance-manage', 'App\Balance\Controller\BalanceCategoryEditController::__invoke'],
+        'balance_structure_edit' => ['balance-manage', 'App\Balance\Controller\BalanceCategoryEditController::__invoke'],
+        'balance_structure_move' => ['balance-manage', 'App\Balance\Controller\BalanceCategoryMoveController::__invoke'],
+        'balance_structure_delete' => ['balance-manage', 'App\Balance\Controller\BalanceCategoryMutationController::__invoke'],
+        'balance_structure_archive' => ['balance-manage', 'App\Balance\Controller\BalanceCategoryMutationController::__invoke'],
+        'balance_document_post' => ['balance-document-mutation', 'App\Balance\Controller\BalanceDocumentMutationController::__invoke'],
+        'balance_document_delete' => ['balance-document-mutation', 'App\Balance\Controller\BalanceDocumentMutationController::__invoke'],
+        'balance_access' => ['balance-manage', 'App\Balance\Controller\BalanceGrantsController::__invoke'],
+        'balance_structure_link_money_accounts_total' => ['balance-disabled', 'App\Balance\Controller\BalanceLegacyLinkController::__invoke'],
+        'balance_structure_link_money_funds_total' => ['balance-disabled', 'App\Balance\Controller\BalanceLegacyLinkController::__invoke'],
+        'balance_periods' => ['balance-periods', 'App\Balance\Controller\BalancePeriodsController::__invoke'],
+        'balance_rebuild' => ['balance-manage', 'App\Balance\Controller\BalanceRebuildController::__invoke'],
+        'balance_document_reverse' => ['balance-post', 'App\Balance\Controller\BalanceReversalController::__invoke'],
+        'balance_setup' => ['balance-manage', 'App\Balance\Controller\BalanceSetupController::__invoke'],
+        'balance_structure_seed' => ['balance-manage', 'App\Balance\Controller\BalanceStructureSeedController::__invoke'],
+        'balance_account_target' => ['balance-prepare', 'App\Balance\Controller\BalanceTargetController::__invoke'],
+
         'settings_api_permissions' => ['owner', 'App\Api\Controller\Settings\PermissionsController::__invoke'],
         'settings_api_create' => ['owner', 'App\Api\Controller\Settings\CreateController::__invoke'],
         'settings_api_rename' => ['owner', 'App\Api\Controller\Settings\RenameController::__invoke'],
@@ -193,6 +223,10 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
                     );
                 }
 
+                if (str_starts_with($policy, 'balance-') && !$this->hasBalancePolicyGate($className, $methodName, $policy)) {
+                    $problems[] = sprintf('%s — отсутствует точный BalanceAccess-гейт политики %s', $routeName, $policy);
+                }
+
                 $usedRoutePolicies[$routeName] = $policy;
 
                 continue;
@@ -277,6 +311,13 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         self::assertSame([], $problems, "Мутирующие маршруты без корректного write-гейта:\n".implode("\n", $problems));
     }
 
+    public function testBalancePolicyDoesNotAcceptReadOnlyOrWrongGrantControllers(): void
+    {
+        self::assertFalse($this->hasBalancePolicyGate(\App\Balance\Controller\BalanceAccountsController::class, '__invoke', 'balance-manage'));
+        self::assertFalse($this->hasBalancePolicyGate(\App\Balance\Controller\BalanceReversalController::class, '__invoke', 'balance-prepare'));
+        self::assertTrue($this->hasBalancePolicyGate(\App\Balance\Controller\BalanceCategoryEditController::class, '__invoke', 'balance-manage'));
+    }
+
     /**
      * @return array{0: string, 1: string}
      */
@@ -310,6 +351,68 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
 
         return $reflection->hasMethod($methodName)
             && [] !== $reflection->getMethod($methodName)->getAttributes(PublicAccess::class, \ReflectionAttribute::IS_INSTANCEOF);
+    }
+
+    /** Inspect executable actor-call tokens, not strings/comments mentioning a gate. */
+    private function hasBalancePolicyGate(string $className, string $methodName, string $policy): bool
+    {
+        $method = $this->method($className, $methodName);
+        if (null === $method || false === $method->getFileName() || false === $method->getStartLine() || false === $method->getEndLine()) {
+            return false;
+        }
+        $expected = match ($policy) {
+            'balance-manage' => ['manage'],
+            'balance-prepare' => ['prepare'],
+            'balance-post' => ['post'],
+            'balance-document-mutation' => ['post', 'prepare'],
+            'balance-periods' => ['manage_periods', 'reopen_periods'],
+            'balance-disabled' => [],
+            default => null,
+        };
+        if (null === $expected) {
+            return false;
+        }
+        if ('balance-disabled' === $policy && !str_contains($this->executableBody($method), 'Response::HTTP_GONE')) {
+            return false;
+        }
+        $lines = explode("\n", (string) file_get_contents($method->getFileName()));
+        $source = implode("\n", array_slice($lines, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+        $parts = [];
+        foreach (token_get_all('<?php '.$source) as $token) {
+            if (is_array($token)) {
+                if (in_array($token[0], [\T_OPEN_TAG, \T_WHITESPACE, \T_COMMENT, \T_DOC_COMMENT], true)) {
+                    continue;
+                }
+                $parts[] = \T_CONSTANT_ENCAPSED_STRING === $token[0] ? 'literal:'.substr($token[1], 1, -1) : 'token:'.$token[1];
+            } else {
+                $parts[] = 'token:'.$token;
+            }
+        }
+        $prefix = ['token:$this', 'token:->', 'token:access', 'token:->', 'token:actor', 'token:(', 'token:$companyId'];
+        for ($index = 0; $index < count($parts); ++$index) {
+            if (array_slice($parts, $index, count($prefix)) !== $prefix) {
+                continue;
+            }
+            $depth = 1;
+            $literals = [];
+            for ($next = $index + count($prefix); $next < count($parts) && $depth > 0; ++$next) {
+                $part = $parts[$next];
+                if ('token:(' === $part) {
+                    ++$depth;
+                }
+                if ('token:)' === $part) {
+                    --$depth;
+                }
+                if (str_starts_with($part, 'literal:')) {
+                    $literals[] = substr($part, 8);
+                }
+            }
+            if ([] === array_diff($expected, $literals)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function writeConstant(Module $module): string

@@ -314,6 +314,32 @@ final class LedgerReadAndPeriodTest extends IntegrationTestCase
         self::assertSame(200, $this->query->accountCard($this->company, $this->asset, '2026-01-01', '2026-01-31', 1, 999)['per_page']);
     }
 
+    public function testPeriodsBeforeAndAcrossOpeningExposeActualAccountingStart(): void
+    {
+        $this->connection->executeStatement('UPDATE balance_books SET start_date=? WHERE company_id=?', ['2026-01-15', $this->company]);
+        $this->connection->executeStatement("UPDATE balance_operations SET operation_date=CASE WHEN kind='opening' THEN DATE '2026-01-15' ELSE DATE '2026-01-20' END WHERE company_id=?", [$this->company]);
+        $before = $this->query->statement($this->company, '2026-01-01', '2026-01-14');
+        self::assertFalse($before['accounting_started']);
+        self::assertNull($before['effective_from']);
+        self::assertSame('0', $before['accounts'][0]['opening']);
+        $month = $this->query->statement($this->company, '2026-01-01', '2026-01-31');
+        self::assertSame('2026-01-01', $month['from']);
+        self::assertSame('2026-01-15', $month['effective_from']);
+        self::assertSame('10000', $month['accounts'][0]['opening']);
+        self::assertSame('5000', $month['accounts'][0]['increase']);
+        $day = $this->query->statement($this->company, '2026-01-15', '2026-01-15');
+        self::assertSame('2026-01-15', $day['effective_from']);
+        self::assertSame('10000', $day['accounts'][0]['opening']);
+        self::assertSame('0', $day['accounts'][0]['increase']);
+        $card = $this->query->accountCard($this->company, $this->asset, '2026-01-01', '2026-01-31');
+        self::assertSame('2026-01-15', $card['effective_from']);
+        self::assertTrue($card['accounting_started']);
+        self::assertSame('10000', $card['opening']);
+        $after = $this->query->statement($this->company, '2026-01-22', '2026-01-31');
+        self::assertSame('2026-01-22', $after['effective_from']);
+        self::assertSame('15000', $after['accounts'][0]['opening']);
+    }
+
     public function testActiveCompanyBoundaryCannotBeBypassed(): void
     {
         $this->expectException(AccessDeniedException::class);

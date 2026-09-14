@@ -20,3 +20,25 @@ Fresh ephemeral read-only session received only TASK, full diff and stage checkl
 | IMPORTANT | Movement cards load all rows | SQL pagination with full-period totals and prefix-aware running balance; awaiting final tests |
 
 Counts are findings, not open issues; handoff will record final open count separately. No review is declared green until fixes and targeted verification are recorded. Production unchanged.
+
+## Verification after first fresh review
+
+All eight confirmed findings resolved. Core38tests98assertions, query/access/period28tests88assertions, UI26tests170assertions; independent two-connection tests verify company and book lock behavior. Details and later expanded totals in stage reports.
+
+## Second fresh internal full-task review
+
+Found B0/I3/MINOR2. Two IMPORTANT confirmed and fixed:
+- Period straddling opening: cards/statements now return and display effective_from; entirely-before-opening shows accounting_started=false. Backend red→green4tests32assertions, functional UI regressions green.
+- Historical draft references: once-per-object document_referenced audit markers for accounts/articles/ancestors survive edit/delete. Structural deletion checks the indexed marker. Root deletion/sorting regressions red→green2tests5assertions; core marker regression green.
+- MINOR missing reopen grant cell fixed and tested red→green; reparenting now gets an available order and sorting normalizes ties before swapping, recording before/after orders.
+
+One IMPORTANT classification rejected with technical evidence and recorded FOLLOW-UP: arbitrary pre-existing corruption of an existing cached balance requires an out-of-band SQL write. Source search found all authorized state writers: creation writes zero; posting/reversal updates exact delta atomically with immutable journal under company/book locks; explicit rebuild validates history and reconciles before commit; deletion only removes never-referenced accounts. Thus state=journal is preserved inductively across supported commands. The suggested per-post full-prefix SUM would reintroduce the confirmed external performance issue. Period integrity checks and explicit owner rebuild already detect/repair drift; proactive scheduled drift monitoring remains separate future work. No application trigger producing drift was demonstrated by either independent reviewer or core audit.
+
+## External completion
+
+- Round1: B1/I2 confirmed and fixed.
+- Round2: tool failed with Reached max turns(40), not green.
+- Corrected retry: exact-file/embedded-diff guidance prevented repeated broad exploration; Claude returned REVIEW_GREEN, B0/I0. Two MINOR: reopen grant cell already fixed; audit labels corrected to actual action names and Twig lint passed.
+- Subsequent IMPORTANT-only corrections above verified internally; no new BLOCKER requiring another external invocation. Fresh acceptance internal review remains in progress at this checkpoint.
+
+Global module-gate failures were task regressions, not dismissed as baseline. Balance editors retain exact manage/prepare/post GET restrictions; mixed-route runtime tests now assert403 for named restricted routes, still exercise POST on every route, and assert mapping coverage. Period POST read-only path fixed before form handling. Static route policies are exact controller/permission matches with executable token checks, not namespace exemptions. Final full suite is rerunning after these corrections.

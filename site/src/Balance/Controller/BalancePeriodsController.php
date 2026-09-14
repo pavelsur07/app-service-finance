@@ -38,6 +38,9 @@ final class BalancePeriodsController extends AbstractController
         }
         $this->access->actor($companyId);
         $permissions = $this->access->permissions($companyId);
+        if ($request->isMethod('POST') && !$permissions['manage_periods'] && !$permissions['reopen_periods']) {
+            throw $this->createAccessDeniedException();
+        }
         $actions = [];
         if ($permissions['manage_periods']) {
             $actions['Закрыть'] = '1';

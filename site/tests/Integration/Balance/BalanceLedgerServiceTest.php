@@ -32,7 +32,6 @@ require_once dirname(__DIR__, 3).'/migrations/Version20260914120000.php';
 final class BalanceLedgerServiceTest extends IntegrationTestCase
 {
     private BalanceLedgerService $ledger;
-    private BalanceAccess $access;
     private string $companyId;
     private string $actorId;
     /** @var array<string, string> */
@@ -62,7 +61,6 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
         $activeCompany = $this->createMock(ActiveCompanyService::class);
         $activeCompany->method('getActiveCompany')->willReturn($company);
         $access = new BalanceAccess($security, self::getContainer()->get(CompanyFacade::class), $this->connection, $activeCompany);
-        $this->access = $access;
         $this->ledger = new BalanceLedgerService($this->connection, $access);
         $this->ledger->configureBook($this->companyId, 'RUB', '2025-01-01', $this->actorId);
         foreach (['money' => 'asset', 'equipment' => 'asset', 'equity' => 'passive', 'loan' => 'passive'] as $name => $type) {
@@ -496,6 +494,22 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
         $this->expectException(BalanceLedgerException::class);
         $this->expectExceptionMessage('начала учета');
         $this->ledger->rebuildCurrentStates($this->companyId, $this->actorId, 'Восстановление');
+    }
+
+    public function testDocumentReferencesSurviveDraftEditsAndDeletionWithoutDuplicates(): void
+    {
+        $group = Uuid::uuid7()->toString();
+        $this->connection->insert('balance_articles', ['id' => $group, 'company_id' => $this->companyId, 'name' => 'Группа', 'type' => 'asset', 'kind' => 'group', 'level' => 1, 'created_at' => '2025-01-01', 'updated_at' => '2025-01-01']);
+        $article = (string) $this->connection->fetchOne('SELECT article_id FROM balance_accounts WHERE company_id = ? AND id = ?', [$this->companyId, $this->accounts['money']]);
+        $this->connection->executeStatement('UPDATE balance_articles SET parent_id = ?, level = 2 WHERE company_id = ? AND id = ?', [$group, $this->companyId, $article]);
+        $lines = $this->lineInput(['money' => '100', 'equity' => '100']);
+        $id = $this->ledger->saveDraft($this->companyId, $this->actorId, 'references', 'opening', '2025-01-01', 'Старт', $lines);
+        $this->ledger->saveDraft($this->companyId, $this->actorId, 'references', 'opening', '2025-01-01', 'Обновлено', $lines, $id, 1);
+        $this->ledger->saveDraft($this->companyId, $this->actorId, 'references', 'opening', '2025-01-01', 'Очищено', [], $id, 2);
+        $this->ledger->deleteDraft($this->companyId, $this->actorId, $id, 3);
+        foreach ([['account', $this->accounts['money']], ['article', $article], ['article', $group]] as [$type, $object]) {
+            self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id = ? AND object_type = ? AND object_id = ? AND action = 'document_referenced'", [$this->companyId, $type, $object]));
+        }
     }
 
     private function accessOnConnection(Connection $connection): BalanceAccess

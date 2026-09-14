@@ -309,9 +309,42 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
         foreach ($normalized as $line) {
             $this->connection->insert('balance_operation_lines', ['id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'operation_id' => $id, 'account_id' => $line['accountId'], 'direction' => $line['direction'], 'amount' => $line['amount']]);
         }
+        $this->rememberDocumentReferences($companyId, $actorId, $id, array_keys($seen));
         $this->audit($companyId, $actorId, 'operation', $id, $action, ['date' => $date, 'reason' => $reason, 'lines' => $normalized]);
 
         return $id;
+    }
+
+    /** @param list<string> $accountIds */
+    private function rememberDocumentReferences(string $companyId, string $actorId, string $documentId, array $accountIds): void
+    {
+        if ([] === $accountIds) {
+            return;
+        }
+        // One durable marker per object; draft removal must not erase past use.
+        // Company/book locking serializes this check-and-insert with deletion.
+        $objects = $this->connection->fetchAllAssociative(<<<'SQL'
+WITH RECURSIVE articles AS (
+    SELECT c.id, c.parent_id FROM balance_articles c
+    JOIN balance_accounts a ON a.article_id = c.id AND a.company_id = c.company_id
+    WHERE a.company_id = :company AND a.id IN (:accounts)
+    UNION
+    SELECT c.id, c.parent_id FROM balance_articles c JOIN articles p ON c.id = p.parent_id
+    WHERE c.company_id = :company
+), objects AS (
+    SELECT 'article' AS object_type, id AS object_id FROM articles
+    UNION ALL
+    SELECT 'account', id FROM balance_accounts WHERE company_id = :company AND id IN (:accounts)
+)
+SELECT o.object_type, o.object_id FROM objects o
+WHERE NOT EXISTS (
+    SELECT 1 FROM balance_audit_events e WHERE e.company_id = :company
+    AND e.object_type = o.object_type AND e.object_id = o.object_id AND e.action = 'document_referenced'
+)
+SQL, ['company' => $companyId, 'accounts' => $accountIds], ['accounts' => \Doctrine\DBAL\ArrayParameterType::STRING]);
+        foreach ($objects as $object) {
+            $this->audit($companyId, $actorId, (string) $object['object_type'], (string) $object['object_id'], 'document_referenced', ['documentId' => $documentId]);
+        }
     }
 
     /** @param array<string, mixed> $book */

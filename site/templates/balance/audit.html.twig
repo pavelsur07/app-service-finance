@@ -19,7 +19,7 @@
                     <tr>
                         <td>{{ event.created_at }}
                         </td>
-                        <td>{{ {'create':'Создание','update':'Изменение','archive':'Архивирование','restore':'Возврат из архива','delete':'Удаление','sort':'Изменение порядка','configure':'Настройка учета','create_draft':'Создание черновика','update_draft':'Изменение черновика','delete_draft':'Удаление черновика','post':'Проведение','target_prepared':'Расчет корректировки','close':'Закрытие периода','reopen':'Переоткрытие периода','grant':'Изменение прав','system_seed':'Создание базовой структуры'}[event.action]|default(event.action) }}
+                        <td>{{ {'create':'Создание','update':'Изменение','archive':'Архивирование','restore':'Возврат из архива','delete':'Удаление','sort':'Изменение порядка','configure':'Настройка учета','create_draft':'Создание черновика','update_draft':'Изменение черновика','delete_draft':'Удаление черновика','post':'Проведение','target_prepared':'Расчет корректировки','closed':'Закрытие периода','reopened':'Переоткрытие периода','grant_changed':'Изменение прав','states_rebuilt':'Восстановление остатков','draft_deleted':'Защита от повторного создания удаленного черновика','document_referenced':'Первое использование в документе','seed':'Создание базовой структуры','system_seed':'Создание базовой структуры'}[event.action]|default(event.action) }}
                         </td>
                         <td>{{ event.author_id ? members[event.author_id]|default('Бывший участник') : 'Система' }}
                         </td>
