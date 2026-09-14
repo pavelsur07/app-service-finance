@@ -25,7 +25,7 @@ final readonly class MoySkladClient
 
     public function check(#[\SensitiveParameter] string $token): ConnectionCheckResult
     {
-        if ('' === $token || 1 === preg_match('/[\x00-\x20\x7f]/', $token)) {
+        if (strlen($token) > 8192 || 1 !== preg_match('/^[\x21-\x7E]+$/D', $token)) {
             return new ConnectionCheckResult(ConnectionCheckStatus::INVALID_TOKEN);
         }
 

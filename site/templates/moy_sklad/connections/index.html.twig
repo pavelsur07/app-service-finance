@@ -95,7 +95,7 @@
                                 <p>{{ connection.accountId ? 'Новый токен будет сохранён после проверки доступа к тому же аккаунту.' : 'После успешной проверки аккаунт будет закреплён за подключением.' }} При ошибке текущий токен останется без изменений.</p>
                                 {% include 'moy_sklad/connections/_token_help.html.twig' %}
                                 <label class="form-label" for="replacement-token-{{ connection.id }}">Новый токен пользователя</label>
-                                <input type="password" id="replacement-token-{{ connection.id }}" name="token" class="form-control" autocomplete="new-password" required maxlength="4096" spellcheck="false">
+                                <input type="password" id="replacement-token-{{ connection.id }}" name="token" maxlength="8192" class="form-control" autocomplete="new-password" required maxlength="4096" spellcheck="false">
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>

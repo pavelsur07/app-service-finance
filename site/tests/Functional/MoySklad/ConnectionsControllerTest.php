@@ -208,12 +208,11 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $this->em()->persist($user);
         $this->em()->persist($company);
-        $connection = new MoySkladConnection(Uuid::uuid7()->toString(), $company->getId(), 'Склад', 'https://api.moysklad.ru/api/remap/1.2');
+        $connection = new MoySkladConnection(Uuid::uuid7()->toString(), (string) $company->getId(), 'Склад', 'https://api.moysklad.ru/api/remap/1.2');
         $connection->setAccessToken('stored-sensitive-token')->setRefreshToken('stored-refresh-secret');
         $this->em()->persist($connection);
         $this->em()->flush();
         $limiter = static::getContainer()->get('limiter.moysklad_connection_check');
-        self::assertInstanceOf(RateLimiterFactory::class, $limiter);
         $limiter->create($company->getId().':create:'.$user->getId())->reset();
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());

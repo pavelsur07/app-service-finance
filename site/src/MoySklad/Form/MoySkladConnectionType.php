@@ -30,7 +30,7 @@ final class MoySkladConnectionType extends AbstractType
                 'always_empty' => true,
                 'trim' => true,
                 'attr' => ['autocomplete' => 'new-password'],
-                'constraints' => [new NotBlank(), new Length(max: 8192), new Regex(pattern: '/^[^\s\x00-\x1f\x7f]+$/u', message: 'Токен не должен содержать пробелы или управляющие символы.')],
+                'constraints' => [new NotBlank(), new Length(max: 8192), new Regex(pattern: '/^[\x21-\x7E]+$/D', message: 'Токен должен содержать только печатные ASCII-символы без пробелов.')],
             ]);
         }
     }

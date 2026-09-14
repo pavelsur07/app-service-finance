@@ -20,6 +20,7 @@ final class ConnectionTokenCodecTest extends TestCase
         $connection = MoySkladConnectionBuilder::aConnection()->build()->setAccessToken('old-token');
         $codec->replaceAccessToken($connection, 'new-secret-token');
         self::assertNull($connection->getAccessToken());
+        self::assertIsString($connection->getAccessTokenEncrypted());
         self::assertStringNotContainsString('new-secret-token', $connection->getAccessTokenEncrypted());
         self::assertSame('new-secret-token', $codec->accessTokenFor($connection));
     }
@@ -32,6 +33,7 @@ final class ConnectionTokenCodecTest extends TestCase
         self::assertTrue($codec->encryptExisting($connection));
         self::assertNull($connection->getAccessToken());
         self::assertNull($connection->getRefreshToken());
+        self::assertIsString($connection->getRefreshTokenEncrypted());
         self::assertSame('legacy-refresh', $this->encryption()->decrypt(EncryptedPayload::fromStorageJson($connection->getRefreshTokenEncrypted())));
         self::assertSame('legacy-access', $codec->accessTokenFor($connection));
         $payload = $connection->getAccessTokenEncrypted();

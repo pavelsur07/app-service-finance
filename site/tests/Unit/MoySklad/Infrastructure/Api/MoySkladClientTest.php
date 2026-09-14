@@ -92,7 +92,9 @@ final class MoySkladClientTest extends TestCase
         $http = new MockHttpClient(static function (): never {
             self::fail('Invalid token must never reach HTTP transport.');
         });
-        $result = (new MoySkladClient($http, 'https://example.test'))->check($token);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('log');
+        $result = (new MoySkladClient($http, 'https://example.test', $logger))->check($token);
         self::assertSame(ConnectionCheckStatus::INVALID_TOKEN, $result->status);
         self::assertNull($result->accountId);
     }
@@ -101,6 +103,10 @@ final class MoySkladClientTest extends TestCase
     public static function invalidTokens(): iterable
     {
         yield 'empty' => [''];
+        yield 'cyrillic' => ['private-токен'];
+        yield 'non-breaking space' => ["private-\u{00A0}token"];
+        yield 'zero-width space' => ["private-\u{200B}token"];
+        yield 'over limit' => [str_repeat('a', 8193)];
         yield 'space' => ['token secret'];
         yield 'newline' => ["token\nsecret"];
         yield 'null byte' => ["token\0secret"];

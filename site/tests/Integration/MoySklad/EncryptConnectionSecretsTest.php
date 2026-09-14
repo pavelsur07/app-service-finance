@@ -47,6 +47,8 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
         self::assertNull($connection->getAccessToken());
         self::assertNull($connection->getRefreshToken());
         $encryption = static::getContainer()->get(FieldEncryptionServiceInterface::class);
+        self::assertIsString($connection->getAccessTokenEncrypted());
+        self::assertIsString($connection->getRefreshTokenEncrypted());
         self::assertSame('private-access', $encryption->decrypt(EncryptedPayload::fromStorageJson($connection->getAccessTokenEncrypted())));
         self::assertSame('private-refresh', $encryption->decrypt(EncryptedPayload::fromStorageJson($connection->getRefreshTokenEncrypted())));
         self::assertSame('private-access', $foreign->getAccessToken());
