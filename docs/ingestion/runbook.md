@@ -344,6 +344,49 @@ prune выполняется автоматически (`NormalizeRawRecordActi
 `OzonAccrualStaleProjectionPruner`). Ручной prune нужен только для repair:
 исторические расхождения или случаи, когда нормализация нового raw не прошла.
 
+### Вторая причина: перетипизация компонента (не лечится prune)
+
+Если правка маппера меняет `type` у уже загруженных начислений, prune не поможет:
+строки не устарели, у них разъехался тип. Признак — **у каждого дня ровно один
+`raw_record_id`**, то есть перекрытых снапшотов нет:
+
+```sql
+SELECT DATE(occurred_at) AS d, count(DISTINCT raw_record_id) AS raws
+FROM ingest_financial_transactions
+WHERE source='ozon' AND shop_ref='SHOP_REF' AND occurred_at >= 'FROM'
+GROUP BY 1 HAVING count(DISTINCT raw_record_id) > 1;
+```
+
+Пусто → это перетипизация, а не stale. Тогда искать границу по типу, который
+перестал появляться:
+
+```sql
+SELECT shop_ref, max(d) FROM (
+  SELECT shop_ref, DATE(occurred_at) d, count(*) FILTER (WHERE type='other') o
+  FROM ingest_financial_transactions
+  WHERE source='ozon' AND occurred_at >= 'FROM' GROUP BY 1,2
+) t WHERE o > 0 GROUP BY 1;
+```
+
+Починка — повторная выборка сырья за пострадавшее окно, а **не**
+`normalize-stored --include-done`: последняя гасит прежнюю строку через
+`voidForReplay()` (`amount_minor = 0` плюс отметка `_ingestion_voided`) вместо
+удаления. На деньги это не влияет, но такие строки остаются в таблице, и их
+считают `tx_count` в `FinancialSummaryQuery`, `CoverageQuery`, `ReconciliationQuery`.
+
+```bash
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:rolling-refresh \
+  --from=2026-07-01 --to=2026-07-07 \
+  --company-id=UUID --shop-ref=SHOP_REF --dry-run   # затем --execute
+```
+
+Разобранный случай 09.2026 — `docs/tasks/ozon-accrual-retype-boundary/README.md`.
+
+**Ограничение глубины:** сверка проверяет 45 дней, а ночное обновление достаёт
+около 10 (скользящее окно `chunkSizeDays: 7`). Расхождение старше этой зоны само
+не чинится — оно только выходит из окна сверки, и гейт зеленеет с неверными
+данными.
+
 ### Ночная цепочка (cron, `docker/cron/app.cron`)
 
 | Время MSK | Команда |

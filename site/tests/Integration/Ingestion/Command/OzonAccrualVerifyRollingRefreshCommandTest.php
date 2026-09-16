@@ -7,14 +7,18 @@ namespace App\Tests\Integration\Ingestion\Command;
 use App\Company\Entity\Company;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\MessageHandler\NormalizeRawRecordHandler;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -134,6 +138,72 @@ final class OzonAccrualVerifyRollingRefreshCommandTest extends IntegrationTestCa
             static fn (LogRecord $record): bool => 'Ozon accrual rolling refresh verification found unknown categories.' === $record->message
                 && ($record->context['unknownCategoryRows'] ?? 0) > 0,
         ), $tester->getDisplay());
+    }
+
+    /**
+     * Ремонт перетипизации гасит прежнюю строку, а не удаляет её: естественный ключ
+     * содержит type, поэтому строка со старым типом остаётся в таблице с нулевой
+     * суммой и отметкой `_ingestion_voided`. Она логически удалена, и считать её
+     * наравне с живой нельзя — иначе один ремонт красит гейт по countMismatches
+     * навсегда, при нулевой дельте по деньгам.
+     */
+    public function testVoidedCanonicalRowDoesNotCreateCountMismatch(): void
+    {
+        $company = $this->seedCompany(2204);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000002204');
+        $date = (new \DateTimeImmutable('yesterday'))->format('Y-m-d');
+
+        $rawRecord = $this->storeAccrualRaw($companyId, $connection->getId(), $date, 220400);
+
+        /** @var NormalizeRawRecordHandler $handler */
+        $handler = self::getContainer()->get(NormalizeRawRecordHandler::class);
+        $handler(new NormalizeRawRecordMessage($rawRecord->getId(), $companyId));
+        $this->em->clear();
+
+        $this->seedVoidedTransaction($companyId, $connection->getId(), $rawRecord->getId(), $date);
+
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:verify-rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--days-back' => '2',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertFalse($logHandler->hasErrorRecords(), $tester->getDisplay());
+    }
+
+    private function seedVoidedTransaction(
+        string $companyId,
+        string $connectionRef,
+        string $rawRecordId,
+        string $date,
+    ): void {
+        $transaction = new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            shopRef: $connectionRef,
+            source: IngestSource::OZON,
+            externalId: 'ozon:accrual-by-day:220400:retyped-component',
+            externalUpdatedAt: new \DateTimeImmutable(sprintf('%s 10:00:00+00:00', $date)),
+            operationGroupId: Uuid::uuid7()->toString(),
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(500, 'RUB'),
+            occurredAt: new \DateTimeImmutable(sprintf('%s 12:00:00+00:00', $date)),
+            rawRecordId: $rawRecordId,
+        );
+
+        self::assertTrue($transaction->voidForReplay('ozon_mapper_component_retyped'));
+
+        $this->em->persist($transaction);
+        $this->em->flush();
+        $this->em->clear();
     }
 
     private function seedCompany(int $index): Company

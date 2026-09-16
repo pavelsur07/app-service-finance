@@ -122,6 +122,93 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
         self::assertCount(1, $transport->getSent());
     }
 
+    public function testExplicitWindowOverridesRollingWindow(): void
+    {
+        $company = $this->seedCompany(2105);
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000002105');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $company->getId(),
+            '--from' => '2026-07-01',
+            '--to' => '2026-07-07',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('custom', $tester->getDisplay());
+
+        $parent = $this->connection->fetchAssociative(
+            'SELECT window_from, window_to, progress_total, shop_ref
+             FROM ingest_sync_jobs
+             WHERE company_id = :companyId AND parent_job_id IS NULL AND kind = :kind',
+            ['companyId' => $company->getId(), 'kind' => SyncJobKind::BACKFILL->value],
+        );
+
+        self::assertIsArray($parent);
+        self::assertStringStartsWith('2026-07-01', (string) $parent['window_from']);
+        self::assertStringStartsWith('2026-07-07', (string) $parent['window_to']);
+        self::assertSame($connection->getId(), (string) $parent['shop_ref']);
+        // Ровно один чанк: окно в 7 дней совпадает с chunkSizeDays.
+        self::assertSame(1, (int) $parent['progress_total']);
+    }
+
+    public function testFromWithoutToIsRejected(): void
+    {
+        $company = $this->seedCompany(2106);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000002106');
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $company->getId(),
+            '--from' => '2026-07-01',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('must be provided together', $tester->getDisplay());
+        self::assertSame(0, $this->backfillJobCount($company->getId()));
+    }
+
+    public function testReversedWindowIsRejected(): void
+    {
+        $company = $this->seedCompany(2107);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000002107');
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $company->getId(),
+            '--from' => '2026-07-07',
+            '--to' => '2026-07-01',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('cannot be later than', $tester->getDisplay());
+        self::assertSame(0, $this->backfillJobCount($company->getId()));
+    }
+
+    public function testMalformedDateIsRejected(): void
+    {
+        $company = $this->seedCompany(2108);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000002108');
+
+        $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
+        $exit = $tester->execute([
+            '--company-id' => $company->getId(),
+            '--from' => '2026-7-1',
+            '--to' => '2026-07-07',
+            '--execute' => true,
+        ]);
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertStringContainsString('valid YYYY-MM-DD', $tester->getDisplay());
+        self::assertSame(0, $this->backfillJobCount($company->getId()));
+    }
+
     private function seedCompany(int $index): Company
     {
         $owner = UserBuilder::aUser()->withIndex($index)->build();
