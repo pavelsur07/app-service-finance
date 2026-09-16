@@ -159,28 +159,32 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
     public function testFromWithoutToIsRejected(): void
     {
         $company = $this->seedCompany(2106);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
         $this->seedConnection($company, '77777777-7777-7777-7777-000000002106');
 
         $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
         $exit = $tester->execute([
-            '--company-id' => $company->getId(),
+            '--company-id' => $companyId,
             '--from' => '2026-07-01',
             '--execute' => true,
         ]);
 
         self::assertSame(Command::FAILURE, $exit);
         self::assertStringContainsString('must be provided together', $tester->getDisplay());
-        self::assertSame(0, $this->backfillJobCount($company->getId()));
+        self::assertSame(0, $this->backfillJobCount($companyId));
     }
 
     public function testReversedWindowIsRejected(): void
     {
         $company = $this->seedCompany(2107);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
         $this->seedConnection($company, '77777777-7777-7777-7777-000000002107');
 
         $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
         $exit = $tester->execute([
-            '--company-id' => $company->getId(),
+            '--company-id' => $companyId,
             '--from' => '2026-07-07',
             '--to' => '2026-07-01',
             '--execute' => true,
@@ -188,17 +192,19 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::FAILURE, $exit);
         self::assertStringContainsString('cannot be later than', $tester->getDisplay());
-        self::assertSame(0, $this->backfillJobCount($company->getId()));
+        self::assertSame(0, $this->backfillJobCount($companyId));
     }
 
     public function testMalformedDateIsRejected(): void
     {
         $company = $this->seedCompany(2108);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
         $this->seedConnection($company, '77777777-7777-7777-7777-000000002108');
 
         $tester = $this->tester('app:ingestion:ozon-accrual:rolling-refresh');
         $exit = $tester->execute([
-            '--company-id' => $company->getId(),
+            '--company-id' => $companyId,
             '--from' => '2026-7-1',
             '--to' => '2026-07-07',
             '--execute' => true,
@@ -206,7 +212,7 @@ final class OzonAccrualRollingRefreshCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::FAILURE, $exit);
         self::assertStringContainsString('valid YYYY-MM-DD', $tester->getDisplay());
-        self::assertSame(0, $this->backfillJobCount($company->getId()));
+        self::assertSame(0, $this->backfillJobCount($companyId));
     }
 
     private function seedCompany(int $index): Company
