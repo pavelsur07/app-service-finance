@@ -143,6 +143,34 @@ case "$cmd" in
       *) echo "Too many arguments for $cmd" >&2; exit 2 ;;
     esac
     ;;
+  app:ingestion:ozon-accrual:normalize-stored)
+    # Мутирующая: перестраивает канонические транзакции из уже сохранённого
+    # сырья текущим маппером. Нужна там, где повторная выборка бессильна —
+    # дедуп сырья идёт по external_id и хешу содержимого, поэтому исторические
+    # окна, по которым Ozon отдаёт те же данные, переиспользуются без
+    # перенормализации. Разбор — docs/tasks/ozon-accrual-retype-boundary/.
+    #
+    # Диапазон дат обязателен: без него команда взяла бы неопределённый объём.
+    # --dispatch намеренно не разрешён: ремонт требует --include-done, а тот
+    # осмыслен только вместе с --execute-inline (иначе намерение replay теряется
+    # в очереди, команда это и сама отвергает).
+    seen_company=0; seen_from=0; seen_to=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--company-id=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then seen_company=1
+      elif [[ "$arg" =~ ^--from=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_from=1
+      elif [[ "$arg" =~ ^--to=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_to=1
+      elif [[ "$arg" =~ ^--shop-ref=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then :
+      elif [[ "$arg" =~ ^--limit=[1-9][0-9]{0,2}$ ]]; then :
+      elif [ "$arg" = "--include-done" ]; then :
+      elif [ "$arg" = "--dry-run" ]; then :
+      elif [ "$arg" = "--execute-inline" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ] || [ "$seen_from" -ne 1 ] || [ "$seen_to" -ne 1 ]; then
+      echo "--company-id=<uuid>, --from=YYYY-MM-DD and --to=YYYY-MM-DD are required for $cmd" >&2; exit 2
+    fi
+    ;;
   app:inventory:renormalize-snapshots)
     # Мутирующая команда: пере-нормализует исторические снапшоты остатков.
     # Разрешены только перечисленные флаги строгой формы; --execute допускается

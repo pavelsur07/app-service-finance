@@ -368,17 +368,32 @@ SELECT shop_ref, max(d) FROM (
 ) t WHERE o > 0 GROUP BY 1;
 ```
 
-Починка — повторная выборка сырья за пострадавшее окно, а **не**
-`normalize-stored --include-done`: последняя гасит прежнюю строку через
-`voidForReplay()` (`amount_minor = 0` плюс отметка `_ingestion_voided`) вместо
-удаления. На деньги это не влияет, но такие строки остаются в таблице, и их
-считают `tx_count` в `FinancialSummaryQuery`, `CoverageQuery`, `ReconciliationQuery`.
+Починка — перенормализация **сохранённого** сырья:
 
 ```bash
-php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:rolling-refresh \
-  --from=2026-07-01 --to=2026-07-07 \
-  --company-id=UUID --shop-ref=SHOP_REF --dry-run   # затем --execute
+php -d memory_limit=1G bin/console app:ingestion:ozon-accrual:normalize-stored \
+  --company-id=UUID --shop-ref=SHOP_REF \
+  --from=2026-07-01 --to=2026-07-31 --include-done --dry-run   # затем --execute-inline
 ```
+
+**Повторная выборка (`rolling-refresh`) здесь не работает** — проверено на проде
+16.09.2026. Дедуп сырья идёт по `external_id` **и хешу содержимого**
+(`StoreRawBatchAction::findOneByCompanySourceExternalIdAndHash`). Ozon на
+исторические окна отдаёт те же данные, поэтому запись переиспользуется:
+обновляется только `last_seen_at`, новой записи нет, перенормализации нет.
+Признак — у сырья `last_seen_at` сегодняшний, а `fetched_at` старый.
+
+Сдвиг границ окна тоже не спасает: ночное скольжение создало семидневное окно с
+началом на каждую дату, так что новым `external_id` может оказаться только
+частичный хвостовой чанк.
+
+`--include-done` требует `--execute-inline`: в режиме `--dispatch` намерение
+replay потерялось бы в очереди, и команда это отвергает.
+
+Побочный эффект: перетипизация в пределах того же сырья гасит прежнюю строку
+через `voidForReplay()` — `amount_minor = 0` плюс отметка `_ingestion_voided`.
+Строка остаётся в таблице, но с версии 09.2026 её не считают ни гейт сверки, ни
+`FinancialSummaryQuery` / `CoverageQuery` / `ReconciliationQuery`.
 
 Разобранный случай 09.2026 — `docs/tasks/ozon-accrual-retype-boundary/README.md`.
 
