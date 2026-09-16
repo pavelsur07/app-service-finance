@@ -18,6 +18,14 @@ final class ReconciliationQuery
 {
     private const THRESHOLD_MINOR = 100;
 
+    /**
+     * Обнулённая строка логически удалена: перетипизация компонента меняет
+     * естественный ключ, поэтому прежняя строка гасится `voidForReplay()`.
+     * Сумму она не искажает, но попадала в `COUNT(*)` и подтягивала на себя
+     * `MAX(updated_at)` — сверка показывала пересчёт, которого не было.
+     */
+    private const NOT_VOIDED = "COALESCE(ft.source_data->>'_ingestion_voided', 'false') <> 'true'";
+
     public function __construct(
         private readonly Connection $connection,
         private readonly OzonTransactionTotalsCheckRepository $totalsCheckRepository,
@@ -42,6 +50,7 @@ final class ReconciliationQuery
             ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
+            ->andWhere(self::NOT_VOIDED)
             ->setParameter('companyId', $companyId)
             ->setParameter('source', IngestSource::OZON->value)
             ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')
@@ -100,6 +109,7 @@ final class ReconciliationQuery
             ->andWhere("(ft.external_id LIKE :externalIdPrefix OR ft.source_data->>'_ingestion_resource' = :resourceType)")
             ->andWhere('ft.occurred_at >= :from')
             ->andWhere('ft.occurred_at < :toExclusive')
+            ->andWhere(self::NOT_VOIDED)
             ->setParameter('companyId', $companyId)
             ->setParameter('source', IngestSource::OZON->value)
             ->setParameter('externalIdPrefix', 'ozon:accrual-by-day:%')

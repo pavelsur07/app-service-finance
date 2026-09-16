@@ -78,11 +78,14 @@ final class CoverageQuery
                 'j',
                 'j.company_id = r.company_id AND j.id::text = r.sync_job_id',
             )
+            // Условие про обнулённые строки стоит в ON, а не в WHERE: в WHERE оно
+            // убрало бы из покрытия сами сырые записи, у которых живых строк не
+            // осталось, — а именно их и надо видеть.
             ->leftJoin(
                 'r',
                 'ingest_financial_transactions',
                 'ft',
-                'ft.company_id = r.company_id AND ft.raw_record_id = r.id',
+                "ft.company_id = r.company_id AND ft.raw_record_id = r.id AND COALESCE(ft.source_data->>'_ingestion_voided', 'false') <> 'true'",
             )
             ->leftJoin(
                 'r',

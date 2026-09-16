@@ -829,6 +829,69 @@ final class VerificationQueriesTest extends IntegrationTestCase
         self::assertSame(-1000, $amountsByName['Ozon accrual posting 32'] ?? null);
     }
 
+    /**
+     * Обнулённая строка логически удалена: перетипизация компонента меняет
+     * естественный ключ, поэтому прежняя строка не перезаписывается, а гасится
+     * `voidForReplay()` — сумма обнуляется, строка остаётся. Суммы такая строка
+     * не искажает, но до этой правки она попадала во все три счётчика, а в
+     * разбивке по категориям порождала запись с нулевой суммой и ненулевым
+     * `txCount`.
+     */
+    public function testVoidedTransactionsAreExcludedFromCoverageSummaryAndReconciliation(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $raw = $this->rawRecord(
+            companyId: $companyId,
+            shopRef: 'shop-1',
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            fetchedAt: new \DateTimeImmutable('2026-06-15 10:00:00+00:00'),
+            externalId: 'voided-raw-1',
+        );
+
+        $voided = $this->transaction($companyId, $raw->getId(), 'voided-retyped-component', -500, TransactionType::OTHER);
+        self::assertTrue($voided->voidForReplay('ozon_mapper_component_retyped'));
+
+        $this->em->persist($raw);
+        $this->em->persist($this->transaction($companyId, $raw->getId(), 'voided-sale-1', 1000, TransactionType::SALE));
+        $this->em->persist($this->transaction($companyId, $raw->getId(), 'voided-commission-1', -200, TransactionType::COMMISSION));
+        $this->em->persist($voided);
+        $this->em->flush();
+
+        /** @var CoverageQuery $coverage */
+        $coverage = self::getContainer()->get(CoverageQuery::class);
+        $cells = $coverage->heatmap(
+            $companyId,
+            'shop-1',
+            new \DateTimeImmutable('2026-06-01'),
+            new \DateTimeImmutable('2026-06-30'),
+        );
+
+        self::assertCount(1, $cells);
+        self::assertSame(1, $cells[0]->rawCount);
+        self::assertSame(2, $cells[0]->txCount);
+
+        /** @var FinancialSummaryQuery $summary */
+        $summary = self::getContainer()->get(FinancialSummaryQuery::class);
+
+        $byCategory = array_column($summary->byCategory($companyId, 'shop-1', 2026, 6), 'amountMinor', 'categoryId');
+        ksort($byCategory);
+        self::assertArrayNotHasKey('other:out', $byCategory);
+        self::assertSame(['commission:out' => 200, 'sale:in' => 1000], $byCategory);
+
+        $marketplaceTypes = array_column($summary->marketplaceCategories($companyId, 'shop-1', 2026, 6), 'type');
+        self::assertNotContains(TransactionType::OTHER->value, $marketplaceTypes);
+
+        /** @var ReconciliationQuery $reconciliation */
+        $reconciliation = self::getContainer()->get(ReconciliationQuery::class);
+        $byType = $reconciliation->breakdownByType($companyId, 'shop-1', 2026, 6);
+
+        self::assertSame(
+            ['sale' => 1, 'commission' => 1],
+            array_column($byType, 'txCount', 'type'),
+        );
+        self::assertSame(1000 - 200, $reconciliation->summary($companyId, 'shop-1', 2026, 6)->canonTotalMinor);
+    }
+
     private function rawRecord(
         string $companyId,
         string $shopRef,
