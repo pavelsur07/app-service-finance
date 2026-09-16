@@ -354,6 +354,12 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
     }
 
     /**
+     * Обнулённые строки в выборку не попадают. Перетипизация компонента меняет
+     * естественный ключ, поэтому прежняя строка не перезаписывается, а гасится
+     * `voidForReplay()`: `amount_minor = 0` плюс отметка `_ingestion_voided`.
+     * Такая строка логически удалена, и `SUM` её не замечает — а `COUNT(*)`
+     * замечал, и один ремонт красил гейт по `countMismatches` навсегда.
+     *
      * @return array<string, array{count: int, totalMinor: int}>
      */
     private function canonicalGroups(string $companyId, string $shopRef, \DateTimeImmutable $from, \DateTimeImmutable $to): array
@@ -370,6 +376,7 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
                AND shop_ref = :shopRef
                AND occurred_at >= :fromAt
                AND occurred_at < :toExclusive
+               AND COALESCE(source_data->>\'_ingestion_voided\', \'false\') <> \'true\'
              GROUP BY DATE(occurred_at), type, direction',
             [
                 'companyId' => $companyId,

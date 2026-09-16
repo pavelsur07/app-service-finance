@@ -51,7 +51,9 @@ final class OzonAccrualRollingRefreshCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('days-back', null, InputOption::VALUE_REQUIRED, 'Rolling refresh depth in days, 1..365.', 45)
+            ->addOption('days-back', null, InputOption::VALUE_REQUIRED, 'Rolling refresh depth in days, 1..365. Used when --from/--to are omitted.', 45)
+            ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Optional start accrual date YYYY-MM-DD. Must be paired with --to.')
+            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Optional end accrual date YYYY-MM-DD. Must be paired with --from.')
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Optional company UUID filter.')
             ->addOption('shop-ref', null, InputOption::VALUE_REQUIRED, 'Optional shop reference filter.')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum shop targets per run, 1..500.', 50)
@@ -86,7 +88,7 @@ final class OzonAccrualRollingRefreshCommand extends Command
                 throw new \InvalidArgumentException('Choose exactly one action: --dry-run or --execute.');
             }
 
-            $daysBack = $this->intOption($input, 'days-back', 1, self::MAX_DAYS_BACK);
+            [$from, $to, $daysBack] = $this->dateWindow($input);
             $companyId = $this->companyId($input);
             $shopRef = $this->stringOption($input, 'shop-ref');
             $limit = $this->intOption($input, 'limit', 1, self::MAX_LIMIT);
@@ -97,7 +99,6 @@ final class OzonAccrualRollingRefreshCommand extends Command
             return Command::FAILURE;
         }
 
-        [$from, $to] = $this->window($daysBack);
         $targets = array_slice($this->targets($companyId, $shopRef), 0, $limit);
 
         $io->title('Ozon accrual rolling refresh');
@@ -105,7 +106,7 @@ final class OzonAccrualRollingRefreshCommand extends Command
             ['mode', $dryRun ? 'dry-run' : 'execute'],
             ['from', $from->format('Y-m-d')],
             ['to', $to->format('Y-m-d')],
-            ['daysBack', (string) $daysBack],
+            ['daysBack', null === $daysBack ? 'custom' : (string) $daysBack],
             ['companyId', $companyId ?? 'all'],
             ['shopRef', $shopRef ?? 'all'],
             ['limit', (string) $limit],
@@ -232,6 +233,49 @@ final class OzonAccrualRollingRefreshCommand extends Command
         }
 
         return 0 === $started && $failed > 0 ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Явная пара --from/--to нужна для ремонта: скользящее окно всегда упирается
+     * в сегодня, а чинить приходится участок, который из него давно вышел.
+     *
+     * @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable, 2: int|null}
+     */
+    private function dateWindow(InputInterface $input): array
+    {
+        $from = $this->optionalDateOption($input, 'from');
+        $to = $this->optionalDateOption($input, 'to');
+        if ((null === $from) !== (null === $to)) {
+            throw new \InvalidArgumentException('Options --from and --to must be provided together.');
+        }
+
+        if (null !== $from && null !== $to) {
+            if ($from > $to) {
+                throw new \InvalidArgumentException('--from cannot be later than --to.');
+            }
+
+            return [$from, $to, null];
+        }
+
+        $daysBack = $this->intOption($input, 'days-back', 1, self::MAX_DAYS_BACK);
+        [$windowFrom, $windowTo] = $this->window($daysBack);
+
+        return [$windowFrom, $windowTo, $daysBack];
+    }
+
+    private function optionalDateOption(InputInterface $input, string $name): ?\DateTimeImmutable
+    {
+        $value = $this->stringOption($input, $name);
+        if (null === $value) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone(self::BUSINESS_TIMEZONE));
+        if (!$date instanceof \DateTimeImmutable || $date->format('Y-m-d') !== $value) {
+            throw new \InvalidArgumentException(sprintf('--%s must be a valid YYYY-MM-DD date.', $name));
+        }
+
+        return $date;
     }
 
     /**
