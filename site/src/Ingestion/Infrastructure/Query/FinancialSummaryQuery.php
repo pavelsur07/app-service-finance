@@ -17,6 +17,15 @@ use Webmozart\Assert\Assert;
 
 final class FinancialSummaryQuery
 {
+    /**
+     * Обнулённая строка логически удалена. Перетипизация компонента меняет
+     * естественный ключ, поэтому прежняя строка не перезаписывается, а гасится
+     * `voidForReplay()`: `amount_minor = 0` плюс отметка `_ingestion_voided`.
+     * На суммы она не влияет, но в `COUNT(*)` попадала — и разбивка по
+     * категориям получала строку с нулевой суммой и ненулевым счётчиком.
+     */
+    private const NOT_VOIDED = "COALESCE(ft.source_data->>'_ingestion_voided', 'false') <> 'true'";
+
     public function __construct(
         private readonly Connection $connection,
     ) {
@@ -40,6 +49,7 @@ final class FinancialSummaryQuery
             'ft.company_id = :companyId',
             'ft.occurred_at >= :from',
             'ft.occurred_at < :toExclusive',
+            self::NOT_VOIDED,
         ];
         $params = [
             'companyId' => $companyId,
@@ -100,6 +110,7 @@ final class FinancialSummaryQuery
             'ft.company_id = :companyId',
             'ft.occurred_at >= :from',
             'ft.occurred_at < :toExclusive',
+            self::NOT_VOIDED,
         ];
         $params = [
             'companyId' => $companyId,
@@ -158,6 +169,7 @@ final class FinancialSummaryQuery
             "ft.source_data->>'_ingestion_resource' = :resourceType",
             'ft.occurred_at >= :from',
             'ft.occurred_at < :toExclusive',
+            self::NOT_VOIDED,
         ];
         $params = [
             'companyId' => $companyId,
