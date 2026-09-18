@@ -313,6 +313,97 @@ final class OzonAccrualNormalizeStoredCommandTest extends IntegrationTestCase
         self::assertSame(3, $this->transactionCount($companyId, $newRecord->getId()));
     }
 
+    /**
+     * Снапшот покрывает несколько дней, но авторитетом является лишь для части:
+     * на остальные есть более свежий. Реплей обязан записать только «свои» дни,
+     * иначе на чужих днях рядом с актуальной строкой появляется вторая — ровно
+     * так на проде 18.09.2026 удвоились восемь строк за 25.06.
+     */
+    public function testExecuteInlineReplaysOnlyDaysTheSnapshotOwns(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+
+        $sharedDayRow = [
+            'accrual_id' => 222222222,
+            'date' => '2026-06-25',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => 1042,
+                'name' => 'LabelBrandVerified',
+                'accrued' => ['amount' => '-1500.00', 'currency' => 'RUB'],
+            ],
+        ];
+
+        $oldRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-19:2026-06-25',
+            fetchedAt: new \DateTimeImmutable('2026-06-26 03:00:00+00:00'),
+            rows: [
+                $this->postingRow('2026-06-24', 111111111),
+                $sharedDayRow,
+            ],
+        );
+        $oldRecord->markNormalizationDone();
+
+        $newRecord = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-25:2026-07-01',
+            fetchedAt: new \DateTimeImmutable('2026-07-02 03:00:00+00:00'),
+            rows: [$sharedDayRow],
+        );
+        $newRecord->markNormalizationDone();
+
+        // Канон общего дня принадлежит свежему снапшоту и типизирован ПРЕЖНИМ
+        // маппером — как на проде до 07.09. Текущий маппер на том же сырье даёт
+        // FEE, поэтому естественный ключ не совпадёт и upsert создаст ВТОРУЮ
+        // строку, если реплей старого снапшота полезет в этот день.
+        $this->persistExistingTransaction(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            rawRecordId: $newRecord->getId(),
+            operationGroupId: Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, '222222222'))->toString(),
+            externalId: 'ozon:accrual-by-day:222222222:non_item_fee:type-1042',
+            type: TransactionType::OTHER,
+            direction: TransactionDirection::OUT,
+            amountMinor: 150000,
+            occurredAt: new \DateTimeImmutable('2026-06-25 00:00:00+03:00'),
+        );
+        $this->em->flush();
+
+        // Реплей старого снапшота: он авторитет только на 24-е.
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-24',
+            '--to' => '2026-06-24',
+            '--shop-ref' => $connectionRef,
+            '--include-done' => true,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+
+        // Главное: на общем дне по-прежнему ОДНА строка, а не две.
+        self::assertSame(
+            1,
+            $this->transactionCountByExternalId($companyId, 'ozon:accrual-by-day:222222222:non_item_fee:type-1042'),
+        );
+        // И она осталась за свежим снапшотом, нетронутой.
+        self::assertSame(
+            $newRecord->getId(),
+            (string) $this->connection->fetchOne(
+                'SELECT raw_record_id FROM ingest_financial_transactions WHERE company_id = :companyId AND external_id = :externalId',
+                ['companyId' => $companyId, 'externalId' => 'ozon:accrual-by-day:222222222:non_item_fee:type-1042'],
+            ),
+        );
+        // Свой день старый снапшот разобрал: три строки постинга за 24-е.
+        self::assertSame(3, $this->transactionCount($companyId, $oldRecord->getId()));
+        self::assertSame(0, $this->duplicateNaturalKeyCount($companyId));
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);
