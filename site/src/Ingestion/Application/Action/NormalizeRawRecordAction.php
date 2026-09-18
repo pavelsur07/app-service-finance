@@ -73,6 +73,12 @@ final readonly class NormalizeRawRecordAction
             /** @var list<array<string, mixed>> $rows */
             $rows = array_values(iterator_to_array($this->rawStorageFacade->read($rawRecord->getId(), $command->companyId), false));
 
+            // Отсечение идёт до маппинга, а не после: тогда контрольные суммы,
+            // upsert, гашение и prune видят один и тот же набор дней. Фильтр
+            // после маппинга рассинхронизировал бы их — контрольная сумма
+            // считалась бы по всему окну и давала sum_mismatch на отсечённых днях.
+            $rows = $this->restrictRowsToDates($rows, $command->restrictToDates);
+
             try {
                 $mappedTransactions = $mapper->map($rawRecord, $rows);
                 $controlSums = $mapper instanceof RawRecordAwareControlSumMapperInterface
@@ -251,6 +257,44 @@ final readonly class NormalizeRawRecordAction
 
             $issue->markResolved();
         }
+    }
+
+    /**
+     * Оставить только строки за перечисленные дни.
+     *
+     * Пустой список означает «без ограничения» — так идёт обычная нормализация.
+     * Ограничение приходит только из реплея сохранённого сырья, где снапшот
+     * обязан записать лишь те дни, для которых он авторитет.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @param list<string> $dates
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function restrictRowsToDates(array $rows, array $dates): array
+    {
+        if ([] === $dates) {
+            return $rows;
+        }
+
+        $allowed = array_fill_keys($dates, true);
+
+        return array_values(array_filter(
+            $rows,
+            static function (array $row) use ($allowed): bool {
+                $date = trim((string) ($row['date'] ?? ''));
+
+                // Отсеиваем только строки с РАЗБОРЧИВОЙ датой чужого дня.
+                // Строку без даты или с мусором вместо неё фильтр пропускает
+                // дальше: пусть маппер падает и заводит issue, как и раньше.
+                // Молча выбросив её, мы спрятали бы испорченное сырьё.
+                if (1 !== preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                    return true;
+                }
+
+                return isset($allowed[$date]);
+            },
+        ));
     }
 
     /**

@@ -119,6 +119,35 @@ final class OzonAccrualNormalizeStoredCommand extends Command
     }
 
     /**
+     * Дни, для которых снапшот выбран авторитетом. Их считает
+     * `OzonAccrualRawCoverageSelector` внутри `latestCoverageRows()`; сверка
+     * опирается на них давно, реплей — с этой правки.
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return list<string>
+     */
+    private function selectedDates(array $row): array
+    {
+        $dates = $row['selected_dates'] ?? null;
+        $selected = [];
+        if (is_array($dates)) {
+            foreach ($dates as $date) {
+                $selected[] = (string) $date;
+            }
+        }
+
+        // Пустой список нельзя пропускать молча: ниже он означает «без
+        // ограничения», и реплей снова начнёт писать чужие дни. Выбранный
+        // селектором снапшот обязан владеть хотя бы одним днём.
+        if ([] === $selected) {
+            throw new \LogicException(sprintf('Raw record %s came from coverage selection without selected_dates; refusing to replay it without a day restriction.', (string) ($row['id'] ?? '?')));
+        }
+
+        return $selected;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function rawRecords(
@@ -189,7 +218,12 @@ final class OzonAccrualNormalizeStoredCommand extends Command
             }
 
             try {
-                ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand($rawRecordId, $companyId, forceReplay: $includeDone));
+                ($this->normalizeRawRecordAction)(new NormalizeRawRecordCommand(
+                    $rawRecordId,
+                    $companyId,
+                    forceReplay: $includeDone,
+                    restrictToDates: $this->selectedDates($row),
+                ));
             } catch (\Throwable $exception) {
                 if (!$exception instanceof DoneRawRecordReplayFailedException) {
                     $this->markInlineFailure(
