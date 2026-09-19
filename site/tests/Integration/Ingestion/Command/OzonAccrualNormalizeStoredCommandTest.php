@@ -404,6 +404,72 @@ final class OzonAccrualNormalizeStoredCommandTest extends IntegrationTestCase
         self::assertSame(0, $this->duplicateNaturalKeyCount($companyId));
     }
 
+    /**
+     * Обратная сторона ограничения по дням: строки снапшота за дни ВНЕ окна
+     * гасить нельзя — они живые и принадлежат этому же сырью. Гасилка смотрит
+     * на набор разобранных строк, и без такого же ограничения суженный набор
+     * выглядит для неё как «из выгрузки всё пропало». Так 18.09.2026 на проде
+     * обнулились 19 дней, 26 496 строк.
+     */
+    public function testExecuteInlineKeepsRowsOfDaysOutsideTheRestrictionAlive(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $connectionRef = Uuid::uuid7()->toString();
+
+        $record = $this->storeRawRecord(
+            companyId: $companyId,
+            connectionRef: $connectionRef,
+            externalId: 'accrual-by-day:2026-06-24:2026-06-25',
+            fetchedAt: new \DateTimeImmutable('2026-06-26 03:00:00+00:00'),
+            rows: [
+                $this->postingRow('2026-06-24', 111111111),
+                $this->postingRow('2026-06-25', 222222222),
+            ],
+        );
+        $record->markNormalizationDone();
+        $this->em->flush();
+
+        // Полный разбор: оба дня на месте.
+        $tester = $this->tester();
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-24',
+            '--to' => '2026-06-25',
+            '--shop-ref' => $connectionRef,
+            '--include-done' => true,
+            '--execute-inline' => true,
+        ]), $tester->getDisplay());
+
+        self::assertSame(6, $this->transactionCount($companyId, $record->getId()));
+
+        // Чиним только 24-е. 25-е трогать нельзя.
+        $tester = $this->tester();
+        $exit = $tester->execute([
+            '--company-id' => $companyId,
+            '--from' => '2026-06-24',
+            '--to' => '2026-06-24',
+            '--shop-ref' => $connectionRef,
+            '--include-done' => true,
+            '--execute-inline' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertSame(6, $this->transactionCount($companyId, $record->getId()));
+        self::assertSame(0, $this->voidedTransactionCount($companyId, $record->getId()));
+    }
+
+    private function voidedTransactionCount(string $companyId, string $rawRecordId): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM ingest_financial_transactions
+             WHERE company_id = :companyId
+               AND raw_record_id = :rawRecordId
+               AND source_data->>'_ingestion_voided' = 'true'",
+            ['companyId' => $companyId, 'rawRecordId' => $rawRecordId],
+        );
+    }
+
     private function tester(): CommandTester
     {
         $app = new Application(self::$kernel);

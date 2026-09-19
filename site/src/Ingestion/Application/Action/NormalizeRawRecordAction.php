@@ -177,13 +177,13 @@ final readonly class NormalizeRawRecordAction
             // Reconciliation and verification commands may legitimately re-normalize
             // a non-DONE Ozon record without forceReplay. Retyping a component changes
             // its natural key, so the obsolete same-raw row must always be voided.
-            $this->ozonAccrualStaleComponentVoider->void($rawRecord, $mappedTransactions);
+            $this->ozonAccrualStaleComponentVoider->void($rawRecord, $mappedTransactions, $command->restrictToDates);
 
             if ($command->forceReplay) {
                 $this->wbFinanceStaleComponentVoider->void($rawRecord, $mappedTransactions);
             }
 
-            $this->ozonAccrualStaleProjectionPruner->prune($rawRecord, $mappedTransactions, execute: true);
+            $this->ozonAccrualStaleProjectionPruner->prune($rawRecord, $mappedTransactions, execute: true, restrictToDates: $command->restrictToDates);
 
             $this->entityManager->flush();
             // Mark the raw record DONE before recording control-sum issues: issues are
