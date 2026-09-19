@@ -3286,7 +3286,15 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 - Нет `Request`/`Session`/`Security` — CLI-контекст, companyId из аргумента/итерации по БД
 - Per-item try/catch: сбой одной компании / одной записи не прерывает весь запуск
 - Exit code: `Command::SUCCESS` / `Command::FAILURE`
-- Legacy команда `app:marketplace:wb-daily-sync` сохранена для backward compatibility, но её cron отключён после TASK-028-FIX (активный daily cron только `app:marketplace:wb-financial-reports:sync --mode=daily`).
+
+**Отключённые WB-запуски и чем они заменены.** В `app.cron` этих строк больше нет —
+знание живёт здесь, чтобы расписание читалось как расписание, а не как архив.
+
+| Что отключено | Когда и почему | Чем закрыто сегодня |
+|---|---|---|
+| `app:marketplace:wb-daily-sync` (`0 3 * * *`) | После TASK-028-FIX. Команда сохранена для backward compatibility и диспатчит уже новое `SyncWbFinancialReportDayMessage` | `app:marketplace:wb-financial-reports:sync --mode=daily` в 03:10 |
+| `wb-financial-reports:sync --mode=refresh14` (`*/30 6-23 * * *`) | Дублировал работу оркестратора | `wb-financial-reports:orchestrate --refresh-days-back=14`, rolling refresh последних 14 дней |
+| `wb-financial-reports:sync --mode=missing` (`10 * * * *`) | Там же | Тот же оркестратор: режимы `daily/retry/missing/empty` |
 
 ---
 

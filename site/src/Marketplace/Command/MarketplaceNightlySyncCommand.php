@@ -19,7 +19,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Ежедневная загрузка сырых данных WB за предыдущий день.
  *
- * Cron: 0 3 * * * php bin/console app:marketplace:wb-daily-sync
+ * Cron'ом не запускается: ежедневный слот занимает
+ * `app:marketplace:wb-financial-reports:sync --mode=daily` в 03:10. Команда
+ * сохранена для ручного запуска и обратной совместимости, разбор —
+ * ARCHITECTURE.md, раздел «Cron-задачи».
  *
  * Команда тонкая: получает список активных WB-подключений через DBAL Query,
  * для каждого отправляет Message в шину Messenger.
