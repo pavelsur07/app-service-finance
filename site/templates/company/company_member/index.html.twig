@@ -11,7 +11,12 @@
                 </div>
                 {% if isOwner %}
                     <div class="col-auto">
-                        <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Шаблоны доступа</a>
+                        <div class="btn-list">
+                            <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Шаблоны доступа</a>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-invite-member">
+                                Добавить
+                            </button>
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -36,34 +41,6 @@
                 </div>
             </div>
         {% endif %}
-
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">Пригласить участника</h3>
-            </div>
-            <div class="card-body">
-                {% if isOwner %}
-                    {{ form_start(inviteForm, {
-                        action: path('company_users_invite'),
-                        method: 'POST'
-                    }) }}
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-4 mb-0">
-                            {{ form_row(inviteForm.email, {'label': 'Email'}) }}
-                        </div>
-                        <div class="col-md-4 mb-0">
-                            {{ form_row(inviteForm.accessRole, {'label': 'Шаблон доступа'}) }}
-                        </div>
-                        <div class="col-md-2">
-                            <button class="btn btn-primary w-100">Отправить</button>
-                        </div>
-                    </div>
-                    {{ form_end(inviteForm) }}
-                {% else %}
-                    <div class="alert alert-warning mb-0">Приглашать участников может только владелец.</div>
-                {% endif %}
-            </div>
-        </div>
 
         <div class="card mb-3">
             <div class="card-header">
@@ -225,6 +202,32 @@
             </div>
         </div>
     </div>
+
+    {% if isOwner %}
+        <div class="modal modal-blur fade" id="modal-invite-member" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    {{ form_start(inviteForm, {
+                        action: path('company_users_invite'),
+                        method: 'POST'
+                    }) }}
+                    <div class="modal-header">
+                        <h5 class="modal-title">Пригласить участника</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        {{ form_row(inviteForm.email, {'label': 'Email'}) }}
+                        {{ form_row(inviteForm.accessRole, {'label': 'Шаблон доступа'}) }}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Отправить</button>
+                    </div>
+                    {{ form_end(inviteForm) }}
+                </div>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block javascripts %}
