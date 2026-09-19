@@ -7399,24 +7399,6 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceListingRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceSku\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceListingRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceVariantId\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceListingRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findBySupplierSku\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceListingRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceMonthCloseRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -12353,12 +12335,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Integration/Marketplace/PreflightActionDetailsTest.php
-
-		-
-			message: '#^Parameter \#1 \$company of method App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceVariantId\(\) expects App\\Company\\Entity\\Company\|string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Marketplace/Repository/MarketplaceListingRepositoryTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findAllByCompanyMarketplaceAndMarketplaceVariantIds\(\) expects string, string\|null given\.$#'

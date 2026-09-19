@@ -35,22 +35,23 @@ final class MarketplaceListingRepositoryTest extends IntegrationTestCase
         $this->em->flush();
 
         self::assertSame($first, $this->repository->findByMarketplaceVariantId(
-            $companyA,
+            $this->companyId($companyA),
             MarketplaceType::WILDBERRIES,
             'variant-a',
         ));
         self::assertSame($second, $this->repository->findByMarketplaceVariantId(
-            $companyA->getId(),
+            $this->companyId($companyA),
+            MarketplaceType::WILDBERRIES,
+            'variant-b',
+        ));
+        // Чужая компания не видит вариант, даже зная его идентификатор.
+        self::assertNull($this->repository->findByMarketplaceVariantId(
+            $this->companyId($companyB),
             MarketplaceType::WILDBERRIES,
             'variant-b',
         ));
         self::assertNull($this->repository->findByMarketplaceVariantId(
-            $companyB,
-            MarketplaceType::WILDBERRIES,
-            'variant-b',
-        ));
-        self::assertNull($this->repository->findByMarketplaceVariantId(
-            $companyA,
+            $this->companyId($companyA),
             MarketplaceType::OZON,
             'variant-b',
         ));
@@ -67,6 +68,75 @@ final class MarketplaceListingRepositoryTest extends IntegrationTestCase
             MarketplaceType::WILDBERRIES,
             [],
         ));
+    }
+
+    public function testMarketplaceSkuLookupIsScopedToCompany(): void
+    {
+        [$companyA, $companyB] = $this->seedCompanies();
+
+        $own = $this->seedListing($companyA, 11, MarketplaceType::WILDBERRIES, 'shared-sku', null);
+        $foreign = $this->seedListing($companyB, 12, MarketplaceType::WILDBERRIES, 'shared-sku', null);
+        $this->em->flush();
+
+        // Один и тот же SKU у двух компаний: каждая видит ровно свой листинг.
+        // Без фильтра по компании обе выборки нашли бы по два совпадения и
+        // вернули бы null, поэтому проверка именно на конкретный листинг.
+        self::assertSame($own, $this->repository->findByMarketplaceSku(
+            $this->companyId($companyA),
+            MarketplaceType::WILDBERRIES,
+            'shared-sku',
+        ));
+        self::assertSame($foreign, $this->repository->findByMarketplaceSku(
+            $this->companyId($companyB),
+            MarketplaceType::WILDBERRIES,
+            'shared-sku',
+        ));
+
+        // Маркетплейс тоже ограничивает: того же SKU на Ozon нет.
+        self::assertNull($this->repository->findByMarketplaceSku(
+            $this->companyId($companyA),
+            MarketplaceType::OZON,
+            'shared-sku',
+        ));
+    }
+
+    public function testSupplierSkuLookupIsScopedToCompanyAndRejectsAmbiguity(): void
+    {
+        [$companyA, $companyB] = $this->seedCompanies();
+
+        $own = $this->seedListing($companyA, 21, MarketplaceType::WILDBERRIES, 'sku-21', null);
+        $own->setSupplierSku('shared-supplier-sku');
+        $foreign = $this->seedListing($companyB, 22, MarketplaceType::WILDBERRIES, 'sku-22', null);
+        $foreign->setSupplierSku('shared-supplier-sku');
+        $this->em->flush();
+
+        // Артикул поставщика совпадает у двух компаний — каждая находит свой.
+        self::assertSame($own, $this->repository->findBySupplierSku(
+            $this->companyId($companyA),
+            MarketplaceType::WILDBERRIES,
+            'shared-supplier-sku',
+        ));
+        self::assertSame($foreign, $this->repository->findBySupplierSku(
+            $this->companyId($companyB),
+            MarketplaceType::WILDBERRIES,
+            'shared-supplier-sku',
+        ));
+
+        // Два своих листинга на один артикул — выбирать не из чего, возвращается null.
+        $duplicate = $this->seedListing($companyA, 23, MarketplaceType::WILDBERRIES, 'sku-23', null);
+        $duplicate->setSupplierSku('shared-supplier-sku');
+        $this->em->flush();
+
+        self::assertNull($this->repository->findBySupplierSku(
+            $this->companyId($companyA),
+            MarketplaceType::WILDBERRIES,
+            'shared-supplier-sku',
+        ));
+    }
+
+    private function companyId(Company $company): string
+    {
+        return (string) $company->getId();
     }
 
     /** @return array{Company, Company} */

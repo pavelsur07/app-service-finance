@@ -162,28 +162,28 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Единственный листинг компании с таким артикулом поставщика.
+     *
+     * Неоднозначность — не ошибка: два листинга на один артикул означают, что
+     * выбирать не из чего, и метод возвращает null, а не первый попавшийся.
+     */
     public function findBySupplierSku(
-        Company|string $company,
+        string $companyId,
         MarketplaceType $marketplace,
         string $supplierSku,
     ): ?MarketplaceListing {
-        $qb = $this->createQueryBuilder('l')
+        $matches = $this->createQueryBuilder('l')
+            ->andWhere('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
             ->andWhere('l.supplierSku = :supplierSku')
+            ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('supplierSku', $supplierSku)
             ->orderBy('l.id', 'ASC')
-            ->setMaxResults(2);
-
-        if ($company instanceof Company) {
-            $qb->andWhere('l.company = :company');
-        } else {
-            $qb->andWhere('IDENTITY(l.company) = :company');
-        }
-
-        $qb->setParameter('company', $company);
-
-        $matches = $qb->getQuery()->getResult();
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getResult();
 
         return 1 === count($matches) ? $matches[0] : null;
     }
@@ -234,51 +234,43 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         return $qb->getQuery()->getOneOrNullResult();
     }
 
+    /**
+     * Единственный листинг компании с таким SKU маркетплейса.
+     *
+     * Неоднозначность — не ошибка: см. {@see findBySupplierSku()}.
+     */
     public function findByMarketplaceSku(
-        Company|string $company,
+        string $companyId,
         MarketplaceType $marketplace,
         string $marketplaceSku,
     ): ?MarketplaceListing {
-        $qb = $this->createQueryBuilder('l')
+        $matches = $this->createQueryBuilder('l')
+            ->andWhere('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
             ->andWhere('l.marketplaceSku = :sku')
+            ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('sku', $marketplaceSku)
             ->orderBy('l.id', 'ASC')
-            ->setMaxResults(2);
-
-        if ($company instanceof Company) {
-            $qb->andWhere('l.company = :company');
-        } else {
-            $qb->andWhere('IDENTITY(l.company) = :company');
-        }
-
-        $qb->setParameter('company', $company);
-
-        $matches = $qb->getQuery()->getResult();
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getResult();
 
         return 1 === count($matches) ? $matches[0] : null;
     }
 
     public function findByMarketplaceVariantId(
-        Company|string $company,
+        string $companyId,
         MarketplaceType $marketplace,
         string $marketplaceVariantId,
     ): ?MarketplaceListing {
-        $qb = $this->createQueryBuilder('l')
+        return $this->createQueryBuilder('l')
+            ->andWhere('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
             ->andWhere('l.marketplaceVariantId = :marketplaceVariantId')
+            ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
-            ->setParameter('marketplaceVariantId', $marketplaceVariantId);
-
-        if ($company instanceof Company) {
-            $qb->andWhere('l.company = :company');
-        } else {
-            $qb->andWhere('IDENTITY(l.company) = :company');
-        }
-
-        return $qb
-            ->setParameter('company', $company)
+            ->setParameter('marketplaceVariantId', $marketplaceVariantId)
             ->getQuery()
             ->getOneOrNullResult();
     }
