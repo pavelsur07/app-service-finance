@@ -343,14 +343,14 @@ final class ProcessWbCostsAction
 
 | Транспорт | Когда | Примеры |
 |---|---|---|
-| `async_sync` | Внешние HTTP (marketplace, банк, email) | `SyncWbReportMessage`, `SendEmailMessage` |
+| `async_sync` | Внешние HTTP (marketplace, банк, email) | `SyncOzonListingCatalogMessage`, `SendEmailMessage` |
 | `async_pipeline` | Локальная обработка, DB/CPU-heavy | `ProcessRawDocumentMessage`, `RecalcSnapshotsMessage` |
 | `async_ads` | Ozon Performance polling (до 10 мин) | `FetchOzonAdStatisticsMessage` |
 
 ### Message
 
 ```php
-final readonly class SyncWbReportMessage
+final readonly class SyncReportMessage
 {
     public function __construct(
         public string $companyId,
@@ -362,22 +362,22 @@ final readonly class SyncWbReportMessage
 
 ```yaml
 # config/packages/messenger.yaml
-App\Marketplace\Message\SyncWbReportMessage: async_sync
+App\Marketplace\Message\SyncReportMessage: async_sync
 ```
 
 ### Handler
 
 ```php
 #[AsMessageHandler]
-final class SyncWbReportMessageHandler
+final class SyncReportMessageHandler
 {
     public function __construct(
         private readonly ConnectionRepository $connectionRepository,
-        private readonly SyncWbReportAction $action,
+        private readonly SyncReportAction $action,
         private readonly LoggerInterface $logger,
     ) {}
 
-    public function __invoke(SyncWbReportMessage $message): void
+    public function __invoke(SyncReportMessage $message): void
     {
         $connection = $this->connectionRepository
             ->findByIdAndCompany($message->connectionId, $message->companyId);
@@ -402,7 +402,7 @@ final class SyncWbReportMessageHandler
 
 **Правила:** нет `Request`/`Session`/`Security` · Entity загружать заново по ID из Message · catch → log → rethrow
 
-Эталон: `SyncWbReportMessage`, проверено 2026-09-13
+Эталон: `SyncWbFinancialReportDayMessage`, `SyncWbFinancialReportDayHandler`, проверено 2026-09-19
 
 ---
 

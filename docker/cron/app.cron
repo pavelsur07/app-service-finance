@@ -4,18 +4,11 @@
 # Каждые 5 минут: авто-правила ДДС
 #*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction
 
-# Ночная синхронизация отчётов WB по реализации.
-# Legacy WB daily command kept for backward compatibility; cron disabled after TASK-028-FIX.
-# 0 3 * * * php bin/console app:marketplace:wb-daily-sync --no-interaction
-
-# Новый WB financial sync: только загрузка за вчерашний день
+# Ночная загрузка отчётов WB по реализации за вчерашний день.
+# Режимы refresh14 и missing отдельными строками не запускаются: их работу делает
+# оркестратор ниже. Историю отключённых режимов и legacy-команды wb-daily-sync
+# держит ARCHITECTURE.md, раздел «Cron-задачи».
 10 3 * * * cd /app && php bin/console app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
-
-# Временно отключено: refresh последних 14 дней
-#*/30 6-23 * * * cd /app && php bin/console app:marketplace:wb-financial-reports:sync --mode=refresh14 --max-days=1 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
-
-# Временно отключено: восстановление пропущенных дней
-#10 * * * * cd /app && php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=1 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Оркестрация WB financial reports: каждый час восстанавливает текущий месяц
 # плюс хвост предыдущего глубиной refresh-days-back (daily/retry/missing/empty),
