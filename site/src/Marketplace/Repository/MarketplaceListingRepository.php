@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Repository;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
@@ -327,20 +326,6 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('size', $size)
             ->getQuery()
             ->getOneOrNullResult();
-    }
-
-    /**
-     * @return MarketplaceListing[]
-     */
-    public function findByProduct(Product $product): array
-    {
-        return $this->createQueryBuilder('l')
-            ->where('l.product = :product')
-            ->andWhere('l.isActive = :active')
-            ->setParameter('product', $product)
-            ->setParameter('active', true)
-            ->getQuery()
-            ->getResult();
     }
 
     /**

@@ -7381,12 +7381,6 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceCostRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceCostRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceCostRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceFinancialReportSyncErrorRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7424,12 +7418,6 @@ parameters:
 
 		-
 			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByMarketplaceVariantId\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceListingRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
 			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/MarketplaceListingRepository.php
@@ -7537,12 +7525,6 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceReturnRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceReturnRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceReturnRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceSaleMappingRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7561,64 +7543,10 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceSaleRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceSaleRepository\:\:findByProduct\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceSaleRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\OzonTransactionTotalsCheckRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/Marketplace/Repository/OzonTransactionTotalsCheckRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findByBatch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findFailedByBatch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:getChecksSummary\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:areAllChecksPassed\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findByBatch\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findFailedByBatch\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:findLatestByType\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\ReconciliationLogRepository\:\:getChecksSummary\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/ReconciliationLogRepository.php
 
 		-
 			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
