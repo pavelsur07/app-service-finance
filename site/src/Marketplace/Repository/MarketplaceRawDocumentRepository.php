@@ -255,6 +255,17 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
      * Найти COMPLETED raw-документы, у которых marketplace_costs
      * ссылаются на категории другой компании.
      *
+     * @companyScopeExempt Метод сам и есть детектор межкомпанейских утечек:
+     *                     он ищет затраты, у которых company_id не совпадает с
+     *                     company_id их категории. Обязательное ограничение
+     *                     одной компанией лишило бы его смысла — по всему
+     *                     арендатору такое расхождение и надо искать, а
+     *                     запускает его администратор из консоли. Сужение до
+     *                     одной компании остаётся доступным: параметр
+     *                     $companyId применяется, когда он передан, и
+     *                     ReprocessMarketplaceCostsCommand пробрасывает туда
+     *                     опцию --company-id.
+     *
      * @return MarketplaceRawDocument[]
      */
     public function findDocsWithCrossCompanyCosts(?string $companyId = null): array
