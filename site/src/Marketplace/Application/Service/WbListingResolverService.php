@@ -54,7 +54,7 @@ final class WbListingResolverService
         );
         $listingByVariant = null === $marketplaceVariantId
             ? null
-            : $this->listingRepository->findByMarketplaceVariantId($company, MarketplaceType::WILDBERRIES, $marketplaceVariantId);
+            : $this->listingRepository->findByMarketplaceVariantId($companyId, MarketplaceType::WILDBERRIES, $marketplaceVariantId);
 
         if (null !== $listingByNaturalKey || null !== $listingByVariant) {
             return $this->resolveKnownCandidates(
