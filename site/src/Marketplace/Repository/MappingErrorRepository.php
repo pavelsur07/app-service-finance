@@ -40,6 +40,16 @@ class MappingErrorRepository extends ServiceEntityRepository
     /**
      * Все нерешённые ошибки для админки — с данными компании и контактом.
      *
+     * @companyScopeExempt Платформенная админка под ROLE_ADMIN: страница
+     *                     /admin/marketplace/mapping-errors по замыслу сводит
+     *                     ошибки маппинга всех арендаторов в один список, чтобы
+     *                     их разбирал владелец платформы. Компания здесь —
+     *                     колонка результата и повод написать клиенту, а не
+     *                     фильтр; INNER JOIN companies стоит ради названия и
+     *                     контакта. Ограничить выборку одной компанией значит
+     *                     упразднить саму страницу. Покомпанейский доступ к тем
+     *                     же данным даёт findForUpsert().
+     *
      * @return array<int, array<string, mixed>>
      */
     public function findUnresolvedWithCompanyInfo(): array
@@ -72,6 +82,11 @@ class MappingErrorRepository extends ServiceEntityRepository
 
     /**
      * Все ошибки (включая решённые) с пагинацией.
+     *
+     * @companyScopeExempt Та же страница платформенной админки, что и у
+     *                     {@see findUnresolvedWithCompanyInfo()}, только без
+     *                     фильтра по нерешённым. Причина межкомпанейской
+     *                     выборки там же.
      *
      * @return array<int, array<string, mixed>>
      */

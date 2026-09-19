@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Repository;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
@@ -25,27 +24,6 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->where('r.company = :company')
             ->setParameter('company', $company)
             ->orderBy('r.returnDate', 'DESC');
-    }
-
-    /**
-     * @return MarketplaceReturn[]
-     */
-    public function findByProduct(
-        Product $product,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array {
-        return $this->createQueryBuilder('r')
-            ->join('r.listing', 'l')
-            ->where('l.product = :product')
-            ->andWhere('r.returnDate >= :from')
-            ->andWhere('r.returnDate <= :to')
-            ->setParameter('product', $product)
-            ->setParameter('from', $fromDate)
-            ->setParameter('to', $toDate)
-            ->orderBy('r.returnDate', 'DESC')
-            ->getQuery()
-            ->getResult();
     }
 
     /**
