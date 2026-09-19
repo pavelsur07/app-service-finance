@@ -7267,18 +7267,6 @@ parameters:
 			path: src/Marketplace/MessageHandler/TriggerInitialSyncHandler.php
 
 		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MappingErrorRepository\:\:findAllWithCompanyInfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MappingErrorRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MappingErrorRepository\:\:findUnresolvedWithCompanyInfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Marketplace/Repository/MappingErrorRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceAdvertisingCostRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7491,12 +7479,6 @@ parameters:
 		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceRawDocumentRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceRawDocumentRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Marketplace\\Repository\\MarketplaceRawDocumentRepository\:\:findDocsWithCrossCompanyCosts\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Marketplace/Repository/MarketplaceRawDocumentRepository.php
 
