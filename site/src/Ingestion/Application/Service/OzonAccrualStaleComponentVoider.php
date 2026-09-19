@@ -17,9 +17,21 @@ final readonly class OzonAccrualStaleComponentVoider
     }
 
     /**
+     * Гасилка обязана смотреть ровно на те дни, которые разбирались.
+     *
+     * Реплей сохранённого сырья ограничивается днями, которыми снапшот владеет,
+     * и строки за остальные его дни в `$mappedTransactions` не попадают. Без
+     * такого же ограничения здесь они выглядят «исчезнувшими из выгрузки» и
+     * гасятся — хотя живые и принадлежат этому же сырью. Так 18.09.2026 на проде
+     * обнулились 19 дней, 26 496 строк.
+     *
+     * Пустой список — без ограничения: обычная нормализация разбирает снапшот
+     * целиком, и всё, чего в наборе нет, действительно устарело.
+     *
      * @param list<MappedTransaction> $mappedTransactions
+     * @param list<string> $restrictToDates дни в формате Y-m-d
      */
-    public function void(IngestRawRecord $rawRecord, array $mappedTransactions): void
+    public function void(IngestRawRecord $rawRecord, array $mappedTransactions, array $restrictToDates = []): void
     {
         if (IngestSource::OZON !== $rawRecord->getSource()
             || OzonResourceType::ACCRUAL_BY_DAY !== $rawRecord->getResourceType()) {
@@ -31,7 +43,13 @@ final readonly class OzonAccrualStaleComponentVoider
             $expected[$this->key($transaction->externalId, $transaction->type->value)] = true;
         }
 
+        $allowedDates = array_fill_keys($restrictToDates, true);
+
         foreach ($this->transactionRepository->findByRawRecordId($rawRecord->getCompanyId(), $rawRecord->getId()) as $transaction) {
+            if ([] !== $allowedDates && !isset($allowedDates[$transaction->getOccurredAt()->format('Y-m-d')])) {
+                continue;
+            }
+
             if (isset($expected[$this->key($transaction->getExternalId(), $transaction->getType()->value)])) {
                 continue;
             }

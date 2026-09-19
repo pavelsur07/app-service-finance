@@ -23,9 +23,18 @@ final readonly class OzonAccrualStaleProjectionPruner
     }
 
     /**
+     * `$restrictToDates` держит удаление в тех же днях, что и разбор.
+     *
+     * Реплей сохранённого сырья ограничивается днями, которыми снапшот владеет,
+     * и за остальные его дни в `$mappedTransactions` ничего нет. Без такого же
+     * ограничения здесь под удаление попали бы строки чужих дней только потому,
+     * что их не оказалось в суженном наборе. Пустой список — без ограничения,
+     * как при обычной нормализации.
+     *
      * @param list<MappedTransaction> $mappedTransactions
+     * @param list<string> $restrictToDates дни в формате Y-m-d
      */
-    public function prune(IngestRawRecord $rawRecord, array $mappedTransactions, bool $execute, bool $includeRows = false): OzonAccrualStaleProjectionPruneResult
+    public function prune(IngestRawRecord $rawRecord, array $mappedTransactions, bool $execute, bool $includeRows = false, array $restrictToDates = []): OzonAccrualStaleProjectionPruneResult
     {
         if (IngestSource::OZON !== $rawRecord->getSource() || OzonResourceType::ACCRUAL_BY_DAY !== $rawRecord->getResourceType()) {
             return new OzonAccrualStaleProjectionPruneResult(0, 0, []);
@@ -47,7 +56,13 @@ final readonly class OzonAccrualStaleProjectionPruner
         $deleteIds = [];
         $affectedDates = [];
 
+        $allowedDates = array_fill_keys($restrictToDates, true);
+
         foreach ($candidateRows as $row) {
+            if ([] !== $allowedDates && !isset($allowedDates[(string) $row['date']])) {
+                continue;
+            }
+
             if (isset($expected[$this->key((string) $row['external_id'], (string) $row['type'])])) {
                 continue;
             }
