@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Repository;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceType;
@@ -47,27 +46,6 @@ class MarketplaceCostRepository extends ServiceEntityRepository
         }
 
         return $qb->orderBy('c.costDate', 'DESC');
-    }
-
-    /**
-     * @return MarketplaceCost[]
-     */
-    public function findByProduct(
-        Product $product,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array {
-        return $this->createQueryBuilder('c')
-            ->join('c.listing', 'l')
-            ->where('l.product = :product')
-            ->andWhere('c.costDate >= :from')
-            ->andWhere('c.costDate <= :to')
-            ->setParameter('product', $product)
-            ->setParameter('from', $fromDate)
-            ->setParameter('to', $toDate)
-            ->orderBy('c.costDate', 'DESC')
-            ->getQuery()
-            ->getResult();
     }
 
     /**

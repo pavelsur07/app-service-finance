@@ -106,27 +106,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return MarketplaceSale[]
-     */
-    public function findByProduct(
-        Product $product,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array {
-        return $this->createQueryBuilder('s')
-            ->join('s.listing', 'l')
-            ->where('l.product = :product')
-            ->andWhere('s.saleDate >= :from')
-            ->andWhere('s.saleDate <= :to')
-            ->setParameter('product', $product)
-            ->setParameter('from', $fromDate)
-            ->setParameter('to', $toDate)
-            ->orderBy('s.saleDate', 'DESC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * @return Product[]
      */
     public function findProductsWithSales(
