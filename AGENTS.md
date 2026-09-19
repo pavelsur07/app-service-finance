@@ -90,6 +90,18 @@ pipeline (CI, merge order, branch cleanup, post-deploy checks). Ask again only
 when the answer could differ: work the approval did not cover, a PR carrying a
 migration, or a §3.3 action.
 
+**Once the approval arrives, run the pipeline to the end without handing the
+turn back, and never ask permission for a single stage of it.** No confirmation
+per stage: not before marking Ready, not before the merge, not before waiting on
+CI, not before the deploy, not before the post-deploy checks. Red CI, a merge
+conflict, a failed deploy or a §3.3 action are the only reasons to stop
+mid-pipeline, and each is reported with the failing output.
+Waiting for CI or for the deploy is not one of them: keep waiting inside the
+same turn and report the finished result — merge commit, deploy conclusion,
+post-deploy acceptance. A message that only says a check is running makes the
+owner ask whether the work is done, which is the question the single-decision
+contract exists to avoid.
+
 **A PR that adds a migration does not deploy on that approval.** Production
 migrations are a separate manual dispatch, and the push-triggered deploy gate
 blocks every deploy while a migration is pending. When the PR carries a
