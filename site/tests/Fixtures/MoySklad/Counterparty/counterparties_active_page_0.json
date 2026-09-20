@@ -1,0 +1,252 @@
+{
+  "context": {
+    "employee": {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/employee/metadata",
+        "type": "employee",
+        "mediaType": "application/json"
+      }
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty?limit=2&offset=0&filter=archived%3Dfalse&order=id%2Casc",
+    "type": "counterparty",
+    "mediaType": "application/json",
+    "size": 71,
+    "limit": 2,
+    "offset": 0,
+    "nextHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty?offset=2&filter=archived%3Dfalse&limit=2&order=id%2Casc"
+  },
+  "rows": [
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000001",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
+        "type": "counterparty",
+        "mediaType": "application/json",
+        "uuidHref": "https://online.moysklad.ru/app/#company/edit?id=00000000-0000-4000-8000-000000000001"
+      },
+      "id": "00000000-0000-4000-8000-000000000001",
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "owner": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/employee/00000000-0000-4000-8000-000000000003",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/employee/metadata",
+          "type": "employee",
+          "mediaType": "application/json",
+          "uuidHref": "https://online.moysklad.ru/app/#employee/edit?id=00000000-0000-4000-8000-000000000003"
+        }
+      },
+      "shared": false,
+      "group": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/group/00000000-0000-4000-8000-000000000004",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/group/metadata",
+          "type": "group",
+          "mediaType": "application/json"
+        }
+      },
+      "updated": "2026-01-02 03:04:09.123",
+      "name": "Тестовый контрагент 1",
+      "externalCode": "TEST-CODE-001",
+      "archived": false,
+      "created": "2026-01-02 03:04:09.123",
+      "companyType": "legal",
+      "legalTitle": "ООО Тестовый контрагент 1",
+      "legalAddress": "г. Тестоград, ул. Примерная, 1",
+      "legalAddressFull": {
+        "postalCode": "Тестовое значение",
+        "country": {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/country/00000000-0000-4000-8000-000000000005",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/country/metadata",
+            "type": "country",
+            "mediaType": "application/json",
+            "uuidHref": "https://online.moysklad.ru/app/#country/edit?id=00000000-0000-4000-8000-000000000005"
+          }
+        },
+        "region": {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/region/00000000-0000-4000-8000-000000000006",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/region/metadata",
+            "type": "region",
+            "mediaType": "application/json"
+          }
+        },
+        "city": "Тестовое значение",
+        "street": "Тестовое значение",
+        "house": "Тестовое значение"
+      },
+      "inn": "9999999991",
+      "kpp": "999999991",
+      "ogrn": "9999999999991",
+      "okpo": "99999991",
+      "accounts": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000001/accounts",
+          "type": "account",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "tags": [],
+      "contactpersons": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000001/contactpersons",
+          "type": "contactperson",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "notes": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000001/notes",
+          "type": "note",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "state": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata/states/00000000-0000-4000-8000-000000000007",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
+          "type": "state",
+          "mediaType": "application/json"
+        }
+      },
+      "salesAmount": 0.0,
+      "files": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000001/files",
+          "type": "files",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000008",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
+        "type": "counterparty",
+        "mediaType": "application/json",
+        "uuidHref": "https://online.moysklad.ru/app/#company/edit?id=00000000-0000-4000-8000-000000000008"
+      },
+      "id": "00000000-0000-4000-8000-000000000008",
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "owner": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/employee/00000000-0000-4000-8000-000000000003",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/employee/metadata",
+          "type": "employee",
+          "mediaType": "application/json",
+          "uuidHref": "https://online.moysklad.ru/app/#employee/edit?id=00000000-0000-4000-8000-000000000003"
+        }
+      },
+      "shared": false,
+      "group": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/group/00000000-0000-4000-8000-000000000004",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/group/metadata",
+          "type": "group",
+          "mediaType": "application/json"
+        }
+      },
+      "updated": "2026-01-02 03:04:12.123",
+      "name": "Тестовый контрагент 2",
+      "externalCode": "TEST-CODE-002",
+      "archived": false,
+      "created": "2026-01-02 03:04:11.123",
+      "companyType": "legal",
+      "legalTitle": "ООО Тестовый контрагент 2",
+      "legalAddress": "г. Тестоград, ул. Примерная, 1",
+      "legalAddressFull": {
+        "postalCode": "Тестовое значение",
+        "country": {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/country/00000000-0000-4000-8000-000000000005",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/country/metadata",
+            "type": "country",
+            "mediaType": "application/json",
+            "uuidHref": "https://online.moysklad.ru/app/#country/edit?id=00000000-0000-4000-8000-000000000005"
+          }
+        },
+        "region": {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/region/00000000-0000-4000-8000-000000000009",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/region/metadata",
+            "type": "region",
+            "mediaType": "application/json"
+          }
+        },
+        "city": "Тестовое значение",
+        "street": "Тестовое значение",
+        "house": "Тестовое значение",
+        "apartment": "Тестовое значение"
+      },
+      "inn": "9999999992",
+      "kpp": "999999992",
+      "ogrn": "9999999999992",
+      "okpo": "99999992",
+      "accounts": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000008/accounts",
+          "type": "account",
+          "mediaType": "application/json",
+          "size": 1,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "tags": [],
+      "contactpersons": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000008/contactpersons",
+          "type": "contactperson",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "notes": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000008/notes",
+          "type": "note",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      },
+      "state": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata/states/00000000-0000-4000-8000-000000000007",
+          "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
+          "type": "state",
+          "mediaType": "application/json"
+        }
+      },
+      "salesAmount": 0.0,
+      "files": {
+        "meta": {
+          "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/00000000-0000-4000-8000-000000000008/files",
+          "type": "files",
+          "mediaType": "application/json",
+          "size": 0,
+          "limit": 1000,
+          "offset": 0
+        }
+      }
+    }
+  ]
+}
