@@ -7,7 +7,7 @@
 #### What was done
 
 - Добавлены `MoySkladCounterparty`, `MoySkladSyncCursor`, `MoySkladSyncRun`, нормализованный снимок контрагента, tenant-scoped репозитории и тестовые builder'ы.
-- Миграция создаёт три таблицы, FK без каскада, уникальные и поисковые индексы, ограничения статуса и счётчиков. Удаление подключения с данными отклоняется существующим `connection_in_use`.
+- Миграция создаёт три таблицы, составные FK `(company_id, connection_id)` без каскада, уникальные и поисковые индексы, ограничения статуса и счётчиков. Удаление подключения с данными отклоняется существующим `connection_in_use`.
 - Контракт сущностей описан в `ARCHITECTURE.md`; токен и произвольный API payload не хранятся.
 
 #### Definition of Done
@@ -16,6 +16,7 @@
 - [x] Изоляция компаний проверена запросами по внутреннему и внешнему ID.
 - [x] FK запрещают каскадное удаление подключения.
 - [x] Новые таблицы создаются на пустой test-БД; уникальность `(connection_id, external_id)` проверена.
+- [x] БД отвергает строку с чужим `company_id`; время хранится в UTC с точностью до миллисекунд.
 
 #### Checks
 
@@ -24,6 +25,7 @@
 - модульные unit+integration после исправлений — 81 tests / 346 assertions, PASS.
 - focused PHPStan — no errors; focused CS Fixer — 0 fixable files; Doctrine metadata mapping — valid.
 - полный `doctrine:schema:validate` — red: глобальный diff содержит сотни старых расхождений и намеренные ручные FK. Структура новых таблиц и индексов проверена прямым запросом к локальной test-БД.
+- После handoff-review: миграция `up → down → up` на пустой test-БД — PASS; `down` с синтетической строкой отклонён; строка удалена. Блокировка таблиц исключает вставку между проверкой пустоты и `DROP`.
 
 #### Internal review
 
@@ -31,12 +33,12 @@
 
 #### External review
 
-- Required: yes, HIGH-LOCAL Stage с diff более 500 строк. Round 1: 0 BLOCKER, 2 IMPORTANT, 4 MINOR. Обе IMPORTANT исправлены: UTC microsecond type сохраняет момент и точность; `down()` удаляет только пустые таблицы. MINOR: унифицирован порядок параметров репозитория, разрешено имя `0`, добавлен частичный unique index для `running`. Замечание об uppercase UUID отклонено: тест PostgreSQL подтверждает корректный поиск. После фиксов: 81 тест / 346 assertions, focused PHPStan/CS — PASS. Итог по политике: **fixed without re-run**.
+- Required: yes, HIGH-LOCAL Stage с diff более 500 строк. Round 1: 0 BLOCKER, 2 IMPORTANT, 4 MINOR. Обе IMPORTANT исправлены: UTC type сохраняет момент и точность; `down()` удаляет только пустые таблицы. MINOR: унифицирован порядок параметров репозитория, разрешено имя `0`, добавлен частичный unique index для `running`. Замечание об uppercase UUID отклонено: тест PostgreSQL подтверждает корректный поиск. После фиксов: 81 тест / 346 assertions, focused PHPStan/CS — PASS. Итог по политике: **fixed without re-run**.
 
 #### Risks / reviewer focus
 
 - `down()` работает на пустых таблицах и отказывает, если уже загружены данные. Production dispatch требует отдельного решения Владельца.
-- `company_id` сверяется с компанией подключения в Action будущего Stage 3; FK удерживает подключение, а все запросы уже tenant-scoped.
+- `company_id` сверяется с компанией подключения и в Action, и составным FK; все запросы tenant-scoped.
 
 #### Next
 

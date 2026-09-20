@@ -15,6 +15,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'name'], name: 'idx_moysklad_connections_company_name')]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_company_name', columns: ['company_id', 'name'])]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_account', columns: ['account_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_company_id', columns: ['company_id', 'id'])]
 class MoySkladConnection
 {
     #[ORM\Id]

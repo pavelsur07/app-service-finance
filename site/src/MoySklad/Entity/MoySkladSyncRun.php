@@ -16,6 +16,8 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_sync_runs_running', columns: ['connection_id', 'entity_type'], options: ['where' => "status = 'running'"])]
 class MoySkladSyncRun
 {
+    public const ERROR_CATEGORIES = ['auth', 'forbidden', 'rate_limited', 'temporary', 'invalid_request', 'invalid_response', 'internal'];
+
     #[ORM\Id]
     #[ORM\Column(type: Types::GUID)]
     private string $id;
@@ -32,10 +34,10 @@ class MoySkladSyncRun
     #[ORM\Column(type: Types::STRING, length: 16)]
     private string $status = 'running';
 
-    #[ORM\Column(type: 'datetime_immutable_utc_us', precision: 6)]
+    #[ORM\Column(type: 'datetime_immutable_utc_ms', precision: 3)]
     private \DateTimeImmutable $startedAt;
 
-    #[ORM\Column(type: 'datetime_immutable_utc_us', precision: 6, nullable: true)]
+    #[ORM\Column(type: 'datetime_immutable_utc_ms', precision: 3, nullable: true)]
     private ?\DateTimeImmutable $finishedAt = null;
 
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
@@ -94,7 +96,7 @@ class MoySkladSyncRun
         if ('running' !== $this->status) {
             throw new \LogicException('Run has already finished.');
         }
-        if (!in_array($category, ['auth', 'forbidden', 'rate_limited', 'temporary', 'invalid_request', 'invalid_response', 'internal'], true)) {
+        if (!in_array($category, self::ERROR_CATEGORIES, true)) {
             throw new \InvalidArgumentException('Invalid sync error category.');
         }
         $this->status = 'failed';

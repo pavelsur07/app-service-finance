@@ -1,47 +1,37 @@
 ## Current checkpoint
 
-**Phase:** Handoff
-**Status:** ready for full gates and final review
-**Stage base commit:** `0d52c55c31a99342a8f5a75378690b7cb89c492b`
+**Phase:** handoff
+**Status:** local verification and reviews complete
+**Task base commit:** `2d23ac36f9c6504743460fc064406a5088b7464f`
+**Branch / Draft PR:** `feat/moysklad-counterparty-sync` / #2495
 
 ### Completed
 
-- Создан изолированный worktree `feat/moysklad-counterparty-sync` от `origin/master`.
-- Прочитаны Stage 0, существующий модуль, паттерны и правила проекта; составлен план четырёх Stage.
-- Work item 1.1: три Entity, snapshot DTO, tenant-scoped Repository и builder'ы; unit и integration тесты прошли.
-- Work item 1.2: миграция трёх таблиц с FK, индексами и проверками; свежая test-БД применяет все 262 миграции; запрет удаления подключения проверен.
-- Внутреннее ревью Stage 1: добавлен индекс по `connection_id` для FK истории запусков и проверка диапазона индексов builder'ов.
-- Внешнее ревью Stage 1: 0 BLOCKER, 2 IMPORTANT, 4 MINOR; подтверждённые замечания исправлены, uppercase UUID подтверждён тестом. Исправления проверены 81 тестом / 346 assertions, PHPStan и CS Fixer. Stage Report закрыт.
-- Stage 1 committed as `421908c2`, pushed; Draft PR #2495 targets `master`.
-- Stage 2: API page reader, safe categories and parser based on sanitized fixtures. 77 unit tests / 325 assertions, PHPStan and CS Fixer PASS; internal review fixed malformed empty-object rows. Stage Report closed.
-- Stage 2 committed as `d1fd044b`, pushed to Draft PR #2495.
-- Stage 3: full sync Action, tenant-scoped page batch, lock, cursor, run status, delayed Messenger retries.
-- External Stage 3 review: 0 BLOCKER, 2 IMPORTANT, 3 MINOR. Все исправлены; 109 tests / 465 assertions, focused PHPStan/CS PASS. Stage Report closed.
-- Stage 3 committed as `0d52c55c`, pushed to Draft PR #2495.
-- Stage 4: manual POST and status UI, 18 functional tests / 123 assertions, focused PHPStan/CS and Twig lint PASS. Stage Report closed.
+- Stage 1 schema/storage (`421908c2`), Stage 2 API/parser (`d1fd044b`), Stage 3 full scan/Messenger (`0d52c55c`), Stage 4 manual UI/status (`84825eb6`) committed and pushed.
+- Stage 1 and Stage 3 required external reviews completed; their confirmed findings fixed without re-run.
+- First fresh final internal review found 1 BLOCKER, 5 IMPORTANT, 1 MINOR. Fixes are in working tree: locked guarded rollback, composite company/connection FK, DBAL failed-run update after ORM error, bounded run history, retry-exhaustion error log, missing recovery/error tests and millisecond precision. Second review found 1 IMPORTANT: missing Messenger start/terminal logs. Fixed with a red/green regression test. Third fresh read-only review returned `REVIEW_GREEN`.
+- Changed migration applied to clean local test-BД (262 migrations), empty `down → up` passed, nonempty `down` refused as designed; synthetic rows were removed.
 
-### Checks and baseline
+### Checks
 
-- `make site-composer-install` — PASS.
-- `docker compose run --rm site-php-cli php bin/phpunit -c phpunit.xml tests/Unit/MoySklad` — PASS, 46 tests / 227 assertions.
-- `tests/Integration/MoySklad` на baseline — PASS, 16 tests / 60 assertions.
-- `make site-test-db-rebuild` с изолированным Compose override — PASS, 262 миграции.
-- `tests/Unit/MoySklad tests/Integration/MoySklad` — PASS, 72 tests / 324 assertions.
-- Focused PHPStan — PASS, no errors; focused PHP CS Fixer — PASS, 0 fixable files; Doctrine mapping — PASS.
-- Полный `doctrine:schema:validate` — red: общий schema diff включает сотни существующих расхождений и намеренные ручные FK; SQL новых таблиц и индексов проверен отдельно.
+- Baseline: MoySklad unit 46 / 227, integration 16 / 60, both PASS.
+- Before final-review fixes: `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit` PASS (2945 / 16289), `make site-test` PASS on clean DB (5079 / 28965). Initial full run had 18 unrelated failures caused by demo fixtures from `site-test-db-rebuild`; clean migration-only DB resolved them, and 22 previously failing tests passed separately.
+- After fixes: MoySklad integration/functional plus UTC type 66 tests / 356 assertions PASS; focused PHPStan PASS; Twig lint PASS; Doctrine mapping PASS. Final `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit` (2945 / 16289), `make site-stan`, and `make site-test` (5090 / 29044) PASS on clean migration-only test DB.
+- The first final full suite ran 5088 tests / 29030 assertions with one unrelated intermittent `ApiKeyActionsTest` failure: its raw SQL reads two rows without `ORDER BY` but asserts row zero. The exact test passed on targeted rerun (1 / 13). No Api code changed.
+- Global `doctrine:schema:validate` synchronicity remains red from pre-existing project-wide drift; metadata mapping is valid. No production state touched.
 
 ### Review status
 
-- internal: Stage 1 iteration 1, open BLOCKER/IMPORTANT none; 1 IMPORTANT and 1 MINOR fixed.
-- external: Stage 1 fixed without re-run; handoff review pending.
+- Internal final: round 1 found 1 BLOCKER / 5 IMPORTANT / 1 MINOR, round 2 found 0 / 1 / 0; all addressed. Round 3 returned `REVIEW_GREEN`.
+- External handoff: 1 round, 0 BLOCKER / 1 IMPORTANT / 3 MINOR, all fixed with targeted checks, no re-run required. Stage 1: 0 / 2 / 4; Stage 3: 0 / 2 / 3, all confirmed fixes verified. Fresh internal review of the external fixes returned `REVIEW_GREEN`.
 
 ### Exact next action
 
-- Commit/push Stage 4, then full handoff gates, final internal review, external review and PR Ready.
+- After Ready handoff and Owner approval, run the approved production migration dispatch, merge/deploy pipeline and read-only post-deploy acceptance. Until then do not touch production.
 
 ### Files to inspect first on resume
 
 - `docs/tasks/moysklad-data-sync/plan.md`
-- `docs/tasks/moysklad-data-sync/checkpoint.md`
-- `site/src/MoySklad/Entity/MoySkladConnection.php`
 - `site/migrations/Version20260920110000.php`
+- `site/src/MoySklad/Application/Action/SyncCounterpartiesAction.php`
+- `site/src/MoySklad/Infrastructure/Query/MoySkladCounterpartySyncStatusQuery.php`

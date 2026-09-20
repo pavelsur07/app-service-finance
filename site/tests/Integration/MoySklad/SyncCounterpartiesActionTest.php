@@ -21,6 +21,7 @@ use App\MoySklad\MessageHandler\SyncCounterpartiesHandler;
 use App\Tests\Builders\MoySklad\MoySkladConnectionBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\DBAL\DriverManager;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -40,9 +41,12 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
+        $activePage = json_decode($this->page('counterparties_active_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
+        $activePage['rows'][0]['updated'] = '2026-01-02 03:04:09.000';
+        $activeResponse = json_encode($activePage, \JSON_THROW_ON_ERROR);
 
         $first = $this->action([
-            new MockResponse($this->page('counterparties_active_page_0.json')),
+            new MockResponse($activeResponse),
             new MockResponse($this->page('counterparties_archived_page_0.json')),
         ])($connection->getCompanyId(), $connection->getId());
         self::assertNotNull($first);
@@ -53,7 +57,7 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
         self::assertSame(2, (int) $db->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties WHERE archived'));
 
         $second = $this->action([
-            new MockResponse($this->page('counterparties_active_page_0.json')),
+            new MockResponse($activeResponse),
             new MockResponse($this->page('counterparties_archived_page_0.json')),
         ])($connection->getCompanyId(), $connection->getId());
         self::assertNotNull($second);
@@ -195,14 +199,48 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
         )->willReturn(new Envelope(new \stdClass()));
         $handler = new SyncCounterpartiesHandler($this->action([
             new MockResponse('private-response', ['http_code' => 429, 'response_headers' => ['X-Lognex-Retry-After: 15000']]),
-        ], $logger), $bus);
+        ], $logger), $bus, $logger);
         $handler(new SyncCounterpartiesMessage($connection->getCompanyId(), $connection->getId()));
 
         $run = static::getContainer()->get(MoySkladSyncRunRepository::class)->latestFor($connection->getCompanyId(), $connection->getId(), 'counterparty');
         self::assertSame('rate_limited', $run?->getErrorCategory());
         self::assertStringNotContainsString('private-response', json_encode($logger->records, \JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString('test-secret', json_encode($logger->records, \JSON_THROW_ON_ERROR));
-        self::assertSame('warning', $logger->records[0]['level']);
+        self::assertSame('info', $logger->records[0]['level']);
+        self::assertSame('MoySklad counterparty sync message started', $logger->records[0]['message']);
+        self::assertSame('MoySklad counterparty sync message finished', $logger->records[array_key_last($logger->records)]['message']);
+        self::assertSame('retry_scheduled', $logger->records[array_key_last($logger->records)]['context']['outcome']);
+        self::assertSame(0, $logger->records[array_key_last($logger->records)]['context']['attempt']);
+    }
+
+    public function testHandlerLogsStartAndTerminalOutcomeWhenConnectionIsSkipped(): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{message: string, context: array<string, mixed>}> */
+            public array $records = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['message' => (string) $message, 'context' => $context];
+            }
+        };
+        $handler = new SyncCounterpartiesHandler($this->action([], $logger), $bus, $logger);
+        $handler(new SyncCounterpartiesMessage('99999999-9999-4999-8999-999999999999', $connection->getId()));
+
+        self::assertCount(2, $logger->records);
+        self::assertSame('MoySklad counterparty sync message started', $logger->records[0]['message']);
+        self::assertSame('MoySklad counterparty sync message finished', $logger->records[1]['message']);
+        self::assertSame('skipped', $logger->records[1]['context']['outcome']);
+        self::assertSame('99999999-9999-4999-8999-999999999999', $logger->records[1]['context']['companyId']);
+        self::assertSame($connection->getId(), $logger->records[1]['context']['connectionId']);
+        self::assertSame('counterparty', $logger->records[1]['context']['entityType']);
+        self::assertSame(0, $logger->records[1]['context']['attempt']);
     }
 
     public function testRepairsStaleRunningRowBeforeNewPass(): void
@@ -223,6 +261,30 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
         self::assertSame('internal', $stale->getErrorCategory());
     }
 
+    public function testRetryExhaustionEmitsSafeErrorWithoutSchedulingAgain(): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with('MoySklad counterparty sync retry budget exhausted', self::callback(static function (array $context) use ($connection): bool {
+            self::assertSame($connection->getCompanyId(), $context['companyId']);
+            self::assertSame($connection->getId(), $context['connectionId']);
+            self::assertSame('rate_limited', $context['category']);
+            self::assertArrayHasKey('runId', $context);
+            self::assertStringNotContainsString('private-response', json_encode($context, \JSON_THROW_ON_ERROR));
+
+            return true;
+        }));
+        $handler = new SyncCounterpartiesHandler($this->action([
+            new MockResponse('private-response', ['http_code' => 429]),
+        ]), $bus, $logger);
+        $handler(new SyncCounterpartiesMessage($connection->getCompanyId(), $connection->getId(), 3));
+    }
+
     public function testConcurrentSessionLockPreventsSecondPass(): void
     {
         $this->resetDb();
@@ -240,6 +302,121 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
             $other->fetchOne('SELECT pg_advisory_unlock(hashtext(:namespace), hashtext(:key))', $params);
             $other->close();
         }
+    }
+
+    public function testFailedPageFlushRollsBackPageAndMarksRunFailed(): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $page = json_decode($this->page('counterparties_active_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
+        $page['rows'][1]['id'] = $page['rows'][0]['id'];
+
+        try {
+            $this->action([new MockResponse(json_encode($page, \JSON_THROW_ON_ERROR))])($connection->getCompanyId(), $connection->getId());
+            self::fail('Duplicate external ID must fail the page.');
+        } catch (CounterpartySyncException $e) {
+            self::assertSame('internal', $e->category);
+        }
+
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties'));
+        $row = $this->em()->getConnection()->fetchAssociative('SELECT status, processed, error_category FROM moysklad_sync_runs WHERE connection_id = ?', [$connection->getId()]);
+        self::assertIsArray($row);
+        self::assertSame('failed', $row['status']);
+        self::assertSame(0, (int) $row['processed']);
+        self::assertSame('internal', $row['error_category']);
+    }
+
+    #[DataProvider('fatalPages')]
+    public function testFatalPageKeepsOldCursorAndRows(int $status, string $body, string $category): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $this->action([
+            new MockResponse($this->page('counterparties_active_page_0.json')),
+            new MockResponse($this->page('counterparties_archived_page_0.json')),
+        ])($connection->getCompanyId(), $connection->getId());
+        $db = $this->em()->getConnection();
+        $oldCursor = $db->fetchOne('SELECT last_completed_at FROM moysklad_sync_cursors WHERE connection_id = ?', [$connection->getId()]);
+        try {
+            $this->action([new MockResponse($body, ['http_code' => $status])])($connection->getCompanyId(), $connection->getId());
+            self::fail('Fatal page expected.');
+        } catch (CounterpartySyncException $e) {
+            self::assertSame($category, $e->category);
+        }
+        self::assertSame($oldCursor, $db->fetchOne('SELECT last_completed_at FROM moysklad_sync_cursors WHERE connection_id = ?', [$connection->getId()]));
+        self::assertSame(4, (int) $db->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties'));
+        $run = static::getContainer()->get(MoySkladSyncRunRepository::class)->latestFor($connection->getCompanyId(), $connection->getId(), 'counterparty');
+        self::assertSame($category, $run?->getErrorCategory());
+    }
+
+    /** @return iterable<string, array{int, string, string}> */
+    public static function fatalPages(): iterable
+    {
+        yield '401' => [401, '', 'auth'];
+        yield '403' => [403, '', 'forbidden'];
+        yield 'invalid response' => [200, '{', 'invalid_response'];
+    }
+
+    public function testCompletedPassWithoutRowsDoesNotDeletePreviouslyLoadedCounterparties(): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $this->action([
+            new MockResponse($this->page('counterparties_active_page_0.json')),
+            new MockResponse($this->page('counterparties_archived_page_0.json')),
+        ])($connection->getCompanyId(), $connection->getId());
+        $run = $this->action([
+            new MockResponse($this->page('counterparties_active_empty.json')),
+            new MockResponse($this->page('counterparties_archived_empty.json')),
+        ])($connection->getCompanyId(), $connection->getId());
+        self::assertSame('succeeded', $run?->getStatus());
+        self::assertSame(0, $run->getProcessed());
+        self::assertSame(4, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties'));
+    }
+
+    public function testScheduledRetryRestartsAtZeroAndReusesCommittedRows(): void
+    {
+        $this->resetDb();
+        $connection = $this->verifiedConnection();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+        $retry = null;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static function (SyncCounterpartiesMessage $message) use (&$retry): Envelope {
+            $retry = $message;
+
+            return new Envelope($message);
+        });
+        $firstHandler = new SyncCounterpartiesHandler($this->action([
+            new MockResponse($this->page('counterparties_active_page_0.json')),
+            new MockResponse('', ['http_code' => 503]),
+        ]), $bus, new NullLogger());
+        $firstHandler(new SyncCounterpartiesMessage($connection->getCompanyId(), $connection->getId()));
+        self::assertInstanceOf(SyncCounterpartiesMessage::class, $retry);
+        self::assertSame(1, $retry->attempt);
+        self::assertSame(2, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties'));
+
+        $activeResponse = new MockResponse($this->page('counterparties_active_page_0.json'));
+        $noMoreRetries = $this->createMock(MessageBusInterface::class);
+        $noMoreRetries->expects(self::never())->method('dispatch');
+        $retryHandler = new SyncCounterpartiesHandler($this->action([
+            $activeResponse,
+            new MockResponse($this->page('counterparties_archived_page_0.json')),
+        ]), $noMoreRetries, new NullLogger());
+        $retryHandler($retry);
+
+        self::assertStringContainsString('offset=0', $activeResponse->getRequestUrl());
+        self::assertSame(4, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_counterparties'));
+        $run = static::getContainer()->get(MoySkladSyncRunRepository::class)->latestFor($connection->getCompanyId(), $connection->getId(), 'counterparty');
+        self::assertSame('succeeded', $run?->getStatus());
+        self::assertSame(2, $run->getCreated());
+        self::assertSame(2, $run->getUnchanged());
     }
 
     private function verifiedConnection(): MoySkladConnection

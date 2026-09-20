@@ -28,7 +28,7 @@ class MoySkladSyncCursor
     #[ORM\Column(type: Types::STRING, length: 64)]
     private string $entityType;
 
-    #[ORM\Column(type: 'datetime_immutable_utc_us', precision: 6, nullable: true)]
+    #[ORM\Column(type: 'datetime_immutable_utc_ms', precision: 3, nullable: true)]
     private ?\DateTimeImmutable $lastCompletedAt = null;
 
     public function __construct(string $id, string $companyId, string $connectionId, string $entityType)

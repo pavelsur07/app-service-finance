@@ -48,6 +48,7 @@
                                 <dd class="col-sm-7">{{ sync and sync.lastCompletedAt ? sync.lastCompletedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялся' }}</dd>
                             </dl>
                             {% if sync and sync.status %}
+                                {% set errorLabels = {'auth': 'Проверьте токен', 'forbidden': 'Недостаточно прав', 'rate_limited': 'Лимит запросов МойСклад', 'temporary': 'МойСклад временно недоступен', 'invalid_request': 'Ошибка запроса', 'invalid_response': 'Некорректный ответ МойСклад', 'internal': 'Ошибка сохранения'} %}
                                 <div class="mt-3">
                                     <div>Загрузка контрагентов:
                                         {% if sync.status == 'running' %}Выполняется
@@ -57,9 +58,19 @@
                                     <div class="text-secondary">Начало: {{ sync.startedAt|date('d.m.Y H:i:s') }}{% if sync.finishedAt %} · Завершение: {{ sync.finishedAt|date('d.m.Y H:i:s') }}{% endif %}</div>
                                     <div class="text-secondary">Обработано: {{ sync.processed }} · Создано: {{ sync.created }} · Обновлено: {{ sync.updated }} · Без изменений: {{ sync.unchanged }}</div>
                                     {% if sync.status == 'failed' %}
-                                        {% set errorLabels = {'auth': 'Проверьте токен', 'forbidden': 'Недостаточно прав', 'rate_limited': 'Лимит запросов МойСклад', 'temporary': 'МойСклад временно недоступен', 'invalid_request': 'Ошибка запроса', 'invalid_response': 'Некорректный ответ МойСклад', 'internal': 'Ошибка сохранения'} %}
                                         <div class="text-danger">{{ errorLabels[sync.errorCategory] ?? 'Ошибка загрузки' }}</div>
                                     {% endif %}
+                                    <details class="mt-2">
+                                        <summary>История запусков (последние 5)</summary>
+                                        <ul class="list-unstyled mt-2 mb-0">
+                                            {% for item in sync.history %}
+                                                <li class="mb-1">{{ item.startedAt|date('d.m.Y H:i:s') }} —
+                                                    {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ errorLabels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %};
+                                                    обработано {{ item.processed }}, создано {{ item.created }}, обновлено {{ item.updated }}, без изменений {{ item.unchanged }}
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </details>
                                 </div>
                             {% else %}
                                 <p class="text-secondary mt-3 mb-0">Загрузка контрагентов ещё не запускалась.</p>
@@ -76,7 +87,7 @@
                                         <input type="hidden" name="version" value="{{ connection.version }}">
                                         <button type="submit" class="btn btn-outline-primary">Проверить подключение</button>
                                     </form>
-                                    {% if connection.isActive and status == 'connected' and connection.accountId %}
+                                    {% if connection.isActive and status == 'connected' and connection.accountId and (not sync or sync.status != 'running') %}
                                         <form method="post" action="{{ path('moysklad_connections_sync_counterparties', {id: connection.id}) }}">
                                             <input type="hidden" name="_token" value="{{ csrf_token('moysklad_sync_counterparties' ~ connection.id) }}">
                                             <button type="submit" class="btn btn-primary">Загрузить контрагентов</button>

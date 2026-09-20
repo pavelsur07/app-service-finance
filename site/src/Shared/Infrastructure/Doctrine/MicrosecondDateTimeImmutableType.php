@@ -81,8 +81,8 @@ class MicrosecondDateTimeImmutableType extends Type
         // Зона указывается явно: полагаться на умолчание процесса значило бы
         // читать одну и ту же строку по-разному в разных окружениях.
         $timezone = $this->storageTimezone();
-        $converted = \DateTimeImmutable::createFromFormat(self::FORMAT, $value, $timezone)
-            ?: \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value, $timezone);
+        $converted = \DateTimeImmutable::createFromFormat('!'.self::FORMAT, $value, $timezone)
+            ?: \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $value, $timezone);
 
         if (false === $converted) {
             throw ConversionException::conversionFailedFormat($value, $this->getName(), self::FORMAT);

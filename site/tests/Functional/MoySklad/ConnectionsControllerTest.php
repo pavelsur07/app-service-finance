@@ -65,6 +65,20 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertStringNotContainsString('stored-sensitive-token', (string) $client->getResponse()->getContent());
     }
 
+    public function testRunningSyncHidesDuplicateQueueForm(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $this->em()->persist(new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'counterparty', new \DateTimeImmutable('2026-09-20T09:00:00+00:00')));
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Загрузка контрагентов:');
+        self::assertCount(0, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-counterparties"]'));
+    }
+
     public function testSyncPostRequiresCsrfAndVerifiedActiveConnection(): void
     {
         [$client, $connection] = $this->seed();
@@ -138,12 +152,14 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         $previous = new \DateTimeImmutable('2026-09-19T09:00:00+00:00');
         $cursor = new MoySkladSyncCursor(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'counterparty');
         $cursor->completeAt($previous);
+        $previousRun = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'counterparty', new \DateTimeImmutable('2026-09-18T09:00:00+00:00'));
+        $previousRun->succeed($previous);
         $run = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'counterparty', new \DateTimeImmutable('2026-09-20T09:00:00+00:00'));
         $run->recordPage(2, 2, 0, 0);
         $run->fail('rate_limited', new \DateTimeImmutable('2026-09-20T09:01:00+00:00'));
         $foreign = new MoySkladConnection(Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), 'Чужой склад', $connection->getBaseUrl());
         $foreignRun = new MoySkladSyncRun(Uuid::uuid7()->toString(), $foreign->getCompanyId(), $foreign->getId(), 'counterparty', new \DateTimeImmutable('2026-09-20T09:00:00+00:00'));
-        foreach ([$cursor, $run, $foreign, $foreignRun] as $entity) {
+        foreach ([$cursor, $previousRun, $run, $foreign, $foreignRun] as $entity) {
             $this->em()->persist($entity);
         }
         $this->em()->flush();
@@ -155,6 +171,8 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Лимит запросов МойСклад');
         self::assertSelectorTextContains('body', '19.09.2026');
+        self::assertSelectorTextContains('body', 'История запусков');
+        self::assertSelectorTextContains('body', '18.09.2026');
         self::assertSelectorTextNotContains('body', 'Чужой склад');
     }
 

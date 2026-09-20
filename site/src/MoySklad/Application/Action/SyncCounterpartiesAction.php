@@ -130,18 +130,24 @@ final readonly class SyncCounterpartiesAction
                 return $this->runs->findByIdAndCompanyId($runId, $companyId);
             } catch (\Throwable $error) {
                 $category = $error instanceof CounterpartySyncException ? $error->category : 'internal';
-                $this->em->clear();
-                try {
-                    $failedRun = $this->runs->findByIdAndCompanyId($runId, $companyId);
-                    if (null !== $failedRun && 'running' === $failedRun->getStatus()) {
-                        $failedRun->fail($category, $this->now());
-                        $this->em->flush();
-                    }
-                } catch (\Throwable) {
-                    $this->em->clear();
+                if (!in_array($category, MoySkladSyncRun::ERROR_CATEGORIES, true)) {
+                    $category = 'internal';
                 }
-                $this->logger->log(in_array($category, ['rate_limited', 'temporary'], true) ? 'warning' : 'error', 'MoySklad counterparty sync failed', ['companyId' => $companyId, 'connectionId' => $connectionId, 'runId' => $runId, 'category' => $category]);
-                throw $error instanceof CounterpartySyncException ? $error : new CounterpartySyncException('internal');
+                try {
+                    // A failed ORM flush closes EntityManager. DBAL remains usable
+                    // after transactional rollback, so record the outcome directly.
+                    $db->executeStatement("UPDATE moysklad_sync_runs SET status = 'failed', error_category = :category, finished_at = :finishedAt WHERE id = :runId AND company_id = :companyId AND status = 'running'", [
+                        'category' => $category,
+                        'finishedAt' => $this->now()->format('Y-m-d H:i:s.v'),
+                        'runId' => $runId,
+                        'companyId' => $companyId,
+                    ]);
+                } catch (\Throwable) {
+                    $this->logger->error('MoySklad counterparty sync failure status could not be stored', ['companyId' => $companyId, 'connectionId' => $connectionId, 'runId' => $runId]);
+                }
+                $this->em->clear();
+                $this->logger->log(in_array($category, ['rate_limited', 'temporary'], true) ? 'warning' : 'error', 'MoySklad counterparty sync failed', ['companyId' => $companyId, 'connectionId' => $connectionId, 'runId' => $runId, 'category' => $category, 'exceptionClass' => $error::class]);
+                throw new CounterpartySyncException($category, $error instanceof CounterpartySyncException ? $error->retryAfterMs : null, $runId);
             }
         } finally {
             try {
@@ -154,6 +160,9 @@ final readonly class SyncCounterpartiesAction
 
     private function now(): \DateTimeImmutable
     {
-        return new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $timezone = new \DateTimeZone('UTC');
+        $now = new \DateTimeImmutable('now', $timezone);
+
+        return new \DateTimeImmutable($now->format('Y-m-d H:i:s.v'), $timezone);
     }
 }

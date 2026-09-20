@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Doctrine;
 
 use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
-use App\Shared\Infrastructure\Doctrine\UtcMicrosecondDateTimeImmutableType;
+use App\Shared\Infrastructure\Doctrine\UtcMillisecondDateTimeImmutableType;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
@@ -35,14 +35,14 @@ final class MicrosecondDateTimeImmutableTypeTest extends TestCase
 
     public function testUtcVariantStoresUtcWallClockAndPreservesInstant(): void
     {
-        $type = new UtcMicrosecondDateTimeImmutableType();
+        $type = new UtcMillisecondDateTimeImmutableType();
         $platform = new PostgreSQLPlatform();
         $value = new \DateTimeImmutable('2026-09-20 12:00:00.123456+03:00');
 
         $stored = $type->convertToDatabaseValue($value, $platform);
-        self::assertSame('2026-09-20 09:00:00.123456', $stored);
+        self::assertSame('2026-09-20 09:00:00.123', $stored);
         $restored = $type->convertToPHPValue($stored, $platform);
-        self::assertSame($value->format('U.u'), $restored?->format('U.u'));
+        self::assertSame('2026-09-20 09:00:00.123000', $restored?->format('Y-m-d H:i:s.u'));
         self::assertSame('UTC', $restored->getTimezone()->getName());
     }
 

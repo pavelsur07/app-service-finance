@@ -56,10 +56,10 @@ class MoySkladCounterparty
     #[ORM\Column(type: Types::BOOLEAN)]
     private bool $archived;
 
-    #[ORM\Column(type: 'datetime_immutable_utc_us', precision: 6)]
+    #[ORM\Column(type: 'datetime_immutable_utc_ms', precision: 3)]
     private \DateTimeImmutable $sourceUpdatedAt;
 
-    #[ORM\Column(type: 'datetime_immutable_utc_us', precision: 6)]
+    #[ORM\Column(type: 'datetime_immutable_utc_ms', precision: 3)]
     private \DateTimeImmutable $loadedAt;
 
     public function __construct(string $id, string $companyId, string $connectionId, CounterpartySnapshot $snapshot, \DateTimeImmutable $loadedAt)
