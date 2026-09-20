@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / API and normalization
+**Phase:** Stage 3 / full sync and Messenger
 **Status:** ready to start
-**Stage base commit:** `2d23ac36f9c6504743460fc064406a5088b7464f`
+**Stage base commit:** `421908c2334ad25abba86057e0ed452838a263ad`
 
 ### Completed
 
@@ -12,6 +12,8 @@
 - Work item 1.2: миграция трёх таблиц с FK, индексами и проверками; свежая test-БД применяет все 262 миграции; запрет удаления подключения проверен.
 - Внутреннее ревью Stage 1: добавлен индекс по `connection_id` для FK истории запусков и проверка диапазона индексов builder'ов.
 - Внешнее ревью Stage 1: 0 BLOCKER, 2 IMPORTANT, 4 MINOR; подтверждённые замечания исправлены, uppercase UUID подтверждён тестом. Исправления проверены 81 тестом / 346 assertions, PHPStan и CS Fixer. Stage Report закрыт.
+- Stage 1 committed as `421908c2`, pushed; Draft PR #2495 targets `master`.
+- Stage 2: API page reader, safe categories and parser based on sanitized fixtures. 77 unit tests / 325 assertions, PHPStan and CS Fixer PASS; internal review fixed malformed empty-object rows. Stage Report closed.
 
 ### Checks and baseline
 
@@ -30,7 +32,7 @@
 
 ### Exact next action
 
-- Зафиксировать Stage 1 в Git, отправить branch и открыть Draft PR; затем Stage 2, начиная с API client и тестов по фикстурам.
+- Commit/push Stage 2, обновить Draft PR; затем Stage 3: сначала тесты первичной загрузки, сбоя страницы и повторного прохода, затем Action/Messenger.
 
 ### Files to inspect first on resume
 
