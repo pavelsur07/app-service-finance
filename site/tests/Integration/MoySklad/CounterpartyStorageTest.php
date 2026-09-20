@@ -76,6 +76,8 @@ final class CounterpartyStorageTest extends WebTestCaseBase
         $runs = static::getContainer()->get(MoySkladSyncRunRepository::class);
         self::assertNotNull($records->findByExternalId($connection->getCompanyId(), $connection->getId(), $snapshot->externalId));
         self::assertNull($records->findByExternalId($otherCompany, $connection->getId(), $snapshot->externalId));
+        self::assertCount(1, $records->findByExternalIds($connection->getCompanyId(), $connection->getId(), [$snapshot->externalId]));
+        self::assertSame([], $records->findByExternalIds($otherCompany, $connection->getId(), [$snapshot->externalId]));
         self::assertNull($records->findByIdAndCompanyId($record->getId(), $otherCompany));
         self::assertNotNull($records->findByIdAndCompanyId(strtoupper($record->getId()), $connection->getCompanyId()));
         self::assertNotNull($cursors->findFor($connection->getCompanyId(), $connection->getId(), 'counterparty'));

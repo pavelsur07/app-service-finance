@@ -25,4 +25,28 @@ final class MoySkladCounterpartyRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['companyId' => $companyId, 'connectionId' => $connectionId, 'externalId' => $externalId]);
     }
+
+    /** @param list<string> $externalIds
+     * @return array<string, MoySkladCounterparty>
+     */
+    public function findByExternalIds(string $companyId, string $connectionId, array $externalIds): array
+    {
+        if ([] === $externalIds) {
+            return [];
+        }
+        $rows = $this->createQueryBuilder('c')
+            ->andWhere('c.companyId = :companyId')
+            ->andWhere('c.connectionId = :connectionId')
+            ->andWhere('c.externalId IN (:externalIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('connectionId', $connectionId)
+            ->setParameter('externalIds', $externalIds)
+            ->getQuery()->getResult();
+        $found = [];
+        foreach ($rows as $row) {
+            $found[$row->getExternalId()] = $row;
+        }
+
+        return $found;
+    }
 }

@@ -23,4 +23,14 @@ final class MoySkladSyncRunRepository extends ServiceEntityRepository
             ['startedAt' => 'DESC', 'id' => 'DESC'],
         );
     }
+
+    public function findByIdAndCompanyId(string $id, string $companyId): ?MoySkladSyncRun
+    {
+        return $this->findOneBy(['id' => $id, 'companyId' => $companyId]);
+    }
+
+    public function runningFor(string $companyId, string $connectionId, string $entityType): ?MoySkladSyncRun
+    {
+        return $this->findOneBy(['companyId' => $companyId, 'connectionId' => $connectionId, 'entityType' => $entityType, 'status' => 'running']);
+    }
 }

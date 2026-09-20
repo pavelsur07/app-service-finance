@@ -3438,7 +3438,7 @@ disable/enable/delete, HTTP вне транзакции, версия прове
 Повторный аккаунт отклоняется DB constraint без раскрытия чужой компании.
 `ConnectionTokenCodec` использует Shared encryption; новые секреты только encrypted,
 legacy fallback доступен лишь codec до одобренного переноса. Страница и profiler секреты не получают.
-Синхронизация, финансовые преобразования и публичный интеграционный API отсутствуют.
+Финансовые преобразования и публичный интеграционный API отсутствуют.
 
 Первый входящий поток хранит контрагентов только в `MoySklad`:
 `MoySkladCounterparty` (`companyId`, `connectionId`, внешний UUID,
@@ -3451,3 +3451,11 @@ legacy fallback доступен лишь codec до одобренного пе
 `MoySkladConnection.lastSyncAt` не служит курсором этого потока. Контракт
 загрузки и границы будущих потоков — `docs/tasks/moysklad-data-sync/stage-0.md`
 (PR #2493 до слияния документации).
+
+`MoySkladClient::fetchCounterpartyPage` читает активные и архивные страницы;
+`CounterpartyPageParser` проверяет аккаунт, архив и обязательные поля. Фоновый
+`SyncCounterpartiesAction` вызывается сообщением `SyncCounterpartiesMessage`
+на `async_sync`: session advisory lock защищает пару подключение/тип, каждая
+страница атомарна, а cursor обновляется только вместе с успешным полным
+проходом. Временные и 429 ошибки получают максимум три отложенных повтора;
+другие безопасные категории записываются в `MoySkladSyncRun` без тела ответа.

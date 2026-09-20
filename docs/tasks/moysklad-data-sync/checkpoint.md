@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / full sync and Messenger
+**Phase:** Stage 4 / manual UI
 **Status:** ready to start
-**Stage base commit:** `421908c2334ad25abba86057e0ed452838a263ad`
+**Stage base commit:** `d1fd044b93d2e8eadde98dd0c0436346b204c776`
 
 ### Completed
 
@@ -14,6 +14,9 @@
 - Внешнее ревью Stage 1: 0 BLOCKER, 2 IMPORTANT, 4 MINOR; подтверждённые замечания исправлены, uppercase UUID подтверждён тестом. Исправления проверены 81 тестом / 346 assertions, PHPStan и CS Fixer. Stage Report закрыт.
 - Stage 1 committed as `421908c2`, pushed; Draft PR #2495 targets `master`.
 - Stage 2: API page reader, safe categories and parser based on sanitized fixtures. 77 unit tests / 325 assertions, PHPStan and CS Fixer PASS; internal review fixed malformed empty-object rows. Stage Report closed.
+- Stage 2 committed as `d1fd044b`, pushed to Draft PR #2495.
+- Stage 3: full sync Action, tenant-scoped page batch, lock, cursor, run status, delayed Messenger retries.
+- External Stage 3 review: 0 BLOCKER, 2 IMPORTANT, 3 MINOR. Все исправлены; 109 tests / 465 assertions, focused PHPStan/CS PASS. Stage Report closed.
 
 ### Checks and baseline
 
@@ -32,7 +35,7 @@
 
 ### Exact next action
 
-- Commit/push Stage 2, обновить Draft PR; затем Stage 3: сначала тесты первичной загрузки, сбоя страницы и повторного прохода, затем Action/Messenger.
+- Commit/push Stage 3 and update Draft PR; then Stage 4 controller and status UI.
 
 ### Files to inspect first on resume
 
