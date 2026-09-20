@@ -39,7 +39,7 @@ final readonly class MoySkladClient
         try {
             $response = $httpClient->request('GET', $url, [
                 'auth_bearer' => $token,
-                'headers' => ['Accept' => 'application/json', 'Accept-Encoding' => 'gzip'],
+                'headers' => ['Accept' => 'application/json;charset=utf-8', 'Accept-Encoding' => 'gzip'],
                 'timeout' => 10.0,
                 'max_duration' => 10.0,
                 'max_redirects' => 0,
