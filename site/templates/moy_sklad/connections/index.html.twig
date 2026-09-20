@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block integration_content %}
-    <p class="text-secondary">Подключите аккаунты МойСклад вашей компании. Проверка подтверждает доступ; обмен данными пока не выполняется.</p>
+    <p class="text-secondary">Подключите аккаунты МойСклад вашей компании. После проверки можно загрузить контрагентов.</p>
     {% if pager.nbResults == 0 %}
         <div class="card">
             <div class="card-body empty">
@@ -19,8 +19,9 @@
         </div>
     {% else %}
         <div class="row row-cards mb-3">
-            {% for connection in pager %}
+            {% for connection in connections %}
                 {% set status = connection.checkStatus.value %}
+                {% set sync = syncStatuses[connection.id] ?? null %}
                 <div class="col-12 col-xl-6">
                     <section class="card h-100" aria-labelledby="connection-title-{{ connection.id }}">
                         <div class="card-header flex-wrap gap-2">
@@ -43,7 +44,26 @@
                                 <dd class="col-sm-7">{{ connection.lastCheckedAt ? connection.lastCheckedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялась' }}</dd>
                                 <dt class="col-sm-5">Успешная проверка</dt>
                                 <dd class="col-sm-7">{{ connection.lastSuccessfulCheckAt ? connection.lastSuccessfulCheckAt|date('d.m.Y H:i:s') : 'Ещё не выполнялась' }}</dd>
+                                <dt class="col-sm-5">Последний полный проход</dt>
+                                <dd class="col-sm-7">{{ sync and sync.lastCompletedAt ? sync.lastCompletedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялся' }}</dd>
                             </dl>
+                            {% if sync and sync.status %}
+                                <div class="mt-3">
+                                    <div>Загрузка контрагентов:
+                                        {% if sync.status == 'running' %}Выполняется
+                                        {% elseif sync.status == 'succeeded' %}Успешно
+                                        {% else %}Ошибка{% endif %}
+                                    </div>
+                                    <div class="text-secondary">Начало: {{ sync.startedAt|date('d.m.Y H:i:s') }}{% if sync.finishedAt %} · Завершение: {{ sync.finishedAt|date('d.m.Y H:i:s') }}{% endif %}</div>
+                                    <div class="text-secondary">Обработано: {{ sync.processed }} · Создано: {{ sync.created }} · Обновлено: {{ sync.updated }} · Без изменений: {{ sync.unchanged }}</div>
+                                    {% if sync.status == 'failed' %}
+                                        {% set errorLabels = {'auth': 'Проверьте токен', 'forbidden': 'Недостаточно прав', 'rate_limited': 'Лимит запросов МойСклад', 'temporary': 'МойСклад временно недоступен', 'invalid_request': 'Ошибка запроса', 'invalid_response': 'Некорректный ответ МойСклад', 'internal': 'Ошибка сохранения'} %}
+                                        <div class="text-danger">{{ errorLabels[sync.errorCategory] ?? 'Ошибка загрузки' }}</div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <p class="text-secondary mt-3 mb-0">Загрузка контрагентов ещё не запускалась.</p>
+                            {% endif %}
                             {% if status != 'connected' %}
                                 <p class="text-secondary mt-3 mb-0">{{ status == 'unverified' ? 'Требуется проверка' : connection.checkStatus.message() }}</p>
                             {% endif %}
@@ -56,6 +76,12 @@
                                         <input type="hidden" name="version" value="{{ connection.version }}">
                                         <button type="submit" class="btn btn-outline-primary">Проверить подключение</button>
                                     </form>
+                                    {% if connection.isActive and status == 'connected' and connection.accountId %}
+                                        <form method="post" action="{{ path('moysklad_connections_sync_counterparties', {id: connection.id}) }}">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('moysklad_sync_counterparties' ~ connection.id) }}">
+                                            <button type="submit" class="btn btn-primary">Загрузить контрагентов</button>
+                                        </form>
+                                    {% endif %}
                                     <a class="btn" href="{{ path('moysklad_connections_edit', {id: connection.id}) }}">Изменить название</a>
                                     <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#replace-token-{{ connection.id }}">Заменить токен</button>
                                     {% set operation = connection.isActive ? 'disable' : 'enable' %}
@@ -80,7 +106,7 @@
 
 {% block modals %}
     {% if is_granted('module.marketplace.write') %}
-        {% for connection in pager %}
+        {% for connection in connections %}
             <div class="modal modal-blur fade" id="replace-token-{{ connection.id }}" tabindex="-1" aria-labelledby="replace-token-title-{{ connection.id }}" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">

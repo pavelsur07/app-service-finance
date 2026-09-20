@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 / manual UI
-**Status:** ready to start
-**Stage base commit:** `d1fd044b93d2e8eadde98dd0c0436346b204c776`
+**Phase:** Handoff
+**Status:** ready for full gates and final review
+**Stage base commit:** `0d52c55c31a99342a8f5a75378690b7cb89c492b`
 
 ### Completed
 
@@ -17,6 +17,8 @@
 - Stage 2 committed as `d1fd044b`, pushed to Draft PR #2495.
 - Stage 3: full sync Action, tenant-scoped page batch, lock, cursor, run status, delayed Messenger retries.
 - External Stage 3 review: 0 BLOCKER, 2 IMPORTANT, 3 MINOR. Все исправлены; 109 tests / 465 assertions, focused PHPStan/CS PASS. Stage Report closed.
+- Stage 3 committed as `0d52c55c`, pushed to Draft PR #2495.
+- Stage 4: manual POST and status UI, 18 functional tests / 123 assertions, focused PHPStan/CS and Twig lint PASS. Stage Report closed.
 
 ### Checks and baseline
 
@@ -35,7 +37,7 @@
 
 ### Exact next action
 
-- Commit/push Stage 3 and update Draft PR; then Stage 4 controller and status UI.
+- Commit/push Stage 4, then full handoff gates, final internal review, external review and PR Ready.
 
 ### Files to inspect first on resume
 
