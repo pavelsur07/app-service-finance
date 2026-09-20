@@ -28,7 +28,7 @@ use Doctrine\DBAL\Types\Type;
  * времени в проекте: смена типа у остальных — отдельное решение с отдельной
  * проверкой обратной совместимости.
  */
-final class MicrosecondDateTimeImmutableType extends Type
+class MicrosecondDateTimeImmutableType extends Type
 {
     public const NAME = 'datetime_immutable_us';
 
@@ -60,7 +60,7 @@ final class MicrosecondDateTimeImmutableType extends Type
             // бы положить UTC-время и прочитать его как местное: отметка,
             // пришедшая из ClockInterface (UTC), возвращалась бы сдвинутой на
             // смещение зоны — три часа для Europe/Moscow.
-            return $value->setTimezone(self::applicationTimezone())->format(self::FORMAT);
+            return $value->setTimezone($this->storageTimezone())->format(self::FORMAT);
         }
 
         throw ConversionException::conversionFailedInvalidType($value, $this->getName(), ['null', \DateTimeImmutable::class]);
@@ -80,7 +80,7 @@ final class MicrosecondDateTimeImmutableType extends Type
         // записанные до перехода на этот тип, микросекунд не содержат.
         // Зона указывается явно: полагаться на умолчание процесса значило бы
         // читать одну и ту же строку по-разному в разных окружениях.
-        $timezone = self::applicationTimezone();
+        $timezone = $this->storageTimezone();
         $converted = \DateTimeImmutable::createFromFormat(self::FORMAT, $value, $timezone)
             ?: \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value, $timezone);
 
@@ -96,7 +96,7 @@ final class MicrosecondDateTimeImmutableType extends Type
         return true;
     }
 
-    private static function applicationTimezone(): \DateTimeZone
+    protected function storageTimezone(): \DateTimeZone
     {
         return new \DateTimeZone(date_default_timezone_get());
     }

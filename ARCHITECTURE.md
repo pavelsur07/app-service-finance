@@ -3439,3 +3439,15 @@ disable/enable/delete, HTTP вне транзакции, версия прове
 `ConnectionTokenCodec` использует Shared encryption; новые секреты только encrypted,
 legacy fallback доступен лишь codec до одобренного переноса. Страница и profiler секреты не получают.
 Синхронизация, финансовые преобразования и публичный интеграционный API отсутствуют.
+
+Первый входящий поток хранит контрагентов только в `MoySklad`:
+`MoySkladCounterparty` (`companyId`, `connectionId`, внешний UUID,
+нормализованные реквизиты, `archived`, время источника и загрузки),
+`MoySkladSyncCursor` (последний успешный полный проход для подключения и типа)
+и `MoySkladSyncRun` (статус, счётчики, безопасная категория ошибки). Уникальность
+контрагента — `(connection_id, external_id)`, курсора —
+`(connection_id, entity_type)`; репозитории требуют `companyId` во всех
+запросах. FK от всех трёх таблиц запрещают удаление подключения с данными.
+`MoySkladConnection.lastSyncAt` не служит курсором этого потока. Контракт
+загрузки и границы будущих потоков — `docs/tasks/moysklad-data-sync/stage-0.md`
+(PR #2493 до слияния документации).
