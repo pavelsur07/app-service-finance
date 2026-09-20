@@ -22,6 +22,7 @@ final class MoySkladClientTest extends TestCase
             self::assertSame('GET', $method);
             self::assertSame('https://example.test/remap/1.2/context/employee', $url);
             self::assertContains('Authorization: Bearer test-secret', $options['normalized_headers']['authorization']);
+            self::assertContains('Accept: application/json;charset=utf-8', $options['normalized_headers']['accept']);
             self::assertContains('Accept-Encoding: gzip', $options['normalized_headers']['accept-encoding']);
             self::assertSame(10.0, (float) $options['timeout']);
             self::assertSame(10.0, (float) $options['max_duration']);
