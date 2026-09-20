@@ -6,6 +6,7 @@ namespace App\MoySklad\Infrastructure\Api;
 
 use App\MoySklad\Application\DTO\ConnectionCheckResult;
 use App\MoySklad\Enum\ConnectionCheckStatus;
+use App\MoySklad\Exception\CounterpartySyncException;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -95,5 +96,82 @@ final readonly class MoySkladClient
             403 => ConnectionCheckStatus::FORBIDDEN,
             default => ConnectionCheckStatus::INVALID_RESPONSE,
         });
+    }
+
+    /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
+    public function fetchCounterpartyPage(#[\SensitiveParameter] string $token, bool $archived, int $offset, int $limit = 100): array
+    {
+        if (strlen($token) > 8192 || 1 !== preg_match('/^[\x21-\x7E]+$/D', $token)) {
+            throw new CounterpartySyncException('auth');
+        }
+        if ($offset < 0 || $limit < 1 || $limit > 100) {
+            throw new \InvalidArgumentException('Invalid counterparty page coordinates.');
+        }
+
+        $httpClient = $this->httpClient instanceof RetryableHttpClient
+            ? $this->httpClient->withOptions(['max_retries' => 0])
+            : $this->httpClient;
+        $url = rtrim($this->baseUrl, '/').'/entity/counterparty';
+        $query = http_build_query([
+            'limit' => $limit,
+            'offset' => $offset,
+            'order' => 'id,asc',
+            'filter' => 'archived='.($archived ? 'true' : 'false'),
+        ], '', '&', \PHP_QUERY_RFC3986);
+        $statusCode = null;
+        $startedAt = hrtime(true);
+        try {
+            $response = $httpClient->request('GET', $url.'?'.$query, [
+                'auth_bearer' => $token,
+                'headers' => ['Accept' => 'application/json;charset=utf-8'],
+                'timeout' => 10.0,
+                'max_duration' => 20.0,
+                'max_redirects' => 0,
+                'extra' => ['trace_content' => false],
+            ]);
+            $statusCode = $response->getStatusCode();
+            if (200 !== $statusCode) {
+                $retryAfterMs = null;
+                if (429 === $statusCode) {
+                    $header = $response->getHeaders(false)['x-lognex-retry-after'][0] ?? null;
+                    if (is_string($header) && preg_match('/^\d{1,7}$/D', $header)) {
+                        $retryAfterMs = min(3_600_000, (int) $header);
+                    }
+                }
+                $response->cancel();
+                throw new CounterpartySyncException(match (true) {
+                    401 === $statusCode => 'auth', 403 === $statusCode => 'forbidden', 429 === $statusCode => 'rate_limited', $statusCode >= 500 => 'temporary', default => 'invalid_request',
+                }, $retryAfterMs);
+            }
+
+            try {
+                $body = $response->getContent(false);
+                $data = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+                $shape = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                throw new CounterpartySyncException('invalid_response');
+            }
+            if (!is_array($data) || !$shape instanceof \stdClass || !isset($shape->rows) || !is_array($shape->rows) || !isset($data['meta'], $data['rows']) || !is_array($data['meta']) || !array_is_list($data['rows']) || !is_int($data['meta']['size'] ?? null) || $data['meta']['size'] < 0 || ($data['meta']['limit'] ?? null) !== $limit || ($data['meta']['offset'] ?? null) !== $offset || count($data['rows']) > $limit) {
+                throw new CounterpartySyncException('invalid_response');
+            }
+            foreach ($data['rows'] as $row) {
+                if (!is_array($row)) {
+                    throw new CounterpartySyncException('invalid_response');
+                }
+            }
+
+            return ['meta' => $data['meta'], 'rows' => $data['rows']];
+        } catch (TransportExceptionInterface) {
+            $statusCode = null;
+            throw new CounterpartySyncException('temporary');
+        } finally {
+            $safeUrl = (parse_url($url, \PHP_URL_SCHEME) ?: 'https').'://'.(parse_url($url, \PHP_URL_HOST) ?: '').(parse_url($url, \PHP_URL_PATH) ?: '');
+            $this->logger?->log(null === $statusCode || $statusCode >= 400 ? 'warning' : 'info', 'MoySklad counterparty page request', [
+                'method' => 'GET',
+                'url' => $safeUrl,
+                'httpStatus' => $statusCode,
+                'durationMs' => (hrtime(true) - $startedAt) / 1_000_000,
+            ]);
+        }
     }
 }

@@ -6,6 +6,7 @@ namespace App\MoySklad\Controller;
 
 use App\Company\Security\ModuleAccess;
 use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
+use App\MoySklad\Infrastructure\Query\MoySkladCounterpartySyncStatusQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Exception\OutOfRangeCurrentPageException;
@@ -21,7 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MoySkladConnectionsController extends AbstractController
 {
     #[Route('/moy-sklad/connections', name: 'moysklad_connections_index', methods: ['GET'])]
-    public function __invoke(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query): Response
+    public function __invoke(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query, MoySkladCounterpartySyncStatusQuery $syncStatusQuery): Response
     {
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
         $page = $request->query->getInt('page', 1);
@@ -34,6 +35,9 @@ final class MoySkladConnectionsController extends AbstractController
             throw new UnprocessableEntityHttpException('Страница не существует.');
         }
 
-        return $this->render('moy_sklad/connections/index.html.twig', ['pager' => $pager]);
+        $connections = array_values(iterator_to_array($pager->getCurrentPageResults()));
+        $statuses = $syncStatusQuery->forConnections($companyId, array_map(static fn ($connection): string => $connection->getId(), $connections));
+
+        return $this->render('moy_sklad/connections/index.html.twig', ['pager' => $pager, 'connections' => $connections, 'syncStatuses' => $statuses]);
     }
 }
