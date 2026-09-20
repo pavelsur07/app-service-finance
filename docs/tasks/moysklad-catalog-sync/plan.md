@@ -38,7 +38,7 @@ Reviewer focus: сортировка и полнота страниц, тран�
 
 ## Stage 3: запуск и наблюдаемость
 
-Risk: MEDIUM. stage_base_commit: фиксируется после Stage 2.
+Risk: HIGH-LOCAL. stage_base_commit: `422f431a`.
 
 Definition of Done: кнопка запуска и отдельные статусы товара/модификации видны только своей компании; функциональные тесты прав/CSRF; документация и Stage reports обновлены.
 

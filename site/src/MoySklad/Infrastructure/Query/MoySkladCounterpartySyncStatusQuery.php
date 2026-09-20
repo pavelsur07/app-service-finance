@@ -16,8 +16,11 @@ final readonly class MoySkladCounterpartySyncStatusQuery
     /** @param list<string> $connectionIds
      * @return array<string, array{status: ?string, startedAt: ?\DateTimeImmutable, finishedAt: ?\DateTimeImmutable, processed: int, created: int, updated: int, unchanged: int, errorCategory: ?string, lastCompletedAt: ?\DateTimeImmutable, history: list<array{status: string, startedAt: \DateTimeImmutable, finishedAt: ?\DateTimeImmutable, processed: int, created: int, updated: int, unchanged: int, errorCategory: ?string}>}>
      */
-    public function forConnections(string $companyId, array $connectionIds): array
+    public function forConnections(string $companyId, array $connectionIds, string $entityType = 'counterparty'): array
     {
+        if (!in_array($entityType, ['counterparty', 'product', 'variant'], true)) {
+            throw new \InvalidArgumentException('Invalid MoySklad sync entity type.');
+        }
         if ([] === $connectionIds) {
             return [];
         }
@@ -29,14 +32,14 @@ final readonly class MoySkladCounterpartySyncStatusQuery
             LEFT JOIN LATERAL (
                 SELECT status, started_at, finished_at, processed, created, updated, unchanged, error_category
                 FROM moysklad_sync_runs r
-                WHERE r.company_id = c.company_id AND r.connection_id = c.id AND r.entity_type = 'counterparty'
+                WHERE r.company_id = c.company_id AND r.connection_id = c.id AND r.entity_type = :entityType
                 ORDER BY r.started_at DESC, r.id DESC
                 LIMIT 1
             ) r ON true
             LEFT JOIN moysklad_sync_cursors cursor
-              ON cursor.company_id = c.company_id AND cursor.connection_id = c.id AND cursor.entity_type = 'counterparty'
+              ON cursor.company_id = c.company_id AND cursor.connection_id = c.id AND cursor.entity_type = :entityType
             WHERE c.company_id = :companyId AND c.id IN (:connectionIds)
-            SQL, ['companyId' => $companyId, 'connectionIds' => $connectionIds], ['connectionIds' => ArrayParameterType::STRING])->fetchAllAssociative();
+            SQL, ['companyId' => $companyId, 'connectionIds' => $connectionIds, 'entityType' => $entityType], ['connectionIds' => ArrayParameterType::STRING])->fetchAllAssociative();
 
         $statuses = [];
         foreach ($rows as $row) {
@@ -61,11 +64,11 @@ final readonly class MoySkladCounterpartySyncStatusQuery
                        r.processed, r.created, r.updated, r.unchanged, r.error_category,
                        ROW_NUMBER() OVER (PARTITION BY r.connection_id ORDER BY r.started_at DESC, r.id DESC) AS row_number
                 FROM moysklad_sync_runs r
-                WHERE r.company_id = :companyId AND r.connection_id IN (:connectionIds) AND r.entity_type = 'counterparty'
+                WHERE r.company_id = :companyId AND r.connection_id IN (:connectionIds) AND r.entity_type = :entityType
             ) ranked
             WHERE row_number <= 5
             ORDER BY connection_id, row_number
-            SQL, ['companyId' => $companyId, 'connectionIds' => $connectionIds], ['connectionIds' => ArrayParameterType::STRING])->fetchAllAssociative();
+            SQL, ['companyId' => $companyId, 'connectionIds' => $connectionIds, 'entityType' => $entityType], ['connectionIds' => ArrayParameterType::STRING])->fetchAllAssociative();
         foreach ($historyRows as $row) {
             $connectionId = (string) $row['connection_id'];
             if (!isset($statuses[$connectionId]) || !is_string($row['status'])) {

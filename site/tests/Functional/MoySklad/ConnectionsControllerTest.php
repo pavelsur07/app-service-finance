@@ -11,6 +11,7 @@ use App\MoySklad\Entity\MoySkladSyncCursor;
 use App\MoySklad\Entity\MoySkladSyncRun;
 use App\MoySklad\Enum\ConnectionCheckStatus;
 use App\MoySklad\Infrastructure\Query\MoySkladCounterpartySyncStatusQuery;
+use App\MoySklad\Message\SyncCatalogMessage;
 use App\MoySklad\Message\SyncCounterpartiesMessage;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
@@ -63,6 +64,86 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertSame($connection->getCompanyId(), $message->companyId);
         self::assertSame($connection->getId(), $message->connectionId);
         self::assertStringNotContainsString('stored-sensitive-token', (string) $client->getResponse()->getContent());
+    }
+
+    public function testVerifiedConnectionQueuesCatalogSyncAndShowsSeparateStatuses(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
+        $productRun = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'product', $now);
+        $productRun->recordPage(2, 2, 0, 0);
+        $productRun->succeed($now);
+        $variantRun = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'variant', $now);
+        $variantRun->fail('rate_limited', $now);
+        $this->em()->persist($productRun);
+        $this->em()->persist($variantRun);
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Товары: Успешно');
+        self::assertSelectorTextContains('body', 'Модификации: Ошибка');
+        self::assertCount(1, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-catalog"]'));
+        $client->request('POST', '/moy-sklad/connections/'.$connection->getId().'/sync-catalog', [
+            '_token' => $this->csrfToken($client, 'moysklad_sync_catalog'.$connection->getId()),
+        ]);
+        self::assertResponseRedirects('/moy-sklad/connections');
+        /** @var InMemoryTransport $transport */
+        $transport = $client->getContainer()->get('messenger.transport.async_sync');
+        self::assertCount(1, $transport->getSent());
+        $message = $transport->getSent()[0]->getMessage();
+        self::assertInstanceOf(SyncCatalogMessage::class, $message);
+        self::assertSame($connection->getCompanyId(), $message->companyId);
+        self::assertSame($connection->getId(), $message->connectionId);
+    }
+
+    public function testCatalogSyncRequiresCsrfWriteAccessAndOwnCompany(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $foreign = new MoySkladConnection(Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), 'Чужой склад', $connection->getBaseUrl());
+        $this->em()->persist($foreign);
+        $this->em()->flush();
+        $statuses = static::getContainer()->get(MoySkladCounterpartySyncStatusQuery::class)->forConnections($connection->getCompanyId(), [$connection->getId(), $foreign->getId()], 'product');
+        self::assertArrayHasKey($connection->getId(), $statuses);
+        self::assertArrayNotHasKey($foreign->getId(), $statuses);
+
+        $url = '/moy-sklad/connections/'.$connection->getId().'/sync-catalog';
+        $client->request('POST', $url, ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+        $client->request('POST', '/moy-sklad/connections/'.$foreign->getId().'/sync-catalog');
+        self::assertResponseStatusCodeSame(404);
+        $this->loginMember($client, $connection->getCompanyId(), ['marketplace' => 'read']);
+        $client->request('GET', '/moy-sklad/connections');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('form[action$="/sync-catalog"]');
+        $client->request('POST', $url, ['_token' => $this->csrfToken($client, 'moysklad_sync_catalog'.$connection->getId())]);
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testRunningCatalogSyncAllowsManualRecoveryOfStaleRun(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $this->em()->persist(new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'product', new \DateTimeImmutable('2026-09-20T09:00:00+00:00')));
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Товары: Выполняется');
+        self::assertCount(1, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-catalog"]'));
+        self::assertSelectorTextContains('body', 'Уже выполняется');
+    }
+
+    public function testMalformedCatalogConnectionIdReturnsNotFound(): void
+    {
+        [$client] = $this->seed();
+        $client->request('POST', '/moy-sklad/connections/not-a-uuid/sync-catalog');
+        self::assertResponseStatusCodeSame(404);
     }
 
     public function testRunningSyncHidesDuplicateQueueForm(): void
