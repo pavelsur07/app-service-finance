@@ -26,7 +26,7 @@ Reviewer focus: tenant FK, nullable поля, контракт `product.meta.hre
 
 ## Stage 2: полный импорт и возобновление
 
-Risk: HIGH-LOCAL. stage_base_commit: фиксируется после Stage 1.
+Risk: HIGH-LOCAL. stage_base_commit: `0152da06`.
 
 Definition of Done: оба типа читаются постранично, архив/повторы/сбой страницы/429 и tenant isolation покрыты тестами; курсоры и история запусков корректны; Messenger retry ограничен.
 

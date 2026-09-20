@@ -6,6 +6,7 @@ namespace App\MoySklad\Infrastructure\Api;
 
 use App\MoySklad\Application\DTO\ConnectionCheckResult;
 use App\MoySklad\Enum\ConnectionCheckStatus;
+use App\MoySklad\Exception\CatalogSyncException;
 use App\MoySklad\Exception\CounterpartySyncException;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -101,17 +102,37 @@ final readonly class MoySkladClient
     /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
     public function fetchCounterpartyPage(#[\SensitiveParameter] string $token, bool $archived, int $offset, int $limit = 100): array
     {
+        try {
+            return $this->fetchPage($token, 'counterparty', $archived, $offset, $limit);
+        } catch (CatalogSyncException $error) {
+            throw new CounterpartySyncException($error->category, $error->retryAfterMs);
+        }
+    }
+
+    /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
+    public function fetchCatalogPage(#[\SensitiveParameter] string $token, string $entityType, bool $archived, int $offset, int $limit = 100): array
+    {
+        if (!in_array($entityType, ['product', 'variant'], true)) {
+            throw new \InvalidArgumentException('Invalid catalog entity type.');
+        }
+
+        return $this->fetchPage($token, $entityType, $archived, $offset, $limit);
+    }
+
+    /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
+    private function fetchPage(#[\SensitiveParameter] string $token, string $entityType, bool $archived, int $offset, int $limit): array
+    {
         if (strlen($token) > 8192 || 1 !== preg_match('/^[\x21-\x7E]+$/D', $token)) {
-            throw new CounterpartySyncException('auth');
+            throw new CatalogSyncException('auth');
         }
         if ($offset < 0 || $limit < 1 || $limit > 100) {
-            throw new \InvalidArgumentException('Invalid counterparty page coordinates.');
+            throw new \InvalidArgumentException('Invalid MoySklad page coordinates.');
         }
 
         $httpClient = $this->httpClient instanceof RetryableHttpClient
             ? $this->httpClient->withOptions(['max_retries' => 0])
             : $this->httpClient;
-        $url = rtrim($this->baseUrl, '/').'/entity/counterparty';
+        $url = rtrim($this->baseUrl, '/').'/entity/'.$entityType;
         $query = http_build_query([
             'limit' => $limit,
             'offset' => $offset,
@@ -139,7 +160,7 @@ final readonly class MoySkladClient
                     }
                 }
                 $response->cancel();
-                throw new CounterpartySyncException(match (true) {
+                throw new CatalogSyncException(match (true) {
                     401 === $statusCode => 'auth', 403 === $statusCode => 'forbidden', 429 === $statusCode => 'rate_limited', $statusCode >= 500 => 'temporary', default => 'invalid_request',
                 }, $retryAfterMs);
             }
@@ -149,26 +170,27 @@ final readonly class MoySkladClient
                 $data = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
                 $shape = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
             } catch (\JsonException) {
-                throw new CounterpartySyncException('invalid_response');
+                throw new CatalogSyncException('invalid_response');
             }
             if (!is_array($data) || !$shape instanceof \stdClass || !isset($shape->rows) || !is_array($shape->rows) || !isset($data['meta'], $data['rows']) || !is_array($data['meta']) || !array_is_list($data['rows']) || !is_int($data['meta']['size'] ?? null) || $data['meta']['size'] < 0 || ($data['meta']['limit'] ?? null) !== $limit || ($data['meta']['offset'] ?? null) !== $offset || count($data['rows']) > $limit) {
-                throw new CounterpartySyncException('invalid_response');
+                throw new CatalogSyncException('invalid_response');
             }
             foreach ($data['rows'] as $row) {
                 if (!is_array($row)) {
-                    throw new CounterpartySyncException('invalid_response');
+                    throw new CatalogSyncException('invalid_response');
                 }
             }
 
             return ['meta' => $data['meta'], 'rows' => $data['rows']];
         } catch (TransportExceptionInterface) {
             $statusCode = null;
-            throw new CounterpartySyncException('temporary');
+            throw new CatalogSyncException('temporary');
         } finally {
             $safeUrl = (parse_url($url, \PHP_URL_SCHEME) ?: 'https').'://'.(parse_url($url, \PHP_URL_HOST) ?: '').(parse_url($url, \PHP_URL_PATH) ?: '');
-            $this->logger?->log(null === $statusCode || $statusCode >= 400 ? 'warning' : 'info', 'MoySklad counterparty page request', [
+            $this->logger?->log(null === $statusCode || $statusCode >= 400 ? 'warning' : 'info', 'counterparty' === $entityType ? 'MoySklad counterparty page request' : 'MoySklad catalog page request', [
                 'method' => 'GET',
                 'url' => $safeUrl,
+                'entityType' => $entityType,
                 'httpStatus' => $statusCode,
                 'durationMs' => (hrtime(true) - $startedAt) / 1_000_000,
             ]);

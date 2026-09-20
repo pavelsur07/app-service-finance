@@ -5,6 +5,7 @@
     "accountId": "00000000-0000-4000-8000-000000000003",
     "name": "Тестовая модификация",
     "externalCode": "TEST-VARIANT-1",
+    "discountProhibited": false,
     "archived": false,
     "updated": "2026-01-02 03:04:06.123",
     "characteristics": [{

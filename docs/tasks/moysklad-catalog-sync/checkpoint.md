@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.2
-**Status:** implementing
-**Stage base commit:** `30b18441ae28681e08325b07cf4cd5bec0f6b447`
+**Phase:** Stage 2 / commit and push
+**Status:** checking
+**Stage base commit:** `0152da06`
 
 ### Completed
 
@@ -10,22 +10,25 @@
 - Создан изолированный worktree `feat/moysklad-catalog-sync`.
 - Work items 1.1–1.3: тесты парсера RED→GREEN, DTO, сущности, репозитории, миграция, архитектура и синтетическая непустая фикстура.
 - Stage 1 external review `REVIEW_GREEN`; 3 MINOR исправлены и подтверждены RED→GREEN.
+- Stage 1 commit `0152da06`, pushed; Draft PR #2497, base master проверена.
 - Stage 2 тесты Action RED (отсутствующий класс), клиент и Action реализованы; первичные интеграционные тесты GREEN.
+- Stage 2 Messenger, retry, pagination, gzip, безопасные ошибки и проверки курсоров реализованы; модульный набор 147 tests / 652 assertions.
 
 ### Checks and baseline
 
 - `make site-test-unit` — 2945 tests, 16289 assertions, 4 existing deprecations после установки `site/vendor`.
 - `php bin/phpunit tests/Unit/MoySklad` — 91 tests, 360 assertions.
 - `make site-test-migrations` — latest Version20260920160000; Doctrine mapping OK; focused PHPStan no errors.
+- `php bin/phpunit tests/Integration/MoySklad tests/Unit/MoySklad` — 150 tests, 665 assertions; focused PHPStan no errors.
 
 ### Review status
 
-- internal: iteration 1, open none
-- external: Stage 1 round 1 REVIEW_GREEN, 3 MINOR fixed
+- internal: Stage 2 iteration 1, open none
+- external: Stage 1 round 1 REVIEW_GREEN, 3 MINOR fixed; Stage 2 2 rounds, total BLOCKER 1 / IMPORTANT 2 / MINOR 4 all fixed, result fixed without re-run
 
 ### Exact next action
 
-- Завершить Stage 1 commit/push/PR, затем расширить тесты Stage 2 на страницы, tenant isolation и retry, добавить Messenger handler.
+- Commit/push Stage 2 task-owned files and update Draft PR #2497; continue Stage 3 UI checks.
 
 ### Files to inspect first on resume
 
