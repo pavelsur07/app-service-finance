@@ -1,0 +1,21 @@
+{
+  "context": {
+    "employee": {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/employee/metadata",
+        "type": "employee",
+        "mediaType": "application/json"
+      }
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/entity/variant?limit=2&offset=0&filter=productid%3D00000000-0000-4000-8000-000000000001",
+    "type": "variant",
+    "mediaType": "application/json",
+    "size": 0,
+    "limit": 2,
+    "offset": 0
+  },
+  "rows": []
+}
