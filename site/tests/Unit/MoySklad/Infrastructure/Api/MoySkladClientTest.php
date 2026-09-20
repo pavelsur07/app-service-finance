@@ -10,9 +10,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpClient\Exception\TransportException;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpClient\RetryableHttpClient;
+use Symfony\Component\Process\Process;
 
 final class MoySkladClientTest extends TestCase
 {
@@ -23,7 +25,7 @@ final class MoySkladClientTest extends TestCase
             self::assertSame('https://example.test/remap/1.2/context/employee', $url);
             self::assertContains('Authorization: Bearer test-secret', $options['normalized_headers']['authorization']);
             self::assertContains('Accept: application/json;charset=utf-8', $options['normalized_headers']['accept']);
-            self::assertContains('Accept-Encoding: gzip', $options['normalized_headers']['accept-encoding']);
+            self::assertArrayNotHasKey('accept-encoding', $options['normalized_headers'], 'Symfony must manage gzip decompression.');
             self::assertSame(10.0, (float) $options['timeout']);
             self::assertSame(10.0, (float) $options['max_duration']);
             self::assertSame(0, $options['max_redirects']);
@@ -37,6 +39,40 @@ final class MoySkladClientTest extends TestCase
         self::assertSame(['status', 'accountId'], array_keys(get_object_vars($result)));
         self::assertStringNotContainsString('private-person', serialize($result));
         self::assertStringNotContainsString('test-secret', serialize($result));
+    }
+
+    public function testDecodesGzippedEmployeeResponseWithRealHttpTransport(): void
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertNotFalse($socket);
+        $address = stream_socket_get_name($socket, false);
+        fclose($socket);
+        self::assertIsString($address);
+
+        $serverCode = <<<'PHP'
+            $socket = stream_socket_server('tcp://127.0.0.1:'.$argv[1]);
+            if (false === $socket) { exit(1); }
+            fwrite(STDOUT, "READY\n");
+            $connection = stream_socket_accept($socket, 12);
+            if (false === $connection) { exit(2); }
+            while (false !== ($line = fgets($connection)) && '' !== trim($line)) {}
+            $body = gzencode('{"accountId":"d82c0727-2f5b-4b78-9847-a2cb36660c13"}');
+            fwrite($connection, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\nContent-Length: ".strlen($body)."\r\nConnection: close\r\n\r\n".$body);
+            fclose($connection);
+            fclose($socket);
+            PHP;
+        $process = new Process([\PHP_BINARY, '-r', $serverCode, (string) substr($address, strlen('127.0.0.1:'))]);
+        $process->setTimeout(15);
+        $process->start();
+        try {
+            self::assertTrue($process->waitUntil(static fn (string $type, string $output): bool => str_contains($output, "READY\n")), $process->getErrorOutput());
+            $result = (new MoySkladClient(HttpClient::create(), 'http://'.$address.'/api/remap/1.2'))->check('test-secret');
+
+            self::assertSame(ConnectionCheckStatus::CONNECTED, $result->status);
+            self::assertSame('d82c0727-2f5b-4b78-9847-a2cb36660c13', $result->accountId);
+        } finally {
+            $process->stop(1);
+        }
     }
 
     #[DataProvider('responses')]
