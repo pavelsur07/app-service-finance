@@ -1,4 +1,6 @@
-# Ответы МойСклад для тестов контрагентов
+# Ответы МойСклад для тестов
+
+## Контрагенты
 
 Файлы `Counterparty/*.json` получены из ответов `GET /entity/counterparty`
 JSON API 1.2 тестового аккаунта 2026-09-20. Использовались
@@ -24,3 +26,28 @@ JSON API 1.2 тестового аккаунта 2026-09-20. Использов�
 Каталог `captured/` игнорируется Git; сырые ответы удалены после проверки
 обезличенных копий. Фикстуры не содержат токен и не требуют сетевого доступа
 при запуске тестов.
+
+## Товары и модификации
+
+Файлы `Product/*.json` и `Variant/*.json` получены из ответов
+`GET /entity/product` и `GET /entity/variant` JSON API 1.2 тестового
+аккаунта 2026-09-20. Использовались `Accept: application/json;charset=utf-8`,
+`Accept-Encoding: gzip`, `limit=2`, явный `filter=archived=false|true` и
+`order=id,asc`. Отдельный запрос модификаций использовал
+`filter=productid=<UUID товара>`.
+
+| Файлы | Выборка |
+| --- | --- |
+| `Product/products_active_page_0.json`, `products_active_page_2.json`, `products_active_empty.json` | Активные товары: страницы с `offset=0`, `2` и пустая с `offset=1340`; `meta.size=1340`. |
+| `Product/products_archived_page_0.json`, `products_archived_page_2.json`, `products_archived_empty.json` | Архивные товары: страницы с `offset=0`, `2` и пустая с `offset=33`; `meta.size=33`. |
+| `Variant/variants_active_empty.json`, `variants_archived_empty.json` | Обе архивные выборки модификаций пусты; `meta.size=0`. |
+| `Variant/variants_by_product_empty.json` | Фильтр `productid` по товару из первой активной страницы; пустой ответ. |
+
+Сохранены ключи, вложенность, типы JSON, отсутствующие поля, `meta.size`,
+`limit`, `offset` и связь синтетического ID товара с фильтром `productid`.
+Исходные UUID, названия, коды, штрихкоды, значения дополнительных полей,
+даты и коммерческие числа заменены тестовыми. Фикстуры являются отдельными
+образцами страниц, а не всем списком из 1340 и 33 товаров. В тестовом
+аккаунте нет модификаций, поэтому непустой ответ и ссылку `variant.product`
+эти файлы не покрывают. Сырые ответы удалены после сверки; токен в фикстуры
+не записывался.

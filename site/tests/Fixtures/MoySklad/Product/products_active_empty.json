@@ -1,0 +1,22 @@
+{
+  "context": {
+    "employee": {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/employee/metadata",
+        "type": "employee",
+        "mediaType": "application/json"
+      }
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/entity/product?limit=2&offset=1340&filter=archived%3Dfalse&order=id%2Casc",
+    "type": "product",
+    "mediaType": "application/json",
+    "size": 1340,
+    "limit": 2,
+    "offset": 1340,
+    "previousHref": "https://api.moysklad.ru/api/remap/1.2/entity/product?offset=1338&filter=archived%3Dfalse&limit=2&order=id%2Casc"
+  },
+  "rows": []
+}
