@@ -47,6 +47,9 @@ final class SyncCatalogActionTest extends WebTestCaseBase
         self::assertSame(2, (int) $db->fetchOne('SELECT COUNT(*) FROM moysklad_sync_cursors WHERE connection_id = ?', [$connection->getId()]));
         $variant = static::getContainer()->get(MoySkladVariantRepository::class)->findByExternalId($connection->getCompanyId(), $connection->getId(), '00000000-0000-4000-8000-000000000101');
         self::assertSame('00000000-0000-4000-8000-000000000001', $variant?->getProductExternalId());
+        $foreignCompanyId = '99999999-9999-4999-8999-999999999999';
+        self::assertSame([], static::getContainer()->get(MoySkladProductRepository::class)->findByExternalIds($foreignCompanyId, $connection->getId(), ['00000000-0000-4000-8000-000000000001']));
+        self::assertSame([], static::getContainer()->get(MoySkladVariantRepository::class)->findByExternalIds($foreignCompanyId, $connection->getId(), ['00000000-0000-4000-8000-000000000101']));
 
         self::assertTrue(($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId()));
         self::assertSame(4, (int) $db->fetchOne('SELECT COUNT(*) FROM moysklad_products'));
