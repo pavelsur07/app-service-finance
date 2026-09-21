@@ -36,8 +36,11 @@ final class MoySkladConnectionsController extends AbstractController
         }
 
         $connections = array_values(iterator_to_array($pager->getCurrentPageResults()));
-        $statuses = $syncStatusQuery->forConnections($companyId, array_map(static fn ($connection): string => $connection->getId(), $connections));
+        $connectionIds = array_map(static fn ($connection): string => $connection->getId(), $connections);
+        $statuses = $syncStatusQuery->forConnections($companyId, $connectionIds);
+        $productStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'product');
+        $variantStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'variant');
 
-        return $this->render('moy_sklad/connections/index.html.twig', ['pager' => $pager, 'connections' => $connections, 'syncStatuses' => $statuses]);
+        return $this->render('moy_sklad/connections/index.html.twig', ['pager' => $pager, 'connections' => $connections, 'syncStatuses' => $statuses, 'productSyncStatuses' => $productStatuses, 'variantSyncStatuses' => $variantStatuses]);
     }
 }
