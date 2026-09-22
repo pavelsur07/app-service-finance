@@ -54,6 +54,10 @@ assortment-ссылки и индексы; документированные JS
 таблицах, focused CS/PHPStan. **Reviewer focus:** tenant FK, decimal precision,
 полиморфная ссылка product/variant, guarded rollback, отсутствие raw JSON.
 
+По решению владельца Stage 1 выпускается отдельным PR #2498. Stage 2 и Stage 3
+остаются последующей работой в отдельных ветках после выпуска схемы и
+контракта.
+
 ## Stage 2: полный снимок и отказоустойчивость
 
 **Risk:** HIGH-LOCAL — внешний отчёт, транзакции и Messenger.
@@ -102,6 +106,7 @@ external review.
 
 ## Release
 
-PR содержит миграцию, поэтому после Ready нужен единый owner decision с
-номером созданного PR: запустить production-миграцию и deploy. До этого
-решения production не изменяется.
+PR #2498 содержит миграцию `Version20260921100000`. Разрешение владельца
+покрывает merge Stage 1 после зелёного CI. Production-миграция и deploy требуют
+отдельного ручного запуска по `docs/workflow/release.md`; до такого разрешения
+production не изменяется.

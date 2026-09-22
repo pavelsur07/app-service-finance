@@ -1,0 +1,37 @@
+{
+  "context": {
+    "employee": {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+        "type": "employee",
+        "mediaType": "application/json"
+      }
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/entity/store?limit=2&offset=0&filter=archived%3Dtrue",
+    "type": "store",
+    "mediaType": "application/json",
+    "size": 1,
+    "limit": 2,
+    "offset": 0
+  },
+  "rows": [
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000403",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+        "type": "store",
+        "mediaType": "application/json"
+      },
+      "id": "00000000-0000-4000-8000-000000000403",
+      "accountId": "00000000-0000-4000-8000-000000000003",
+      "shared": false,
+      "updated": "2026-01-02 03:04:08.500",
+      "name": "Архивный тестовый склад",
+      "externalCode": "store-external-3",
+      "archived": true,
+      "pathName": ""
+    }
+  ]
+}

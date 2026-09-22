@@ -1,0 +1,87 @@
+{
+  "context": {
+    "employee": {
+      "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+      "type": "employee",
+      "mediaType": "application/json"
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/report/stock/bystore?limit=2&offset=0&groupBy=variant&filter=stockMode%3Dall",
+    "type": "stockbystore",
+    "mediaType": "application/json",
+    "size": 2,
+    "limit": 2,
+    "offset": 0
+  },
+  "rows": [
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/product/00000000-0000-4000-8000-000000000001",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/product/metadata",
+        "type": "product",
+        "mediaType": "application/json"
+      },
+      "stockByStore": [
+        {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000401",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+            "type": "store",
+            "mediaType": "application/json"
+          },
+          "name": "Основной тестовый склад",
+          "stock": -30,
+          "reserve": 1.25,
+          "inTransit": 3
+        },
+        {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000402",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+            "type": "store",
+            "mediaType": "application/json"
+          },
+          "name": "Резервный тестовый склад",
+          "stock": 0,
+          "reserve": 0,
+          "inTransit": 0
+        }
+      ]
+    },
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/variant/00000000-0000-4000-8000-000000000101",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/variant/metadata",
+        "type": "variant",
+        "mediaType": "application/json"
+      },
+      "stockByStore": [
+        {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000401",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+            "type": "store",
+            "mediaType": "application/json"
+          },
+          "name": "Основной тестовый склад",
+          "stock": 4.125,
+          "reserve": 0.125,
+          "inTransit": 0
+        },
+        {
+          "meta": {
+            "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000402",
+            "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+            "type": "store",
+            "mediaType": "application/json"
+          },
+          "name": "Резервный тестовый склад",
+          "stock": 2,
+          "reserve": 0,
+          "inTransit": 1
+        }
+      ]
+    }
+  ]
+}
