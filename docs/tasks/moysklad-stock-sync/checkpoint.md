@@ -1,52 +1,54 @@
 # moysklad-stock-sync — checkpoint
 
-**Phase:** Stage 1 / handoff
-**Status:** done locally, release in progress
-**Stage base commit:** `13f706a92e847eb21d1c82c303257b5196735b3e`
-**Branch:** `feat/moysklad-stock-sync`
-**PR:** [#2498](https://github.com/pavelsur07/app-service-finance/pull/2498)
+**Phase:** Stage 2 / handoff
+**Status:** Stage 2 complete; PR handoff ready
+**Stage base commit:** `06ef7968e61216f4b5898ce382e884bfbc737b1a`
+**Branch:** `feat/moysklad-stock-snapshot-loader`
+**PR:** [#2499](https://github.com/pavelsur07/app-service-finance/pull/2499)
 
 ## Completed
 
-- Зафиксирован контракт `/entity/store` и `/report/stock/bystore` по
-  официальной JSON API 1.2 ревизии `74f6a4fa`.
-- Добавлены tenant-scoped склады, неизменяемые снимки остатков и строки снимка
-  с product/variant XOR, составными FK и decimal `numeric(30,10)`.
-- Добавлены строгие постраничные parser/DTO, безопасная категория ошибки,
-  обезличенные JSON fixtures и тесты parser/entity/storage.
-- Миграция проверена вверх/вниз на пустой БД; rollback с данными отказал без
-  удаления данных, как предусмотрено guard.
-- Состояния terminal snapshot и его строки защищены триггерами БД.
-- Обычная и экспоненциальная запись decimal нормализуются точно, до float.
+- Добавлен последовательный полный проход активных и архивных складов с
+  отдельным `store` run/cursor и tenant-scoped upsert.
+- Добавлена загрузка сырого `/report/stock/bystore`, постраничная запись строк
+  и публикация снимка только после проверки `meta.size`, дубликатов и ссылок.
+- HTTP выполняется вне транзакций; каждая страница и финальная публикация
+  атомарны, а ошибка stock не откатывает успешный проход складов.
+- Добавлены advisory lock, восстановление зависших runs/snapshots и безопасное
+  закрытие failed snapshot даже при закрытом EntityManager.
+- Добавлены Message/Handler на `async_sync` с ручным bounded retry только для
+  `rate_limited` и `temporary`.
+- Покрыты первичная и повторная загрузка, pagination/drift/duplicates,
+  unknown references, empty report, tenant isolation, lock и recovery.
 
 ## Checks and baseline
 
-- baseline `make site-test-unit` — 2965 tests, 16341 assertions, PASS;
-  4 существующих deprecations.
-- `make site-stan` — PASS, no errors.
-- `make site-cs-check` — PASS, 2693 files.
-- `make site-cs-strict-types` — PASS, 2693 files.
-- `make site-test-unit` — 3006 tests, 16453 assertions, PASS;
-  4 существующих deprecations.
-- `make site-test` — 5174 tests, 29330 assertions, PASS;
-  6 существующих deprecations.
-- current MoySklad module after review fixes — 201 tests, 797 assertions, PASS.
-- migration down/up and guarded non-empty rollback — PASS.
+- Stage 2 baseline MoySklad unit — 143 tests, 499 assertions, PASS.
+- Stage 2 baseline MoySklad integration — 60 tests, 302 assertions, PASS.
+- Final MoySklad unit+integration — 246 tests, 1003 assertions, PASS.
+- `make site-stan` — PASS, 2686 files, no errors.
+- `make site-cs-check` — PASS, 2701 files.
+- `make site-cs-strict-types` — PASS, 2701 files.
+- `make site-test-unit` — 3023 tests, 16503 assertions, PASS;
+  4 existing deprecations.
+- `make site-test` — 5221 tests, 29540 assertions, PASS;
+  6 existing deprecations.
 
 ## Review status
 
-- internal: 7 iterations; 9 IMPORTANT fixed; BLOCKER open: none;
-  final result `REVIEW_GREEN`.
-- external: round 1; 1 IMPORTANT fixed and verified internally without re-run;
-  result `fixed without re-run`; BLOCKER open: none.
+- internal: 0 BLOCKER, 3 IMPORTANT and 1 MINOR found and fixed; open: none.
+- external round 1: 0 BLOCKER, 2 IMPORTANT and 3 MINOR; both IMPORTANT and two
+  MINOR fixed; one MINOR rejected because the task forbids duplicate assortment
+  IDs regardless of type; result `fixed without re-run`.
 
 ## Exact next action
 
-- Commit and push Stage 1, mark PR #2498 Ready, wait for required checks and
-  merge into `master` under the owner's existing approval.
+- Await the owner's single merge + automatic deploy decision for PR #2499.
 
 ## Files to inspect first on resume
 
-- `site/src/MoySklad/Application/StockReportPageParser.php`
-- `site/migrations/Version20260921100000.php`
-- `site/tests/Integration/MoySklad/StockStorageTest.php`
+- `docs/tasks/moysklad-stock-sync/plan.md`
+- `site/src/MoySklad/Application/Action/SyncStockSnapshotAction.php`
+- `site/src/MoySklad/Application/StoreSyncRunner.php`
+- `site/src/MoySklad/Application/StockSnapshotRunner.php`
+- `site/src/MoySklad/MessageHandler/SyncStockSnapshotHandler.php`

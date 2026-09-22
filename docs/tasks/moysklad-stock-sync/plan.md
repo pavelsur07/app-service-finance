@@ -62,7 +62,7 @@ assortment-ссылки и индексы; документированные JS
 
 **Risk:** HIGH-LOCAL — внешний отчёт, транзакции и Messenger.
 
-**stage_base_commit:** записать перед 2.1.
+**stage_base_commit:** `06ef7968e61216f4b5898ce382e884bfbc737b1a`.
 
 **Definition of Done:** store active+archived и stock report проходят все
 страницы; size/duplicate/source-drift guards не публикуют неполный снимок;

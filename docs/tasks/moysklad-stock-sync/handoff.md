@@ -1,69 +1,63 @@
-# moysklad-stock-sync Stage 1 — handoff
+# moysklad-stock-sync Stage 2 — handoff
 
-**Branch:** `feat/moysklad-stock-sync` · **PR:**
-[#2498](https://github.com/pavelsur07/app-service-finance/pull/2498) ·
+**Branch:** `feat/moysklad-stock-snapshot-loader` · **PR:**
+[#2499](https://github.com/pavelsur07/app-service-finance/pull/2499) ·
 **CI:** merge only after all required checks are green
 
 ## Summary of stages
 
-- Stage 1 — API contract, sanitized fixtures, strict parsers and tenant-scoped
-  immutable storage for MoySklad stores and stock snapshots.
-- Stages 2 and 3 — sync orchestration, Messenger and admin status UI remain
-  follow-up work in separate branches by owner decision.
+- Stage 1 — released separately in PR #2498: schema, immutable storage and
+  strict parsers.
+- Stage 2 — complete store synchronization, immutable stock snapshot loading,
+  recovery and bounded Messenger retry.
+- Stage 3 — manual endpoint and UI remain separate work.
 
 ## Files changed
 
-- `site/migrations/Version20260921100000.php` — three tables, constraints,
-  indexes and immutability triggers.
-- `site/src/MoySklad/` — page DTO/parsers, domain snapshots, entities and
-  repositories.
-- `site/tests/` — sanitized fixtures, builders and unit/integration coverage.
-- `ARCHITECTURE.md`, `docs/tasks/moysklad-stock-sync/` — architecture,
-  contract, checkpoint and Stage report.
+- `site/src/MoySklad/Application/` — stock sync action and store/stock runners.
+- `site/src/MoySklad/Infrastructure/Api/MoySkladClient.php` — paginated Store
+  and raw Stock report requests without automatic HTTP retry.
+- `site/src/MoySklad/Message/`, `MessageHandler/` and Messenger config —
+  `async_sync` message with bounded retry.
+- `site/tests/` — HTTP, integration, recovery, tenant and Messenger coverage.
+- `ARCHITECTURE.md`, task checkpoint and Stage report — internal contracts.
 
 ## Migrations
 
-- `Version20260921100000` is schema-only and touches no row data.
-- Down migration is safe while the new tables are empty; after rows exist it
-  deliberately refuses rollback and requires a separate data decision.
-- Creating `uniq_moysklad_variants_tenant_external` is non-concurrent and can
-  briefly block writes to the existing variants table during migration.
+- None. Stage 2 uses the Stage 1 schema already present on `master`.
 
 ## Public API / contract changes
 
-- No HTTP endpoint or cross-module Facade is added in Stage 1.
-- Internal contract adds strict Store and Stock page parsing and storage.
+- No HTTP endpoint or cross-module Facade.
+- Internal Messenger message `SyncStockSnapshotMessage` routes to `async_sync`.
 
 ## Checks
 
-- `make site-stan` — PASS.
-- `make site-cs-check` — PASS.
-- `make site-cs-strict-types` — PASS.
-- `make site-test-unit` — 3006 tests, 16453 assertions, PASS.
-- `make site-test` — 5174 tests, 29330 assertions, PASS.
-- current MoySklad module — 201 tests, 797 assertions, PASS.
-- migration down/up, guarded rollback and mapping validation — PASS.
+- MoySklad unit+integration — 246 tests, 1003 assertions, PASS.
+- `make site-stan` — PASS, 2686 files.
+- `make site-cs-check` — PASS, 2701 files.
+- `make site-cs-strict-types` — PASS, 2701 files.
+- `make site-test-unit` — 3023 tests, 16503 assertions, PASS.
+- `make site-test` — 5221 tests, 29540 assertions, PASS.
 
 ## Reviews
 
-- internal: 7 iterations; 0 BLOCKER, 9 IMPORTANT fixed; `REVIEW_GREEN`.
-- external: 1 round; 0 BLOCKER, 1 IMPORTANT fixed; fixed without re-run.
+- internal: 0 BLOCKER, 3 IMPORTANT and 1 MINOR found and fixed.
+- external: round 1, 0 BLOCKER, 2 IMPORTANT and 3 MINOR; both IMPORTANT and
+  two MINOR fixed; one MINOR rejected per explicit assortment-ID requirement;
+  result `fixed without re-run`.
 
 ## Risks, limitations, follow-ups
 
-- Production migration may briefly lock writes to `moysklad_variants` while
-  building one unique index.
-- Stage 1 does not call the MoySklad API or populate the new tables.
-- Stage 2 will implement full store/stock loading, retries, cursors and runs.
-- Stage 3 will expose manual launch and status in the admin UI.
+- Remote pagination cannot provide a single source timestamp; size, duplicate
+  and store-coverage guards prevent known incomplete snapshots.
+- Stage 3 must add the manual endpoint and status UI before user-driven runs.
+- Production synchronization is data processing outside the deploy pipeline
+  and is not authorized or performed by this handoff.
 
 ## Owner decision
 
-Merge after green CI is already approved for Stage 1. Production migration and
-deploy remain a separate manual decision required by the release workflow.
+Ready: PR #2499 "feat(moysklad): sync store stock snapshots" — merge into
+master with automatic production deploy?
 
-Ready: PR #2498 "feat(moysklad): model stores and stock snapshots" adds
-`Version20260921100000` (schema-only; guarded rollback; brief variants write
-lock). Run the production migration and deploy?
-
-Reply: `run the migration and deploy #2498`
+Reply: "merge and deploy #2499"
