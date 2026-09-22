@@ -28,4 +28,9 @@ final class MoySkladStockSnapshotRepository extends ServiceEntityRepository
             ['completedAt' => 'DESC', 'id' => 'DESC'],
         );
     }
+
+    public function buildingFor(string $companyId, string $connectionId): ?MoySkladStockSnapshot
+    {
+        return $this->findOneBy(['companyId' => $companyId, 'connectionId' => $connectionId, 'status' => 'building']);
+    }
 }

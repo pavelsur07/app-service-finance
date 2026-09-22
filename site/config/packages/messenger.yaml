@@ -82,6 +82,7 @@ framework:
             'App\Ingestion\Message\RunSyncChunkMessage': ingest_fetch
             'App\MoySklad\Message\SyncCounterpartiesMessage': async_sync
             'App\MoySklad\Message\SyncCatalogMessage': async_sync
+            'App\MoySklad\Message\SyncStockSnapshotMessage': async_sync
 
             # --- async_pipeline: local CPU/DB processing of already-fetched data ---
             'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline

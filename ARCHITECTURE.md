@@ -3511,3 +3511,15 @@ legacy fallback доступен лишь codec до одобренного пе
 имеет статус `building`, поэтому опубликованные и failed снимки неизменяемы.
 Контракт источника и ограничения полноты описаны в
 `docs/tasks/moysklad-stock-sync/stock-api-contract.md`.
+
+`SyncStockSnapshotAction` держит session advisory lock на подключение и
+последовательно запускает `StoreSyncRunner`, затем `StockSnapshotRunner`.
+Первый выполняет отдельные active/archived проходы `/entity/store` и завершает
+собственные `store` run/cursor до загрузки остатков. Второй создаёт новый
+`building` snapshot, пишет каждую страницу `/report/stock/bystore` в отдельной
+транзакции и атомарно завершает `stock` run/cursor/snapshot только после
+проверки стабильного `meta.size`, уникальности assortment и полного количества
+строк отчёта. HTTP выполняется вне транзакций; unknown store/product/variant и
+source drift считаются временными ошибками. `SyncStockSnapshotMessage` идёт на
+`async_sync`, вручную перепланирует только `rate_limited`/`temporary` до трёх
+раз с bounded exponential backoff; permanent категории не ретраятся.

@@ -8,6 +8,7 @@ use App\MoySklad\Application\DTO\ConnectionCheckResult;
 use App\MoySklad\Enum\ConnectionCheckStatus;
 use App\MoySklad\Exception\CatalogSyncException;
 use App\MoySklad\Exception\CounterpartySyncException;
+use App\MoySklad\Exception\StockSyncException;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -117,6 +118,76 @@ final readonly class MoySkladClient
         }
 
         return $this->fetchPage($token, $entityType, $archived, $offset, $limit);
+    }
+
+    /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
+    public function fetchStorePage(#[\SensitiveParameter] string $token, bool $archived, int $offset, int $limit = 100): array
+    {
+        try {
+            return $this->fetchPage($token, 'store', $archived, $offset, $limit);
+        } catch (CatalogSyncException $error) {
+            throw new StockSyncException($error->category, $error->retryAfterMs);
+        }
+    }
+
+    public function fetchStockReportPage(#[\SensitiveParameter] string $token, int $offset, int $limit = 1000): string
+    {
+        if (strlen($token) > 8192 || 1 !== preg_match('/^[\x21-\x7E]+$/D', $token)) {
+            throw new StockSyncException('auth');
+        }
+        if ($offset < 0 || $limit < 1 || $limit > 1000) {
+            throw new \InvalidArgumentException('Invalid MoySklad stock report page coordinates.');
+        }
+
+        $httpClient = $this->httpClient instanceof RetryableHttpClient
+            ? $this->httpClient->withOptions(['max_retries' => 0])
+            : $this->httpClient;
+        $url = rtrim($this->baseUrl, '/').'/report/stock/bystore';
+        $query = http_build_query([
+            'limit' => $limit,
+            'offset' => $offset,
+            'groupBy' => 'variant',
+            'filter' => 'stockMode=all',
+        ], '', '&', \PHP_QUERY_RFC3986);
+        $statusCode = null;
+        $startedAt = hrtime(true);
+        try {
+            $response = $httpClient->request('GET', $url.'?'.$query, [
+                'auth_bearer' => $token,
+                'headers' => ['Accept' => 'application/json;charset=utf-8'],
+                'timeout' => 30.0,
+                'max_duration' => 120.0,
+                'max_redirects' => 0,
+                'extra' => ['trace_content' => false],
+            ]);
+            $statusCode = $response->getStatusCode();
+            if (200 !== $statusCode) {
+                $retryAfterMs = null;
+                if (429 === $statusCode) {
+                    $header = $response->getHeaders(false)['x-lognex-retry-after'][0] ?? null;
+                    if (is_string($header) && preg_match('/^\d{1,7}$/D', $header)) {
+                        $retryAfterMs = min(3_600_000, (int) $header);
+                    }
+                }
+                $response->cancel();
+                throw new StockSyncException(match (true) {
+                    401 === $statusCode => 'auth', 403 === $statusCode => 'forbidden', 429 === $statusCode => 'rate_limited', $statusCode >= 500 => 'temporary', default => 'invalid_request',
+                }, $retryAfterMs);
+            }
+
+            return $response->getContent(false);
+        } catch (TransportExceptionInterface) {
+            $statusCode = null;
+            throw new StockSyncException('temporary');
+        } finally {
+            $safeUrl = (parse_url($url, \PHP_URL_SCHEME) ?: 'https').'://'.(parse_url($url, \PHP_URL_HOST) ?: '').(parse_url($url, \PHP_URL_PATH) ?: '');
+            $this->logger?->log(null === $statusCode || $statusCode >= 400 ? 'warning' : 'info', 'MoySklad stock report page request', [
+                'method' => 'GET',
+                'url' => $safeUrl,
+                'httpStatus' => $statusCode,
+                'durationMs' => (hrtime(true) - $startedAt) / 1_000_000,
+            ]);
+        }
     }
 
     /** @return array{meta: array<string, mixed>, rows: list<array<string, mixed>>} */
