@@ -33,7 +33,7 @@
 
 - RED UI: 3 expected failures на отсутствующих store/stock секциях; GREEN UI:
   4 tests, 42 assertions.
-- Stage functional: 32 tests, 229 assertions, PASS.
+- Stage functional after review fixes: 32 tests, 232 assertions, PASS.
 - focused Twig CS: no violations; focused PHP CS Fixer: 0 fixable; focused
   PHPStan: no errors.
 - `npm run lint` — PASS; `npm run build` — PASS (122 modules).
@@ -42,24 +42,29 @@
 - `npm run check:uikit-react-mapping` — pre-existing global baseline red:
   47 missing mappings; task changes neither UI Kit nor React.
 - Rendered DOM smoke covers statuses/forms and preserves responsive
-  `col-12 col-xl-6` cards plus wrapping footer actions. A real browser viewport
-  is unavailable in this environment; no browser screenshot is claimed.
+  `col-12 col-xl-6` cards. The running action now uses Tabler's `mw-100` and
+  `text-wrap`; the loaded Tabler 1.2 stylesheet was checked to resolve these to
+  `max-width: 100%` and `white-space: normal`. A real browser viewport is
+  unavailable in this environment; no 320/375 px browser screenshot is claimed.
 
 #### Internal review
 
-- iterations: 1; BLOCKER: 0; IMPORTANT: 0; MINOR: 0; FOLLOW-UP: none.
-- Проверены loading/empty/error equivalents, responsive wrapping, visible
-  read-only status, CSRF, safe labels and absence of new CSS/JS.
+- iterations: 1; BLOCKER: 0; IMPORTANT: 1 fixed; MINOR: 1 fixed;
+  FOLLOW-UP: none.
+- Fresh review found the running button's non-wrapping mobile overflow and
+  missing ordering regressions. The form/button are now width-constrained and
+  wrapping; tests distinguish two completed snapshots by row count and assert
+  newest-five history order/exclusion.
 
 #### External review
 
-- required: one mandatory round at overall handoff; pending after full gates.
+- round 1: `REVIEW_GREEN`; BLOCKER: 0; IMPORTANT: 0.
 
 #### Risks / reviewer focus
 
 - Global Twig/UI Kit baselines remain red outside this task; changed Twig file
-  is point-wise clean and introduces no new classes.
+  is point-wise clean and uses existing Tabler utility classes only.
 
 #### Next
 
-- handoff gates, fresh internal review and external review.
+- commit review fixes and complete PR handoff.

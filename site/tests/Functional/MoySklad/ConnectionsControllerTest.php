@@ -235,6 +235,7 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         $startedAt = new \DateTimeImmutable('2026-09-21T08:00:00+00:00');
         $completedAt = new \DateTimeImmutable('2026-09-21T08:10:00+00:00');
         $store = MoySkladStoreBuilder::aStore()->withTenant($companyId, $connection->getId())->build();
+        $secondStore = MoySkladStoreBuilder::aStore()->withIndex(2)->withTenant($companyId, $connection->getId())->build();
         $product = new MoySkladProduct(
             '11111111-1111-7111-8111-111111111112',
             $companyId,
@@ -242,13 +243,24 @@ final class ConnectionsControllerTest extends WebTestCaseBase
             new ProductSnapshot('00000000-0000-4000-8000-000000000001', 'Product', 'product-external', null, null, 0, false, $startedAt),
             $startedAt,
         );
-        $completed = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $companyId, $connection->getId(), $startedAt);
-        foreach ([$second, $foreign, $store, $product, $completed] as $entity) {
+        $olderCompleted = new MoySkladStockSnapshot('99999999-9999-7999-8999-999999999999', $companyId, $connection->getId(), $startedAt->modify('-1 hour'));
+        foreach ([$second, $foreign, $store, $secondStore, $product, $olderCompleted] as $entity) {
             $this->em()->persist($entity);
         }
         $this->em()->flush();
-        $line = new MoySkladStockSnapshotLine('bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb', $companyId, $connection->getId(), $completed->getId(), $store->getExternalId(), 'product', $product->getExternalId(), '1', '0', '0');
-        $this->em()->persist($line);
+        foreach ([
+            new MoySkladStockSnapshotLine('77777777-7777-7777-8777-777777777777', $companyId, $connection->getId(), $olderCompleted->getId(), $store->getExternalId(), 'product', $product->getExternalId(), '1', '0', '0'),
+            new MoySkladStockSnapshotLine('88888888-8888-7888-8888-888888888888', $companyId, $connection->getId(), $olderCompleted->getId(), $secondStore->getExternalId(), 'product', $product->getExternalId(), '2', '0', '0'),
+        ] as $line) {
+            $this->em()->persist($line);
+        }
+        $this->em()->flush();
+        $olderCompleted->complete($completedAt->modify('-1 hour'));
+        $this->em()->flush();
+        $completed = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $companyId, $connection->getId(), $startedAt);
+        $this->em()->persist($completed);
+        $this->em()->flush();
+        $this->em()->persist(new MoySkladStockSnapshotLine('bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb', $companyId, $connection->getId(), $completed->getId(), $store->getExternalId(), 'product', $product->getExternalId(), '1', '0', '0'));
         $this->em()->flush();
         $completed->complete($completedAt);
         $this->em()->flush();
@@ -303,6 +315,7 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-stock"]'));
         self::assertSelectorTextContains('form[action$="/sync-stock"] button', 'Проверить и повторить загрузку складов и остатков');
         self::assertSelectorTextContains('form[action$="/sync-stock"]', 'Повторный запрос будет пропущен, если загрузка ещё активна');
+        self::assertCount(1, $crawler->filter('form[action$="/sync-stock"].mw-100 button.text-wrap'));
     }
 
     public function testStockUiShowsSuccessfulRunsCursorsSnapshotAndFiveItemHistory(): void
@@ -339,7 +352,13 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Последний успешный проход: 22.09.2026 12:10:00');
         self::assertSelectorTextContains('[data-sync-stream="stock"]', 'ID: aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa');
         self::assertSelectorTextContains('[data-sync-stream="stock"]', '0 строк');
-        self::assertCount(5, $crawler->filter('[data-sync-history="stock"] li'));
+        $history = $crawler->filter('[data-sync-history="stock"] li');
+        self::assertCount(5, $history);
+        self::assertSame(
+            ['21.09.2026', '20.09.2026', '19.09.2026', '18.09.2026', '17.09.2026'],
+            $history->each(static fn ($node): string => substr(trim($node->text()), 0, 10)),
+        );
+        self::assertStringNotContainsString('16.09.2026', implode(' ', $history->each(static fn ($node): string => $node->text())));
     }
 
     public function testStockUiShowsSafeFailureAndKeepsPreviousCompletedSnapshot(): void

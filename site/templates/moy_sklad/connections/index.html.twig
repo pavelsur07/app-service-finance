@@ -174,9 +174,9 @@
                                                 <small class="text-secondary d-block">Уже выполняется. Повторный запрос будет пропущен, если загрузка ещё активна.</small>
                                             {% endif %}
                                         </form>
-                                        <form method="post" action="{{ path('moysklad_connections_sync_stock', {id: connection.id}) }}">
+                                        <form method="post" action="{{ path('moysklad_connections_sync_stock', {id: connection.id}) }}" class="mw-100">
                                             <input type="hidden" name="_token" value="{{ csrf_token('moysklad_sync_stock' ~ connection.id) }}">
-                                            <button type="submit" class="btn btn-primary">{{ (store_sync and store_sync.status == 'running') or (stock_sync and stock_sync.status == 'running') ? 'Проверить и повторить загрузку складов и остатков' : 'Загрузить склады и остатки' }}</button>
+                                            <button type="submit" class="btn btn-primary text-wrap">{{ (store_sync and store_sync.status == 'running') or (stock_sync and stock_sync.status == 'running') ? 'Проверить и повторить загрузку складов и остатков' : 'Загрузить склады и остатки' }}</button>
                                             {% if (store_sync and store_sync.status == 'running') or (stock_sync and stock_sync.status == 'running') %}
                                                 <small class="text-secondary d-block">Уже выполняется. Повторный запрос будет пропущен, если загрузка ещё активна.</small>
                                             {% endif %}

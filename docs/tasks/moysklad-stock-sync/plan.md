@@ -133,7 +133,7 @@ fresh internal и обязательный external review.
 
 ## Release
 
-PR #2498 содержит миграцию `Version20260921100000`. Разрешение владельца
-покрывает merge Stage 1 после зелёного CI. Production-миграция и deploy требуют
-отдельного ручного запуска по `docs/workflow/release.md`; до такого разрешения
-production не изменяется.
+Stage 3/4 выпускаются одним PR из `feat/moysklad-stock-sync-ui` в `master`.
+Новой миграции в этой ветке нет; merge запускает обычный автоматический deploy.
+Production POST/dispatch синхронизации обрабатывает данные и не входит в
+release acceptance без отдельного именованного разрешения владельца.
