@@ -1,8 +1,8 @@
 # moysklad-stock-sync — checkpoint
 
-**Phase:** Stage 3 complete / Stage 4 pending
-**Status:** reviewing
-**Stage base commit:** `25585a3bedd270d5355f4e7638ead566a20a9f72`
+**Phase:** Stage 4 complete / handoff
+**Status:** checking
+**Stage base commit:** `b47e6875705803bc6e12866c65dc51b14469040e`
 **Branch:** `feat/moysklad-stock-sync-ui`
 **PR:** pending
 
@@ -17,6 +17,8 @@
 - Generic batch `MoySkladSyncStatusQuery` supports all five streams and reads
   the latest completed stock snapshot with line count without N+1.
 - Stage 3 internal review complete; no BLOCKER/IMPORTANT/MINOR.
+- Stage 4 adds store/stock empty/running/succeeded/failed UI, cursor/history,
+  completed snapshot details and permission-aware recovery form.
 - Добавлен последовательный полный проход активных и архивных складов с
   отдельным `store` run/cursor и tenant-scoped upsert.
 - Добавлена загрузка сырого `/report/stock/bystore`, постраничная запись строк
@@ -37,6 +39,12 @@
 - RED read model — missing `MoySkladSyncStatusQuery`; GREEN — 1 test, 8 assertions.
 - Stage 3 functional — 28 tests, 184 assertions, PASS.
 - focused PHP CS Fixer — 4 files, 0 fixable; focused PHPStan — no errors.
+- RED Twig UI — 3 failures on absent sections; GREEN — 4 tests, 42 assertions.
+- Stage 4 functional — 32 tests, 229 assertions, PASS.
+- focused Twig CS — no violations; focused PHP CS/PHPStan — green.
+- frontend lint/build — PASS; global UI Kit checks remain at pre-existing
+  baselines (8996 class findings, 47 React mapping findings), with no related
+  files or new CSS classes in this diff.
 - Stage 2 baseline MoySklad unit — 143 tests, 499 assertions, PASS.
 - Stage 2 baseline MoySklad integration — 60 tests, 302 assertions, PASS.
 - Final MoySklad unit+integration — 246 tests, 1003 assertions, PASS.
@@ -51,11 +59,12 @@
 ## Review status
 
 - Stage 3 internal: iteration 1, 0 BLOCKER, 0 IMPORTANT, 0 MINOR; open none.
+- Stage 4 internal: iteration 1, 0 BLOCKER, 0 IMPORTANT, 0 MINOR; open none.
 - Handoff external: pending.
 
 ## Exact next action
 
-- Commit Stage 3, then record Stage 4 base and add RED Twig UI tests.
+- Commit Stage 4, then run full handoff gates and fresh reviews.
 
 ## Files to inspect first on resume
 

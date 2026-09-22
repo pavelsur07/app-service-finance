@@ -110,7 +110,7 @@ completed snapshot текущей страницы без N+1. Failed/building s
 
 **Risk:** MEDIUM — существующий Legacy Twig экран без React/Vite/UI Kit правок.
 
-**stage_base_commit:** записать перед 4.1.
+**stage_base_commit:** `b47e6875705803bc6e12866c65dc51b14469040e`.
 
 **Definition of Done:** карточка показывает отдельные store/stock состояния,
 время, counters, cursor, пять последних запусков и последний completed snapshot

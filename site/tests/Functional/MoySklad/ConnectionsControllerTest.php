@@ -42,10 +42,12 @@ final class ConnectionsControllerTest extends WebTestCaseBase
 
     public function testUnverifiedConnectionIsNotShownAsConnected(): void
     {
-        [$client] = $this->seed();
-        $client->request('GET', '/moy-sklad/connections');
+        [$client, $connection] = $this->seed();
+        $crawler = $client->request('GET', '/moy-sklad/connections');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Требуется проверка');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Ещё не запускалось');
+        self::assertCount(0, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-stock"]'));
         self::assertSelectorExists('a[href="/moy-sklad/connections"]');
     }
 
@@ -279,6 +281,108 @@ final class ConnectionsControllerTest extends WebTestCaseBase
         self::assertSame(1, $snapshots[$connection->getId()]['lineCount']);
         self::assertSame(0, $snapshots[$second->getId()]['lineCount']);
         self::assertArrayNotHasKey($foreign->getId(), $snapshots);
+    }
+
+    public function testStockUiShowsEmptyStatesAndAllowsRetryWhileRunning(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="store"]', 'Ещё не запускалось');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Ещё не запускалось');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Последний завершённый снимок: Ещё не создавался');
+        self::assertCount(1, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-stock"]'));
+
+        $this->em()->persist(new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'stock', new \DateTimeImmutable('2026-09-22T09:00:00+00:00')));
+        $this->em()->flush();
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Выполняется');
+        self::assertCount(1, $crawler->filter('form[action="/moy-sklad/connections/'.$connection->getId().'/sync-stock"]'));
+        self::assertSelectorTextContains('form[action$="/sync-stock"] button', 'Проверить и повторить загрузку складов и остатков');
+        self::assertSelectorTextContains('form[action$="/sync-stock"]', 'Повторный запрос будет пропущен, если загрузка ещё активна');
+    }
+
+    public function testStockUiShowsSuccessfulRunsCursorsSnapshotAndFiveItemHistory(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $completedAt = new \DateTimeImmutable('2026-09-22T09:10:00+00:00');
+        foreach (['store', 'stock'] as $entityType) {
+            $cursor = new MoySkladSyncCursor(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), $entityType);
+            $cursor->completeAt($completedAt);
+            $this->em()->persist($cursor);
+        }
+        for ($index = 0; $index < 6; ++$index) {
+            $startedAt = new \DateTimeImmutable(sprintf('2026-09-%02dT09:00:00+00:00', 16 + $index));
+            $run = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'stock', $startedAt);
+            $run->recordPage(3, 1, 1, 1);
+            $run->succeed($startedAt->modify('+10 minutes'));
+            $this->em()->persist($run);
+        }
+        $storeRun = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'store', new \DateTimeImmutable('2026-09-22T08:00:00+00:00'));
+        $storeRun->recordPage(2, 1, 0, 1);
+        $storeRun->succeed(new \DateTimeImmutable('2026-09-22T08:05:00+00:00'));
+        $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable('2026-09-22T09:00:00+00:00'));
+        $snapshot->complete($completedAt);
+        $this->em()->persist($storeRun);
+        $this->em()->persist($snapshot);
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="store"]', 'Успешно');
+        self::assertSelectorTextContains('[data-sync-stream="store"]', 'Обработано: 2 · Создано: 1 · Обновлено: 0 · Без изменений: 1');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Успешно');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Последний успешный проход: 22.09.2026 12:10:00');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'ID: aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', '0 строк');
+        self::assertCount(5, $crawler->filter('[data-sync-history="stock"] li'));
+    }
+
+    public function testStockUiShowsSafeFailureAndKeepsPreviousCompletedSnapshot(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable('2026-09-21T08:00:00+00:00'));
+        $snapshot->complete(new \DateTimeImmutable('2026-09-21T08:10:00+00:00'));
+        $failed = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'stock', new \DateTimeImmutable('2026-09-22T09:00:00+00:00'));
+        $failed->fail('invalid_response', new \DateTimeImmutable('2026-09-22T09:01:00+00:00'));
+        $this->em()->persist($snapshot);
+        $this->em()->persist($failed);
+        $this->em()->flush();
+
+        $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Ошибка');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'Некорректный ответ МойСклад');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'ID: aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', '21.09.2026 11:10:00');
+    }
+
+    public function testInactiveAndReadOnlyUsersSeeStockStatusWithoutSyncForm(): void
+    {
+        [$client, $connection] = $this->seed();
+        $connection->bindAccount('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $connection->recordCheck(ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable());
+        $run = new MoySkladSyncRun(Uuid::uuid7()->toString(), $connection->getCompanyId(), $connection->getId(), 'stock', new \DateTimeImmutable('2026-09-22T09:00:00+00:00'));
+        $run->fail('temporary', new \DateTimeImmutable('2026-09-22T09:01:00+00:00'));
+        $connection->setIsActive(false);
+        $this->em()->persist($run);
+        $this->em()->flush();
+
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'МойСклад временно недоступен');
+        self::assertCount(0, $crawler->filter('form[action$="/sync-stock"]'));
+
+        $connection->setIsActive(true);
+        $this->em()->flush();
+        $this->loginMember($client, $connection->getCompanyId(), ['marketplace' => 'read']);
+        $crawler = $client->request('GET', '/moy-sklad/connections');
+        self::assertSelectorTextContains('[data-sync-stream="stock"]', 'МойСклад временно недоступен');
+        self::assertCount(0, $crawler->filter('form[action$="/sync-stock"]'));
     }
 
     public function testRunningSyncHidesDuplicateQueueForm(): void
