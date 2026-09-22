@@ -1,0 +1,54 @@
+{
+  "context": {
+    "employee": {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/context/employee",
+        "type": "employee",
+        "mediaType": "application/json"
+      }
+    }
+  },
+  "meta": {
+    "href": "https://api.moysklad.ru/api/remap/1.2/entity/store?limit=2&offset=0&filter=archived%3Dfalse",
+    "type": "store",
+    "mediaType": "application/json",
+    "size": 2,
+    "limit": 2,
+    "offset": 0
+  },
+  "rows": [
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000401",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+        "type": "store",
+        "mediaType": "application/json"
+      },
+      "id": "00000000-0000-4000-8000-000000000401",
+      "accountId": "00000000-0000-4000-8000-000000000003",
+      "shared": true,
+      "updated": "2026-01-02 03:04:06.123",
+      "name": "Основной тестовый склад",
+      "code": "store-main",
+      "externalCode": "store-external-1",
+      "archived": false,
+      "pathName": ""
+    },
+    {
+      "meta": {
+        "href": "https://api.moysklad.ru/api/remap/1.2/entity/store/00000000-0000-4000-8000-000000000402",
+        "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/store/metadata",
+        "type": "store",
+        "mediaType": "application/json"
+      },
+      "id": "00000000-0000-4000-8000-000000000402",
+      "accountId": "00000000-0000-4000-8000-000000000003",
+      "shared": false,
+      "updated": "2026-01-02 03:04:07",
+      "name": "Резервный тестовый склад",
+      "externalCode": "store-external-2",
+      "archived": false,
+      "pathName": "Тестовая группа"
+    }
+  ]
+}
