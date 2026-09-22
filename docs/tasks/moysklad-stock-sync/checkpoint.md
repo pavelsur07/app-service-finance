@@ -1,10 +1,10 @@
 # moysklad-stock-sync — checkpoint
 
 **Phase:** Stage 2 / handoff
-**Status:** Stage 2 complete; handoff in progress
+**Status:** Stage 2 complete; PR handoff ready
 **Stage base commit:** `06ef7968e61216f4b5898ce382e884bfbc737b1a`
 **Branch:** `feat/moysklad-stock-snapshot-loader`
-**PR:** not created yet
+**PR:** [#2499](https://github.com/pavelsur07/app-service-finance/pull/2499)
 
 ## Completed
 
@@ -43,7 +43,7 @@
 
 ## Exact next action
 
-- Commit, push, create the Draft PR, add handoff metadata and mark Ready.
+- Await the owner's single merge + automatic deploy decision for PR #2499.
 
 ## Files to inspect first on resume
 
