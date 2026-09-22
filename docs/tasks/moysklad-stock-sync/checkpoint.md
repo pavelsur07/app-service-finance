@@ -1,13 +1,22 @@
 # moysklad-stock-sync — checkpoint
 
-**Phase:** Stage 2 / handoff
-**Status:** Stage 2 complete; PR handoff ready
-**Stage base commit:** `06ef7968e61216f4b5898ce382e884bfbc737b1a`
-**Branch:** `feat/moysklad-stock-snapshot-loader`
-**PR:** [#2499](https://github.com/pavelsur07/app-service-finance/pull/2499)
+**Phase:** Stage 3 complete / Stage 4 pending
+**Status:** reviewing
+**Stage base commit:** `25585a3bedd270d5355f4e7638ead566a20a9f72`
+**Branch:** `feat/moysklad-stock-sync-ui`
+**PR:** pending
 
 ## Completed
 
+- Stage 1 released in PR #2498; Stage 2 released in PR #2499 and is present in
+  the Stage 3 base `origin/master`.
+- Stage 3/4 delivery split recorded: backend POST/read model first, Legacy Twig
+  UI and handoff second.
+- Stage 3 endpoint dispatches `SyncStockSnapshotMessage` only for a verified,
+  active tenant-owned connection after UUID, permission and CSRF checks.
+- Generic batch `MoySkladSyncStatusQuery` supports all five streams and reads
+  the latest completed stock snapshot with line count without N+1.
+- Stage 3 internal review complete; no BLOCKER/IMPORTANT/MINOR.
 - Добавлен последовательный полный проход активных и архивных складов с
   отдельным `store` run/cursor и tenant-scoped upsert.
 - Добавлена загрузка сырого `/report/stock/bystore`, постраничная запись строк
@@ -23,6 +32,11 @@
 
 ## Checks and baseline
 
+- Stage 3 baseline `ConnectionsControllerTest` — 23 tests, 158 assertions, PASS.
+- RED endpoint — 4 tests failed on missing route; GREEN — 4 tests, 18 assertions.
+- RED read model — missing `MoySkladSyncStatusQuery`; GREEN — 1 test, 8 assertions.
+- Stage 3 functional — 28 tests, 184 assertions, PASS.
+- focused PHP CS Fixer — 4 files, 0 fixable; focused PHPStan — no errors.
 - Stage 2 baseline MoySklad unit — 143 tests, 499 assertions, PASS.
 - Stage 2 baseline MoySklad integration — 60 tests, 302 assertions, PASS.
 - Final MoySklad unit+integration — 246 tests, 1003 assertions, PASS.
@@ -36,19 +50,17 @@
 
 ## Review status
 
-- internal: 0 BLOCKER, 3 IMPORTANT and 1 MINOR found and fixed; open: none.
-- external round 1: 0 BLOCKER, 2 IMPORTANT and 3 MINOR; both IMPORTANT and two
-  MINOR fixed; one MINOR rejected because the task forbids duplicate assortment
-  IDs regardless of type; result `fixed without re-run`.
+- Stage 3 internal: iteration 1, 0 BLOCKER, 0 IMPORTANT, 0 MINOR; open none.
+- Handoff external: pending.
 
 ## Exact next action
 
-- Await the owner's single merge + automatic deploy decision for PR #2499.
+- Commit Stage 3, then record Stage 4 base and add RED Twig UI tests.
 
 ## Files to inspect first on resume
 
 - `docs/tasks/moysklad-stock-sync/plan.md`
-- `site/src/MoySklad/Application/Action/SyncStockSnapshotAction.php`
-- `site/src/MoySklad/Application/StoreSyncRunner.php`
-- `site/src/MoySklad/Application/StockSnapshotRunner.php`
-- `site/src/MoySklad/MessageHandler/SyncStockSnapshotHandler.php`
+- `site/tests/Functional/MoySklad/ConnectionsControllerTest.php`
+- `site/src/MoySklad/Infrastructure/Query/MoySkladSyncStatusQuery.php`
+- `site/src/MoySklad/Controller/MoySkladConnectionsController.php`
+- `site/templates/moy_sklad/connections/index.html.twig`

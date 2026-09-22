@@ -6,7 +6,7 @@ namespace App\MoySklad\Controller;
 
 use App\Company\Security\ModuleAccess;
 use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
-use App\MoySklad\Infrastructure\Query\MoySkladCounterpartySyncStatusQuery;
+use App\MoySklad\Infrastructure\Query\MoySkladSyncStatusQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Exception\OutOfRangeCurrentPageException;
@@ -22,7 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MoySkladConnectionsController extends AbstractController
 {
     #[Route('/moy-sklad/connections', name: 'moysklad_connections_index', methods: ['GET'])]
-    public function __invoke(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query, MoySkladCounterpartySyncStatusQuery $syncStatusQuery): Response
+    public function __invoke(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query, MoySkladSyncStatusQuery $syncStatusQuery): Response
     {
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
         $page = $request->query->getInt('page', 1);
@@ -40,7 +40,19 @@ final class MoySkladConnectionsController extends AbstractController
         $statuses = $syncStatusQuery->forConnections($companyId, $connectionIds);
         $productStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'product');
         $variantStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'variant');
+        $storeStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'store');
+        $stockStatuses = $syncStatusQuery->forConnections($companyId, $connectionIds, 'stock');
+        $stockSnapshots = $syncStatusQuery->latestCompletedStockSnapshotsForConnections($companyId, $connectionIds);
 
-        return $this->render('moy_sklad/connections/index.html.twig', ['pager' => $pager, 'connections' => $connections, 'syncStatuses' => $statuses, 'productSyncStatuses' => $productStatuses, 'variantSyncStatuses' => $variantStatuses]);
+        return $this->render('moy_sklad/connections/index.html.twig', [
+            'pager' => $pager,
+            'connections' => $connections,
+            'syncStatuses' => $statuses,
+            'productSyncStatuses' => $productStatuses,
+            'variantSyncStatuses' => $variantStatuses,
+            'storeSyncStatuses' => $storeStatuses,
+            'stockSyncStatuses' => $stockStatuses,
+            'stockSnapshots' => $stockSnapshots,
+        ]);
     }
 }

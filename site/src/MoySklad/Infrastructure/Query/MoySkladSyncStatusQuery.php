@@ -7,7 +7,7 @@ namespace App\MoySklad\Infrastructure\Query;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
-final readonly class MoySkladCounterpartySyncStatusQuery
+final readonly class MoySkladSyncStatusQuery
 {
     public function __construct(private EntityManagerInterface $em)
     {
@@ -18,7 +18,7 @@ final readonly class MoySkladCounterpartySyncStatusQuery
      */
     public function forConnections(string $companyId, array $connectionIds, string $entityType = 'counterparty'): array
     {
-        if (!in_array($entityType, ['counterparty', 'product', 'variant'], true)) {
+        if (!in_array($entityType, ['counterparty', 'product', 'variant', 'store', 'stock'], true)) {
             throw new \InvalidArgumentException('Invalid MoySklad sync entity type.');
         }
         if ([] === $connectionIds) {
@@ -91,6 +91,49 @@ final readonly class MoySkladCounterpartySyncStatusQuery
         }
 
         return $statuses;
+    }
+
+    /** @param list<string> $connectionIds
+     * @return array<string, array{id: string, startedAt: \DateTimeImmutable, completedAt: \DateTimeImmutable, lineCount: int}>
+     */
+    public function latestCompletedStockSnapshotsForConnections(string $companyId, array $connectionIds): array
+    {
+        if ([] === $connectionIds) {
+            return [];
+        }
+
+        $rows = $this->em->getConnection()->executeQuery(<<<'SQL'
+            SELECT c.id AS connection_id, snapshot.id, snapshot.started_at, snapshot.completed_at,
+                   (SELECT COUNT(*)
+                    FROM moysklad_stock_snapshot_lines line
+                    WHERE line.company_id = c.company_id AND line.connection_id = c.id AND line.snapshot_id = snapshot.id) AS line_count
+            FROM moysklad_connections c
+            JOIN LATERAL (
+                SELECT s.id, s.started_at, s.completed_at
+                FROM moysklad_stock_snapshots s
+                WHERE s.company_id = c.company_id AND s.connection_id = c.id AND s.status = 'completed'
+                ORDER BY s.completed_at DESC, s.id DESC
+                LIMIT 1
+            ) snapshot ON true
+            WHERE c.company_id = :companyId AND c.id IN (:connectionIds)
+            SQL, ['companyId' => $companyId, 'connectionIds' => $connectionIds], ['connectionIds' => ArrayParameterType::STRING])->fetchAllAssociative();
+
+        $snapshots = [];
+        foreach ($rows as $row) {
+            $startedAt = $this->utcDate($row['started_at']);
+            $completedAt = $this->utcDate($row['completed_at']);
+            if (!is_string($row['id']) || null === $startedAt || null === $completedAt) {
+                continue;
+            }
+            $snapshots[(string) $row['connection_id']] = [
+                'id' => $row['id'],
+                'startedAt' => $startedAt,
+                'completedAt' => $completedAt,
+                'lineCount' => (int) $row['line_count'],
+            ];
+        }
+
+        return $snapshots;
     }
 
     private function utcDate(mixed $value): ?\DateTimeImmutable
