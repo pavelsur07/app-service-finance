@@ -1,6 +1,7 @@
 # moysklad-stock-sync Stage 3/4 — handoff
 
-**Branch:** `feat/moysklad-stock-sync-ui` · **PR:** pending
+**Branch:** `feat/moysklad-stock-sync-ui` · **PR:**
+[#2500](https://github.com/pavelsur07/app-service-finance/pull/2500) · base `master`
 
 ## Summary
 
@@ -60,4 +61,7 @@
 
 ## Owner decision
 
-The Ready PR number and URL are added after PR creation.
+Ready: PR #2500 "feat(moysklad): add stock sync controls and status" — merge
+into master with automatic production deploy?
+
+Reply: "merge and deploy #2500"

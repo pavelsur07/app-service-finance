@@ -1,10 +1,10 @@
 # moysklad-stock-sync — checkpoint
 
 **Phase:** Stage 4 complete / handoff
-**Status:** handoff complete; preparing Ready PR
+**Status:** handoff complete; Ready PR
 **Stage base commit:** `b47e6875705803bc6e12866c65dc51b14469040e`
 **Branch:** `feat/moysklad-stock-sync-ui`
-**PR:** pending
+**PR:** [#2500](https://github.com/pavelsur07/app-service-finance/pull/2500), base `master`
 
 ## Completed
 
@@ -65,7 +65,7 @@
 
 ## Exact next action
 
-- Commit the handoff review fixes, push and create/mark the Draft PR Ready.
+- Await the owner's single merge + automatic deploy decision.
 
 ## Files to inspect first on resume
 
