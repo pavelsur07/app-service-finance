@@ -1,0 +1,2 @@
+R100	site/src/Old/Foo.php	site/src/New/Foo.php
+R091	site/tests/Unit/Old/FooTest.php	site/tests/Unit/New/FooTest.php
