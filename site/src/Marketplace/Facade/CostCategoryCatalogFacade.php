@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Facade;
 
 use App\Marketplace\Application\DTO\CostCategoryGroupsDTO;
-use App\Marketplace\Domain\OzonCostCategory;
+use App\Marketplace\Ozon\Domain\OzonCostCategory;
 use App\Marketplace\Wildberries\Domain\WbCostCategory;
 
 /**

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller;
 
 use App\Company\Security\ModuleAccess;
-use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\OzonPerformanceValidationException;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Marketplace\Ozon\Application\Service\OzonPerformanceConnectionValidator;
+use App\Marketplace\Ozon\Exception\OzonPerformanceValidationException;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;

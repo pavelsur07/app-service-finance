@@ -58,6 +58,12 @@ marketplace_wildberries_controllers:
         namespace: App\Marketplace\Wildberries\Controller
     type: attribute
 
+marketplace_ozon_controllers:
+    resource:
+        path: ../src/Marketplace/Ozon/Controller/
+        namespace: App\Marketplace\Ozon\Controller
+    type: attribute
+
 
 moysklad_controllers:
     resource:

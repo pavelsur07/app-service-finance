@@ -6,12 +6,12 @@ namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Application\DTO\SyncConnectionResult;
-use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\ManualSyncNotSupportedException;
+use App\Marketplace\Ozon\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
 use Doctrine\ORM\EntityManagerInterface;

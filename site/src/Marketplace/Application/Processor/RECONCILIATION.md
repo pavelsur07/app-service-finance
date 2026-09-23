@@ -139,10 +139,10 @@ GET /marketplace/costs/debug/verify?marketplace=ozon&year=2026&month=1
 ## Ключевые файлы
 
 ```
-src/Marketplace/Application/Processor/OzonServiceCategoryMap.php   — маппинг service name → category
-src/Marketplace/Application/Processor/OzonCostsRawProcessor.php    — процессор затрат, знаковая логика
+src/Marketplace/Ozon/Application/Processor/OzonServiceCategoryMap.php   — маппинг service name → category
+src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php    — процессор затрат, знаковая логика
 src/Marketplace/Infrastructure/Query/CostsVerifyQuery.php           — сверка, xlsx_comparable
-tests/Unit/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php — тесты знакового соглашения
+tests/Unit/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php — тесты знакового соглашения
 ```
 
 ---

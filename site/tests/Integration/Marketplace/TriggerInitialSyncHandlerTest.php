@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace;
 
-use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\MessageHandler\TriggerInitialSyncHandler;
+use App\Marketplace\Ozon\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Wildberries\Application\Service\WbInitialSyncStartDateResolver;

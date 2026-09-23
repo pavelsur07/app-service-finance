@@ -260,7 +260,7 @@ controlSum(iterable $rows): list<MappedControlSum>
 
 ### OzonCostCategory — единственный источник правды для Ozon
 
-`App\Marketplace\Domain\OzonCostCategory` — справочник всех категорий Ozon.
+`App\Marketplace\Ozon\Domain\OzonCostCategory` — справочник всех категорий Ozon.
 
 **Правило:** добавить новый тип операции Ozon = добавить ТОЛЬКО в `OzonCostCategory`.
 Маппер использует `OzonCostCategory::findByServiceName()` и `OzonCostCategory::findByOperationType()`.

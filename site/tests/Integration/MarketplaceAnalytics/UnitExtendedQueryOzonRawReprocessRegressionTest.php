@@ -6,9 +6,9 @@ namespace App\Tests\Integration\MarketplaceAnalytics;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Ozon\Application\Processor\OzonSalesRawProcessor;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

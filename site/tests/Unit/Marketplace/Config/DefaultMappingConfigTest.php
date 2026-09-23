@@ -6,10 +6,10 @@ namespace App\Tests\Unit\Marketplace\Config;
 
 use App\Marketplace\Application\DTO\DefaultCostMappingRule;
 use App\Marketplace\Application\DTO\DefaultSaleMappingRule;
-use App\Marketplace\Domain\OzonCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider;
 use App\Marketplace\Infrastructure\Provider\DefaultSaleMappingYamlProvider;
+use App\Marketplace\Ozon\Domain\OzonCostCategory;
 use App\Marketplace\Wildberries\Domain\WbCostCategory;
 use PHPUnit\Framework\TestCase;
 

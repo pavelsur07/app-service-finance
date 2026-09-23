@@ -117,7 +117,7 @@ services:
 
     App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
     App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlanner'
-    App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidator'
+    App\Marketplace\Ozon\Infrastructure\Api\OzonSellerCredentialValidatorInterface: '@App\Marketplace\Ozon\Infrastructure\Api\OzonSellerCredentialValidator'
     App\Ingestion\Domain\Contract\SecretCodec: '@App\Ingestion\Infrastructure\Security\PlaintextSecretCodec'
     App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunnerInterface: '@App\Ingestion\Command\OzonAccrualCategoryMetadataBulkRunner'
     App\Shared\Service\Storage\ObjectStorageInterface:

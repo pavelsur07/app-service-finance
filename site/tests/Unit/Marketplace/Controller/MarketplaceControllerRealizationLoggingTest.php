@@ -6,15 +6,15 @@ namespace App\Tests\Unit\Marketplace\Controller;
 
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
-use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Controller\MarketplaceController;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
-use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Marketplace\Ozon\Application\Action\ProcessOzonRealizationAction;
+use App\Marketplace\Ozon\Infrastructure\Api\OzonSellerCredentialValidatorInterface;
+use App\Marketplace\Ozon\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
@@ -168,7 +168,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
         AppLogger $appLogger,
         ?ReprocessMarketplacePeriodAction $reprocessAction = null,
     ): MarketplaceController {
-        return new class($companyService, self::uninitialized(MarketplaceConnectionRepository::class), $rawDocumentRepository, self::uninitialized(WildberriesAdapter::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $this->createMock(EntityManagerInterface::class), $this->createMock(MessageBusInterface::class), $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), self::uninitialized(WbInitialSyncStartDateResolver::class), $this->createMock(WbFinancialReportSyncPlannerInterface::class), self::uninitialized(WbFinanceSyncStatusListQuery::class), $this->createMock(OzonSellerCredentialValidatorInterface::class), self::uninitialized(ConnectionApiKeyCodec::class), $appLogger, self::uninitialized(\App\Marketplace\Application\Service\OzonPerformanceConnectionValidator::class)) extends MarketplaceController {
+        return new class($companyService, self::uninitialized(MarketplaceConnectionRepository::class), $rawDocumentRepository, self::uninitialized(WildberriesAdapter::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $this->createMock(EntityManagerInterface::class), $this->createMock(MessageBusInterface::class), $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), self::uninitialized(WbInitialSyncStartDateResolver::class), $this->createMock(WbFinancialReportSyncPlannerInterface::class), self::uninitialized(WbFinanceSyncStatusListQuery::class), $this->createMock(OzonSellerCredentialValidatorInterface::class), self::uninitialized(ConnectionApiKeyCodec::class), $appLogger, self::uninitialized(\App\Marketplace\Ozon\Application\Service\OzonPerformanceConnectionValidator::class)) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }

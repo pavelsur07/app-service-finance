@@ -7,7 +7,7 @@ namespace App\Marketplace\Controller\Inventory;
 use App\Company\Security\ModuleAccess;
 use App\Marketplace\Entity\MarketplaceListingBarcode;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Api\Ozon\OzonProductBarcodeFetcher;
+use App\Marketplace\Ozon\Infrastructure\Api\OzonProductBarcodeFetcher;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Shared\Service\ActiveCompanyService;

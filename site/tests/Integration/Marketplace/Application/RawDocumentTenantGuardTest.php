@@ -6,8 +6,8 @@ namespace App\Tests\Integration\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
-use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Ozon\Application\Action\ProcessOzonRealizationAction;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;

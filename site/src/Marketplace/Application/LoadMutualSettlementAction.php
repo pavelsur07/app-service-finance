@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\OzonMutualSettlementProcessor;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Enum\PipelineStep;
-use App\Marketplace\Infrastructure\Api\Ozon\OzonMutualSettlementClient;
+use App\Marketplace\Ozon\Application\Processor\OzonMutualSettlementProcessor;
+use App\Marketplace\Ozon\Infrastructure\Api\OzonMutualSettlementClient;
 use App\Shared\Service\AppLogger;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;

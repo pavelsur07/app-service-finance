@@ -6,12 +6,12 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
-use App\Marketplace\Application\Processor\OzonCostsRawProcessor;
-use App\Marketplace\Application\Processor\OzonReturnsRawProcessor;
-use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Ozon\Application\Processor\OzonCostsRawProcessor;
+use App\Marketplace\Ozon\Application\Processor\OzonReturnsRawProcessor;
+use App\Marketplace\Ozon\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Wildberries\Application\Processor\WbCostsRawProcessor;
 use App\Marketplace\Wildberries\Application\Processor\WbReturnsRawProcessor;
 use App\Marketplace\Wildberries\Application\Processor\WbSalesRawProcessor;

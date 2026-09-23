@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Domain\Backward;
 
-use App\Marketplace\Domain\OzonCostCategory;
+use App\Marketplace\Ozon\Domain\OzonCostCategory;
 use PHPUnit\Framework\TestCase;
 
 /**
