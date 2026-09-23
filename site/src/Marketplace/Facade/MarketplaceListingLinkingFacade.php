@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Facade;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\DTO\MarketplaceListingEnsurePreviewDTO;
 use App\Marketplace\DTO\MarketplaceListingReferenceDTO;
 use App\Marketplace\DTO\MarketplaceListingSeedDTO;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
 

@@ -17,7 +17,7 @@ DG\BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Application/ProcessAdRawDocumentAction.php',
     '*/src/MarketplaceAds/Application/Service/AdBatchPlanner.php',
     '*/src/MarketplaceAds/Infrastructure/Api/Wildberries/WildberriesAdClient.php',
-    '*/src/Marketplace/Infrastructure/Query/ActiveOzonConnectionsQuery.php',
+    '*/src/Marketplace/Ozon/Infrastructure/Query/ActiveOzonConnectionsQuery.php',
     '*/src/Marketplace/Wildberries/Infrastructure/Query/ActiveWbConnectionsQuery.php',
     '*/src/Marketplace/Infrastructure/Query/ActiveSellerConnectionsQuery.php',
     '*/src/MarketplaceAnalytics/Domain/Service/CostMappingResolver.php',

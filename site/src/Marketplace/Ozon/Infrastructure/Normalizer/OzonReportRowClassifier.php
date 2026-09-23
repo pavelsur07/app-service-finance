@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Ozon\Infrastructure\Normalizer;
+
+use App\Marketplace\Enum\MarketplaceRawFormat;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+
+#[AutoconfigureTag('marketplace.row_classifier')]
+final readonly class OzonReportRowClassifier implements RowClassifierInterface
+{
+    public function supports(MarketplaceType $type, ?MarketplaceRawFormat $format = null): bool
+    {
+        // Реестр берёт первый подошедший, и этот классификатор стоит раньше
+        // by-day. Без явного отказа он затенял бы его порядком сервисов, и
+        // начисления разбирались бы правилами снятого формата v3.
+        return MarketplaceType::OZON === $type
+            && MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY !== $format;
+    }
+
+    public function classify(array $rawRow): StagingRecordType
+    {
+        $type = $rawRow['type'] ?? '';
+        $operationType = $rawRow['operation_type'] ?? '';
+
+        // orders → продажи
+        if ('orders' === $type) {
+            return StagingRecordType::SALE;
+        }
+
+        // returns:
+        // ClientReturnAgentOperation = реальный возврат товара покупателем → RETURN
+        // OperationAgentStornoDeliveredToCustomer = сторно начисления продажи → SALE
+        // OperationItemReturn = затраты на обработку возврата (логистика) → COST
+        if ('returns' === $type) {
+            if ('ClientReturnAgentOperation' === $operationType) {
+                return StagingRecordType::RETURN;
+            }
+
+            if ('OperationAgentStornoDeliveredToCustomer' === $operationType) {
+                return StagingRecordType::SALE;
+            }
+
+            return StagingRecordType::COST;
+        }
+
+        // services, other, compensation → затраты
+        if (in_array($type, ['services', 'other', 'compensation'], true)) {
+            return StagingRecordType::COST;
+        }
+
+        return StagingRecordType::OTHER;
+    }
+}

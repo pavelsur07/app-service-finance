@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Query;
 
-use App\Marketplace\Application\Reconciliation\OzonXlsxServiceGroupMap;
+use App\Marketplace\Ozon\Application\Reconciliation\OzonXlsxServiceGroupMap;
 use Doctrine\DBAL\Connection;
 
 /**

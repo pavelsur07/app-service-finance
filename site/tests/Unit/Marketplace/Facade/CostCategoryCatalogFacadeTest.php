@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Facade;
 
-use App\Marketplace\Domain\OzonCostCategory;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
+use App\Marketplace\Ozon\Domain\OzonCostCategory;
 use App\Marketplace\Wildberries\Domain\WbCostCategory;
 use PHPUnit\Framework\TestCase;
 

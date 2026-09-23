@@ -4600,91 +4600,91 @@ parameters:
 			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getDocumentType\(\)\.$#'
 			identifier: method.notFound
 			count: 2
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getMarketplace\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getRawData\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:setRecordsCreated\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:setRecordsSkipped\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\ProcessOzonRealizationAction\:\:process\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Action\\ProcessOzonRealizationAction\:\:process\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\ProcessOzonRealizationAction\:\:reprocess\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Action\\ProcessOzonRealizationAction\:\:reprocess\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Parameter \#1 \$company of method App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findListingsBySkusIndexed\(\) expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
-			message: '#^Parameter \#2 \$rawDoc of method App\\Marketplace\\Application\\ProcessOzonRealizationAction\:\:process\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
+			message: '#^Parameter \#2 \$rawDoc of method App\\Marketplace\\Ozon\\Application\\Action\\ProcessOzonRealizationAction\:\:process\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
-			message: '#^Parameter \#2 \$rawDoc of method App\\Marketplace\\Application\\ProcessOzonRealizationAction\:\:reprocess\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
+			message: '#^Parameter \#2 \$rawDoc of method App\\Marketplace\\Ozon\\Application\\Action\\ProcessOzonRealizationAction\:\:reprocess\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonRealizationAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
 			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonReturnsAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonReturnsAction.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceReturn constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonReturnsAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonReturnsAction.php
 
 		-
 			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonSalesAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonSalesAction.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceSale constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessOzonSalesAction.php
+			path: src/Marketplace/Ozon/Application/Action/ProcessOzonSalesAction.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Action\\ProcessWbCostsAction\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
@@ -4747,46 +4747,46 @@ parameters:
 			path: src/Marketplace/Wildberries/Application/Action/ProcessWbSalesAction.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonCostsRawProcessor\:\:extractCostEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessor\:\:extractCostEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonCostsRawProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonCostsRawProcessor\:\:resolveServiceCategoryCode\(\) has parameter \$rawOp with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessor\:\:resolveServiceCategoryCode\(\) has parameter \$rawOp with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonCostsRawProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parse\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parse\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 7
-			path: src/Marketplace/Application/Processor/OzonMutualSettlementProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseCompensations\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseCompensations\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonMutualSettlementProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseDocumentInfo\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseDocumentInfo\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonMutualSettlementProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseOperations\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseOperations\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonMutualSettlementProcessor.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
-			path: src/Marketplace/Application/Processor/OzonServiceCategoryMap.php
+			path: src/Marketplace/Ozon/Application/Processor/OzonServiceCategoryMap.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessor\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
@@ -4933,52 +4933,52 @@ parameters:
 			path: src/Marketplace/Application/Service/MarketplaceCostPriceResolver.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupExecutor\:\:deleteStaleRows\(\) should return int but returns int\|string\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupExecutor\:\:deleteStaleRows\(\) should return int but returns int\|string\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupExecutor.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupExecutor.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:chooseCanonical\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:chooseCanonical\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findRawDocumentStatusById\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findRawDocumentStatusById\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findRawDocumentsForDay\(\) should return list\<array\{id\: string, period_from\: string, period_to\: string, processing_status\: string\|null, synced_at\: string, records_count\: int\}\> but returns list\<array\<string, mixed\>\>\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findRawDocumentsForDay\(\) should return list\<array\{id\: string, period_from\: string, period_to\: string, processing_status\: string\|null, synced_at\: string, records_count\: int\}\> but returns list\<array\<string, mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findSafeToDeleteRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:findSafeToDeleteRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:hasPendingOrRunningRawDocument\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:hasPendingOrRunningRawDocument\(\) has parameter \$rawDocuments with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<mixed\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Parameter \$safeToDeleteRawDocumentIds of class App\\Marketplace\\Application\\DTO\\OzonRawDuplicatesCleanupDayPlan constructor expects list\<string\>, array given\.$#'
+			message: '#^Parameter \$safeToDeleteRawDocumentIds of class App\\Marketplace\\Ozon\\Application\\DTO\\OzonRawDuplicatesCleanupDayPlan constructor expects list\<string\>, array given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
+			path: src/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportReconciliationService\:\:createOrRefreshRawDocument\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
@@ -5095,16 +5095,16 @@ parameters:
 			path: src/Marketplace/Command/MarketplaceNightlySyncCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\OzonRawDuplicatesAuditCommand\:\:renderSectionTable\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Command\\OzonRawDuplicatesAuditCommand\:\:renderSectionTable\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/OzonRawDuplicatesAuditCommand.php
+			path: src/Marketplace/Ozon/Command/OzonRawDuplicatesAuditCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\OzonRealizationSyncCommand\:\:resolvePeriod\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Command\\OzonRealizationSyncCommand\:\:resolvePeriod\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/OzonRealizationSyncCommand.php
+			path: src/Marketplace/Ozon/Command/OzonRealizationSyncCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
@@ -6211,28 +6211,28 @@ parameters:
 			path: src/Marketplace/Facade/MarketplaceListingLinkingFacade.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonMutualSettlementClient\:\:countRecords\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:countRecords\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Ozon/OzonMutualSettlementClient.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonMutualSettlementClient\:\:downloadReport\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:downloadReport\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Ozon/OzonMutualSettlementClient.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonMutualSettlementClient\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Ozon/OzonMutualSettlementClient.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonMutualSettlementClient\:\:pollReport\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:pollReport\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Ozon/OzonMutualSettlementClient.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
 
 		-
 			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
@@ -6307,10 +6307,10 @@ parameters:
 			path: src/Marketplace/Infrastructure/Normalizer/Contract/RowClassifierInterface.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Ozon\\OzonReportRowClassifier\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Normalizer\\OzonReportRowClassifier\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Ozon/OzonReportRowClassifier.php
+			path: src/Marketplace/Ozon/Infrastructure/Normalizer/OzonReportRowClassifier.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbReportRowClassifier\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
@@ -6565,16 +6565,16 @@ parameters:
 			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\ActiveOzonConnectionsQuery\:\:execute\(\) should return array\<int, array\{id\: string, company_id\: string, client_id\: string\|null, finance_lock_before\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\ActiveOzonConnectionsQuery\:\:execute\(\) should return array\<int, array\{id\: string, company_id\: string, client_id\: string\|null, finance_lock_before\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/ActiveOzonConnectionsQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/ActiveOzonConnectionsQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\ActiveOzonPerformanceConnectionsQuery\:\:execute\(\) should return list\<array\{id\: string, company_id\: string, client_id\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\ActiveOzonPerformanceConnectionsQuery\:\:execute\(\) should return list\<array\{id\: string, company_id\: string, client_id\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/ActiveOzonPerformanceConnectionsQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/ActiveOzonPerformanceConnectionsQuery.php
 
 		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\ActiveSellerConnectionsQuery\:\:execute\(\) should return array\<int, array\{id\: string, company_id\: string, marketplace\: string\}\> but returns list\<array\<string, mixed\>\>\.$#'
@@ -6757,52 +6757,52 @@ parameters:
 			path: src/Marketplace/Infrastructure/Query/MarketplaceRawDocumentDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:buildBaseParams\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:buildBaseParams\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findExactRawDocumentDuplicates\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findExactRawDocumentDuplicates\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findOverlappingRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findOverlappingRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedCostsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedCostsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedReturnsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedReturnsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedRowsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedRowsWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedSalesWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRawDuplicateAuditQuery\:\:findProcessedSalesWithMultipleRawDocuments\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\OzonRealizationStatusQuery\:\:loadedMonths\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Query\\OzonRealizationStatusQuery\:\:loadedMonths\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Query/OzonRealizationStatusQuery.php
+			path: src/Marketplace/Ozon/Infrastructure/Query/OzonRealizationStatusQuery.php
 
 		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\PLCategoriesByCodeQuery\:\:fetchIndexed\(\) return type has no value type specified in iterable type array\.$#'
@@ -7090,25 +7090,25 @@ parameters:
 			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
 			identifier: method.notFound
 			count: 2
-			path: src/Marketplace/MessageHandler/SyncOzonRealizationHandler.php
+			path: src/Marketplace/Ozon/MessageHandler/SyncOzonRealizationHandler.php
 
 		-
 			message: '#^Call to an undefined method object\:\:setRawData\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/MessageHandler/SyncOzonRealizationHandler.php
+			path: src/Marketplace/Ozon/MessageHandler/SyncOzonRealizationHandler.php
 
 		-
 			message: '#^Call to an undefined method object\:\:setRecordsCount\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/MessageHandler/SyncOzonRealizationHandler.php
+			path: src/Marketplace/Ozon/MessageHandler/SyncOzonRealizationHandler.php
 
 		-
 			message: '#^Call to an undefined method object\:\:setSyncNotes\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/MessageHandler/SyncOzonRealizationHandler.php
+			path: src/Marketplace/Ozon/MessageHandler/SyncOzonRealizationHandler.php
 
 		-
 			message: '#^Parameter \#4 \$rows of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportReconciliationService\:\:appendRawDocumentPage\(\) expects list\<array\<string, mixed\>\>, array given\.$#'
@@ -7591,16 +7591,16 @@ parameters:
 			path: src/Marketplace/Wildberries/CostCalculator/WbWarehouseLogisticsCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\Integration\\OzonRealizationFetcher\:\:buildHeaders\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonRealizationFetcher\:\:buildHeaders\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/Integration/OzonRealizationFetcher.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonRealizationFetcher.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\Integration\\OzonRealizationFetcher\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonRealizationFetcher\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/Integration/OzonRealizationFetcher.php
+			path: src/Marketplace/Ozon/Infrastructure/Api/OzonRealizationFetcher.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:fetchRawReport\(\) return type has no value type specified in iterable type array\.$#'
@@ -11605,70 +11605,70 @@ parameters:
 			path: tests/Integration/Marketplace/Application/DispatchBulkProcessingActionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\ProcessOzonRealizationRegressionTest\:\:replaceRawData\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\ProcessOzonRealizationRegressionTest\:\:replaceRawData\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/ProcessOzonRealizationRegressionTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/ProcessOzonRealizationRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\ProcessOzonRealizationRegressionTest\:\:seed\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\ProcessOzonRealizationRegressionTest\:\:seed\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/ProcessOzonRealizationRegressionTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/ProcessOzonRealizationRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\ProcessOzonRealizationRegressionTest\:\:wrapRows\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\ProcessOzonRealizationRegressionTest\:\:wrapRows\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/ProcessOzonRealizationRegressionTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/ProcessOzonRealizationRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\ProcessOzonRealizationRegressionTest\:\:wrapRows\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\ProcessOzonRealizationRegressionTest\:\:wrapRows\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/ProcessOzonRealizationRegressionTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/ProcessOzonRealizationRegressionTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of class App\\Marketplace\\Application\\Command\\ProcessMarketplaceRawDocumentCommand constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Integration/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Application\\Processor\\OzonCostsRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 4
-			path: tests/Integration/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Application\\Processor\\OzonReturnsRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Ozon\\Application\\Processor\\OzonReturnsRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Processor/OzonReturnsRawProcessorTest.php
-
-		-
-			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
-			identifier: argument.type
-			count: 2
-			path: tests/Integration/Marketplace/Application/Processor/OzonReturnsRawProcessorTest.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Application\\Processor\\OzonSalesRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Marketplace/Application/Processor/OzonSalesRawProcessorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonReturnsRawProcessorTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/Processor/OzonSalesRawProcessorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonReturnsRawProcessorTest.php
+
+		-
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Ozon\\Application\\Processor\\OzonSalesRawProcessor\:\:processBatch\(\) expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonSalesRawProcessorTest.php
+
+		-
+			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: tests/Integration/Marketplace/Ozon/Application/Processor/OzonSalesRawProcessorTest.php
 
 		-
 			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\RawDocumentTenantGuardTest\:\:seedTwoCompaniesWithDocument\(\) return type has no value type specified in iterable type array\.$#'
@@ -11719,40 +11719,40 @@ parameters:
 			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupExecutorTest\:\:counts\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupExecutorTest\:\:counts\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:buildPlan\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:buildPlan\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupExecutorTest\:\:counts\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupExecutorTest\:\:counts\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupExecutorTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:buildPlan\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Ozon\\Application\\Service\\OzonRawDuplicatesCleanupPlanner\:\:buildPlan\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
+			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
 
 		-
 			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportFirstAvailableResolverTest\:\:resolverWithResponses\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
@@ -11890,49 +11890,49 @@ parameters:
 			message: '#^Parameter \#1 \$kernel of class Symfony\\Bundle\\FrameworkBundle\\Console\\Application constructor expects Symfony\\Component\\HttpKernel\\KernelInterface, Symfony\\Component\\HttpKernel\\KernelInterface\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesAuditCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesAuditCommandTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesAuditCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesAuditCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:counts\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:counts\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:seedDuplicateDay\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Ozon\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:seedDuplicateDay\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:counts\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Ozon\\Command\\OzonRawDuplicatesCleanupCommandTest\:\:counts\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
 			message: '#^Parameter \#1 \$kernel of class Symfony\\Bundle\\FrameworkBundle\\Console\\Application constructor expects Symfony\\Component\\HttpKernel\\KernelInterface, Symfony\\Component\\HttpKernel\\KernelInterface\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:contains\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Command/OzonRawDuplicatesCleanupCommandTest.php
+			path: tests/Integration/Marketplace/Ozon/Command/OzonRawDuplicatesCleanupCommandTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Marketplace\\Entity\\MarketplaceRawDocument\:\:markRunning\(\)\.$#'
@@ -11974,7 +11974,7 @@ parameters:
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 4
-			path: tests/Integration/Marketplace/Infrastructure/Query/OzonRawDuplicateAuditQueryTest.php
+			path: tests/Integration/Marketplace/Ozon/Infrastructure/Query/OzonRawDuplicateAuditQueryTest.php
 
 		-
 			message: '#^Parameter \$companyId of method App\\Marketplace\\Infrastructure\\Query\\SalesListQuery\:\:buildQueryBuilder\(\) expects string, string\|null given\.$#'
@@ -13369,34 +13369,34 @@ parameters:
 			path: tests/Unit/Inventory/Message/SyncOzonInventorySnapshotMessageTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\OzonCostsRawProcessorTest\:\:extractClientReturnEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessorTest\:\:extractClientReturnEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\OzonCostsRawProcessorTest\:\:extractEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessorTest\:\:extractEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/OzonCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with 2 and 1 will always evaluate to false\.$#'
 			identifier: staticMethod.impossibleType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/OzonSalesRawProcessorVersioningTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Processor/OzonSalesRawProcessorVersioningTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\OzonSalesRawProcessorVersioningTest\:\:makeOp\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Ozon\\Application\\Processor\\OzonSalesRawProcessorVersioningTest\:\:makeOp\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/OzonSalesRawProcessorVersioningTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Processor/OzonSalesRawProcessorVersioningTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertNotSame\(\) with arguments ''ozon_other_service'', ''ozon_additional…''\|''ozon_brand_verified''\|''ozon_charity''\|''ozon_defect_rate…''\|''ozon_fines…''\|''ozon_fines_shipment…''\|''ozon_fines_wrong…''\|''ozon_marketing…''\|''ozon_original_label''\|''ozon_package_labor''\|''ozon_package…''\|''ozon_partial…''\|''ozon_pin_review''\|''ozon_premium…''\|''ozon_reviews''\|''ozon_sending_push…''\|''ozon_service_fee…''\|''ozon_site…''\|''ozon_stock_insurance''\|''ozon_supply_surplus''\|''ozon_temporary…'' and ''"Charity" не должен…''\|''"DefectFineCancella…''\|''"DefectFineIncomple…''\|''"DefectFineShipment…''\|''"DefectFineWrongIte…''\|''"DefectRateCancella…''\|''"DefectRateIncomple…''\|''"DefectRateShipment…''\|''"DefectRateWrongIte…''\|''"InsuranceServiceSe…''\|''"MarketplaceMarketi…''\|''"MarketplaceService…''\|''"OperationLabelBran…''\|''"OperationLabelOrig…''\|''"OperationMarketpla…''\|''"OperationMarketPla…''\|''"OperationSubscript…'' will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/OzonServiceCategoryMapTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Processor/OzonServiceCategoryMapTest.php
 
 		-
 			message: '#^Array has 2 duplicate keys with value ''rrd_id'' \(''rrd_id'', ''rrd_id''\)\.$#'
@@ -13537,28 +13537,28 @@ parameters:
 			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbSalesRawProcessorRevenueTest.php
 
 		-
-			message: '#^Method App\\Shared\\Service\\Storage\\ObjectStorageInterface@anonymous/tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest\.php\:65\:\:readStream\(\) should return resource but returns resource\|false\.$#'
+			message: '#^Method App\\Shared\\Service\\Storage\\ObjectStorageInterface@anonymous/tests/Unit/Marketplace/Ozon/Application/Reconciliation/OzonReportParserFacadeStorageTest\.php\:65\:\:readStream\(\) should return resource but returns resource\|false\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
 
 		-
 			message: '#^Parameter \#1 \$stream of function fwrite expects resource, resource\|false given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
 
 		-
 			message: '#^Parameter \#1 \$stream of function rewind expects resource, resource\|false given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 4
-			path: tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
+			path: tests/Unit/Marketplace/Ozon/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of callable App\\Marketplace\\Wildberries\\Application\\Action\\RefreshWbListingCatalogAction expects string, string\|null given\.$#'
@@ -13612,7 +13612,7 @@ parameters:
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: tests/Unit/Marketplace/Command/OzonRealizationSyncCommandTest.php
+			path: tests/Unit/Marketplace/Ozon/Command/OzonRealizationSyncCommandTest.php
 
 		-
 			message: '#^Parameter \#1 \$objectOrClass of class ReflectionClass constructor expects class\-string\<T of object\>\|T of object, string given\.$#'
@@ -13621,7 +13621,7 @@ parameters:
 			path: tests/Unit/Marketplace/Command/ReprocessMarketplaceCommandTest.php
 
 		-
-			message: '#^Parameter \#3 \$processRealizationAction of class App\\Marketplace\\Application\\ReprocessMarketplacePeriodAction constructor expects App\\Marketplace\\Application\\ProcessOzonRealizationAction, object given\.$#'
+			message: '#^Parameter \#3 \$processRealizationAction of class App\\Marketplace\\Application\\ReprocessMarketplacePeriodAction constructor expects App\\Marketplace\\Ozon\\Application\\Action\\ProcessOzonRealizationAction, object given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Unit/Marketplace/Command/ReprocessMarketplaceCommandTest.php
@@ -13726,7 +13726,7 @@ parameters:
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 109, array\{MarketplaceServiceItemDirectFlowLogistic\: ''ozon_logistic_direct'', MarketplaceServiceItemDirectFlowLogisticVDC\: ''ozon_logistic…'', MarketplaceServiceItemDirectFlowTrans\: ''ozon_logistic…'', MarketplaceDeliveryCostItem\: ''ozon_logistic…'', MarketplaceServiceItemDelivToCustomer\: ''ozon_logistic_last…'', MarketplaceServiceItemRedistributionLastMileCourier\: ''ozon_logistic_last…'', MarketplaceServiceItemDeliveryKGT\: ''ozon_logistic_kgt'', MarketplaceServiceItemReturnFlowLogistic\: ''ozon_logistic_return'', \.\.\.\} and ''EXPECTED_MAPPING…'' will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Domain/Backward/OzonResolveBackwardCompatTest.php
+			path: tests/Unit/Marketplace/Ozon/Domain/Backward/OzonResolveBackwardCompatTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 85, array\{ozon_sale_commission\: ''Вознаграждение'', ozon_brand_commission\: ''Вознаграждение'', ozon_logistic_direct\: ''Услуги доставки и…'', ozon_logistic_direct_vdc\: ''Услуги доставки и…'', ozon_logistic_direct_trans\: ''Услуги доставки и…'', ozon_logistic_delivery\: ''Услуги доставки и…'', ozon_logistic_kgt\: ''Услуги доставки и…'', ozon_logistic_return\: ''Услуги доставки и…'', \.\.\.\} and ''EXPECTED_GROUPS…'' will always evaluate to true\.$#'
@@ -13735,22 +13735,22 @@ parameters:
 			path: tests/Unit/Marketplace/Domain/Backward/WidgetGroupBackwardCompatTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonSellerCredentialValidatorTest\:\:assertHeaderValue\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonSellerCredentialValidatorTest\:\:assertHeaderValue\(\) has parameter \$options with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Ozon/OzonSellerCredentialValidatorTest.php
+			path: tests/Unit/Marketplace/Ozon/Infrastructure/Api/OzonSellerCredentialValidatorTest.php
 
 		-
-			message: '#^Parameter \#2 \$options of static method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonSellerCredentialValidatorTest\:\:assertHeaderValue\(\) expects array, array\|string given\.$#'
+			message: '#^Parameter \#2 \$options of static method App\\Tests\\Unit\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonSellerCredentialValidatorTest\:\:assertHeaderValue\(\) expects array, array\|string given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Unit/Marketplace/Infrastructure/Api/Ozon/OzonSellerCredentialValidatorTest.php
+			path: tests/Unit/Marketplace/Ozon/Infrastructure/Api/OzonSellerCredentialValidatorTest.php
 
 		-
 			message: '#^Parameter \#2 \$string of static method PHPUnit\\Framework\\Assert\:\:assertStringEndsWith\(\) expects string, array\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Ozon/OzonSellerCredentialValidatorTest.php
+			path: tests/Unit/Marketplace/Ozon/Infrastructure/Api/OzonSellerCredentialValidatorTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'

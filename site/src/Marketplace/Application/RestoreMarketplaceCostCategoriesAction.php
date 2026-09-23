@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Ozon\Application\Processor\OzonServiceCategoryMap;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

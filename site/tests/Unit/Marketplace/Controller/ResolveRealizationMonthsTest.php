@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Controller;
 
 use App\Marketplace\Controller\MarketplaceController;
-use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
+use App\Marketplace\Ozon\Infrastructure\Query\OzonRealizationStatusQuery;
 use Doctrine\DBAL\Connection as DbalConnection;
 use PHPUnit\Framework\TestCase;
 
