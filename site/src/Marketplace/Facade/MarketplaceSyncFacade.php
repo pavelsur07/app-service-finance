@@ -6,15 +6,18 @@ namespace App\Marketplace\Facade;
 
 use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\DTO\OzonTotalsCheckDTO;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
 use App\Marketplace\Command\WbFinancialReportsSyncCommand;
 use App\Marketplace\DTO\ActiveSellerConnectionDTO;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ActiveSellerConnectionsQuery;
+use App\Marketplace\Repository\OzonTransactionTotalsCheckRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Webmozart\Assert\Assert;
 
 final readonly class MarketplaceSyncFacade
 {
@@ -31,6 +34,7 @@ final readonly class MarketplaceSyncFacade
         // отношения не имеет, и складывать его в тот же канал значило бы
         // спрятать инцидент среди сообщений про отключённую фичу.
         private LoggerInterface $connectionsLogger,
+        private OzonTransactionTotalsCheckRepository $ozonTotalsCheckRepository,
     ) {
     }
 
@@ -187,5 +191,24 @@ final readonly class MarketplaceSyncFacade
     public function processCostsFromRaw(string $companyId, string $rawDocId): int
     {
         return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'costs'));
+    }
+
+    /**
+     * Последняя контрольная сверка итогов Ozon, пересекающая период компании.
+     * Для сверки canon-слоя Ingestion с итогами Ozon (`ReconciliationQuery`).
+     */
+    public function findLatestOzonTotalsCheck(
+        string $companyId,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): ?OzonTotalsCheckDTO {
+        Assert::uuid($companyId);
+
+        $check = $this->ozonTotalsCheckRepository->findLatestByCompanyAndPeriod($companyId, $periodFrom, $periodTo);
+        if (null === $check) {
+            return null;
+        }
+
+        return new OzonTotalsCheckDTO($check->getOzonTotals(), $check->getCheckedAt());
     }
 }

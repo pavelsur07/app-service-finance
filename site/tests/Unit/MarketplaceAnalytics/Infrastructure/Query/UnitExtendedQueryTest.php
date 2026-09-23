@@ -11,6 +11,7 @@ use App\Marketplace\DTO\ListingMetaDTO;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
@@ -74,7 +75,7 @@ final class UnitExtendedQueryTest extends TestCase
             $this->marketplaceFacade,
             $this->adsFacade,
             $this->inventoryFacade,
-            new MarketplaceCostAnalyticsGroupResolver(),
+            new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade()),
             $this->listingTagFacade,
         );
 

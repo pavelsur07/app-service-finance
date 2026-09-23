@@ -6,6 +6,7 @@ namespace App\Tests\Unit\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
+use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
@@ -26,7 +27,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     {
         $this->facade = $this->createMock(MarketplaceFacade::class);
         $this->connection = $this->createMock(Connection::class);
-        $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver();
+        $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade());
         $this->query = new WidgetSummaryQuery($this->facade, $this->connection, $this->groupResolver);
     }
 
