@@ -4,9 +4,6 @@ monolog:
         - import.bank1c
         - recalc
         - marketplace_ads
-        # ERROR in this channel is intentionally routed to Sentry by the prod sentry handler.
-        # Use event marker legacy_wb_sync_fail_fast as the alert/query key during quarantine.
-        - legacy_wb_sync
         # Канал приёма Telegram-апдейтов. Нужен отдельным, потому что на проде `main` —
         # fingers_crossed с action_level: error: INFO о принятом апдейте оседает в буфере
         # и до stderr не доходит, пока в том же запросе не случится ошибка. А вебхук
