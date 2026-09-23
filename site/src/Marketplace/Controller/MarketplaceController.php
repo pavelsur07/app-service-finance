@@ -7,13 +7,13 @@ namespace App\Marketplace\Controller;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Command\SyncConnectionCommand;
+use App\Marketplace\Application\DTO\SyncConnectionResult;
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
-use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
-use App\Marketplace\Application\DTO\SyncConnectionResult;
 use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -217,7 +217,7 @@ class MarketplaceController extends AbstractController
 
         $connection = $this->connectionRepository->find($id);
 
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+        if (!$connection instanceof MarketplaceConnection || $connection->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
         }
 
@@ -290,7 +290,7 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
         $connection = $this->connectionRepository->find($id);
 
-        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+        if (!$connection instanceof MarketplaceConnection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
         }
 
@@ -330,7 +330,7 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
         $connection = $this->connectionRepository->find($id);
 
-        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+        if (!$connection instanceof MarketplaceConnection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
         }
 

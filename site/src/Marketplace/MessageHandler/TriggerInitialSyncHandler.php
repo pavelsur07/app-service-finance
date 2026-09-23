@@ -4,37 +4,37 @@ declare(strict_types=1);
 
 namespace App\Marketplace\MessageHandler;
 
-use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
+use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Нарезает текущий год на недельные партии с учётом границ месяца и диспатчит первую.
- * Каждая следующая партия диспатчится из InitialSyncHandler после успеха предыдущей.
- *
- * Период: 01.01 текущего года → вчера (с времени 00:00:00 → 23:59:59).
+ * Первичная загрузка истории нового SELLER-подключения: 01.01 текущего года → вчера.
  * За сегодня данные ещё неполные — их загрузит ежедневный cron завтра.
+ *
+ * WB — дневные статусы планировщика финансовых отчётов (старт — от резолвера).
+ * Ozon — задачи by-day через OzonAccrualSyncPlanner; начало окна поднимается до
+ * OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY. Прежняя недельная цепочка
+ * InitialSyncMessage ходила в /v3/finance/transaction/list, снятый 09.09.2026.
  */
 #[AsMessageHandler]
 final class TriggerInitialSyncHandler
 {
     public function __construct(
-        private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
-        private readonly MarketplaceWeekPartitionService $partitionService,
         private readonly ClockInterface $clock,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly WbInitialSyncStartDateResolver $wbStartDateResolver,
         private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
+        private readonly OzonAccrualSyncPlanner $ozonAccrualSyncPlanner,
     ) {
     }
 
@@ -45,11 +45,11 @@ final class TriggerInitialSyncHandler
         // поэтому триггер выполняется только для SELLER.
         $connection = $this->connectionRepository->find($message->connectionId);
 
-        if (null === $connection || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()) {
+        if (!$connection instanceof MarketplaceConnection || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()) {
             $this->logger->warning('InitialSync: skipped — connection missing or not SELLER', [
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
-                'connection_type' => $connection?->getConnectionType()->value,
+                'connection_type' => $connection instanceof MarketplaceConnection ? $connection->getConnectionType()->value : null,
             ]);
 
             return;
@@ -81,37 +81,30 @@ final class TriggerInitialSyncHandler
             return;
         }
 
-        $weeks = $this->partitionService->buildPartitions($syncStart, $yesterday);
-
-        if (empty($weeks)) {
-            $this->logger->warning('InitialSync: no weeks to sync', [
+        if (MarketplaceType::OZON !== $connection->getMarketplace()) {
+            $this->logger->warning('InitialSync: skipped — unsupported marketplace', [
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
+                'marketplace' => $connection->getMarketplace()->value,
             ]);
 
             return;
         }
 
-        // Диспатчим только первую партию — цепочка продолжится из InitialSyncHandler
-        $first = $weeks[0];
-        $second = $weeks[1] ?? null;
+        $plan = $this->ozonAccrualSyncPlanner->planRange(
+            $message->companyId,
+            $message->connectionId,
+            $syncStart,
+            $yesterday,
+        );
 
-        $this->messageBus->dispatch(new InitialSyncMessage(
-            companyId: $message->companyId,
-            connectionId: $message->connectionId,
-            marketplace: $message->marketplace,
-            dateFrom: $first['from'],
-            dateTo: $first['to'],
-            nextDateFrom: $second ? $second['from'] : null,
-            nextDateTo: $second ? $second['to'] : null,
-        ));
-
-        $this->logger->info('InitialSync: dispatched first batch', [
+        $this->logger->info('InitialSync Ozon: dispatched accrual by-day tasks', [
             'company_id' => $message->companyId,
-            'marketplace' => $message->marketplace,
-            'date_from' => $first['from'],
-            'date_to' => $first['to'],
-            'total_batches' => count($weeks),
+            'connection_id' => $message->connectionId,
+            'first_day' => $plan->firstDay,
+            'last_day' => $plan->lastDay,
+            'clamped_to_safe_day' => $plan->clampedToSafeDay,
+            'scheduled_days' => $plan->dispatchedCount,
         ]);
     }
 }

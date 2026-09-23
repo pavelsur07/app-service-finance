@@ -185,6 +185,13 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
         };
     }
 
+    /**
+     * @template T of object
+     *
+     * @param class-string<T> $className
+     *
+     * @return T
+     */
     private static function uninitialized(string $className): object
     {
         return (new \ReflectionClass($className))->newInstanceWithoutConstructor();

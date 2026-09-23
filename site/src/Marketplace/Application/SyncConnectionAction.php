@@ -8,6 +8,7 @@ use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Application\DTO\SyncConnectionResult;
 use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -43,7 +44,7 @@ final class SyncConnectionAction
     {
         $connection = $this->connectionRepository->find($command->connectionId);
 
-        if (!$connection || (string) $connection->getCompany()->getId() !== $command->companyId) {
+        if (!$connection instanceof MarketplaceConnection || (string) $connection->getCompany()->getId() !== $command->companyId) {
             throw new \DomainException('Подключение не найдено');
         }
 

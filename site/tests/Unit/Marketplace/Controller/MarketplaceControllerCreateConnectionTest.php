@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Marketplace\Controller;
 
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Application\SyncConnectionAction;
@@ -23,14 +24,13 @@ use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\WildberriesAdapter;
-use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\Envelope;
@@ -466,6 +466,9 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
                 return true;
             }
 
+            /**
+             * @param array<string, mixed> $parameters
+             */
             protected function redirectToRoute(string $route, array $parameters = [], int $status = 302): RedirectResponse
             {
                 return new RedirectResponse('/'.$route, $status);
