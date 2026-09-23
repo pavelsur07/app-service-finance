@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Command;
 
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
-use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -14,7 +13,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Ежедневная загрузка финансовых отчётов Ozon через /v1/finance/accrual/by-day.
@@ -25,16 +23,16 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * префиксом читался бы как та же семья в кроне, allowlist и логах.
  *
  * Замена app:marketplace:ozon-daily-sync, чей источник Ozon снял 09.09.2026.
- * Команда тонкая: берёт активные Ozon-подключения и на каждый день окна шлёт
- * сообщение; вся загрузка — в SyncOzonAccrualByDayHandler.
+ * Команда тонкая: берёт активные Ozon-подключения и ставит задачи через
+ * OzonAccrualSyncPlanner; вся загрузка — в SyncOzonAccrualByDayHandler.
  *
  * Окно по умолчанию 2 дня: Ozon правит начисления задним числом, и однодневное
  * окно эти правки теряет. Строки документа при перезагрузке заменяются целиком
  * (`ProcessMarketplaceRawDocumentAction`), поэтому правка действительно
  * доезжает до таблиц, а не только до сырья.
  *
- * Окно ограничено снизу датой EARLIEST_SAFE_DAY: до неё дни покрыты снятым
- * форматом v3, и повторная нормализация дала бы двойной учёт продаж. Запрос,
+ * Окно ограничено снизу датой OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY: до неё
+ * дни покрыты снятым форматом v3, и повторная нормализация дала бы двойной учёт продаж. Запрос,
  * достающий раньше этой даты, отвергается, а не обрезается молча — обрезка
  * выдала бы частичную работу за полную.
  *
@@ -49,26 +47,9 @@ final class OzonFinancialReportsSyncCommand extends Command
     private const DEFAULT_LOOKBACK_DAYS = 2;
     private const MAX_LOOKBACK_DAYS = 365;
 
-    /**
-     * Первый день, который by-day имеет право заводить.
-     *
-     * Дни по 07.09.2026 включительно уже покрыты документами снятого формата v3,
-     * и их продажи лежат в `marketplace_sales`. Документы by-day с ними не
-     * конфликтуют — у by-day свой `document_type`, — но нормализованные строки
-     * не разводятся: уникальность `marketplace_sales` стоит на
-     * `external_order_id`, а ключи у путей разные (`posting_number` против
-     * `ozon-accrual-{posting}-product-{i}`). День, обработанный из обоих
-     * документов, дал бы двойной учёт выручки и возвратов.
-     *
-     * Граница снимается вместе с переносом истории на by-day, а не раньше:
-     * перезалив пересекающихся дней требует отдельной сверенной процедуры.
-     */
-    private const EARLIEST_SAFE_DAY = '2026-09-08';
-
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
-        private readonly MessageBusInterface $messageBus,
-        private readonly LoggerInterface $logger,
+        private readonly OzonAccrualSyncPlanner $planner,
         private readonly ClockInterface $clock,
     ) {
         parent::__construct();
@@ -139,11 +120,11 @@ final class OzonFinancialReportsSyncCommand extends Command
         $today = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->setTime(0, 0);
 
         $earliestRequested = $today->modify(sprintf('-%d day', $daysBack))->format('Y-m-d');
-        if ($earliestRequested < self::EARLIEST_SAFE_DAY) {
+        if ($earliestRequested < OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY) {
             $io->error(sprintf(
                 'Окно достаёт до %s, а by-day разрешён с %s: более ранние дни уже покрыты документами снятого формата v3, и повторная нормализация дала бы двойной учёт продаж. Уменьшите --days-back.',
                 $earliestRequested,
-                self::EARLIEST_SAFE_DAY,
+                OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY,
             ));
 
             return Command::FAILURE;
@@ -152,21 +133,12 @@ final class OzonFinancialReportsSyncCommand extends Command
         $dispatched = 0;
 
         foreach ($connections as $row) {
-            $rowCompanyId = (string) $row['company_id'];
-            $connectionId = (string) $row['id'];
-
-            for ($offset = 1; $offset <= $daysBack; ++$offset) {
-                $date = $today->modify(sprintf('-%d day', $offset))->format('Y-m-d');
-
-                $this->messageBus->dispatch(new SyncOzonAccrualByDayMessage($rowCompanyId, $connectionId, $date));
-                ++$dispatched;
-
-                $this->logger->info('Dispatched Ozon accrual by-day sync message', [
-                    'company_id' => $rowCompanyId,
-                    'connection_id' => $connectionId,
-                    'date' => $date,
-                ]);
-            }
+            $dispatched += $this->planner->planRange(
+                (string) $row['company_id'],
+                (string) $row['id'],
+                $today->modify(sprintf('-%d day', $daysBack)),
+                $today->modify('-1 day'),
+            )->dispatchedCount;
         }
 
         $io->success(sprintf('Отправлено %d задач на загрузку начислений Ozon за последние %d дней.', $dispatched, $daysBack));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Command;
 
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Command\OzonFinancialReportsSyncCommand;
 use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Message\SyncOzonAccrualByDayMessage;
@@ -155,6 +156,8 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
 
         // Фиксированное «сегодня»: у команды есть нижняя граница по дате, и без
         // мока тест начал бы зависеть от того, в какой день его запустили.
-        return new OzonFinancialReportsSyncCommand($query, $bus, new NullLogger(), new MockClock('2026-09-20 09:00:00', 'Europe/Moscow'));
+        $clock = new MockClock('2026-09-20 09:00:00', 'Europe/Moscow');
+
+        return new OzonFinancialReportsSyncCommand($query, new OzonAccrualSyncPlanner($bus, new NullLogger(), $clock), $clock);
     }
 }
