@@ -773,7 +773,7 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 
 > Marketplace этим фасадом больше не пользуется: с 11.09.2026 услуги by-day
 > разбирает `OzonAccrualServiceCategoryResolver` по каталогу
-> `Marketplace\Domain\OzonCostCategory` — тому же, на котором построен маппинг
+> `Marketplace\Ozon\Domain\OzonCostCategory` — тому же, на котором построен маппинг
 > затрат к категориям ОПиУ. Словари расходились, и затрата заводилась, но до
 > отчёта не доходила. Фасад остаётся контрактом Ingestion для его собственных нужд.
 

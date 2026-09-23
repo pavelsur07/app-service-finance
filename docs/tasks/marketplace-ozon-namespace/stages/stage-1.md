@@ -16,3 +16,9 @@
 
 #### Next
 - internal + external review, handoff
+
+#### Reviews
+- internal: 1 итерация, BLOCKER/IMPORTANT нет; MINOR (устаревший путь `OzonCostCategory` в ARCHITECTURE.md:776) — исправлен
+- FOLLOW-UP: `SyncOzonListingCatalogHandler` пишет `$exception::class` в `reason` job-log — старые строки с прежним FQCN; код значение не разбирает
+- Проверено на проде (read-only): в failed 5 сообщений — ProcessRawDocumentStep, RunSyncChunk, SyncWbFinancialReportDay ×3; Ozon-сообщений и `HandledStamp` нет → смена FQCN обработчиков на повторы не влияет
+- external: 1 раунд, REVIEW_GREEN
