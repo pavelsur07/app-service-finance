@@ -15,6 +15,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class PhpstanBaselineGuardTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        $root = sys_get_temp_dir().'/baseline-guard-renames-'.getmypid();
+        if (is_dir($root)) {
+            exec('rm -rf '.escapeshellarg($root));
+        }
+    }
+
     /**
      * @return iterable<string, array{string, string, int}>
      */
@@ -76,6 +84,35 @@ final class PhpstanBaselineGuardTest extends TestCase
         self::assertSame($expected, $exitCode);
     }
 
+    /**
+     * Переписывание склеило бы две разные записи базы в один ключ, и guard
+     * сложил бы их count: рост одной прошёл бы как перенос. Такой случай —
+     * отказ, а не зелёный.
+     */
+    public function testGuardFailsClosedWhenRenameCollapsesDistinctEntries(): void
+    {
+        $data = __DIR__.'/data/renames/';
+
+        exec($this->renameCommand($data.'base-collision.neon', $data.'head-renamed.neon', $data.'map.tsv').' 2>&1', $output, $exitCode);
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('склеило разные записи', implode("\n", $output));
+    }
+
+    /**
+     * Та же склейка через второстепенный класс: перенесённый файл объявляет
+     * FooHelper, а база уже упоминала и старый, и новый FooHelper.
+     */
+    public function testGuardFailsClosedWhenSecondaryClassCollapsesEntries(): void
+    {
+        $data = __DIR__.'/data/renames/';
+
+        exec($this->renameCommand($data.'base-collision-secondary.neon', $data.'head-renamed.neon', $data.'map.tsv').' 2>&1', $output, $exitCode);
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('склеило разные записи', implode("\n", $output));
+    }
+
     public function testGuardReportsHowManyRenamesWereApplied(): void
     {
         $data = __DIR__.'/data/renames/';
@@ -118,6 +155,35 @@ final class PhpstanBaselineGuardTest extends TestCase
         }
 
         return $root;
+    }
+
+    /**
+     * Больше 20 новых записей: отчёт режется на первых двадцати. Раньше это
+     * делал `printf | head`, и при pipefail скрипт выходил с кодом 141 (SIGPIPE)
+     * и «Broken pipe» в логе CI вместо штатного отказа.
+     */
+    public function testManyNewEntriesFailWithRegularExitCode(): void
+    {
+        $data = __DIR__.'/data/';
+        $head = tempnam(sys_get_temp_dir(), 'baseline-head-');
+        self::assertIsString($head);
+        $entries = '';
+        for ($i = 0; $i < 30; ++$i) {
+            $entries .= "\t\t-\n\t\t\tmessage: '#^Новая ошибка {$i}$#'\n\t\t\tidentifier: test.rule\n\t\t\tcount: 1\n\t\t\tpath: src/New{$i}.php\n\n";
+        }
+        file_put_contents($head, "parameters:\n\tignoreErrors:\n".$entries);
+
+        exec(sprintf(
+            '%s %s %s 2>&1',
+            escapeshellarg(\dirname(__DIR__, 3).'/bin/phpstan-baseline-guard.sh'),
+            escapeshellarg($data.'base.neon'),
+            escapeshellarg($head),
+        ), $output, $exitCode);
+        unlink($head);
+
+        self::assertSame(1, $exitCode);
+        self::assertStringNotContainsString('Broken pipe', implode("\n", $output));
+        self::assertStringContainsString('и ещё 10', implode("\n", $output));
     }
 
     public function testGuardFailsWhenBaselineCannotBeParsedEntirely(): void

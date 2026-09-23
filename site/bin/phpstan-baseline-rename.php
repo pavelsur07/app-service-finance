@@ -116,15 +116,44 @@ foreach ($paths as $old => $new) {
 
 $rewritten = 0;
 $out = [];
+// Ключ записи — как у guard: (path, identifier, message). Переписывание не должно
+// склеивать две разные записи базы в один ключ: guard суммирует их count, и
+// рост одной из них мог бы пройти как «без изменений». Такой случай — отказ.
+$entry = ['message' => '', 'identifier' => '', 'path' => '', 'origMessage' => '', 'origPath' => ''];
+$keys = []; // новый ключ => исходный ключ
+$collisions = [];
 foreach (preg_split('/(?<=\n)/', $base) ?: [] as $line) {
-    if ([] !== $patterns && preg_match('/^\s*(message|path):/', $line)) {
-        $new = preg_replace($patterns, $replacements, $line) ?? $line;
+    $field = preg_match('/^\s*(message|identifier|path):\s*(.*?)\s*$/', $line, $f) ? $f[1] : null;
+    if (null !== $field && 'identifier' !== $field) {
+        $new = [] === $patterns ? $line : (preg_replace($patterns, $replacements, $line) ?? $line);
         if ($new !== $line) {
             ++$rewritten;
-            $line = $new;
         }
+        preg_match('/^\s*(?:message|path):\s*(.*?)\s*$/', $new, $nf);
+        $entry['orig'.ucfirst($field)] = $f[2];
+        $entry[$field] = $nf[1] ?? $f[2];
+        $line = $new;
+    } elseif ('identifier' === $field) {
+        $entry['identifier'] = $f[2];
+    }
+    if ('path' === $field) {
+        $newKey = $entry['path'].'|'.$entry['identifier'].'|'.$entry['message'];
+        $origKey = $entry['origPath'].'|'.$entry['identifier'].'|'.$entry['origMessage'];
+        if (isset($keys[$newKey]) && $keys[$newKey] !== $origKey) {
+            $collisions[] = $newKey;
+        }
+        $keys[$newKey] = $origKey;
+        $entry = ['message' => '', 'identifier' => '', 'path' => '', 'origMessage' => '', 'origPath' => ''];
     }
     $out[] = $line;
+}
+
+if ([] !== $collisions) {
+    throw new RuntimeException(sprintf(
+        "Переписывание склеило разные записи базы в один ключ (%d): рост одной из них был бы неотличим от переноса.\nПервая: %s\nПроведите PR с меткой [baseline-grow] и объяснением в описании.",
+        count($collisions),
+        $collisions[0],
+    ));
 }
 
 fwrite(STDOUT, implode('', $out));
