@@ -6,8 +6,8 @@ namespace App\Tests\Unit\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
-use App\Marketplace\Facade\MarketplaceFacade;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use Doctrine\DBAL\ArrayParameterType;

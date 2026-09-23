@@ -129,12 +129,7 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
             return;
         }
 
-        throw new ConnectorRateLimitedException(
-            $denied->sharedCooldown
-                ? 'WB finance report shared cooldown is active.'
-                : 'WB finance report local rate limit is active.',
-            $denied->waitSeconds,
-        );
+        throw new ConnectorRateLimitedException($denied->sharedCooldown ? 'WB finance report shared cooldown is active.' : 'WB finance report local rate limit is active.', $denied->waitSeconds);
     }
 
     /**

@@ -782,6 +782,12 @@ activeSellerConnections(string $companyId): list<ActiveSellerConnectionDTO>
 // @companyScopeExempt — системный обход для cron.
 activeSellerConnectionsPage(int $limit, ?string $afterConnectionRef = null): list<ActiveSellerConnectionDTO>
 // ActiveSellerConnectionDTO: connectionRef, companyId, marketplace
+
+// Последняя контрольная сверка итогов Ozon (OzonTransactionTotalsCheck),
+// пересекающая период компании. Потребитель — Ingestion ReconciliationQuery.
+// Сущность наружу не отдаётся. null — сверки за период нет.
+findLatestOzonTotalsCheck(string $companyId, DateTimeImmutable $periodFrom, DateTimeImmutable $periodTo): ?OzonTotalsCheckDTO
+// OzonTotalsCheckDTO (Application/DTO): ozonTotals (array, ключ total_minor), checkedAt
 ```
 
 Два метода, а не один с nullable-параметром: межкомпанейский проход нельзя
@@ -1443,6 +1449,33 @@ listingIdsByTags(string $companyId, array $tagIds, bool $matchAll = false): arra
 tagsForListings(string $companyId, array $listingIds): array
 ```
 Потребитель: `MarketplaceAnalytics` (фильтр `tags[]` + колонка тегов в расширенной юнит-экономике).
+
+### `WbFinanceThrottleFacade` (`src/Marketplace/Facade/WbFinanceThrottleFacade.php`)
+```php
+// Троттлинг WB finance sales-reports. За фасадом — тот же WbFinanceRateLimiter
+// (limiter.wb_finance + Redis cooldown), что у SyncWbFinancialReportDayHandler:
+// 429 в одном потоке тормозит оба.
+// null — слот зарезервирован, запрос можно отправлять; иначе — сколько ждать и
+// почему (sharedCooldown=true — общий cooldown после 429, false — локальный бакет).
+reserveSalesReportsSlot(string $sellerBucketId): ?WbFinanceThrottleDTO
+
+// Зафиксировать 429 от WB общим cooldown; возвращает секунды ожидания.
+registerSalesReportsRemote429(string $sellerBucketId, ?int $retryAfterSeconds, int $defaultSeconds): int
+// WbFinanceThrottleDTO (Application/DTO): waitSeconds, sharedCooldown
+```
+Потребитель: `Ingestion` (`WbFinanceReportClient`).
+
+### `CostCategoryCatalogFacade` (`src/Marketplace/Facade/CostCategoryCatalogFacade.php`)
+```php
+// Справочники категорий затрат как данные; правила группировки — у потребителя.
+// Без зависимостей: каталоги OzonCostCategory / WbCostCategory статические.
+// Ozon: breakdownGroup = xlsxGroup, unitBucket = null; при повторе кода — первое вхождение.
+// @return array<string, CostCategoryGroupsDTO> ключ — category code
+ozonCostCategoryGroups(): array
+wbCostCategoryGroups(): array
+// CostCategoryGroupsDTO (Application/DTO): widgetGroup, breakdownGroup, ?unitBucket
+```
+Потребитель: `MarketplaceAnalytics` (`MarketplaceCostAnalyticsGroupResolver`).
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php

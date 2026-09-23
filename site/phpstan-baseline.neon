@@ -4267,12 +4267,6 @@ parameters:
 			path: src/Ingestion/Infrastructure/Api/Wildberries/WbFinanceReportClient.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Infrastructure\\Api\\Wildberries\\WbFinanceReportClient should not depend on App\\Marketplace\\Application\\Service\\WbFinanceRateLimiter$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
-			count: 1
-			path: src/Ingestion/Infrastructure/Api/Wildberries/WbFinanceReportClient.php
-
-		-
 			message: '#^Method App\\Ingestion\\Infrastructure\\Doctrine\\EncryptedJsonType\:\:convertToPHPValue\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -4289,12 +4283,6 @@ parameters:
 			identifier: arrayValues.list
 			count: 1
 			path: src/Ingestion/Infrastructure/Query/OzonAccrualProjectionHealthQuery.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesMarketplace\: App\\Ingestion\\Infrastructure\\Query\\ReconciliationQuery should not depend on App\\Marketplace\\Repository\\OzonTransactionTotalsCheckRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesMarketplace
-			count: 1
-			path: src/Ingestion/Infrastructure/Query/ReconciliationQuery.php
 
 		-
 			message: '#^Метод\-запрос App\\Ingestion\\Repository\\IngestRawRecordRepository\:\:findStuckPending\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'

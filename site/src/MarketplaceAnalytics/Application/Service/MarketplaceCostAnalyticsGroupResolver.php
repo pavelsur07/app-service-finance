@@ -24,37 +24,37 @@ final class MarketplaceCostAnalyticsGroupResolver
     public function resolveWidgetGroup(?string $marketplace, string $code, string $name): string
     {
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {
-            return $this->wb($code)?->widgetGroup ?? 'Другие услуги и штрафы';
+            return $this->wb($code)->widgetGroup ?? 'Другие услуги и штрафы';
         }
 
         if ($marketplace === MarketplaceType::OZON->value) {
-            return $this->ozon($code)?->widgetGroup ?? 'Другие услуги и штрафы';
+            return $this->ozon($code)->widgetGroup ?? 'Другие услуги и штрафы';
         }
 
-        return $this->ozon($code)?->widgetGroup
-            ?? $this->wb($code)?->widgetGroup
+        return $this->ozon($code)->widgetGroup
+            ?? $this->wb($code)->widgetGroup
             ?? 'Другие услуги и штрафы';
     }
 
     public function resolveBreakdownGroup(?string $marketplace, string $code, string $name): string
     {
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {
-            return $this->wb($code)?->breakdownGroup ?? 'Другие услуги и штрафы';
+            return $this->wb($code)->breakdownGroup ?? 'Другие услуги и штрафы';
         }
 
         if ($marketplace === MarketplaceType::OZON->value) {
-            return $this->ozon($code)?->breakdownGroup ?? 'Другие услуги и штрафы';
+            return $this->ozon($code)->breakdownGroup ?? 'Другие услуги и штрафы';
         }
 
-        return $this->ozon($code)?->breakdownGroup
-            ?? $this->wb($code)?->breakdownGroup
+        return $this->ozon($code)->breakdownGroup
+            ?? $this->wb($code)->breakdownGroup
             ?? 'Другие услуги и штрафы';
     }
 
     public function resolveUnitBucket(?string $marketplace, string $code, string $name): string
     {
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {
-            return $this->wb($code)?->unitBucket ?? 'other';
+            return $this->wb($code)->unitBucket ?? 'other';
         }
 
         if ($marketplace === MarketplaceType::OZON->value) {
@@ -79,7 +79,7 @@ final class MarketplaceCostAnalyticsGroupResolver
             return 'Услуги доставки' === $ozon->breakdownGroup ? 'logistics' : 'other';
         }
 
-        return $this->wb($code)?->unitBucket ?? 'other';
+        return $this->wb($code)->unitBucket ?? 'other';
     }
 
     private function ozon(string $code): ?CostCategoryGroupsDTO
