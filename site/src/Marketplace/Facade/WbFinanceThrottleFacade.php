@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Facade;
 
 use App\Marketplace\Application\DTO\WbFinanceThrottleDTO;
-use App\Marketplace\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 
 /**
  * Троттлинг WB finance sales-reports для других модулей (Ingestion

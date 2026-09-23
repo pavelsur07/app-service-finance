@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\MessageHandler\ProcessDayReportHandler;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbGeneratedRowsSafeReplaceServiceInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

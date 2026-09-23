@@ -186,7 +186,7 @@ class AnalyzeProcessingCostCommand extends Command
                 sprintf('Наиболее вероятное поле для суммы: %s', $topField),
                 '',
                 'Что делать дальше:',
-                '1. Откройте: src/Marketplace/Service/CostCalculator/WbProductProcessingCalculator.php',
+                '1. Откройте: src/Marketplace/Wildberries/CostCalculator/WbProductProcessingCalculator.php',
                 '2. Найдите строку 22: $amount = (float)($item[\'delivery_rub\'] ?? 0);',
                 sprintf('3. Замените на: $amount = (float)($item[\'%s\'] ?? 0);', $topField),
                 '4. Очистите кеш: php bin/console cache:clear',

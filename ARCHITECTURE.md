@@ -353,6 +353,27 @@
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
 
+### Marketplace: раскладка по провайдерам
+
+Код конкретного маркетплейса живёт в каталоге провайдера, общий — в слоях модуля:
+
+- `src/Marketplace/Wildberries/` (с 23.09.2026) — `Application/{Action,Processor,FinancialReport,Service}`,
+  `Command`, `Controller(/Api)`, `CostCalculator`, `Domain`, `Exception`,
+  `Infrastructure/{Api,Normalizer,Query,Redis}`, `MessageHandler`.
+  Маршруты — ресурс `marketplace_wildberries_controllers` в `config/routes.yaml`.
+- `src/Marketplace/Ozon/` — этап 6 (ещё не перенесено).
+- Общее: `Entity`, `Repository`, `Enum`, `Facade`, `Message`, файлы с ветками для
+  обоих провайдеров (`MarketplaceController`, `MarketplaceFacade`,
+  `ProcessMarketplaceRawDocumentAction`).
+
+Правила:
+- `Message/*` провайдера не переносится: FQCN лежит в сериализованных сообщениях
+  очередей (`SyncWbFinancialReportDayMessage` остаётся в `App\Marketplace\Message`).
+- Контракт фасадов — в общих `Facade` и `Application/DTO`: пространства
+  `App\Marketplace\{Ozon,Wildberries}` закрыты для чужих модулей целиком
+  (`ModuleBoundaryRules::test_marketplace_provider_code_is_closed_to_other_modules`),
+  а провайдеры не зависят друг от друга (`…providers_do_not_depend_on_each_other`).
+
 ### Marketplace: загрузка начислений Ozon (by-day)
 
 Единственный источник финансовых данных Ozon — `/v1/finance/accrual/by-day`
@@ -3259,7 +3280,7 @@ Payload (только scalar):
 
 Message/worker:
 - Message: `App\Marketplace\Message\SyncWbFinancialReportDayMessage`;
-- Worker: `App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler`.
+- Worker: `App\Marketplace\Wildberries\MessageHandler\SyncWbFinancialReportDayHandler`.
 
 ---
 

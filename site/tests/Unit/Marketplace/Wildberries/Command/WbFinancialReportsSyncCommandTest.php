@@ -1,0 +1,270 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Marketplace\Wildberries\Command;
+
+use App\Marketplace\Enum\FinancialReportSyncMode;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportPeriodResolver;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlanResult;
+use App\Marketplace\Wildberries\Command\WbFinancialReportsSyncCommand;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
+
+final class WbFinancialReportsSyncCommandTest extends TestCase
+{
+    private WbFinancialReportSyncPlannerInterface&MockObject $planner;
+
+    protected function setUp(): void
+    {
+        $this->planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
+    }
+
+    public function testInvalidModeReturnsFailure(): void
+    {
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'bad']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testFromWithoutToReturnsFailure(): void
+    {
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'daily', '--from' => '2026-05-19']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testToWithoutFromReturnsFailure(): void
+    {
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'daily', '--to' => '2026-05-19']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testFromGreaterThanToReturnsFailure(): void
+    {
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'daily', '--from' => '2026-05-20', '--to' => '2026-05-19']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testDefaultModeRunsDailyOnly(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(1);
+
+        $this->planner->expects(self::never())->method('planInitial');
+        $this->planner->expects(self::never())->method('planRefresh14Days');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        $tester = $this->tester();
+        $code = $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testAutoDailyOutputDoesNotShowDispatchLimit(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(2);
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'daily']);
+
+        self::assertSame(Command::SUCCESS, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('Mode daily: dispatched_count=2', $output);
+        self::assertStringNotContainsString('dispatch_limit=1', $output);
+    }
+
+    public function testAllWithoutAllowAllReturnsFailureAndWarns(): void
+    {
+        $this->planner->expects(self::never())->method('planDaily');
+        $this->planner->expects(self::never())->method('planInitial');
+        $this->planner->expects(self::never())->method('planRefresh14Days');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'all']);
+
+        self::assertSame(Command::FAILURE, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+
+        self::assertStringContainsString(
+            'WB financial reports --mode=all is dangerous for cron because it can enqueue many days and hit WB API rate limits.',
+            $output,
+        );
+    }
+
+    public function testAllWithDateReturnsFailure(): void
+    {
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'all', '--allow-all' => true, '--date' => '2026-05-19']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testAllWithAllowAllRunsAllModes(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planInitial')
+            ->with(null, null, null, 1)
+            ->willReturn(1);
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(2);
+        $this->planner
+            ->expects(self::once())
+            ->method('planRefresh14Days')
+            ->with(null, null, 1)
+            ->willReturn(3);
+        $this->planner
+            ->expects(self::once())
+            ->method('planMissing')
+            ->with(null, null, 1)
+            ->willReturn(4);
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'all', '--allow-all' => true]);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testMissingWithDateReturnsFailureAndDoesNotCallPlanMissing(): void
+    {
+        $this->planner->expects(self::never())->method('planMissing');
+
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'missing', '--date' => '2026-05-19']);
+
+        self::assertSame(Command::FAILURE, $code);
+    }
+
+    public function testDailyDateCallsPlanRangeForOneDay(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planRangeLimited')
+            ->with(
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
+                FinancialReportSyncMode::DAILY,
+                1,
+                null,
+                null,
+                false,
+            )
+            ->willReturn(new WbFinancialReportSyncPlanResult(1, 1, 1, 1, 0));
+
+        $this->planner->expects(self::never())->method('planDaily');
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'daily', '--date' => '2026-05-19']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testInitialAutomaticPassesMaxDays(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planInitial')
+            ->with(null, null, null, 3)
+            ->willReturn(3);
+
+        $this->planner->expects(self::never())->method('planRangeLimited');
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'initial', '--max-days' => '3']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testInitialExplicitRangeUsesPlanRangeLimitedAndHonorsMaxDaysLimit(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planRangeLimited')
+            ->with(
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-18' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-20' === $d->format('Y-m-d')),
+                FinancialReportSyncMode::INITIAL,
+                1,
+                null,
+                null,
+                false,
+            )
+            ->willReturn(new WbFinancialReportSyncPlanResult(3, 1, 1, 1, 2));
+
+        $this->planner->expects(self::never())->method('planInitial');
+
+        $tester = $this->tester();
+        $code = $tester->execute([
+            '--mode' => 'initial',
+            '--from' => '2026-05-18',
+            '--to' => '2026-05-20',
+            '--max-days' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('candidates_count=3 dispatch_limit=1 attempted_count=1 dispatched_count=1 skipped_by_limit_count=2', $output);
+    }
+
+    public function testInitialDateCallsPlanRangeLimitedAndNotPlanInitial(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planRangeLimited')
+            ->with(
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-19' === $d->format('Y-m-d')),
+                FinancialReportSyncMode::INITIAL,
+                1,
+                null,
+                null,
+                false,
+            )
+            ->willReturn(new WbFinancialReportSyncPlanResult(1, 1, 1, 1, 0));
+
+        $this->planner->expects(self::never())->method('planInitial');
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'initial', '--date' => '2026-05-19']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    private function tester(): CommandTester
+    {
+        $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-21 00:00:00 Europe/Moscow'));
+        $command = new WbFinancialReportsSyncCommand($this->planner, $resolver, new NullLogger());
+
+        return new CommandTester($command);
+    }
+}

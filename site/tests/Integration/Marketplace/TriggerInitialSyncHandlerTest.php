@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
-use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\MessageHandler\TriggerInitialSyncHandler;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Wildberries\Application\Service\WbInitialSyncStartDateResolver;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Psr\Log\NullLogger;

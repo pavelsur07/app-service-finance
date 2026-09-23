@@ -300,7 +300,7 @@ $counterpartyNames = $this->counterpartyFacade->getNamesByIds($ids);
 App\Marketplace\Service\WbCommissionCalculator:
     tags: [{ name: 'app.marketplace.cost_calculator', priority: 110 }]
 
-App\Marketplace\Application\ProcessWbCostsAction:
+App\Marketplace\Wildberries\Application\Action\ProcessWbCostsAction:
     arguments:
         $costCalculators: !tagged_iterator app.marketplace.cost_calculator
 ```
@@ -1072,7 +1072,7 @@ final class ImportBankStatementHandler
 
 ### Messenger Handler — канонический паттерн
 
-Эталон: `App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler`.
+Эталон: `App\Marketplace\Wildberries\MessageHandler\SyncWbFinancialReportDayHandler`.
 
 ```php
 try {

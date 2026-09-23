@@ -1,0 +1,395 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Application\Action;
+
+use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Wildberries\Application\Service\WbListingResolverService;
+use App\Marketplace\Wildberries\CostCalculator\CostCalculatorInterface;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
+
+final class ProcessWbCostsAction
+{
+    /** @var iterable<CostCalculatorInterface> */
+    private iterable $costCalculators;
+
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
+        private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceCostCategoryResolver $categoryResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
+        private readonly WbSalesReportRowNormalizer $normalizer,
+        private readonly LoggerInterface $logger,
+        iterable $costCalculators,
+    ) {
+        $this->costCalculators = $costCalculators;
+    }
+
+    public function __invoke(string $companyId, string $rawDocId): int
+    {
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: '.$companyId);
+        }
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
+        }
+        $rawData = $rawDoc->getRawData();
+        $companyId = (string) $company->getId();
+        $rawDocId = (string) $rawDoc->getId();
+        $synced = 0;
+        $unprocessedTypes = [];
+        $failedItems = 0;
+        $lastItemError = null;
+        $batchSize = 100;
+
+        // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
+
+        $costsData = $rawData;
+
+        if (empty($costsData)) {
+            $this->logger->info('No costs to process');
+
+            return 0;
+        }
+
+        $this->logger->info('Starting bulk costs processing', [
+            'total_filtered' => count($costsData),
+            'batch_size' => $batchSize,
+        ]);
+
+        // 2. Массово загружаем listings (ПО ТОЙ ЖЕ ЛОГИКЕ ЧТО И ПРОДАЖИ!)
+        $allNmIdsMap = [];
+        foreach ($costsData as $item) {
+            $nmId = trim($this->normalizer->nmId($item));
+            if ('' === $nmId || '0' === $nmId) {
+                continue;
+            }
+            $allNmIdsMap[$nmId] = true;
+        }
+        $allNmIds = array_keys($allNmIdsMap);
+
+        // Собираем все barcodes для barcode→size lookup
+        $allBarcodes = [];
+        foreach ($costsData as $item) {
+            $barcode = trim((string) $this->normalizer->barcode($item));
+            if ('' !== $barcode) {
+                $allBarcodes[$barcode] = true;
+            }
+        }
+
+        $barcodeSizeMap = $this->barcodeCatalog->findSizesByBarcodes(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            array_keys($allBarcodes),
+        );
+
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
+
+        $listingsCache = [];
+        if (!empty($allNmIds)) {
+            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: используем ту же логику индексации что и для продаж/возвратов
+            $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                $allNmIds,
+            );
+
+            $this->logger->info('Loaded listings for costs', [
+                'count' => count($listingsCache),
+            ]);
+        }
+
+        $newListingsCreated = 0;
+        foreach ($costsData as $item) {
+            $nmId = trim($this->normalizer->nmId($item));
+            if ('' === $nmId || '0' === $nmId) {
+                continue;
+            }
+
+            $tsName = $this->normalizer->techSize($item);
+            $barcode = trim((string) $this->normalizer->barcode($item));
+
+            if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
+                $tsName = $barcodeSizeMap[$barcode];
+            }
+
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
+
+            if (isset($listingsCache[$cacheKey])) {
+                continue;
+            }
+
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
+            ], $barcode);
+
+            $listingsCache[$cacheKey] = $listing;
+            ++$newListingsCreated;
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->listingResolver->flushBarcodes();
+            $this->logger->info('Created missing listings for costs in bulk', [
+                'new_listings' => $newListingsCreated,
+            ]);
+        }
+
+        // 3. Прогреваем категории компании
+        $this->categoryResolver->preload($company, MarketplaceType::WILDBERRIES);
+
+        // --- ФАЗА 2: ОБРАБОТКА ---
+        $counter = 0;
+        $lastFlushedCounter = 0;
+        $knownExternalIdsMap = [];
+        $pending = [];
+        $pendingIds = [];
+        $dedupBatchSize = $batchSize;
+
+        $processPendingBatch = function () use (
+            &$pending,
+            &$pendingIds,
+            &$knownExternalIdsMap,
+            &$counter,
+            &$synced,
+            &$lastFlushedCounter,
+            &$listingsCache,
+            &$barcodeListingMap,
+            &$company,
+            $companyId,
+            $rawDocId,
+            $batchSize,
+        ): void {
+            if (empty($pendingIds)) {
+                return;
+            }
+
+            $dbExistingMap = $this->costExistingExternalIdsQuery->execute($companyId, $pendingIds);
+
+            $knownExternalIdsMap += $dbExistingMap;
+
+            foreach ($pending as $pendingItem) {
+                $externalId = $pendingItem['external_id'];
+                if (isset($knownExternalIdsMap[$externalId])) {
+                    continue;
+                }
+
+                $costData = $pendingItem['costData'];
+                $listing = $pendingItem['listing']; // ← Теперь это MarketplaceListing (или null)
+
+                $categoryCode = $costData['category_code'];
+                $categoryName = $costData['category_name']
+                    ?? $costData['description']
+                    ?? $categoryCode;
+                $category = $this->categoryResolver->resolve(
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    $categoryCode,
+                    $categoryName,
+                );
+
+                $cost = new MarketplaceCost(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    $category,
+                );
+
+                $cost->setExternalId($externalId);
+                $cost->setCostDate($costData['cost_date']);
+                $cost->setAmount($costData['amount']);
+                $cost->setDescription($costData['description']);
+                $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE);
+                $cost->setRawDocumentId($rawDocId);
+
+                // ПРИВЯЗКА К LISTING (если есть)
+                if ($listing) {
+                    $cost->setListing($listing);
+                }
+
+                $this->em->persist($cost);
+                $knownExternalIdsMap[$externalId] = true;
+                ++$synced;
+                ++$counter;
+            }
+
+            if (($counter - $lastFlushedCounter) >= $batchSize) {
+                $this->em->flush();
+                $this->em->clear();
+                $lastFlushedCounter = $counter;
+
+                $company = $this->em->find(Company::class, $companyId);
+                $this->categoryResolver->resetCache();
+
+                foreach ($listingsCache as $k => $cachedListing) {
+                    $listingsCache[$k] = $this->em->getReference(
+                        MarketplaceListing::class,
+                        $cachedListing->getId(),
+                    );
+                }
+
+                foreach ($barcodeListingMap as $bc => $bcListing) {
+                    $barcodeListingMap[$bc] = $this->em->getReference(
+                        MarketplaceListing::class,
+                        $bcListing->getId(),
+                    );
+                }
+
+                gc_collect_cycles();
+
+                $this->logger->info('Costs batch processed', [
+                    'processed' => $counter,
+                    'synced' => $synced,
+                    'memory' => round(memory_get_usage(true) / 1024 / 1024, 2).' MB',
+                ]);
+            }
+
+            $pending = [];
+            $pendingIds = [];
+        };
+
+        foreach ($costsData as $item) {
+            try {
+                $processed = false;
+
+                foreach ($this->costCalculators as $calculator) {
+                    if (!$calculator->supports($item)) {
+                        continue;
+                    }
+
+                    $processed = true;
+
+                    // Получаем listing из кэша по nm_id + size (с barcode fallback)
+                    $nmId = trim($this->normalizer->nmId($item));
+                    $barcode = trim((string) $this->normalizer->barcode($item));
+                    if ('' === $nmId || '0' === $nmId) {
+                        // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
+                        $listing = '' !== $barcode && isset($barcodeListingMap[$barcode])
+                            ? $barcodeListingMap[$barcode]
+                            : null;
+                    } else {
+                        $tsName = $this->normalizer->techSize($item);
+
+                        if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
+                            $tsName = $barcodeSizeMap[$barcode];
+                        }
+
+                        $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+                        $cacheKey = $nmId.'_'.$size;
+                        $listing = $listingsCache[$cacheKey] ?? null;
+                    }
+
+                    $calculatedCosts = $calculator->calculate($item, $listing);
+
+                    foreach ($calculatedCosts as $costData) {
+                        $externalId = $costData['external_id'];
+
+                        if (isset($knownExternalIdsMap[$externalId])) {
+                            continue;
+                        }
+
+                        $pending[] = [
+                            'external_id' => $externalId,
+                            'costData' => $costData,
+                            'listing' => $listing, // ← Передаем найденный listing (или null)
+                        ];
+                        $pendingIds[] = $externalId;
+
+                        if (count($pendingIds) >= $dedupBatchSize) {
+                            $processPendingBatch();
+                        }
+                    }
+                }
+
+                $operName = $this->normalizer->sellerOperName($item);
+                if (!$processed && '' !== $operName) {
+                    if (!isset($unprocessedTypes[$operName])) {
+                        $unprocessedTypes[$operName] = 0;
+                    }
+                    ++$unprocessedTypes[$operName];
+                }
+            } catch (\Exception $e) {
+                // Одна строка — warning; агрегированный error со счётчиком ниже,
+                // иначе один битый отчёт даёт сотни алертов.
+                ++$failedItems;
+                $lastItemError = $e->getMessage();
+                $this->logger->warning('Failed to process cost item', [
+                    'srid' => $item['srid'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+        }
+
+        if ($failedItems > 0) {
+            $this->logger->error('Cost items failed to process', [
+                'raw_document_id' => $rawDocId,
+                'failed_count' => $failedItems,
+                'total_records' => count($rawData),
+                'last_error' => $lastItemError,
+            ]);
+        }
+
+        if (!empty($pendingIds)) {
+            $processPendingBatch();
+        }
+
+        if (0 !== $counter % $batchSize) {
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        // Сохраняем статистику
+        $unprocessedCount = array_sum($unprocessedTypes);
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+
+        if ($rawDoc) {
+            $rawDoc->setUnprocessedCostsCount($unprocessedCount);
+            $rawDoc->setUnprocessedCostTypes($unprocessedTypes ?: null);
+            $this->em->flush();
+        }
+
+        $this->logger->info('Costs processing completed', [
+            'total_synced' => $synced,
+            'total_records' => count($rawData),
+            'unprocessed_count' => $unprocessedCount,
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2).' MB',
+        ]);
+
+        return $synced;
+    }
+}

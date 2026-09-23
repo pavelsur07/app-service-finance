@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Facade;
 
-use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
-use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Facade\WbFinanceThrottleFacade;
+use App\Marketplace\Wildberries\Application\Service\WbFinanceCooldownStorageInterface;
+use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
