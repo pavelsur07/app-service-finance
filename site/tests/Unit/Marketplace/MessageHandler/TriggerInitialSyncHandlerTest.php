@@ -140,4 +140,26 @@ final class TriggerInitialSyncHandlerTest extends TestCase
 
         $handler(new TriggerInitialSyncMessage((string) $company->getId(), $connection->getId(), MarketplaceType::OZON->value));
     }
+
+    public function testMessageForConnectionOfAnotherCompanyIsSkipped(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('88888888-8888-4888-8888-888888888888', $company, MarketplaceType::OZON);
+        $repo = $this->createMock(MarketplaceConnectionRepository::class);
+        $repo->method('find')->willReturn($connection);
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+
+        $handler = new TriggerInitialSyncHandler(
+            new NullLogger(),
+            new MockClock('2026-09-12 10:00:00'),
+            $repo,
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            new OzonAccrualSyncPlanner($bus, new NullLogger(), new MockClock('2026-09-12 10:00:00')),
+        );
+
+        $handler(new TriggerInitialSyncMessage('99999999-9999-4999-8999-999999999999', $connection->getId(), MarketplaceType::OZON->value));
+    }
 }

@@ -127,6 +127,38 @@ final class SyncConnectionActionTest extends TestCase
         self::assertContainsOnlyInstancesOf(SyncOzonAccrualByDayMessage::class, $messages);
         self::assertSame($connectionId, $messages[0]->connectionId);
         self::assertSame($companyId, $messages[0]->companyId);
+        self::assertNotNull($connection->getLastSyncAt(), 'Задачи поставлены — подключение отмечено как синхронизируемое.');
+    }
+
+    public function testOzonEmptyWindowLeavesConnectionStateUntouched(): void
+    {
+        $companyId = '11111111-1111-4111-8111-111111111111';
+        $connectionId = '77777777-7777-4777-8777-777777777777';
+        $connection = new MarketplaceConnection($connectionId, new Company($companyId, self::uninitialized(User::class)), MarketplaceType::OZON);
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $action = new SyncConnectionAction(
+            $this->repositoryReturning($connectionId, $connection),
+            $em,
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            $this->ozonPlanner($bus),
+        );
+
+        // Всё окно до порога 08.09 — ни одной задачи, значит и синхронизации не было.
+        $result = $action(new SyncConnectionCommand(
+            companyId: $companyId,
+            connectionId: $connectionId,
+            fromDate: new \DateTimeImmutable('2026-09-01'),
+            toDate: new \DateTimeImmutable('2026-09-05'),
+        ));
+
+        self::assertSame(0, $result->scheduledCount);
+        self::assertNull($connection->getLastSyncAt());
     }
 
     public function testOzonPerformanceConnectionIsNotSyncedManually(): void

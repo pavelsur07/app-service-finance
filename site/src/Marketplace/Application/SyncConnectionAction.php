@@ -56,28 +56,36 @@ final class SyncConnectionAction
             throw new ManualSyncNotSupportedException(sprintf('Ручная синхронизация для %s не поддерживается', $marketplace->getDisplayName()));
         }
 
-        $connection->markSyncStarted();
-        $this->em->flush();
-
-        try {
-            if (MarketplaceType::WILDBERRIES === $marketplace) {
-                return new SyncConnectionResult($this->planWbManualSync($command), null, null, false);
-            }
-
-            $plan = $this->ozonAccrualSyncPlanner->planRange(
-                $command->companyId,
-                $command->connectionId,
-                $command->fromDate,
-                $command->toDate,
-            );
-
-            return new SyncConnectionResult($plan->dispatchedCount, $plan->firstDay, $plan->lastDay, $plan->clampedToSafeDay);
-        } catch (\Exception $e) {
-            $connection->markSyncFailed($e->getMessage());
+        if (MarketplaceType::WILDBERRIES === $marketplace) {
+            $connection->markSyncStarted();
             $this->em->flush();
 
-            throw $e;
+            try {
+                return new SyncConnectionResult($this->planWbManualSync($command), null, null, false);
+            } catch (\Exception $e) {
+                $connection->markSyncFailed($e->getMessage());
+                $this->em->flush();
+
+                throw $e;
+            }
         }
+
+        // Ozon: состояние подключения трогаем только если задачи реально поставлены.
+        // Пустое окно (всё до порога EARLIEST_SAFE_DAY или только сегодня) — не
+        // синхронизация, и `lastSyncAt` не должен выдавать её за «synced».
+        $plan = $this->ozonAccrualSyncPlanner->planRange(
+            $command->companyId,
+            $command->connectionId,
+            $command->fromDate,
+            $command->toDate,
+        );
+
+        if ($plan->dispatchedCount > 0) {
+            $connection->markSyncStarted();
+            $this->em->flush();
+        }
+
+        return new SyncConnectionResult($plan->dispatchedCount, $plan->firstDay, $plan->lastDay, $plan->clampedToSafeDay);
     }
 
     private function planWbManualSync(SyncConnectionCommand $command): int

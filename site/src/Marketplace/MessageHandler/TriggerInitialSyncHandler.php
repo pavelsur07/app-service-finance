@@ -45,6 +45,15 @@ final class TriggerInitialSyncHandler
         // поэтому триггер выполняется только для SELLER.
         $connection = $this->connectionRepository->find($message->connectionId);
 
+        if ($connection instanceof MarketplaceConnection && (string) $connection->getCompany()->getId() !== $message->companyId) {
+            $this->logger->warning('InitialSync: skipped — connection belongs to another company', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+            ]);
+
+            return;
+        }
+
         if (!$connection instanceof MarketplaceConnection || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()) {
             $this->logger->warning('InitialSync: skipped — connection missing or not SELLER', [
                 'company_id' => $message->companyId,

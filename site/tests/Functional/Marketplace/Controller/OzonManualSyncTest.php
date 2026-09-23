@@ -105,6 +105,11 @@ final class OzonManualSyncTest extends WebTestCaseBase
             ['Новых задач нет: дни до 08.09.2026 уже загружены из прежнего источника.'],
             $this->flashes($client, 'success'),
         );
+
+        $this->em()->clear();
+        $reloaded = $this->em()->find(MarketplaceConnection::class, $connection->getId());
+        self::assertInstanceOf(MarketplaceConnection::class, $reloaded);
+        self::assertNull($reloaded->getLastSyncAt(), 'Пустое окно не должно выдавать себя за синхронизацию.');
     }
 
     /**
