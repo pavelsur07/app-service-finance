@@ -85,7 +85,7 @@ final class StockReportPageParser
         $type = is_array($meta) ? ($meta['type'] ?? null) : null;
         $href = is_array($meta) ? ($meta['href'] ?? null) : null;
         if (!is_string($type) || !in_array($type, $allowedTypes, true) || !is_string($href)
-            || 1 !== preg_match('~^https://api\.moysklad\.ru/api/remap/1\.2/entity/([a-z]+)/([0-9a-fA-F-]{36})$~D', $href, $match)
+            || 1 !== preg_match('~^https://api\.moysklad\.ru/api/remap/1\.2/entity/([a-z]+)/([0-9a-fA-F-]{36})(?:\?[^#]*)?$~D', $href, $match)
             || $match[1] !== $type || !Uuid::isValid($match[2])) {
             throw new StockSyncException('invalid_response');
         }
