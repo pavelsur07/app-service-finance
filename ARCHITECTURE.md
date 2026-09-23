@@ -353,6 +353,25 @@
 - Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
 - `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
 
+### Marketplace: загрузка начислений Ozon (by-day)
+
+Единственный источник финансовых данных Ozon — `/v1/finance/accrual/by-day`
+(`SyncOzonAccrualByDayMessage` → `SyncOzonAccrualByDayHandler`, транспорт
+`async_sync`). Задачи ставит только `Application/Service/OzonAccrualSyncPlanner::planRange(companyId, connectionId, from, to)`:
+одно сообщение на бизнес-день (Europe/Moscow), от новых к старым; конец окна
+ограничен вчерашним днём, начало поднимается до `EARLIEST_SAFE_DAY = 2026-09-08`
+(дни раньше покрыты документами v3, повторная нормализация дала бы двойной учёт).
+Потребители: cron `app:marketplace:ozon-financial-reports:sync` (отвергает окно
+за порогом, а не обрезает), ручная синхронизация `SyncConnectionAction`
+(Ozon SELLER; результат — `Application/DTO/SyncConnectionResult`) и первичный
+синк нового подключения `TriggerInitialSyncHandler`.
+
+Легаси v3 (`/v3/finance/transaction/list`, снят Ozon 09.09.2026) удалён
+23.09.2026 (`docs/tasks/marketplace-ozon-v3-removal/`): `OzonDailySyncCommand`,
+`OzonMonthRawRefreshCommand`, `SyncOzonReportMessage`, `InitialSyncMessage`,
+`OzonAdapter` и реестр адаптеров. Формат `MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3`
+и его процессоры остаются: 967 документов переобрабатываются по сохранённому сырью.
+
 ### Marketplace: загрузка каталога товаров Ozon
 
 Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либо
@@ -2864,7 +2883,6 @@ $money->amountMinor(): int;  $money->currency(): string
 | Тег | Назначение |
 |---|---|
 | `app.marketplace.cost_calculator` | Калькуляторы WB-затрат (priority в services.yaml) |
-| `app.marketplace.adapter` | Адаптеры маркетплейсов (WB, Ozon) |
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 | `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |

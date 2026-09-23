@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace;
 
-use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -64,13 +64,12 @@ final class TriggerInitialSyncHandlerTest extends IntegrationTestCase
             ->willReturn(375);
 
         $handler = new TriggerInitialSyncHandler(
-            $bus,
             new NullLogger(),
-            new MarketplaceWeekPartitionService(),
             new MockClock('2026-05-10 00:00:00'),
             self::getContainer()->get(\App\Marketplace\Repository\MarketplaceConnectionRepository::class),
             $resolver,
             $planner,
+            new OzonAccrualSyncPlanner($bus, new NullLogger(), new MockClock('2026-05-10 00:00:00')),
         );
 
         $handler(new TriggerInitialSyncMessage($company->getId(), $connection->getId(), MarketplaceType::WILDBERRIES->value));

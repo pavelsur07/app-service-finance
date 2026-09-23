@@ -8,7 +8,7 @@
 | `ozon_finance_accrual_postings` | `POST /v1/finance/accrual/postings` | `OzonAccrualShadowMapper` |
 | `ozon_finance_accrual_types` | `POST /v1/finance/accrual/types` | `OzonAccrualShadowMapper` |
 
-Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`) продолжает работать параллельно.
+Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`, `/v3/finance/transaction/list`) удалён 23.09.2026: Ozon снял эндпоинт 09.09.2026.
 Новый Ingestion-пайплайн работает в shadow-режиме до переключения.
 
 ### Справочник accrual/by-day категорий

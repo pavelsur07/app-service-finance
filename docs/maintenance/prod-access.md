@@ -173,8 +173,8 @@ Read-only проверки можно выполнять после запрос
   пятнадцать команд Ingestion, и одноимённый сегмент под другим префиксом
   читался бы в этом файле как та же семья.
 
-  Обе Ozon-команды в allowlist намеренно: легаси нужна, пока не восстановлена
-  история, а её 967 документов остаются переобрабатываемыми.
+  967 документов v3 переобрабатываются процессорами по сохранённому сырью —
+  загрузчик v3 для этого не нужен.
 
 - `app:marketplace:ozon-financial-reports:freshness-check` — read-only гейт под
   ту же загрузку: у каждого активного seller-подключения обязан быть документ
@@ -183,22 +183,11 @@ Read-only проверки можно выполнять после запрос
   code — рабочий сигнал команды: загрузка встала сейчас. Починка под гейт —
   `ozon-financial-reports:sync`, её окно вчерашний день покрывает.
 
-- `app:marketplace:ozon-daily-sync` — ставит в `async_sync` загрузку сырых
-  отчётов Ozon за последние 14 дней по всем активным seller-подключениям:
-  внешние вызовы Seller API и перезапись `marketplace_raw_documents`.
-  Существует ради восстановления пропущенного дня — в остальное время этим
-  занимается крон в 04:00. Идемпотентна: документ дня обновляется, дубль не
-  создаётся. Wrapper допускает только служебные флаги Symfony
-  (`--no-interaction`, `-n`, `--quiet`, `-q`); собственных опций у команды нет,
-  и любой другой аргумент отвергается.
-
-  Одобрение на неё — отдельное (`AGENTS.md` §3.3) и не покрывается
-  «merge and deploy». Правила `permissions.allow` в `.claude/settings.local.json`
-  написаны под форму `codex-console *` целиком, поэтому запрос разрешения на
-  неё не всплывёт: если нужен обязательный вопрос перед запуском, Владелец
-  добавляет узкое правило в `ask`, например
-  `Bash(*vf-prod-codex*ozon-daily-sync*)`. Ограничение внутри wrapper от
-  случайного запуска не спасает — оно держит только форму аргументов.
+- `app:marketplace:ozon-daily-sync` — **удалена 23.09.2026** вместе с цепочкой
+  `/v3/finance/transaction/list` (`docs/tasks/marketplace-ozon-v3-removal/`).
+  Строка в боевом wrapper'е и в `codex-console.sh` осталась: wrapper-ы правит
+  Владелец. Вызов безвреден — Symfony ответит `command not defined`. Замена —
+  `ozon-financial-reports:sync` выше.
 - Repair, prune, backfill, rebuild, refresh, maintenance.
 - SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
 - Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.

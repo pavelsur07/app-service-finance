@@ -22,7 +22,7 @@ use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -168,7 +168,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
         AppLogger $appLogger,
         ?ReprocessMarketplacePeriodAction $reprocessAction = null,
     ): MarketplaceController {
-        return new class($companyService, self::uninitialized(MarketplaceConnectionRepository::class), $rawDocumentRepository, self::uninitialized(MarketplaceAdapterRegistry::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $this->createMock(EntityManagerInterface::class), $this->createMock(MessageBusInterface::class), $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), self::uninitialized(WbInitialSyncStartDateResolver::class), $this->createMock(WbFinancialReportSyncPlannerInterface::class), self::uninitialized(WbFinanceSyncStatusListQuery::class), $this->createMock(OzonSellerCredentialValidatorInterface::class), self::uninitialized(ConnectionApiKeyCodec::class), $appLogger) extends MarketplaceController {
+        return new class($companyService, self::uninitialized(MarketplaceConnectionRepository::class), $rawDocumentRepository, self::uninitialized(WildberriesAdapter::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $this->createMock(EntityManagerInterface::class), $this->createMock(MessageBusInterface::class), $reprocessAction ?? self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), self::uninitialized(WbInitialSyncStartDateResolver::class), $this->createMock(WbFinancialReportSyncPlannerInterface::class), self::uninitialized(WbFinanceSyncStatusListQuery::class), $this->createMock(OzonSellerCredentialValidatorInterface::class), self::uninitialized(ConnectionApiKeyCodec::class), $appLogger, self::uninitialized(\App\Marketplace\Application\Service\OzonPerformanceConnectionValidator::class)) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }
@@ -185,6 +185,13 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
         };
     }
 
+    /**
+     * @template T of object
+     *
+     * @param class-string<T> $className
+     *
+     * @return T
+     */
     private static function uninitialized(string $className): object
     {
         return (new \ReflectionClass($className))->newInstanceWithoutConstructor();

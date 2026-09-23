@@ -5,24 +5,28 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\SyncConnectionCommand;
+use App\Marketplace\Application\DTO\SyncConnectionResult;
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\FinancialReportSyncMode;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\ManualSyncNotSupportedException;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 
 /**
- * Для не-WB загружает сырой отчёт за указанный период и сохраняет его как MarketplaceRawDocument.
- * Для WB только планирует дневные задачи новой финансовой синхронизации.
+ * Ручная синхронизация подключения: только ставит асинхронные задачи.
+ *
+ * WB — дневные задачи новой финансовой синхронизации (планировщик статусов).
+ * Ozon SELLER — задачи загрузки начислений by-day (OzonAccrualSyncPlanner), тот
+ * же путь, что у ночного cron. Прежняя прямая загрузка через /v3/finance/
+ * transaction/list снята вместе с эндпоинтом (Ozon, 09.09.2026).
  *
  * Используется из:
  *   - MarketplaceController::syncConnection()       — синхронизация за последние 7 дней
  *   - MarketplaceController::syncConnectionPeriod() — синхронизация за произвольный период
- *
- * @return int количество загруженных записей (не-WB) или запланированных задач (WB)
  */
 final class SyncConnectionAction
 {
@@ -30,56 +34,58 @@ final class SyncConnectionAction
 
     public function __construct(
         private readonly MarketplaceConnectionRepository $connectionRepository,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly EntityManagerInterface $em,
         private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
+        private readonly OzonAccrualSyncPlanner $ozonAccrualSyncPlanner,
     ) {
     }
 
-    public function __invoke(SyncConnectionCommand $command): int
+    public function __invoke(SyncConnectionCommand $command): SyncConnectionResult
     {
         $connection = $this->connectionRepository->find($command->connectionId);
 
-        if (!$connection || (string) $connection->getCompany()->getId() !== $command->companyId) {
+        if (!$connection instanceof MarketplaceConnection || (string) $connection->getCompany()->getId() !== $command->companyId) {
             throw new \DomainException('Подключение не найдено');
         }
 
-        $connection->markSyncStarted();
-        $this->em->flush();
+        $marketplace = $connection->getMarketplace();
+        $isOzonSeller = MarketplaceType::OZON === $marketplace
+            && MarketplaceConnectionType::SELLER === $connection->getConnectionType();
 
-        try {
-            if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
-                return $this->planWbManualSync($command);
-            }
-
-            $company = $connection->getCompany();
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $command->fromDate, $command->toDate);
-            $recordsCount = count($response);
-
-            $rawDoc = new MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                $connection->getMarketplace(),
-                'sales_report',
-            );
-            $rawDoc->setPeriodFrom($command->fromDate);
-            $rawDoc->setPeriodTo($command->toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount($recordsCount);
-
-            $this->em->persist($rawDoc);
-            $connection->markSyncSuccess();
-            $this->em->flush();
-
-            return $recordsCount;
-        } catch (\Exception $e) {
-            $connection->markSyncFailed($e->getMessage());
-            $this->em->flush();
-
-            throw $e;
+        if (MarketplaceType::WILDBERRIES !== $marketplace && !$isOzonSeller) {
+            throw new ManualSyncNotSupportedException(sprintf('Ручная синхронизация для %s не поддерживается', $marketplace->getDisplayName()));
         }
+
+        if (MarketplaceType::WILDBERRIES === $marketplace) {
+            $connection->markSyncStarted();
+            $this->em->flush();
+
+            try {
+                return new SyncConnectionResult($this->planWbManualSync($command), null, null, false);
+            } catch (\Exception $e) {
+                $connection->markSyncFailed($e->getMessage());
+                $this->em->flush();
+
+                throw $e;
+            }
+        }
+
+        // Ozon: состояние подключения трогаем только если задачи реально поставлены.
+        // Пустое окно (всё до порога EARLIEST_SAFE_DAY или только сегодня) — не
+        // синхронизация, и `lastSyncAt` не должен выдавать её за «synced».
+        $plan = $this->ozonAccrualSyncPlanner->planRange(
+            $command->companyId,
+            $command->connectionId,
+            $command->fromDate,
+            $command->toDate,
+        );
+
+        if ($plan->dispatchedCount > 0) {
+            $connection->markSyncStarted();
+            $this->em->flush();
+        }
+
+        return new SyncConnectionResult($plan->dispatchedCount, $plan->firstDay, $plan->lastDay, $plan->clampedToSafeDay);
     }
 
     private function planWbManualSync(SyncConnectionCommand $command): int
