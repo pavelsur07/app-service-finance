@@ -11,12 +11,16 @@ use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
+use App\Marketplace\Application\DTO\SyncConnectionResult;
+use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
+use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\OzonPerformanceValidationException;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
@@ -28,7 +32,7 @@ use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,7 +55,7 @@ class MarketplaceController extends AbstractController
         private readonly ActiveCompanyService $companyService,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
+        private readonly WildberriesAdapter $wildberriesAdapter,
         private readonly OzonRealizationStatusQuery $realizationStatusQuery,
         private readonly RawDocumentsListQuery $rawDocumentsListQuery,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
@@ -65,6 +69,7 @@ class MarketplaceController extends AbstractController
         private readonly OzonSellerCredentialValidatorInterface $ozonCredentialValidator,
         private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
         private readonly AppLogger $appLogger,
+        private readonly OzonPerformanceConnectionValidator $ozonPerformanceValidator,
     ) {
     }
 
@@ -244,12 +249,29 @@ class MarketplaceController extends AbstractController
             return $this->redirectToRoute('marketplace_connections_index');
         }
 
-        try {
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
-            $success = $adapter->authenticate($company);
-        } catch (\Exception $e) {
+        if (MarketplaceType::OZON === $connection->getMarketplace()
+            && MarketplaceConnectionType::PERFORMANCE === $connection->getConnectionType()
+        ) {
+            try {
+                $this->ozonPerformanceValidator->validate(
+                    (string) $connection->getClientId(),
+                    $this->connectionApiKeyCodec->apiKeyFor($connection),
+                );
+                $success = true;
+            } catch (OzonPerformanceValidationException $e) {
+                $success = false;
+                $error = $e->getMessage();
+            }
+        } elseif (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
+            try {
+                $success = $this->wildberriesAdapter->authenticate($company);
+            } catch (\Exception $e) {
+                $success = false;
+                $error = $e->getMessage();
+            }
+        } else {
             $success = false;
-            $error = $e->getMessage();
+            $error = sprintf('проверка для %s не поддерживается', $connection->getMarketplace()->getDisplayName());
         }
 
         if ($success) {
@@ -289,20 +311,9 @@ class MarketplaceController extends AbstractController
                 fromDate: new \DateTimeImmutable('-7 days'),
                 toDate: new \DateTimeImmutable(),
             );
-            $count = ($this->syncConnectionAction)($cmd);
+            $result = ($this->syncConnectionAction)($cmd);
 
-            if (MarketplaceType::WILDBERRIES === $connection?->getMarketplace()) {
-                $this->addFlash('success', sprintf(
-                    'Запланировано %d задач синхронизации WB.',
-                    $count,
-                ));
-            } else {
-                $this->addFlash('success', sprintf(
-                    'Загружено %d записей от %s.',
-                    $count,
-                    $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
-                ));
-            }
+            $this->addFlash('success', $this->manualSyncScheduledMessage($connection, $result));
         } catch (\DomainException $e) {
             throw $this->createNotFoundException($e->getMessage());
         } catch (\Exception $e) {
@@ -364,24 +375,9 @@ class MarketplaceController extends AbstractController
                 fromDate: $fromDate,
                 toDate: $toDate,
             );
-            $count = ($this->syncConnectionAction)($cmd);
+            $result = ($this->syncConnectionAction)($cmd);
 
-            if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
-                $this->addFlash('success', sprintf(
-                    'Запланировано %d задач синхронизации WB за период %s — %s.',
-                    $count,
-                    $fromDate->format('d.m.Y'),
-                    $toDate->format('d.m.Y'),
-                ));
-            } else {
-                $this->addFlash('success', sprintf(
-                    'Загружено %d записей от %s за период %s — %s.',
-                    $count,
-                    $connection->getMarketplace()->getDisplayName(),
-                    $fromDate->format('d.m.Y'),
-                    $toDate->format('d.m.Y'),
-                ));
-            }
+            $this->addFlash('success', $this->manualSyncScheduledMessage($connection, $result, $fromDate, $toDate));
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка загрузки: '.$e->getMessage());
         }
@@ -914,6 +910,49 @@ class MarketplaceController extends AbstractController
      * сервере, иначе ручной запуск по мёртвому ключу продолжает порождать
      * заведомо падающие задания.
      */
+    private function manualSyncScheduledMessage(
+        MarketplaceConnection $connection,
+        SyncConnectionResult $result,
+        ?\DateTimeImmutable $requestedFrom = null,
+        ?\DateTimeImmutable $requestedTo = null,
+    ): string {
+        if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
+            if (null === $requestedFrom || null === $requestedTo) {
+                return sprintf('Запланировано %d задач синхронизации WB.', $result->scheduledCount);
+            }
+
+            return sprintf(
+                'Запланировано %d задач синхронизации WB за период %s — %s.',
+                $result->scheduledCount,
+                $requestedFrom->format('d.m.Y'),
+                $requestedTo->format('d.m.Y'),
+            );
+        }
+
+        if (null === $result->firstDay || null === $result->lastDay) {
+            return sprintf(
+                'Новых задач нет: начисления Ozon загружаются по вчерашний день, а дни до %s уже загружены из прежнего источника.',
+                (new \DateTimeImmutable(OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY))->format('d.m.Y'),
+            );
+        }
+
+        $message = sprintf(
+            'Запланировано %d задач загрузки начислений Ozon за %s — %s.',
+            $result->scheduledCount,
+            (new \DateTimeImmutable($result->firstDay))->format('d.m.Y'),
+            (new \DateTimeImmutable($result->lastDay))->format('d.m.Y'),
+        );
+
+        if ($result->clampedToSafeDay) {
+            $message .= sprintf(
+                ' Дни до %s уже загружены из прежнего источника.',
+                (new \DateTimeImmutable(OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY))->format('d.m.Y'),
+            );
+        }
+
+        return $message;
+    }
+
     private function canRunManualSync(MarketplaceConnection $connection): bool
     {
         return $connection->isActive() && !$connection->getAuthStatus()->isFailed();

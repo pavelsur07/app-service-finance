@@ -22,7 +22,10 @@ use App\Marketplace\Infrastructure\Query\WbFinanceSyncStatusListQuery;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
+use App\Marketplace\Application\Service\OzonPerformanceConnectionValidator;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -394,6 +397,52 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         ]);
     }
 
+    public function testTestConnectionChecksOzonPerformanceThroughPerformanceTokenEndpoint(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection(
+            '66666666-6666-4666-8666-666666666666',
+            $company,
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::PERFORMANCE,
+        );
+        $connection->setApiKey('perf-secret');
+        $connection->setClientId('perf-client');
+
+        $companyService = $this->createMock(ActiveCompanyService::class);
+        $companyService->method('getActiveCompany')->willReturn($company);
+
+        $connectionRepository = $this->createMock(MarketplaceConnectionRepository::class);
+        $connectionRepository->method('find')->with($connection->getId())->willReturn($connection);
+
+        $sellerValidator = $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $sellerValidator->expects(self::never())->method('validate');
+
+        $requests = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$requests): MockResponse {
+            $requests[] = [$url, json_decode((string) ($options['body'] ?? '{}'), true)];
+
+            return new MockResponse('{"access_token":"t"}', ['http_code' => 200]);
+        });
+
+        $response = $this->controller(
+            $companyService,
+            $connectionRepository,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(MessageBusInterface::class),
+            $this->createMock(WbInitialSyncStartDateResolver::class),
+            $this->createMock(WbFinancialReportSyncPlannerInterface::class),
+            $sellerValidator,
+            new OzonPerformanceConnectionValidator($http),
+        )->testConnection($connection->getId(), new Request());
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertCount(1, $requests, 'Ровно один запрос — к токену Performance API, не к снятому v3.');
+        self::assertSame('https://api-performance.ozon.ru/api/client/token', $requests[0][0]);
+        self::assertSame('perf-client', $requests[0][1]['client_id'] ?? null);
+        self::assertSame('perf-secret', $requests[0][1]['client_secret'] ?? null);
+    }
+
     private function controller(
         ActiveCompanyService $companyService,
         MarketplaceConnectionRepository $connectionRepository,
@@ -402,10 +451,12 @@ final class MarketplaceControllerCreateConnectionTest extends TestCase
         WbInitialSyncStartDateResolver $startDateResolver,
         WbFinancialReportSyncPlannerInterface $planner,
         ?OzonSellerCredentialValidatorInterface $ozonCredentialValidator = null,
+        ?OzonPerformanceConnectionValidator $ozonPerformanceValidator = null,
     ): MarketplaceController {
         $ozonCredentialValidator ??= $this->createMock(OzonSellerCredentialValidatorInterface::class);
+        $ozonPerformanceValidator ??= self::uninitialized(OzonPerformanceConnectionValidator::class);
 
-        return new class($companyService, $connectionRepository, self::uninitialized(MarketplaceRawDocumentRepository::class), self::uninitialized(MarketplaceAdapterRegistry::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $em, $messageBus, self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), $startDateResolver, $planner, self::uninitialized(WbFinanceSyncStatusListQuery::class), $ozonCredentialValidator, new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->fieldEncryptionServiceStub(), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)), new AppLogger($this->createMock(\Psr\Log\LoggerInterface::class))) extends MarketplaceController {
+        return new class($companyService, $connectionRepository, self::uninitialized(MarketplaceRawDocumentRepository::class), self::uninitialized(WildberriesAdapter::class), self::uninitialized(OzonRealizationStatusQuery::class), self::uninitialized(RawDocumentsListQuery::class), self::uninitialized(ProjectDirectionRepository::class), $em, $messageBus, self::uninitialized(ReprocessMarketplacePeriodAction::class), self::uninitialized(SyncConnectionAction::class), $startDateResolver, $planner, self::uninitialized(WbFinanceSyncStatusListQuery::class), $ozonCredentialValidator, new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->fieldEncryptionServiceStub(), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)), new AppLogger($this->createMock(\Psr\Log\LoggerInterface::class)), $ozonPerformanceValidator) extends MarketplaceController {
             protected function addFlash(string $type, mixed $message): void
             {
             }
