@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Command;
 
-use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Enum\FinancialReportSyncMode;
-use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportPeriodResolver;
+use App\Marketplace\Wildberries\Infrastructure\Query\ActiveWbConnectionsQuery;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

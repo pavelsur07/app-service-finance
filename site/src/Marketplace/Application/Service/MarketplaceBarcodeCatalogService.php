@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
 use Ramsey\Uuid\Uuid;
 
 /**

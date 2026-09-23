@@ -3259,7 +3259,7 @@ Payload (только scalar):
 
 Message/worker:
 - Message: `App\Marketplace\Message\SyncWbFinancialReportDayMessage`;
-- Worker: `App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler`.
+- Worker: `App\Marketplace\Wildberries\MessageHandler\SyncWbFinancialReportDayHandler`.
 
 ---
 

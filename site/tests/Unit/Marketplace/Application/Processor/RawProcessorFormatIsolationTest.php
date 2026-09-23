@@ -9,12 +9,12 @@ use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Application\Processor\OzonCostsRawProcessor;
 use App\Marketplace\Application\Processor\OzonReturnsRawProcessor;
 use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
-use App\Marketplace\Application\Processor\WbCostsRawProcessor;
-use App\Marketplace\Application\Processor\WbReturnsRawProcessor;
-use App\Marketplace\Application\Processor\WbSalesRawProcessor;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Wildberries\Application\Processor\WbCostsRawProcessor;
+use App\Marketplace\Wildberries\Application\Processor\WbReturnsRawProcessor;
+use App\Marketplace\Wildberries\Application\Processor\WbSalesRawProcessor;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

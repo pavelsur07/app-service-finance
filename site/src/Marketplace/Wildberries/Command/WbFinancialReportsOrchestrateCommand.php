@@ -1,0 +1,360 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Command;
+
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportPeriodResolver;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Wildberries\Infrastructure\Query\ActiveWbConnectionsQuery;
+use Doctrine\DBAL\Connection;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LockableTrait;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+#[AsCommand(
+    name: 'app:marketplace:wb-financial-reports:orchestrate',
+    description: 'Safe WB finance recovery orchestration with cooldown-aware one-task-per-connection scheduling.',
+)]
+final class WbFinancialReportsOrchestrateCommand extends Command
+{
+    use LockableTrait;
+
+    private const REPORT_TYPE = 'sales_report';
+    private const GLOBAL_BUCKET = 'global';
+    private const MODE_OPERATIONAL = 'operational';
+    private const MODE_HISTORICAL_RECOVERY = 'historical-recovery';
+    // Пустой день (WB отдал 204/нет данных) ретраим до 24 раз — сутки ежечасных
+    // попыток. WB нередко публикует отчёт дня с задержкой в несколько часов, и при
+    // старом лимите 5 день навсегда застревал в статусе empty, хотя данные позже
+    // появлялись, и требовался ручной перезалив с --force.
+    private const EMPTY_REFRESH_MAX_ATTEMPTS = 24;
+
+    public function __construct(
+        private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
+        private readonly WbFinanceRateLimiter $rateLimiter,
+        private readonly WbFinancialReportPeriodResolver $periodResolver,
+        private readonly WbFinancialReportSyncPlannerInterface $planner,
+        private readonly Connection $connection,
+        private readonly LoggerInterface $logger,
+    ) {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this
+            ->addOption('company-id', null, InputOption::VALUE_OPTIONAL)
+            ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL)
+            ->addOption('refresh-days-back', null, InputOption::VALUE_OPTIONAL, 'Refresh only the last N business days before today; the same N extends the operational recovery window past the current month start.', '2')
+            ->addOption('retry-window-days', null, InputOption::VALUE_OPTIONAL, 'Deprecated compatibility option; operational recovery uses current month-to-date united with the last refresh-days-back days.', '14')
+            ->addOption('include-historical-retry', null, InputOption::VALUE_NONE, 'Allow due retries and missing days older than current month-to-date.')
+            ->addOption('historical-max-days', null, InputOption::VALUE_OPTIONAL, 'Maximum historical days to schedule per connection when history is explicitly enabled.', '1')
+            ->addOption('mode', null, InputOption::VALUE_OPTIONAL, 'Run mode: operational or historical-recovery.', self::MODE_OPERATIONAL);
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        if (!$this->lock()) {
+            return Command::SUCCESS;
+        }
+
+        $io = new SymfonyStyle($input, $output);
+        $rows = [];
+        $totalDispatched = 0;
+
+        try {
+            $companyId = $this->normalizeOptional((string) $input->getOption('company-id'));
+            $connectionId = $this->normalizeOptional((string) $input->getOption('connection-id'));
+            $refreshDaysBack = max(1, (int) $input->getOption('refresh-days-back'));
+            $historicalMaxDays = max(1, (int) $input->getOption('historical-max-days'));
+            $mode = (string) $input->getOption('mode');
+            if (!\in_array($mode, [self::MODE_OPERATIONAL, self::MODE_HISTORICAL_RECOVERY], true)) {
+                $io->error('Invalid mode. Allowed values: operational, historical-recovery.');
+
+                return Command::INVALID;
+            }
+            $includeHistoricalRetry = (bool) $input->getOption('include-historical-retry') || self::MODE_HISTORICAL_RECOVERY === $mode;
+            $globalCooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil(self::GLOBAL_BUCKET);
+            if (null !== $globalCooldownUntil) {
+                $message = 'WB finance global cooldown is active but orchestrator continues connection-scoped planning.';
+                $this->logger->warning($message, ['cooldown_until' => $globalCooldownUntil->format(\DateTimeInterface::ATOM)]);
+                $io->warning($message.' cooldown_until='.$globalCooldownUntil->format(\DateTimeInterface::ATOM));
+            }
+            $yesterday = $this->periodResolver->yesterday();
+            $currentYearStart = $this->periodResolver->currentYearStart();
+            // Хвост предыдущего месяца глубиной refresh-days-back входит в окно:
+            // иначе empty-день, записанный ночью 1-го, выпадал из восстановления.
+            $recoveryFrom = $this->periodResolver->recoveryWindowStart($refreshDaysBack);
+            $hasRecoveryWindow = $recoveryFrom <= $yesterday;
+            $historicalTo = $hasRecoveryWindow ? $recoveryFrom->modify('-1 day') : $yesterday;
+
+            foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $activeConnection) {
+                $connectionIdValue = (string) $activeConnection['connection_id'];
+                $companyIdValue = (string) $activeConnection['company_id'];
+                $action = 'skipped';
+                $reason = 'no candidate';
+                $dispatched = 0;
+
+                $connectionCooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil('connection:'.$connectionIdValue);
+
+                $recoveryDueRetryCount = $hasRecoveryWindow
+                    ? $this->countDueRetry($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
+                    : 0;
+                $historicalDueRetryCount = $historicalTo >= $currentYearStart
+                    ? $this->countDueRetry($companyIdValue, $connectionIdValue, $currentYearStart, $historicalTo)
+                    : 0;
+                $recoveryMissingCount = $hasRecoveryWindow
+                    ? $this->countMissing($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
+                    : 0;
+                $recoveryEmptyCount = $hasRecoveryWindow
+                    ? $this->countRetryableEmpty($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
+                    : 0;
+                $historicalMissingCount = $historicalTo >= $currentYearStart
+                    ? $this->countMissing($companyIdValue, $connectionIdValue, $currentYearStart, $historicalTo)
+                    : 0;
+                $futureQueuedCount = $hasRecoveryWindow
+                    ? $this->countFutureQueued($companyIdValue, $connectionIdValue, $recoveryFrom, $yesterday)
+                    : 0;
+
+                if (null !== $connectionCooldownUntil) {
+                    $reason = 'connection cooldown until '.$connectionCooldownUntil->format(\DateTimeInterface::ATOM);
+                } else {
+                    if (self::MODE_HISTORICAL_RECOVERY !== $mode) {
+                        $dailyStatus = $this->findDailyStatus($companyIdValue, $connectionIdValue, $yesterday);
+                        if (!\in_array($dailyStatus, ['success', 'empty'], true)) {
+                            $dispatched = $this->planner->planDaily($companyIdValue, $connectionIdValue, false);
+                            $action = $dispatched > 0 ? 'daily yesterday' : 'daily skipped by claim';
+                            $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                        }
+                    }
+
+                    if (0 === $dispatched && $futureQueuedCount > 0) {
+                        if ('skipped' === $action) {
+                            $reason = 'queued future retry exists in recovery window';
+                        }
+                    } else {
+                        if (self::MODE_HISTORICAL_RECOVERY !== $mode) {
+                            if (0 === $dispatched && $recoveryDueRetryCount > 0) {
+                                $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
+                                $action = $dispatched > 0 ? 'recovery due retry' : 'recovery due retry skipped by claim';
+                                $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && $recoveryMissingCount > 0) {
+                                $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, 1, $recoveryFrom, $yesterday);
+                                if ($dispatched > 0) {
+                                    $action = 'recovery missing';
+                                    $reason = 'planned';
+                                }
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount && $recoveryEmptyCount > 0) {
+                                $dispatched = $this->planner->planEmptyRefresh(
+                                    $companyIdValue,
+                                    $connectionIdValue,
+                                    1,
+                                    $recoveryFrom,
+                                    $yesterday,
+                                    self::EMPTY_REFRESH_MAX_ATTEMPTS,
+                                );
+                                $action = $dispatched > 0 ? 'recovery empty refresh' : 'recovery empty skipped by claim';
+                                $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                            }
+
+                            if (0 === $dispatched && 0 === $recoveryDueRetryCount && 0 === $recoveryMissingCount && 0 === $recoveryEmptyCount) {
+                                $dispatched = $this->planner->planRefreshRecentDays($companyIdValue, $connectionIdValue, $refreshDaysBack, 1);
+                                if ($dispatched > 0) {
+                                    $action = 'refresh last '.$refreshDaysBack.' days';
+                                    $reason = 'planned';
+                                }
+                            }
+                        }
+
+                        if (0 === $dispatched && $includeHistoricalRetry && $historicalDueRetryCount > 0) {
+                            $dispatched = $this->planner->planDueRetry($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
+                            $action = $dispatched > 0 ? 'historical due retry' : 'historical due retry skipped by claim';
+                            $reason = $dispatched > 0 ? 'planned' : 'status not claimable';
+                        }
+
+                        if (0 === $dispatched && $includeHistoricalRetry && 0 === $historicalDueRetryCount && $historicalMissingCount > 0) {
+                            $dispatched = $this->planner->planMissing($companyIdValue, $connectionIdValue, $historicalMaxDays, $currentYearStart, $historicalTo);
+                            if ($dispatched > 0) {
+                                $action = 'historical missing';
+                                $reason = 'planned';
+                            }
+                        }
+                    }
+                }
+
+                $totalDispatched += $dispatched;
+                $rows[] = [
+                    $companyIdValue,
+                    $connectionIdValue,
+                    $action,
+                    (string) $dispatched,
+                    $reason,
+                    (string) $recoveryDueRetryCount,
+                    (string) $historicalDueRetryCount,
+                    (string) $recoveryMissingCount,
+                    (string) $recoveryEmptyCount,
+                    (string) $historicalMissingCount,
+                ];
+            }
+
+            $io->table([
+                'company_id',
+                'connection_id',
+                'action',
+                'dispatched',
+                'reason',
+                'recovery_due_retry_count',
+                'historical_due_retry_count',
+                'recovery_missing_count',
+                'recovery_empty_count',
+                'historical_missing_count',
+            ], $rows);
+            $io->success(sprintf('WB finance orchestration completed. Dispatched %d task(s).', $totalDispatched));
+
+            return Command::SUCCESS;
+        } finally {
+            $this->release();
+        }
+    }
+
+    private function countDueRetry(string $companyId, string $connectionId, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date BETWEEN :fromDate AND :toDate
+               AND (
+                    (status IN ('queued', 'failed') AND next_retry_at IS NOT NULL AND next_retry_at <= NOW())
+                    OR (status = 'failed' AND next_retry_at IS NULL AND last_error_status_code = 429 AND last_error_class = :rateLimitErrorClass)
+                    OR (status = 'queued' AND next_retry_at IS NULL AND updated_at <= :stuckBefore)
+                    OR (status = 'loading' AND updated_at <= :stuckBefore)
+               )",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+                'rateLimitErrorClass' => MarketplaceRateLimitException::class,
+                'stuckBefore' => (new \DateTimeImmutable())
+                    ->sub(new \DateInterval(MarketplaceFinancialReportSyncStatusRepository::STUCK_RECLAIM_INTERVAL))
+                    ->format('Y-m-d H:i:s'),
+            ],
+        );
+    }
+
+    private function countFutureQueued(string $companyId, string $connectionId, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date BETWEEN :fromDate AND :toDate
+               AND status = 'queued'
+               AND next_retry_at IS NOT NULL
+               AND next_retry_at > NOW()",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+            ],
+        );
+    }
+
+    private function countRetryableEmpty(string $companyId, string $connectionId, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        return (int) $this->connection->fetchOne(
+            "SELECT COUNT(*)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date BETWEEN :fromDate AND :toDate
+               AND status = 'empty'
+               AND attempts < :maxAttempts",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+                'maxAttempts' => self::EMPTY_REFRESH_MAX_ATTEMPTS,
+            ],
+        );
+    }
+
+    private function countMissing(string $companyId, string $connectionId, \DateTimeImmutable $from, \DateTimeImmutable $to): int
+    {
+        $knownDays = (int) $this->connection->fetchOne(
+            "SELECT COUNT(DISTINCT business_date)
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date BETWEEN :fromDate AND :toDate",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'fromDate' => $from->format('Y-m-d'),
+                'toDate' => $to->format('Y-m-d'),
+            ],
+        );
+
+        return max(0, count($this->periodResolver->daysBetween($from, $to)) - $knownDays);
+    }
+
+    private function findDailyStatus(string $companyId, string $connectionId, \DateTimeImmutable $businessDate): ?string
+    {
+        $status = $this->connection->fetchOne(
+            "SELECT status
+             FROM marketplace_financial_report_sync_statuses
+             WHERE company_id = :companyId
+               AND connection_id = :connectionId
+               AND marketplace = 'wildberries'
+               AND report_type = :reportType
+               AND business_date = :businessDate
+               AND mode = 'daily'
+             LIMIT 1",
+            [
+                'companyId' => $companyId,
+                'connectionId' => $connectionId,
+                'reportType' => self::REPORT_TYPE,
+                'businessDate' => $businessDate->format('Y-m-d'),
+            ],
+        );
+
+        return false === $status || null === $status ? null : (string) $status;
+    }
+
+    private function normalizeOptional(string $value): ?string
+    {
+        $trimmed = trim($value);
+
+        return '' === $trimmed ? null : $trimmed;
+    }
+}

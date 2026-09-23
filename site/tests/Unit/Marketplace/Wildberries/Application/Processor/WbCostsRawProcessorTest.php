@@ -1,0 +1,1698 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Marketplace\Wildberries\Application\Processor;
+
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
+use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Wildberries\Application\Action\ProcessWbCostsAction;
+use App\Marketplace\Wildberries\Application\Processor\WbCostsRawProcessor;
+use App\Marketplace\Wildberries\Application\Service\WbListingResolverService;
+use App\Marketplace\Wildberries\CostCalculator\CostCalculatorInterface;
+use App\Marketplace\Wildberries\CostCalculator\WbAcquiringCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbCommissionCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbDeductionCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbLogisticsCorrectionCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbLogisticsDeliveryCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbLogisticsReturnCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbLoyaltyDiscountCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbPenaltyCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbProductProcessingCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbPvzProcessingCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbStorageCalculator;
+use App\Marketplace\Wildberries\CostCalculator\WbWarehouseLogisticsCalculator;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
+use App\Marketplace\Wildberries\Infrastructure\Query\WbBarcodeUpsertQuery;
+use App\Shared\Service\SlugifyService;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Result;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+
+/**
+ * Тесты знакового соглашения WbCostsRawProcessor / WB-калькуляторов.
+ *
+ * Знаковое соглашение MarketplaceCost.amount / operation_type для WB:
+ *   amount всегда положительная (по модулю);
+ *   operation_type задаёт смысл операции (CHARGE/STORNO);
+ *   если калькулятор не вернул operation_type, процессор ставит CHARGE по умолчанию.
+ *
+ * Эти тесты ловят регрессию если знаковая логика в калькуляторах изменится
+ * или если из persist-блока процессора пропадёт fallback к CHARGE.
+ */
+final class WbCostsRawProcessorTest extends TestCase
+{
+    // -------------------------------------------------------------------------
+    // supports()
+    // -------------------------------------------------------------------------
+
+    public function testSupportsWbCosts(): void
+    {
+        $processor = $this->makeProcessorWithoutConstructor();
+
+        self::assertTrue(
+            $processor->supports('wildberries', MarketplaceType::WILDBERRIES, 'costs'),
+        );
+    }
+
+    public function testSupportsStagingRecordTypeCost(): void
+    {
+        $processor = $this->makeProcessorWithoutConstructor();
+
+        self::assertTrue(
+            $processor->supports(StagingRecordType::COST, MarketplaceType::WILDBERRIES),
+        );
+    }
+
+    public function testDoesNotSupportOzon(): void
+    {
+        $processor = $this->makeProcessorWithoutConstructor();
+
+        self::assertFalse(
+            $processor->supports('ozon', MarketplaceType::OZON, 'costs'),
+        );
+    }
+
+    public function testDoesNotSupportSalesStagingType(): void
+    {
+        $processor = $this->makeProcessorWithoutConstructor();
+
+        self::assertFalse(
+            $processor->supports(StagingRecordType::SALE, MarketplaceType::WILDBERRIES),
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-calculator amount-invariant: result['amount'] > 0 (по модулю)
+    //
+    // operation_type здесь не проверяется — калькуляторы его не выставляют.
+    // Это делается на уровне WbCostsRawProcessor::processBatch() и
+    // ProcessWbCostsAction::__invoke() — отдельные тесты ниже.
+    // -------------------------------------------------------------------------
+
+    #[DataProvider('commissionScenarios')]
+    public function testWbCommissionCalculatorEmitsPositiveAmount(
+        array $overrides,
+        float $expectedAbs,
+    ): void {
+        $entries = (new WbCommissionCalculator())->calculate(
+            $this->saleItem($overrides),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('commission', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta($expectedAbs, (float) $entries[0]['amount'], 0.01);
+    }
+
+    /**
+     * Комиссия МП = цена с согласованной скидкой × кол-во − |к перечислению| − |эквайринг|.
+     *
+     * @return iterable<string, array{0:array<string,mixed>,1:float}>
+     */
+    public static function commissionScenarios(): iterable
+    {
+        yield 'обычная продажа' => [
+            ['retail_price_withdisc_rub' => 3000.00, 'ppvz_for_pay' => 1581.10, 'acquiring_fee' => 64.28],
+            1354.62,
+        ];
+        yield 'отрицательные значения полей WB' => [
+            ['retail_price_withdisc_rub' => 1000.00, 'ppvz_for_pay' => -800.00, 'acquiring_fee' => -20.00],
+            180.00,
+        ];
+        // Регрессия: реальная строка finance API (июнь 2026, СПП 44.85%) — vw отрицательный
+        // из-за СПП-компенсации и в формуле комиссии не участвует. Комиссия = кВВ 29% × 660.
+        yield 'finance API camelCase со СПП' => [
+            [
+                'retailPriceWithDisc' => '660',
+                'retailAmount' => '364',
+                'forPay' => '454.04',
+                'acquiringFee' => '14.56',
+                'vw' => '-94.5680327868852459',
+                'vwNds' => '-20.8',
+            ],
+            191.40,
+        ];
+    }
+
+    public function testWbAcquiringCalculatorEmitsPositiveAmountFromNegativeFee(): void
+    {
+        $entries = (new WbAcquiringCalculator())->calculate(
+            $this->saleItem(['acquiring_fee' => -55.50]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('acquiring', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(55.50, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbCommissionCalculatorSaleFormulaAndOperationTypeCharge(): void
+    {
+        $entries = (new WbCommissionCalculator())->calculate(
+            $this->saleItem([
+                'retail_price_withdisc_rub' => 3000.00,
+                'ppvz_for_pay' => 1581.10,
+                'acquiring_fee' => 64.28,
+                'ppvz_vw' => 700.00,
+                'ppvz_vw_nds' => 147.62,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        // 3000 − 1581.10 − 64.28; поля ppvz_vw/ppvz_vw_nds в формуле не участвуют.
+        self::assertEqualsWithDelta(1354.62, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
+    }
+
+    public function testWbCommissionCalculatorReturnFormulaAndOperationTypeStorno(): void
+    {
+        $entries = (new WbCommissionCalculator())->calculate(
+            $this->saleItem([
+                'doc_type_name' => 'Возврат',
+                'retail_price_withdisc_rub' => 1125.00,
+                'ppvz_for_pay' => 680.99,
+                'acquiring_fee' => 27.76,
+                'ppvz_vw' => 350.00,
+                'ppvz_vw_nds' => 66.25,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        // Возврат комиссии по той же формуле: 1125 − 680.99 − 27.76 = 416.25 → сторно.
+        self::assertEqualsWithDelta(416.25, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
+    }
+
+    public function testWbAcquiringCalculatorSaleOperationTypeCharge(): void
+    {
+        $entries = (new WbAcquiringCalculator())->calculate(
+            $this->saleItem(['acquiring_fee' => 64.28]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(64.28, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
+    }
+
+    public function testWbAcquiringCalculatorReturnOperationTypeStorno(): void
+    {
+        $entries = (new WbAcquiringCalculator())->calculate(
+            $this->saleItem([
+                'doc_type_name' => 'Возврат',
+                'acquiring_fee' => 27.76,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(27.76, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
+    }
+
+    public function testWbLogisticsDeliveryCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+        $snakeEntries = $calculator->calculate($this->logisticsItem(1, 0, -42.00), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Логистика',
+            'srid' => 'SRID-LOG-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '2001',
+            'deliveryAmount' => 1,
+            'returnAmount' => 0,
+            'deliveryService' => -42.00,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbLogisticsReturnCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbLogisticsReturnCalculator();
+        $snakeEntries = $calculator->calculate($this->logisticsItem(0, 1, 33.00), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Логистика',
+            'srid' => 'SRID-LOG-2',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '2002',
+            'deliveryAmount' => 0,
+            'returnAmount' => 1,
+            'deliveryService' => 33.00,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbLogisticsDeliveryCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbLogisticsDeliveryCalculator())->calculate(
+            $this->logisticsItem(deliveryAmount: 1, returnAmount: 0, deliveryRub: -42.00),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_delivery', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(42.00, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbLogisticsReturnCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbLogisticsReturnCalculator())->calculate(
+            $this->logisticsItem(deliveryAmount: 0, returnAmount: 1, deliveryRub: 33.00),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_return', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(33.00, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorSnakeCasePositiveAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $row = [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => 24864183,
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'delivery_rub' => 21.22,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция логистики',
+        ];
+
+        self::assertTrue($calculator->supports($row));
+
+        $entries = $calculator->calculate($row, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_correction', $entries[0]['category_code']);
+        self::assertStringContainsString('Коррекция логистики', $entries[0]['category_name']);
+        self::assertStringContainsString('Коррекция логистики', $entries[0]['description']);
+        self::assertEqualsWithDelta(21.22, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3122030188593:logistics_correction', $entries[0]['external_id']);
+        self::assertInstanceOf(\DateTimeImmutable::class, $entries[0]['cost_date']);
+        self::assertSame('2026-04-09', $entries[0]['cost_date']->format('Y-m-d'));
+    }
+
+    public function testWbLogisticsCorrectionCalculatorCamelCasePositiveAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $snakeRow = [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => 24864183,
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'delivery_rub' => 21.22,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция логистики',
+        ];
+        $camelRow = [
+            'sellerOperName' => 'Коррекция логистики',
+            'docTypeName' => '',
+            'rrdId' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'saleDt' => '2026-04-09T08:15:26Z',
+            'rrDate' => '2026-04-29',
+            'nmId' => 24864183,
+            'techSize' => 'XXL',
+            'sku' => '2000000024899',
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'deliveryService' => 21.22,
+            'bonusTypeName' => 'коррекция логистики',
+        ];
+
+        self::assertTrue($calculator->supports($snakeRow));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $snakeEntries = $calculator->calculate($snakeRow, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertEqualsWithDelta(21.22, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame($snakeEntries[0]['category_code'], $camelEntries[0]['category_code']);
+        self::assertSame($snakeEntries[0]['category_name'], $camelEntries[0]['category_name']);
+        self::assertSame($snakeEntries[0]['description'], $camelEntries[0]['description']);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorReturnsEmptyForZeroAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $snakeEntries = $calculator->calculate($this->supplierOpItem('Коррекция логистики', [
+            'delivery_rub' => 0.0,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+        ]), null);
+
+        $camelEntries = $calculator->calculate([
+            'sellerOperName' => 'Коррекция логистики',
+            'deliveryService' => 0.0,
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'rrdId' => '3110',
+            'saleDt' => '2026-04-09T08:15:26Z',
+        ], null);
+
+        self::assertSame([], $snakeEntries);
+        self::assertSame([], $camelEntries);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorDoesNotSupportNormalLogistics(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+        $logisticsRow = $this->logisticsItem(deliveryAmount: 1, returnAmount: 0, deliveryRub: 80.00);
+
+        self::assertFalse($calculator->supports($logisticsRow));
+    }
+
+    public function testWbStorageCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbStorageCalculator())->calculate(
+            $this->supplierOpItem('Хранение', ['storage_fee' => -125.75]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('storage', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(125.75, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbStorageCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbStorageCalculator();
+        $snakeEntries = $calculator->calculate($this->supplierOpItem('Хранение', ['storage_fee' => -125.75]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Хранение',
+            'srid' => 'SRID-OP-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '3001',
+            'paidStorage' => -125.75,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbCommissionCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbCommissionCalculator();
+        $snakeEntries = $calculator->calculate($this->saleItem([
+            'retail_price_withdisc_rub' => 3000.00,
+            'ppvz_for_pay' => 1581.10,
+            'acquiring_fee' => 64.28,
+        ]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Продажа',
+            'srid' => 'SRID-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '1001',
+            'quantity' => 1,
+            'retailPriceWithDisc' => 3000.00,
+            'forPay' => 1581.10,
+            'acquiringFee' => 64.28,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbAcquiringCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbAcquiringCalculator();
+        $snakeEntries = $calculator->calculate($this->saleItem(['acquiring_fee' => 64.28]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Продажа',
+            'srid' => 'SRID-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '1001',
+            'acquiringFee' => 64.28,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbPvzProcessingCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbPvzProcessingCalculator())->calculate(
+            $this->supplierOpItem(
+                'Возмещение за выдачу и возврат товаров на ПВЗ',
+                ['ppvz_reward' => -17.50],
+            ),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('pvz_processing', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(17.50, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbWarehouseLogisticsCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbWarehouseLogisticsCalculator())->calculate(
+            $this->supplierOpItem(
+                'Возмещение издержек по перевозке/по складским операциям с товаром',
+                ['rebill_logistic_cost' => 88.20],
+            ),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('warehouse_logistics', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(88.20, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbPenaltyCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbPenaltyCalculator())->calculate(
+            $this->supplierOpItem('Штраф', ['penalty' => -250.00]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('penalty', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(250.00, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbProductProcessingCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbProductProcessingCalculator())->calculate(
+            $this->supplierOpItem('Обработка товара', ['acceptance' => -12.30]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('product_processing', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(12.30, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbDeductionCalculatorPreservesSignThroughOperationType(): void
+    {
+        $calculator = new WbDeductionCalculator(new SlugifyService());
+
+        $compensationEntries = $calculator->calculate(
+            $this->supplierOpItem('Удержание', [
+                'deduction' => -77.00,
+                'bonus_type_name' => 'Добровольная выплата за товары, документ №123',
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $compensationEntries);
+        self::assertSame('wb_dobrovolnaya_vyplata_za_tovary', $compensationEntries[0]['category_code']);
+        self::assertSame('Добровольная выплата за товары', $compensationEntries[0]['category_name']);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $compensationEntries[0]['operation_type']);
+        self::assertGreaterThan(0, (float) $compensationEntries[0]['amount']);
+        self::assertEqualsWithDelta(77.00, (float) $compensationEntries[0]['amount'], 0.001);
+
+        $chargeEntries = $calculator->calculate(
+            $this->supplierOpItem('Удержание', [
+                'deduction' => 25.00,
+                'bonus_type_name' => 'Списание за отзыв',
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $chargeEntries);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $chargeEntries[0]['operation_type']);
+        self::assertGreaterThan(0, (float) $chargeEntries[0]['amount']);
+        self::assertEqualsWithDelta(25.00, (float) $chargeEntries[0]['amount'], 0.001);
+    }
+
+    public function testWbLoyaltyDiscountCalculatorEmitsPositiveAmount(): void
+    {
+        $entries = (new WbLoyaltyDiscountCalculator())->calculate(
+            $this->supplierOpItem(
+                'Компенсация скидки по программе лояльности',
+                ['cashback_discount' => -10.00],
+            ),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame('wb_loyalty_discount_compensation', $entries[0]['category_code']);
+        self::assertGreaterThan(0, (float) $entries[0]['amount']);
+        self::assertEqualsWithDelta(10.00, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testZeroAmountCalculatorsProduceEmptyResult(): void
+    {
+        // Sanity-check: при значении ниже порога 0.01 калькуляторы возвращают [].
+        // Это важно потому что persist-loop не выставит operation_type на пустом результате.
+        self::assertSame([], (new WbCommissionCalculator())->calculate(
+            $this->saleItem([
+                'ppvz_vw' => 0,
+                'ppvz_vw_nds' => 0,
+            ]),
+            null,
+        ));
+        self::assertSame([], (new WbAcquiringCalculator())->calculate(
+            $this->saleItem(['acquiring_fee' => 0]),
+            null,
+        ));
+        self::assertSame([], (new WbStorageCalculator())->calculate(
+            $this->supplierOpItem('Хранение', ['storage_fee' => 0]),
+            null,
+        ));
+    }
+
+    // -------------------------------------------------------------------------
+    // Processor-level invariant: operation_type берётся из costData + fallback CHARGE.
+    //
+    // Поскольку WbCostsRawProcessor::processBatch() и ProcessWbCostsAction::__invoke()
+    // зависят от ~9 final-классов сервисов (final → нельзя замокать через PHPUnit
+    // createMock, нет заводских интерфейсов), полноценный mock-based behavioural тест
+    // потребовал бы либо bypass-finals-плагина, либо переписывания зависимостей под
+    // интерфейсы — оба варианта выходят за рамки этой задачи.
+    //
+    // Вместо этого фиксируем regression-инвариант через source-text reflection:
+    // каждый persist-блок ОБЯЗАН содержать присвоение
+    //   $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE)
+    //
+    // Этот тест бы упал на состоянии перед commit'ом 7c78411 (фикс по codex-bot P1).
+    // Source-text форма брittle к рефакторингу синтаксиса (например, перенос на 2 строки),
+    // но именно этого мы и хотим — любая правка persist-блока должна явно подтвердить
+    // что setOperationType сохранён.
+    // -------------------------------------------------------------------------
+
+    public function testProcessBatchUsesCalculatorOperationTypeWithChargeFallback(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
+            $source,
+            'WbCostsRawProcessor::processBatch() должен брать operation_type из результата калькулятора '
+            .'и использовать CHARGE как fallback для legacy-калькуляторов.',
+        );
+    }
+
+    public function testProcessBatchSupportsStornoOperationTypeFromCalculatorResult(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
+            $source,
+            'WbCostsRawProcessor::processBatch() должен уметь сохранить STORNO, '
+            .'если calculator вернул operation_type=STORNO.',
+        );
+    }
+
+    public function testProcessBatchPersistsMarketplaceCostWithStornoOperationType(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
+            $source,
+        );
+    }
+
+    public function testProcessBatchFallsBackToChargeWhenCalculatorDoesNotProvideOperationType(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
+            $source,
+        );
+    }
+
+    public function testProcessBatchDoesNotFilterOutReturnsAndDelegatesOperationTypeToCalculators(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            'foreach ($costsData as $item)',
+            $source,
+        );
+        self::assertStringNotContainsString(
+            "return \$docType !== 'Возврат';",
+            $source,
+        );
+    }
+
+    public function testProcessWbCostsActionSetsOperationTypeChargeOnEveryPersistedCost(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(ProcessWbCostsAction::class, '__invoke'),
+        );
+
+        self::assertStringContainsString(
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
+            $source,
+            'ProcessWbCostsAction::__invoke() должен брать operation_type из calculator-result '
+            .'и использовать CHARGE как fallback для legacy-калькуляторов.',
+        );
+    }
+
+    public function testProcessWbCostsActionDoesNotFilterOutReturns(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(ProcessWbCostsAction::class, '__invoke'),
+        );
+
+        self::assertStringNotContainsString(
+            "return \$docType !== 'Возврат';",
+            $source,
+            'ProcessWbCostsAction::__invoke() не должен исключать возвраты из costsData.',
+        );
+    }
+
+    public function testProcessWbCostsActionCreatesChargeAndStornoForSaleAndReturn(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $company = $this->makeCompany();
+        $persisted = [];
+
+        $rawRows = [
+            [
+                'doc_type_name' => 'Продажа',
+                'supplier_oper_name' => 'Продажа',
+                'srid' => 'SRID-SALE',
+                'rrd_id' => '9101',
+                'retail_price_withdisc_rub' => 1000.00,
+                'ppvz_for_pay' => 800.00,
+                'acquiring_fee' => 40.00,
+                'ppvz_vw' => 120.00,
+                'ppvz_vw_nds' => 40.00,
+                'quantity' => 1,
+                'sale_dt' => '2026-01-10 10:00:00',
+                'rr_dt' => '2026-01-10 10:00:00',
+                'delivery_amount' => 0,
+                'return_amount' => 0,
+                'delivery_rub' => 0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
+                'barcode' => '',
+            ],
+            [
+                'doc_type_name' => 'Возврат',
+                'supplier_oper_name' => 'Возврат покупателем',
+                'srid' => 'SRID-RETURN',
+                'rrd_id' => '9102',
+                'retail_price_withdisc_rub' => 500.00,
+                'ppvz_for_pay' => 430.00,
+                'acquiring_fee' => 12.00,
+                'ppvz_vw' => 48.00,
+                'ppvz_vw_nds' => 10.00,
+                'quantity' => 1,
+                'sale_dt' => '2026-01-10 10:00:00',
+                'rr_dt' => '2026-01-10 10:00:00',
+                'delivery_amount' => 0,
+                'return_amount' => 0,
+                'delivery_rub' => 0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
+                'barcode' => '',
+            ],
+        ];
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn($rawRows);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getProduct'])
+            ->getMock();
+        $listing->method('getId')->willReturn('33333333-3333-3333-3333-333333333333');
+        $listing->method('getProduct')->willReturn(null);
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+        ]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))
+            ->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [
+                new WbCommissionCalculator(),
+                new WbAcquiringCalculator(),
+                new WbLogisticsDeliveryCalculator(),
+                new WbLogisticsReturnCalculator(),
+            ],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(4, $persisted);
+
+        $opsByExternalId = [];
+        foreach ($persisted as $cost) {
+            $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
+            self::assertGreaterThan(0, (float) $cost->getAmount());
+        }
+
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:acquiring'] ?? null);
+
+        self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_return', $opsByExternalId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function saleItem(array $overrides = []): array
+    {
+        return array_merge([
+            'doc_type_name' => 'Продажа',
+            'srid' => 'SRID-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'retail_price' => 1000.00,
+            'quantity' => 1,
+            'acquiring_fee' => 20.00,
+            'ppvz_for_pay' => 800.00,
+            'nm_id' => '',
+            'ts_name' => '',
+            'rrd_id' => '1001',
+        ], $overrides);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function logisticsItem(int $deliveryAmount, int $returnAmount, float $deliveryRub, array $overrides = []): array
+    {
+        return array_merge([
+            'doc_type_name' => 'Услуги',
+            'supplier_oper_name' => 'Логистика',
+            'srid' => 'SRID-LOG-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'rrd_id' => '3001',
+            'delivery_amount' => $deliveryAmount,
+            'return_amount' => $returnAmount,
+            'delivery_rub' => $deliveryRub,
+            'rrd_id' => '2001',
+        ], $overrides);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function supplierOpItem(string $supplierOperName, array $overrides = []): array
+    {
+        return array_merge([
+            'doc_type_name' => 'Услуги',
+            'supplier_oper_name' => $supplierOperName,
+            'srid' => 'SRID-OP-1',
+            'sale_dt' => '2026-01-15 10:00:00',
+            'rrd_id' => '3001',
+        ], $overrides);
+    }
+
+    /**
+     * Возвращает исходный текст тела метода (без сигнатуры).
+     */
+    private function getMethodSource(\ReflectionMethod $method): string
+    {
+        $file = (string) $method->getFileName();
+        $start = (int) $method->getStartLine();
+        $end = (int) $method->getEndLine();
+
+        $lines = file($file);
+        if (false === $lines) {
+            self::fail("Не удалось прочитать файл {$file}");
+        }
+
+        return implode('', array_slice($lines, $start - 1, $end - $start + 1));
+    }
+
+    private function makeProcessorWithoutConstructor(): WbCostsRawProcessor
+    {
+        // supports() читает только аргументы метода и не трогает зависимости —
+        // безопасно создавать через newInstanceWithoutConstructor().
+        return (new \ReflectionClass(WbCostsRawProcessor::class))
+            ->newInstanceWithoutConstructor();
+    }
+
+    /**
+     * @param iterable<CostCalculatorInterface> $calculators
+     *
+     * @return array{0: WbCostsRawProcessor, 1: array<int, MarketplaceCost>}
+     */
+    private function makeProcessorForBehavioralTest(iterable $calculators): array
+    {
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturn($company);
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getProduct'])
+            ->getMock();
+        $listing->method('getId')->willReturn('33333333-3333-3333-3333-333333333333');
+        $listing->method('getProduct')->willReturn(null);
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+        ]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))
+            ->newInstanceWithoutConstructor();
+        $action = (new \ReflectionClass(ProcessWbCostsAction::class))
+            ->newInstanceWithoutConstructor();
+
+        $processor = new WbCostsRawProcessor(
+            $action,
+            $em,
+            $listingRepository,
+            $listingResolver,
+            $costExistingIdsQuery,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            $calculators,
+        );
+
+        return [$processor, $persisted];
+    }
+
+    private function invokeProcessBatch(WbCostsRawProcessor $processor): void
+    {
+        $processor->processBatch(
+            '11111111-1111-1111-1111-111111111111',
+            MarketplaceType::WILDBERRIES,
+            [[
+                'doc_type_name' => 'Продажа',
+                'supplier_oper_name' => 'Продажа',
+                'srid' => 'SRID-TEST',
+                'rrd_id' => '3999',
+                'sale_dt' => '2026-01-15 10:00:00',
+                'retail_price_withdisc_rub' => 100.0,
+                'ppvz_for_pay' => 80.0,
+                'acquiring_fee' => 5.0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
+                'barcode' => '',
+            ]],
+            null,
+        );
+    }
+
+    private function makeCompany(): \App\Company\Entity\Company
+    {
+        $user = new \App\Company\Entity\User('00000000-0000-0000-0000-000000000001');
+        $user->setEmail('test@example.com');
+        $user->setPassword('secret');
+
+        $company = new \App\Company\Entity\Company('11111111-1111-1111-1111-111111111111', $user);
+        $company->setName('Test company');
+
+        return $company;
+    }
+
+    /**
+     * Контрактная проверка: все 12 калькуляторов реализуют CostCalculatorInterface.
+     * На случай если кто-то добавит calculator без implements — поймаем здесь.
+     */
+    public function testAllTwelveWbCalculatorsImplementInterface(): void
+    {
+        $calculators = [
+            new WbCommissionCalculator(),
+            new WbAcquiringCalculator(),
+            new WbLogisticsDeliveryCalculator(),
+            new WbLogisticsReturnCalculator(),
+            new WbLogisticsCorrectionCalculator(),
+            new WbStorageCalculator(),
+            new WbPvzProcessingCalculator(),
+            new WbWarehouseLogisticsCalculator(),
+            new WbPenaltyCalculator(),
+            new WbProductProcessingCalculator(),
+            new WbDeductionCalculator(new SlugifyService()),
+            new WbLoyaltyDiscountCalculator(),
+        ];
+
+        self::assertCount(12, $calculators, '12 WB-калькуляторов согласно services.yaml');
+
+        foreach ($calculators as $calc) {
+            self::assertInstanceOf(CostCalculatorInterface::class, $calc);
+        }
+    }
+
+    #[DataProvider('wbCostRowFormatsProvider')]
+    public function testProcessWbCostsActionBindsListingForBothCamelAndSnakeCaseRows(array $row): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)->disableOriginalConstructor()->getMock();
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn(['999_XL' => $listing]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class));
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+        $listingResolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
+
+        $calculator = new class implements CostCalculatorInterface {
+            public function supports(array $item): bool
+            {
+                return true;
+            }
+
+            public function requiresListing(): bool
+            {
+                return true;
+            }
+
+            public function calculate(array $item, ?MarketplaceListing $listing = null): array
+            {
+                return [[
+                    'external_id' => 'test:wb:cost:1',
+                    'cost_date' => new \DateTimeImmutable('2026-01-15 10:00:00'),
+                    'amount' => '80',
+                    'description' => 'Логистика до покупателя',
+                    'category_code' => 'logistics_delivery',
+                    'category_name' => 'Логистика до покупателя',
+                    'operation_type' => MarketplaceCostOperationType::CHARGE,
+                ]];
+            }
+        };
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [$calculator],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(1, $persisted);
+        self::assertSame($listing, $persisted[0]->getListing());
+    }
+
+    #[DataProvider('wbLogisticsCorrectionRowFormatsProvider')]
+    public function testProcessWbCostsActionProcessesLogisticsCorrectionThroughCostsPipeline(array $row): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)->disableOriginalConstructor()->getMock();
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn(['24864183_XXL' => $listing]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class));
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsCorrectionCalculator(), new WbLogisticsDeliveryCalculator()],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(1, $persisted);
+        self::assertSame($listing, $persisted[0]->getListing());
+        self::assertEqualsWithDelta(21.22, (float) $persisted[0]->getAmount(), 0.001);
+        self::assertSame($rawDocId, $persisted[0]->getRawDocumentId());
+        self::assertSame('logistics_correction', $persisted[0]->getCategory()->getCode());
+        self::assertSame(
+            'wb:3122030188593:logistics_correction',
+            $persisted[0]->getExternalId(),
+        );
+        self::assertNotSame(
+            'wb:3122030188593:logistics_delivery',
+            $persisted[0]->getExternalId(),
+        );
+    }
+
+    public function testProcessWbCostsActionDeduplicatesIdenticalLogisticsCorrectionRows(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+        $row = self::wbLogisticsCorrectionSnakeCaseRow();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row, $row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn(['wb:3122030188593:logistics_correction']);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeRepository->method('findByBarcode')->willReturn(null);
+        $listingRepository->method('findByNmIdAndSize')->willReturn(null);
+        $listingResolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            $listingResolver,
+            new MarketplaceCostCategoryResolver($this->createMock(MarketplaceCostCategoryRepository::class), $em),
+            new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class)),
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsCorrectionCalculator()],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(0, $persisted);
+    }
+
+    public static function wbCostRowFormatsProvider(): iterable
+    {
+        yield 'camelCase' => [[
+            'sellerOperName' => 'Логистика',
+            'docTypeName' => '',
+            'nmId' => '999',
+            'techSize' => 'XL',
+            'sku' => '123456',
+            'vendorCode' => 'VC-1',
+            'brandName' => 'Brand',
+            'subjectName' => 'Subject',
+            'retailPrice' => 1500,
+            'deliveryAmount' => 1,
+            'deliveryService' => 80,
+        ]];
+
+        yield 'snake_case' => [[
+            'supplier_oper_name' => 'Логистика',
+            'doc_type_name' => '',
+            'nm_id' => '999',
+            'ts_name' => 'XL',
+            'barcode' => '123456',
+            'sa_name' => 'VC-1',
+            'brand_name' => 'Brand',
+            'subject_name' => 'Subject',
+            'retail_price' => 1500,
+            'delivery_amount' => 1,
+            'delivery_rub' => 80,
+        ]];
+    }
+
+    public static function wbLogisticsCorrectionRowFormatsProvider(): iterable
+    {
+        yield 'snake_case' => [self::wbLogisticsCorrectionSnakeCaseRow()];
+        yield 'camelCase' => [[
+            'sellerOperName' => 'Коррекция логистики',
+            'docTypeName' => '',
+            'rrdId' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'saleDt' => '2026-04-09T08:15:26Z',
+            'rrDate' => '2026-04-29',
+            'nmId' => '24864183',
+            'techSize' => 'XXL',
+            'sku' => '2000000024899',
+            'vendorCode' => 'wj1121104211/черный',
+            'brandName' => 'womjoy',
+            'subjectName' => 'Велосипедки',
+            'deliveryService' => 21.22,
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'bonusTypeName' => 'коррекция логистики',
+        ]];
+    }
+
+    private static function wbLogisticsCorrectionSnakeCaseRow(): array
+    {
+        return [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => '24864183',
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'sa_name' => 'wj1121104211/черный',
+            'brand_name' => 'womjoy',
+            'subject_name' => 'Велосипедки',
+            'delivery_rub' => 21.22,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция логистики',
+        ];
+    }
+
+    public function testWbStorageCorrectionUsesStorageCategory(): void
+    {
+        $calculator = new WbStorageCalculator();
+        $row = $this->supplierOpItem('Коррекция хранения', ['storage_fee' => -125.75]);
+        $camelRow = [
+            'sellerOperName' => 'Коррекция хранения',
+            'rrdId' => '3002',
+            'saleDt' => '2026-01-15 10:00:00',
+            'paidStorage' => -125.75,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('storage', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(125.75, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3001:storage', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('storage', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(125.75, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:3002:storage', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbWarehouseLogisticsNewOperationNameUsesExistingCategory(): void
+    {
+        $calculator = new WbWarehouseLogisticsCalculator();
+        $row = $this->supplierOpItem(
+            'Возмещение издержек по перемещению и операционной обработке товара',
+            ['rebill_logistic_cost' => 88.20],
+        );
+        $camelRow = [
+            'sellerOperName' => 'Возмещение издержек по перемещению и операционной обработке товара',
+            'rrdId' => '3003',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rebillLogisticCost' => 88.20,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('warehouse_logistics', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(88.20, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3001:warehouse_logistics', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('warehouse_logistics', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(88.20, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:3003:warehouse_logistics', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbStorageCorrectionWithoutStorageAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem('Коррекция хранения', ['deduction' => 125.75]);
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbWarehouseLogisticsNewOperationWithoutRebillAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem(
+            'Возмещение издержек по перемещению и операционной обработке товара',
+            ['deduction' => 88.20],
+        );
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbStorageCorrectionUsesCalculationAmountBoundary(): void
+    {
+        $calculator = new WbStorageCalculator();
+
+        self::assertFalse($calculator->supports($this->supplierOpItem('Коррекция хранения', ['storage_fee' => -0.009])));
+        self::assertTrue($calculator->supports($this->supplierOpItem('Коррекция хранения', ['storage_fee' => -0.01])));
+    }
+
+    public function testWbWarehouseLogisticsNewOperationUsesCalculationAmountBoundary(): void
+    {
+        $calculator = new WbWarehouseLogisticsCalculator();
+        $operation = 'Возмещение издержек по перемещению и операционной обработке товара';
+
+        self::assertFalse($calculator->supports($this->supplierOpItem($operation, ['rebill_logistic_cost' => 0.009])));
+        self::assertTrue($calculator->supports($this->supplierOpItem($operation, ['rebill_logistic_cost' => 0.01])));
+    }
+
+    public function testWbDeliveryOperationWithoutDeliveryCounterUsesDeliveryCategory(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+        $row = $this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: -180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'rrd_id' => '2001',
+            ],
+        );
+        $camelRow = [
+            'sellerOperName' => 'Доставка',
+            'rrdId' => '2002',
+            'saleDt' => '2026-01-15 10:00:00',
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'deliveryService' => -180.00,
+        ];
+
+        self::assertTrue($calculator->supports($row));
+        self::assertTrue($calculator->supports($camelRow));
+        self::assertCount(1, array_filter(
+            $this->allWbCostCalculators(),
+            static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($row),
+        ));
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_delivery', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(180.00, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:2001:logistics_delivery', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('logistics_delivery', $camelEntries[0]['category_code']);
+        self::assertEqualsWithDelta(180.00, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame('wb:2002:logistics_delivery', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbDeliveryOperationWithoutDeliveryServiceAmountRemainsUnsupported(): void
+    {
+        $row = $this->supplierOpItem('Доставка', ['deduction' => 180.00]);
+
+        foreach ($this->allWbCostCalculators() as $candidate) {
+            self::assertFalse($candidate->supports($row));
+        }
+    }
+
+    public function testWbDeliveryOperationRequiresMaterialAmountAndNoReturnCounter(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 0.009,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertTrue($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 0.01,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 1,
+            deliveryRub: 180.00,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: 180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'doc_type_name' => 'Возврат',
+            ],
+        )));
+    }
+
+    public function testProcessWbCostsActionClearsDeliveryFromUnprocessedTypes(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+        $row = $this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 0,
+            deliveryRub: -180.00,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'rrd_id' => '2001',
+            ],
+        );
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+        $rawDoc->expects(self::once())->method('setUnprocessedCostsCount')->with(0);
+        $rawDoc->expects(self::once())->method('setUnprocessedCostTypes')->with(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if (\App\Company\Entity\Company::class === $class && $id === $companyId) {
+                    return $company;
+                }
+                if (\App\Marketplace\Entity\MarketplaceRawDocument::class === $class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $this->createMock(MarketplaceListingRepository::class),
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            $listingResolver,
+            new MarketplaceCostCategoryResolver($costCategoryRepository, $em),
+            new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class)),
+            $this->createMock(MarketplaceListingBarcodeRepository::class),
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsDeliveryCalculator()],
+        );
+
+        self::assertSame(1, $action($companyId, $rawDocId));
+        self::assertCount(1, $persisted);
+        $category = $persisted[0]->getCategory();
+        self::assertNotNull($category);
+        self::assertSame('logistics_delivery', $category->getCode());
+        self::assertEqualsWithDelta(180.00, (float) $persisted[0]->getAmount(), 0.001);
+        self::assertSame('wb:2001:logistics_delivery', $persisted[0]->getExternalId());
+    }
+
+    /**
+     * @return list<CostCalculatorInterface>
+     */
+    private function allWbCostCalculators(): array
+    {
+        $calculators = [
+            new WbCommissionCalculator(),
+            new WbAcquiringCalculator(),
+            new WbLogisticsDeliveryCalculator(),
+            new WbLogisticsReturnCalculator(),
+            new WbLogisticsCorrectionCalculator(),
+            new WbStorageCalculator(),
+            new WbPvzProcessingCalculator(),
+            new WbWarehouseLogisticsCalculator(),
+            new WbPenaltyCalculator(),
+            new WbProductProcessingCalculator(),
+            new WbDeductionCalculator(new SlugifyService()),
+            new WbLoyaltyDiscountCalculator(),
+        ];
+
+        return $calculators;
+    }
+}

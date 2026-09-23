@@ -6,7 +6,7 @@ namespace App\Marketplace\Facade;
 
 use App\Marketplace\Application\DTO\CostCategoryGroupsDTO;
 use App\Marketplace\Domain\OzonCostCategory;
-use App\Marketplace\Domain\WbCostCategory;
+use App\Marketplace\Wildberries\Domain\WbCostCategory;
 
 /**
  * Справочники категорий затрат Ozon и WB для других модулей

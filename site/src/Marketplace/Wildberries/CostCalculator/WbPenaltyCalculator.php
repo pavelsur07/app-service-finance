@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\CostCalculator;
+
+use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+
+class WbPenaltyCalculator implements CostCalculatorInterface
+{
+    private WbSalesReportRowNormalizer $normalizer;
+    private WbCostExternalIdBuilder $externalIdBuilder;
+
+    public function __construct(?WbSalesReportRowNormalizer $normalizer = null, ?LoggerInterface $logger = null)
+    {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+        $this->externalIdBuilder = new WbCostExternalIdBuilder($this->normalizer, $logger ?? new NullLogger());
+    }
+
+    public function supports(array $item): bool
+    {
+        return 'Штраф' === $this->normalizer->sellerOperName($item);
+    }
+
+    public function requiresListing(): bool
+    {
+        return false; // Не блокируем — listing опционален
+    }
+
+    public function calculate(array $item, ?MarketplaceListing $listing): array
+    {
+        $penalty = (float) ($item['penalty'] ?? 0);
+        if (abs($penalty) < 0.01) {
+            return [];
+        }
+
+        $externalId = $this->externalIdBuilder->build($item, 'penalty');
+        if (null === $externalId) {
+            return [];
+        }
+
+        $saleDate = $this->normalizer->operationDate($item);
+
+        // Привязываем к товару только если listing найден
+        $product = $listing?->getProduct();
+
+        return [
+            [
+                'category_code' => 'penalty',
+                'amount' => (string) abs($penalty),
+                'external_id' => $externalId,
+                'cost_date' => $saleDate,
+                'description' => 'Штраф WB',
+                'product' => $product,
+            ],
+        ];
+    }
+}

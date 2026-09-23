@@ -1,0 +1,264 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Application\Processor;
+
+use App\Company\Entity\Company;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceRawFormat;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Wildberries\Application\Action\ProcessWbCostsAction;
+use App\Marketplace\Wildberries\Application\Service\WbListingResolverService;
+use App\Marketplace\Wildberries\CostCalculator\CostCalculatorInterface;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
+
+final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
+{
+    /** @var iterable<CostCalculatorInterface> */
+    private iterable $costCalculators;
+
+    public function __construct(
+        private readonly ProcessWbCostsAction $action,
+        private readonly EntityManagerInterface $em,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
+        private readonly MarketplaceCostCategoryResolver $categoryResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
+        private readonly WbSalesReportRowNormalizer $normalizer,
+        private readonly LoggerInterface $logger,
+        iterable $costCalculators,
+    ) {
+        $this->costCalculators = $costCalculators;
+    }
+
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
+    {
+        if ($type instanceof StagingRecordType) {
+            return StagingRecordType::COST === $type
+                && MarketplaceType::WILDBERRIES === $marketplace;
+        }
+
+        return $type === MarketplaceType::WILDBERRIES->value && 'costs' === $kind;
+    }
+
+    public function process(string $companyId, string $rawDocId): int
+    {
+        return ($this->action)($companyId, $rawDocId);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rawRows
+     */
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
+        if (empty($rawRows)) {
+            return;
+        }
+
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: '.$companyId);
+        }
+
+        $costsData = $rawRows;
+
+        if (empty($costsData)) {
+            return;
+        }
+
+        // Собираем все barcodes из затрат для массового поиска в каталоге
+        $allBarcodes = [];
+        foreach ($costsData as $item) {
+            $barcode = trim((string) $this->normalizer->barcode($item));
+            if ('' !== $barcode) {
+                $allBarcodes[$barcode] = true;
+            }
+        }
+
+        // Массовый поиск size из каталога по barcodes
+        $barcodeSizeMap = $this->barcodeCatalog->findSizesByBarcodes(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            array_keys($allBarcodes),
+        );
+
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
+
+        // Предзагрузка листингов
+        $allNmIdsMap = [];
+        foreach ($costsData as $item) {
+            $nmId = trim($this->normalizer->nmId($item));
+            if ('' !== $nmId && '0' !== $nmId) {
+                $allNmIdsMap[$nmId] = true;
+            }
+        }
+
+        $listingsCache = [];
+        if (!empty($allNmIdsMap)) {
+            $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                array_keys($allNmIdsMap),
+            );
+        }
+
+        // Создаём отсутствующие листинги
+        $newListings = 0;
+        foreach ($costsData as $item) {
+            $nmId = trim($this->normalizer->nmId($item));
+            if ('' === $nmId || '0' === $nmId) {
+                continue;
+            }
+
+            $tsName = $this->normalizer->techSize($item);
+            $barcode = trim((string) $this->normalizer->barcode($item));
+
+            // Если ts_name пустой — ищем size в каталоге по barcode
+            if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
+                $tsName = $barcodeSizeMap[$barcode];
+            }
+
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
+
+            if (isset($listingsCache[$cacheKey])) {
+                continue;
+            }
+
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
+            ], $barcode);
+            $listingsCache[$cacheKey] = $listing;
+            ++$newListings;
+        }
+
+        if ($newListings > 0) {
+            $this->em->flush();
+            // Баркоды вставляются после flush, чтобы FK на листинг был уже в БД
+            $this->listingResolver->flushBarcodes();
+        }
+
+        $this->categoryResolver->preload($company, MarketplaceType::WILDBERRIES);
+
+        // Собираем все cost entries
+        $allEntries = [];
+        foreach ($costsData as $item) {
+            $nmId = trim($this->normalizer->nmId($item));
+            $listing = null;
+
+            if ('' !== $nmId && '0' !== $nmId) {
+                $tsName = $this->normalizer->techSize($item);
+                $barcode = trim((string) $this->normalizer->barcode($item));
+
+                if ('' === trim((string) $tsName) && '' !== $barcode && isset($barcodeSizeMap[$barcode])) {
+                    $tsName = $barcodeSizeMap[$barcode];
+                }
+
+                $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+                $listing = $listingsCache[$nmId.'_'.$size] ?? null;
+            } else {
+                // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
+                $barcode = trim((string) $this->normalizer->barcode($item));
+                if ('' !== $barcode && isset($barcodeListingMap[$barcode])) {
+                    $listing = $barcodeListingMap[$barcode];
+                }
+            }
+
+            foreach ($this->costCalculators as $calculator) {
+                if (!$calculator->supports($item)) {
+                    continue;
+                }
+                foreach ($calculator->calculate($item, $listing) as $costData) {
+                    $allEntries[] = ['costData' => $costData, 'listing' => $listing];
+                }
+            }
+        }
+
+        if (empty($allEntries)) {
+            return;
+        }
+
+        // Дедупликация
+        $allExternalIds = array_unique(array_map(
+            static fn (array $row): string => $row['costData']['external_id'],
+            $allEntries,
+        ));
+        $existingMap = $this->costExistingIdsQuery->execute($companyId, $allExternalIds);
+
+        // Сохраняем
+        foreach ($allEntries as $row) {
+            $costData = $row['costData'];
+            $externalId = $costData['external_id'];
+
+            if (isset($existingMap[$externalId])) {
+                continue;
+            }
+
+            $categoryCode = $costData['category_code'];
+            $categoryName = $costData['category_name'] ?? $costData['description'] ?? $categoryCode;
+            $category = $this->categoryResolver->resolve(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                $categoryCode,
+                $categoryName,
+            );
+
+            $cost = new MarketplaceCost(
+                Uuid::uuid4()->toString(),
+                $company,
+                MarketplaceType::WILDBERRIES,
+                $category,
+            );
+
+            $cost->setExternalId($externalId);
+            if (null !== $rawDocId) {
+                $cost->setRawDocumentId($rawDocId);
+            }
+            $cost->setCostDate($costData['cost_date']);
+            $cost->setAmount($costData['amount']);
+            $cost->setDescription($costData['description']);
+            $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE);
+
+            if ($row['listing']) {
+                $cost->setListing($row['listing']);
+            }
+
+            $this->em->persist($cost);
+            $existingMap[$externalId] = true;
+        }
+
+        $this->em->flush();
+    }
+}

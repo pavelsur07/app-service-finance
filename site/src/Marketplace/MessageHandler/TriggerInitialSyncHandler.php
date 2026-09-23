@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Service\OzonAccrualSyncPlanner;
-use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
+use App\Marketplace\Wildberries\Application\Service\WbInitialSyncStartDateResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;

@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Application\FinancialReport;
+
+use Symfony\Component\Clock\ClockInterface;
+
+final class WbFinancialReportPeriodResolver
+{
+    private const BUSINESS_TIMEZONE = 'Europe/Moscow';
+
+    public function __construct(
+        private readonly ClockInterface $clock,
+    ) {
+    }
+
+    public function yesterday(): \DateTimeImmutable
+    {
+        return $this->nowInBusinessTimezone()->modify('-1 day');
+    }
+
+    public function currentYearStart(): \DateTimeImmutable
+    {
+        $now = $this->nowInBusinessTimezone();
+
+        return $now->setDate((int) $now->format('Y'), 1, 1);
+    }
+
+    public function currentMonthStart(): \DateTimeImmutable
+    {
+        $now = $this->nowInBusinessTimezone();
+
+        return $now->setDate((int) $now->format('Y'), (int) $now->format('n'), 1);
+    }
+
+    /**
+     * Начало окна оперативного восстановления: объединение «с начала текущего
+     * месяца» и «последние $daysBack дней до вчера», не раньше начала года.
+     *
+     * Окно только «с начала месяца» теряло день, помеченный empty ночью 1-го
+     * числа: утром он уже был «историей» и не перезапрашивался никогда.
+     * Одно правило для оркестратора и планировщика, чтобы они не разошлись.
+     */
+    public function recoveryWindowStart(int $daysBack): \DateTimeImmutable
+    {
+        if ($daysBack <= 0) {
+            throw new \DomainException('Days back must be a positive integer.');
+        }
+
+        $rollingStart = $this->yesterday()->modify(sprintf('-%d days', $daysBack - 1));
+        $start = min($this->currentMonthStart(), $rollingStart);
+
+        return max($start, $this->currentYearStart());
+    }
+
+    /**
+     * @return list<\DateTimeImmutable>
+     */
+    public function last14Days(): array
+    {
+        return $this->lastDays(14);
+    }
+
+    /**
+     * @return list<\DateTimeImmutable>
+     */
+    public function lastDays(int $daysBack): array
+    {
+        if ($daysBack <= 0) {
+            throw new \DomainException('Days back must be a positive integer.');
+        }
+
+        $to = $this->yesterday();
+        $from = $to->modify(sprintf('-%d days', $daysBack - 1));
+
+        return $this->daysBetween($from, $to);
+    }
+
+    /**
+     * @return list<\DateTimeImmutable>
+     */
+    public function daysBetween(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $normalizedFrom = $this->normalizeToBusinessDayStart($from);
+        $normalizedTo = $this->normalizeToBusinessDayStart($to);
+
+        if ($normalizedFrom > $normalizedTo) {
+            throw new \DomainException('From date must be less than or equal to to date.');
+        }
+
+        $days = [];
+        for ($cursor = $normalizedFrom; $cursor <= $normalizedTo; $cursor = $cursor->add(new \DateInterval('P1D'))) {
+            $days[] = $cursor;
+        }
+
+        return $days;
+    }
+
+    public function normalizeBusinessDate(string $date): \DateTimeImmutable
+    {
+        $trimmed = trim($date);
+        if ('' === $trimmed) {
+            throw new \InvalidArgumentException('Business date must not be empty.');
+        }
+
+        $timezone = $this->businessTimezone();
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $trimmed, $timezone);
+        $errors = \DateTimeImmutable::getLastErrors();
+
+        if (false === $parsed || (is_array($errors) && (0 !== $errors['warning_count'] || 0 !== $errors['error_count']))) {
+            throw new \DomainException(sprintf('Invalid WB business date: "%s".', $date));
+        }
+
+        return $parsed->setTime(0, 0, 0);
+    }
+
+    private function nowInBusinessTimezone(): \DateTimeImmutable
+    {
+        return $this->clock->now()->setTimezone($this->businessTimezone())->setTime(0, 0, 0);
+    }
+
+    private function normalizeToBusinessDayStart(\DateTimeImmutable $date): \DateTimeImmutable
+    {
+        return $date->setTimezone($this->businessTimezone())->setTime(0, 0, 0);
+    }
+
+    private function businessTimezone(): \DateTimeZone
+    {
+        return new \DateTimeZone(self::BUSINESS_TIMEZONE);
+    }
+}

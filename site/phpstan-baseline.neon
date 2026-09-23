@@ -4687,64 +4687,64 @@ parameters:
 			path: src/Marketplace/Application/ProcessOzonSalesAction.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\ProcessWbCostsAction\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Action\\ProcessWbCostsAction\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
 			message: '#^Offset string on array\{\} in isset\(\) does not exist\.$#'
 			identifier: isset.offset
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
-			message: '#^Property App\\Marketplace\\Application\\ProcessWbCostsAction\:\:\$costExistingExternalIdsQuery is never read, only written\.$#'
+			message: '#^Property App\\Marketplace\\Wildberries\\Application\\Action\\ProcessWbCostsAction\:\:\$costExistingExternalIdsQuery is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between 0 and 0 will always evaluate to false\.$#'
 			identifier: notIdentical.alwaysFalse
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
 			message: '#^Variable \$pendingIds in empty\(\) always exists and is always falsy\.$#'
 			identifier: empty.variable
 			count: 1
-			path: src/Marketplace/Application/ProcessWbCostsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbCostsAction.php
 
 		-
 			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Marketplace/Application/ProcessWbReturnsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbReturnsAction.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceReturn constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessWbReturnsAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbReturnsAction.php
 
 		-
 			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Marketplace/Application/ProcessWbSalesAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbSalesAction.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceSale constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/ProcessWbSalesAction.php
+			path: src/Marketplace/Wildberries/Application/Action/ProcessWbSalesAction.php
 
 		-
 			message: '#^Method App\\Marketplace\\Application\\Processor\\OzonCostsRawProcessor\:\:extractCostEntries\(\) has parameter \$op with no value type specified in iterable type array\.$#'
@@ -4789,28 +4789,28 @@ parameters:
 			path: src/Marketplace/Application/Processor/OzonServiceCategoryMap.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Processor\\WbCostsRawProcessor\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessor\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Processor/WbCostsRawProcessor.php
+			path: src/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessor.php
 
 		-
 			message: '#^Offset ''category_name'' on array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\} on left side of \?\? does not exist\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
-			path: src/Marketplace/Application/Processor/WbCostsRawProcessor.php
+			path: src/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessor.php
 
 		-
-			message: '#^Property App\\Marketplace\\Application\\Processor\\WbCostsRawProcessor\:\:\$logger is never read, only written\.$#'
+			message: '#^Property App\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessor\:\:\$logger is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Marketplace/Application/Processor/WbCostsRawProcessor.php
+			path: src/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessor.php
 
 		-
 			message: '#^Variable \$costsData in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.variable
 			count: 1
-			path: src/Marketplace/Application/Processor/WbCostsRawProcessor.php
+			path: src/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessor.php
 
 		-
 			message: '#^Right side of && is always true\.$#'
@@ -4849,22 +4849,22 @@ parameters:
 			path: src/Marketplace/Application/Reconciliation/XlsxReaderService.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Infrastructure\\Query\\WbBarcodeUpsertQuery\:\:upsertForListing\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Wildberries\\Infrastructure\\Query\\WbBarcodeUpsertQuery\:\:upsertForListing\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/RefreshWbListingCatalogAction.php
+			path: src/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogAction.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Repository\\MarketplaceListingRepository\:\:findAllByCompanyMarketplaceAndMarketplaceVariantIds\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/RefreshWbListingCatalogAction.php
+			path: src/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogAction.php
 
 		-
 			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Infrastructure\\Security\\ConnectionApiKeyCodec\:\:apiKeyFor\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, App\\Marketplace\\Entity\\MarketplaceConnection\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/RefreshWbListingCatalogAction.php
+			path: src/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogAction.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
@@ -4981,94 +4981,94 @@ parameters:
 			path: src/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlanner.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\WbFinancialReportReconciliationService\:\:createOrRefreshRawDocument\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportReconciliationService\:\:createOrRefreshRawDocument\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/WbFinancialReportReconciliationService.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportReconciliationService.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
-			path: src/Marketplace/Application/Service/WbFinancialReportSyncPlanner.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlanner.php
 
 		-
 			message: '#^Offset int\<0, max\>\|null might not exist on list\<DateTimeImmutable\>\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
-			path: src/Marketplace/Application/Service/WbFinancialReportSyncPlanner.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlanner.php
 
 		-
 			message: '#^Using nullsafe property access on non\-nullable type App\\Marketplace\\Enum\\PipelineStatus\:\:COMPLETED\|App\\Marketplace\\Enum\\PipelineStatus\:\:FAILED\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
-			path: src/Marketplace/Application/Service/WbFinancialReportSyncStatusUpdater.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncStatusUpdater.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\WbFinancialReportSyncStatusUpdaterInterface\:\:markConflict\(\) has parameter \$requestPayload with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportSyncStatusUpdaterInterface\:\:markConflict\(\) has parameter \$requestPayload with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/WbFinancialReportSyncStatusUpdaterInterface.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncStatusUpdaterInterface.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\WbInitialSyncStartDateResolver\:\:parseSettingsStartDateOverride\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Service\\WbInitialSyncStartDateResolver\:\:parseSettingsStartDateOverride\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Application/Service/WbInitialSyncStartDateResolver.php
+			path: src/Marketplace/Wildberries/Application/Service/WbInitialSyncStartDateResolver.php
 
 		-
-			message: '#^Parameter \#1 \$leftMinor of method App\\Marketplace\\Application\\Service\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, int\|string given\.$#'
+			message: '#^Parameter \#1 \$leftMinor of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
 			message: '#^Parameter \#1 \$string1 of function strnatcasecmp expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
-			message: '#^Parameter \#2 \$rightMinor of method App\\Marketplace\\Application\\Service\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, float\|int given\.$#'
+			message: '#^Parameter \#2 \$rightMinor of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, float\|int given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
-			message: '#^Parameter \#2 \$rightMinor of method App\\Marketplace\\Application\\Service\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, int\|string given\.$#'
+			message: '#^Parameter \#2 \$rightMinor of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbRawFinancialReportBuilder\:\:sum\(\) expects int, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
 			message: '#^Parameter \#2 \$string2 of function strnatcasecmp expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
-			message: '#^Parameter &\$reports by\-ref type of method App\\Marketplace\\Application\\Service\\WbRawFinancialReportBuilder\:\:addReportRow\(\) expects array\<string, array\<string, int\|string\>\>, array\<string, array\<string, mixed\>\> given\.$#'
+			message: '#^Parameter &\$reports by\-ref type of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbRawFinancialReportBuilder\:\:addReportRow\(\) expects array\<string, array\<string, int\|string\>\>, array\<string, array\<string, mixed\>\> given\.$#'
 			identifier: parameterByRef.type
 			count: 2
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
 			message: '#^Unary operation "\-" on int\|string results in an error\.$#'
 			identifier: unaryOp.invalid
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportBuilder.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportBuilder.php
 
 		-
 			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportProductEnricher.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportProductEnricher.php
 
 		-
-			message: '#^Parameter \#1 \$sources of method App\\Marketplace\\Application\\Service\\WbRawFinancialReportProductEnricher\:\:identifiers\(\) expects list\<array\<string, mixed\>\>, non\-empty\-array\<mixed\> given\.$#'
+			message: '#^Parameter \#1 \$sources of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbRawFinancialReportProductEnricher\:\:identifiers\(\) expects list\<array\<string, mixed\>\>, non\-empty\-array\<mixed\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/Application/Service/WbRawFinancialReportProductEnricher.php
+			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportProductEnricher.php
 
 		-
 			message: '#^If condition is always true\.$#'
@@ -5110,67 +5110,67 @@ parameters:
 			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:scan\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:ttl\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:xlen\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
 			message: '#^Call to an undefined method object\:\:zcard\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\WbFinanceDiagnosticsCommand\:\:renderRows\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinanceDiagnosticsCommand\:\:renderRows\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
-			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Application\\Service\\WbFinanceRateLimiter\:\:resolveSalesReportsBucketId\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, object given\.$#'
+			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Wildberries\\Application\\Service\\WbFinanceRateLimiter\:\:resolveSalesReportsBucketId\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, object given\.$#'
 			identifier: argument.type
 			count: 2
-			path: src/Marketplace/Command/WbFinanceDiagnosticsCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:buildStatusFromRaw\(\) has parameter \$raw with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:buildStatusFromRaw\(\) has parameter \$raw with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/WbFinancialReportsReconcileLegacyCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:findActiveConnections\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:findActiveConnections\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/WbFinancialReportsReconcileLegacyCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:findDailyRaw\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:findDailyRaw\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/WbFinancialReportsReconcileLegacyCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommand.php
 
 		-
-			message: '#^Method App\\Marketplace\\Command\\WbFinancialReportsSyncCommand\:\:resolveRange\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinancialReportsSyncCommand\:\:resolveRange\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Command/WbFinancialReportsSyncCommand.php
+			path: src/Marketplace/Wildberries/Command/WbFinancialReportsSyncCommand.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Infrastructure\\Query\\AnalyticsKpiQuery\:\:getAllKpi\(\) expects string, string\|null given\.$#'
@@ -6238,67 +6238,67 @@ parameters:
 			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:calculateRemote429Cooldown\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:calculateRemote429Cooldown\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:encodeSafeHeadersJson\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:encodeSafeHeadersJson\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:extractHeaderFirstValue\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:extractHeaderFirstValue\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:extractHeaderInt\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:extractHeaderInt\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:extractRetryAfter\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:extractRetryAfter\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:extractRetryAfter\(\) is unused\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:extractRetryAfter\(\) is unused\.$#'
 			identifier: method.unused
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:fetchDetailedInternal\(\) should return list\<array\<string, mixed\>\> but returns array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:fetchDetailedInternal\(\) should return list\<array\<string, mixed\>\> but returns array\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:handleRemote429\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:handleRemote429\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportClient\:\:logWbResponse\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportClient\:\:logWbResponse\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClient.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFinanceSalesReportPage\:\:__construct\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WbFinanceSalesReportPage\:\:__construct\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportPage.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportPage.php
 
 		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Contract\\RowClassifierInterface\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
@@ -6313,256 +6313,256 @@ parameters:
 			path: src/Marketplace/Infrastructure/Normalizer/Ozon/OzonReportRowClassifier.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbReportRowClassifier\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbReportRowClassifier\:\:classify\(\) has parameter \$rawRow with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbReportRowClassifier.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbReportRowClassifier.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbReportRowClassifier\:\:firstNonEmptyString\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbReportRowClassifier\:\:firstNonEmptyString\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbReportRowClassifier.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbReportRowClassifier.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:acquiringFee\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:acquiringFee\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:barcode\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:barcode\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:bonusTypeName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:bonusTypeName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:brandName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:brandName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:cashbackDiscount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:cashbackDiscount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:commissionAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:commissionAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:deliveryAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:deliveryAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:deliveryService\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:deliveryService\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:docTypeName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:docTypeName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:float\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:float\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:forPay\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:forPay\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:fullMarketplaceCommission\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:fullMarketplaceCommission\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:grossWithoutSpp\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:grossWithoutSpp\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:isReturn\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:isReturn\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:isSale\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:isSale\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:isSaleOrReturn\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:isSaleOrReturn\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:nmId\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:nmId\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:nullableString\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:nullableString\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:operationDate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:operationDate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:operationName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:operationName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:paidAcceptance\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:paidAcceptance\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:paidStorage\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:paidStorage\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:ppvzReward\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:ppvzReward\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:ppvzVw\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:ppvzVw\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:ppvzVwNds\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:ppvzVwNds\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:quantity\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:quantity\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:raw\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:raw\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:rebillLogisticCost\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:rebillLogisticCost\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:reportDate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:reportDate\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:retailAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:retailAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:retailPrice\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:retailPrice\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:retailPriceWithDisc\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:retailPriceWithDisc\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:returnAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:returnAmount\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:rrdId\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:rrdId\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:sellerOperName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:sellerOperName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:srid\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:srid\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:string\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:string\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:subjectName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:subjectName\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:techSize\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:techSize\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Normalizer\\Wildberries\\WbSalesReportRowNormalizer\:\:vendorCode\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:vendorCode\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Infrastructure/Normalizer/Wildberries/WbSalesReportRowNormalizer.php
+			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
 
 		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\ActiveOzonConnectionsQuery\:\:execute\(\) should return array\<int, array\{id\: string, company_id\: string, client_id\: string\|null, finance_lock_before\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
@@ -6904,13 +6904,13 @@ parameters:
 			message: '#^Call to an undefined method object\:\:eval\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Infrastructure/Redis/WbFinanceRedisCooldownStorage.php
+			path: src/Marketplace/Wildberries/Infrastructure/Redis/WbFinanceRedisCooldownStorage.php
 
 		-
 			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Infrastructure/Redis/WbFinanceRedisCooldownStorage.php
+			path: src/Marketplace/Wildberries/Infrastructure/Redis/WbFinanceRedisCooldownStorage.php
 
 		-
 			message: '#^Parameter \#1 \$ciphertext of method App\\Marketplace\\Infrastructure\\Security\\ConnectionApiKeyCodec\:\:decrypt\(\) expects string, string\|null given\.$#'
@@ -7069,7 +7069,7 @@ parameters:
 			path: src/Marketplace/MessageHandler/ProcessRawDocumentStepMessageHandler.php
 
 		-
-			message: '#^Parameter \#1 \$rawDocument of method App\\Marketplace\\Application\\Service\\WbFinancialReportSyncStatusUpdaterInterface\:\:syncByRawPipelineResult\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
+			message: '#^Parameter \#1 \$rawDocument of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportSyncStatusUpdaterInterface\:\:syncByRawPipelineResult\(\) expects App\\Marketplace\\Entity\\MarketplaceRawDocument, object given\.$#'
 			identifier: argument.type
 			count: 4
 			path: src/Marketplace/MessageHandler/ProcessRawDocumentStepMessageHandler.php
@@ -7111,10 +7111,10 @@ parameters:
 			path: src/Marketplace/MessageHandler/SyncOzonRealizationHandler.php
 
 		-
-			message: '#^Parameter \#4 \$rows of method App\\Marketplace\\Application\\Service\\WbFinancialReportReconciliationService\:\:appendRawDocumentPage\(\) expects list\<array\<string, mixed\>\>, array given\.$#'
+			message: '#^Parameter \#4 \$rows of method App\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportReconciliationService\:\:appendRawDocumentPage\(\) expects list\<array\<string, mixed\>\>, array given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Marketplace/MessageHandler/SyncWbFinancialReportDayHandler.php
+			path: src/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandler.php
 
 		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceAdvertisingCostRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -7363,232 +7363,232 @@ parameters:
 			path: src/Marketplace/Repository/OzonTransactionTotalsCheckRepository.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\CostCalculatorInterface\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/CostCalculatorInterface.php
+			path: src/Marketplace/Wildberries/CostCalculator/CostCalculatorInterface.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\CostCalculatorInterface\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/CostCalculatorInterface.php
+			path: src/Marketplace/Wildberries/CostCalculator/CostCalculatorInterface.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbAcquiringCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbAcquiringCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbAcquiringCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbAcquiringCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbAcquiringCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''acquiring'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Эквайринг'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbAcquiringCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''acquiring'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Эквайринг'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbAcquiringCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbAcquiringCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbAcquiringCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbAcquiringCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbAcquiringCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbAcquiringCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbCommissionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbCommissionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbCommissionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbCommissionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbCommissionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''commission'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Комиссия…'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbCommissionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''commission'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Комиссия…'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbCommissionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbCommissionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbCommissionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbCommissionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbCommissionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbCommissionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbCostExternalIdBuilder\:\:build\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbCostExternalIdBuilder\:\:build\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbCostExternalIdBuilder.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbCostExternalIdBuilder.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbDeductionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbDeductionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbDeductionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbDeductionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbDeductionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: string, category_name\: non\-empty\-string, amount\: numeric\-string, operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, external_id\: string, cost_date\: DateTimeImmutable, description\: non\-empty\-string, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbDeductionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: string, category_name\: non\-empty\-string, amount\: numeric\-string, operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\|App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:STORNO, external_id\: string, cost_date\: DateTimeImmutable, description\: non\-empty\-string, product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbDeductionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbDeductionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbDeductionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbDeductionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbDeductionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbDeductionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsCorrectionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsCorrectionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_correction'', category_name\: ''Коррекция логистики'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Коррекция логистики…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_correction'', category_name\: ''Коррекция логистики'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Коррекция логистики…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsCorrectionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsCorrectionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsCorrectionCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsCorrectionCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsCorrectionCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsDeliveryCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsDeliveryCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_delivery'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика до…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_delivery'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика до…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsDeliveryCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsDeliveryCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsDeliveryCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsDeliveryCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsDeliveryCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsReturnCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsReturnCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsReturnCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsReturnCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsReturnCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_return'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика возврат'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsReturnCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''logistics_return'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика возврат'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsReturnCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsReturnCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLogisticsReturnCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsReturnCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLogisticsReturnCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLogisticsReturnCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLoyaltyDiscountCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLoyaltyDiscountCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''wb_loyalty_discount…'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Компенсация скидки…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''wb_loyalty_discount…'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Компенсация скидки…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLoyaltyDiscountCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLoyaltyDiscountCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbLoyaltyDiscountCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbLoyaltyDiscountCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPenaltyCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPenaltyCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPenaltyCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPenaltyCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPenaltyCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''penalty'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Штраф WB'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPenaltyCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''penalty'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Штраф WB'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPenaltyCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPenaltyCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPenaltyCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPenaltyCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPenaltyCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPenaltyCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbProductProcessingCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbProductProcessingCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbProductProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbProductProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbProductProcessingCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''product_processing'', category_name\: ''Обработка товара'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Обработка товара'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbProductProcessingCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''product_processing'', category_name\: ''Обработка товара'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Обработка товара'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbProductProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbProductProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbProductProcessingCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbProductProcessingCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbProductProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbProductProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPvzProcessingCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPvzProcessingCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPvzProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPvzProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPvzProcessingCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''pvz_processing'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика обработка…''\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPvzProcessingCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''pvz_processing'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика обработка…''\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPvzProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPvzProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbPvzProcessingCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbPvzProcessingCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbPvzProcessingCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbPvzProcessingCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbStorageCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbStorageCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbStorageCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbStorageCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbStorageCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbStorageCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbStorageCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbStorageCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbWarehouseLogisticsCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbWarehouseLogisticsCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''warehouse_logistics'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика складские…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''warehouse_logistics'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Логистика складские…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbWarehouseLogisticsCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbWarehouseLogisticsCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbWarehouseLogisticsCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/CostCalculator/WbWarehouseLogisticsCalculator.php
+			path: src/Marketplace/Wildberries/CostCalculator/WbWarehouseLogisticsCalculator.php
 
 		-
 			message: '#^Method App\\Marketplace\\Service\\Integration\\OzonRealizationFetcher\:\:buildHeaders\(\) return type has no value type specified in iterable type array\.$#'
@@ -7603,22 +7603,22 @@ parameters:
 			path: src/Marketplace/Service/Integration/OzonRealizationFetcher.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\Integration\\WildberriesAdapter\:\:fetchRawReport\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:fetchRawReport\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Marketplace/Service/Integration/WildberriesAdapter.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
 
 		-
-			message: '#^Property App\\Marketplace\\Service\\Integration\\WildberriesAdapter\:\:\$httpClient is never read, only written\.$#'
+			message: '#^Property App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:\$httpClient is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Marketplace/Service/Integration/WildberriesAdapter.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
 
 		-
-			message: '#^Property App\\Marketplace\\Service\\Integration\\WildberriesAdapter\:\:\$logger is never read, only written\.$#'
+			message: '#^Property App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:\$logger is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Marketplace/Service/Integration/WildberriesAdapter.php
+			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
 
 		-
 			message: '#^Parameter \#2 \$entries of method App\\MarketplaceAds\\Application\\LoadWbAdSpendDayAction\:\:result\(\) expects list\<App\\MarketplaceAds\\Application\\DTO\\AdRawEntry\>, array\<App\\MarketplaceAds\\Application\\DTO\\AdRawEntry\> given\.$#'
@@ -11680,43 +11680,43 @@ parameters:
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Repository\\\\MarketplaceConnectionRepository'' and App\\Marketplace\\Repository\\MarketplaceConnectionRepository\<App\\Marketplace\\Entity\\MarketplaceConnection\> will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Repository\\\\MarketplaceListingBarcodeRepository'' and App\\Marketplace\\Repository\\MarketplaceListingBarcodeRepository\<App\\Marketplace\\Entity\\MarketplaceListingBarcode\> will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Repository\\\\MarketplaceListingRepository'' and App\\Marketplace\\Repository\\MarketplaceListingRepository\<App\\Marketplace\\Entity\\MarketplaceListing\> will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of callable App\\Marketplace\\Application\\RefreshWbListingCatalogAction expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of callable App\\Marketplace\\Wildberries\\Application\\Action\\RefreshWbListingCatalogAction expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Repository\\MarketplaceListingBarcodeRepository\:\:findListingIdByBarcode\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Parameter \#3 \$companyId of class App\\Marketplace\\Entity\\MarketplaceListingBarcode constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\Service\\OzonRawDuplicatesCleanupExecutorTest\:\:counts\(\) return type has no value type specified in iterable type array\.$#'
@@ -11755,130 +11755,130 @@ parameters:
 			path: tests/Integration/Marketplace/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\Service\\WbFinancialReportFirstAvailableResolverTest\:\:resolverWithResponses\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportFirstAvailableResolverTest\:\:resolverWithResponses\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/Service/WbFinancialReportFirstAvailableResolverTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportFirstAvailableResolverTest.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceRawDocument constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 6
-			path: tests/Integration/Marketplace/Application/Service/WbFinancialReportSyncStatusUpdaterTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncStatusUpdaterTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:costAmountByCategoryAndOperation\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:costAmountByCategoryAndOperation\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:costListingIdByCategory\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:costListingIdByCategory\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:returnsCount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:returnsCount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:returnsListingId\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:returnsListingId\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:saleRevenue\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:saleRevenue\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:salesCount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:salesCount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:salesListingId\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbCamelCaseRawDocumentPipelineRegressionTest\:\:salesListingId\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbCamelCaseRawDocumentPipelineRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbReturnRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbReturnRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbSaleRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbSaleRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbSaleRowWithAmounts\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:makeWbSaleRowWithAmounts\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:returnAmount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:returnAmount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 6
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:returnRowsCount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:returnRowsCount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 4
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:saleAmount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:saleAmount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 5
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:saleGrossBySrid\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:saleGrossBySrid\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:saleRevenueBySrid\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:saleRevenueBySrid\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:saleRowsCount\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:saleRowsCount\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Application\\WbRawForceReprocessRegressionTest\:\:saleRowsCountBySrid\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\WbRawForceReprocessRegressionTest\:\:saleRowsCountBySrid\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 4
-			path: tests/Integration/Marketplace/Application/WbRawForceReprocessRegressionTest.php
+			path: tests/Integration/Marketplace/Wildberries/Application/WbRawForceReprocessRegressionTest.php
 
 		-
 			message: '#^Method App\\Tests\\Integration\\Marketplace\\CloseMonthStageActionPreliminaryTest\:\:emptyEntriesModesProvider\(\) return type has no value type specified in iterable type array\.$#'
@@ -11938,25 +11938,25 @@ parameters:
 			message: '#^Call to an undefined method App\\Marketplace\\Entity\\MarketplaceRawDocument\:\:markRunning\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: tests/Integration/Marketplace/Command/WbFinancialReportsReconcileLegacyCommandTest.php
+			path: tests/Integration/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommandTest.php
 
 		-
 			message: '#^Method App\\Marketplace\\Entity\\MarketplaceRawDocument\:\:markFailed\(\) invoked with 1 parameter, 0 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: tests/Integration/Marketplace/Command/WbFinancialReportsReconcileLegacyCommandTest.php
+			path: tests/Integration/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Command\\WbFinancialReportsReconcileLegacyCommandTest\:\:findStatus\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncStatus\|null but returns object\|null\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommandTest\:\:findStatus\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncStatus\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Integration/Marketplace/Command/WbFinancialReportsReconcileLegacyCommandTest.php
+			path: tests/Integration/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Command\\WbFinancialReportsReconcileLegacyCommandTest\:\:seedWbConnection\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommandTest\:\:seedWbConnection\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/Command/WbFinancialReportsReconcileLegacyCommandTest.php
+			path: tests/Integration/Marketplace/Wildberries/Command/WbFinancialReportsReconcileLegacyCommandTest.php
 
 		-
 			message: '#^Offset ''987001'' does not exist on non\-empty\-array\<string, array\{id\: string, parentSku\: string, variantId\: string, size\: string\}\>\.$#'
@@ -12034,91 +12034,91 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$messages\.$#'
 			identifier: property.notFound
 			count: 8
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\MessageHandler\\\\SyncWbFinancialReportDayHandler'' and App\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandler will always evaluate to true\.$#'
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Wildberries\\\\MessageHandler\\\\SyncWbFinancialReportDayHandler'' and App\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandler will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:createRaw\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:createRaw\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:filterProcessMessages\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:filterProcessMessages\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:filterSyncMessages\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:filterSyncMessages\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findLastError\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncError\|null but returns object\|null\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findLastError\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncError\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findRawDocument\(\) should return App\\Marketplace\\Entity\\MarketplaceRawDocument\|null but returns object\|null\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findRawDocument\(\) should return App\\Marketplace\\Entity\\MarketplaceRawDocument\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findStatus\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncStatus\|null but returns object\|null\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findStatus\(\) should return App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncStatus\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of class App\\Marketplace\\Message\\SyncWbFinancialReportDayMessage constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:countRawDocuments\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:countRawDocuments\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findRawDocument\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findRawDocument\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 4
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:makeStatusRetryDue\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:makeStatusRetryDue\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:message\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:message\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 20
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
 			message: '#^Parameter \#2 \$companyId of class App\\Marketplace\\Entity\\MarketplaceFinancialReportSyncStatus constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
-			message: '#^Parameter \#2 \$companyId of method App\\Tests\\Integration\\Marketplace\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findStatus\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#2 \$companyId of method App\\Tests\\Integration\\Marketplace\\Wildberries\\MessageHandler\\SyncWbFinancialReportDayHandlerTest\:\:findStatus\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 16
-			path: tests/Integration/Marketplace/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
+			path: tests/Integration/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandlerTest.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$blocking\.$#'
@@ -12232,67 +12232,67 @@ parameters:
 			message: '#^Call to method getSql\(\) on an unknown class DoctrineMigrations\\Version20260730120000\.$#'
 			identifier: class.notFound
 			count: 1
-			path: tests/Integration/Marketplace/WbDeductionOperationTypeMigrationTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbDeductionOperationTypeMigrationTest.php
 
 		-
 			message: '#^Call to method up\(\) on an unknown class DoctrineMigrations\\Version20260730120000\.$#'
 			identifier: class.notFound
 			count: 1
-			path: tests/Integration/Marketplace/WbDeductionOperationTypeMigrationTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbDeductionOperationTypeMigrationTest.php
 
 		-
 			message: '#^Instantiated class DoctrineMigrations\\Version20260730120000 not found\.$#'
 			identifier: class.notFound
 			count: 1
-			path: tests/Integration/Marketplace/WbDeductionOperationTypeMigrationTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbDeductionOperationTypeMigrationTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/WbDeductionOperationTypeMigrationTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbDeductionOperationTypeMigrationTest.php
 
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
 			count: 2
-			path: tests/Integration/Marketplace/WbFinancialReportRefreshTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportRefreshTest.php
 
 		-
 			message: '#^Empty array passed to foreach\.$#'
 			identifier: foreach.emptyArray
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
 			message: '#^Instanceof between \*NEVER\* and App\\Marketplace\\Message\\ProcessRawDocumentStepMessage will always evaluate to false\.$#'
 			identifier: instanceof.alwaysFalse
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\WbFinancialReportSyncIdempotencyTest\:\:createCompanyAndConnection\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\WbFinancialReportSyncIdempotencyTest\:\:createCompanyAndConnection\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\WbFinancialReportSyncIdempotencyTest\:\:swapWbClient\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\WbFinancialReportSyncIdempotencyTest\:\:swapWbClient\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
 			message: '#^Parameter \#1 \$array \(array\{\}\) to function array_values is empty, call has no effect\.$#'
 			identifier: arrayValues.empty
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Finance\\Entity\\Document constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Marketplace/WbFinancialReportSyncIdempotencyTest.php
+			path: tests/Integration/Marketplace/Wildberries/WbFinancialReportSyncIdempotencyTest.php
 
 		-
 			message: '#^Cannot access offset ''status'' on array\<string, mixed\>\|false\.$#'
@@ -13402,139 +13402,139 @@ parameters:
 			message: '#^Array has 2 duplicate keys with value ''rrd_id'' \(''rrd_id'', ''rrd_id''\)\.$#'
 			identifier: array.duplicateKey
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 12, array\{App\\Marketplace\\Service\\CostCalculator\\WbCommissionCalculator, App\\Marketplace\\Service\\CostCalculator\\WbAcquiringCalculator, App\\Marketplace\\Service\\CostCalculator\\WbLogisticsDeliveryCalculator, App\\Marketplace\\Service\\CostCalculator\\WbLogisticsReturnCalculator, App\\Marketplace\\Service\\CostCalculator\\WbLogisticsCorrectionCalculator, App\\Marketplace\\Service\\CostCalculator\\WbStorageCalculator, App\\Marketplace\\Service\\CostCalculator\\WbPvzProcessingCalculator, App\\Marketplace\\Service\\CostCalculator\\WbWarehouseLogisticsCalculator, \.\.\.\} and ''12 WB\-калькуляторов…'' will always evaluate to true\.$#'
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 12, array\{App\\Marketplace\\Wildberries\\CostCalculator\\WbCommissionCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbAcquiringCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsDeliveryCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsReturnCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsCorrectionCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbStorageCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbPvzProcessingCalculator, App\\Marketplace\\Wildberries\\CostCalculator\\WbWarehouseLogisticsCalculator, \.\.\.\} and ''12 WB\-калькуляторов…'' will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Service\\\\CostCalculator\\\\CostCalculatorInterface'' and App\\Marketplace\\Service\\CostCalculator\\WbAcquiringCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbCommissionCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbDeductionCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbLogisticsCorrectionCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbLogisticsDeliveryCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbLogisticsReturnCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbLoyaltyDiscountCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbPenaltyCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbProductProcessingCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbPvzProcessingCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbStorageCalculator\|App\\Marketplace\\Service\\CostCalculator\\WbWarehouseLogisticsCalculator will always evaluate to true\.$#'
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Marketplace\\\\Wildberries\\\\CostCalculator\\\\CostCalculatorInterface'' and App\\Marketplace\\Wildberries\\CostCalculator\\WbAcquiringCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbCommissionCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbDeductionCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsCorrectionCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsDeliveryCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbLogisticsReturnCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbPenaltyCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbProductProcessingCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbPvzProcessingCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbStorageCalculator\|App\\Marketplace\\Wildberries\\CostCalculator\\WbWarehouseLogisticsCalculator will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''DateTimeImmutable'' and DateTimeImmutable will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Cannot call method getCode\(\) on App\\Marketplace\\Entity\\MarketplaceCostCategory\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:calculate\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{external_id\: ''test\:wb\:cost\:1'', cost_date\: DateTimeImmutable, amount\: ''80'', description\: ''Логистика до…'', category_code\: ''logistics_delivery'', category_name\: ''Логистика до…'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\}\}\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{external_id\: ''test\:wb\:cost\:1'', cost_date\: DateTimeImmutable, amount\: ''80'', description\: ''Логистика до…'', category_code\: ''logistics_delivery'', category_name\: ''Логистика до…'', operation_type\: App\\Marketplace\\Enum\\MarketplaceCostOperationType\:\:CHARGE\}\}\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Marketplace\\Service\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\CostCalculatorInterface@anonymous/tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest\.php\:1149\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:invokeProcessBatch\(\) is unused\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:invokeProcessBatch\(\) is unused\.$#'
 			identifier: method.unused
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:makeProcessorForBehavioralTest\(\) is unused\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:makeProcessorForBehavioralTest\(\) is unused\.$#'
 			identifier: method.unused
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:testProcessWbCostsActionBindsListingForBothCamelAndSnakeCaseRows\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:testProcessWbCostsActionBindsListingForBothCamelAndSnakeCaseRows\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:testProcessWbCostsActionProcessesLogisticsCorrectionThroughCostsPipeline\(\) has parameter \$row with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:testProcessWbCostsActionProcessesLogisticsCorrectionThroughCostsPipeline\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:testWbCommissionCalculatorEmitsPositiveAmount\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:testWbCommissionCalculatorEmitsPositiveAmount\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbCostRowFormatsProvider\(\) return type has no value type specified in iterable type iterable\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbCostRowFormatsProvider\(\) return type has no value type specified in iterable type iterable\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbLogisticsCorrectionRowFormatsProvider\(\) return type has no value type specified in iterable type iterable\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbLogisticsCorrectionRowFormatsProvider\(\) return type has no value type specified in iterable type iterable\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbLogisticsCorrectionSnakeCaseRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessorTest\:\:wbLogisticsCorrectionSnakeCaseRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Offset ''category_name'' does not exist on array\{category_code\: ''logistics_correction'', amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Offset ''category_name'' does not exist on array\{category_code\: ''wb_dobrovolnaya…'', amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Offset ''category_name'' does not exist on array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 2
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Offset ''operation_type'' might not exist on array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\.$#'
 			identifier: offsetAccess.notFound
 			count: 5
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
 			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbCostsRawProcessorTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessorTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbReturnsRawProcessorRefundAmountTest\:\:runProcessorWithRow\(\) should return array\{returns\: list\<App\\Marketplace\\Entity\\MarketplaceReturn\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<list\<string\>\>\} but returns array\{returns\: list\<App\\Marketplace\\Entity\\MarketplaceReturn\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<array\>\}\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbReturnsRawProcessorRefundAmountTest\:\:runProcessorWithRow\(\) should return array\{returns\: list\<App\\Marketplace\\Entity\\MarketplaceReturn\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<list\<string\>\>\} but returns array\{returns\: list\<App\\Marketplace\\Entity\\MarketplaceReturn\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<array\>\}\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbReturnsRawProcessorRefundAmountTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbReturnsRawProcessorRefundAmountTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Processor\\WbSalesRawProcessorRevenueTest\:\:runProcessorWithRow\(\) should return array\{sales\: list\<App\\Marketplace\\Entity\\MarketplaceSale\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<list\<string\>\>\} but returns array\{sales\: list\<App\\Marketplace\\Entity\\MarketplaceSale\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<array\>\}\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\Processor\\WbSalesRawProcessorRevenueTest\:\:runProcessorWithRow\(\) should return array\{sales\: list\<App\\Marketplace\\Entity\\MarketplaceSale\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<list\<string\>\>\} but returns array\{sales\: list\<App\\Marketplace\\Entity\\MarketplaceSale\>, createdListings\: list\<App\\Marketplace\\Entity\\MarketplaceListing\>, nmIdsCalls\: list\<array\>\}\.$#'
 			identifier: return.type
 			count: 1
-			path: tests/Unit/Marketplace/Application/Processor/WbSalesRawProcessorRevenueTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Processor/WbSalesRawProcessorRevenueTest.php
 
 		-
 			message: '#^Method App\\Shared\\Service\\Storage\\ObjectStorageInterface@anonymous/tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest\.php\:65\:\:readStream\(\) should return resource but returns resource\|false\.$#'
@@ -13561,40 +13561,40 @@ parameters:
 			path: tests/Unit/Marketplace/Application/Reconciliation/OzonReportParserFacadeStorageTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of callable App\\Marketplace\\Application\\RefreshWbListingCatalogAction expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of callable App\\Marketplace\\Wildberries\\Application\\Action\\RefreshWbListingCatalogAction expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Unit/Marketplace/Application/RefreshWbListingCatalogActionTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Action/RefreshWbListingCatalogActionTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertNotNull\(\) with null will always evaluate to false\.$#'
 			identifier: staticMethod.impossibleType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Service/WbFinanceRateLimiterTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/Service/WbFinanceRateLimiterTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Application\\Service\\WbFinancialReportReconciliationServiceTest\:\:buildCompanyAndConnection\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportReconciliationServiceTest\:\:buildCompanyAndConnection\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Application/Service/WbFinancialReportReconciliationServiceTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportReconciliationServiceTest.php
 
 		-
 			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
 			identifier: return.unusedType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Service/WbFinancialReportSyncPlannerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlannerTest.php
 
 		-
-			message: '#^Property App\\Tests\\Unit\\Marketplace\\Application\\Service\\WbFinancialReportSyncPlannerTest\:\:\$connections has unresolvable native type\.$#'
+			message: '#^Property App\\Tests\\Unit\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportSyncPlannerTest\:\:\$connections has unresolvable native type\.$#'
 			identifier: property.unresolvableNativeType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Service/WbFinancialReportSyncPlannerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlannerTest.php
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: tests/Unit/Marketplace/Application/Service/WbFinancialReportSyncPlannerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlannerTest.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$companyId\.$#'
@@ -13633,52 +13633,52 @@ parameters:
 			path: tests/Unit/Marketplace/Command/ReprocessMarketplaceCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Command\\DiagnosticsRedisFake\:\:scan\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Command\\DiagnosticsRedisFake\:\:scan\(\) has parameter \$options with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinanceDiagnosticsCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommandTest.php
 
 		-
 			message: '#^Cannot call method getDisplay\(\) on Symfony\\Component\\Console\\Tester\\CommandTester\|null\.$#'
 			identifier: method.nonObject
 			count: 5
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsOrchestrateCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsOrchestrateCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:execute\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:execute\(\) has parameter \$input with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsOrchestrateCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsOrchestrateCommandTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:execute\(\) never assigns null to &\$tester so it can be removed from the by\-ref type\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:execute\(\) never assigns null to &\$tester so it can be removed from the by\-ref type\.$#'
 			identifier: parameterByRef.unusedType
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsOrchestrateCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsOrchestrateCommandTest.php
 
 		-
-			message: '#^Property App\\Tests\\Unit\\Marketplace\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:\$connections has unresolvable native type\.$#'
+			message: '#^Property App\\Tests\\Unit\\Marketplace\\Wildberries\\Command\\WbFinancialReportsOrchestrateCommandTest\:\:\$connections has unresolvable native type\.$#'
 			identifier: property.unresolvableNativeType
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsOrchestrateCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsOrchestrateCommandTest.php
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsOrchestrateCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsOrchestrateCommandTest.php
 
 		-
 			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 3
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsSyncCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsSyncCommandTest.php
 
 		-
 			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringNotContainsString\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Command/WbFinancialReportsSyncCommandTest.php
+			path: tests/Unit/Marketplace/Wildberries/Command/WbFinancialReportsSyncCommandTest.php
 
 		-
 			message: '#^Method App\\Tests\\Unit\\Marketplace\\Config\\DefaultMappingConfigTest\:\:rulesFor\(\) should return list\<App\\Marketplace\\Application\\DTO\\DefaultCostMappingRule\> but returns array\<App\\Marketplace\\Application\\DTO\\DefaultCostMappingRule\>\.$#'
@@ -13756,49 +13756,49 @@ parameters:
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClientTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClientTest.php
 
 		-
 			message: '#^Parameter \#2 \$array of static method PHPUnit\\Framework\\Assert\:\:assertArrayNotHasKey\(\) expects array\<mixed\>\|ArrayAccess\<\(int\|string\), mixed\>, array\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClientTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClientTest.php
 
 		-
 			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringNotContainsString\(\) expects string, array\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClientTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClientTest.php
 
 		-
 			message: '#^Parameter \#2 \$string of static method PHPUnit\\Framework\\Assert\:\:assertStringEndsWith\(\) expects string, array\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Api/Wildberries/WbFinanceSalesReportClientTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClientTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Wildberries\\WbSalesReportRowNormalizerTest\:\:newReturnRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:newReturnRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Wildberries/WbSalesReportRowNormalizerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Wildberries\\WbSalesReportRowNormalizerTest\:\:newSaleRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:newSaleRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Wildberries/WbSalesReportRowNormalizerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Wildberries\\WbSalesReportRowNormalizerTest\:\:oldReturnRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:oldReturnRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Wildberries/WbSalesReportRowNormalizerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Infrastructure\\Wildberries\\WbSalesReportRowNormalizerTest\:\:oldSaleRow\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:oldSaleRow\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Infrastructure/Wildberries/WbSalesReportRowNormalizerTest.php
+			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
 
 		-
 			message: '#^Call to function property_exists\(\) with App\\Marketplace\\Message\\SyncWbFinancialReportDayMessage and ''apiKey'' will always evaluate to false\.$#'
@@ -13867,28 +13867,28 @@ parameters:
 			path: tests/Unit/Marketplace/MessageHandler/TriggerInitialSyncHandlerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Service\\CostCalculator\\CollectingLogger\:\:log\(\) has parameter \$message with no type specified\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\CostCalculator\\CollectingLogger\:\:log\(\) has parameter \$message with no type specified\.$#'
 			identifier: missingType.parameter
 			count: 1
-			path: tests/Unit/Marketplace/Service/CostCalculator/WbCostExternalIdBuilderTest.php
+			path: tests/Unit/Marketplace/Wildberries/CostCalculator/WbCostExternalIdBuilderTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Service\\CostCalculator\\WbCostExternalIdBuilderTest\:\:saleItem\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\CostCalculator\\WbCostExternalIdBuilderTest\:\:saleItem\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Service/CostCalculator/WbCostExternalIdBuilderTest.php
+			path: tests/Unit/Marketplace/Wildberries/CostCalculator/WbCostExternalIdBuilderTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Service\\CostCalculator\\WbCostExternalIdBuilderTest\:\:saleItem\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\CostCalculator\\WbCostExternalIdBuilderTest\:\:saleItem\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Service/CostCalculator/WbCostExternalIdBuilderTest.php
+			path: tests/Unit/Marketplace/Wildberries/CostCalculator/WbCostExternalIdBuilderTest.php
 
 		-
-			message: '#^Property App\\Tests\\Unit\\Marketplace\\Service\\CostCalculator\\CollectingLogger\:\:\$warnings type has no value type specified in iterable type array\.$#'
+			message: '#^Property App\\Tests\\Unit\\Marketplace\\Wildberries\\CostCalculator\\CollectingLogger\:\:\$warnings type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: tests/Unit/Marketplace/Service/CostCalculator/WbCostExternalIdBuilderTest.php
+			path: tests/Unit/Marketplace/Wildberries/CostCalculator/WbCostExternalIdBuilderTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''DateTimeImmutable'' and DateTimeImmutable will always evaluate to true\.$#'

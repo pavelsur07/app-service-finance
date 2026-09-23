@@ -1,0 +1,184 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Application\Processor;
+
+use App\Company\Entity\Company;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
+use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceRawFormat;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Repository\MarketplaceReturnRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
+use App\Marketplace\Wildberries\Application\Action\ProcessWbReturnsAction;
+use App\Marketplace\Wildberries\Application\Service\WbListingResolverService;
+use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
+
+final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
+{
+    public function __construct(
+        private readonly ProcessWbReturnsAction $action,
+        private readonly EntityManagerInterface $em,
+        private readonly MarketplaceReturnRepository $returnRepository,
+        private readonly MarketplaceSaleRepository $saleRepository,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceCostPriceResolver $costPriceResolver,
+        private readonly WbSalesReportRowNormalizer $normalizer,
+        private readonly LoggerInterface $logger,
+    ) {
+    }
+
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
+    {
+        if ($type instanceof StagingRecordType) {
+            return StagingRecordType::RETURN === $type
+                && MarketplaceType::WILDBERRIES === $marketplace;
+        }
+
+        return $type === MarketplaceType::WILDBERRIES->value && 'returns' === $kind;
+    }
+
+    public function process(string $companyId, string $rawDocId): int
+    {
+        return ($this->action)($companyId, $rawDocId);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rawRows
+     */
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
+        if (empty($rawRows)) {
+            return;
+        }
+
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: '.$companyId);
+        }
+
+        $returnsData = array_filter($rawRows, function (array $item): bool {
+            return $this->normalizer->isReturn($item)
+                && $this->normalizer->quantity($item) > 0
+                && $this->normalizer->retailPriceWithDisc($item) > 0;
+        });
+
+        if (empty($returnsData)) {
+            return;
+        }
+
+        $this->barcodeCatalog->fillFromWbRows($companyId, array_values($returnsData));
+
+        $allNmIds = array_values(array_unique(array_map(
+            fn (array $item): string => $this->normalizer->nmId($item),
+            $returnsData,
+        )));
+        $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $allNmIds,
+        );
+
+        $newListings = 0;
+        foreach ($returnsData as $item) {
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId.'_'.$size;
+
+            if (isset($listingsCache[$cacheKey])) {
+                continue;
+            }
+
+            $barcode = (string) ($this->normalizer->barcode($item) ?? '');
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name' => $this->normalizer->vendorCode($item),
+                'brand_name' => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
+            ], $barcode);
+            $listingsCache[$cacheKey] = $listing;
+            ++$newListings;
+        }
+
+        if ($newListings > 0) {
+            $this->em->flush();
+            // Баркоды вставляются после flush, чтобы FK на листинг был уже в БД
+            $this->listingResolver->flushBarcodes();
+        }
+
+        $allSrids = array_values(array_filter(array_map(fn (array $item): ?string => $this->normalizer->srid($item), $returnsData)));
+        $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
+        $salesBySrid = $this->saleRepository->findByMarketplaceOrdersIndexed(
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $allSrids,
+        );
+
+        foreach ($returnsData as $item) {
+            $srid = (string) ($this->normalizer->srid($item) ?? '');
+            if ('' === $srid || isset($existingMap[$srid])) {
+                continue;
+            }
+
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
+            $size = '' !== trim((string) $tsName) ? trim((string) $tsName) : 'UNKNOWN';
+            $listing = $listingsCache[$nmId.'_'.$size] ?? null;
+
+            if (!$listing) {
+                $this->logger->warning('[WB] processBatch returns: listing not found', ['nm_id' => $nmId]);
+                continue;
+            }
+
+            // Связанная продажа по srid (предзагружена батчем выше) — для себестоимости
+            $sale = $salesBySrid[$srid] ?? null;
+
+            $return = new MarketplaceReturn(
+                Uuid::uuid4()->toString(),
+                $company,
+                $listing,
+                MarketplaceType::WILDBERRIES,
+            );
+
+            $return->setExternalReturnId($srid);
+            $return->setReturnDate($this->normalizer->reportDate($item));
+            $return->setQuantity(abs($this->normalizer->quantity($item)));
+            $return->setRefundAmount((string) $this->normalizer->retailPriceWithDisc($item));
+            $return->setReturnReason($this->normalizer->sellerOperName($item));
+            $return->setCostPrice($this->costPriceResolver->resolveForReturn(
+                $listing,
+                $sale,
+                $item,
+                $this->normalizer->reportDate($item),
+            ));
+            $return->setRawData($item);
+            if (null !== $rawDocId) {
+                $return->setRawDocumentId($rawDocId);
+            }
+
+            if (null !== $sale) {
+                $return->setSale($sale);
+            }
+
+            $this->em->persist($return);
+            $existingMap[$srid] = true;
+        }
+
+        $this->em->flush();
+    }
+}

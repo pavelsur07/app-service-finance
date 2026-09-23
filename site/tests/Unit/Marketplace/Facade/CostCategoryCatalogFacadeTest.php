@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Facade;
 
 use App\Marketplace\Domain\OzonCostCategory;
-use App\Marketplace\Domain\WbCostCategory;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
+use App\Marketplace\Wildberries\Domain\WbCostCategory;
 use PHPUnit\Framework\TestCase;
 
 final class CostCategoryCatalogFacadeTest extends TestCase
