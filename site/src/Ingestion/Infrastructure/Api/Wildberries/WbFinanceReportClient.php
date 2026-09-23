@@ -8,7 +8,7 @@ use App\Ingestion\Exception\ConnectorAuthException;
 use App\Ingestion\Exception\ConnectorRateLimitedException;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Exception\CredentialNotFoundException;
-use App\Marketplace\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Facade\WbFinanceThrottleFacade;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -26,7 +26,7 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
     public function __construct(
         private HttpClientInterface $httpClient,
         private WbCredentialProviderInterface $credentialProvider,
-        private WbFinanceRateLimiter $rateLimiter,
+        private WbFinanceThrottleFacade $throttle,
         private ClockInterface $clock,
         private LoggerInterface $logger,
     ) {
@@ -124,20 +124,17 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
 
     private function consumeRateLimit(string $connectionRef): void
     {
-        $sellerBucketId = $this->sellerBucketId($connectionRef);
-        $cooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil($sellerBucketId);
-        if (null !== $cooldownUntil) {
-            throw new ConnectorRateLimitedException('WB finance report shared cooldown is active.', $this->rateLimiter->secondsUntil($cooldownUntil));
-        }
-
-        $retryAfter = $this->rateLimiter->tryConsume(
-            $this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId),
-        );
-        if (null === $retryAfter) {
+        $denied = $this->throttle->reserveSalesReportsSlot($this->sellerBucketId($connectionRef));
+        if (null === $denied) {
             return;
         }
 
-        throw new ConnectorRateLimitedException('WB finance report local rate limit is active.', $this->rateLimiter->secondsUntil($retryAfter));
+        throw new ConnectorRateLimitedException(
+            $denied->sharedCooldown
+                ? 'WB finance report shared cooldown is active.'
+                : 'WB finance report local rate limit is active.',
+            $denied->waitSeconds,
+        );
     }
 
     /**
@@ -169,12 +166,13 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
         }
 
         if (429 === $statusCode) {
-            $retryAfterSeconds = $this->retryAfterSeconds($headers);
-            $sellerBucketId = $this->sellerBucketId($connectionRef);
-            $cooldownUntil = $this->rateLimiter->cooldownUntilAfterRemote429($retryAfterSeconds, self::DEFAULT_RETRY_AFTER_SECONDS);
-            $this->rateLimiter->setSalesReportsCooldownUntil($sellerBucketId, $cooldownUntil);
+            $waitSeconds = $this->throttle->registerSalesReportsRemote429(
+                $this->sellerBucketId($connectionRef),
+                $this->retryAfterSeconds($headers),
+                self::DEFAULT_RETRY_AFTER_SECONDS,
+            );
 
-            throw new ConnectorRateLimitedException('WB finance API remote rate limit is active.', $this->rateLimiter->secondsUntil($cooldownUntil));
+            throw new ConnectorRateLimitedException('WB finance API remote rate limit is active.', $waitSeconds);
         }
 
         if ($statusCode >= 500) {

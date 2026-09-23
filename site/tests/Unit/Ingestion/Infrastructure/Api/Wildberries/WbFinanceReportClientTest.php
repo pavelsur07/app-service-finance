@@ -10,6 +10,7 @@ use App\Ingestion\Infrastructure\Api\Wildberries\WbCredentialProviderInterface;
 use App\Ingestion\Infrastructure\Api\Wildberries\WbFinanceReportClient;
 use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Facade\WbFinanceThrottleFacade;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
@@ -115,6 +116,7 @@ final class WbFinanceReportClientTest extends TestCase
             );
             self::fail('Expected rate limit exception.');
         } catch (ConnectorRateLimitedException $exception) {
+            self::assertSame('WB finance API remote rate limit is active.', $exception->getMessage());
             self::assertSame(12, $exception->retryAfterSeconds());
             self::assertSame(
                 $clock->now()->modify('+12 seconds')->getTimestamp(),
@@ -136,6 +138,7 @@ final class WbFinanceReportClientTest extends TestCase
         });
 
         $this->expectException(ConnectorRateLimitedException::class);
+        $this->expectExceptionMessage('WB finance report shared cooldown is active.');
         try {
             $this->client($http, $storage, $clock)->fetchDetailedDayPage(
                 '0192f0c2-0000-7000-8000-000000000001',
@@ -166,6 +169,7 @@ final class WbFinanceReportClientTest extends TestCase
         );
 
         $this->expectException(ConnectorRateLimitedException::class);
+        $this->expectExceptionMessage('WB finance report local rate limit is active.');
         try {
             $client->fetchDetailedDayPage(
                 '0192f0c2-0000-7000-8000-000000000001',
@@ -193,7 +197,7 @@ final class WbFinanceReportClientTest extends TestCase
                     return ['api_key' => 'wb-token'];
                 }
             },
-            new WbFinanceRateLimiter(new RateLimiterFactory(
+            new WbFinanceThrottleFacade(new WbFinanceRateLimiter(new RateLimiterFactory(
                 [
                     'id' => 'wb_finance',
                     'policy' => 'fixed_window',
@@ -201,7 +205,7 @@ final class WbFinanceReportClientTest extends TestCase
                     'interval' => '70 seconds',
                 ],
                 new InMemoryStorage(),
-            ), $clock, null, $cooldownStorage),
+            ), $clock, null, $cooldownStorage)),
             $clock,
             new NullLogger(),
         );
