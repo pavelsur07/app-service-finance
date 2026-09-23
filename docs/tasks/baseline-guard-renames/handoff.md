@@ -1,6 +1,6 @@
 # baseline-guard-renames — handoff
 
-**Branch:** `chore/baseline-guard-renames` · **PR:** см. PR · **CI:** см. PR
+**Branch:** `chore/baseline-guard-renames` · **PR:** https://github.com/pavelsur07/app-service-finance/pull/2509 · **CI:** см. PR
 
 ## Summary
 - CI-гейт роста baseline учитывает переименования: база переписывается по карте `git diff -M`,
@@ -26,3 +26,7 @@
 ## Risks, follow-ups
 - Ложный красный возможен, если перенесённый файл объявляет класс с именем, уже
   встречающимся в базе под старым namespace, — безопасная сторона; выход — `[baseline-grow]`.
+
+## Owner decision
+Ready: PR #2509 "chore(ci): baseline-guard учитывает переименования файлов" — изменение CI-гейта (AGENTS.md §3.3) и merge into master with automatic production deploy?
+Reply: "merge and deploy #2509, включая изменение CI-гейта"
