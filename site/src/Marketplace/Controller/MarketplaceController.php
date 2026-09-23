@@ -20,6 +20,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\OzonPerformanceValidationException;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
@@ -257,7 +258,17 @@ class MarketplaceController extends AbstractController
                     $this->connectionApiKeyCodec->apiKeyFor($connection),
                 );
                 $success = true;
+            } catch (OzonPerformanceValidationException $e) {
+                $success = false;
+                $error = $e->getMessage();
             } catch (\Exception $e) {
+                // Не ответ API, а сбой у нас (например, ключ не расшифровывается):
+                // пользователю — флеш, в лог — предупреждение с причиной.
+                $this->appLogger->warning('[ConnectionTest] Ozon Performance check failed before API response', [
+                    'company_id' => (string) $company->getId(),
+                    'connection_id' => $connection->getId(),
+                    'exception_class' => $e::class,
+                ]);
                 $success = false;
                 $error = $e->getMessage();
             }
