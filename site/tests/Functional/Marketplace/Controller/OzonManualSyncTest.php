@@ -14,6 +14,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
@@ -50,7 +51,7 @@ final class OzonManualSyncTest extends WebTestCaseBase
         }
         self::assertSame(['2026-09-10', '2026-09-09', '2026-09-08'], $dates);
 
-        $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('success');
+        $flashes = $this->flashes($client, 'success');
         self::assertCount(1, $flashes);
         self::assertStringContainsString('Запланировано 3 задач загрузки начислений Ozon за 08.09.2026 — 10.09.2026.', $flashes[0]);
         self::assertStringContainsString('Дни до 08.09.2026 уже загружены из прежнего источника.', $flashes[0]);
@@ -77,7 +78,7 @@ final class OzonManualSyncTest extends WebTestCaseBase
         self::assertCount(0, $transport->getSent());
         self::assertSame(
             ['Дата начала должна быть меньше или равна дате окончания'],
-            $client->getRequest()->getSession()->getFlashBag()->peek('error'),
+            $this->flashes($client, 'error'),
         );
     }
 
@@ -102,8 +103,19 @@ final class OzonManualSyncTest extends WebTestCaseBase
         self::assertCount(0, $transport->getSent());
         self::assertSame(
             ['Новых задач нет: дни до 08.09.2026 уже загружены из прежнего источника.'],
-            $client->getRequest()->getSession()->getFlashBag()->peek('success'),
+            $this->flashes($client, 'success'),
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function flashes(KernelBrowser $client, string $type): array
+    {
+        $session = $client->getRequest()->getSession();
+        self::assertInstanceOf(FlashBagAwareSessionInterface::class, $session);
+
+        return array_values(array_map('strval', $session->getFlashBag()->peek($type)));
     }
 
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
