@@ -20,7 +20,6 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\OzonPerformanceValidationException;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonCredentialValidationStatus;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonSellerCredentialValidatorInterface;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
@@ -258,7 +257,7 @@ class MarketplaceController extends AbstractController
                     $this->connectionApiKeyCodec->apiKeyFor($connection),
                 );
                 $success = true;
-            } catch (OzonPerformanceValidationException $e) {
+            } catch (\Exception $e) {
                 $success = false;
                 $error = $e->getMessage();
             }
@@ -358,6 +357,12 @@ class MarketplaceController extends AbstractController
             $toDate = new \DateTimeImmutable($dateToStr.' 23:59:59');
         } catch (\Exception) {
             $this->addFlash('error', 'Неверный формат дат');
+
+            return $this->redirectToRoute('marketplace_connections_index');
+        }
+
+        if ($fromDate > $toDate) {
+            $this->addFlash('error', 'Дата начала должна быть меньше или равна дате окончания');
 
             return $this->redirectToRoute('marketplace_connections_index');
         }
@@ -904,12 +909,6 @@ class MarketplaceController extends AbstractController
         return $date;
     }
 
-    /**
-     * Кнопку в разметке мало: страница могла быть открыта до того, как ключ
-     * отвергли, и её CSRF-токен всё ещё действителен. Запрет обязан жить на
-     * сервере, иначе ручной запуск по мёртвому ключу продолжает порождать
-     * заведомо падающие задания.
-     */
     private function manualSyncScheduledMessage(
         MarketplaceConnection $connection,
         SyncConnectionResult $result,
@@ -930,10 +929,12 @@ class MarketplaceController extends AbstractController
         }
 
         if (null === $result->firstDay || null === $result->lastDay) {
-            return sprintf(
-                'Новых задач нет: начисления Ozon загружаются по вчерашний день, а дни до %s уже загружены из прежнего источника.',
-                (new \DateTimeImmutable(OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY))->format('d.m.Y'),
-            );
+            return $result->clampedToSafeDay
+                ? sprintf(
+                    'Новых задач нет: дни до %s уже загружены из прежнего источника.',
+                    (new \DateTimeImmutable(OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY))->format('d.m.Y'),
+                )
+                : 'Новых задач нет: начисления Ozon загружаются по вчерашний день включительно.';
         }
 
         $message = sprintf(
@@ -953,6 +954,12 @@ class MarketplaceController extends AbstractController
         return $message;
     }
 
+    /**
+     * Кнопку в разметке мало: страница могла быть открыта до того, как ключ
+     * отвергли, и её CSRF-токен всё ещё действителен. Запрет обязан жить на
+     * сервере, иначе ручной запуск по мёртвому ключу продолжает порождать
+     * заведомо падающие задания.
+     */
     private function canRunManualSync(MarketplaceConnection $connection): bool
     {
         return $connection->isActive() && !$connection->getAuthStatus()->isFailed();

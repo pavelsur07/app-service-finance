@@ -55,29 +55,6 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Idempotency lookup for daily sync: возвращает существующий raw_document
-     * за конкретный день (periodFrom=periodTo), у которого processingStatus
-     * НЕ равен FAILED (т.е. null / PENDING / RUNNING / COMPLETED).
-     *
-     * Используется SyncOzonReportHandler'ом для поиска существующего документа
-     * за день: для refresh при повторной загрузке и для idempotency-контроля.
-     * FAILED документы в выборку не попадают, чтобы retry мог создать новый.
-     */
-    public function findExistingDayDocument(
-        Company $company,
-        MarketplaceType $marketplace,
-        string $documentType,
-        \DateTimeImmutable $day,
-    ): ?MarketplaceRawDocument {
-        return $this->findActiveExactDayDocuments(
-            $company,
-            $marketplace,
-            $documentType,
-            $day,
-        )[0] ?? null;
-    }
-
-    /**
      * Deterministic lookup for refresh/idempotency by exact period + api endpoint.
      * Excludes FAILED documents and returns newest first.
      *
@@ -131,37 +108,6 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             $periodFrom,
             $periodTo,
         )[0] ?? null;
-    }
-
-    /**
-     * Idempotency lookup for initial sync weekly/month-split batches.
-     */
-    public function findExistingInitialSyncDocument(
-        Company $company,
-        MarketplaceType $marketplace,
-        string $documentType,
-        \DateTimeImmutable $periodFrom,
-        \DateTimeImmutable $periodTo,
-        string $apiEndpoint,
-    ): ?MarketplaceRawDocument {
-        return $this->createQueryBuilder('d')
-            ->where('d.company = :company')
-            ->andWhere('d.marketplace = :marketplace')
-            ->andWhere('d.documentType = :documentType')
-            ->andWhere('d.periodFrom = :periodFrom')
-            ->andWhere('d.periodTo = :periodTo')
-            ->andWhere('d.apiEndpoint = :apiEndpoint')
-            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
-            ->setParameter('company', $company)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('documentType', $documentType)
-            ->setParameter('periodFrom', $periodFrom)
-            ->setParameter('periodTo', $periodTo)
-            ->setParameter('apiEndpoint', $apiEndpoint)
-            ->setParameter('failed', PipelineStatus::FAILED)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
     }
 
     public function findMinPeriodFromForSuccessfulDocuments(

@@ -62,20 +62,6 @@
 # Соседи по суткам: 03:00 ingestion run-incremental, 03:10 WB financial daily.
 40 3 * * * cd /app && php bin/console app:marketplace:ozon-listing-catalog:sync --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# Ночная синхронизация отчётов Ozon по реализации.
-#
-# ОТКЛЮЧЕНО 09.09.2026. Ozon снял POST /v3/finance/transaction/list — единственный
-# источник этой команды. Ответ: HTTP 400 {"code":9,"message":"obsolete method
-# cannot be used"}. Последний успешный прогон — 08.09.2026 04:00.
-#
-# Оставлять включённой нельзя: каждая ночь клала 56 сообщений (4 подключения x
-# 14 дней) в failed-транспорт, и это уже не сигнал, а шум — причина известна и
-# ремонтом не лечится, пока не переписан адаптер.
-#
-# Включить обратно после Stage 4 задачи ozon-accrual-adapter, когда загрузка
-# поедет на /v1/finance/accrual/by-day. Разбор — docs/tasks/ozon-accrual-adapter/plan.md.
-#0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
-
 # Замена: загрузка финансовых отчётов Ozon через /v1/finance/accrual/by-day.
 #
 # Окно 2 дня, а не 14, как у снятой команды. Причина не в экономии запросов:
@@ -188,7 +174,7 @@
 
 # Ежедневная пересборка предварительного («оперативного») закрытия
 # текущего открытого месяца для всех активных SELLER-подключений.
-# Запуск после ozon-daily-sync (04:00) и marketplace-ads:daily-sync (04:30),
+# Запуск после ozon-financial-reports:sync (04:00) и marketplace-ads:daily-sync (04:30),
 # чтобы свежие сырые данные за вчера к этому моменту были загружены.
 45 4 * * * php bin/console app:marketplace:month-preliminary-rebuild --no-interaction --quiet
 

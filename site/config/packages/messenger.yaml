@@ -61,13 +61,11 @@ framework:
         routing:
             # --- async_sync: external marketplace/bank HTTP fetches ---
             'App\Marketplace\Message\SyncWbFinancialReportDayMessage': async_wb_finance
-            'App\Marketplace\Message\SyncOzonReportMessage': async_sync
             'App\Marketplace\Message\SyncOzonAccrualByDayMessage': async_sync
             'App\Marketplace\Message\SyncOzonRealizationMessage': async_sync
             'App\Marketplace\Message\SyncOzonListingBarcodesMessage': async_sync
             # Каталог Ozon: внешние HTTP-запросы к Seller API -> async_sync.
             'App\Marketplace\Message\SyncOzonListingCatalogMessage': async_sync
-            'App\Marketplace\Message\InitialSyncMessage': async_sync
             'App\Marketplace\Message\TriggerInitialSyncMessage': async_sync
             'App\Cash\Message\Import\BankImportMessage': async_sync
             'App\Cash\Message\Import\CashFileImportMessage': async_sync

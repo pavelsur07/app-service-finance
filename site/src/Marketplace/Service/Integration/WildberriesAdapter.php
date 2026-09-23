@@ -18,7 +18,7 @@ use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class WildberriesAdapter implements MarketplaceAdapterInterface
+class WildberriesAdapter
 {
     public const FINANCE_API_ENDPOINT = 'wildberries::finance-sales-reports-detailed';
 
@@ -96,6 +96,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
      *
      * @deprecated
+     *
+     * @return SaleData[]
      */
     public function fetchSales(
         Company $company,
@@ -141,6 +143,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
      *
      * @deprecated
+     *
+     * @return CostData[]
      */
     public function fetchCosts(
         Company $company,
@@ -294,6 +298,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
      *
      * @deprecated
+     *
+     * @return ReturnData[]
      */
     public function fetchReturns(
         Company $company,
