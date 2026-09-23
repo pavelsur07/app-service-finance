@@ -788,6 +788,10 @@ activeSellerConnectionsPage(int $limit, ?string $afterConnectionRef = null): lis
 // Сущность наружу не отдаётся. null — сверки за период нет.
 findLatestOzonTotalsCheck(string $companyId, DateTimeImmutable $periodFrom, DateTimeImmutable $periodTo): ?OzonTotalsCheckDTO
 // OzonTotalsCheckDTO (Application/DTO): ozonTotals (array, ключ total_minor), checkedAt
+
+// Переобработать затраты сохранённого raw-документа (kind = costs); возвращает число строк.
+// Потребители внутри модуля: ReprocessMarketplaceCostsCommand, ReprocessCostsMessageHandler.
+processCostsFromRaw(string $companyId, string $rawDocId): int
 ```
 
 Два метода, а не один с nullable-параметром: межкомпанейский проход нельзя
@@ -795,6 +799,12 @@ findLatestOzonTotalsCheck(string $companyId, DateTimeImmutable $periodFrom, Date
 явного лимита и несёт документированный `@companyScopeExempt`. Курсор keyset, а
 не OFFSET: подключение, добавленное или отключённое между страницами, сдвинуло
 бы OFFSET, и одно подключение обработалось бы дважды, а другое — ни разу.
+
+Легаси `marketplace:sync` и `syncSales/syncCosts/syncReturns` удалены 23.09.2026
+(`docs/tasks/marketplace-legacy-sync-removal/`): WB-путь был fail-fast заглушкой,
+Ozon-путь ходил через `FetchMarketplaceDataCommand` на `/v2/finance/transaction/list`.
+Живые пути — `app:marketplace:wb-financial-reports:{sync,orchestrate}`,
+`app:marketplace:ozon-financial-reports:sync` и Ingestion accrual.
 
 ### `CompanyFacade` (`src/Company/Facade/CompanyFacade.php`)
 ```php

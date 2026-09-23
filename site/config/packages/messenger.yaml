@@ -69,7 +69,6 @@ framework:
             'App\Marketplace\Message\SyncOzonListingCatalogMessage': async_sync
             'App\Marketplace\Message\InitialSyncMessage': async_sync
             'App\Marketplace\Message\TriggerInitialSyncMessage': async_sync
-            'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async_sync
             'App\Cash\Message\Import\BankImportMessage': async_sync
             'App\Cash\Message\Import\CashFileImportMessage': async_sync
             'App\Company\Message\SendRegistrationEmailMessage': async_sync

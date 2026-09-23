@@ -4555,18 +4555,6 @@ parameters:
 			path: src/Marketplace/Application/DTO/PreflightResult.php
 
 		-
-			message: '#^Call to an undefined method App\\Marketplace\\Repository\\MarketplaceRawDocumentRepository\:\:save\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Application/FetchMarketplaceDataAction.php
-
-		-
-			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceRawDocument constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Application/FetchMarketplaceDataAction.php
-
-		-
 			message: '#^Method App\\Marketplace\\Application\\LoadMutualSettlementAction\:\:__invoke\(\) should return array\{rawDocumentId\: string, recordsCount\: int, responseSize\: int\} but returns array\.$#'
 			identifier: return.type
 			count: 1
@@ -5141,18 +5129,6 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: src/Marketplace/Command/MarketplaceNightlySyncCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Command/MarketplaceSyncCommand.php
-
-		-
-			message: '#^Method App\\Marketplace\\Command\\MarketplaceSyncCommand\:\:getAllCompaniesWithConnection\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Command/MarketplaceSyncCommand.php
 
 		-
 			message: '#^Method App\\Marketplace\\Command\\OzonMonthRawRefreshCommand\:\:renderPlanTable\(\) has parameter \$plan with no value type specified in iterable type array\.$#'
@@ -6289,18 +6265,6 @@ parameters:
 			path: src/Marketplace/Facade/MarketplaceListingLinkingFacade.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Contract\\MarketplaceFetcherInterface\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Infrastructure/Api/Contract/MarketplaceFetcherInterface.php
-
-		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonFetcher\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Infrastructure/Api/Ozon/OzonFetcher.php
-
-		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Ozon\\OzonMutualSettlementClient\:\:countRecords\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -6323,12 +6287,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/Infrastructure/Api/Ozon/OzonMutualSettlementClient.php
-
-		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Api\\Wildberries\\WbFetcher\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Infrastructure/Api/Wildberries/WbFetcher.php
 
 		-
 			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
