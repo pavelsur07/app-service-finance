@@ -583,6 +583,32 @@ final class VerificationQueriesTest extends IntegrationTestCase
         );
     }
 
+    public function testReconciliationIgnoresOzonControlOfAnotherCompany(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $foreignCompanyId = Uuid::uuid7()->toString();
+
+        $this->em->persist($this->transaction($companyId, Uuid::uuid7()->toString(), 'sale-1', 1000, TransactionType::SALE));
+
+        $foreignCheck = new OzonTransactionTotalsCheck(
+            companyId: $foreignCompanyId,
+            rawDocumentId: Uuid::uuid7()->toString(),
+            periodFrom: new \DateTimeImmutable('2026-06-01'),
+            periodTo: new \DateTimeImmutable('2026-06-30'),
+        );
+        $foreignCheck->markOk([], ['total_minor' => 750], []);
+        $this->em->persist($foreignCheck);
+        $this->em->flush();
+
+        /** @var ReconciliationQuery $query */
+        $query = self::getContainer()->get(ReconciliationQuery::class);
+        $summary = $query->summary($companyId, 'shop-1', 2026, 6);
+
+        self::assertSame(1000, $summary->canonTotalMinor);
+        self::assertNull($summary->ozonControlTotalMinor);
+        self::assertNull($summary->canonVsOzonDeltaMinor);
+    }
+
     public function testIssuesFacadeReturnsOnlyOpenHumanizedItemsWithPagination(): void
     {
         $companyId = Uuid::uuid7()->toString();

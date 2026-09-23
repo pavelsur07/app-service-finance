@@ -9,7 +9,7 @@ use App\Ingestion\Application\DTO\ReconciliationSummaryView;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
-use App\Marketplace\Repository\OzonTransactionTotalsCheckRepository;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Types\Types;
 use Webmozart\Assert\Assert;
@@ -28,7 +28,7 @@ final class ReconciliationQuery
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly OzonTransactionTotalsCheckRepository $totalsCheckRepository,
+        private readonly MarketplaceSyncFacade $marketplaceSyncFacade,
     ) {
     }
 
@@ -69,12 +69,12 @@ final class ReconciliationQuery
         $canonTotalMinor = (int) ($row['canon_total_minor'] ?? 0);
         $currency = (string) ($row['currency'] ?? 'RUB');
 
-        $control = $this->totalsCheckRepository->findLatestByCompanyAndPeriod(
+        $control = $this->marketplaceSyncFacade->findLatestOzonTotalsCheck(
             $companyId,
             $from,
             $toExclusive->modify('-1 day'),
         );
-        $ozonTotalMinor = $this->extractOzonTotalMinor($control?->getOzonTotals());
+        $ozonTotalMinor = $this->extractOzonTotalMinor($control?->ozonTotals);
         $delta = null === $ozonTotalMinor ? null : $canonTotalMinor - $ozonTotalMinor;
 
         return new ReconciliationSummaryView(
@@ -84,7 +84,7 @@ final class ReconciliationQuery
             currency: $currency,
             canonVsOzonDeltaMinor: $delta,
             thresholdMinor: self::THRESHOLD_MINOR,
-            recomputedAt: $this->latestDateTime($row['recomputed_at'] ?? null, $control?->getCheckedAt()),
+            recomputedAt: $this->latestDateTime($row['recomputed_at'] ?? null, $control?->checkedAt),
         );
     }
 
