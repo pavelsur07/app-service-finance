@@ -7603,24 +7603,6 @@ parameters:
 			path: src/Marketplace/Ozon/Infrastructure/Api/OzonRealizationFetcher.php
 
 		-
-			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:fetchRawReport\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
-
-		-
-			message: '#^Property App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:\$httpClient is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
-
-		-
-			message: '#^Property App\\Marketplace\\Wildberries\\Infrastructure\\Api\\WildberriesAdapter\:\:\$logger is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Marketplace/Wildberries/Infrastructure/Api/WildberriesAdapter.php
-
-		-
 			message: '#^Parameter \#2 \$entries of method App\\MarketplaceAds\\Application\\LoadWbAdSpendDayAction\:\:result\(\) expects list\<App\\MarketplaceAds\\Application\\DTO\\AdRawEntry\>, array\<App\\MarketplaceAds\\Application\\DTO\\AdRawEntry\> given\.$#'
 			identifier: argument.type
 			count: 3

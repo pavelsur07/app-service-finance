@@ -12,9 +12,7 @@ use App\Marketplace\Wildberries\Application\Service\WbFinanceCooldownStorageInte
 use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Wildberries\Infrastructure\Api\WbFinanceSalesReportClient;
 use App\Marketplace\Wildberries\Infrastructure\Api\WildberriesAdapter;
-use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -23,54 +21,6 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WildberriesAdapterTest extends TestCase
 {
-    public function testFetchRawReportDelegatesViaFinanceEndpoint(): void
-    {
-        $calls = 0;
-        $capturedUrl = '';
-
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$calls): MockResponse {
-            $capturedUrl = $url;
-            ++$calls;
-
-            return 1 === $calls
-                ? new MockResponse('[{"rrdId":10}]', ['http_code' => 200])
-                : new MockResponse('', ['http_code' => 204]);
-        });
-
-        $adapter = $this->createAdapter($http);
-        $rows = $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
-
-        self::assertSame([['rrdId' => 10]], $rows);
-        self::assertSame('https://finance-api.wildberries.ru/api/finance/v1/sales-reports/detailed', $capturedUrl);
-        self::assertStringNotContainsString('/api/v5/supplier/reportDetailByPeriod', $capturedUrl);
-        self::assertSame(1, $calls);
-    }
-
-    public function testHasRawReportDataUsesFinanceEndpointNotLegacyV5(): void
-    {
-        $capturedUrl = '';
-        $capturedPayload = [];
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedPayload): MockResponse {
-            $capturedUrl = $url;
-            $capturedPayload = $options['json'] ?? [];
-            if ([] === $capturedPayload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $capturedPayload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
-            }
-
-            return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
-        });
-
-        $adapter = $this->createAdapter($http);
-        self::assertTrue($adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
-        self::assertSame('https://finance-api.wildberries.ru/api/finance/v1/sales-reports/detailed', $capturedUrl);
-        self::assertStringNotContainsString('/api/v5/supplier/reportDetailByPeriod', $capturedUrl);
-        self::assertSame(1, $capturedPayload['limit'] ?? null);
-        self::assertSame(0, $capturedPayload['rrdId'] ?? null);
-        self::assertSame('daily', $capturedPayload['period'] ?? null);
-        self::assertSame('2026-01-01', $capturedPayload['dateFrom'] ?? null);
-        self::assertSame('2026-01-02', $capturedPayload['dateTo'] ?? null);
-    }
-
     public function testAuthenticateUsesProbeAccess(): void
     {
         $http = new MockHttpClient(new MockResponse('{"Status":"OK"}', ['http_code' => 200]));
@@ -93,55 +43,12 @@ final class WildberriesAdapterTest extends TestCase
         }
     }
 
-    public function testGetApiEndpointNameReturnsFinanceEndpoint(): void
-    {
-        $adapter = $this->createAdapter(new MockHttpClient(new MockResponse('', ['http_code' => 204])));
-        self::assertSame('wildberries::finance-sales-reports-detailed', $adapter->getApiEndpointName());
-    }
-
-    public function testLegacyFetchSalesUsesRetailAmountAndGrossWithoutSpp(): void
-    {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 123, 'rrd_id' => '123', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 2, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125, 'ppvz_for_pay' => 800, 'acquiring_fee' => 40, 'ppvz_vw' => 100, 'ppvz_vw_nds' => 60]], \JSON_THROW_ON_ERROR);
-        $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
-        $sales = $adapter->fetchSales($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
-        self::assertCount(1, $sales);
-        self::assertSame('9999.00', $sales[0]->totalRevenue);
-        self::assertSame('1125.00', $sales[0]->pricePerUnit);
-    }
-
-    public function testLegacyFetchReturnsUsesRetailPriceWithDiscInsteadOfRetailAmount(): void
-    {
-        $payload = json_encode([['doc_type_name' => 'Возврат', 'rrdId' => 124, 'rrd_id' => '124', 'rr_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], \JSON_THROW_ON_ERROR);
-        $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
-        $returns = $adapter->fetchReturns($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
-        self::assertCount(1, $returns);
-        self::assertSame('1125', $returns[0]->refundAmount);
-    }
-
-    public function testLegacyFetchCostsDoesNotCreateCommissionForReturnBecauseCostDataHasNoStorno(): void
-    {
-        $payload = json_encode([['doc_type_name' => 'Возврат', 'supplier_oper_name' => 'Возврат покупателем', 'rrdId' => 125, 'rrd_id' => '125', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], \JSON_THROW_ON_ERROR);
-        $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
-        self::assertSame([], $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31')));
-    }
-
-    public function testLegacyFetchCostsForSaleUsesCommissionFormulaAndExternalIdByRrdId(): void
-    {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 126, 'rrd_id' => '126', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76, 'ppvz_vw' => 350.00, 'ppvz_vw_nds' => 66.25]], \JSON_THROW_ON_ERROR);
-        $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
-        $costs = $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
-        self::assertCount(1, $costs);
-        self::assertSame('wb_commission', $costs[0]->categoryCode);
-        self::assertSame('416.25', $costs[0]->amount);
-        self::assertSame('wb:126:wb_commission', $costs[0]->externalId);
-    }
-
     private function createAdapter(MockHttpClient $http, ?WbFinanceCooldownStorageInterface $storage = null): WildberriesAdapter
     {
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, $this->createRateLimiter($storage)), new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)));
+        return new WildberriesAdapter($repo, new WbFinanceSalesReportClient($http, $this->createRateLimiter($storage)), new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class), $this->createMock(\App\Shared\Security\Contract\SecretRotationServiceInterface::class)));
     }
 
     private function company(): Company
