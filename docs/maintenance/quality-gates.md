@@ -23,7 +23,10 @@
 
 - `site/tests/Architecture/ModuleBoundaryRules.php` — запрет зависеть от
   `Service/`, `Repository/`, `Application/` (кроме `Application/DTO`) и
-  `Infrastructure/` чужого модуля; легаси-зона держится пустой.
+  `Infrastructure/` чужого модуля; легаси-зона держится пустой. Код провайдеров
+  `App\Marketplace\{Ozon,Wildberries}` закрыт для чужих модулей целиком, а
+  провайдеры не зависят друг от друга; Ingestion не зависит от `App\Finance`,
+  Finance — от сообщений и событий Ingestion.
 - `site/tests/PHPStan/Rules/RepositoryCompanyScopeRule.php` — методы-запросы
   Repository без параметра компании; исключение `@companyScopeExempt <причина>`.
 - `spaze/phpstan-disallowed-calls` — `dump`, `dd`, `var_dump`, `print_r`,

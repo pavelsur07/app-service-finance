@@ -87,6 +87,16 @@ final class ModuleBoundaryRules
     private const OPEN_APPLICATION_SUBLAYER = 'Application\DTO';
 
     /**
+     * Код конкретного маркетплейса внутри Marketplace: провайдер — граница
+     * первого уровня, слои (`Application`, `Domain`, `Infrastructure`…) — внутри
+     * него. Ключ — короткое имя для identifier правила.
+     */
+    private const MARKETPLACE_PROVIDER_NAMESPACES = [
+        'Ozon' => 'App\Marketplace\Ozon',
+        'Wildberries' => 'App\Marketplace\Wildberries',
+    ];
+
+    /**
      * @return iterable<string, Rule>
      */
     public function test_module_internals_are_closed_to_other_modules(): iterable
@@ -119,6 +129,78 @@ final class ModuleBoundaryRules
                     $module,
                     $module,
                     $module,
+                ));
+        }
+    }
+
+    /**
+     * Код провайдеров Marketplace закрыт для остальных модулей целиком.
+     *
+     * Правило выше закрывает только слои модуля (`App\Marketplace\Application`
+     * и т. д.), а код Ozon и WB переезжает в `App\Marketplace\{Ozon,Wildberries}\…`
+     * — под него это правило не попадает. Без отдельного запрета, например,
+     * `Ozon\Domain\OzonCostCategory` снова стал бы доступен Analytics напрямую,
+     * хотя такие обращения только что переведены на фасады
+     * (`docs/tasks/marketplace-provider-facades/`).
+     *
+     * Исключения для `Application\DTO` здесь нет намеренно: типы контракта
+     * фасадов живут в общем `App\Marketplace\Application\DTO`, а не у провайдера.
+     *
+     * На момент добавления оба пространства пусты — гейт зелёный с первого дня
+     * и включается сам, как только туда переезжают файлы. Граница та же, что у
+     * остальных правил: PHPat видит настоящую связь классов, голый `use` —
+     * нет.
+     */
+    public function test_marketplace_provider_code_is_closed_to_other_modules(): Rule
+    {
+        $providers = [];
+        foreach (self::MARKETPLACE_PROVIDER_NAMESPACES as $namespace) {
+            $providers[] = Selector::inNamespace($namespace);
+        }
+
+        return PHPat::rule()
+            ->classes(Selector::AllOf(
+                Selector::inNamespace('App'),
+                Selector::Not(Selector::inNamespace('App\Tests')),
+                Selector::Not(Selector::inNamespace('App\Marketplace')),
+            ))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(Selector::AnyOf(...$providers))
+            ->because(
+                'код провайдеров Marketplace закрыт: снаружи доступны App\Marketplace\Facade '
+                .'и типы его контракта App\Marketplace\Application\DTO',
+            );
+    }
+
+    /**
+     * Провайдеры Marketplace не зависят друг от друга.
+     *
+     * Разделение по провайдеру имеет смысл, пока Ozon и WB меняются независимо;
+     * общее для обоих живёт в `App\Marketplace\*` вне провайдерских пространств.
+     * При анализе модуля (сентябрь 2026) прямых связей Ozon ↔ WB было ноль, и
+     * правило удерживает это состояние.
+     *
+     * @return iterable<string, Rule>
+     */
+    public function test_marketplace_providers_do_not_depend_on_each_other(): iterable
+    {
+        foreach (self::MARKETPLACE_PROVIDER_NAMESPACES as $provider => $namespace) {
+            $others = [];
+            foreach (self::MARKETPLACE_PROVIDER_NAMESPACES as $otherProvider => $otherNamespace) {
+                if ($otherProvider !== $provider) {
+                    $others[] = Selector::inNamespace($otherNamespace);
+                }
+            }
+
+            yield $provider => PHPat::rule()
+                ->classes(Selector::inNamespace($namespace))
+                ->shouldNot()
+                ->dependOn()
+                ->classes(Selector::AnyOf(...$others))
+                ->because(sprintf(
+                    'код провайдера %s не зависит от других провайдеров: общее — в App\Marketplace вне провайдеров',
+                    $provider,
                 ));
         }
     }
