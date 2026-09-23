@@ -361,9 +361,11 @@
   `Command`, `Controller(/Api)`, `CostCalculator`, `Domain`, `Exception`,
   `Infrastructure/{Api,Normalizer,Query,Redis}`, `MessageHandler`.
   Маршруты — ресурс `marketplace_wildberries_controllers` в `config/routes.yaml`.
-- `src/Marketplace/Ozon/` — этап 6 (ещё не перенесено).
-- Общее: `Entity`, `Repository`, `Enum`, `Facade`, `Message`, файлы с ветками для
-  обоих провайдеров (`MarketplaceController`, `MarketplaceFacade`,
+- `src/Marketplace/Ozon/` (с 23.09.2026) — `Application/{Action,DTO,Processor,Reconciliation,Service}`,
+  `Command`, `Controller`, `Domain`, `Exception`, `Infrastructure/{Api,Normalizer,Query}`,
+  `MessageHandler`. Маршруты — ресурс `marketplace_ozon_controllers`.
+- Общее: `Entity`, `Repository`, `Enum`, `Facade`, `Message`, контрактные DTO фасадов
+  (`Application/DTO`, например `OzonTotalsCheckDTO`), файлы с ветками для обоих провайдеров (`MarketplaceController`, `MarketplaceFacade`,
   `ProcessMarketplaceRawDocumentAction`).
 
 Правила:
@@ -378,7 +380,7 @@
 
 Единственный источник финансовых данных Ozon — `/v1/finance/accrual/by-day`
 (`SyncOzonAccrualByDayMessage` → `SyncOzonAccrualByDayHandler`, транспорт
-`async_sync`). Задачи ставит только `Application/Service/OzonAccrualSyncPlanner::planRange(companyId, connectionId, from, to)`:
+`async_sync`). Задачи ставит только `Ozon/Application/Service/OzonAccrualSyncPlanner::planRange(companyId, connectionId, from, to)`:
 одно сообщение на бизнес-день (Europe/Moscow), от новых к старым; конец окна
 ограничен вчерашним днём, начало поднимается до `EARLIEST_SAFE_DAY = 2026-09-08`
 (дни раньше покрыты документами v3, повторная нормализация дала бы двойной учёт).
