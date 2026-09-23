@@ -51,6 +51,75 @@ final class PhpstanBaselineGuardTest extends TestCase
         self::assertSame($expected, $exitCode);
     }
 
+    /**
+     * Переименования: база переписывается по карте `git diff -M`, текущий
+     * baseline — нет. Поэтому перенос сам по себе проходит, а новая ошибка или
+     * рост count в перенесённом файле по-прежнему роняют проверку.
+     *
+     * @return iterable<string, array{string, string, int}>
+     */
+    public static function renameScenarios(): iterable
+    {
+        yield 'только переименование, записи те же' => ['head-renamed.neon', 'map.tsv', 0];
+        yield 'переименование и новая ошибка в перенесённом файле' => ['head-renamed-new.neon', 'map.tsv', 1];
+        yield 'переименование и рост count' => ['head-renamed-grew.neon', 'map.tsv', 1];
+        yield 'пустая карта — как без неё' => ['head-renamed.neon', 'empty-map.tsv', 1];
+    }
+
+    #[DataProvider('renameScenarios')]
+    public function testGuardAppliesRenameMap(string $head, string $map, int $expected): void
+    {
+        $data = __DIR__.'/data/renames/';
+
+        exec($this->renameCommand($data.'base.neon', $data.$head, $data.$map).' > /dev/null 2>&1', $output, $exitCode);
+
+        self::assertSame($expected, $exitCode);
+    }
+
+    public function testGuardReportsHowManyRenamesWereApplied(): void
+    {
+        $data = __DIR__.'/data/renames/';
+
+        exec($this->renameCommand($data.'base.neon', $data.'head-renamed.neon', $data.'map.tsv').' 2>&1', $output, $exitCode);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('Учтено переименований: 2', implode("\n", $output));
+    }
+
+    private function renameCommand(string $base, string $head, string $map): string
+    {
+        return sprintf(
+            '%s %s %s %s %s',
+            escapeshellarg(\dirname(__DIR__, 3).'/bin/phpstan-baseline-guard.sh'),
+            escapeshellarg($base),
+            escapeshellarg($head),
+            escapeshellarg($map),
+            escapeshellarg($this->renameRoot()),
+        );
+    }
+
+    /**
+     * Новые версии перенесённых файлов: helper читает из них второстепенные
+     * классы (FooHelper). Создаются во временном каталоге, а не лежат в
+     * tests/: иначе их подхватили бы PHPUnit, PHPStan и cs-fixer.
+     */
+    private function renameRoot(): string
+    {
+        $root = sys_get_temp_dir().'/baseline-guard-renames-'.getmypid();
+        $files = [
+            'src/New/Foo.php' => "<?php\n\nnamespace App\\New;\n\nfinal class Foo\n{\n}\n",
+            'tests/Unit/New/FooTest.php' => "<?php\n\nnamespace App\\Tests\\Unit\\New;\n\nfinal class FooTest\n{\n}\n\nfinal class FooHelper\n{\n}\n",
+        ];
+        foreach ($files as $path => $content) {
+            if (!is_dir(\dirname($root.'/'.$path))) {
+                mkdir(\dirname($root.'/'.$path), 0o777, true);
+            }
+            file_put_contents($root.'/'.$path, $content);
+        }
+
+        return $root;
+    }
+
     public function testGuardFailsWhenBaselineCannotBeParsedEntirely(): void
     {
         $script = \dirname(__DIR__, 3).'/bin/phpstan-baseline-guard.sh';

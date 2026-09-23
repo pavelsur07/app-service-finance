@@ -14,13 +14,25 @@
 # регресс проходит молча. Проверяется два условия: не появилось нового ключа
 # и ни у одного существующего не вырос count.
 #
+# Переименования. Переименованный файл уносит и path, и полное имя класса в
+# message — без нормализации все его записи выглядят новыми (переносы WB/Ozon,
+# #2506 и #2507: 248 «новых» при неизменных 2410). Третьим аргументом можно
+# передать карту переименований (`git diff -M --name-status --diff-filter=R`):
+# тогда записи БАЗЫ сначала переписываются под новые пути и имена
+# (bin/phpstan-baseline-rename.php), и сравнивается уже результат. Текущий
+# baseline не трогается, поэтому настоящий рост в перенесённом файле остаётся
+# NEW или GREW. Четвёртый аргумент — корень site/ для чтения новых версий файлов
+# (по умолчанию родитель bin/; нужен тестам).
+#
 # Использование:
-#   phpstan-baseline-guard.sh <baseline базы> <baseline текущий>
+#   phpstan-baseline-guard.sh <baseline базы> <baseline текущий> [<карта переименований> [<корень site>]]
 
 set -euo pipefail
 
 base_file=${1:?первым аргументом — baseline базы сравнения}
 head_file=${2:?вторым аргументом — текущий baseline}
+rename_map=${3:-}
+rename_root=${4:-}
 
 if [ ! -e "$base_file" ]; then
     echo "Файла базы сравнения нет ($base_file) — в базе baseline ещё не существует, проверка роста неприменима."
@@ -35,6 +47,25 @@ fi
 if [ ! -s "$head_file" ]; then
     echo "Текущего baseline нет или он пуст ($head_file) — рост невозможен." >&2
     exit 0
+fi
+
+renames_note=''
+if [ -n "$rename_map" ] && [ -s "$rename_map" ]; then
+    if ! command -v php > /dev/null 2>&1; then
+        echo "Передана карта переименований, но php недоступен — нормализовать базу нечем." >&2
+        exit 1
+    fi
+    normalized_base=$(mktemp)
+    trap 'rm -f "$normalized_base"' EXIT
+    rename_script="$(dirname "$0")/phpstan-baseline-rename.php"
+    if ! renames_note=$(php "$rename_script" "$base_file" "$rename_map" ${rename_root:+"$rename_root"} 2>&1 > "$normalized_base"); then
+        {
+            echo "Не удалось переписать базу по карте переименований:"
+            echo "$renames_note"
+        } >&2
+        exit 1
+    fi
+    base_file=$normalized_base
 fi
 
 # Парсер ниже понимает канонический формат `--generate-baseline`: четыре поля,
@@ -144,6 +175,7 @@ fi
 
 if [ -z "$problems" ]; then
     echo "Baseline не вырос: новых записей нет, ни один count не увеличился."
+    [ -n "$renames_note" ] && echo "$renames_note"
     echo "Записей удалено: ${removed:-0}, сокращено по count: ${shrunk:-0}."
     exit 0
 fi
@@ -154,10 +186,13 @@ grew_count=$(printf '%s\n' "$problems" | grep -c '^GREW' || true)
 {
     echo
     echo "Baseline PHPStan вырос: новых записей ${new_count}, выросших по count ${grew_count}."
+    [ -n "$renames_note" ] && echo "$renames_note"
     echo
-    printf '%s\n' "$problems" | head -20 | while IFS=$'\t' read -r kind delta key; do
+    # Не `printf | head`: при pipefail ранний выход head даёт SIGPIPE (код 141)
+    # и «write error: Broken pipe» в логе CI вместо штатного отказа с кодом 1.
+    while IFS=$'\t' read -r kind delta key; do
         printf '  %-5s %-14s %s\n' "$kind" "$delta" "${key%%|*}"
-    done
+    done < <(printf '%s\n' "$problems" | sed -n '1,20p')
     if [ "$(printf '%s\n' "$problems" | wc -l)" -gt 20 ]; then
         echo "  … и ещё $(( $(printf '%s\n' "$problems" | wc -l) - 20 ))"
     fi

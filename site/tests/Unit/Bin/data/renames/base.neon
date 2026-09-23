@@ -1,0 +1,31 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method App\\Old\\Foo\:\:bar\(\) has no return type\.$#'
+			identifier: test.rule
+			count: 1
+			path: src/Old/Foo.php
+
+		-
+			message: '#^Parameter \#1 of App\\Old\\Foo\:\:baz\(\) expects \'App\\\\Old\\\\Foo\', string given\.$#'
+			identifier: test.rule
+			count: 1
+			path: src/Old/Foo.php
+
+		-
+			message: '#^Method App\\Tests\\Unit\\Old\\FooHelper\:\:log\(\) has no return type\.$#'
+			identifier: test.rule
+			count: 1
+			path: tests/Unit/Old/FooTest.php
+
+		-
+			message: '#^Method App\\Old\\Foo@anonymous/tests/Unit/Old/FooTest\.php:12\:\:run\(\) has no return type\.$#'
+			identifier: test.rule
+			count: 1
+			path: tests/Unit/Old/FooTest.php
+
+		-
+			message: '#^Unrelated entry stays put$#'
+			identifier: test.rule
+			count: 1
+			path: src/Other.php

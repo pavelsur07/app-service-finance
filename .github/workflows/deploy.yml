@@ -369,7 +369,10 @@ jobs:
                       echo "В базе сравнения baseline ещё нет — проверка роста неприменима."
                       : > /tmp/baseline-base.neon
                   fi
-                  site/bin/phpstan-baseline-guard.sh /tmp/baseline-base.neon site/phpstan-baseline.neon
+                  # Карта переименований: перенос файла уносит path и FQCN в message,
+                  # без неё все его записи выглядят новыми. Переписывается только база.
+                  git diff -M --name-status --diff-filter=R "$BASE_SHA" HEAD -- site/src site/tests > /tmp/baseline-renames.tsv
+                  site/bin/phpstan-baseline-guard.sh /tmp/baseline-base.neon site/phpstan-baseline.neon /tmp/baseline-renames.tsv
 
             - name: 🔐 Login to GHCR
               uses: docker/login-action@v4
