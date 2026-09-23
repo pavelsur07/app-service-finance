@@ -31,6 +31,26 @@ final class StockReportPageParserTest extends TestCase
         self::assertSame('4.125', $rows[1]->levels[0]->stock);
     }
 
+    #[DataProvider('sanitizedLiveReport')]
+    public function testParsesSanitizedLiveReportWithExpandedAssortmentHref(string $fixture, int $offset, string $firstAssortmentId): void
+    {
+        $page = (new StockReportPageParser())->parse($this->fixture($fixture));
+
+        self::assertSame(4, $page->size);
+        self::assertSame(2, $page->limit);
+        self::assertSame($offset, $page->offset);
+        self::assertCount(2, $page->rows);
+        self::assertSame($firstAssortmentId, $page->rows[0]->assortmentExternalId);
+        self::assertCount(16, $page->rows[0]->levels);
+    }
+
+    /** @return iterable<string, array{string, int, string}> */
+    public static function sanitizedLiveReport(): iterable
+    {
+        yield 'first page' => ['stock_bystore_live_page_0.json', 0, '00000000-0000-4000-8000-000000000001'];
+        yield 'last page' => ['stock_bystore_live_page_2.json', 2, '00000000-0000-4000-8000-000000000003'];
+    }
+
     #[DataProvider('invalidReport')]
     public function testRejectsInvalidReport(callable $mutate): void
     {
@@ -141,9 +161,9 @@ final class StockReportPageParserTest extends TestCase
         self::assertSame('1000000000000000.1', $page->rows[999]->levels[0]->stock);
     }
 
-    private function fixture(): string
+    private function fixture(string $name = 'stock_bystore_page_0.json'): string
     {
-        $body = file_get_contents(__DIR__.'/../../../Fixtures/MoySklad/Stock/stock_bystore_page_0.json');
+        $body = file_get_contents(__DIR__.'/../../../Fixtures/MoySklad/Stock/'.$name);
         self::assertIsString($body);
 
         return $body;
