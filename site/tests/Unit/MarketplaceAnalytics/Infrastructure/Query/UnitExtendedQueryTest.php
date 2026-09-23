@@ -14,6 +14,7 @@ use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
+use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use DG\BypassFinals;
@@ -74,7 +75,7 @@ final class UnitExtendedQueryTest extends TestCase
             $this->marketplaceFacade,
             $this->adsFacade,
             $this->inventoryFacade,
-            new MarketplaceCostAnalyticsGroupResolver(),
+            new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade()),
             $this->listingTagFacade,
         );
 

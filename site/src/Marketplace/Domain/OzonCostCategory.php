@@ -11,8 +11,8 @@ namespace App\Marketplace\Domain;
  * список service_name (из services[].name API Ozon) и operation_type
  * (из operation_type / operation_type_name для операций без services[]).
  *
- * Все остальные мапы (OzonServiceCategoryMap, WidgetServiceGroupMap,
- * OzonXlsxServiceGroupMap) читают данные отсюда.
+ * Все остальные мапы (OzonServiceCategoryMap, OzonXlsxServiceGroupMap) читают
+ * данные отсюда; другим модулям справочник отдаёт CostCategoryCatalogFacade.
  *
  * При добавлении нового кода Ozon — добавить ТОЛЬКО сюда.
  */

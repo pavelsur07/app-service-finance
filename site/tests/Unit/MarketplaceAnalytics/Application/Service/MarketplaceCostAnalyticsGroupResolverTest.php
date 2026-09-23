@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAnalytics\Application\Service;
 
+use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use PHPUnit\Framework\TestCase;
 
@@ -13,7 +14,7 @@ final class MarketplaceCostAnalyticsGroupResolverTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->resolver = new MarketplaceCostAnalyticsGroupResolver();
+        $this->resolver = new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade());
     }
 
     public function testWbCommissionGroupsAndBucket(): void

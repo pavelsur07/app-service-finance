@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Domain\Backward;
 
-use App\MarketplaceAnalytics\Application\Service\WidgetServiceGroupMap;
+use App\Marketplace\Domain\OzonCostCategory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Backward-compatibility тест: гарантирует что getCategoryToWidgetGroup()
- * возвращает те же widget groups для каждого category code.
+ * Backward-compatibility тест: гарантирует, что OzonCostCategory::all()
+ * даёт те же widget groups для каждого category code.
  *
  * EXPECTED_GROUPS — эталонный снимок маппинга WidgetServiceGroupMap
- * на момент коммита a9d1305 (2026-04-16).
+ * на момент коммита a9d1305 (2026-04-16). Сам WidgetServiceGroupMap удалён
+ * как неиспользуемый; снимок сверяется с источником — OzonCostCategory.
  *
  * Если маппинг изменится — тест покажет какой именно category_code разошёлся.
  */
@@ -122,7 +123,10 @@ final class WidgetGroupBackwardCompatTest extends TestCase
 
     public function testWidgetGroupsUnchangedAfterRefactoring(): void
     {
-        $actual = WidgetServiceGroupMap::getCategoryToWidgetGroup();
+        $actual = [];
+        foreach (OzonCostCategory::all() as $category) {
+            $actual[$category->code] = $category->widgetGroup;
+        }
 
         foreach (self::EXPECTED_GROUPS as $code => $expectedGroup) {
             $this->assertArrayHasKey(
