@@ -1,63 +1,67 @@
-# moysklad-stock-sync Stage 2 — handoff
+# moysklad-stock-sync Stage 3/4 — handoff
 
-**Branch:** `feat/moysklad-stock-snapshot-loader` · **PR:**
-[#2499](https://github.com/pavelsur07/app-service-finance/pull/2499) ·
-**CI:** merge only after all required checks are green
+**Branch:** `feat/moysklad-stock-sync-ui` · **PR:**
+[#2500](https://github.com/pavelsur07/app-service-finance/pull/2500) · base `master`
 
-## Summary of stages
+## Summary
 
-- Stage 1 — released separately in PR #2498: schema, immutable storage and
-  strict parsers.
-- Stage 2 — complete store synchronization, immutable stock snapshot loading,
-  recovery and bounded Messenger retry.
-- Stage 3 — manual endpoint and UI remain separate work.
+- Добавлен защищённый ручной POST-запуск `SyncStockSnapshotMessage` для
+  tenant-owned active+connected подключения МойСклад.
+- Batch read model теперь отдаёт store/stock run, cursor, пять последних
+  запусков и последний completed snapshot с числом строк без N+1.
+- Legacy Twig-карточка показывает статусы складов/остатков, counters, cursor,
+  историю и snapshot; read-only/inactive/unverified не получают mutation-форму.
+- Running recovery-кнопка остаётся доступной и переносится в узкой карточке.
 
-## Files changed
+## Files
 
-- `site/src/MoySklad/Application/` — stock sync action and store/stock runners.
-- `site/src/MoySklad/Infrastructure/Api/MoySkladClient.php` — paginated Store
-  and raw Stock report requests without automatic HTTP retry.
-- `site/src/MoySklad/Message/`, `MessageHandler/` and Messenger config —
-  `async_sync` message with bounded retry.
-- `site/tests/` — HTTP, integration, recovery, tenant and Messenger coverage.
-- `ARCHITECTURE.md`, task checkpoint and Stage report — internal contracts.
+- `site/src/MoySklad/Controller/` — endpoint и подключение batch status model.
+- `site/src/MoySklad/Infrastructure/Query/MoySkladSyncStatusQuery.php` — общий
+  tenant-scoped status/snapshot query.
+- `site/templates/moy_sklad/connections/index.html.twig` — store/stock UI.
+- `site/tests/Functional/MoySklad/ConnectionsControllerTest.php` — endpoint,
+  isolation, snapshot selection, ordering, UI states and permissions.
+- `ARCHITECTURE.md`, plan/checkpoint/Stage reports — contracts and evidence.
 
-## Migrations
+## Migration and contracts
 
-- None. Stage 2 uses the Stage 1 schema already present on `master`.
-
-## Public API / contract changes
-
-- No HTTP endpoint or cross-module Facade.
-- Internal Messenger message `SyncStockSnapshotMessage` routes to `async_sync`.
+- No migration. Existing Stage 1 schema is reused.
+- New internal HTTP contract: `POST /moy-sklad/connections/{id}/sync-stock`.
+- Existing Messenger message/routing, runner, retry, lock and stale recovery are
+  unchanged.
 
 ## Checks
 
-- MoySklad unit+integration — 246 tests, 1003 assertions, PASS.
-- `make site-stan` — PASS, 2686 files.
-- `make site-cs-check` — PASS, 2701 files.
-- `make site-cs-strict-types` — PASS, 2701 files.
-- `make site-test-unit` — 3023 tests, 16503 assertions, PASS.
-- `make site-test` — 5221 tests, 29540 assertions, PASS.
+- MoySklad functional: 32 tests, 232 assertions, PASS.
+- `make site-stan`: PASS, 2687 files, no errors.
+- `make site-cs-check`: PASS, 2702 files, 0 fixable.
+- `make site-cs-strict-types`: PASS, 2702 files, 0 fixable.
+- `make site-test-unit`: PASS, 3023 tests, 16503 assertions; 4 pre-existing
+  deprecations.
+- `make site-test`: PASS, 5230 tests, 29611 assertions; 6 pre-existing
+  deprecations.
+- Twig CS, frontend lint/build: PASS. Global UI Kit checks remain at their
+  pre-existing red baselines (8996 class findings, 47 React mappings); this PR
+  changes no React/UI Kit file and uses existing Tabler utilities.
 
 ## Reviews
 
-- internal: 0 BLOCKER, 3 IMPORTANT and 1 MINOR found and fixed.
-- external: round 1, 0 BLOCKER, 2 IMPORTANT and 3 MINOR; both IMPORTANT and
-  two MINOR fixed; one MINOR rejected per explicit assortment-ID requirement;
-  result `fixed without re-run`.
+- Internal fresh review: 0 BLOCKER, 1 IMPORTANT and 1 MINOR; both fixed and
+  verified by focused tests. Open: none.
+- External review: round 1, exact result `REVIEW_GREEN`; 0 BLOCKER,
+  0 IMPORTANT.
 
-## Risks, limitations, follow-ups
+## Risks and limitations
 
-- Remote pagination cannot provide a single source timestamp; size, duplicate
-  and store-coverage guards prevent known incomplete snapshots.
-- Stage 3 must add the manual endpoint and status UI before user-driven runs.
-- Production synchronization is data processing outside the deploy pipeline
-  and is not authorized or performed by this handoff.
+- Real 320/375 px browser screenshots could not be produced because no browser
+  is installed. DOM tests plus the loaded Tabler 1.2 rules verify the running
+  form is capped at 100% width and its button text can wrap.
+- Production sync POST/dispatch is data processing and was not executed. It
+  requires a separate named approval outside merge/deploy.
 
 ## Owner decision
 
-Ready: PR #2499 "feat(moysklad): sync store stock snapshots" — merge into
-master with automatic production deploy?
+Ready: PR #2500 "feat(moysklad): add stock sync controls and status" — merge
+into master with automatic production deploy?
 
-Reply: "merge and deploy #2499"
+Reply: "merge and deploy #2500"

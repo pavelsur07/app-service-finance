@@ -22,9 +22,12 @@
             {% for connection in connections %}
                 {% set status = connection.checkStatus.value %}
                 {% set sync = syncStatuses[connection.id] ?? null %}
-                {% set productSync = productSyncStatuses[connection.id] ?? null %}
-                {% set variantSync = variantSyncStatuses[connection.id] ?? null %}
-                {% set errorLabels = {'auth': 'Проверьте токен', 'forbidden': 'Недостаточно прав', 'rate_limited': 'Лимит запросов МойСклад', 'temporary': 'МойСклад временно недоступен', 'invalid_request': 'Ошибка запроса', 'invalid_response': 'Некорректный ответ МойСклад', 'internal': 'Ошибка сохранения'} %}
+                {% set product_sync = productSyncStatuses[connection.id] ?? null %}
+                {% set variant_sync = variantSyncStatuses[connection.id] ?? null %}
+                {% set store_sync = storeSyncStatuses[connection.id] ?? null %}
+                {% set stock_sync = stockSyncStatuses[connection.id] ?? null %}
+                {% set stock_snapshot = stockSnapshots[connection.id] ?? null %}
+                {% set error_labels = {'auth': 'Проверьте токен', 'forbidden': 'Недостаточно прав', 'rate_limited': 'Лимит запросов МойСклад', 'temporary': 'МойСклад временно недоступен', 'invalid_request': 'Ошибка запроса', 'invalid_response': 'Некорректный ответ МойСклад', 'internal': 'Ошибка сохранения'} %}
                 <div class="col-12 col-xl-6">
                     <section class="card h-100" aria-labelledby="connection-title-{{ connection.id }}">
                         <div class="card-header flex-wrap gap-2">
@@ -60,14 +63,14 @@
                                     <div class="text-secondary">Начало: {{ sync.startedAt|date('d.m.Y H:i:s') }}{% if sync.finishedAt %} · Завершение: {{ sync.finishedAt|date('d.m.Y H:i:s') }}{% endif %}</div>
                                     <div class="text-secondary">Обработано: {{ sync.processed }} · Создано: {{ sync.created }} · Обновлено: {{ sync.updated }} · Без изменений: {{ sync.unchanged }}</div>
                                     {% if sync.status == 'failed' %}
-                                        <div class="text-danger">{{ errorLabels[sync.errorCategory] ?? 'Ошибка загрузки' }}</div>
+                                        <div class="text-danger">{{ error_labels[sync.errorCategory] ?? 'Ошибка загрузки' }}</div>
                                     {% endif %}
                                     <details class="mt-2">
                                         <summary>История запусков (последние 5)</summary>
                                         <ul class="list-unstyled mt-2 mb-0">
                                             {% for item in sync.history %}
                                                 <li class="mb-1">{{ item.startedAt|date('d.m.Y H:i:s') }} —
-                                                    {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ errorLabels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %};
+                                                    {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ error_labels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %};
                                                     обработано {{ item.processed }}, создано {{ item.created }}, обновлено {{ item.updated }}, без изменений {{ item.unchanged }}
                                                 </li>
                                             {% endfor %}
@@ -77,29 +80,73 @@
                             {% else %}
                                 <p class="text-secondary mt-3 mb-0">Загрузка контрагентов ещё не запускалась.</p>
                             {% endif %}
-                            {% for stream in [{label: 'Товары', sync: productSync}, {label: 'Модификации', sync: variantSync}] %}
-                                {% set streamSync = stream.sync %}
+                            {% for stream in [{label: 'Товары', sync: product_sync}, {label: 'Модификации', sync: variant_sync}] %}
+                                {% set stream_sync = stream.sync %}
                                 <div class="mt-3">
                                     <div>{{ stream.label }}:
-                                        {% if not streamSync or not streamSync.status %}Ещё не загружались
-                                        {% elseif streamSync.status == 'running' %}Выполняется
-                                        {% elseif streamSync.status == 'succeeded' %}Успешно
+                                        {% if not stream_sync or not stream_sync.status %}Ещё не загружались
+                                        {% elseif stream_sync.status == 'running' %}Выполняется
+                                        {% elseif stream_sync.status == 'succeeded' %}Успешно
                                         {% else %}Ошибка{% endif %}
                                     </div>
-                                    {% if streamSync and streamSync.status %}
-                                        <div class="text-secondary">Обработано: {{ streamSync.processed }} · Создано: {{ streamSync.created }} · Обновлено: {{ streamSync.updated }} · Без изменений: {{ streamSync.unchanged }}</div>
-                                        <div class="text-secondary">Последний полный проход: {{ streamSync.lastCompletedAt ? streamSync.lastCompletedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялся' }}</div>
-                                        {% if streamSync.status == 'failed' %}<div class="text-danger">{{ errorLabels[streamSync.errorCategory] ?? 'Ошибка загрузки' }}</div>{% endif %}
+                                    {% if stream_sync and stream_sync.status %}
+                                        <div class="text-secondary">Обработано: {{ stream_sync.processed }} · Создано: {{ stream_sync.created }} · Обновлено: {{ stream_sync.updated }} · Без изменений: {{ stream_sync.unchanged }}</div>
+                                        <div class="text-secondary">Последний полный проход: {{ stream_sync.lastCompletedAt ? stream_sync.lastCompletedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялся' }}</div>
+                                        {% if stream_sync.status == 'failed' %}<div class="text-danger">{{ error_labels[stream_sync.errorCategory] ?? 'Ошибка загрузки' }}</div>{% endif %}
                                         <details class="mt-2">
                                             <summary>История запусков {{ stream.label|lower }} (последние 5)</summary>
                                             <ul class="list-unstyled mt-2 mb-0">
-                                                {% for item in streamSync.history %}
-                                                    <li>{{ item.startedAt|date('d.m.Y H:i:s') }} — {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ errorLabels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %}; обработано {{ item.processed }}</li>
+                                                {% for item in stream_sync.history %}
+                                                    <li>{{ item.startedAt|date('d.m.Y H:i:s') }} — {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ error_labels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %}; обработано {{ item.processed }}</li>
                                                 {% endfor %}
                                             </ul>
                                         </details>
                                     {% endif %}
                                 </div>
+                            {% endfor %}
+                            {% for stream in [{key: 'store', label: 'Склады', sync: store_sync}, {key: 'stock', label: 'Остатки', sync: stock_sync}] %}
+                                {% set stream_sync = stream.sync %}
+                                <section class="mt-3" data-sync-stream="{{ stream.key }}" aria-labelledby="{{ stream.key }}-sync-title-{{ connection.id }}">
+                                    <h3 class="card-title mb-1" id="{{ stream.key }}-sync-title-{{ connection.id }}">{{ stream.label }}</h3>
+                                    {% if not stream_sync or not stream_sync.status %}
+                                        <p class="text-secondary mb-1">Ещё не запускалось.</p>
+                                    {% else %}
+                                        <div>
+                                            {% if stream_sync.status == 'running' %}Выполняется
+                                            {% elseif stream_sync.status == 'succeeded' %}Успешно
+                                            {% else %}Ошибка{% endif %}
+                                        </div>
+                                        <div class="text-secondary">Начало: {{ stream_sync.startedAt|date('d.m.Y H:i:s') }}{% if stream_sync.finishedAt %} · Завершение: {{ stream_sync.finishedAt|date('d.m.Y H:i:s') }}{% endif %}</div>
+                                        <div class="text-secondary">Обработано: {{ stream_sync.processed }} · Создано: {{ stream_sync.created }} · Обновлено: {{ stream_sync.updated }} · Без изменений: {{ stream_sync.unchanged }}</div>
+                                        {% if stream_sync.status == 'failed' %}
+                                            <div class="text-danger">{{ error_labels[stream_sync.errorCategory] ?? 'Ошибка загрузки' }}</div>
+                                        {% endif %}
+                                    {% endif %}
+                                    <div class="text-secondary">Последний успешный проход: {{ stream_sync and stream_sync.lastCompletedAt ? stream_sync.lastCompletedAt|date('d.m.Y H:i:s') : 'Ещё не выполнялся' }}</div>
+                                    {% if stream.key == 'stock' %}
+                                        <div class="text-secondary">
+                                            Последний завершённый снимок:
+                                            {% if stock_snapshot %}
+                                                ID: {{ stock_snapshot.id }} · Начало: {{ stock_snapshot.startedAt|date('d.m.Y H:i:s') }} · Завершение: {{ stock_snapshot.completedAt|date('d.m.Y H:i:s') }} · {{ stock_snapshot.lineCount }} строк
+                                            {% else %}
+                                                Ещё не создавался
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    {% if stream_sync and stream_sync.history %}
+                                        <details class="mt-2">
+                                            <summary>История запусков (последние 5)</summary>
+                                            <ul class="list-unstyled mt-2 mb-0" data-sync-history="{{ stream.key }}">
+                                                {% for item in stream_sync.history %}
+                                                    <li class="mb-1">{{ item.startedAt|date('d.m.Y H:i:s') }} —
+                                                        {% if item.status == 'running' %}Выполняется{% elseif item.status == 'succeeded' %}Успешно{% else %}{{ error_labels[item.errorCategory] ?? 'Ошибка загрузки' }}{% endif %};
+                                                        обработано {{ item.processed }}, создано {{ item.created }}, обновлено {{ item.updated }}, без изменений {{ item.unchanged }}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </details>
+                                    {% endif %}
+                                </section>
                             {% endfor %}
                             {% if status != 'connected' %}
                                 <p class="text-secondary mt-3 mb-0">{{ status == 'unverified' ? 'Требуется проверка' : connection.checkStatus.message() }}</p>
@@ -122,8 +169,15 @@
                                     {% if connection.isActive and status == 'connected' and connection.accountId %}
                                         <form method="post" action="{{ path('moysklad_connections_sync_catalog', {id: connection.id}) }}">
                                             <input type="hidden" name="_token" value="{{ csrf_token('moysklad_sync_catalog' ~ connection.id) }}">
-                                            <button type="submit" class="btn btn-primary">{{ (productSync and productSync.status == 'running') or (variantSync and variantSync.status == 'running') ? 'Проверить и повторить загрузку' : 'Загрузить товары и модификации' }}</button>
-                                            {% if (productSync and productSync.status == 'running') or (variantSync and variantSync.status == 'running') %}
+                                            <button type="submit" class="btn btn-primary">{{ (product_sync and product_sync.status == 'running') or (variant_sync and variant_sync.status == 'running') ? 'Проверить и повторить загрузку' : 'Загрузить товары и модификации' }}</button>
+                                            {% if (product_sync and product_sync.status == 'running') or (variant_sync and variant_sync.status == 'running') %}
+                                                <small class="text-secondary d-block">Уже выполняется. Повторный запрос будет пропущен, если загрузка ещё активна.</small>
+                                            {% endif %}
+                                        </form>
+                                        <form method="post" action="{{ path('moysklad_connections_sync_stock', {id: connection.id}) }}" class="mw-100">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('moysklad_sync_stock' ~ connection.id) }}">
+                                            <button type="submit" class="btn btn-primary text-wrap">{{ (store_sync and store_sync.status == 'running') or (stock_sync and stock_sync.status == 'running') ? 'Проверить и повторить загрузку складов и остатков' : 'Загрузить склады и остатки' }}</button>
+                                            {% if (store_sync and store_sync.status == 'running') or (stock_sync and stock_sync.status == 'running') %}
                                                 <small class="text-secondary d-block">Уже выполняется. Повторный запрос будет пропущен, если загрузка ещё активна.</small>
                                             {% endif %}
                                         </form>

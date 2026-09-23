@@ -3461,7 +3461,7 @@ legacy fallback доступен лишь codec до одобренного пе
 проходом. Временные и 429 ошибки получают максимум три отложенных повтора;
 другие безопасные категории записываются в `MoySkladSyncRun` без тела ответа.
 Страница подключений отправляет ручной запуск только с `MARKETPLACE_WRITE`,
-активной компанией и CSRF; `MoySkladCounterpartySyncStatusQuery` читает
+активной компанией и CSRF; `MoySkladSyncStatusQuery` читает
 последние статусы, до пяти записей истории и cursor пачкой для карточек
 текущей страницы.
 
@@ -3489,7 +3489,7 @@ legacy fallback доступен лишь codec до одобренного пе
 остаётся открытой для отдельной проверки.
 
 Страница подключений показывает последние запуски, курсоры и историю отдельно
-для контрагентов, товаров и модификаций. `MoySkladCounterpartySyncStatusQuery`
+для контрагентов, товаров и модификаций. `MoySkladSyncStatusQuery`
 принимает тип сущности и читает статусы всех подключений на текущей странице
 пакетом, с фильтром `companyId`. Ручной POST запуска каталога требует
 `MARKETPLACE_WRITE`, активную компанию, подтверждённое подключение и CSRF.
@@ -3523,3 +3523,10 @@ legacy fallback доступен лишь codec до одобренного пе
 source drift считаются временными ошибками. `SyncStockSnapshotMessage` идёт на
 `async_sync`, вручную перепланирует только `rate_limited`/`temporary` до трёх
 раз с bounded exponential backoff; permanent категории не ретраятся.
+Ручной `POST /moy-sklad/connections/{id}/sync-stock` требует
+`MARKETPLACE_WRITE`, активную компанию, UUID/CSRF и tenant-scoped lookup, затем
+отправляет только `companyId` и `connectionId`. `MoySkladSyncStatusQuery`
+пакетно читает `store`/`stock` runs, cursors и пять последних запусков для
+подключений текущей страницы; отдельный batch-запрос выбирает только последний
+`completed` снимок и считает его строки. Более новый `building` или `failed`
+снимок не скрывает предыдущий опубликованный.

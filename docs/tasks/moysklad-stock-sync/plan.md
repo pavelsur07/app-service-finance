@@ -82,31 +82,58 @@ assortment-ссылки и индексы; документированные JS
 routing. **Reviewer focus:** полнота снимка, retry, отсутствие HTTP внутри DB
 transaction, failed snapshots invisible, rate limits, stale-run recovery.
 
-## Stage 3: ручной запуск, статус и handoff
+## Stage 3: POST-контракт и read model
 
-**Risk:** MEDIUM — внутренний POST и существующий Legacy Twig экран.
+**Risk:** HIGH-LOCAL — внутренний mutation endpoint и tenant-scoped batch SQL.
 
-**stage_base_commit:** записать перед 3.1.
+**stage_base_commit:** `25585a3bedd270d5355f4e7638ead566a20a9f72`.
 
-**Definition of Done:** администратор своей компании запускает flow для
-active+connected подключения; видит store/stock status, counters, cursor и
-последний completed snapshot; CSRF, permission, foreign tenant, stale/running,
-empty/error/success покрыты functional tests.
+**Definition of Done:** администратор своей компании запускает stock flow для
+active+connected подключения; CSRF, permission, UUID и foreign tenant закрыты;
+list-controller получает store/stock runs, cursors, историю и последний
+completed snapshot текущей страницы без N+1. Failed/building snapshot не
+скрывает предыдущий completed.
 
 **Work items:**
 
-- 3.1 — RED functional tests для маршрута, прав, CSRF, tenant isolation и UI.
-- 3.2 — Controller, Message dispatch, расширение status query и Twig.
-- 3.3 — документация, Stage report, полный handoff и reviews.
+- 3.1 — RED functional tests endpoint: dispatch со scalar IDs, GET/UUID, CSRF,
+  permission, tenant isolation и inactive/unverified preconditions.
+- 3.2 — `MoySkladStockSyncController`; переименование и расширение batch status
+  query типами `store|stock`; batch read последнего completed snapshot и строк.
+- 3.3 — интеграция read model в list-controller, документация и Stage review.
 
-**Stage checks:** MoySklad functional, Twig lint, focused CS/PHPStan. На handoff
-один раз: `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`,
-`make site-test-unit`, `make site-test`, затем fresh internal и обязательный
-external review.
+**Stage checks:** MoySklad functional, focused PHPStan/CS.
+**Reviewer focus:** active company до lookup, отсутствие IDOR/N+1, выбор только
+последнего `completed` snapshot и сохранение scalar-only Messenger message.
+
+## Stage 4: Legacy Twig status UI и handoff
+
+**Risk:** MEDIUM — существующий Legacy Twig экран без React/Vite/UI Kit правок.
+
+**stage_base_commit:** `b47e6875705803bc6e12866c65dc51b14469040e`.
+
+**Definition of Done:** карточка показывает отдельные store/stock состояния,
+время, counters, cursor, пять последних запусков и последний completed snapshot
+включая `0 строк`; running допускает повторный ручной запрос; inactive,
+unverified и read-only пользователи видят статус без mutation-формы.
+
+**Work items:**
+
+- 4.1 — RED functional UI tests для empty/running/success/failed, completed
+  snapshot fallback, read-only и скрытой кнопки inactive/unverified.
+- 4.2 — Twig-секции «Склады»/«Остатки» на существующих Tabler-классах и
+  русские безопасные error labels.
+- 4.3 — Twig/frontend checks, Stage report, общий handoff и reviews.
+
+**Stage checks:** MoySklad functional, `composer cs:twig`, focused PHPStan/CS.
+На handoff один раз: `make site-stan`, `make site-cs-check`,
+`make site-cs-strict-types`, `make site-test-unit`, `make site-test`, frontend
+lint/build/UI Kit mapping checks и ручной smoke desktop/узкого viewport; затем
+fresh internal и обязательный external review.
 
 ## Release
 
-PR #2498 содержит миграцию `Version20260921100000`. Разрешение владельца
-покрывает merge Stage 1 после зелёного CI. Production-миграция и deploy требуют
-отдельного ручного запуска по `docs/workflow/release.md`; до такого разрешения
-production не изменяется.
+Stage 3/4 выпускаются одним PR из `feat/moysklad-stock-sync-ui` в `master`.
+Новой миграции в этой ветке нет; merge запускает обычный автоматический deploy.
+Production POST/dispatch синхронизации обрабатывает данные и не входит в
+release acceptance без отдельного именованного разрешения владельца.
