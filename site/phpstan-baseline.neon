@@ -13759,30 +13759,6 @@ parameters:
 			path: tests/Unit/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClientTest.php
 
 		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:newReturnRow\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
-
-		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:newSaleRow\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
-
-		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:oldReturnRow\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
-
-		-
-			message: '#^Method App\\Tests\\Unit\\Marketplace\\Wildberries\\Infrastructure\\WbSalesReportRowNormalizerTest\:\:oldSaleRow\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Unit/Marketplace/Wildberries/Infrastructure/WbSalesReportRowNormalizerTest.php
-
-		-
 			message: '#^Call to function property_exists\(\) with App\\Marketplace\\Message\\SyncWbFinancialReportDayMessage and ''apiKey'' will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
