@@ -12,6 +12,7 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Wildberries\Infrastructure\Api\WbFinanceSalesReportClient;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Symfony\Component\Clock\MockClock;
@@ -229,6 +230,45 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
+    /**
+     * Все ветки разбора ответа пробного запроса «есть ли данные за период».
+     * Этим путём WbFinancialReportFirstAvailableResolver ищет первый доступный
+     * день отчёта при подключении кабинета.
+     *
+     * @return iterable<string, array{int, string, bool|class-string<\Throwable>}>
+     */
+    public static function hasAnyDataResponses(): iterable
+    {
+        yield '204 — данных нет' => [204, '', false];
+        yield '200 с пустым телом — данных нет' => [200, '', false];
+        yield '200 с пустым списком — данных нет' => [200, '[]', false];
+        yield '200 со строкой — данные есть' => [200, '[{"rrdId":1}]', true];
+        yield '401 — ключ отвергнут' => [401, '', MarketplaceAuthException::class];
+        yield '403 — ключ отвергнут' => [403, '', MarketplaceAuthException::class];
+        yield '5xx — временная ошибка' => [503, '{"error":"server"}', MarketplaceTemporaryApiException::class];
+        yield 'неожиданный статус — временная ошибка' => [418, '', MarketplaceTemporaryApiException::class];
+        yield 'невалидный JSON' => [200, '{invalid', MarketplaceInvalidApiResponseException::class];
+        yield 'JSON не список' => [200, '{"rrdId":1}', MarketplaceInvalidApiResponseException::class];
+        yield 'элемент списка не объект' => [200, '[1]', MarketplaceInvalidApiResponseException::class];
+    }
+
+    /**
+     * @param bool|class-string<\Throwable> $expected
+     */
+    #[DataProvider('hasAnyDataResponses')]
+    public function testHasAnyDataForConnectionMapsResponse(int $status, string $body, bool|string $expected): void
+    {
+        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse($body, ['http_code' => $status])), $this->createRateLimiter());
+
+        if (is_string($expected)) {
+            $this->expectException($expected);
+        }
+
+        $result = $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03');
+
+        self::assertSame($expected, $result);
+    }
+
     public function testConnectionRemote429CreatesConnectionCooldownWithoutGlobalCooldown(): void
     {
         $storage = new InMemoryWbFinanceCooldownStorage();
@@ -274,22 +314,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionA));
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionB));
             self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
-        }
-    }
-
-    public function testLegacyHasAnyDataUsesGlobalCooldownFallback(): void
-    {
-        $storage = new InMemoryWbFinanceCooldownStorage();
-        $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
-            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
-        );
-
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->hasAnyData('token', '2026-01-01', '2026-01-01');
-        } finally {
-            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
         }
     }
 
