@@ -263,21 +263,15 @@ final readonly class WbFinanceSalesReportClient
             throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($retryAfter));
         }
 
-        return $this->hasAnyData($apiKey, $dateFrom, $dateTo, $sellerBucketId, true);
+        return $this->requestAnyData($apiKey, $dateFrom, $dateTo, $sellerBucketId);
     }
 
-    public function hasAnyData(string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId = null, bool $rateLimitTokenConsumed = false): bool
+    /**
+     * Пробный запрос `limit=1`: есть ли в отчёте строки за период. Cooldown и
+     * токен бакета подключения уже проверены в hasAnyDataForConnection().
+     */
+    private function requestAnyData(string $apiKey, string $dateFrom, string $dateTo, string $sellerBucketId): bool
     {
-        $sellerBucketId = $this->normalizeSellerBucketId($sellerBucketId, null);
-        $this->guardCooldown($sellerBucketId, $dateFrom, $dateTo);
-
-        if (!$rateLimitTokenConsumed) {
-            $retryAfter = $this->rateLimiter->tryConsume($this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId));
-            if (null !== $retryAfter) {
-                throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($retryAfter));
-            }
-        }
-
         try {
             $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
                 'headers' => ['Authorization' => $apiKey],
