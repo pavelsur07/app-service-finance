@@ -23,7 +23,7 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinanceSalesReportClientTest extends TestCase
 {
-    public function test200WithOneRowDoesNotTriggerSecondRequest(): void
+    public function test200WithOneRowIsLastPageAndMakesSingleRequest(): void
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
@@ -33,14 +33,16 @@ final class WbFinanceSalesReportClientTest extends TestCase
         });
 
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
-        $rows = $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+        $page = $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
 
-        self::assertCount(1, $rows);
+        self::assertCount(1, $page->rows);
+        self::assertFalse($page->hasNextPage);
+        self::assertSame(10, $page->nextRrdId);
         self::assertCount(1, $captured);
         self::assertSame(0, $captured[0]['rrdId'] ?? null);
     }
 
-    public function testFetchDetailedDayUsesSameDateInRange(): void
+    public function testFetchDetailedDayPageUsesSameDateInRange(): void
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
@@ -54,13 +56,13 @@ final class WbFinanceSalesReportClientTest extends TestCase
         });
 
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
-        $client->fetchDetailedDay('conn-1', 'token', new \DateTimeImmutable('2026-01-15T12:00:00+03:00'));
+        $client->fetchDetailedDayPage('conn-1', 'token', new \DateTimeImmutable('2026-01-15T12:00:00+03:00'), 0);
 
         self::assertSame('2026-01-15', $captured[0]['dateFrom'] ?? null);
         self::assertSame('2026-01-15', $captured[0]['dateTo'] ?? null);
     }
 
-    public function testFetchDetailedDayThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
+    public function testFetchDetailedDayPageThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -71,17 +73,17 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
 
-        self::assertSame([], $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDayPage('same-connection', 'token', new \DateTimeImmutable('2026-01-15'), 0)->rows);
 
         $this->expectException(MarketplaceRateLimitException::class);
         try {
-            $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15'));
+            $client->fetchDetailedDayPage('same-connection', 'token', new \DateTimeImmutable('2026-01-15'), 0);
         } finally {
             self::assertSame(1, $requestCount);
         }
     }
 
-    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentConnectionIdsWhenSellerBucketMissing(): void
+    public function testFetchDetailedDayPageUsesDifferentLimiterBucketsForDifferentConnectionIdsWhenSellerBucketMissing(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -94,14 +96,14 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        self::assertSame([], $client->fetchDetailedDay('connection-a', 'same-token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame([], $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDayPage('connection-a', 'same-token', new \DateTimeImmutable('2026-01-15'), 0)->rows);
+        self::assertSame([], $client->fetchDetailedDayPage('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15'), 0)->rows);
 
         self::assertSame(2, $requestCount);
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
-    public function testFetchDetailedDayUsesConnectionBucketsEvenWhenSellerBucketsAreProvided(): void
+    public function testFetchDetailedDayPageUsesConnectionBucketsEvenWhenSellerBucketsAreProvided(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -114,8 +116,8 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token-a', new \DateTimeImmutable('2026-01-15'), 'seller-a'));
-        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token-b', new \DateTimeImmutable('2026-01-15'), 'seller-b'));
+        self::assertSame([], $client->fetchDetailedDayPage('connection-a', 'token-a', new \DateTimeImmutable('2026-01-15'), 0, false, 'seller-a')->rows);
+        self::assertSame([], $client->fetchDetailedDayPage('connection-b', 'token-b', new \DateTimeImmutable('2026-01-15'), 0, false, 'seller-b')->rows);
         self::assertSame(2, $requestCount);
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
@@ -238,7 +240,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $this->expectException(MarketplaceRateLimitException::class);
         try {
-            $client->fetchDetailedForConnection($connectionId, 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage($connectionId, 'token', new \DateTimeImmutable('2026-01-01'), 0);
         } finally {
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionId));
             self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
@@ -259,35 +261,19 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage));
 
         try {
-            $client->fetchDetailedForConnection($connectionA, 'token-a', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage($connectionA, 'token-a', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected first connection to be rate limited');
         } catch (MarketplaceRateLimitException) {
         }
 
         $this->expectException(MarketplaceRateLimitException::class);
         try {
-            $client->fetchDetailedForConnection($connectionB, 'token-b', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage($connectionB, 'token-b', new \DateTimeImmutable('2026-01-01'), 0);
         } finally {
             self::assertSame(2, $requestCount);
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionA));
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionB));
             self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
-        }
-    }
-
-    public function testLegacyFetchDetailedUsesGlobalCooldownFallback(): void
-    {
-        $storage = new InMemoryWbFinanceCooldownStorage();
-        $client = new WbFinanceSalesReportClient(
-            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']])),
-            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
-        );
-
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
-        } finally {
-            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
         }
     }
 
@@ -307,13 +293,17 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
-    public function test204ReturnsAccumulatedRows(): void
+    public function test204ReturnsEmptyLastPage(): void
     {
         $client = new WbFinanceSalesReportClient(new MockHttpClient([
             new MockResponse('', ['http_code' => 204]),
         ]), $this->createRateLimiter());
 
-        self::assertSame([], $client->fetchDetailed('token', '2026-01-01', '2026-01-01'));
+        $page = $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
+
+        self::assertSame([], $page->rows);
+        self::assertNull($page->nextRrdId);
+        self::assertFalse($page->hasNextPage);
     }
 
     public function test429MappedToRateLimitException(): void
@@ -321,7 +311,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429])), $this->createRateLimiter());
 
         $this->expectException(MarketplaceRateLimitException::class);
-        $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+        $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
     }
 
     public function test429MappedToRateLimitExceptionWithRetryAfter(): void
@@ -334,7 +324,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         ])), $this->createRateLimiter());
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(17, $e->getRetryAfter());
@@ -354,7 +344,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(60, $e->getRetryAfter());
@@ -379,7 +369,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(60, $e->getRetryAfter());
@@ -405,7 +395,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(75, $e->getRetryAfter());
@@ -427,7 +417,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertNull($e->getRetryAfter());
@@ -456,7 +446,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(60, $e->getRetryAfter());
@@ -487,7 +477,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         );
 
         try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+            $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceRateLimitException');
         } catch (MarketplaceRateLimitException) {
         }
@@ -506,7 +496,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $client401 = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('', ['http_code' => 401])), $this->createRateLimiter());
         try {
-            $client401->fetchDetailed('token', '2026-01-01', '2026-01-01');
+            $client401->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
             self::fail('Expected MarketplaceAuthException for 401');
         } catch (MarketplaceAuthException) {
             self::assertTrue(true);
@@ -514,7 +504,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $client403 = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('', ['http_code' => 403])), $this->createRateLimiter());
         $this->expectException(MarketplaceAuthException::class);
-        $client403->fetchDetailed('token', '2026-01-01', '2026-01-01');
+        $client403->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
     }
 
     public function test400MappedToBadRequestException(): void
@@ -522,7 +512,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"bad"}', ['http_code' => 400])), $this->createRateLimiter());
 
         $this->expectException(MarketplaceBadRequestException::class);
-        $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+        $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
     }
 
     public function testInvalidJsonMappedToInvalidApiResponseException(): void
@@ -530,42 +520,25 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{invalid', ['http_code' => 200])), $this->createRateLimiter());
 
         $this->expectException(MarketplaceInvalidApiResponseException::class);
-        $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+        $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
     }
 
-    public function testCountEqualPageSizeThrowsBeforeNextRequestWhenBucketIsBusy(): void
+    public function test5xxMappedToTemporaryApiException(): void
     {
-        $rows = array_fill(0, 100000, ['rrdId' => 10]);
-        $rows[99999] = ['rrdId' => 20];
+        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"server"}', ['http_code' => 502])), $this->createRateLimiter());
 
-        $captured = [];
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured, $rows): MockResponse {
-            $payload = $options['json'] ?? null;
+        $this->expectException(MarketplaceTemporaryApiException::class);
+        $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
+    }
 
-            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
-            }
+    public function testNonGrowingCursorMappedToInvalidApiResponseException(): void
+    {
+        // Страница, чей последний rrdId не больше запрошенного, зациклила бы
+        // пагинацию хендлера: клиент обязан отказать, а не вернуть её.
+        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('[{"rrdId":5}]', ['http_code' => 200])), $this->createRateLimiter());
 
-            $captured[] = $payload;
-
-            return match (count($captured)) {
-                1 => new MockResponse((string) json_encode($rows, \JSON_THROW_ON_ERROR), ['http_code' => 200]),
-                default => new MockResponse('', ['http_code' => 204]),
-            };
-        });
-
-        $clock = new MockClock('@'.time());
-        $startTimestamp = $clock->now()->getTimestamp();
-        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
-
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
-        } finally {
-            self::assertCount(1, $captured);
-            self::assertSame(0, $captured[0]['rrdId'] ?? null);
-            self::assertSame($startTimestamp, $clock->now()->getTimestamp());
-        }
+        $this->expectException(MarketplaceInvalidApiResponseException::class);
+        $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 5);
     }
 
     public function testProbeAccessUsesFinancePingEndpoint(): void
