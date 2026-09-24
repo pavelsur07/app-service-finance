@@ -22,7 +22,6 @@ final readonly class WbFinanceSalesReportClient
     public const PAGE_SIZE = 100000;
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
-    private const SALES_REPORTS_RATE_LIMIT_KEY_PREFIX = 'wb_finance_sales_reports';
     private const GLOBAL_SELLER_BUCKET = 'global';
 
     private LoggerInterface $logger;
@@ -37,29 +36,11 @@ final readonly class WbFinanceSalesReportClient
         $this->rateLimiter = $rateLimiter;
     }
 
-    /** @return list<array<string,mixed>> */
-    public function fetchDetailedDay(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, ?string $sellerBucketId = null): array
-    {
-        $date = $businessDate->format('Y-m-d');
-
-        return $this->fetchDetailedInternal($apiKey, $date, $date, $sellerBucketId, $connectionId);
-    }
-
     public function fetchDetailedDayPage(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, int $rrdId, bool $rateLimitTokenConsumed = false, ?string $sellerBucketId = null): WbFinanceSalesReportPage
     {
         $date = $businessDate->format('Y-m-d');
 
         return $this->fetchDetailedPage($apiKey, $date, $date, $rrdId, self::PAGE_SIZE, $rateLimitTokenConsumed, $sellerBucketId, $connectionId);
-    }
-
-    /**
-     * The $connectionId parameter scopes throttling when seller/account identifiers are unavailable.
-     *
-     * @return list<array<string,mixed>>
-     */
-    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId = null): array
-    {
-        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, $sellerBucketId, $connectionId);
     }
 
     public function tryConsume(string $sellerRateLimitKey): ?\DateTimeImmutable
@@ -81,11 +62,6 @@ final readonly class WbFinanceSalesReportClient
     public function resolveSalesReportsBucket(MarketplaceConnection $connection): array
     {
         return $this->rateLimiter->resolveSalesReportsBucket($connection);
-    }
-
-    public function resolveSalesReportsSellerBucketId(MarketplaceConnection $connection): string
-    {
-        return $this->resolveSalesReportsBucketId($connection);
     }
 
     public function buildSalesReportsRateLimitKeyForSellerBucket(string $sellerBucketId): string
@@ -111,36 +87,6 @@ final readonly class WbFinanceSalesReportClient
     public function buildSalesReportsCooldownKey(string $sellerBucketId): string
     {
         return $this->rateLimiter->buildSalesReportsCooldownKey($sellerBucketId);
-    }
-
-    public function buildSalesReportsRateLimitKeyForApiKey(string $apiKey): string
-    {
-        return $this->buildSalesReportsRateLimitKey(hash('sha256', $apiKey));
-    }
-
-    /**
-     * @deprecated use fetchDetailedForConnection() in production flows when connection context is available; unknown context uses the shared global bucket
-     *
-     * @return list<array<string,mixed>>
-     */
-    public function fetchDetailed(string $apiKey, string $dateFrom, string $dateTo): array
-    {
-        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, null, null);
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId, ?string $connectionId): array
-    {
-        $rows = [];
-        $rrdId = 0;
-
-        do {
-            $page = $this->fetchDetailedPage($apiKey, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, false, $sellerBucketId, $connectionId);
-            $rows = [...$rows, ...$page->rows];
-            $rrdId = $page->nextRrdId ?? $rrdId;
-        } while ($page->hasNextPage);
-
-        return $rows;
     }
 
     private function fetchDetailedPage(string $apiKey, string $dateFrom, string $dateTo, int $rrdId, int $limit, bool $rateLimitTokenConsumed = false, ?string $sellerBucketId = null, ?string $connectionId = null): WbFinanceSalesReportPage
@@ -413,11 +359,6 @@ final readonly class WbFinanceSalesReportClient
         }
 
         return self::GLOBAL_SELLER_BUCKET;
-    }
-
-    private function buildSalesReportsRateLimitKey(string $tokenHash): string
-    {
-        return self::SALES_REPORTS_RATE_LIMIT_KEY_PREFIX.':'.$tokenHash;
     }
 
     private function createSafeExcerpt(string $body): string
