@@ -9,10 +9,17 @@ use PHPUnit\Framework\TestCase;
 
 final class WbSalesReportRowNormalizerTest extends TestCase
 {
+    private WbSalesReportRowNormalizer $normalizer;
+
+    protected function setUp(): void
+    {
+        $this->normalizer = new WbSalesReportRowNormalizer();
+    }
+
+    // Поля, суммы и фолбэки: snake_case и camelCase ключи, выручка без СПП, пустые значения.
+
     public function testSnakeCaseAndCamelCaseRowsAreNormalizedEqually(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $snakeCase = [
             'supplier_oper_name' => 'Логистика продажа',
             'doc_type_name' => 'Продажа',
@@ -69,37 +76,37 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'rrDate' => '2026-05-01 12:00:00',
         ];
 
-        self::assertSame($normalizer->operationName($snakeCase), $normalizer->operationName($camelCase));
-        self::assertSame($normalizer->docTypeName($snakeCase), $normalizer->docTypeName($camelCase));
-        self::assertSame($normalizer->nmId($snakeCase), $normalizer->nmId($camelCase));
-        self::assertSame($normalizer->techSize($snakeCase), $normalizer->techSize($camelCase));
-        self::assertSame($normalizer->barcode($snakeCase), $normalizer->barcode($camelCase));
-        self::assertSame($normalizer->vendorCode($snakeCase), $normalizer->vendorCode($camelCase));
-        self::assertSame($normalizer->brandName($snakeCase), $normalizer->brandName($camelCase));
-        self::assertSame($normalizer->subjectName($snakeCase), $normalizer->subjectName($camelCase));
-        self::assertSame($normalizer->retailPrice($snakeCase), $normalizer->retailPrice($camelCase));
-        self::assertSame($normalizer->retailPriceWithDisc($snakeCase), $normalizer->retailPriceWithDisc($camelCase));
-        self::assertSame($normalizer->forPay($snakeCase), $normalizer->forPay($camelCase));
-        self::assertSame($normalizer->acquiringFee($snakeCase), $normalizer->acquiringFee($camelCase));
-        self::assertSame($normalizer->ppvzVw($snakeCase), $normalizer->ppvzVw($camelCase));
-        self::assertSame($normalizer->ppvzVwNds($snakeCase), $normalizer->ppvzVwNds($camelCase));
-        self::assertSame($normalizer->fullMarketplaceCommission($snakeCase), $normalizer->fullMarketplaceCommission($camelCase));
-        self::assertSame($normalizer->deliveryAmount($snakeCase), $normalizer->deliveryAmount($camelCase));
-        self::assertSame($normalizer->returnAmount($snakeCase), $normalizer->returnAmount($camelCase));
-        self::assertSame($normalizer->deliveryService($snakeCase), $normalizer->deliveryService($camelCase));
-        self::assertSame($normalizer->paidStorage($snakeCase), $normalizer->paidStorage($camelCase));
-        self::assertSame($normalizer->paidAcceptance($snakeCase), $normalizer->paidAcceptance($camelCase));
-        self::assertSame($normalizer->rebillLogisticCost($snakeCase), $normalizer->rebillLogisticCost($camelCase));
-        self::assertSame($normalizer->bonusTypeName($snakeCase), $normalizer->bonusTypeName($camelCase));
-        self::assertSame($normalizer->ppvzReward($snakeCase), $normalizer->ppvzReward($camelCase));
-        self::assertSame($normalizer->cashbackDiscount($snakeCase), $normalizer->cashbackDiscount($camelCase));
+        self::assertSame($this->normalizer->operationName($snakeCase), $this->normalizer->operationName($camelCase));
+        self::assertSame($this->normalizer->docTypeName($snakeCase), $this->normalizer->docTypeName($camelCase));
+        self::assertSame($this->normalizer->nmId($snakeCase), $this->normalizer->nmId($camelCase));
+        self::assertSame($this->normalizer->techSize($snakeCase), $this->normalizer->techSize($camelCase));
+        self::assertSame($this->normalizer->barcode($snakeCase), $this->normalizer->barcode($camelCase));
+        self::assertSame($this->normalizer->vendorCode($snakeCase), $this->normalizer->vendorCode($camelCase));
+        self::assertSame($this->normalizer->brandName($snakeCase), $this->normalizer->brandName($camelCase));
+        self::assertSame($this->normalizer->subjectName($snakeCase), $this->normalizer->subjectName($camelCase));
+        self::assertSame($this->normalizer->retailPrice($snakeCase), $this->normalizer->retailPrice($camelCase));
+        self::assertSame($this->normalizer->retailPriceWithDisc($snakeCase), $this->normalizer->retailPriceWithDisc($camelCase));
+        self::assertSame($this->normalizer->forPay($snakeCase), $this->normalizer->forPay($camelCase));
+        self::assertSame($this->normalizer->acquiringFee($snakeCase), $this->normalizer->acquiringFee($camelCase));
+        self::assertSame($this->normalizer->ppvzVw($snakeCase), $this->normalizer->ppvzVw($camelCase));
+        self::assertSame($this->normalizer->ppvzVwNds($snakeCase), $this->normalizer->ppvzVwNds($camelCase));
+        self::assertSame($this->normalizer->fullMarketplaceCommission($snakeCase), $this->normalizer->fullMarketplaceCommission($camelCase));
+        self::assertSame($this->normalizer->deliveryAmount($snakeCase), $this->normalizer->deliveryAmount($camelCase));
+        self::assertSame($this->normalizer->returnAmount($snakeCase), $this->normalizer->returnAmount($camelCase));
+        self::assertSame($this->normalizer->deliveryService($snakeCase), $this->normalizer->deliveryService($camelCase));
+        self::assertSame($this->normalizer->paidStorage($snakeCase), $this->normalizer->paidStorage($camelCase));
+        self::assertSame($this->normalizer->paidAcceptance($snakeCase), $this->normalizer->paidAcceptance($camelCase));
+        self::assertSame($this->normalizer->rebillLogisticCost($snakeCase), $this->normalizer->rebillLogisticCost($camelCase));
+        self::assertSame($this->normalizer->bonusTypeName($snakeCase), $this->normalizer->bonusTypeName($camelCase));
+        self::assertSame($this->normalizer->ppvzReward($snakeCase), $this->normalizer->ppvzReward($camelCase));
+        self::assertSame($this->normalizer->cashbackDiscount($snakeCase), $this->normalizer->cashbackDiscount($camelCase));
         self::assertSame(
-            $normalizer->operationDate($snakeCase)->format('Y-m-d H:i:s'),
-            $normalizer->operationDate($camelCase)->format('Y-m-d H:i:s'),
+            $this->normalizer->operationDate($snakeCase)->format('Y-m-d H:i:s'),
+            $this->normalizer->operationDate($camelCase)->format('Y-m-d H:i:s'),
         );
         self::assertSame(
-            $normalizer->reportDate($snakeCase)->format('Y-m-d H:i:s'),
-            $normalizer->reportDate($camelCase)->format('Y-m-d H:i:s'),
+            $this->normalizer->reportDate($snakeCase)->format('Y-m-d H:i:s'),
+            $this->normalizer->reportDate($camelCase)->format('Y-m-d H:i:s'),
         );
     }
 
@@ -113,8 +120,6 @@ final class WbSalesReportRowNormalizerTest extends TestCase
      */
     public function testFinanceApiRowGrossWithoutSppIsSellerPriceAndVwKeysAreRead(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'docTypeName' => 'Продажа',
             'quantity' => 1,
@@ -128,68 +133,253 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'spp' => '44.85',
         ];
 
-        self::assertEqualsWithDelta(115.37, $normalizer->fullMarketplaceCommission($row), 0.01);
-        self::assertSame(660.0, $normalizer->grossWithoutSpp($row));
-        self::assertSame(364.0, $normalizer->retailAmount($row));
+        self::assertEqualsWithDelta(115.37, $this->normalizer->fullMarketplaceCommission($row), 0.01);
+        self::assertSame(660.0, $this->normalizer->grossWithoutSpp($row));
+        self::assertSame(364.0, $this->normalizer->retailAmount($row));
     }
 
     public function testStringFallbackSkipsEmptyCamelCaseAndUsesSnakeCase(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'sellerOperName' => '',
             'supplier_oper_name' => 'Продажа',
         ];
 
-        self::assertSame('Продажа', $normalizer->sellerOperName($row));
+        self::assertSame('Продажа', $this->normalizer->sellerOperName($row));
     }
 
     public function testNullableStringFallbackSkipsEmptyCamelCaseAndUsesSnakeCase(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'techSize' => '',
             'ts_name' => 'M',
         ];
 
-        self::assertSame('M', $normalizer->techSize($row));
+        self::assertSame('M', $this->normalizer->techSize($row));
     }
 
     public function testFloatFallbackSkipsEmptyCamelCaseAndUsesSnakeCase(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'retailPriceWithDisc' => '',
             'retail_price_withdisc_rub' => '1300.40',
         ];
 
-        self::assertSame(1300.40, $normalizer->retailPriceWithDisc($row));
+        self::assertSame(1300.40, $this->normalizer->retailPriceWithDisc($row));
     }
 
     public function testFloatReturnsZeroWhenAllFallbackValuesAreEmpty(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'paidStorage' => '',
             'storage_fee' => null,
         ];
 
-        self::assertSame(0.0, $normalizer->paidStorage($row));
+        self::assertSame(0.0, $this->normalizer->paidStorage($row));
     }
 
     public function testOperationDateFallbackSkipsEmptySaleDtAndUsesRrDate(): void
     {
-        $normalizer = new WbSalesReportRowNormalizer();
-
         $row = [
             'saleDt' => '',
             'rrDate' => '2026-05-01',
         ];
 
-        self::assertSame('2026-05-01', $normalizer->operationDate($row)->format('Y-m-d'));
+        self::assertSame('2026-05-01', $this->normalizer->operationDate($row)->format('Y-m-d'));
+    }
+
+    // Классификация продажа/возврат и даты.
+
+    public function testNormalizesOldSnakeCaseSaleRow(): void
+    {
+        $row = $this->oldSaleRow();
+
+        self::assertSame('1001', $this->normalizer->rrdId($row));
+        self::assertSame('srid-1', $this->normalizer->srid($row));
+        self::assertSame('Продажа', $this->normalizer->docTypeName($row));
+        self::assertSame('Логистика продажа', $this->normalizer->sellerOperName($row));
+        self::assertSame('12345', $this->normalizer->nmId($row));
+        self::assertSame('ART-1', $this->normalizer->vendorCode($row));
+        self::assertSame('M', $this->normalizer->techSize($row));
+        self::assertSame('4600000000001', $this->normalizer->barcode($row));
+        self::assertSame(2, $this->normalizer->quantity($row));
+        self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
+        self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
+        self::assertTrue($this->normalizer->isSale($row));
+        self::assertFalse($this->normalizer->isReturn($row));
+    }
+
+    public function testNormalizesOldSnakeCaseReturnRow(): void
+    {
+        $row = $this->oldReturnRow();
+
+        self::assertTrue($this->normalizer->isReturn($row));
+        self::assertFalse($this->normalizer->isSale($row));
+        self::assertTrue($this->normalizer->isSaleOrReturn($row));
+    }
+
+    public function testNormalizesNewCamelCaseSaleRow(): void
+    {
+        $row = $this->newSaleRow();
+
+        self::assertSame('1001', $this->normalizer->rrdId($row));
+        self::assertSame('srid-1', $this->normalizer->srid($row));
+        self::assertSame('12345', $this->normalizer->nmId($row));
+        self::assertSame('ART-1', $this->normalizer->vendorCode($row));
+        self::assertSame('M', $this->normalizer->techSize($row));
+        self::assertSame('4600000000001', $this->normalizer->barcode($row));
+        self::assertSame(1500.0, $this->normalizer->retailPrice($row));
+        self::assertSame(1500.0, $this->normalizer->retailAmount($row));
+        self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
+        self::assertSame(1200.0, $this->normalizer->forPay($row));
+        self::assertSame(20.0, $this->normalizer->acquiringFee($row));
+        self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
+        self::assertTrue($this->normalizer->isSale($row));
+    }
+
+    public function testNormalizesNewCamelCaseReturnRow(): void
+    {
+        $row = $this->newReturnRow();
+
+        self::assertTrue($this->normalizer->isReturn($row));
+        self::assertFalse($this->normalizer->isSale($row));
+        self::assertTrue($this->normalizer->isSaleOrReturn($row));
+    }
+
+    public function testPvzCompensationWithReturnWordIsStillSaleByDocTypeOnly(): void
+    {
+        $row = [
+            'doc_type_name' => 'Продажа',
+            'supplier_oper_name' => 'Возмещение за выдачу и возврат товаров на ПВЗ',
+        ];
+
+        self::assertTrue($this->normalizer->isSale($row));
+        self::assertFalse($this->normalizer->isReturn($row));
+        self::assertTrue($this->normalizer->isSaleOrReturn($row));
+    }
+
+    public function testRowWithoutDocTypeButWithReturnWordInOperationIsNotReturn(): void
+    {
+        $row = [
+            'doc_type_name' => '',
+            'supplier_oper_name' => 'Возмещение за выдачу и возврат товаров на ПВЗ',
+        ];
+
+        self::assertFalse($this->normalizer->isSale($row));
+        self::assertFalse($this->normalizer->isReturn($row));
+        self::assertFalse($this->normalizer->isSaleOrReturn($row));
+    }
+
+    public function testUnknownDocTypeNameIsNotSaleOrReturn(): void
+    {
+        $row = [
+            'docTypeName' => 'Correction',
+            'sellerOperName' => 'Return operation',
+        ];
+
+        self::assertFalse($this->normalizer->isSale($row));
+        self::assertFalse($this->normalizer->isReturn($row));
+        self::assertFalse($this->normalizer->isSaleOrReturn($row));
+    }
+
+    public function testReportDateThrowsWhenDateFieldsAreMissing(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('WB report row must contain rrDate or rr_dt.');
+
+        $this->normalizer->reportDate([]);
+    }
+
+    public function testOperationDateThrowsWhenDateFieldsAreMissing(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('WB report row must contain saleDt/sale_dt or rrDate/rr_dt.');
+
+        $this->normalizer->operationDate([]);
+    }
+
+    public function testRrdIdReturnsNullWhenMissing(): void
+    {
+        self::assertNull($this->normalizer->rrdId(['srid' => 'srid-2']));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function oldSaleRow(): array
+    {
+        return [
+            'rrd_id' => '1001',
+            'doc_type_name' => 'Продажа',
+            'supplier_oper_name' => 'Логистика продажа',
+            'nm_id' => '12345',
+            'sa_name' => 'ART-1',
+            'ts_name' => 'M',
+            'barcode' => '4600000000001',
+            'retail_price' => '1500',
+            'retail_amount' => '1500',
+            'retail_price_withdisc_rub' => '1300',
+            'ppvz_for_pay' => '1200',
+            'acquiring_fee' => '20',
+            'ppvz_vw' => '60',
+            'ppvz_vw_nds' => '20',
+            'quantity' => 2,
+            'srid' => 'srid-1',
+            'rr_dt' => '2026-05-01 12:00:00',
+            'sale_dt' => '2026-05-01 11:00:00',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function oldReturnRow(): array
+    {
+        $row = $this->oldSaleRow();
+        $row['doc_type_name'] = 'Возврат';
+        $row['supplier_oper_name'] = 'Возврат покупателем';
+
+        return $row;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function newSaleRow(): array
+    {
+        return [
+            'rrdId' => '1001',
+            'docTypeName' => 'Sale',
+            'sellerOperName' => 'Sale operation',
+            'nmId' => '12345',
+            'vendorCode' => 'ART-1',
+            'techSize' => 'M',
+            'sku' => '4600000000001',
+            'retailPrice' => '1500',
+            'retailAmount' => '1500',
+            'retailPriceWithDisc' => '1300',
+            'forPay' => '1200',
+            'acquiringFee' => '20',
+            'ppvzVw' => '60',
+            'ppvzVwNds' => '20',
+            'quantity' => 2,
+            'srid' => 'srid-1',
+            'rrDate' => '2026-05-01 12:00:00',
+            'saleDt' => '2026-05-01 11:00:00',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function newReturnRow(): array
+    {
+        $row = $this->newSaleRow();
+        $row['docTypeName'] = 'Return';
+        $row['sellerOperName'] = 'Return operation';
+
+        return $row;
     }
 }
