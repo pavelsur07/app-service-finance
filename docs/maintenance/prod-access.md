@@ -185,9 +185,10 @@ Read-only проверки можно выполнять после запрос
 
 - `app:marketplace:ozon-daily-sync` — **удалена 23.09.2026** вместе с цепочкой
   `/v3/finance/transaction/list` (`docs/tasks/marketplace-ozon-v3-removal/`).
-  Строка в боевом wrapper'е и в `codex-console.sh` осталась: wrapper-ы правит
-  Владелец. Вызов безвреден — Symfony ответит `command not defined`. Замена —
-  `ozon-financial-reports:sync` выше.
+  Из референсного `codex-console.sh` убрана 25.09.2026; в боевом wrapper'е
+  строка живёт до его следующей установки Владельцем. Вызов безвреден —
+  Symfony ответит `command not defined`. Замена — `ozon-financial-reports:sync`
+  выше.
 - Repair, prune, backfill, rebuild, refresh, maintenance.
 - SQL write (`INSERT`, `UPDATE`, `DELETE`, DDL, migrations).
 - Изменения production Docker, workers, scheduler, queues, secrets, config, deploy.
