@@ -56,8 +56,54 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'ItemPacking' => ['84', 'ItemPacking', 'ozon_additional_packaging_warehouse'];
         yield 'Promotion' => ['54', 'Promotion', 'ozon_marketing_action'];
         yield 'SellerReturns' => ['71', 'SellerReturns', 'ozon_return_from_stock'];
+        // До 26.09.2026 уходила в ozon_unknown_52: 24 990 и 9 990 руб. в том же
+        // ритме, в каком с января приходили в ozon_premium_promotion легаси-путём.
+        yield 'PremiumSubscription' => ['52', 'PremiumSubscription', 'ozon_premium_promotion'];
+        // «Краткосрочное размещение возврата FBS» — решение Владельца от 26.09.2026.
+        yield 'TemporaryPlacement' => ['78', 'TemporaryPlacement', 'ozon_temporary_storage'];
         // Compensation разводится по знаку отдельными тестами ниже: направление
         // у неё кодируется категорией, а не только видом операции.
+    }
+
+    /**
+     * Услуги, размеченные до первого прихода денег в by-day: описание Ozon
+     * совпадает по смыслу с категорией каталога, и эта категория уже получала
+     * деньги легаси-путём. Без разметки первая же такая затрата ушла бы в
+     * «неразобранные» мимо ОПиУ — как PremiumSubscription в сентябре.
+     *
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function servicesMarkedAhead(): iterable
+    {
+        yield 'PremiumCashbackPromotion' => ['49', 'PremiumCashbackPromotion', 'ozon_premium_promotion'];
+        yield 'Charity' => ['7', 'Charity', 'ozon_charity'];
+        yield 'LabelOriginal' => ['27', 'LabelOriginal', 'ozon_original_label'];
+        yield 'Installment' => ['22', 'Installment', 'ozon_installment'];
+        yield 'InternetSiteAdvertising' => ['23', 'InternetSiteAdvertising', 'ozon_site_advertising'];
+        yield 'PremiumCashbackIndividualPoints' => ['48', 'PremiumCashbackIndividualPoints', 'ozon_premium_cashback'];
+        yield 'PremiumMailingCommission' => ['50', 'PremiumMailingCommission', 'ozon_seller_bonus'];
+        yield 'PointsForReviews' => ['47', 'PointsForReviews', 'ozon_reviews'];
+        yield 'SaleReview' => ['70', 'SaleReview', 'ozon_reviews'];
+        yield 'Replenishment' => ['58', 'Replenishment', 'ozon_warehouse_movement'];
+        yield 'DefectFineProhibitedGoods' => ['90', 'DefectFineProhibitedGoods', 'ozon_fines_prohibited_products'];
+        yield 'RfbsServiceFee' => ['68', 'RfbsServiceFee', 'ozon_service_fee_rfbs'];
+        yield 'LastMile' => ['28', 'LastMile', 'ozon_logistic_last_mile'];
+    }
+
+    #[DataProvider('servicesMarkedAhead')]
+    public function testMarkedAheadServiceResolvesToItsMarketplaceCode(string $typeId, string $typeName, string $expectedCode): void
+    {
+        $resolver = new OzonAccrualServiceCategoryResolver();
+
+        self::assertSame($expectedCode, $resolver->resolve($typeId, $typeName, -100.0)['code']);
+    }
+
+    #[DataProvider('servicesMarkedAhead')]
+    public function testMarkedAheadServiceHasDefaultPlRule(string $typeId, string $typeName, string $expectedCode): void
+    {
+        $rules = Yaml::parseFile(__DIR__.'/../../../../../../config/marketplace/default_cost_mapping.yaml');
+
+        self::assertContains($expectedCode, array_column($rules['marketplaces']['ozon']['cost_mappings'], 'cost_code'));
     }
 
     public function testPositiveCompensationIsIncomeCategory(): void

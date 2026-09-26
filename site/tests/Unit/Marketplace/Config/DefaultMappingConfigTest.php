@@ -60,8 +60,6 @@ final class DefaultMappingConfigTest extends TestCase
      */
     private const EXTRA_WB_CODES = [
         'advertising',
-        'wb_avans_za_uslugu_bally_za_otzyvy',
-        'wb_predostavlenie_uslug_po_podpiske_dzhem',
         'wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_y',
         'wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_f',
         'wb_otchet_ob_utilizirovannom_tovare_po_skladu_za_m',

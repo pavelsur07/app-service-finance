@@ -408,6 +408,11 @@ marketplaces:
       - cost_code: wb_okazanie_uslug_wb_prodvizhenie
         pl_code: PROMO_INTERNAL
         include_in_pl: true
+      - cost_code: wb_okazanie_uslug_wb_media
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+        confidence: medium
+        note: "Рекламная услуга WB, по аналогии с «WB Продвижение»"
       - cost_code: wb_spisanie_za_otzyv
         pl_code: PROMO_INTERNAL
         include_in_pl: true
