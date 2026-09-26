@@ -55,7 +55,17 @@ final class ApplyDefaultCostMappingConsoleCommandTest extends IntegrationTestCas
     {
         $company = $this->company(942);
         $commission = $this->costCategory($company, 'commission');
+
+        // Соседняя компания с полным деревом ОПиУ: её строки не делают
+        // компанию запуска разблокированной, и сама она не затрагивается.
+        $neighbour = $this->company(943);
+        $this->standardPlTree($neighbour);
+        $neighbourCommission = $this->costCategory($neighbour, 'commission');
         $this->em->flush();
+
+        $tester = $this->tester();
+        self::assertSame(Command::FAILURE, $tester->execute(['--company-id' => $company->getId(), '--marketplace' => 'wildberries']));
+        self::assertStringContainsString('missing_pl_category', $tester->getDisplay());
 
         $tester = $this->tester();
         $exit = $tester->execute(['--company-id' => $company->getId(), '--marketplace' => 'wildberries', '--execute' => true]);
@@ -66,18 +76,22 @@ final class ApplyDefaultCostMappingConsoleCommandTest extends IntegrationTestCas
             'SELECT count(*) FROM marketplace_cost_pl_mappings WHERE cost_category_id = :id',
             ['id' => $commission->getId()],
         ));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM marketplace_cost_pl_mappings WHERE company_id = :id', ['id' => $neighbour->getId()]));
+        self::assertNull($this->plCategoryOf($neighbourCommission));
     }
 
     public function testRejectsInvalidArguments(): void
     {
         self::assertSame(Command::INVALID, $this->tester()->execute(['--company-id' => 'not-a-uuid', '--marketplace' => 'ozon']));
         self::assertSame(Command::INVALID, $this->tester()->execute(['--company-id' => Uuid::uuid4()->toString(), '--marketplace' => 'yandex_market']));
-        self::assertSame(Command::FAILURE, $this->tester()->execute(['--company-id' => Uuid::uuid4()->toString(), '--marketplace' => 'ozon']));
+        $tester = $this->tester();
+        self::assertSame(Command::FAILURE, $tester->execute(['--company-id' => Uuid::uuid4()->toString(), '--marketplace' => 'ozon']));
+        self::assertStringContainsString('не найдена', $tester->getDisplay());
     }
 
     private function company(int $index): Company
     {
-        $owner = UserBuilder::aUser()->build();
+        $owner = UserBuilder::aUser()->withIndex($index)->build();
         $company = CompanyBuilder::aCompany()->withIndex($index)->withOwner($owner)->build();
         $this->em->persist($owner);
         $this->em->persist($company);

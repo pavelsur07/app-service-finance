@@ -113,7 +113,8 @@ case "$cmd" in
     # Без --execute read-only предпросмотр; с --execute пишет
     # marketplace_cost_pl_mappings (только пустые правила, ручные не трогает),
     # поэтому запуск с --execute — отдельное одобрение Владельца (AGENTS.md §3.3).
-    # Компания и маркетплейс обязательны и проверяются по форме.
+    # Форма --company-id и --marketplace проверяется здесь, наличие — самой
+    # командой (без них exit 2).
     for arg in "$@"; do
       case "$arg" in
         --no-interaction|-n|--quiet|-q|--execute) ;;

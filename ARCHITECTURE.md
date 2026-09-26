@@ -521,6 +521,7 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 | Writer | `DefaultCostMappingWriter` | `DefaultSaleMappingWriter` |
 | Таблица | `marketplace_cost_pl_mappings` | `marketplace_sale_mappings` |
 | Маршруты | `/marketplace/cost-pl-mapping/default/{preview,apply}` | `/marketplace/pl-mappings/default/{preview,apply}` |
+| Консоль | `app:marketplace:cost-pl-mapping:apply-default` (без `--execute` — предпросмотр) | — |
 
 Общие правила:
 

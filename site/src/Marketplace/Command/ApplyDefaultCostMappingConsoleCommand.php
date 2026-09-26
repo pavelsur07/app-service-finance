@@ -107,7 +107,16 @@ final class ApplyDefaultCostMappingConsoleCommand extends Command
             return Command::SUCCESS;
         }
 
-        $result = ($this->applyAction)(new ApplyDefaultCostMappingCommand($companyId, $marketplace->value, self::ACTOR));
+        try {
+            $result = ($this->applyAction)(new ApplyDefaultCostMappingCommand($companyId, $marketplace->value, self::ACTOR));
+        } catch (\DomainException $e) {
+            // Категория ОПиУ исчезла или сменила тип между предпросмотром и
+            // записью: экшен перепроверяет и отказывает до транзакции.
+            $io->error($e->getMessage());
+            $this->logger->warning('[DefaultCostMapping] console run blocked on apply', $context);
+
+            return Command::FAILURE;
+        }
 
         $io->success(sprintf(
             'Создано: %d, заполнено пустых: %d, пропущено: %d.',
