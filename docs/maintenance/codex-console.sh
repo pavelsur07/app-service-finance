@@ -108,6 +108,22 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:cost-pl-mapping:apply-default)
+    # Базовый маппинг затрат в ОПиУ для одной компании — то же, что кнопка UI.
+    # Без --execute read-only предпросмотр; с --execute пишет
+    # marketplace_cost_pl_mappings (только пустые правила, ручные не трогает),
+    # поэтому запуск с --execute — отдельное одобрение Владельца (AGENTS.md §3.3).
+    # Форма --company-id и --marketplace проверяется здесь, наличие — самой
+    # командой (без них exit 2).
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q|--execute) ;;
+        --marketplace=ozon|--marketplace=wildberries) ;;
+        --company-id=[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   messenger:failed:remove)
     # Мутирующая команда: удаляет сообщение из failed-очереди безвозвратно.
     # Поэтому первым аргументом допускается только числовой id. Это заодно

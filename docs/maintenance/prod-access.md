@@ -183,6 +183,17 @@ Read-only проверки можно выполнять после запрос
   code — рабочий сигнал команды: загрузка встала сейчас. Починка под гейт —
   `ozon-financial-reports:sync`, её окно вчерашний день покрывает.
 
+- `app:marketplace:cost-pl-mapping:apply-default --company-id=<uuid> --marketplace=ozon|wildberries [--execute]` —
+  базовый маппинг затрат в ОПиУ для одной компании, те же экшены, что у кнопки
+  `/marketplace/cost-pl-mapping/default/apply`. Без `--execute` — read-only
+  предпросмотр (рутинная проверка); с `--execute` пишет
+  `marketplace_cost_pl_mappings`: создаёт недостающие и заполняет пустые
+  правила, ручные не перезаписывает. Отсутствующая или не-`LEAF_INPUT`
+  категория ОПиУ блокирует запись целиком, exit 1. Wrapper пропускает только
+  `--company-id` в форме UUID, `--marketplace` из двух значений, `--execute` и
+  служебные флаги. Предпросмотр — без отдельного одобрения; запуск с
+  `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
+
 - `app:marketplace:ozon-daily-sync` — **удалена 23.09.2026** вместе с цепочкой
   `/v3/finance/transaction/list` (`docs/tasks/marketplace-ozon-v3-removal/`).
   Из референсного `codex-console.sh` убрана 25.09.2026; в боевом wrapper'е
