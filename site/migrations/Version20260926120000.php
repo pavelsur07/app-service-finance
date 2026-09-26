@@ -65,24 +65,20 @@ final class Version20260926120000 extends AbstractMigration
               AND u.code IN ('ozon_unknown_52', 'ozon_unknown_78')
               AND u.deleted_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM marketplace_costs c WHERE c.category_id = u.id)
+              AND NOT EXISTS (SELECT 1 FROM marketplace_cost_pl_mappings pm WHERE pm.cost_category_id = u.id)
             SQL);
     }
 
     /**
-     * Возвращает в неразобранные строки этих услуг, ещё не попавшие в документ
-     * ОПиУ, — в том числе пришедшие by-day после деплоя: другого признака
-     * перенесённой строки, кроме type в external_id, нет.
+     * Возвращает в неразобранные строки этих услуг вне документа ОПиУ и вне
+     * заблокированного периода — в том числе пришедшие by-day после деплоя:
+     * другого признака перенесённой строки, кроме type в external_id, нет.
+     * Строки заблокированного периода остаются в категории каталога: в
+     * неразобранной у них не было бы правила ОПиУ, а переразбор период не пустит.
+     * Восстанавливаются только категории, которым вернулись строки.
      */
     public function down(Schema $schema): void
     {
-        $this->addSql(<<<'SQL'
-            UPDATE marketplace_cost_categories u
-            SET deleted_at = NULL, updated_at = NOW()
-            WHERE u.marketplace = 'ozon'
-              AND u.code IN ('ozon_unknown_52', 'ozon_unknown_78')
-              AND u.deleted_at IS NOT NULL
-            SQL);
-
         $this->addSql(sprintf(<<<'SQL'
             UPDATE marketplace_costs c
             SET category_id = u.id,
@@ -94,11 +90,22 @@ final class Version20260926120000 extends AbstractMigration
                 ON u.company_id = t.company_id
                AND u.marketplace = t.marketplace
                AND u.code = m.unknown_code
+            JOIN companies co ON co.id = t.company_id
             WHERE t.marketplace = 'ozon'
               AND c.category_id = t.id
               AND c.company_id = t.company_id
               AND c.document_id IS NULL
               AND c.external_id LIKE m.external_id_pattern
+              AND (co.finance_lock_before IS NULL OR c.cost_date::date > co.finance_lock_before)
             SQL, self::MOVES));
+
+        $this->addSql(<<<'SQL'
+            UPDATE marketplace_cost_categories u
+            SET deleted_at = NULL, updated_at = NOW()
+            WHERE u.marketplace = 'ozon'
+              AND u.code IN ('ozon_unknown_52', 'ozon_unknown_78')
+              AND u.deleted_at IS NOT NULL
+              AND EXISTS (SELECT 1 FROM marketplace_costs c WHERE c.category_id = u.id)
+            SQL);
     }
 }

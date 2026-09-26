@@ -50,6 +50,8 @@ final class OzonUnclassifiedServicesMigrationTest extends IntegrationTestCase
         $inDocument = $this->cost($open, $openUnknown78, 'ozon-accrual-2-item-fee-0-type-78', '2026-09-20', 'ручное описание')
             ->setDocument($document);
         $beforeLock = $this->cost($locked, $lockedUnknown52, 'ozon-accrual-3-non-item-type-52', '2026-09-14', self::PREMIUM_UNKNOWN_NAME);
+        // День блокировки сам заблокирован: ByDayRowReplacement считает так же.
+        $onLockDay = $this->cost($locked, $lockedUnknown52, 'ozon-accrual-6-non-item-type-52', '2026-09-15', self::PREMIUM_UNKNOWN_NAME);
         $afterLock = $this->cost($locked, $lockedUnknown52, 'ozon-accrual-4-non-item-type-52', '2026-09-25', 'своё описание');
         $noTarget = $this->cost($locked, $lockedUnknown78, 'ozon-accrual-5-item-fee-0-type-78', '2026-09-20', 'x');
         $legacyPremium = $this->cost($open, $openPremium, 'legacy-premium-1', '2026-08-25', 'Продвижение Premium Ozon');
@@ -65,6 +67,7 @@ final class OzonUnclassifiedServicesMigrationTest extends IntegrationTestCase
         self::assertSame('своё описание', $this->descriptionOf($afterLock));
         self::assertSame($openUnknown78->getId(), $this->categoryOf($inDocument));
         self::assertSame($lockedUnknown52->getId(), $this->categoryOf($beforeLock));
+        self::assertSame($lockedUnknown52->getId(), $this->categoryOf($onLockDay));
         self::assertSame($lockedUnknown78->getId(), $this->categoryOf($noTarget));
         self::assertSame($totalBefore, $this->totalAmount());
 
@@ -80,6 +83,41 @@ final class OzonUnclassifiedServicesMigrationTest extends IntegrationTestCase
         self::assertSame($openPremium->getId(), $this->categoryOf($legacyPremium));
         self::assertFalse($this->isDeleted($openUnknown52));
         self::assertSame($totalBefore, $this->totalAmount());
+    }
+
+    public function testSkipsSoftDeletedTargetAndRollbackKeepsRowsOfLockedPeriod(): void
+    {
+        $owner = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(928)->withOwner($owner)->build();
+        $this->em->persist($owner);
+        $this->em->persist($company);
+
+        $premium = $this->category($company, 'ozon_premium_promotion', 'Продвижение Premium Ozon');
+        $unknown52 = $this->category($company, 'ozon_unknown_52', self::PREMIUM_UNKNOWN_NAME);
+        $deletedTarget = $this->category($company, 'ozon_temporary_storage', 'Временное хранение товара Ozon')->softDelete();
+        $unknown78 = $this->category($company, 'ozon_unknown_78', 'Неразобранная услуга Ozon: TemporaryPlacement');
+
+        $premiumCost = $this->cost($company, $unknown52, 'ozon-accrual-7-non-item-type-52', '2026-09-11', self::PREMIUM_UNKNOWN_NAME);
+        $placementCost = $this->cost($company, $unknown78, 'ozon-accrual-8-item-fee-0-type-78', '2026-09-20', 'x');
+        $this->em->flush();
+
+        $this->applyMigration(fn (Version20260926120000 $m) => $m->up(new Schema()));
+
+        self::assertSame($premium->getId(), $this->categoryOf($premiumCost));
+        self::assertSame($unknown78->getId(), $this->categoryOf($placementCost));
+        self::assertTrue($this->isDeleted($deletedTarget));
+
+        // Сентябрь закрыли после деплоя: откат не уводит его строки туда,
+        // где у них нет правила ОПиУ и откуда переразбор их не вернёт.
+        $this->connection->executeStatement(
+            'UPDATE companies SET finance_lock_before = :lock WHERE id = :id',
+            ['lock' => '2026-09-30', 'id' => $company->getId()],
+        );
+
+        $this->applyMigration(fn (Version20260926120000 $m) => $m->down(new Schema()));
+
+        self::assertSame($premium->getId(), $this->categoryOf($premiumCost));
+        self::assertTrue($this->isDeleted($unknown52), 'пустую неразобранную категорию откат не восстанавливает');
     }
 
     /**

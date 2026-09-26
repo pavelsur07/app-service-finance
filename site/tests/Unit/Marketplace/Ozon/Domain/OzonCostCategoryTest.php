@@ -67,7 +67,7 @@ final class OzonCostCategoryTest extends TestCase
     private const AWAITING_CLASSIFICATION = [
         // Продвижение и маркетинг без своей категории
         'BrandPromotion', 'BrandShelf', 'ExternalPromotion', 'Marketing', 'SocialMediaAdvertising',
-        'LeadGeneration', 'OrdersBooking', 'CustomerReviews', 'FirstCustomerReview', 'CustomerChatPoints',
+        'LeadGeneration', 'OrdersBooking', 'FirstCustomerReview', 'CustomerChatPoints',
         'PremiumMembership',
         // Контент и сервисы кабинета
         'ItemCloning', 'Moderation', 'OzonData', 'Stencil', 'VideoCover', 'IncreaseAssortmentLimit',

@@ -22,9 +22,9 @@ stage_base_commit: 85038031 · риск: HIGH-LOCAL (миграция данны
 
 ## Stage 1 — код и данные
 
-1. Ozon: 15 имён by-day в `OzonCostCategory::$accrualTypeNames` (2 с деньгами на проде
-   + 13 заранее, у каждой целевой категории есть деньги легаси-путём и правило ОПиУ).
-2. Ozon: `OzonCostCategoryTest::AWAITING_CLASSIFICATION` — 75 услуг справочника,
+1. Ozon: 16 имён by-day в `OzonCostCategory::$accrualTypeNames` (2 с деньгами на проде
+   + 14 заранее, у каждой целевой категории есть деньги легаси-путём и правило ОПиУ).
+2. Ozon: `OzonCostCategoryTest::AWAITING_CLASSIFICATION` — 74 услуги справочника,
    намеренно оставленных неразобранными; тест падает на услуге без решения.
 3. WB: три кода в `WbCostCategory` под теми же кодами, что даёт слугификация;
    правило `wb_okazanie_uslug_wb_media` → `PROMO_INTERNAL`.

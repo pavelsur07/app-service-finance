@@ -84,6 +84,8 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'PremiumMailingCommission' => ['50', 'PremiumMailingCommission', 'ozon_seller_bonus'];
         yield 'PointsForReviews' => ['47', 'PointsForReviews', 'ozon_reviews'];
         yield 'SaleReview' => ['70', 'SaleReview', 'ozon_reviews'];
+        // Легаси вело ту же подписку как MarketplaceServiceItemProductReviewsManagementSubscription.
+        yield 'CustomerReviews' => ['95', 'CustomerReviews', 'ozon_reviews'];
         yield 'Replenishment' => ['58', 'Replenishment', 'ozon_warehouse_movement'];
         yield 'DefectFineProhibitedGoods' => ['90', 'DefectFineProhibitedGoods', 'ozon_fines_prohibited_products'];
         yield 'RfbsServiceFee' => ['68', 'RfbsServiceFee', 'ozon_service_fee_rfbs'];

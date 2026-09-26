@@ -456,7 +456,7 @@ final readonly class OzonCostCategory
                     'OperationPointsForReviews',
                     'Баллы за отзывы',
                 ],
-                accrualTypeNames: ['AcceleratedReviewCollection', 'PointsForReviews', 'SaleReview'],
+                accrualTypeNames: ['AcceleratedReviewCollection', 'PointsForReviews', 'SaleReview', 'CustomerReviews'],
             ),
             new self(
                 code: 'ozon_pin_review',
