@@ -52,6 +52,50 @@ final class OzonCostCategoryTest extends TestCase
     ];
 
     /**
+     * Услуги справочника Ozon, которые намеренно НЕ размечены и при первом
+     * приходе денег должны попасть в «неразобранные» (`ozon_unknown_<id>`).
+     *
+     * У каждой либо нет категории с тем же смыслом в каталоге, либо такая
+     * категория ни разу не получала денег, и совпадение по названию нечем
+     * подтвердить. Неверная разметка тише, чем неразобранная затрата: первая
+     * уходит в чужую строку ОПиУ без следа, вторая видна в очереди на разбор.
+     *
+     * Разметить услугу — перенести её отсюда в `accrualTypeNames` категории.
+     * Новая услуга в справочнике Ozon — решить, куда она идёт, иначе упадёт
+     * testEveryDictionaryServiceIsMappedOrAwaitingClassification.
+     */
+    private const AWAITING_CLASSIFICATION = [
+        // Продвижение и маркетинг без своей категории
+        'BrandPromotion', 'BrandShelf', 'ExternalPromotion', 'Marketing', 'SocialMediaAdvertising',
+        'LeadGeneration', 'OrdersBooking', 'FirstCustomerReview', 'CustomerChatPoints',
+        'PremiumMembership',
+        // Контент и сервисы кабинета
+        'ItemCloning', 'Moderation', 'OzonData', 'Stencil', 'VideoCover', 'IncreaseAssortmentLimit',
+        // Возвраты и отмены: несколько кандидатов в каталоге, денег у них не было
+        'Cancellation', 'ClientReturn', 'PartialReturn', 'PreparingToReturn', 'ReturnStorageInTheWarehouse',
+        // Логистика и обработка отправлений: несколько кандидатов или нет денег
+        'Shipment', 'Drop-Off', 'Pick-Up', 'PickUpCourierArrangement', 'PickUpCourierDelivery',
+        'CrossDockPickUpCourierDelivery', 'CourierPickUpByOzon', 'CourierPickUpReinvoice', 'LastMilePickUpPoint',
+        'ClickAndCollect', 'QuantProcessingDrop', 'PackageUnitProcessing', 'OversizedExtraHandling',
+        'ItemSealing', 'PackmanCisPacking', 'Marking',
+        // Штрафы и индекс ошибок без однозначной категории
+        'DefectRate', 'DefectFineModeration', 'DefectFineCounterfeitGoods', 'DefectFineComplaint', 'DefectFineErrors',
+        // Взаиморасчёты, претензии, обеспечительные платежи — не услуги
+        'SaleCommission', 'ClaimCommission', 'CorrectionCommission', 'SetOff', 'VolumeObligationReward',
+        'BrandDeposit', 'KazakhstanBuyerInstallment',
+        // rFBS и международная логистика
+        'RfbsClientDeliveryCharge', 'RfbsDomesticAgentFee', 'RfbsDomesticDelivery', 'RfbsEasyReturn',
+        'RfbsGlobalAgentFee', 'RfbsGlobalDelivery', 'RfbsGlobalIntermediaryService',
+        'RfbsGlobalPlatformConnectionService', 'RfbsBuyerDelivery', 'InternationalLogisticDelta',
+        'OzonGlobalLogisticsDelivery',
+        // B2C-отправления
+        'B2CTemporaryPlacement', 'B2CDisposal', 'B2CInsuranceCompensation', 'B2CInsuranceShipping',
+        'B2C Drop-Off', 'B2C Drop-Off Agent', 'B2CContainerPacking', 'B2CContainerPackage',
+        'B2CCourierClientReinvoice', 'B2CDeliveryToHandoverPlaceByOzon', 'B2CPickUpPointClientReinvoice',
+        'B2CPickUpPointReturnAcceptance', 'B2CLogistics', 'B2CBackwardLogistics',
+    ];
+
+    /**
      * Каждый код уникален.
      */
     public function testNoDuplicateCodes(): void
@@ -202,6 +246,38 @@ final class OzonCostCategoryTest extends TestCase
                 $category->name,
             ),
         );
+    }
+
+    /**
+     * По каждой услуге справочника решение принято явно: она либо размечена,
+     * либо стоит в AWAITING_CLASSIFICATION. Иначе услуга становится видна
+     * только после того, как деньги по ней уже прошли мимо ОПиУ.
+     */
+    public function testEveryDictionaryServiceIsMappedOrAwaitingClassification(): void
+    {
+        $undecided = [];
+        foreach (array_keys(self::ozonAccrualDictionary()) as $name) {
+            if (null === OzonCostCategory::findByAccrualTypeName($name) && !\in_array($name, self::AWAITING_CLASSIFICATION, true)) {
+                $undecided[] = $name;
+            }
+        }
+
+        self::assertSame([], $undecided, 'Услуги справочника Ozon без решения: разметить или добавить в AWAITING_CLASSIFICATION.');
+    }
+
+    public function testAwaitingServiceIsNotMappedAndExistsInDictionary(): void
+    {
+        $dictionary = self::ozonAccrualDictionary();
+
+        self::assertSame(self::AWAITING_CLASSIFICATION, array_values(array_unique(self::AWAITING_CLASSIFICATION)));
+
+        foreach (self::AWAITING_CLASSIFICATION as $name) {
+            self::assertArrayHasKey($name, $dictionary, sprintf('услуги "%s" нет в справочнике Ozon', $name));
+            self::assertNull(
+                OzonCostCategory::findByAccrualTypeName($name),
+                sprintf('услуга "%s" размечена — убрать её из AWAITING_CLASSIFICATION', $name),
+            );
+        }
     }
 
     /**

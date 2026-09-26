@@ -296,6 +296,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги FBO',
                 serviceNames: ['MarketplaceServiceItemTemporaryStorage'],
+                accrualTypeNames: ['TemporaryPlacement'],
             ),
             new self(
                 code: 'ozon_logistic_pickup',
@@ -317,6 +318,7 @@ final readonly class OzonCostCategory
                     'OperationMarketplaceWarehouseToWarehouseMovement',
                     'Перемещение товаров между складами Ozon',
                 ],
+                accrualTypeNames: ['Replenishment'],
             ),
 
             // =================================================================
@@ -331,7 +333,7 @@ final readonly class OzonCostCategory
                     'MarketplaceServiceItemDelivToCustomer',
                     'MarketplaceServiceItemRedistributionLastMileCourier',
                 ],
-                accrualTypeNames: ['LastMileCourier'],
+                accrualTypeNames: ['LastMileCourier', 'LastMile'],
             ),
             new self(
                 code: 'ozon_return_pvz',
@@ -405,6 +407,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
                 operationTypes: ['OperationMarketplaceInternetSiteAdvertising'],
+                accrualTypeNames: ['InternetSiteAdvertising'],
             ),
             new self(
                 code: 'ozon_sending_push_notifications',
@@ -425,6 +428,7 @@ final readonly class OzonCostCategory
                     'OperationSubscriptionPremiumPlus',
                     'Подписка Premium Plus',
                 ],
+                accrualTypeNames: ['PremiumSubscription', 'PremiumCashbackPromotion'],
             ),
             new self(
                 code: 'ozon_premium_cashback',
@@ -436,6 +440,7 @@ final readonly class OzonCostCategory
                     'MarketplaceServiceItemElectronicServicesPremiumCashbackIndividualPoints',
                     'OperationMarketplaceServicePremiumCashbackIndividualPoints',
                 ],
+                accrualTypeNames: ['PremiumCashbackIndividualPoints'],
             ),
             new self(
                 code: 'ozon_reviews',
@@ -451,7 +456,7 @@ final readonly class OzonCostCategory
                     'OperationPointsForReviews',
                     'Баллы за отзывы',
                 ],
-                accrualTypeNames: ['AcceleratedReviewCollection'],
+                accrualTypeNames: ['AcceleratedReviewCollection', 'PointsForReviews', 'SaleReview', 'CustomerReviews'],
             ),
             new self(
                 code: 'ozon_pin_review',
@@ -474,6 +479,7 @@ final readonly class OzonCostCategory
                     'OperationMarketplaceServicePremiumCashbackBonusAccrual',
                     'Бонусы продавца - рассылка',
                 ],
+                accrualTypeNames: ['PremiumMailingCommission'],
             ),
             new self(
                 code: 'ozon_marketing_action',
@@ -578,6 +584,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['OperationLabelOriginal'],
+                accrualTypeNames: ['LabelOriginal'],
             ),
             new self(
                 code: 'ozon_brand_verified',
@@ -601,6 +608,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['Charity'],
+                accrualTypeNames: ['Charity'],
             ),
             new self(
                 code: 'ozon_agency_fee',
@@ -631,6 +639,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['MarketplaceServiceItemInstallment'],
+                accrualTypeNames: ['Installment'],
             ),
             new self(
                 code: 'ozon_premium_correction',
@@ -667,6 +676,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['FinesProhibitedProducts'],
+                accrualTypeNames: ['DefectFineProhibitedGoods'],
             ),
             new self(
                 code: 'ozon_fines_shipment_delay',
@@ -749,6 +759,7 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 serviceNames: ['MarketplaceServiceItemServiceFeeRFBS'],
+                accrualTypeNames: ['RfbsServiceFee'],
             ),
             new self(
                 code: 'ozon_other_service',
