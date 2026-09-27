@@ -3913,12 +3913,6 @@ parameters:
 			path: src/Finance/Repository/PLCategoryRepository.php
 
 		-
-			message: '#^Method App\\Finance\\Repository\\PLCategoryRepository\:\:collectTree\(\) has parameter \$result with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Finance/Repository/PLCategoryRepository.php
-
-		-
 			message: '#^Class App\\Finance\\Repository\\PLDailyTotalRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -5195,42 +5189,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Marketplace/Controller/CostCategoriesCleanupController.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: src/Marketplace/Controller/CostPLMappingController.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getName\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: src/Marketplace/Controller/CostPLMappingController.php
-
-		-
-			message: '#^Call to an undefined method object\:\:isSystem\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Controller/CostPLMappingController.php
-
-		-
-			message: '#^Call to an undefined method object\:\:softDelete\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Controller/CostPLMappingController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Controller/CostPLMappingController.php
-
-		-
-			message: '#^Parameter \#3 \$costCategory of class App\\Marketplace\\Entity\\MarketplaceCostPLMapping constructor expects App\\Marketplace\\Entity\\MarketplaceCostCategory, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Controller/CostPLMappingController.php
 
 		-
 			message: '#^Method App\\Marketplace\\Controller\\CostPLMappingDefaultSetupController\:\:applyResultToArray\(\) return type has no value type specified in iterable type array\.$#'
@@ -9725,12 +9683,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Functional/Inventory/Controller/StockReportControllerTest.php
-
-		-
-			message: '#^Method App\\Tests\\Functional\\Marketplace\\Controller\\CostPLMappingControllerTest\:\:seedBaseData\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Functional/Marketplace/Controller/CostPLMappingControllerTest.php
 
 		-
 			message: '#^Method App\\Tests\\Functional\\Marketplace\\Controller\\CostPLMappingDefaultSetupControllerTest\:\:seedBaseData\(\) return type has no value type specified in iterable type array\.$#'
