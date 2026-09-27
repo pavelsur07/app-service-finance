@@ -90,6 +90,34 @@ final class WbFinanceSyncCalendarBuilderTest extends TestCase
         );
     }
 
+    public function testErrorDaysListDaysWithErrorNewestFirst(): void
+    {
+        $rows = [
+            $this->row('2026-09-01', 'success'),
+            $this->row('2026-09-02', 'failed_final', ['last_error_class' => 'WbApiException', 'last_error_message' => 'Bad request', 'last_error_status_code' => 400]),
+            $this->row('2026-09-05', 'loading', ['last_error_message' => 'Too Many Requests', 'last_error_status_code' => 429]),
+            $this->row('2026-09-03', 'conflict', ['last_error_message' => 'Rows changed']),
+            $this->row('2026-09-04', 'processing'),
+        ];
+
+        $errorDays = $this->builder->build($rows, new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-27'))['errorDays'];
+
+        self::assertSame(
+            ['2026-09-05 00:00:00', '2026-09-03 00:00:00', '2026-09-02 00:00:00'],
+            array_column($errorDays, 'business_date'),
+        );
+        self::assertSame(['Загрузка', 'Конфликт', 'Финальная ошибка'], array_column($errorDays, 'status_label'));
+        self::assertSame('Bad request', $errorDays[2]['last_error_message']);
+        self::assertSame(400, $errorDays[2]['last_error_status_code']);
+    }
+
+    public function testErrorDaysEmptyWhenMonthIsClean(): void
+    {
+        $calendar = $this->builder->build([$this->row('2026-09-01', 'success')], new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-27'));
+
+        self::assertSame([], $calendar['errorDays']);
+    }
+
     public function testLongErrorMessageIsTruncated(): void
     {
         $row = $this->row('2026-09-04', 'failed', ['last_error_message' => str_repeat('x', 1000)]);

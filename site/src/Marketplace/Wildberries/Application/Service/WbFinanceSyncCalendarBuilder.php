@@ -17,7 +17,8 @@ use App\Marketplace\Enum\FinancialReportSyncStatus;
  *     prevMonth: string,
  *     nextMonth: ?string,
  *     weekLabels: list<string>,
- *     weekdays: list<array{label: string, cells: list<?CalendarCell>}>
+ *     weekdays: list<array{label: string, cells: list<?CalendarCell>}>,
+ *     errorDays: list<array<string, mixed>>
  * }
  */
 final readonly class WbFinanceSyncCalendarBuilder
@@ -69,10 +70,18 @@ final readonly class WbFinanceSyncCalendarBuilder
         $todayDate = $today->format('Y-m-d');
 
         $rowsByDate = [];
+        $errorDays = [];
         foreach ($rows as $row) {
             $date = substr((string) ($row['business_date'] ?? ''), 0, 10);
             $rowsByDate[$date] ??= $row;
+
+            $status = FinancialReportSyncStatus::tryFrom((string) ($row['status'] ?? ''));
+            if (null !== ($row['last_error_message'] ?? null) || self::STATE_ERR === $this->state($status)) {
+                $row['status_label'] = $status?->getLabel() ?? (string) ($row['status'] ?? '');
+                $errorDays[] = $row;
+            }
         }
+        usort($errorDays, static fn (array $a, array $b): int => strcmp((string) $b['business_date'], (string) $a['business_date']));
 
         $offset = (int) $monthStart->format('N') - 1;
         $daysInMonth = (int) $monthStart->format('t');
@@ -115,6 +124,7 @@ final readonly class WbFinanceSyncCalendarBuilder
             'nextMonth' => $nextMonth->format('Y-m-d') > $todayDate ? null : $nextMonth->format('Y-m'),
             'weekLabels' => $weekLabels,
             'weekdays' => $weekdays,
+            'errorDays' => $errorDays,
         ];
     }
 
