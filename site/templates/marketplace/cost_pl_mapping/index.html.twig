@@ -275,7 +275,8 @@
                 if (!currentRow || inFlight) {
                     return;
                 }
-                if (!sortInput.checkValidity()) {
+                var sortOrder = Number(sortInput.value);
+                if (!sortInput.checkValidity() || !Number.isInteger(sortOrder)) {
                     sortInput.reportValidity();
                     return;
                 }
@@ -295,7 +296,7 @@
                         body: JSON.stringify({
                             plCategoryId: plSelect.value || null,
                             includeInPl: includeInput.checked,
-                            sortOrder: parseInt(sortInput.value, 10)
+                            sortOrder: sortOrder
                         })
                     });
                     var data = null;
