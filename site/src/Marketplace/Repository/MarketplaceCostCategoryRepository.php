@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Ramsey\Uuid\Uuid;
 
 class MarketplaceCostCategoryRepository extends ServiceEntityRepository
 {
@@ -57,6 +58,22 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->andWhere('c.id = :id')
             ->andWhere('c.deletedAt IS NULL')
             ->setParameter('company', $company)
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findByIdAndCompanyId(string $companyId, string $id): ?MarketplaceCostCategory
+    {
+        if (!Uuid::isValid($id)) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('c')
+            ->where('IDENTITY(c.company) = :companyId')
+            ->andWhere('c.id = :id')
+            ->andWhere('c.deletedAt IS NULL')
+            ->setParameter('companyId', $companyId)
             ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();

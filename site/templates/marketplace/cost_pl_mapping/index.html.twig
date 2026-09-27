@@ -28,100 +28,123 @@
             </button>
         </form>
 
-        {% if cost_categories is empty %}
+        {% if rows is empty %}
             <div class="alert alert-info">
                 Нет категорий затрат. Загрузите затраты из маркетплейса.
             </div>
         {% else %}
-            <form method="post" action="{{ path('marketplace_cost_pl_mapping_bulk_save') }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_cost_pl_mapping_bulk_save') }}">
-                <input type="hidden" name="marketplace" value="{{ selected_marketplace ?? '' }}">
-
-                <div class="card">
-                    <div class="table-responsive">
-                        <table class="table table-vcenter card-table">
-                            <thead>
-                            <tr>
-                                <th>Категория затрат</th>
-                                <th>Маркетплейс</th>
-                                <th style="min-width: 280px">Категория ОПиУ</th>
-                                <th class="text-center">Включить в ОПиУ</th>
-                                <th style="width: 80px">Порядок</th>
-                                <th style="width: 60px"></th>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>Категория затрат</th>
+                            <th>Маркетплейс</th>
+                            <th>Категория ОПиУ</th>
+                            <th class="text-center">Включить в ОПиУ</th>
+                            <th>Порядок</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in rows %}
+                            <tr data-mapping-row
+                                data-update-url="{{ path('marketplace_cost_pl_mapping_update', {costCategoryId: row.costCategoryId}) }}"
+                                data-name="{{ row.name }}"
+                                data-pl-category-id="{{ row.plCategoryId ?? '' }}"
+                                data-include-in-pl="{{ row.includeInPl ? '1' : '0' }}"
+                                data-sort-order="{{ row.sortOrder }}">
+                                <td>
+                                    <div class="fw-medium">{{ row.name }}</div>
+                                    {% if row.code %}
+                                        <div class="text-muted small">{{ row.code }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-azure-lt">{{ row.marketplace|upper }}</span>
+                                </td>
+                                <td data-cell-pl>
+                                    {% if row.plCategoryId is null %}
+                                        <span class="text-muted">— не задана —</span>
+                                    {% else %}
+                                        {{ pl_category_names[row.plCategoryId] ?? 'Статья ОПиУ не найдена' }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-center" data-cell-include>
+                                    {% if row.includeInPl %}
+                                        <span class="badge bg-green-lt">Да</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-lt">Нет</span>
+                                    {% endif %}
+                                </td>
+                                <td data-cell-sort>{{ row.sortOrder }}</td>
+                                <td class="text-end text-nowrap">
+                                    <button type="button"
+                                            class="btn btn-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modal-edit-cost-mapping">
+                                        Изменить
+                                    </button>
+                                    {% if not row.isSystem %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-ghost-danger"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modal-delete-cost-category"
+                                                data-url="{{ path('marketplace_cost_pl_mapping_delete_category', {id: row.costCategoryId}) }}"
+                                                data-name="{{ row.name }}">
+                                            Удалить
+                                        </button>
+                                    {% endif %}
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody>
-                            {% for category in cost_categories %}
-                                {% set mapping = mappings_indexed[category.id] ?? null %}
-                                <tr>
-                                    <td>
-                                        <div class="fw-medium">{{ category.name }}</div>
-                                        {% if category.code %}
-                                            <div class="text-muted small">{{ category.code }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-azure-lt">{{ category.marketplace.value|upper }}</span>
-                                    </td>
-                                    <td>
-                                        <select name="mappings[{{ category.id }}][pl_category_id]"
-                                                class="form-select form-select-sm">
-                                            <option value="">— не задана —</option>
-                                            {% for plCat in pl_categories %}
-                                                <option value="{{ plCat.id }}"
-                                                    {{ (mapping and mapping.plCategoryId == plCat.id) ? 'selected' : '' }}>
-                                                    {{ plCat.indentedName }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td class="text-center">
-                                        <input type="checkbox"
-                                               name="mappings[{{ category.id }}][include_in_pl]"
-                                               value="1"
-                                               class="form-check-input"
-                                            {{ (mapping is null or mapping.includeInPl) ? 'checked' : '' }}>
-                                    </td>
-                                    <td>
-                                        <input type="number"
-                                               name="mappings[{{ category.id }}][sort_order]"
-                                               value="{{ mapping ? mapping.sortOrder : 0 }}"
-                                               class="form-control form-control-sm"
-                                               min="0" step="10">
-                                    </td>
-                                    <td>
-                                        {% if not category.isSystem %}
-                                            <button type="button"
-                                                    class="btn btn-sm btn-ghost-danger"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#modal-delete-cost-category"
-                                                    data-url="{{ path('marketplace_cost_pl_mapping_delete_category', {id: category.id}) }}"
-                                                    data-name="{{ category.name }}"
-                                                    data-marketplace="{{ selected_marketplace ?? '' }}"
-                                                    data-token="{{ csrf_token('delete' ~ category.id) }}">
-                                                Удалить
-                                            </button>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-footer d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
-                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M5 12l5 5l10 -10"/>
-                            </svg>
-                            Сохранить все маппинги
-                        </button>
-                    </div>
+                        {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </form>
+            </div>
         {% endif %}
 
+    </div>
+
+    {# Modal: Изменить маппинг одной категории затрат — select статей ОПиУ один на страницу #}
+    <div class="modal modal-blur fade" id="modal-edit-cost-mapping" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form id="form-edit-cost-mapping"
+                      data-csrf-token="{{ csrf_token(constant('App\\Marketplace\\Controller\\CostPLMappingUpdateController::CSRF_TOKEN_ID')) }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Маппинг: <span id="edit-mapping-name"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger d-none" id="edit-mapping-error"></div>
+                        <div class="mb-3">
+                            <label class="form-label" for="edit-mapping-pl">Категория ОПиУ</label>
+                            <select id="edit-mapping-pl" class="form-select">
+                                <option value="">— не задана —</option>
+                                {% for plCat in pl_categories %}
+                                    <option value="{{ plCat.id }}">{{ plCat.indentedName }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-check">
+                                <input type="checkbox" id="edit-mapping-include" class="form-check-input">
+                                <span class="form-check-label">Включить в ОПиУ</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="form-label" for="edit-mapping-sort">Порядок</label>
+                            <input type="number" id="edit-mapping-sort" class="form-control" min="0" max="32767" step="10" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary" id="edit-mapping-submit">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     {% include 'marketplace/cost_pl_mapping/_default_mapping_modal.html.twig' %}
@@ -131,8 +154,8 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" id="form-delete-cost-category">
-                    <input type="hidden" name="_token" id="delete-modal-token" value="">
-                    <input type="hidden" name="marketplace" id="delete-modal-marketplace" value="">
+                    <input type="hidden" name="_token" value="{{ csrf_token(constant('App\\Marketplace\\Controller\\CostCategoryDeleteController::CSRF_TOKEN_ID')) }}">
+                    <input type="hidden" name="marketplace" value="{{ selected_marketplace ?? '' }}">
                     <div class="modal-header">
                         <h5 class="modal-title">Удалить категорию затрат</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -165,15 +188,114 @@
     <script>
         document.getElementById('modal-delete-cost-category').addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;
-            var categoryName = btn.getAttribute('data-name');
-            var marketplace = btn.getAttribute('data-marketplace');
-            var url = btn.getAttribute('data-url');
-
-            document.getElementById('delete-modal-category-name').textContent = '"' + categoryName + '"';
-            document.getElementById('delete-modal-marketplace').value = marketplace;
-            document.getElementById('delete-modal-token').value = btn.getAttribute('data-token');
-            document.getElementById('form-delete-cost-category').action = url;
+            document.getElementById('delete-modal-category-name').textContent = '"' + btn.getAttribute('data-name') + '"';
+            document.getElementById('form-delete-cost-category').action = btn.getAttribute('data-url');
         });
+
+        (function () {
+            var modalEl = document.getElementById('modal-edit-cost-mapping');
+            var form = document.getElementById('form-edit-cost-mapping');
+            var nameEl = document.getElementById('edit-mapping-name');
+            var errorEl = document.getElementById('edit-mapping-error');
+            var plSelect = document.getElementById('edit-mapping-pl');
+            var includeInput = document.getElementById('edit-mapping-include');
+            var sortInput = document.getElementById('edit-mapping-sort');
+            var submitBtn = document.getElementById('edit-mapping-submit');
+            var currentRow = null;
+
+            function plName(id) {
+                var option = id ? plSelect.querySelector('option[value="' + CSS.escape(id) + '"]') : null;
+                return option ? option.textContent.replace(/^(— )+/, '').trim() : '';
+            }
+
+            function badge(text, cls) {
+                var span = document.createElement('span');
+                span.className = 'badge ' + cls;
+                span.textContent = text;
+                return span;
+            }
+
+            function renderRow(row, data) {
+                row.setAttribute('data-pl-category-id', data.plCategoryId || '');
+                row.setAttribute('data-include-in-pl', data.includeInPl ? '1' : '0');
+                row.setAttribute('data-sort-order', String(data.sortOrder));
+
+                var plCell = row.querySelector('[data-cell-pl]');
+                plCell.textContent = '';
+                if (data.plCategoryId) {
+                    plCell.textContent = plName(data.plCategoryId) || 'Статья ОПиУ не найдена';
+                } else {
+                    var empty = document.createElement('span');
+                    empty.className = 'text-muted';
+                    empty.textContent = '— не задана —';
+                    plCell.appendChild(empty);
+                }
+
+                var includeCell = row.querySelector('[data-cell-include]');
+                includeCell.textContent = '';
+                includeCell.appendChild(data.includeInPl ? badge('Да', 'bg-green-lt') : badge('Нет', 'bg-secondary-lt'));
+
+                row.querySelector('[data-cell-sort]').textContent = String(data.sortOrder);
+            }
+
+            modalEl.addEventListener('show.bs.modal', function (event) {
+                currentRow = event.relatedTarget.closest('[data-mapping-row]');
+                errorEl.classList.add('d-none');
+                submitBtn.disabled = false;
+                nameEl.textContent = currentRow.getAttribute('data-name');
+                plSelect.value = currentRow.getAttribute('data-pl-category-id');
+                if (plSelect.value !== currentRow.getAttribute('data-pl-category-id')) {
+                    plSelect.value = '';
+                }
+                includeInput.checked = currentRow.getAttribute('data-include-in-pl') === '1';
+                sortInput.value = currentRow.getAttribute('data-sort-order');
+            });
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                if (!currentRow || submitBtn.disabled) {
+                    return;
+                }
+                if (!sortInput.checkValidity()) {
+                    sortInput.reportValidity();
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                errorEl.classList.add('d-none');
+                try {
+                    var res = await fetch(currentRow.getAttribute('data-update-url'), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token': form.getAttribute('data-csrf-token')
+                        },
+                        body: JSON.stringify({
+                            plCategoryId: plSelect.value || null,
+                            includeInPl: includeInput.checked,
+                            sortOrder: parseInt(sortInput.value, 10)
+                        })
+                    });
+                    var data = null;
+                    try {
+                        data = await res.json();
+                    } catch (e) {
+                        data = null;
+                    }
+                    if (!res.ok || !data) {
+                        throw new Error(data && data.error ? data.error.message : 'Не удалось сохранить. Обновите страницу и повторите попытку.');
+                    }
+
+                    renderRow(currentRow, data);
+                    window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                } catch (e) {
+                    errorEl.textContent = e.message;
+                    errorEl.classList.remove('d-none');
+                    submitBtn.disabled = false;
+                }
+            });
+        })();
 
         (function () {
             var modalRoot = document.querySelector('[data-default-mapping-modal]');

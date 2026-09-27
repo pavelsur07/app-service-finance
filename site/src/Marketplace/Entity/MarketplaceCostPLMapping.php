@@ -25,6 +25,9 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_pl_mapping_company')]
 class MarketplaceCostPLMapping
 {
+    /** Верхняя граница колонки smallint */
+    public const SORT_ORDER_MAX = 32767;
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private string $id;
@@ -69,25 +72,41 @@ class MarketplaceCostPLMapping
         MarketplaceCostCategory $costCategory,
         ?string $plCategoryId,
         bool $includeInPl = true,
+        int $sortOrder = 0,
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
+        Assert::range($sortOrder, 0, self::SORT_ORDER_MAX);
 
         $this->id = $id;
         $this->companyId = $companyId;
         $this->costCategory = $costCategory;
         $this->plCategoryId = $plCategoryId;
         $this->includeInPl = $includeInPl;
+        $this->sortOrder = $sortOrder;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function update(?string $plCategoryId, bool $includeInPl, int $sortOrder): void
+    /**
+     * @return bool false — значения те же, запись не изменена и UPDATE не нужен
+     */
+    public function update(?string $plCategoryId, bool $includeInPl, int $sortOrder): bool
     {
+        Assert::range($sortOrder, 0, self::SORT_ORDER_MAX);
+
+        if ($this->plCategoryId === $plCategoryId
+            && $this->includeInPl === $includeInPl
+            && $this->sortOrder === $sortOrder) {
+            return false;
+        }
+
         $this->plCategoryId = $plCategoryId;
         $this->includeInPl = $includeInPl;
         $this->sortOrder = $sortOrder;
         $this->updatedAt = new \DateTimeImmutable();
+
+        return true;
     }
 
     public function getId(): string

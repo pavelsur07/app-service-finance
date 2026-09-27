@@ -33,24 +33,52 @@ class PLCategoryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Дерево компании в DFS pre-order, братья по sortOrder.
+     *
+     * Один SELECT и сборка в памяти: обход через getChildren() стоил запроса
+     * на каждый узел, включая листья.
+     *
      * @return PLCategory[]
      */
     public function findTreeByCompany(Company $company): array
     {
-        $roots = $this->findRootByCompany($company);
+        /** @var PLCategory[] $categories */
+        $categories = $this->createQueryBuilder('c')
+            ->andWhere('c.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('c.sortOrder', 'ASC')
+            ->addOrderBy('c.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $roots = [];
+        $childrenByParentId = [];
+        foreach ($categories as $category) {
+            $parent = $category->getParent();
+            if (null === $parent) {
+                $roots[] = $category;
+            } else {
+                $childrenByParentId[(string) $parent->getId()][] = $category;
+            }
+        }
+
         $result = [];
         foreach ($roots as $root) {
-            $this->collectTree($root, $result);
+            $this->collectTree($root, $childrenByParentId, $result);
         }
 
         return $result;
     }
 
-    private function collectTree(PLCategory $category, array &$result): void
+    /**
+     * @param array<string, PLCategory[]> $childrenByParentId
+     * @param PLCategory[] $result
+     */
+    private function collectTree(PLCategory $category, array $childrenByParentId, array &$result): void
     {
         $result[] = $category;
-        foreach ($category->getChildren() as $child) {
-            $this->collectTree($child, $result);
+        foreach ($childrenByParentId[(string) $category->getId()] ?? [] as $child) {
+            $this->collectTree($child, $childrenByParentId, $result);
         }
     }
 
