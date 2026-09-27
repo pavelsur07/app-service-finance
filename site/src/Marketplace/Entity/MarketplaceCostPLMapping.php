@@ -25,7 +25,8 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_pl_mapping_company')]
 class MarketplaceCostPLMapping
 {
-    /** Верхняя граница колонки smallint */
+    /** Границы колонки smallint */
+    public const SORT_ORDER_MIN = -32768;
     public const SORT_ORDER_MAX = 32767;
 
     #[ORM\Id]
@@ -76,7 +77,7 @@ class MarketplaceCostPLMapping
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
-        Assert::range($sortOrder, 0, self::SORT_ORDER_MAX);
+        Assert::range($sortOrder, self::SORT_ORDER_MIN, self::SORT_ORDER_MAX);
 
         $this->id = $id;
         $this->companyId = $companyId;
@@ -93,7 +94,7 @@ class MarketplaceCostPLMapping
      */
     public function update(?string $plCategoryId, bool $includeInPl, int $sortOrder): bool
     {
-        Assert::range($sortOrder, 0, self::SORT_ORDER_MAX);
+        Assert::range($sortOrder, self::SORT_ORDER_MIN, self::SORT_ORDER_MAX);
 
         if ($this->plCategoryId === $plCategoryId
             && $this->includeInPl === $includeInPl

@@ -9685,12 +9685,6 @@ parameters:
 			path: tests/Functional/Inventory/Controller/StockReportControllerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Functional\\Marketplace\\Controller\\CostPLMappingControllerTest\:\:seedBaseData\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Functional/Marketplace/Controller/CostPLMappingControllerTest.php
-
-		-
 			message: '#^Method App\\Tests\\Functional\\Marketplace\\Controller\\CostPLMappingDefaultSetupControllerTest\:\:seedBaseData\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1

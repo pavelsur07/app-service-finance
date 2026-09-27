@@ -22,6 +22,29 @@ use Symfony\Component\HttpKernel\Profiler\Profile;
 
 final class CostPLMappingControllerTest extends WebTestCaseBase
 {
+    public function testIndexRendersDefaultMappingUiElements(): void
+    {
+        $this->resetDb();
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(1);
+        $this->em()->flush();
+        $this->login($client, $user, $company);
+
+        $client->request('GET', '/marketplace/cost-pl-mapping');
+
+        self::assertResponseIsSuccessful();
+        $html = (string) $client->getResponse()->getContent();
+
+        self::assertStringContainsString('Настроить базовый маппинг', $html);
+        self::assertSelectorExists('#modal-default-cost-mapping [data-default-mapping-modal]');
+        self::assertSelectorExists('#modal-default-cost-mapping [data-default-mapping-apply]');
+
+        self::assertSelectorExists('[data-preview-url="/marketplace/cost-pl-mapping/default/preview"]');
+        self::assertSelectorExists('[data-apply-url="/marketplace/cost-pl-mapping/default/apply"]');
+
+        self::assertSelectorExists('[data-default-mapping-modal][data-csrf-token]:not([data-csrf-token=""])');
+    }
+
     public function testIndexRendersReadOnlyRowsWithSingleSelect(): void
     {
         $this->resetDb();
@@ -122,7 +145,7 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(422);
         self::assertSame('pl_category_invalid', $this->json($client)['error']['code']);
 
-        $this->postUpdate($client, (string) $cost->getId(), ['plCategoryId' => null, 'includeInPl' => true, 'sortOrder' => -1]);
+        $this->postUpdate($client, (string) $cost->getId(), ['plCategoryId' => null, 'includeInPl' => true, 'sortOrder' => 40000]);
         self::assertResponseStatusCodeSame(422);
         self::assertSame('sort_order_invalid', $this->json($client)['error']['code']);
 

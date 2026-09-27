@@ -28,6 +28,7 @@
             </button>
         </form>
 
+        {% set can_write = is_granted(constant('App\\Company\\Security\\ModuleAccess::MARKETPLACE_WRITE')) %}
         {% if rows is empty %}
             <div class="alert alert-info">
                 Нет категорий затрат. Загрузите затраты из маркетплейса.
@@ -79,6 +80,7 @@
                                 </td>
                                 <td data-cell-sort>{{ row.sortOrder }}</td>
                                 <td class="text-end text-nowrap">
+                                    {% if can_write %}
                                     <button type="button"
                                             class="btn btn-sm"
                                             data-bs-toggle="modal"
@@ -94,6 +96,7 @@
                                                 data-name="{{ row.name }}">
                                             Удалить
                                         </button>
+                                    {% endif %}
                                     {% endif %}
                                 </td>
                             </tr>
@@ -118,12 +121,15 @@
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger d-none" id="edit-mapping-error"></div>
+                        <div class="alert alert-warning d-none" id="edit-mapping-dangling">
+                            Текущая статья ОПиУ не найдена. Выберите статью, иначе при сохранении привязка будет снята.
+                        </div>
                         <div class="mb-3">
                             <label class="form-label" for="edit-mapping-pl">Категория ОПиУ</label>
                             <select id="edit-mapping-pl" class="form-select">
                                 <option value="">— не задана —</option>
                                 {% for plCat in pl_categories %}
-                                    <option value="{{ plCat.id }}">{{ plCat.indentedName }}</option>
+                                    <option value="{{ plCat.id }}" data-name="{{ plCat.name }}">{{ plCat.indentedName }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -135,7 +141,7 @@
                         </div>
                         <div>
                             <label class="form-label" for="edit-mapping-sort">Порядок</label>
-                            <input type="number" id="edit-mapping-sort" class="form-control" min="0" max="32767" step="10" required>
+                            <input type="number" id="edit-mapping-sort" class="form-control" min="{{ constant('App\\Marketplace\\Entity\\MarketplaceCostPLMapping::SORT_ORDER_MIN') }}" max="{{ constant('App\\Marketplace\\Entity\\MarketplaceCostPLMapping::SORT_ORDER_MAX') }}" step="1" required>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -201,11 +207,13 @@
             var includeInput = document.getElementById('edit-mapping-include');
             var sortInput = document.getElementById('edit-mapping-sort');
             var submitBtn = document.getElementById('edit-mapping-submit');
+            var danglingEl = document.getElementById('edit-mapping-dangling');
             var currentRow = null;
+            var inFlight = false;
 
             function plName(id) {
                 var option = id ? plSelect.querySelector('option[value="' + CSS.escape(id) + '"]') : null;
-                return option ? option.textContent.replace(/^(— )+/, '').trim() : '';
+                return option ? option.getAttribute('data-name') : '';
             }
 
             function badge(text, cls) {
@@ -243,17 +251,28 @@
                 errorEl.classList.add('d-none');
                 submitBtn.disabled = false;
                 nameEl.textContent = currentRow.getAttribute('data-name');
-                plSelect.value = currentRow.getAttribute('data-pl-category-id');
-                if (plSelect.value !== currentRow.getAttribute('data-pl-category-id')) {
+                var plCategoryId = currentRow.getAttribute('data-pl-category-id');
+                plSelect.value = plCategoryId;
+                var dangling = plSelect.value !== plCategoryId;
+                if (dangling) {
                     plSelect.value = '';
                 }
+                danglingEl.classList.toggle('d-none', !dangling);
                 includeInput.checked = currentRow.getAttribute('data-include-in-pl') === '1';
                 sortInput.value = currentRow.getAttribute('data-sort-order');
             });
 
+            // Пока запрос в полёте, модалку не закрыть и не открыть на другой строке:
+            // иначе поздний ответ попадёт в чужую строку.
+            modalEl.addEventListener('hide.bs.modal', function (event) {
+                if (inFlight) {
+                    event.preventDefault();
+                }
+            });
+
             form.addEventListener('submit', async function (event) {
                 event.preventDefault();
-                if (!currentRow || submitBtn.disabled) {
+                if (!currentRow || inFlight) {
                     return;
                 }
                 if (!sortInput.checkValidity()) {
@@ -261,10 +280,12 @@
                     return;
                 }
 
+                var row = currentRow;
+                inFlight = true;
                 submitBtn.disabled = true;
                 errorEl.classList.add('d-none');
                 try {
-                    var res = await fetch(currentRow.getAttribute('data-update-url'), {
+                    var res = await fetch(row.getAttribute('data-update-url'), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -287,12 +308,15 @@
                         throw new Error(data && data.error ? data.error.message : 'Не удалось сохранить. Обновите страницу и повторите попытку.');
                     }
 
-                    renderRow(currentRow, data);
+                    renderRow(row, data);
+                    inFlight = false;
                     window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
                 } catch (e) {
                     errorEl.textContent = e.message;
                     errorEl.classList.remove('d-none');
                     submitBtn.disabled = false;
+                } finally {
+                    inFlight = false;
                 }
             });
         })();

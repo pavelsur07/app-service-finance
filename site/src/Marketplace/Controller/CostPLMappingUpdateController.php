@@ -65,8 +65,14 @@ final class CostPLMappingUpdateController extends AbstractController
         if ((null !== $plCategoryId && !is_string($plCategoryId)) || !is_bool($includeInPl)) {
             return $this->error('payload_invalid', 'Некорректный запрос.', Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-        if (!is_int($sortOrder) || $sortOrder < 0 || $sortOrder > MarketplaceCostPLMapping::SORT_ORDER_MAX) {
-            return $this->error('sort_order_invalid', sprintf('Порядок — целое число от 0 до %d.', MarketplaceCostPLMapping::SORT_ORDER_MAX), Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (!is_int($sortOrder)
+            || $sortOrder < MarketplaceCostPLMapping::SORT_ORDER_MIN
+            || $sortOrder > MarketplaceCostPLMapping::SORT_ORDER_MAX) {
+            return $this->error('sort_order_invalid', sprintf(
+                'Порядок — целое число от %d до %d.',
+                MarketplaceCostPLMapping::SORT_ORDER_MIN,
+                MarketplaceCostPLMapping::SORT_ORDER_MAX,
+            ), Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         try {
