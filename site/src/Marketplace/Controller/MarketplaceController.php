@@ -12,6 +12,7 @@ use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
@@ -29,7 +30,6 @@ use App\Marketplace\Ozon\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlannerInterface;
-use App\Marketplace\Wildberries\Application\Service\WbFinanceSyncCalendarBuilder;
 use App\Marketplace\Wildberries\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Wildberries\Infrastructure\Api\WildberriesAdapter;
 use App\Marketplace\Wildberries\Infrastructure\Query\WbFinanceSyncStatusListQuery;
@@ -70,7 +70,6 @@ class MarketplaceController extends AbstractController
         private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
         private readonly AppLogger $appLogger,
         private readonly OzonPerformanceConnectionValidator $ozonPerformanceValidator,
-        private readonly WbFinanceSyncCalendarBuilder $wbFinanceSyncCalendarBuilder,
     ) {
     }
 
@@ -93,22 +92,17 @@ class MarketplaceController extends AbstractController
             50,
         );
 
-        $wbFinanceSyncCalendar = null;
-        if (null !== $this->connectionRepository->findByMarketplace($company, MarketplaceType::WILDBERRIES)) {
-            $today = new \DateTimeImmutable('today');
-            $wbFinanceMonth = $this->wbFinanceSyncCalendarBuilder->resolveMonth((string) $request->query->get('month', ''), $today);
-            $wbFinanceSyncCalendar = $this->wbFinanceSyncCalendarBuilder->build(
-                $this->wbFinanceSyncStatusListQuery->findMonthDays((string) $company->getId(), $wbFinanceMonth),
-                $wbFinanceMonth,
-                $today,
-            );
-        }
+        $wbFinanceSyncDays = array_map(static function (array $row): array {
+            $row['status_enum'] = FinancialReportSyncStatus::from((string) $row['status']);
+
+            return $row;
+        }, $this->wbFinanceSyncStatusListQuery->findCurrentMonthDays((string) $company->getId()));
 
         return $this->render('marketplace/index.html.twig', [
             'rawDocumentsPager' => $rawDocumentsPager,
             'availableMarketplaces' => MarketplaceType::cases(),
             'selectedMarketplace' => $selectedMarketplace,
-            'wbFinanceSyncCalendar' => $wbFinanceSyncCalendar,
+            'wbFinanceSyncDays' => $wbFinanceSyncDays,
         ]);
     }
 
