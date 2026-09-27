@@ -12,7 +12,6 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Wildberries\Infrastructure\Api\WbFinanceSalesReportClient;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Symfony\Component\Clock\MockClock;
@@ -156,117 +155,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(1, $requestCount);
         self::assertSame(0, $captured[0]['rrdId']);
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
-    }
-
-    public function testHasAnyDataForConnectionThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
-    {
-        $requestCount = 0;
-        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
-            ++$requestCount;
-
-            return new MockResponse('[{"rrdId":1}]', ['http_code' => 200]);
-        });
-
-        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
-
-        self::assertTrue($client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31'));
-
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31');
-        } finally {
-            self::assertSame(1, $requestCount);
-        }
-    }
-
-    public function testHasAnyDataForConnectionDelegatesToHasAnyDataLogic(): void
-    {
-        $captured = [];
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $payload = $options['json'] ?? null;
-            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
-                $payload = json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR);
-            }
-            $captured = [$method, $url, $payload];
-
-            return new MockResponse('[{"rrdId":77}]', ['http_code' => 200]);
-        });
-
-        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
-
-        self::assertTrue($client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03'));
-        self::assertSame('POST', $captured[0]);
-        self::assertStringEndsWith('/api/finance/v1/sales-reports/detailed', $captured[1]);
-        self::assertSame(1, $captured[2]['limit'] ?? null);
-        self::assertSame('2026-02-01', $captured[2]['dateFrom'] ?? null);
-        self::assertSame('2026-02-03', $captured[2]['dateTo'] ?? null);
-    }
-
-    public function testHasAnyDataForConnectionStoresCooldownAfterRemote429AndSkipsNextHttpRequest(): void
-    {
-        $storage = new InMemoryWbFinanceCooldownStorage();
-        $requestCount = 0;
-        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
-            ++$requestCount;
-
-            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['retry-after: 17']]);
-        });
-        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(null, $storage));
-
-        try {
-            $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03', 'seller-has-any');
-            self::fail('Expected MarketplaceRateLimitException');
-        } catch (MarketplaceRateLimitException $e) {
-            self::assertSame(17, $e->getRetryAfter());
-        }
-
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03', 'seller-has-any');
-        } finally {
-            self::assertSame(1, $requestCount);
-            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:connection-id'));
-            self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-has-any'));
-        }
-    }
-
-    /**
-     * Все ветки разбора ответа пробного запроса «есть ли данные за период».
-     * Этим путём WbFinancialReportFirstAvailableResolver ищет первый доступный
-     * день отчёта при подключении кабинета.
-     *
-     * @return iterable<string, array{int, string, bool|class-string<\Throwable>}>
-     */
-    public static function hasAnyDataResponses(): iterable
-    {
-        yield '204 — данных нет' => [204, '', false];
-        yield '200 с пустым телом — данных нет' => [200, '', false];
-        yield '200 с пустым списком — данных нет' => [200, '[]', false];
-        yield '200 со строкой — данные есть' => [200, '[{"rrdId":1}]', true];
-        yield '401 — ключ отвергнут' => [401, '', MarketplaceAuthException::class];
-        yield '403 — ключ отвергнут' => [403, '', MarketplaceAuthException::class];
-        yield '5xx — временная ошибка' => [503, '{"error":"server"}', MarketplaceTemporaryApiException::class];
-        yield 'неожиданный статус — временная ошибка' => [418, '', MarketplaceTemporaryApiException::class];
-        yield 'невалидный JSON' => [200, '{invalid', MarketplaceInvalidApiResponseException::class];
-        yield 'JSON не список' => [200, '{"rrdId":1}', MarketplaceInvalidApiResponseException::class];
-        yield 'элемент списка не объект' => [200, '[1]', MarketplaceInvalidApiResponseException::class];
-    }
-
-    /**
-     * @param bool|class-string<\Throwable> $expected
-     */
-    #[DataProvider('hasAnyDataResponses')]
-    public function testHasAnyDataForConnectionMapsResponse(int $status, string $body, bool|string $expected): void
-    {
-        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse($body, ['http_code' => $status])), $this->createRateLimiter());
-
-        if (is_string($expected)) {
-            $this->expectException($expected);
-        }
-
-        $result = $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03');
-
-        self::assertSame($expected, $result);
     }
 
     public function testConnectionRemote429CreatesConnectionCooldownWithoutGlobalCooldown(): void

@@ -41,17 +41,6 @@ final class PreflightResult
     }
 
     /**
-     * @return PreflightCheck[]
-     */
-    public function getWarnings(): array
-    {
-        return array_values(array_filter(
-            $this->checks,
-            static fn (PreflightCheck $c) => !$c->passed && !$c->blocking,
-        ));
-    }
-
-    /**
      * Сериализация для хранения в preflight_snapshot.
      */
     public function toArray(): array

@@ -6,7 +6,6 @@ namespace App\Marketplace\Repository;
 
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
-use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 
 interface MarketplaceFinancialReportSyncStatusLookupInterface
@@ -38,14 +37,6 @@ interface MarketplaceFinancialReportSyncStatusLookupInterface
         \DateTimeImmutable $businessDate,
         string $rawDocumentId,
     ): ?MarketplaceFinancialReportSyncStatus;
-
-    public function findStatusEnumByDay(
-        string $connectionId,
-        string $companyId,
-        MarketplaceType $marketplace,
-        \DateTimeImmutable $businessDate,
-        string $reportType,
-    ): ?FinancialReportSyncStatus;
 
     /**
      * @return list<MarketplaceFinancialReportSyncStatus>

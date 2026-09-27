@@ -6,7 +6,6 @@ namespace App\Marketplace\Repository;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCostCategory;
-use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
@@ -48,38 +47,5 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();
-    }
-
-    /**
-     * Массовая загрузка категорий по кодам с индексацией (для bulk import)
-     * Возвращает массив: ['category_code' => Category].
-     */
-    public function findByCodesIndexed(
-        Company $company,
-        MarketplaceType $marketplace,
-        array $codes,
-    ): array {
-        if (empty($codes)) {
-            return [];
-        }
-
-        $categories = $this->createQueryBuilder('c')
-            ->where('c.company = :company')
-            ->andWhere('c.marketplace = :marketplace')
-            ->andWhere('c.code IN (:codes)')
-            ->andWhere('c.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('codes', $codes)
-            ->getQuery()
-            ->getResult();
-
-        // Индексируем по code
-        $indexed = [];
-        foreach ($categories as $category) {
-            $indexed[$category->getCode()] = $category;
-        }
-
-        return $indexed;
     }
 }

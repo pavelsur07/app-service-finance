@@ -90,7 +90,6 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame($this->normalizer->acquiringFee($snakeCase), $this->normalizer->acquiringFee($camelCase));
         self::assertSame($this->normalizer->ppvzVw($snakeCase), $this->normalizer->ppvzVw($camelCase));
         self::assertSame($this->normalizer->ppvzVwNds($snakeCase), $this->normalizer->ppvzVwNds($camelCase));
-        self::assertSame($this->normalizer->fullMarketplaceCommission($snakeCase), $this->normalizer->fullMarketplaceCommission($camelCase));
         self::assertSame($this->normalizer->deliveryAmount($snakeCase), $this->normalizer->deliveryAmount($camelCase));
         self::assertSame($this->normalizer->returnAmount($snakeCase), $this->normalizer->returnAmount($camelCase));
         self::assertSame($this->normalizer->deliveryService($snakeCase), $this->normalizer->deliveryService($camelCase));
@@ -133,7 +132,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
             'spp' => '44.85',
         ];
 
-        self::assertEqualsWithDelta(115.37, $this->normalizer->fullMarketplaceCommission($row), 0.01);
+        self::assertEqualsWithDelta(-94.568, $this->normalizer->ppvzVw($row), 0.001);
+        self::assertSame(-20.8, $this->normalizer->ppvzVwNds($row));
         self::assertSame(660.0, $this->normalizer->grossWithoutSpp($row));
         self::assertSame(364.0, $this->normalizer->retailAmount($row));
     }
@@ -204,7 +204,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame('4600000000001', $this->normalizer->barcode($row));
         self::assertSame(2, $this->normalizer->quantity($row));
         self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
-        self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(60.0, $this->normalizer->ppvzVw($row));
+        self::assertSame(20.0, $this->normalizer->ppvzVwNds($row));
         self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
         self::assertFalse($this->normalizer->isReturn($row));
@@ -234,7 +235,8 @@ final class WbSalesReportRowNormalizerTest extends TestCase
         self::assertSame(1300.0, $this->normalizer->retailPriceWithDisc($row));
         self::assertSame(1200.0, $this->normalizer->forPay($row));
         self::assertSame(20.0, $this->normalizer->acquiringFee($row));
-        self::assertSame(80.0, $this->normalizer->fullMarketplaceCommission($row));
+        self::assertSame(60.0, $this->normalizer->ppvzVw($row));
+        self::assertSame(20.0, $this->normalizer->ppvzVwNds($row));
         self::assertSame(2600.0, $this->normalizer->grossWithoutSpp($row));
         self::assertTrue($this->normalizer->isSale($row));
     }

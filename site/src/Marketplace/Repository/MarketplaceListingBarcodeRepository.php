@@ -97,12 +97,4 @@ class MarketplaceListingBarcodeRepository extends ServiceEntityRepository
             'barcode' => $barcode,
         ]);
     }
-
-    /**
-     * @deprecated используйте existsForCompanyAndMarketplace — баркод уникален внутри маркетплейса, не глобально
-     */
-    public function existsForCompany(string $companyId, string $barcode): bool
-    {
-        return null !== $this->findOneBy(['companyId' => $companyId, 'barcode' => $barcode]);
-    }
 }

@@ -58,19 +58,6 @@ final class MarketplaceBarcodeCatalogService
     }
 
     /**
-     * Получить size по barcode из каталога.
-     */
-    public function findSizeByBarcode(
-        string $companyId,
-        MarketplaceType $marketplace,
-        string $barcode,
-    ): ?string {
-        $entry = $this->repository->findByBarcode($companyId, $marketplace, $barcode);
-
-        return $entry?->getSize();
-    }
-
-    /**
      * Массовый поиск — индексировано по barcode.
      *
      * @param string[] $barcodes

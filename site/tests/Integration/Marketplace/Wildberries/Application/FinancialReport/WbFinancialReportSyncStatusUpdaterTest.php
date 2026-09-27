@@ -31,9 +31,9 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $this->errorRepository = self::getContainer()->get(MarketplaceFinancialReportSyncErrorRepository::class);
     }
 
-    public function testStartLoadingCreatesStatusAndIncrementsAttempts(): void
+    public function testFindOrCreateForDayThenMarkLoadingCreatesStatusAndIncrementsAttempts(): void
     {
-        $status = $this->updater->startLoading(
+        $status = $this->startLoading(
             $this->connectionId(),
             $this->companyId(),
             'sales',
@@ -334,7 +334,7 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         $oldConnectionId = '00000000-0000-0000-0000-000000000222';
         $newConnectionId = '00000000-0000-0000-0000-000000000333';
 
-        $status = $this->updater->startLoading(
+        $status = $this->startLoading(
             $oldConnectionId,
             $this->companyId(),
             'sales_report',
@@ -379,9 +379,17 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertSame($oldConnectionId, $persisted->getConnectionId());
     }
 
+    private function startLoading(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate, FinancialReportSyncMode $mode): MarketplaceFinancialReportSyncStatus
+    {
+        $status = $this->updater->findOrCreateForDay($connectionId, $companyId, $reportType, $apiEndpoint, $businessDate);
+        $this->updater->markLoading($status, $mode);
+
+        return $status;
+    }
+
     private function startLoadingStatus(): MarketplaceFinancialReportSyncStatus
     {
-        return $this->updater->startLoading(
+        return $this->startLoading(
             $this->connectionId(),
             $this->companyId(),
             'sales',

@@ -65,11 +65,6 @@ final class WbFinanceRateLimiter
         ];
     }
 
-    public function resolveSalesReportsSellerBucketId(MarketplaceConnection $connection): string
-    {
-        return $this->resolveSalesReportsBucketId($connection);
-    }
-
     public function buildSalesReportsRateLimitKeyForSellerBucket(string $sellerBucketId): string
     {
         $normalized = $this->normalizeBucketPart($sellerBucketId);

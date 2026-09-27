@@ -49,29 +49,6 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Общие затраты (не привязанные к листингу, например реклама).
-     *
-     * @return MarketplaceCost[]
-     */
-    public function findGeneralCosts(
-        Company $company,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array {
-        return $this->createQueryBuilder('c')
-            ->where('c.company = :company')
-            ->andWhere('c.listing IS NULL')
-            ->andWhere('c.costDate >= :from')
-            ->andWhere('c.costDate <= :to')
-            ->setParameter('company', $company)
-            ->setParameter('from', $fromDate)
-            ->setParameter('to', $toDate)
-            ->orderBy('c.costDate', 'DESC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * Массовая проверка существующих external_id затрат (для bulk import)
      * Возвращает массив для isset() проверок: ['id1' => true, 'id2' => true].
      */

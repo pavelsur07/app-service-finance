@@ -57,21 +57,6 @@ final class WbFinanceSyncStatusListQuery
     }
 
     /**
-     * Последние N дней для server-side рендера карточки на странице маркетплейсов.
-     * Окно ограничено днями (одна строка на день/report_type) — выборка bounded.
-     *
-     * @return list<array<string, mixed>>
-     */
-    public function findRecentDays(string $companyId, int $days = 14): array
-    {
-        $from = (new \DateTimeImmutable('today'))->modify(sprintf('-%d days', max(1, $days)));
-
-        return $this->createByCompanyQueryBuilder($companyId, $from)
-            ->executeQuery()
-            ->fetchAllAssociative();
-    }
-
-    /**
      * @return list<array<string, mixed>>
      */
     public function findCurrentMonthDays(string $companyId): array

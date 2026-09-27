@@ -4549,30 +4549,6 @@ parameters:
 			path: src/Marketplace/Application/DTO/PreflightResult.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\LoadMutualSettlementAction\:\:__invoke\(\) should return array\{rawDocumentId\: string, recordsCount\: int, responseSize\: int\} but returns array\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Application/LoadMutualSettlementAction.php
-
-		-
-			message: '#^Method App\\Marketplace\\Application\\LoadMutualSettlementAction\:\:createRawDocument\(\) has parameter \$rawData with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Application/LoadMutualSettlementAction.php
-
-		-
-			message: '#^Method App\\Marketplace\\Application\\LoadMutualSettlementAction\:\:handleBinaryResponse\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Application/LoadMutualSettlementAction.php
-
-		-
-			message: '#^Offset ''parsing_error'' on array\{file_path\: non\-falsy\-string, file_size_bytes\: int, content_type\: string, parsed\?\: array\{source_endpoint\: string, document_info\: array, opening_balance\: array, closing_balance\: array, rows\: array, compensations\: array, totals\: array, meta\: array\}, parsing_error\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Marketplace/Application/LoadMutualSettlementAction.php
-
-		-
 			message: '#^Method App\\Marketplace\\Application\\MonthClosePreflightAction\:\:checkCommon\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -4751,30 +4727,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parse\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 7
-			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseCompensations\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseDocumentInfo\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Application\\Processor\\OzonMutualSettlementProcessor\:\:parseOperations\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Application/Processor/OzonMutualSettlementProcessor.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
@@ -5411,12 +5363,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/DTO/SaleData.php
-
-		-
-			message: '#^Parameter \#1 \$marketplaceSku of class App\\Marketplace\\Domain\\ValueObject\\ListingKey constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Domain/ValueObject/ListingKey.php
 
 		-
 			message: '#^Method App\\Marketplace\\Entity\\MappingError\:\:__construct\(\) has parameter \$sampleRawJson with no value type specified in iterable type array\.$#'
@@ -6109,30 +6055,6 @@ parameters:
 			path: src/Marketplace/Facade/MarketplaceListingLinkingFacade.php
 
 		-
-			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:countRecords\(\) has parameter \$data with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:downloadReport\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:fetch\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
-
-		-
-			message: '#^Method App\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonMutualSettlementClient\:\:pollReport\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php
-
-		-
 			message: '#^Call to function is_array\(\) with array\<mixed, mixed\> will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -6278,12 +6200,6 @@ parameters:
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:forPay\(\) has parameter \$row with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
-
-		-
-			message: '#^Method App\\Marketplace\\Wildberries\\Infrastructure\\Normalizer\\WbSalesReportRowNormalizer\:\:fullMarketplaceCommission\(\) has parameter \$row with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php
@@ -6763,12 +6679,6 @@ parameters:
 			path: src/Marketplace/Infrastructure/Query/UnmappedListingsQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\UnmappedListingsQuery\:\:searchUnmapped\(\) should return array\<int, array\{id\: string, nm_id\: string, sku\: string, name\: string, marketplace\: string, barcode\: string\|null\}\> but returns list\<array\<string, mixed\>\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Infrastructure/Query/UnmappedListingsQuery.php
-
-		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\UnprocessedRealizationQuery\:\:execute\(\) should return array\<int, array\{pl_category_id\: string, project_direction_id\: string\|null, is_negative\: bool, description_template\: string\|null, sort_order\: int, total_amount\: string\}\> but returns list\<array\<string, mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
@@ -7039,12 +6949,6 @@ parameters:
 			path: src/Marketplace/Repository/MarketplaceBarcodeCatalogRepository.php
 
 		-
-			message: '#^Method App\\Marketplace\\Repository\\MarketplaceBarcodeCatalogRepository\:\:findByBarcode\(\) should return App\\Marketplace\\Entity\\MarketplaceBarcodeCatalog\|null but returns object\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceBarcodeCatalogRepository.php
-
-		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceConnectionRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -7059,18 +6963,6 @@ parameters:
 		-
 			message: '#^Class App\\Marketplace\\Repository\\MarketplaceCostCategoryRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceCostCategoryRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\MarketplaceCostCategoryRepository\:\:findByCodesIndexed\(\) has parameter \$codes with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Repository/MarketplaceCostCategoryRepository.php
-
-		-
-			message: '#^Method App\\Marketplace\\Repository\\MarketplaceCostCategoryRepository\:\:findByCodesIndexed\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/Repository/MarketplaceCostCategoryRepository.php
 
@@ -11623,12 +11515,6 @@ parameters:
 			path: tests/Integration/Marketplace/Ozon/Application/Service/OzonRawDuplicatesCleanupPlannerTest.php
 
 		-
-			message: '#^Method App\\Tests\\Integration\\Marketplace\\Wildberries\\Application\\FinancialReport\\WbFinancialReportFirstAvailableResolverTest\:\:resolverWithResponses\(\) has parameter \$responses with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: tests/Integration/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportFirstAvailableResolverTest.php
-
-		-
 			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceRawDocument constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
 			identifier: argument.type
 			count: 6
@@ -11889,7 +11775,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$object of method Doctrine\\Persistence\\ObjectManager\:\:persist\(\) expects object, App\\Company\\Entity\\User\|null given\.$#'
 			identifier: argument.type
-			count: 4
+			count: 3
 			path: tests/Integration/Marketplace/MarketplaceRawDocumentRepositoryTest.php
 
 		-
