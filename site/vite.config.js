@@ -29,6 +29,7 @@ export default defineConfig({
                 login: "./assets/styles/pages/login.css",
                 admin_shell: "./assets/styles/pages/admin-shell.css",
                 vf_custom_classes: "./assets/styles/vf-custom-classes.css",
+                marketplace_coverage: "./assets/styles/pages/marketplace-coverage.css",
                 dashboard: "./assets/react/_legacy/dashboard_started.tsx", // Точка ./ обязательна!
                 finance_balance_dynamics: "./assets/react/_legacy/finance-balance-dynamics-page.tsx",
                 marketplace_analytics_page: "./assets/react/_legacy/marketplace-analytics-page.tsx",

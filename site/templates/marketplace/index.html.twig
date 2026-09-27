@@ -2,75 +2,139 @@
 
 {% set active_tab = 'marketplace' %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_coverage') }}
+{% endblock %}
+
 {% block tab_content %}
     <div class="p-3">
 
-        {# Статус загрузки финансовых отчётов WB по дням #}
-        {% if wbFinanceSyncDays is not empty %}
-            {% set wbSyncBadgeClass = {
-                'success': 'bg-success',
-                'empty': 'bg-secondary',
-                'queued': 'bg-secondary',
-                'loading': 'bg-info',
-                'raw_loaded': 'bg-info',
-                'processing': 'bg-info',
-                'failed': 'bg-danger',
-                'failed_final': 'bg-danger',
-                'auth_failed': 'bg-danger',
-                'conflict': 'bg-warning',
-            } %}
+        {# Покрытие загрузки финансовых отчётов WB: календарь месяца, строки — дни недели, колонки — недели #}
+        {% if wbFinanceSyncCalendar %}
+            {% set calendar = wbFinanceSyncCalendar %}
+            {% set monthLinkParams = app.request.query.all %}
             <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="card-title mb-0">Загрузка отчётов WB (текущий месяц)</h3>
+                    <h3 class="card-title">Загрузка отчётов WB</h3>
+                    <div class="card-actions d-flex align-items-center gap-2">
+                        <a class="btn btn-icon btn-sm btn-ghost-secondary"
+                           href="{{ path('marketplace_index', monthLinkParams|merge({'month': calendar.prevMonth})) }}"
+                           title="Предыдущий месяц" aria-label="Предыдущий месяц">‹</a>
+                        <span class="fw-medium text-nowrap">{{ calendar.title }}</span>
+                        {% if calendar.nextMonth %}
+                            <a class="btn btn-icon btn-sm btn-ghost-secondary"
+                               href="{{ path('marketplace_index', monthLinkParams|merge({'month': calendar.nextMonth})) }}"
+                               title="Следующий месяц" aria-label="Следующий месяц">›</a>
+                        {% else %}
+                            <span class="btn btn-icon btn-sm btn-ghost-secondary disabled" aria-disabled="true">›</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
-                        <thead>
-                        <tr>
-                            <th>Дата</th>
-                            <th>Режим</th>
-                            <th>Статус</th>
-                            <th>Записей</th>
-                            <th>Попыток</th>
-                            <th>Обновлено</th>
-                            <th>Ошибка</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for day in wbFinanceSyncDays %}
-                            <tr>
-                                <td>{{ day.business_date|date('d.m.Y') }}</td>
-                                <td><small class="text-muted">{{ day.mode ?? '—' }}</small></td>
-                                <td>
-                                    <span class="badge {{ wbSyncBadgeClass[day.status] ?? 'bg-secondary' }}"
-                                          {% if day.last_error_message %}title="{{ day.last_error_message }}"{% endif %}>
-                                        {{ day.status_enum.label }}
-                                    </span>
-                                </td>
-                                <td>{{ day.records_count }}</td>
-                                <td>{{ day.attempts }}</td>
-                                <td><small>{{ day.updated_at|date('d.m.Y H:i') }}</small></td>
-                                <td>
-                                    {% if day.last_error_message %}
-                                        <details>
-                                            <summary class="text-danger small" title="{{ day.last_error_message }}">
-                                                {{ day.last_error_message|length > 60 ? day.last_error_message|slice(0, 60) ~ '…' : day.last_error_message }}
-                                            </summary>
-                                            <div class="small text-muted mt-1">
-                                                {% if day.last_error_status_code %}HTTP {{ day.last_error_status_code }} · {% endif %}
-                                                {{ day.last_error_class }}<br>
-                                                {{ day.last_error_message }}
+                <div class="card-body">
+                    <div class="cov-legend mb-3">
+                        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--ok"></span>Загружено / нет данных у WB</span>
+                        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--partial"></span>В работе / конфликт</span>
+                        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--err">!</span>Ошибка</span>
+                        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--empty"></span>Нет загрузки</span>
+                    </div>
+
+                    <div class="coverage-scroll">
+                        <div class="coverage-grid" style="--cov-days: {{ calendar.weekLabels|length }}; --cov-label-w: 56px;">
+                            <div class="cov-corner"></div>
+                            {% for weekLabel in calendar.weekLabels %}
+                                <div class="cov-day">{{ weekLabel }}</div>
+                            {% endfor %}
+
+                            {% for weekday in calendar.weekdays %}
+                                <div class="cov-label">
+                                    <div class="cov-label-text">
+                                        <div class="cov-label-title">{{ weekday.label }}</div>
+                                    </div>
+                                </div>
+                                {% for cell in weekday.cells %}
+                                    <div class="cov-cellwrap">
+                                        {% if cell %}
+                                            <div class="cov-cell cov-cell--{{ cell.state }}" title="{{ cell.title }}">
+                                                {{- cell.day -}}
+                                                {% if cell.dot %}<span class="cov-cell-dot cov-cell-dot--{{ cell.dot }}"></span>{% endif %}
                                             </div>
-                                        </details>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
+
+                {# Дни с ошибками за месяц — детали видны без наведения, как в прежней таблице #}
+                {% if calendar.errorDays is not empty %}
+                    {% set wbSyncBadgeClass = {
+                        'success': 'bg-success',
+                        'empty': 'bg-secondary',
+                        'queued': 'bg-secondary',
+                        'loading': 'bg-info',
+                        'raw_loaded': 'bg-info',
+                        'processing': 'bg-info',
+                        'failed': 'bg-danger',
+                        'failed_final': 'bg-danger',
+                        'auth_failed': 'bg-danger',
+                        'conflict': 'bg-warning',
+                    } %}
+                    <div class="card-header border-top">
+                        <h3 class="card-title">Дни с ошибками: {{ calendar.errorDays|length }}</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter">
+                            <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Режим</th>
+                                <th>Статус</th>
+                                <th>Записей</th>
+                                <th>Попыток</th>
+                                <th>Обновлено</th>
+                                <th>Ошибка</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for day in calendar.errorDays %}
+                                <tr>
+                                    <td>{{ day.business_date|date('d.m.Y') }}</td>
+                                    <td><small class="text-muted">{{ day.mode ?? '—' }}</small></td>
+                                    <td>
+                                        <span class="badge {{ wbSyncBadgeClass[day.status] ?? 'bg-secondary' }}"
+                                              {% if day.last_error_message %}title="{{ day.last_error_message }}"{% endif %}>
+                                            {{ day.status_label }}
+                                        </span>
+                                    </td>
+                                    <td>{{ day.records_count }}</td>
+                                    <td>{{ day.attempts }}</td>
+                                    <td><small>{{ day.updated_at|date('d.m.Y H:i') }}</small></td>
+                                    <td>
+                                        {% if day.last_error_message %}
+                                            <details>
+                                                <summary class="text-danger small" title="{{ day.last_error_message }}">
+                                                    {{ day.last_error_message|length > 60 ? day.last_error_message|slice(0, 60) ~ '…' : day.last_error_message }}
+                                                </summary>
+                                                <div class="small text-muted mt-1">
+                                                    {% if day.last_error_status_code %}HTTP {{ day.last_error_status_code }} · {% endif %}
+                                                    {{ day.last_error_class }}<br>
+                                                    {{ day.last_error_message }}
+                                                </div>
+                                            </details>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="card-footer text-muted small">Ошибок за {{ calendar.title|lower }} нет</div>
+                {% endif %}
             </div>
         {% endif %}
 
