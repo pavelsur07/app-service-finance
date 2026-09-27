@@ -65,4 +65,20 @@ final class WbFinanceSyncStatusListQuery
             ->executeQuery()
             ->fetchAllAssociative();
     }
+
+    /**
+     * Дни календарного месяца, которому принадлежит $month.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findMonthDays(string $companyId, \DateTimeImmutable $month): array
+    {
+        $monthStart = $month->modify('first day of this month')->setTime(0, 0);
+
+        return $this->createByCompanyQueryBuilder($companyId, $monthStart)
+            ->andWhere('s.business_date < :toDate')
+            ->setParameter('toDate', $monthStart->modify('first day of next month')->format('Y-m-d'))
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
 }

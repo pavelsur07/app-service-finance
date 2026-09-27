@@ -1,0 +1,4 @@
+/* Покрытие Маркетплейса — legacy-страница на Tabler: UI Kit (base/all) здесь не подключён.
+   Берём только токены (переменные :root, с --tblr-* / --vf-* не пересекаются) и coverage-matrix. */
+@import url('../../../ui-kit/tokens/index.css');
+@import url('../../../ui-kit/components/coverage.css');
