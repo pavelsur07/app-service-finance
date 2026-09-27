@@ -62,25 +62,6 @@ class MarketplaceInventoryCostPriceRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    /**
-     * Найти последнюю запись для листинга (без ограничения по дате).
-     * Используется в SetInventoryCostPriceAction для закрытия предыдущего периода.
-     */
-    public function findLatest(
-        string $companyId,
-        string $listingId,
-    ): ?MarketplaceInventoryCostPrice {
-        return $this->createQueryBuilder('p')
-            ->where('p.companyId = :companyId')
-            ->andWhere('IDENTITY(p.listing) = :listingId')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('listingId', $listingId)
-            ->orderBy('p.effectiveFrom', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
     /** Найти цену, которая начинается точно в указанную дату. */
     public function findAtExactDate(
         string $companyId,

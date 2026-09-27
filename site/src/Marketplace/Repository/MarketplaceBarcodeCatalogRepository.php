@@ -17,21 +17,6 @@ class MarketplaceBarcodeCatalogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Найти запись по barcode.
-     */
-    public function findByBarcode(
-        string $companyId,
-        MarketplaceType $marketplace,
-        string $barcode,
-    ): ?MarketplaceBarcodeCatalog {
-        return $this->findOneBy([
-            'companyId' => $companyId,
-            'marketplace' => $marketplace,
-            'barcode' => $barcode,
-        ]);
-    }
-
-    /**
      * Массовая загрузка по списку barcodes — индексировано по barcode.
      *
      * @param string[] $barcodes

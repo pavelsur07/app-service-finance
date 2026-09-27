@@ -180,7 +180,6 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         );
 
         $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
-        $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
         $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
 

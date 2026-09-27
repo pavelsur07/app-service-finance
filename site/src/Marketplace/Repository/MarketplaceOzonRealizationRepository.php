@@ -39,41 +39,6 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
     }
 
     /**
-     * Загрузить строки реализации за период, индексированные по SKU.
-     * Используется при переобработке для обновления полей return_commission.
-     *
-     * Если на один SKU несколько строк (разные quantity) — возвращается первая.
-     * Это покрывает 99% случаев: один возврат привязан к одной строке реализации.
-     *
-     * @return array<string, MarketplaceOzonRealization> [sku => entity]
-     */
-    public function findByPeriodIndexedBySku(
-        string $companyId,
-        string $periodFrom,
-        string $periodTo,
-    ): array {
-        $rows = $this->createQueryBuilder('r')
-            ->where('r.companyId = :companyId')
-            ->andWhere('r.periodFrom = :periodFrom')
-            ->andWhere('r.periodTo = :periodTo')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('periodFrom', new \DateTimeImmutable($periodFrom))
-            ->setParameter('periodTo', new \DateTimeImmutable($periodTo))
-            ->getQuery()
-            ->getResult();
-
-        $indexed = [];
-        foreach ($rows as $row) {
-            // Первая строка для данного SKU побеждает
-            if (!isset($indexed[$row->getSku()])) {
-                $indexed[$row->getSku()] = $row;
-            }
-        }
-
-        return $indexed;
-    }
-
-    /**
      * Пометить строки реализации за период как обработанные.
      *
      * @return int количество обновлённых записей

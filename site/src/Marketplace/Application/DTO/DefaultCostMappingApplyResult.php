@@ -72,12 +72,6 @@ final readonly class DefaultCostMappingApplyResult
         return $this->skippedCostCodes;
     }
 
-    /** @return list<string> */
-    public function getBlockedCostCodes(): array
-    {
-        return $this->blockedCostCodes;
-    }
-
     /** @return array<string,int> */
     public function getSummary(): array
     {

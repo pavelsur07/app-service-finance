@@ -60,45 +60,6 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->getOneOrNullResult();
     }
 
-    public function findStatusEnumByDay(
-        string $connectionId,
-        string $companyId,
-        MarketplaceType $marketplace,
-        \DateTimeImmutable $businessDate,
-        string $reportType,
-    ): ?FinancialReportSyncStatus {
-        Assert::uuid($connectionId);
-        Assert::uuid($companyId);
-
-        $status = $this->createQueryBuilder('s')
-            ->select('s.status')
-            ->where('s.companyId = :companyId')
-            ->andWhere('s.marketplace = :marketplace')
-            ->andWhere('s.businessDate = :businessDate')
-            ->andWhere('s.reportType = :reportType')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('businessDate', $businessDate)
-            ->setParameter('reportType', $reportType)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-
-        if (null === $status) {
-            return null;
-        }
-
-        if (is_array($status)) {
-            $status = $status['status'] ?? null;
-        }
-
-        if ($status instanceof FinancialReportSyncStatus) {
-            return $status;
-        }
-
-        return is_string($status) ? FinancialReportSyncStatus::from($status) : null;
-    }
-
     /**
      * @return list<MarketplaceFinancialReportSyncStatus>
      */

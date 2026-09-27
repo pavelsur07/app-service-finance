@@ -86,11 +86,11 @@ final class WbFinancialReportPeriodResolverTest extends TestCase
         $resolver->recoveryWindowStart(0);
     }
 
-    public function testLast14DaysReturnsFourteenDatesIncludingYesterday(): void
+    public function testLastFourteenDaysEndsYesterday(): void
     {
         $resolver = new WbFinancialReportPeriodResolver(new MockClock('2026-05-20 12:00:00 Europe/Moscow'));
 
-        $days = $resolver->last14Days();
+        $days = $resolver->lastDays(14);
 
         self::assertCount(14, $days);
         self::assertSame('2026-05-06', $days[0]->format('Y-m-d'));

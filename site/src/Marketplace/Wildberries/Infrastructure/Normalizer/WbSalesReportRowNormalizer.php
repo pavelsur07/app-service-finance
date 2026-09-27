@@ -193,11 +193,6 @@ final readonly class WbSalesReportRowNormalizer
         return $this->isSale($row) || $this->isReturn($row);
     }
 
-    public function fullMarketplaceCommission(array $row): float
-    {
-        return abs($this->ppvzVw($row)) + abs($this->ppvzVwNds($row));
-    }
-
     /**
      * Комиссия МП по официальной формуле WB (утверждена Владельцем 2026-07-06):
      * «К перечислению» = «Цена с согласованной скидкой» − кВВ% − эквайринг, откуда

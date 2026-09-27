@@ -57,14 +57,6 @@ final class WbFinancialReportPeriodResolver
     /**
      * @return list<\DateTimeImmutable>
      */
-    public function last14Days(): array
-    {
-        return $this->lastDays(14);
-    }
-
-    /**
-     * @return list<\DateTimeImmutable>
-     */
     public function lastDays(int $daysBack): array
     {
         if ($daysBack <= 0) {

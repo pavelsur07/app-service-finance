@@ -143,6 +143,8 @@ final class ProductSkuPolicy
 
 ### Value Object
 
+Иллюстрация (класса `ListingKey` в коде нет — живой эталон ниже):
+
 ```php
 final readonly class ListingKey
 {
@@ -163,7 +165,7 @@ final readonly class ListingKey
 
 **Когда выделять:** логика нужна в нескольких Actions · правило сложнее одного `if` · есть понятие из предметной области
 
-Эталон: `ProductSkuPolicy`, `ListingKey`, проверено 2026-09-13
+Эталон: `ProductSkuPolicy`, `CounterpartyName`, проверено 2026-09-27
 
 ---
 

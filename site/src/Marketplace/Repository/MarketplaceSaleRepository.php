@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Repository;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -103,28 +102,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         }
 
         return $map;
-    }
-
-    /**
-     * @return Product[]
-     */
-    public function findProductsWithSales(
-        Company $company,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array {
-        return $this->createQueryBuilder('s')
-            ->select('DISTINCT p')
-            ->join('s.listing', 'l')
-            ->join('l.product', 'p')
-            ->where('s.company = :company')
-            ->andWhere('s.saleDate >= :from')
-            ->andWhere('s.saleDate <= :to')
-            ->setParameter('company', $company)
-            ->setParameter('from', $fromDate)
-            ->setParameter('to', $toDate)
-            ->getQuery()
-            ->getResult();
     }
 
     /**

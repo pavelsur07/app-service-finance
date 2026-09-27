@@ -33,15 +33,6 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         return $status;
     }
 
-    public function startLoading(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate, FinancialReportSyncMode $mode): MarketplaceFinancialReportSyncStatus
-    {
-        $status = $this->statusRepository->findOrCreateForDay($connectionId, $companyId, MarketplaceType::WILDBERRIES, $reportType, $apiEndpoint, $businessDate);
-        $status->markLoading($mode);
-        $this->statusRepository->save($status);
-
-        return $status;
-    }
-
     public function markEmpty(MarketplaceFinancialReportSyncStatus $status): void
     {
         $status->markEmpty();
@@ -52,14 +43,6 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
     {
         $status->markRawLoaded($rawDocumentId, $recordsCount, $rowsHash);
         $this->statusRepository->save($status);
-    }
-
-    public function scheduleQueuedRetry(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate, FinancialReportSyncMode $mode, bool $forceRefresh, \DateTimeImmutable $nextRetryAt, ?string $stagingRawDocumentId = null, ?int $nextRrdId = null): MarketplaceFinancialReportSyncStatus
-    {
-        $status = $this->statusRepository->findOrCreateForDay($connectionId, $companyId, MarketplaceType::WILDBERRIES, $reportType, $apiEndpoint, $businessDate);
-        $this->markPageQueued($status, $mode, $forceRefresh, $nextRetryAt, $stagingRawDocumentId, $nextRrdId);
-
-        return $status;
     }
 
     public function markLoading(MarketplaceFinancialReportSyncStatus $status, FinancialReportSyncMode $mode): void
