@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  * getMapStats() удалён вместе с единственным своим потребителем, эндпоинтом
  * /marketplace/costs/debug/map-version.
  *
- * Используется в: OzonCostsRawProcessor, RestoreMarketplaceCostCategoriesAction.
+ * Используется в: OzonCostsRawProcessor.
  */
 final class OzonServiceCategoryMap
 {
@@ -81,21 +81,6 @@ final class OzonServiceCategoryMap
     {
         return null !== OzonCostCategory::findByServiceName($serviceName)
             || null !== OzonCostCategory::findByOperationType($serviceName);
-    }
-
-    /**
-     * Все уникальные category codes с человекочитаемыми именами.
-     *
-     * @return array<string, string> code => human-readable name
-     */
-    public static function getAllCategoryCodes(): array
-    {
-        $codes = [];
-        foreach (OzonCostCategory::all() as $c) {
-            $codes[$c->code] = $c->name;
-        }
-
-        return $codes;
     }
 
     /**

@@ -4864,36 +4864,6 @@ parameters:
 			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
 			identifier: method.notFound
 			count: 1
-			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
-
-		-
-			message: '#^Call to an undefined method object\:\:isActive\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
-
-		-
-			message: '#^Call to an undefined method object\:\:isDeleted\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
-
-		-
-			message: '#^Call to an undefined method object\:\:restore\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
-
-		-
-			message: '#^Call to an undefined method object\:\:setIsActive\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Application/RestoreMarketplaceCostCategoriesAction.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
-			identifier: method.notFound
-			count: 1
 			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php
 
 		-
@@ -5363,30 +5333,6 @@ parameters:
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Marketplace/Controller/MarketplaceController.php
-
-		-
-			message: '#^Access to an undefined property App\\Marketplace\\Enum\\MarketplaceType\:\:\$displayName\.$#'
-			identifier: property.notFound
-			count: 2
-			path: src/Marketplace/Controller/MarketplaceCostCategoryController.php
-
-		-
-			message: '#^Parameter \#1 \$string of function trim expects string, bool\|float\|int\|string given\.$#'
-			identifier: argument.type
-			count: 6
-			path: src/Marketplace/Controller/MarketplaceCostCategoryController.php
-
-		-
-			message: '#^Parameter \#1 \$value of static method App\\Marketplace\\Enum\\MarketplaceType\:\:from\(\) expects int\|string, float\|int\<min, \-1\>\|int\<1, max\>\|string\|true given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Controller/MarketplaceCostCategoryController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Marketplace/Controller/MarketplaceCostCategoryController.php
 
 		-
 			message: '#^Parameter \#2 \$companyId of method App\\Marketplace\\Repository\\MarketplaceSaleMappingRepository\:\:findByIdAndCompany\(\) expects string, string\|null given\.$#'

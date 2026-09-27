@@ -10,10 +10,12 @@ use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
+use App\Marketplace\Controller\CostCategoryDeleteController;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 /**
  * Write-гейты Stage 3 по HTTP, по одному репрезентативному эндпоинту на группу.
@@ -28,11 +30,15 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
  *
  * Проверяется и то, что гейт срабатывает раньше обработки формы и CSRF: POST без тела
  * обязан дать 403, а не 422 и не 500.
+ *
+ * Эндпоинт, который проверяет CSRF раньше входных данных, получает валидный токен (4-й
+ * элемент провайдера): иначе 403 от CSRF неотличим от 403 гейта, и `write` не пройдёт,
+ * а `read` останется зелёным даже без гейта.
  */
 final class ModuleWriteGateTest extends WebTestCaseBase
 {
     /**
-     * @return iterable<string, array{0: Module, 1: string, 2: string}>
+     * @return iterable<string, array{0: Module, 1: string, 2: string, 3?: string}>
      */
     public static function moduleGateProvider(): iterable
     {
@@ -40,11 +46,16 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         yield 'deals' => [Module::DEALS, '/deals', '/deals/new'];
         yield 'catalog' => [Module::CATALOG, '/catalog/products', '/catalog/products/new'];
         yield 'admin' => [Module::ADMIN, '/integrations/telegram', '/integrations/telegram/generate-link'];
-        yield 'marketplace' => [Module::MARKETPLACE, '/marketplace', '/marketplace/cost-categories/create'];
+        yield 'marketplace' => [
+            Module::MARKETPLACE,
+            '/marketplace',
+            '/marketplace/cost-pl-mapping/00000000-0000-7000-8000-000000000000/delete-category',
+            CostCategoryDeleteController::CSRF_TOKEN_ID,
+        ];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
-    public function testReadOnlyRoleReadsButCannotWrite(Module $module, string $readUrl, string $writeUrl): void
+    public function testReadOnlyRoleReadsButCannotWrite(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -60,12 +71,12 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         $client->request('GET', $readUrl);
         self::assertResponseIsSuccessful();
 
-        $client->request('POST', $writeUrl);
+        $this->postWrite($client, $writeUrl, $csrfTokenId);
         self::assertResponseStatusCodeSame(403);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
-    public function testWriteRolePassesTheGate(Module $module, string $readUrl, string $writeUrl): void
+    public function testWriteRolePassesTheGate(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -78,7 +89,7 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
-        $client->request('POST', $writeUrl);
+        $this->postWrite($client, $writeUrl, $csrfTokenId);
 
         // Гейт пропустил: дальше может быть невалидная форма (200), редирект или ошибка CSRF,
         // но не 403. Отдельно исключаем 5xx — иначе сломанный endpoint формально прошёл бы тест.
@@ -88,7 +99,7 @@ final class ModuleWriteGateTest extends WebTestCaseBase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('moduleGateProvider')]
-    public function testEmptyPermissionsRoleIsDeniedEvenOnRead(Module $module, string $readUrl, string $writeUrl): void
+    public function testEmptyPermissionsRoleIsDeniedEvenOnRead(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -101,8 +112,14 @@ final class ModuleWriteGateTest extends WebTestCaseBase
         $client->request('GET', $readUrl);
         self::assertResponseStatusCodeSame(403);
 
-        $client->request('POST', $writeUrl);
+        $this->postWrite($client, $writeUrl, $csrfTokenId);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    private function postWrite(KernelBrowser $client, string $writeUrl, ?string $csrfTokenId): void
+    {
+        $body = null === $csrfTokenId ? [] : ['_token' => $this->csrfToken($client, $csrfTokenId)];
+        $client->request('POST', $writeUrl, $body);
     }
 
     /**

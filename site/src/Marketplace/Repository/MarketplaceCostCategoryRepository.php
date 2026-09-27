@@ -34,35 +34,6 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findByCode(
-        Company $company,
-        MarketplaceType $marketplace,
-        string $code,
-    ): ?MarketplaceCostCategory {
-        return $this->createQueryBuilder('c')
-            ->where('c.company = :company')
-            ->andWhere('c.marketplace = :marketplace')
-            ->andWhere('c.code = :code')
-            ->andWhere('c.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('code', $code)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
-    public function findByIdAndCompany(Company $company, string $id): ?MarketplaceCostCategory
-    {
-        return $this->createQueryBuilder('c')
-            ->where('c.company = :company')
-            ->andWhere('c.id = :id')
-            ->andWhere('c.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
     public function findByIdAndCompanyId(string $companyId, string $id): ?MarketplaceCostCategory
     {
         if (!Uuid::isValid($id)) {
