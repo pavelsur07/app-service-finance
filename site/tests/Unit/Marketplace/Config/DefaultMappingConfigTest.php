@@ -49,9 +49,10 @@ final class DefaultMappingConfigTest extends TestCase
     private const COST_CODE_MAX_LENGTH = 50;
 
     /**
-     * Коды WB вне каталога WbCostCategory: `advertising` создаётся
-     * RestoreMarketplaceCostCategoriesAction (метод приватный, поэтому дублируем),
-     * остальные — динамические слаги удержаний из WbDeductionCalculator.
+     * Коды WB вне каталога WbCostCategory: `advertising` — категория, которую
+     * создавала удалённая кнопка «Восстановить категории» (на проде есть у
+     * компаний, правило для неё остаётся), остальные — динамические слаги
+     * удержаний из WbDeductionCalculator.
      *
      * Список закрытый намеренно: маска «любой wb_*» пропустила бы опечатку, а
      * опечатка в коде — вечно неприменимое правило и затрата мимо ОПиУ.
