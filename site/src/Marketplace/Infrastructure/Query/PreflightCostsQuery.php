@@ -86,7 +86,8 @@ final class PreflightCostsQuery
      * типа нет в справочнике Ozon, название одинаковое, и разные услуги слились бы.
      *
      * У легаси-корзины одна категория на все неизвестные услуги, поэтому
-     * название берётся из description — там исходное имя услуги.
+     * название берётся из description — там исходное имя услуги; без него —
+     * название категории, а не пустая строка.
      *
      * decided — по категории у компании есть решение по ОПиУ (условие
      * without_pl_decision из getCostsStats); блокировать ли такие строки,
@@ -106,7 +107,7 @@ final class PreflightCostsQuery
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
-                CASE WHEN cc.code = 'ozon_other_service' THEN c.description ELSE cc.name END AS service_name,
+                CASE WHEN cc.code = 'ozon_other_service' THEN COALESCE(NULLIF(c.description, ''), cc.name) ELSE cc.name END AS service_name,
                 cc.code                                                                        AS category_code,
                 COUNT(c.id)                                                                    AS count,
                 NOT (m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL))   AS decided

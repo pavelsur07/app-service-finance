@@ -96,6 +96,18 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertSame(1, $check->details[1]['count']);
     }
 
+    public function testLegacyBucketCostWithoutDescriptionIsListedUnderCategoryName(): void
+    {
+        $bucket = $this->category(MarketplaceType::OZON, 'ozon_other_service', 'Прочие услуги Ozon');
+        $this->cost($bucket, MarketplaceType::OZON);
+        $this->em->flush();
+
+        $check = $this->check($this->preflight(MarketplaceType::OZON), 'costs_unknown_service_names');
+
+        self::assertSame('Прочие услуги Ozon', $check->details[0]['service_name']);
+        self::assertSame('ozon_other_service', $check->details[0]['category_code']);
+    }
+
     public function testOzonUnknownServiceOnlyWarnsBeforePreliminaryClose(): void
     {
         $category = $this->category(MarketplaceType::OZON, 'ozon_unknown_900', 'Неразобранная услуга Ozon: NewService');
