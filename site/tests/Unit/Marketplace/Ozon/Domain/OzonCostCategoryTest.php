@@ -445,6 +445,17 @@ final class OzonCostCategoryTest extends TestCase
     /**
      * findByCode возвращает null для неизвестного кода.
      */
+    public function testRecognizedCodesAreCatalogWithoutLegacyBucket(): void
+    {
+        $recognized = OzonCostCategory::recognizedCodes();
+
+        self::assertNotContains('ozon_other_service', $recognized);
+        self::assertSame(
+            array_values(array_diff(array_keys(OzonCostCategory::byCode()), ['ozon_other_service'])),
+            $recognized,
+        );
+    }
+
     public function testFindByCodeReturnsNullForUnknown(): void
     {
         $this->assertNull(OzonCostCategory::findByCode('nonexistent_code'));

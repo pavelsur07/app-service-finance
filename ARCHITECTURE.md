@@ -3495,6 +3495,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-05-11 | Inventory | Нормализация raw snapshot запускается через `async_pipeline` после completed raw-загрузки | Raw-загрузка = внешний HTTP, нормализация = локальная DB-heavy обработка |
 | 2026-05-11 | Inventory | Маппинг Inventory → Marketplace идёт через MarketplaceFacade по `sourceSku` | Соблюдение границ модулей и запрет прямого импорта Marketplace repository/service |
 | 2026-09-28 | Marketplace | Preflight COSTS: нераспознанная затрата — категория вне каталога (`OzonCostCategory` / `WbCostCategory`, плюс легаси `ozon_other_service`); затраты без решения по ОПиУ блокируют. Блокируют только финальное закрытие (`PreflightMonthCloseCommand::$preliminary`); WB вне каталога — только без маппинга | Проверка искала лишь `ozon_other_service`, а by-day пишет `ozon_unknown_*`; затраты без маппинга молча выпадали из ОПиУ. Оперативный ОПиУ не должен замирать на новой услуге |
+| 2026-09-28 | Marketplace | Оперативное закрытие затрат Ozon берёт только распознанные коды (`OzonCostCategory::recognizedCodes()`); фильтр один на `UnprocessedCostsQuery` и `MarkProcessedQuery` — `PreliminaryCostFilter` | Раньше исключалась только `ozon_other_service`, а `ozon_unknown_*` из by-day попадали в оперативный ОПиУ; определение «нераспознанного» расходилось с preflight |
 
 ## Api — внешние Bearer-ключи и подготовленные права (api-management)
 

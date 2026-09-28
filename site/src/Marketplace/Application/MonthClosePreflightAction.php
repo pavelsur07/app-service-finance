@@ -292,10 +292,7 @@ final class MonthClosePreflightAction
         $label = 'Нераспознанные операции';
 
         [$knownCodes, $blocksWhenDecided] = match (MarketplaceType::tryFrom($command->marketplace)) {
-            MarketplaceType::OZON => [
-                array_values(array_diff(array_keys(OzonCostCategory::byCode()), ['ozon_other_service'])),
-                true,
-            ],
+            MarketplaceType::OZON => [OzonCostCategory::recognizedCodes(), true],
             MarketplaceType::WILDBERRIES => [array_keys(WbCostCategory::byCode()), false],
             default => [null, false],
         };

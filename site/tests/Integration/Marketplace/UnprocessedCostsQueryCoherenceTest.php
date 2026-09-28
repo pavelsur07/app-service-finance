@@ -64,14 +64,19 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
         $this->query = self::getContainer()->get(UnprocessedCostsQuery::class);
 
         // 5 regular costs (100.00 each) + 3 ozon_other_service costs (50.00 each)
-        $regular = $this->createMappedCategory('coherence_logistic', 'Логистика', $plCategory);
+        // + 2 unknown by-day service costs ozon_unknown_555 (30.00 each)
+        $regular = $this->createMappedCategory('ozon_logistic_direct', 'Логистика', $plCategory);
         $other = $this->createMappedCategory('ozon_other_service', 'Прочие услуги Ozon', $plCategory);
+        $unknown = $this->createMappedCategory('ozon_unknown_555', 'Неразобранная услуга Ozon: NewService', $plCategory);
 
         for ($i = 0; $i < 5; ++$i) {
             $this->createCost($regular, '100.00', '2026-05-0'.($i + 1));
         }
         for ($i = 0; $i < 3; ++$i) {
             $this->createCost($other, '50.00', '2026-05-1'.$i);
+        }
+        for ($i = 0; $i < 2; ++$i) {
+            $this->createCost($unknown, '30.00', '2026-05-2'.$i);
         }
 
         $this->em->flush();
@@ -80,7 +85,7 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
 
     public function testControlSumMatchesExecuteSumInPreliminaryMode(): void
     {
-        // preliminary=true excludes ozon_other_service → only 5×100 = 500
+        // preliminary=true excludes unrecognized (ozon_other_service, ozon_unknown_*) → only 5×100 = 500
         $controlSum = (float) $this->query->getControlSum(
             self::COMPANY_ID,
             self::MARKETPLACE_VALUE,
@@ -103,7 +108,7 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
 
     public function testControlSumMatchesExecuteSumInFinalMode(): void
     {
-        // preliminary=false includes all → 5×100 + 3×50 = 650
+        // preliminary=false includes all → 5×100 + 3×50 + 2×30 = 710
         $controlSum = (float) $this->query->getControlSum(
             self::COMPANY_ID,
             self::MARKETPLACE_VALUE,
@@ -114,8 +119,8 @@ final class UnprocessedCostsQueryCoherenceTest extends IntegrationTestCase
 
         $executeSum = $this->sumFromExecute(preliminary: false);
 
-        self::assertEqualsWithDelta(650.0, $controlSum, 0.01, 'getControlSum(final) должен быть 650');
-        self::assertEqualsWithDelta(650.0, $executeSum, 0.01, 'execute(final) сумма должна быть 650');
+        self::assertEqualsWithDelta(710.0, $controlSum, 0.01, 'getControlSum(final) должен быть 710');
+        self::assertEqualsWithDelta(710.0, $executeSum, 0.01, 'execute(final) сумма должна быть 710');
         self::assertEqualsWithDelta(
             0.0,
             abs($controlSum - $executeSum),

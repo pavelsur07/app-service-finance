@@ -155,9 +155,7 @@ final class MarkProcessedQuery
         string $periodTo,
         bool $preliminary = false,
     ): int {
-        $preliminaryFilter = $preliminary
-            ? "AND mcc.code != 'ozon_other_service'"
-            : '';
+        [$preliminaryFilter, $preliminaryParams, $preliminaryTypes] = PreliminaryCostFilter::build($marketplace, $preliminary);
 
         return $this->connection->executeStatement(
             'UPDATE marketplace_costs
@@ -186,7 +184,9 @@ final class MarkProcessedQuery
                 'marketplace' => $marketplace,
                 'periodFrom' => $periodFrom,
                 'periodTo' => $periodTo,
-            ]
+                ...$preliminaryParams,
+            ],
+            $preliminaryTypes,
         );
     }
 

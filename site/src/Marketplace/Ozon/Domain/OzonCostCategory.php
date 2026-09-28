@@ -824,6 +824,20 @@ final readonly class OzonCostCategory
         return self::byCode()[$code] ?? null;
     }
 
+    /**
+     * Коды, за которыми стоит известная услуга: весь каталог, кроме легаси-корзины
+     * `ozon_other_service`, куда v3-путь сваливал неизвестные услуги. Затрата с
+     * кодом вне этого списка — нераспознанная (в том числе `ozon_unknown_<type_id>`
+     * из by-day): её блокирует preflight финального закрытия и не берёт
+     * оперативное.
+     *
+     * @return list<string>
+     */
+    public static function recognizedCodes(): array
+    {
+        return array_values(array_diff(array_keys(self::byCode()), ['ozon_other_service']));
+    }
+
     // -------------------------------------------------------------------------
     // Lookup by service name (services[].name in Ozon API)
     // -------------------------------------------------------------------------
