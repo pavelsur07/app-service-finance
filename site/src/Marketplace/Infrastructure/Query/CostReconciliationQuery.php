@@ -10,7 +10,7 @@ use Doctrine\DBAL\Connection;
 /**
  * Сверяет данные из xlsx-отчёта с данными из marketplace_costs.
  *
- * Формула сверки (та же что в CostsVerifyQuery):
+ * Формула сверки:
  *   xlsx_comparable = api_net_amount + return_revenue_amount
  *   delta           = |xlsx_comparable| - xlsx_total
  *
