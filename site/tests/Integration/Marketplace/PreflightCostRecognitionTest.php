@@ -74,6 +74,28 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertFalse($result->canClose());
     }
 
+    /**
+     * Типов нет в справочнике Ozon — названия одинаковые; детали различают
+     * услуги по коду категории, а не сливают их в одну строку.
+     */
+    public function testOzonUnknownServicesWithSameNameAreListedSeparately(): void
+    {
+        $first = $this->category(MarketplaceType::OZON, 'ozon_unknown_901', 'Неразобранная услуга Ozon');
+        $second = $this->category(MarketplaceType::OZON, 'ozon_unknown_902', 'Неразобранная услуга Ozon');
+        $this->cost($first, MarketplaceType::OZON);
+        $this->cost($first, MarketplaceType::OZON);
+        $this->cost($second, MarketplaceType::OZON);
+        $this->em->flush();
+
+        $check = $this->check($this->preflight(MarketplaceType::OZON), 'costs_unknown_service_names');
+
+        self::assertCount(2, $check->details);
+        self::assertSame('ozon_unknown_901', $check->details[0]['category_code']);
+        self::assertSame(2, $check->details[0]['count']);
+        self::assertSame('ozon_unknown_902', $check->details[1]['category_code']);
+        self::assertSame(1, $check->details[1]['count']);
+    }
+
     public function testOzonUnknownServiceOnlyWarnsBeforePreliminaryClose(): void
     {
         $category = $this->category(MarketplaceType::OZON, 'ozon_unknown_900', 'Неразобранная услуга Ozon: NewService');

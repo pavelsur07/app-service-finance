@@ -92,7 +92,10 @@ final class PreflightCostsQuery
      *
      * @param list<string> $knownCodes коды каталога; всё остальное — нераспознанное
      *
-     * @return list<array{service_name: string, count: int, decided: bool}>
+     * Строка на категорию: у `ozon_unknown_<type_id>`, чьего типа нет в
+     * справочнике Ozon, название одинаковое, и без кода разные услуги слились бы.
+     *
+     * @return list<array{service_name: string, category_code: string, count: int, decided: bool}>
      */
     public function getUnrecognizedCosts(
         string $companyId,
@@ -105,6 +108,7 @@ final class PreflightCostsQuery
             <<<'SQL'
             SELECT
                 CASE WHEN cc.code = 'ozon_other_service' THEN c.description ELSE cc.name END AS service_name,
+                cc.code                                                                        AS category_code,
                 COUNT(c.id)                                                                    AS count,
                 NOT (m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL))   AS decided
             FROM marketplace_costs c
@@ -117,8 +121,8 @@ final class PreflightCostsQuery
               AND c.cost_date  >= :periodFrom
               AND c.cost_date  <= :periodTo
               AND cc.code NOT IN (:knownCodes)
-            GROUP BY 1, 3
-            ORDER BY COUNT(c.id) DESC, 1
+            GROUP BY 1, 2, 4
+            ORDER BY COUNT(c.id) DESC, 1, 2
             SQL,
             [
                 'companyId' => $companyId,
@@ -135,6 +139,7 @@ final class PreflightCostsQuery
         return array_map(
             static fn (array $row): array => [
                 'service_name' => (string) $row['service_name'],
+                'category_code' => (string) $row['category_code'],
                 'count' => (int) $row['count'],
                 'decided' => (bool) $row['decided'],
             ],
