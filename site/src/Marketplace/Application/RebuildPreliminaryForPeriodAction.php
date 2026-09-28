@@ -11,6 +11,7 @@ use App\Marketplace\Application\Command\ReopenMonthStageCommand;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
+use App\Marketplace\Exception\NothingToCloseException;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
 
@@ -202,6 +203,20 @@ final class RebuildPreliminaryForPeriodAction
                 actorUserId: $command->actorUserId,
                 preliminary: true,
             ));
+        } catch (NothingToCloseException) {
+            // Ожидаемый исход, не сбой: после фильтра оперативного режима у этапа
+            // не осталось строк (например, все затраты Ozon нераспознанные).
+            // Этап остаётся переоткрытым — оперативного ОПиУ по нему нет, и это
+            // верно; ретрай сообщения ничего бы не изменил.
+            $this->logger->warning('[PreliminaryRebuild] Nothing to close, stage left open', [
+                'company_id' => $command->companyId,
+                'marketplace' => $command->marketplace,
+                'year' => $command->year,
+                'month' => $command->month,
+                'stage' => $stage->value,
+                'preliminary' => true,
+                'was_reopened' => $wasReopened,
+            ]);
         } catch (\DomainException $e) {
             $this->logger->warning('[PreliminaryRebuild] Close skipped (domain)', [
                 'company_id' => $command->companyId,

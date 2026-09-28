@@ -15,6 +15,7 @@ use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\NothingToCloseException;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -219,7 +220,7 @@ final class CloseMonthStageAction
         }
 
         if ([] === $allPlEntries) {
-            throw new \DomainException('Закрытие невозможно: нет строк для создания документа ОПиУ по этапу.');
+            throw new NothingToCloseException();
         }
 
         // Создаём один документ для всех Source-ов этапа
