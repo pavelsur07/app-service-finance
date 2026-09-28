@@ -68,51 +68,31 @@ storno_amount (возврат комиссии)           =     7 441.31  ← у
 
 ## Как проверить период
 
-### Быстрая проверка (передаёшь итог xlsx)
+Сверка идёт через UI закрытия месяца, отдельного debug-эндпоинта нет.
 
-```
-GET /marketplace/costs/debug/verify
-  ?marketplace=ozon
-  &year=2026
-  &month=1
-  &xlsx_total=3761721.62
-```
+1. «Маркетплейсы → Закрытие месяца», выбрать маркетплейс и период.
+2. На этапе затрат загрузить отчёт «Детализация начислений» из ЛК Ozon
+   кнопкой «Сверить с xlsx» (после закрытия этапа — «Пересверить»).
+3. `POST /marketplace/month-close/reconcile` → `ReconcileCostsAction` →
+   `CostReconciliationQuery` считает `xlsx_comparable` по формуле выше и
+   сравнивает с итогом xlsx: `|delta| < 0.01` — `matched`, иначе `mismatch`.
+4. Результат — на странице этапа: `xlsx_comparable`, итог xlsx и `delta`.
 
-Смотришь только:
-```json
-"period_health": {
-  "status": "OK"
-}
-```
-
-Если `MISMATCH` — смотришь `reconciliation.delta` и `unknown_service_names`.
-
-### Без xlsx (получаешь число для сравнения вручную)
-
-```
-GET /marketplace/costs/debug/verify?marketplace=ozon&year=2026&month=1
-```
-
-Берёшь `reconciliation.xlsx_comparable` и сравниваешь с итогом xlsx вручную.
+Нераспознанные услуги сверка не показывает — их показывает проверка
+«Нераспознанные операции» при проверке готовности этапа затрат.
 
 ---
 
 ## Алгоритм переобработки периода
 
-```
-1. GET /marketplace/costs/debug/map-version
-   → убедиться что VERSION соответствует последнему коммиту
-
-2. GET /marketplace/costs/admin/clear-for-reprocess
-   ?marketplace=ozon&year=YYYY&month=M&confirm=1
-
-3. GET /marketplace/costs/admin/process-period
-   ?marketplace=ozon&year=YYYY&month=M&run=1
-
-4. GET /marketplace/costs/debug/verify
-   ?marketplace=ozon&year=YYYY&month=M&xlsx_total=XXXXX
-   → period_health.status: OK
-```
+1. Если этап затрат уже закрыт — переоткрыть его на странице закрытия месяца:
+   переобработка не снимает отметки строк, попавших в документ ОПиУ.
+2. Переобработать raw-документы за период:
+   - UI: «Маркетплейсы → Подключения» → «Переобработка данных за период»
+     (`POST /marketplace/reprocess`, тип документов `all` / `sales_report` / `realization`);
+   - CLI: `bin/console app:marketplace:reprocess <companyId> <marketplace> <Y-m-d> <Y-m-d> [--only=all|sales_report|realization] [--dry-run]`.
+   Обе точки вызывают `ReprocessMarketplacePeriodAction`.
+3. Сверить период с xlsx (раздел выше) и закрыть этап.
 
 ---
 
