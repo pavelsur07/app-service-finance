@@ -400,7 +400,8 @@
                                     detailsHtml += `<li>SKU ${escapeHtml(item.marketplace_sku)}${supplier} — ${Number(item.count)} шт.</li>`;
                                 } else if (item.service_name !== undefined) {
                                     // costs_unknown_service_names
-                                    detailsHtml += `<li>${escapeHtml(item.service_name)} — ${Number(item.count)} шт.</li>`;
+                                    const code = item.category_code ? ` (${escapeHtml(item.category_code)})` : '';
+                                    detailsHtml += `<li>${escapeHtml(item.service_name)}${code} — ${Number(item.count)} шт.</li>`;
                                 } else if (item.category_name !== undefined) {
                                     // costs_without_mapping (existing)
                                     detailsHtml += `<li>${escapeHtml(item.category_name)} (${Number(item.costs_count)} шт.)</li>`;
