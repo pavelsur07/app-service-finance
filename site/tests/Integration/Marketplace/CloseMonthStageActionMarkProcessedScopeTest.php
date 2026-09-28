@@ -64,9 +64,9 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
     {
         $plCategory = $this->createPlCategory('Затраты mapped');
 
-        $includedCategory = $this->createCostCategory('cost_included', 'Included');
-        $withoutMappingCategory = $this->createCostCategory('cost_without_mapping', 'Without mapping');
-        $excludedCategory = $this->createCostCategory('cost_excluded', 'Excluded include_in_pl=false');
+        $includedCategory = $this->createCostCategory('ozon_logistic_direct', 'Included');
+        $withoutMappingCategory = $this->createCostCategory('ozon_storage', 'Without mapping');
+        $excludedCategory = $this->createCostCategory('ozon_acquiring', 'Excluded include_in_pl=false');
 
         $this->createCostMapping($includedCategory, $plCategory->getId(), true);
         $this->createCostMapping($excludedCategory, $plCategory->getId(), false);
@@ -77,7 +77,8 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
 
         $this->em->flush();
 
-        $this->closeStage(CloseStage::COSTS, preliminary: false);
+        // Оперативное закрытие: финальное с затратой без маппинга блокирует preflight.
+        $this->closeStage(CloseStage::COSTS, preliminary: true);
 
         $this->assertMarked($includedCost->getId(), 'marketplace_costs', true);
         $this->assertMarked($withoutMappingCost->getId(), 'marketplace_costs', false);
@@ -240,7 +241,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
     public function testFinalCloseWithValidDataStillMarksRowsAsProcessed(): void
     {
         $plCategory = $this->createPlCategory('Final close costs');
-        $category = $this->createCostCategory('final_close_cost', 'Final close cost');
+        $category = $this->createCostCategory('ozon_storage', 'Final close cost');
         $this->createCostMapping($category, $plCategory->getId(), true);
 
         $costA = $this->createCost($category, '400.00', '2026-02-10');

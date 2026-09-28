@@ -152,7 +152,8 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
 
     public function testSkipsWhenPreflightFails(): void
     {
-        $this->seedBlockingOtherServiceCost();
+        $this->seedCostsForCosts();
+        $this->lockFinancePeriod();
 
         $this->rebuild();
 
@@ -183,10 +184,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $documentIds = $before->getStagePLDocumentIds(CloseStage::COSTS);
         self::assertNotSame([], $documentIds);
 
-        /** @var Company $managedCompany */
-        $managedCompany = $this->em->find(Company::class, self::COMPANY_ID);
-        $this->company = $managedCompany;
-        $this->seedBlockingOtherServiceCost();
+        $this->lockFinancePeriod();
 
         $this->rebuild();
 
@@ -201,6 +199,35 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             ['c' => self::COMPANY_ID],
         );
         self::assertSame(1, $documentRows, 'Существующий PLDocument должен сохраниться при провальном preflight.');
+    }
+
+    /**
+     * Нераспознанная услуга блокирует только финальное закрытие: оперативный
+     * ОПиУ пересобирается без неё, а не замирает на прошлой версии.
+     */
+    public function testUnrecognizedServiceDoesNotFreezePreliminaryRebuild(): void
+    {
+        $this->seedCostsForCosts();
+        $this->rebuild();
+
+        $before = $this->reloadMonthClose();
+        self::assertNotNull($before);
+        $documentIds = $before->getStagePLDocumentIds(CloseStage::COSTS);
+        self::assertNotSame([], $documentIds);
+
+        /** @var Company $managedCompany */
+        $managedCompany = $this->em->find(Company::class, self::COMPANY_ID);
+        $this->company = $managedCompany;
+        $this->seedLegacyOtherServiceCost();
+
+        $this->rebuild();
+
+        $after = $this->reloadMonthClose();
+        self::assertNotNull($after);
+        self::assertSame(MonthCloseStageStatus::CLOSED, $after->getStageStatus(CloseStage::COSTS));
+        self::assertTrue($after->isStageLastCloseWasPreliminary(CloseStage::COSTS));
+        self::assertNotSame([], $after->getStagePLDocumentIds(CloseStage::COSTS));
+        self::assertNotSame($documentIds, $after->getStagePLDocumentIds(CloseStage::COSTS));
     }
 
     public function testSalesReturnsPreliminaryReopensDespiteExpectedClosedStageErrors(): void
@@ -280,9 +307,19 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $this->em->clear();
     }
 
-    private function seedBlockingOtherServiceCost(): void
+    private function lockFinancePeriod(): void
     {
-        // include_in_pl=true + ozon_other_service is a blocking preflight error.
+        /** @var Company $company */
+        $company = $this->em->find(Company::class, self::COMPANY_ID);
+        $company->setFinanceLockBefore(new \DateTimeImmutable('2026-04-30'));
+        $this->em->flush();
+        $this->em->clear();
+    }
+
+    private function seedLegacyOtherServiceCost(): void
+    {
+        // Легаси-корзина неизвестных услуг: блокирует финальное закрытие,
+        // перед оперативным — только предупреждение.
         $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
         $plCategory->setName('Прочее Ozon');
         $plCategory->setFlow(PLFlow::EXPENSE);

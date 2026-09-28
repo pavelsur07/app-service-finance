@@ -126,6 +126,7 @@ final class CloseMonthStageAction
             year: $command->year,
             month: $command->month,
             stage: $stage,
+            preliminary: $command->preliminary,
         ));
 
         if (!$preflightResult->canClose()) {

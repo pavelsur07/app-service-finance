@@ -99,6 +99,34 @@ final class DefaultMappingConfigTest extends TestCase
         );
     }
 
+    /**
+     * Коды каталога WB, у которых намеренно нет правила: добровольная выплата —
+     * компенсация продавцу, а не затрата, статью выбирает компания.
+     */
+    private const WB_CATALOG_CODES_WITHOUT_RULE = [
+        'wb_dobrovolnaya_vyplata_za_tovary',
+    ];
+
+    public function testEveryWildberriesCatalogCodeHasRule(): void
+    {
+        $mapped = array_map(
+            static fn (DefaultCostMappingRule $rule): string => $rule->getCostCode(),
+            $this->rulesFor(MarketplaceType::WILDBERRIES),
+        );
+
+        self::assertSame(
+            [],
+            array_values(array_diff(array_keys(WbCostCategory::byCode()), $mapped, self::WB_CATALOG_CODES_WITHOUT_RULE)),
+            'Код каталога WB без правила базового маппинга: закрытие месяца заблокируется, пока компания не замапит его вручную.',
+        );
+
+        self::assertSame(
+            [],
+            array_values(array_diff(self::WB_CATALOG_CODES_WITHOUT_RULE, array_keys(WbCostCategory::byCode()))),
+            'Исключение для кода, которого уже нет в каталоге WB, — убрать из WB_CATALOG_CODES_WITHOUT_RULE.',
+        );
+    }
+
     public function testWildberriesCostCodesAreKnownOrDynamicSlugs(): void
     {
         $static = [...array_keys(WbCostCategory::byCode()), ...self::EXTRA_WB_CODES];

@@ -103,6 +103,7 @@ final class RebuildPreliminaryForPeriodAction
                 year: $command->year,
                 month: $command->month,
                 stage: $stage,
+                preliminary: true,
             ));
             $expectedClosedStageErrors = match ($stage) {
                 CloseStage::SALES_RETURNS => ['already_closed', 'sales_already_processed', 'returns_already_processed'],
@@ -154,6 +155,7 @@ final class RebuildPreliminaryForPeriodAction
             year: $command->year,
             month: $command->month,
             stage: $stage,
+            preliminary: true,
         ));
 
         if (!$preflightResult->canClose()) {
