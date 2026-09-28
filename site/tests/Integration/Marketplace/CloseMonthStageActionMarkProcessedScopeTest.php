@@ -164,7 +164,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $this->assertMarked($excludedCost->getId(), 'marketplace_costs', false);
     }
 
-    public function testOzonOtherServiceBlocksPreliminaryClose(): void
+    public function testOzonOtherServiceBlocksFinalClose(): void
     {
         $plCategory = $this->createPlCategory('Other service blocked');
         $otherService = $this->createCostCategory('ozon_other_service', 'Other service');
@@ -183,12 +183,7 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         ));
         self::assertFalse($preflightResult->canClose());
 
-        try {
-            $this->closeStage(CloseStage::COSTS, preliminary: true);
-            self::fail('Expected DomainException for blocking preflight error.');
-        } catch (\DomainException) {
-            // expected
-        }
+        $this->expectCloseStageException(CloseStage::COSTS, preliminary: false);
 
         /** @var MarketplaceMonthCloseRepository $monthCloseRepository */
         $monthCloseRepository = self::getContainer()->get(MarketplaceMonthCloseRepository::class);
@@ -202,6 +197,46 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
             self::assertFalse($monthClose->isStageClosed(CloseStage::COSTS));
             self::assertSame([], $monthClose->getStagePLDocumentIds(CloseStage::COSTS));
         }
+    }
+
+    /**
+     * Перед оперативным закрытием легаси-корзина — только предупреждение:
+     * закрытие проходит, а её строки в документ не входят и не помечаются.
+     */
+    public function testOzonOtherServiceIsLeftOutOfPreliminaryClose(): void
+    {
+        $plCategory = $this->createPlCategory('Other service preliminary');
+        $otherService = $this->createCostCategory('ozon_other_service', 'Other service');
+        $this->createCostMapping($otherService, $plCategory->getId(), true);
+        $otherServiceCost = $this->createCost($otherService, '500.00', '2026-02-14');
+
+        $logistics = $this->createCostCategory('ozon_logistic_direct', 'Logistics');
+        $this->createCostMapping($logistics, $plCategory->getId(), true);
+        $logisticsCost = $this->createCost($logistics, '150.00', '2026-02-15');
+        $this->em->flush();
+
+        $this->closeStage(CloseStage::COSTS, preliminary: true);
+
+        $this->assertMarked($logisticsCost->getId(), 'marketplace_costs', true);
+        $this->assertMarked($otherServiceCost->getId(), 'marketplace_costs', false);
+    }
+
+    public function testFinalCloseMarksIncludedButNotExcludedRows(): void
+    {
+        $plCategory = $this->createPlCategory('Затраты final scope');
+        $includedCategory = $this->createCostCategory('ozon_logistic_direct', 'Included');
+        $excludedCategory = $this->createCostCategory('ozon_acquiring', 'Excluded include_in_pl=false');
+        $this->createCostMapping($includedCategory, $plCategory->getId(), true);
+        $this->createCostMapping($excludedCategory, $plCategory->getId(), false);
+
+        $includedCost = $this->createCost($includedCategory, '100.00', '2026-02-10');
+        $excludedCost = $this->createCost($excludedCategory, '300.00', '2026-02-12');
+        $this->em->flush();
+
+        $this->closeStage(CloseStage::COSTS, preliminary: false);
+
+        $this->assertMarked($includedCost->getId(), 'marketplace_costs', true);
+        $this->assertMarked($excludedCost->getId(), 'marketplace_costs', false);
     }
 
     public function testSalesPreliminaryCloseBlocksAndDoesNotMarkRowsWithoutCostPrice(): void

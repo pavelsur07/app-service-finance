@@ -228,6 +228,17 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         self::assertTrue($after->isStageLastCloseWasPreliminary(CloseStage::COSTS));
         self::assertNotSame([], $after->getStagePLDocumentIds(CloseStage::COSTS));
         self::assertNotSame($documentIds, $after->getStagePLDocumentIds(CloseStage::COSTS));
+
+        $unrecognizedInDocument = (int) $this->em->getConnection()->fetchOne(
+            <<<'SQL'
+            SELECT COUNT(*)
+            FROM marketplace_costs c
+            INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+            WHERE c.company_id = :c AND cc.code = 'ozon_other_service' AND c.document_id IS NOT NULL
+            SQL,
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(0, $unrecognizedInDocument, 'Нераспознанная затрата не должна попасть в оперативный ОПиУ.');
     }
 
     public function testSalesReturnsPreliminaryReopensDespiteExpectedClosedStageErrors(): void
