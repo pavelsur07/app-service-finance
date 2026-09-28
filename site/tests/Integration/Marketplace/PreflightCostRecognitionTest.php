@@ -108,11 +108,37 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertFalse($unknown->passed);
         self::assertFalse($unknown->blocking);
 
-        $withoutMapping = $this->check($result, 'costs_without_mapping');
-        self::assertFalse($withoutMapping->passed);
-        self::assertFalse($withoutMapping->blocking);
+        // Незамапленная нераспознанная затрата показана один раз — в проверке 3.
+        self::assertTrue($this->check($result, 'costs_without_mapping')->passed);
 
         self::assertTrue($result->canClose());
+    }
+
+    /**
+     * Незамапленная нераспознанная затрата блокирует через проверку 3 и не
+     * дублируется в «Маппинг затрат к ОПиУ»; распознанные без маппинга — там.
+     */
+    public function testUnmappedUnrecognizedCostIsNotReportedTwice(): void
+    {
+        $unknown = $this->category(MarketplaceType::OZON, 'ozon_unknown_900', 'Неразобранная услуга Ozon: NewService');
+        $this->cost($unknown, MarketplaceType::OZON);
+        $this->cost($unknown, MarketplaceType::OZON);
+        $storage = $this->category(MarketplaceType::OZON, 'ozon_storage', 'Хранение Ozon');
+        $this->cost($storage, MarketplaceType::OZON);
+        $this->em->flush();
+
+        $result = $this->preflight(MarketplaceType::OZON);
+
+        $unrecognized = $this->check($result, 'costs_unknown_service_names');
+        self::assertTrue($unrecognized->blocking);
+        self::assertSame(2, $unrecognized->value);
+
+        $withoutMapping = $this->check($result, 'costs_without_mapping');
+        self::assertTrue($withoutMapping->blocking);
+        self::assertSame(1, $withoutMapping->value);
+        self::assertSame(['ozon_storage'], array_column($withoutMapping->details, 'category_code'));
+
+        self::assertFalse($result->canClose());
     }
 
     public function testMappedOzonCatalogCostPassesBothChecks(): void
@@ -183,6 +209,7 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertTrue($check->blocking);
         self::assertSame('Новое удержание', $check->details[0]['service_name']);
         self::assertFalse($check->details[0]['decided']);
+        self::assertTrue($this->check($result, 'costs_without_mapping')->passed);
         self::assertFalse($result->canClose());
     }
 
