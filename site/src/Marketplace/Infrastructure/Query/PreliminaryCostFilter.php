@@ -23,7 +23,7 @@ use Doctrine\DBAL\ArrayParameterType;
  *
  * Условие ссылается на алиас `mcc` таблицы marketplace_cost_categories.
  */
-final class PreliminaryCostFilter
+final readonly class PreliminaryCostFilter
 {
     /**
      * Возвращает SQL-фрагмент, его параметры и типы параметров.

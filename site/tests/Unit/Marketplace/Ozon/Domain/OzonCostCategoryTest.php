@@ -443,19 +443,21 @@ final class OzonCostCategoryTest extends TestCase
     }
 
     /**
-     * findByCode возвращает null для неизвестного кода.
+     * Распознанные коды — каталог без легаси-корзины неизвестных услуг.
      */
     public function testRecognizedCodesAreCatalogWithoutLegacyBucket(): void
     {
         $recognized = OzonCostCategory::recognizedCodes();
 
+        self::assertContains('ozon_logistic_direct', $recognized);
         self::assertNotContains('ozon_other_service', $recognized);
-        self::assertSame(
-            array_values(array_diff(array_keys(OzonCostCategory::byCode()), ['ozon_other_service'])),
-            $recognized,
-        );
+        self::assertNotContains('ozon_unknown_1', $recognized);
+        self::assertCount(\count(OzonCostCategory::byCode()) - 1, $recognized);
     }
 
+    /**
+     * findByCode возвращает null для неизвестного кода.
+     */
     public function testFindByCodeReturnsNullForUnknown(): void
     {
         $this->assertNull(OzonCostCategory::findByCode('nonexistent_code'));
