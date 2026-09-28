@@ -264,8 +264,19 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
 
         $after = $this->reloadMonthClose();
         self::assertNotNull($after);
-        self::assertNotSame(MonthCloseStageStatus::CLOSED, $after->getStageStatus(CloseStage::COSTS));
+        self::assertSame(MonthCloseStageStatus::REOPENED, $after->getStageStatus(CloseStage::COSTS));
         self::assertSame([], $after->getStagePLDocumentIds(CloseStage::COSTS));
+
+        // Прежний документ удалён, затраты сняты с него — висячих ссылок нет.
+        $connection = $this->em->getConnection();
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        ));
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :c AND document_id IS NOT NULL',
+            ['c' => self::COMPANY_ID],
+        ));
     }
 
     public function testSalesReturnsPreliminaryReopensDespiteExpectedClosedStageErrors(): void
