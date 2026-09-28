@@ -57,16 +57,6 @@ final class WbFinanceSyncStatusListQuery
     }
 
     /**
-     * @return list<array<string, mixed>>
-     */
-    public function findCurrentMonthDays(string $companyId): array
-    {
-        return $this->createByCompanyQueryBuilder($companyId, new \DateTimeImmutable('first day of this month'))
-            ->executeQuery()
-            ->fetchAllAssociative();
-    }
-
-    /**
      * Дни календарного месяца, которому принадлежит $month.
      *
      * @return list<array<string, mixed>>
