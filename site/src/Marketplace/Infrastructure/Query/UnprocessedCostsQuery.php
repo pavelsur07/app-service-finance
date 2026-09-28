@@ -74,9 +74,7 @@ final class UnprocessedCostsQuery
         // Важно: все три поля (is_storno / costs_amount / storno_amount) используют одну
         // и ту же классификацию, иначе для Ozon storno (amount > 0, operation_type='storno')
         // строки помеченные is_storno=true попадут в costs_amount вместо storno_amount.
-        $preliminaryFilter = $preliminary
-            ? "AND mcc.code != 'ozon_other_service'"
-            : '';
+        [$preliminaryFilter, $preliminaryParams, $preliminaryTypes] = PreliminaryCostFilter::build($marketplace, $preliminary);
 
         $sql = <<<SQL
             SELECT
@@ -129,7 +127,8 @@ final class UnprocessedCostsQuery
             'marketplace' => $marketplace,
             'periodFrom' => $periodFrom,
             'periodTo' => $periodTo,
-        ]);
+            ...$preliminaryParams,
+        ], $preliminaryTypes);
 
         return array_map(static function (array $r): array {
             $isStorno = (bool) $r['is_storno'];
@@ -185,9 +184,7 @@ final class UnprocessedCostsQuery
         string $periodTo,
         bool $preliminary = false,
     ): string {
-        $preliminaryFilter = $preliminary
-            ? "AND mcc.code != 'ozon_other_service'"
-            : '';
+        [$preliminaryFilter, $preliminaryParams, $preliminaryTypes] = PreliminaryCostFilter::build($marketplace, $preliminary);
 
         $result = $this->connection->fetchOne(
             <<<SQL
@@ -211,7 +208,9 @@ final class UnprocessedCostsQuery
                 'marketplace' => $marketplace,
                 'periodFrom' => $periodFrom,
                 'periodTo' => $periodTo,
+                ...$preliminaryParams,
             ],
+            $preliminaryTypes,
         );
 
         return (string) $result;

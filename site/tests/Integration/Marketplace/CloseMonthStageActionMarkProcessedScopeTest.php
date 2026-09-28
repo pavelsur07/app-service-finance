@@ -221,6 +221,28 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $this->assertMarked($otherServiceCost->getId(), 'marketplace_costs', false);
     }
 
+    /**
+     * Неизвестная услуга by-day, даже замапленная, в оперативный ОПиУ не входит —
+     * как и легаси-корзина: preflight считает её нераспознанной.
+     */
+    public function testOzonUnknownServiceIsLeftOutOfPreliminaryClose(): void
+    {
+        $plCategory = $this->createPlCategory('Unknown service preliminary');
+        $unknown = $this->createCostCategory('ozon_unknown_555', 'Неразобранная услуга Ozon: NewService');
+        $this->createCostMapping($unknown, $plCategory->getId(), true);
+        $unknownCost = $this->createCost($unknown, '500.00', '2026-02-14');
+
+        $logistics = $this->createCostCategory('ozon_logistic_direct', 'Logistics');
+        $this->createCostMapping($logistics, $plCategory->getId(), true);
+        $logisticsCost = $this->createCost($logistics, '150.00', '2026-02-15');
+        $this->em->flush();
+
+        $this->closeStage(CloseStage::COSTS, preliminary: true);
+
+        $this->assertMarked($logisticsCost->getId(), 'marketplace_costs', true);
+        $this->assertMarked($unknownCost->getId(), 'marketplace_costs', false);
+    }
+
     public function testFinalCloseMarksIncludedButNotExcludedRows(): void
     {
         $plCategory = $this->createPlCategory('Затраты final scope');

@@ -292,10 +292,7 @@ final class MonthClosePreflightAction
         $label = 'Нераспознанные операции';
 
         [$knownCodes, $blocksWhenDecided] = match (MarketplaceType::tryFrom($command->marketplace)) {
-            MarketplaceType::OZON => [
-                array_values(array_diff(array_keys(OzonCostCategory::byCode()), ['ozon_other_service'])),
-                true,
-            ],
+            MarketplaceType::OZON => [OzonCostCategory::recognizedCodes(), true],
             MarketplaceType::WILDBERRIES => [array_keys(WbCostCategory::byCode()), false],
             default => [null, false],
         };
@@ -325,10 +322,15 @@ final class MonthClosePreflightAction
             return PreflightCheck::error($key, $label, sprintf($message, $blocking), $blocking, $rows);
         }
 
+        // Ozon вне каталога оперативное закрытие не берёт (PreliminaryCostFilter).
+        $warning = $blocksWhenDecided
+            ? 'Найдено %d операций, которых нет в каталоге услуг маркетплейса. В оперативный ОПиУ они не попадут.'
+            : 'Найдено %d операций, которых нет в каталоге услуг маркетплейса.';
+
         return PreflightCheck::warning(
             $key,
             $label,
-            sprintf('Найдено %d операций, которых нет в каталоге услуг маркетплейса.', $total),
+            sprintf($warning, $total),
             $total,
             details: $rows,
         );

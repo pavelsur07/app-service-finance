@@ -227,7 +227,7 @@ final class CloseMonthStageAction
             // Контрольная сумма ДО создания документа (только для COSTS).
             // Флаг $preliminary передаётся чтобы контрольная сумма и execute()
             // считались на одном подмножестве строк — иначе в preliminary-режиме
-            // исключение ozon_other_service создаёт дельту и бросает RuntimeException.
+            // исключение нераспознанных затрат (PreliminaryCostFilter) создаёт дельту и бросает RuntimeException.
             $controlSumBefore = null;
             if (CloseStage::COSTS === $stage) {
                 $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
