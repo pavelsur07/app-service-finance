@@ -1,25 +1,40 @@
 # Ozon Costs Reconciliation — Руководство по сверке затрат
 
-## Знаковое соглашение `MarketplaceCost.amount`
+## Знаковое соглашение `MarketplaceCost`
 
-| Знак | Смысл | Пример |
-|------|-------|--------|
-| `amount > 0` | Затрата — расход продавца | Комиссия, логистика, хранение, реклама |
-| `amount < 0` | Сторно — возврат от маркетплейса | Возврат комиссии при возврате покупателя, возврат эквайринга |
+Сумма `amount` хранится **положительной**. Направление несёт `operation_type`:
 
-**Правило:** никогда не используй `abs()` при записи `amount`. Знак несёт бизнес-смысл.
+| `operation_type` | Смысл | Пример |
+|------------------|-------|--------|
+| `charge` | Затрата — расход продавца | Комиссия, логистика, хранение, реклама |
+| `storno` | Сторно — возврат от маркетплейса | Возврат комиссии при возврате покупателя, возврат эквайринга |
+
+Процессоры определяют направление по знаку исходной суммы маркетплейса и пишут
+её модуль:
+
+- Ozon by-day (`OzonAccrualCostsRawProcessor::operationType()`): Ozon присылает
+  списание с продавца отрицательным, возврат — положительным, поэтому
+  `> 0` → `storno`, иначе `charge`;
+- WB: калькуляторы задают `operation_type` явно; `storno` бывает у удержаний,
+  комиссии и эквайринга (`WbDeductionCalculator`, `WbCommissionCalculator`,
+  `WbAcquiringCalculator`), например отрицательное удержание → `storno`.
+
+**Правило:** направление читается только из `operation_type`, не из знака
+`amount`. Запросы применяют `ABS(amount)` безусловно — так строка считается
+верно при любом знаке в исторических данных.
 
 ---
 
-## Структура `grand_total`
+## Структура итогов затрат
 
 ```
-costs_amount   = SUM(amount) WHERE amount > 0   — все затраты брутто
-storno_amount  = SUM(ABS(amount)) WHERE amount < 0 — все сторно
-net_amount     = costs_amount − storno_amount   — итог нетто
+costs_amount   = SUM(ABS(amount)) WHERE operation_type = 'charge'  — все затраты брутто
+storno_amount  = SUM(ABS(amount)) WHERE operation_type = 'storno'  — все сторно
+net_amount     = costs_amount − storno_amount                      — итог нетто
 ```
 
-`net_amount` — это то что идёт в ОПиУ как расходы по маркетплейсу.
+`net_amount` — это то, что идёт в ОПиУ как расходы по маркетплейсу. Так же
+считают `CostReconciliationQuery` и `UnprocessedCostsQuery`.
 
 ---
 
@@ -27,15 +42,19 @@ net_amount     = costs_amount − storno_amount   — итог нетто
 
 ```
 xlsx_comparable = net_amount + return_revenue_amount
+delta           = |xlsx_comparable| − xlsx_total      — matched при |delta| < 0.01
 ```
 
 Где:
-- `net_amount` — наш `grand_total.net_amount`
-- `return_revenue_amount` — сумма возвратов выручки покупателям из `marketplace_returns`
+- `net_amount` — итог нетто затрат за период (раздел выше);
+- `return_revenue_amount` — `SUM(refund_amount)` возвратов покупателям из `marketplace_returns`.
 
 **Почему так:** Ozon в «Детализации начислений» включает возврат выручки покупателям
 в расходные группы (группа «Возвраты»). Мы учитываем эти суммы отдельно
 в `marketplace_returns`, поэтому наш `net_amount` на эту сумму меньше xlsx.
+
+Дополнительно сверка сравнивает суммы по группам xlsx с нашими категориями:
+группа категории — `OzonCostCategory::$xlsxGroup`.
 
 ### Пример — январь 2026
 
@@ -51,8 +70,8 @@ xlsx_comparable        = 3 761 721.62  ✅ совпадает с xlsx
 ## Почему комиссия в xlsx и у нас различается
 
 Ozon показывает комиссию **брутто** — без вычета возвращённой комиссии.
-Мы пишем комиссию **нетто** — возврат комиссии записывается отдельной
-строкой `amount < 0` с категорией `ozon_sale_commission`.
+Мы пишем комиссию **нетто**: возврат комиссии — отдельная строка категории
+`ozon_sale_commission` с `operation_type = storno` (описание «Возврат комиссии Ozon»).
 
 ```
 xlsx «Вознаграждение за продажу» (брутто)  = 1 828 929.62
@@ -96,13 +115,14 @@ storno_amount (возврат комиссии)           =     7 441.31  ← у
 
 ---
 
-## Что означают категории сторно
+## Что означает сторно по категориям
 
-| Категория | Когда возникает | Знак |
-|-----------|-----------------|------|
-| `ozon_sale_commission` с `amount < 0` | Возврат комиссии при `ClientReturnAgentOperation` | сторно |
-| `ozon_acquiring` с `amount < 0` | Возврат эквайринга при возврате покупателя | сторно |
-| Любой `services[].price > 0` | Ozon возвращает стоимость услуги | сторно |
+| Категория | Когда возникает |
+|-----------|-----------------|
+| `ozon_sale_commission`, `storno` | Возврат комиссии при возврате покупателя |
+| `ozon_acquiring`, `storno` | Возврат эквайринга при возврате покупателя |
+| Любая категория услуги, `storno` | Ozon вернул стоимость услуги (положительная сумма в начислении) |
+| `ozon_compensation` / `ozon_decompensation` | Услуга `Compensation`: знак суммы выбирает **категорию** (компенсация продавцу / списание с продавца), а не только `operation_type` — см. `OzonAccrualServiceCategoryResolver::SIGN_SPLIT_SERVICES` |
 
 ---
 
@@ -112,22 +132,32 @@ storno_amount (возврат комиссии)           =     7 441.31  ← у
 |-----|-----------------|
 | Возврат выручки покупателям | `marketplace_returns.refund_amount` |
 | Продажи | `marketplace_sales` |
-| Компенсации от Ozon (потеря по вине Ozon) | не учитываются в затратах — это доход |
+
+Компенсации от Ozon в затраты **входят**: категория `ozon_compensation`,
+базовый маппинг — статья `OPEX_WH_COMPENSATION`
+(`config/marketplace/default_cost_mapping.yaml`).
 
 ---
 
 ## Ключевые файлы
 
 ```
-src/Marketplace/Ozon/Application/Processor/OzonServiceCategoryMap.php   — маппинг service name → category
-src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php    — процессор затрат, знаковая логика
-src/Marketplace/Infrastructure/Query/CostReconciliationQuery.php    — сверка с xlsx, xlsx_comparable
-tests/Unit/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessorTest.php — тесты знакового соглашения
+src/Marketplace/Ozon/Application/Processor/OzonAccrualCostsRawProcessor.php     — затраты Ozon by-day, знак → operation_type
+src/Marketplace/Ozon/Application/Service/OzonAccrualServiceCategoryResolver.php — услуга by-day → категория, ozon_unknown_<type_id>
+src/Marketplace/Ozon/Domain/OzonCostCategory.php                                — каталог категорий затрат Ozon, группы xlsx
+src/Marketplace/Application/ReconcileCostsAction.php                            — загрузка xlsx и запуск сверки
+src/Marketplace/Infrastructure/Query/CostReconciliationQuery.php                — сверка с xlsx, xlsx_comparable
+tests/Unit/Marketplace/Ozon/Application/Processor/OzonAccrualCostsRawProcessorTest.php — тесты процессора by-day
 ```
 
 ---
 
-## Changelog маппинга `OzonServiceCategoryMap`
+## Changelog маппинга `OzonServiceCategoryMap` (история легаси-пути v3)
+
+Ozon снял метод v3 `/v3/finance/transaction/list` в сентябре 2026: новые затраты
+идут только через by-day. `OzonCostsRawProcessor` и `OzonServiceCategoryMap`
+остались для переобработки исторических raw-документов v3. Таблица ниже — история
+словаря этого пути. Текущий каталог — `OzonCostCategory`, его изменения — в git.
 
 | Версия | Дата | Изменение |
 |--------|------|-----------|
