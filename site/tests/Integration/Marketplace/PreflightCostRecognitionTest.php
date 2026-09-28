@@ -15,6 +15,7 @@ use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -112,6 +113,37 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertSame('Прочие услуги Ozon', $check->details[0]['service_name']);
         self::assertSame('ozon_other_service', $check->details[0]['category_code']);
         self::assertSame(3, $check->details[0]['count']);
+    }
+
+    /**
+     * Контрольная сумма перед оперативным закрытием — на тех же строках, что
+     * возьмёт закрытие: без нераспознанных затрат Ozon. Перед финальным — все.
+     */
+    public function testControlSumMatchesWhatPreliminaryCloseTakes(): void
+    {
+        $plCategoryId = Uuid::uuid4()->toString();
+        $logistics = $this->category(MarketplaceType::OZON, 'ozon_logistic_direct', 'Логистика к покупателю Ozon');
+        $this->mapping($logistics, plCategoryId: $plCategoryId);
+        $this->cost($logistics, MarketplaceType::OZON);
+        $unknown = $this->category(MarketplaceType::OZON, 'ozon_unknown_900', 'Неразобранная услуга Ozon: NewService');
+        $this->mapping($unknown, plCategoryId: $plCategoryId);
+        $this->cost($unknown, MarketplaceType::OZON);
+        $bucket = $this->category(MarketplaceType::OZON, 'ozon_other_service', 'Прочие услуги Ozon');
+        $this->mapping($bucket, plCategoryId: $plCategoryId);
+        $this->cost($bucket, MarketplaceType::OZON);
+        $this->em->flush();
+
+        $preliminary = $this->preflight(MarketplaceType::OZON, preliminary: true);
+        $final = $this->preflight(MarketplaceType::OZON);
+
+        /** @var UnprocessedCostsQuery $unprocessed */
+        $unprocessed = self::getContainer()->get(UnprocessedCostsQuery::class);
+        $closeTakes = $unprocessed->getControlSum(self::COMPANY_ID, MarketplaceType::OZON->value, '2026-03-01', '2026-03-31', true);
+
+        self::assertEqualsWithDelta(100.0, (float) $this->check($preliminary, 'costs_control_sum')->value, 0.001);
+        self::assertEqualsWithDelta((float) $closeTakes, (float) $this->check($preliminary, 'costs_control_sum')->value, 0.001);
+        self::assertEqualsWithDelta(300.0, (float) $this->check($final, 'costs_control_sum')->value, 0.001);
+        self::assertSame(3, $this->check($preliminary, 'costs_count')->value);
     }
 
     public function testOzonUnknownServiceOnlyWarnsBeforePreliminaryClose(): void
