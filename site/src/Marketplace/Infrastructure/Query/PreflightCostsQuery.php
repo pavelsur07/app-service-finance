@@ -107,7 +107,7 @@ final class PreflightCostsQuery
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
-                CASE WHEN cc.code = 'ozon_other_service' THEN COALESCE(NULLIF(c.description, ''), cc.name) ELSE cc.name END AS service_name,
+                CASE WHEN cc.code = 'ozon_other_service' THEN COALESCE(NULLIF(BTRIM(c.description), ''), cc.name) ELSE cc.name END AS service_name,
                 cc.code                                                                        AS category_code,
                 COUNT(c.id)                                                                    AS count,
                 NOT (m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL))   AS decided

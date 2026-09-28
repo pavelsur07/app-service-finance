@@ -100,12 +100,18 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
     {
         $bucket = $this->category(MarketplaceType::OZON, 'ozon_other_service', 'Прочие услуги Ozon');
         $this->cost($bucket, MarketplaceType::OZON);
+        $this->cost($bucket, MarketplaceType::OZON, description: '');
+        $this->cost($bucket, MarketplaceType::OZON, description: '   ');
         $this->em->flush();
 
         $check = $this->check($this->preflight(MarketplaceType::OZON), 'costs_unknown_service_names');
 
+        self::assertTrue($check->blocking);
+        self::assertSame(3, $check->value);
+        self::assertCount(1, $check->details);
         self::assertSame('Прочие услуги Ozon', $check->details[0]['service_name']);
         self::assertSame('ozon_other_service', $check->details[0]['category_code']);
+        self::assertSame(3, $check->details[0]['count']);
     }
 
     public function testOzonUnknownServiceOnlyWarnsBeforePreliminaryClose(): void
@@ -316,13 +322,16 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         ));
     }
 
-    private function cost(MarketplaceCostCategory $category, MarketplaceType $marketplace): void
+    private function cost(MarketplaceCostCategory $category, MarketplaceType $marketplace, ?string $description = null): void
     {
         $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, $marketplace, $category);
         $cost->setAmount('100.00');
         $cost->setCostDate(new \DateTimeImmutable('2026-03-10'));
         $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
         $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
+        if (null !== $description) {
+            $cost->setDescription($description);
+        }
         $this->em->persist($cost);
     }
 }
