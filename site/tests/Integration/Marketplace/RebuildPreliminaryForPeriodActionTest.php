@@ -241,6 +241,44 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         self::assertSame(0, $unrecognizedInDocument, 'Нераспознанная затрата не должна попасть в оперативный ОПиУ.');
     }
 
+    /**
+     * После переоткрытия у этапа не осталось строк: все затраты Ozon стали
+     * нераспознанными. Это ожидаемый исход, а не сбой — пересборка не бросает
+     * (иначе ERROR и ретрай сообщения), этап остаётся открытым без документа.
+     */
+    public function testNothingToCloseAfterReopenIsNotAFailure(): void
+    {
+        $this->seedCostsForCosts();
+        $this->rebuild();
+
+        $before = $this->reloadMonthClose();
+        self::assertNotNull($before);
+        self::assertNotSame([], $before->getStagePLDocumentIds(CloseStage::COSTS));
+
+        $this->em->getConnection()->executeStatement(
+            "UPDATE marketplace_cost_categories SET code = 'ozon_unknown_1' WHERE company_id = :c AND code = 'ozon_logistic_direct'",
+            ['c' => self::COMPANY_ID],
+        );
+
+        $this->rebuild();
+
+        $after = $this->reloadMonthClose();
+        self::assertNotNull($after);
+        self::assertSame(MonthCloseStageStatus::REOPENED, $after->getStageStatus(CloseStage::COSTS));
+        self::assertSame([], $after->getStagePLDocumentIds(CloseStage::COSTS));
+
+        // Прежний документ удалён, затраты сняты с него — висячих ссылок нет.
+        $connection = $this->em->getConnection();
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        ));
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :c AND document_id IS NOT NULL',
+            ['c' => self::COMPANY_ID],
+        ));
+    }
+
     public function testSalesReturnsPreliminaryReopensDespiteExpectedClosedStageErrors(): void
     {
         $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
