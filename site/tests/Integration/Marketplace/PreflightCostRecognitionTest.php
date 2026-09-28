@@ -128,9 +128,15 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         $unknown = $this->category(MarketplaceType::OZON, 'ozon_unknown_900', 'Неразобранная услуга Ozon: NewService');
         $this->mapping($unknown, plCategoryId: $plCategoryId);
         $this->cost($unknown, MarketplaceType::OZON);
+        $this->cost($unknown, MarketplaceType::OZON, operationType: MarketplaceCostOperationType::STORNO);
         $bucket = $this->category(MarketplaceType::OZON, 'ozon_other_service', 'Прочие услуги Ozon');
         $this->mapping($bucket, plCategoryId: $plCategoryId);
         $this->cost($bucket, MarketplaceType::OZON);
+        // Не входят в сумму ни в каком режиме, но считаются в счётчиках за весь период.
+        $this->cost($this->category(MarketplaceType::OZON, 'ozon_storage', 'Хранение Ozon'), MarketplaceType::OZON);
+        $excluded = $this->category(MarketplaceType::OZON, 'ozon_acquiring', 'Эквайринг Ozon');
+        $this->mapping($excluded, plCategoryId: null, includeInPl: false);
+        $this->cost($excluded, MarketplaceType::OZON);
         $this->em->flush();
 
         $preliminary = $this->preflight(MarketplaceType::OZON, preliminary: true);
@@ -142,8 +148,31 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
 
         self::assertEqualsWithDelta(100.0, (float) $this->check($preliminary, 'costs_control_sum')->value, 0.001);
         self::assertEqualsWithDelta((float) $closeTakes, (float) $this->check($preliminary, 'costs_control_sum')->value, 0.001);
-        self::assertEqualsWithDelta(300.0, (float) $this->check($final, 'costs_control_sum')->value, 0.001);
-        self::assertSame(3, $this->check($preliminary, 'costs_count')->value);
+        // 100 логистика + 100 неизвестная − 100 её сторно + 100 легаси-корзина.
+        self::assertEqualsWithDelta(200.0, (float) $this->check($final, 'costs_control_sum')->value, 0.001);
+
+        // Остальные счётчики перед оперативным закрытием — по всем затратам периода.
+        self::assertSame(6, $this->check($preliminary, 'costs_count')->value);
+        self::assertSame(1, $this->check($preliminary, 'costs_without_mapping')->value);
+        self::assertSame(1, $this->check($preliminary, 'costs_excluded')->value);
+    }
+
+    public function testControlSumBeforePreliminaryCloseExcludesLegacyBucketForWildberries(): void
+    {
+        $plCategoryId = Uuid::uuid4()->toString();
+        $storage = $this->category(MarketplaceType::WILDBERRIES, 'storage', 'Хранение WB');
+        $this->mapping($storage, plCategoryId: $plCategoryId);
+        $this->cost($storage, MarketplaceType::WILDBERRIES);
+        $bucket = $this->category(MarketplaceType::WILDBERRIES, 'ozon_other_service', 'Прочие услуги');
+        $this->mapping($bucket, plCategoryId: $plCategoryId);
+        $this->cost($bucket, MarketplaceType::WILDBERRIES);
+        $this->em->flush();
+
+        $preliminary = $this->preflight(MarketplaceType::WILDBERRIES, preliminary: true);
+        $final = $this->preflight(MarketplaceType::WILDBERRIES);
+
+        self::assertEqualsWithDelta(100.0, (float) $this->check($preliminary, 'costs_control_sum')->value, 0.001);
+        self::assertEqualsWithDelta(200.0, (float) $this->check($final, 'costs_control_sum')->value, 0.001);
     }
 
     public function testOzonUnknownServiceOnlyWarnsBeforePreliminaryClose(): void
@@ -354,12 +383,16 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         ));
     }
 
-    private function cost(MarketplaceCostCategory $category, MarketplaceType $marketplace, ?string $description = null): void
-    {
+    private function cost(
+        MarketplaceCostCategory $category,
+        MarketplaceType $marketplace,
+        ?string $description = null,
+        MarketplaceCostOperationType $operationType = MarketplaceCostOperationType::CHARGE,
+    ): void {
         $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, $marketplace, $category);
         $cost->setAmount('100.00');
         $cost->setCostDate(new \DateTimeImmutable('2026-03-10'));
-        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+        $cost->setOperationType($operationType);
         $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         if (null !== $description) {
             $cost->setDescription($description);
