@@ -25,14 +25,22 @@ final class PreflightCostsQuery
     ) {
     }
 
+    /**
+     * $preliminary — считать net_amount_for_pl на тех же строках, что возьмёт
+     * оперативное закрытие (PreliminaryCostFilter); остальные счётчики — по
+     * всем затратам периода.
+     */
     public function getCostsStats(
         string $companyId,
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
+        [$preliminaryFilter, $preliminaryParams, $preliminaryTypes] = PreliminaryCostFilter::build($marketplace, $preliminary);
+
         return $this->connection->fetchAssociative(
-            <<<'SQL'
+            <<<SQL
             SELECT
                 COUNT(*)                                                        AS total,
                 COUNT(*) FILTER (WHERE c.document_id IS NOT NULL)              AS already_processed,
@@ -50,10 +58,11 @@ final class PreflightCostsQuery
                 )                                                               AS excluded_from_pl,
                 COALESCE(
                     SUM(CASE WHEN c.operation_type = 'storno' THEN -ABS(c.amount) ELSE ABS(c.amount) END)
-                        FILTER (WHERE m.include_in_pl = true AND m.pl_category_id IS NOT NULL),
+                        FILTER (WHERE m.include_in_pl = true AND m.pl_category_id IS NOT NULL $preliminaryFilter),
                     0
                 )                                                               AS net_amount_for_pl
             FROM marketplace_costs c
+            LEFT JOIN marketplace_cost_categories mcc ON mcc.id = c.category_id
             LEFT JOIN marketplace_cost_pl_mappings m
                 ON m.cost_category_id = c.category_id
                 AND m.company_id = c.company_id
@@ -67,7 +76,9 @@ final class PreflightCostsQuery
                 'marketplace' => $marketplace,
                 'periodFrom' => $periodFrom,
                 'periodTo' => $periodTo,
+                ...$preliminaryParams,
             ],
+            $preliminaryTypes,
         ) ?: [
             'total' => 0,
             'already_processed' => 0,

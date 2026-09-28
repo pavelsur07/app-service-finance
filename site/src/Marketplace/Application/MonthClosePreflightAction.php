@@ -207,7 +207,7 @@ final class MonthClosePreflightAction
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
         $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
-        $costsStats = $this->costsQuery->getCostsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
+        $costsStats = $this->costsQuery->getCostsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo, $command->preliminary);
         $total = (int) $costsStats['total'];
         $alreadyProcessed = (int) $costsStats['already_processed'];
         $excluded = (int) $costsStats['excluded_from_pl'];

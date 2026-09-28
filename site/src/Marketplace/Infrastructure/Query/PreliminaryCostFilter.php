@@ -14,7 +14,8 @@ use Doctrine\DBAL\ArrayParameterType;
  * Один фильтр на три запроса, которые обязаны зеркалить друг друга:
  * UnprocessedCostsQuery::execute(), ::getControlSum() и
  * MarkProcessedQuery::markCosts(). Расхождение между ними — дельта контрольной
- * суммы и RuntimeException в CloseMonthStageAction.
+ * суммы и RuntimeException в CloseMonthStageAction. Им же preflight считает
+ * контрольную сумму перед оперативным закрытием (PreflightCostsQuery::getCostsStats).
  *
  * Ozon: только распознанные коды (OzonCostCategory::recognizedCodes()) — то же
  * определение, по которому preflight блокирует финальное закрытие; раньше
