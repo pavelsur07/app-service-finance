@@ -236,20 +236,40 @@ final class MonthClosePreflightAction
         }
 
         // Проверка 3: нераспознанные затраты (БЛОКИРУЕТ финальное закрытие)
-        $checks[] = $this->checkUnrecognizedCosts($command, $periodFrom, $periodTo);
+        [$knownCodes, $blocksWhenDecided] = $this->catalogFor($command->marketplace);
+        $unrecognized = null === $knownCodes ? [] : $this->costsQuery->getUnrecognizedCosts(
+            $command->companyId, $command->marketplace, $periodFrom, $periodTo, $knownCodes,
+        );
+        $checks[] = $this->checkUnrecognizedCosts($command, null !== $knownCodes, $unrecognized, $blocksWhenDecided);
 
-        // Проверка 4: затраты без решения по ОПиУ (БЛОКИРУЕТ финальное закрытие)
-        $withoutDecision = (int) $costsStats['without_pl_decision'];
+        // Проверка 4: затраты без решения по ОПиУ (БЛОКИРУЕТ финальное закрытие).
+        // Нераспознанные строки без решения уже показаны в проверке 3 и блокируют
+        // там же — второй раз их не считаем.
+        $unrecognizedWithoutDecision = array_sum(array_map(
+            static fn (array $row): int => $row['decided'] ? 0 : $row['count'],
+            $unrecognized,
+        ));
+        // Два отдельных чтения: затрата, пришедшая между ними, не должна увести счётчик в минус.
+        $withoutDecision = max(0, (int) $costsStats['without_pl_decision'] - $unrecognizedWithoutDecision);
         if ($withoutDecision > 0) {
-            $categoriesWithoutDecision = $this->costsQuery->getCategoriesWithoutMapping(
-                $command->companyId, $command->marketplace, $periodFrom, $periodTo,
-            );
+            $categoriesWithoutDecision = array_values(array_filter(
+                $this->costsQuery->getCategoriesWithoutMapping(
+                    $command->companyId, $command->marketplace, $periodFrom, $periodTo,
+                ),
+                static fn (array $row): bool => null === $knownCodes || in_array($row['category_code'], $knownCodes, true),
+            ));
             $message = sprintf('Затрат без маппинга к ОПиУ: %d шт. Они не попадут в ОПиУ. Настройте маппинг в разделе "Себестоимость" или исключите категорию из ОПиУ.', $withoutDecision);
             $checks[] = $command->preliminary
                 ? PreflightCheck::warning('costs_without_mapping', 'Маппинг затрат к ОПиУ', $message, $withoutDecision, details: $categoriesWithoutDecision)
                 : PreflightCheck::error('costs_without_mapping', 'Маппинг затрат к ОПиУ', $message, $withoutDecision, $categoriesWithoutDecision);
         } else {
-            $checks[] = PreflightCheck::ok('costs_without_mapping', 'Маппинг затрат к ОПиУ', 'Все затраты имеют маппинг к ОПиУ');
+            $checks[] = PreflightCheck::ok(
+                'costs_without_mapping',
+                'Маппинг затрат к ОПиУ',
+                $unrecognizedWithoutDecision > 0
+                    ? 'Распознанные затраты имеют маппинг к ОПиУ; нераспознанные без маппинга — в проверке «Нераспознанные операции»'
+                    : 'Все затраты имеют маппинг к ОПиУ',
+            );
         }
 
         // Проверка 5: исключённые категории (информационно)
@@ -276,6 +296,22 @@ final class MonthClosePreflightAction
     }
 
     /**
+     * Каталог, по которому затрата считается распознанной, и блокирует ли
+     * нераспознанная затрата, по которой уже есть решение по ОПиУ.
+     * null вместо кодов — каталог для маркетплейса не ведётся.
+     *
+     * @return array{0: list<string>|null, 1: bool}
+     */
+    private function catalogFor(string $marketplace): array
+    {
+        return match (MarketplaceType::tryFrom($marketplace)) {
+            MarketplaceType::OZON => [OzonCostCategory::recognizedCodes(), true],
+            MarketplaceType::WILDBERRIES => [array_keys(WbCostCategory::byCode()), false],
+            default => [null, false],
+        };
+    }
+
+    /**
      * Нераспознанная затрата — категория вне каталога маркетплейса: новая
      * услуга Ozon (`ozon_unknown_<type_id>`), удержание WB, не описанное в
      * WbCostCategory, либо легаси-корзина `ozon_other_service`: код в каталоге
@@ -285,25 +321,18 @@ final class MonthClosePreflightAction
      * WB — только пока по категории нет решения по ОПиУ: удержания WB
      * приходят свободным текстом, и замапленная пользователем категория
      * уже решена.
+     *
+     * @param list<array{service_name: string, category_code: string, count: int, decided: bool}> $rows
      */
-    private function checkUnrecognizedCosts(PreflightMonthCloseCommand $command, string $periodFrom, string $periodTo): PreflightCheck
+    private function checkUnrecognizedCosts(PreflightMonthCloseCommand $command, bool $hasCatalog, array $rows, bool $blocksWhenDecided): PreflightCheck
     {
         $key = 'costs_unknown_service_names';
         $label = 'Нераспознанные операции';
 
-        [$knownCodes, $blocksWhenDecided] = match (MarketplaceType::tryFrom($command->marketplace)) {
-            MarketplaceType::OZON => [OzonCostCategory::recognizedCodes(), true],
-            MarketplaceType::WILDBERRIES => [array_keys(WbCostCategory::byCode()), false],
-            default => [null, false],
-        };
-
-        if (null === $knownCodes) {
+        if (!$hasCatalog) {
             return PreflightCheck::ok($key, $label, 'Каталог услуг для маркетплейса не ведётся');
         }
 
-        $rows = $this->costsQuery->getUnrecognizedCosts(
-            $command->companyId, $command->marketplace, $periodFrom, $periodTo, $knownCodes,
-        );
         if ([] === $rows) {
             return PreflightCheck::ok($key, $label, 'Все операции распознаны');
         }
