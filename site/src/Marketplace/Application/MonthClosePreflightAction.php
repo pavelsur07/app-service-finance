@@ -249,7 +249,8 @@ final class MonthClosePreflightAction
             static fn (array $row): int => $row['decided'] ? 0 : $row['count'],
             $unrecognized,
         ));
-        $withoutDecision = (int) $costsStats['without_pl_decision'] - $unrecognizedWithoutDecision;
+        // Два отдельных чтения: затрата, пришедшая между ними, не должна увести счётчик в минус.
+        $withoutDecision = max(0, (int) $costsStats['without_pl_decision'] - $unrecognizedWithoutDecision);
         if ($withoutDecision > 0) {
             $categoriesWithoutDecision = array_values(array_filter(
                 $this->costsQuery->getCategoriesWithoutMapping(

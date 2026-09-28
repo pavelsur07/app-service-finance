@@ -109,7 +109,9 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertFalse($unknown->blocking);
 
         // Незамапленная нераспознанная затрата показана один раз — в проверке 3.
-        self::assertTrue($this->check($result, 'costs_without_mapping')->passed);
+        $withoutMapping = $this->check($result, 'costs_without_mapping');
+        self::assertTrue($withoutMapping->passed);
+        self::assertStringContainsString('Нераспознанные операции', $withoutMapping->message);
 
         self::assertTrue($result->canClose());
     }
@@ -211,6 +213,23 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertFalse($check->details[0]['decided']);
         self::assertTrue($this->check($result, 'costs_without_mapping')->passed);
         self::assertFalse($result->canClose());
+    }
+
+    public function testWbWithoutMappingListsOnlyCatalogCategories(): void
+    {
+        $unknown = $this->category(MarketplaceType::WILDBERRIES, 'wb_novoe_uderzhanie', 'Новое удержание');
+        $this->cost($unknown, MarketplaceType::WILDBERRIES);
+        $storage = $this->category(MarketplaceType::WILDBERRIES, 'storage', 'Хранение WB');
+        $this->cost($storage, MarketplaceType::WILDBERRIES);
+        $this->em->flush();
+
+        $result = $this->preflight(MarketplaceType::WILDBERRIES);
+
+        self::assertSame(1, $this->check($result, 'costs_unknown_service_names')->value);
+        $withoutMapping = $this->check($result, 'costs_without_mapping');
+        self::assertTrue($withoutMapping->blocking);
+        self::assertSame(1, $withoutMapping->value);
+        self::assertSame(['storage'], array_column($withoutMapping->details, 'category_code'));
     }
 
     public function testMappedWbUnknownDeductionOnlyWarns(): void
