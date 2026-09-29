@@ -24,7 +24,7 @@ final class UploadLoanScheduleAction
         }
 
         $csv->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY | \SplFileObject::DROP_NEW_LINE);
-        $csv->setCsvControl(';');
+        $csv->setCsvControl(';', '"', '\\');
 
         $isHeaderSkipped = false;
 

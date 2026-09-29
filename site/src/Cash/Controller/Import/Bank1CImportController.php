@@ -257,7 +257,7 @@ class Bank1CImportController extends AbstractController
                 'ИНН получателя',
                 'Счёт получателя',
                 'Статус контрагента',
-            ], ';');
+            ], ';', '"', '');
 
             foreach ($preview as $row) {
                 if (!is_array($row)) {
@@ -289,7 +289,7 @@ class Bank1CImportController extends AbstractController
                     (string) ($row['receiverInn'] ?? ''),
                     $this->accountMasker->mask(is_string($row['receiverAccount'] ?? null) ? $row['receiverAccount'] : null),
                     (string) ($row['counterpartyStatus'] ?? ''),
-                ], ';');
+                ], ';', '"', '');
             }
 
             fclose($handle);

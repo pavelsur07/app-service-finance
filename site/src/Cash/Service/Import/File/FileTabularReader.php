@@ -151,7 +151,7 @@ class FileTabularReader
         $bestCount = 1;
 
         foreach ($candidates as $delimiter) {
-            $columns = str_getcsv($line, $delimiter);
+            $columns = str_getcsv($line, $delimiter, '"', '\\');
             $count = count($columns);
             if ($count > $bestCount) {
                 $bestCount = $count;
