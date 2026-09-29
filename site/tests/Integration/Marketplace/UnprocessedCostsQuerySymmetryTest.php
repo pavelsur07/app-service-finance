@@ -163,15 +163,12 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         $processed->setDocument($document);
         $this->em->flush();
 
-        // Preflight не фильтрует document_id (это отдельная метрика already_processed),
-        // поэтому здесь сравниваем только getControlSum с handler'ом.
+        // Все три формулы берут только необработанные строки; сама обработанная
+        // строка видна в preflight отдельной метрикой already_processed.
         self::assertEqualsWithDelta(400.0, (float) $this->getControlSum(), 0.01);
         self::assertEqualsWithDelta(400.0, $this->handlerPlDocumentSum(), 0.01);
-        self::assertEqualsWithDelta(
-            0.0,
-            abs((float) $this->getControlSum() - $this->handlerPlDocumentSum()),
-            0.01,
-        );
+        self::assertEqualsWithDelta(400.0, (float) $this->getPreflightNetAmount(), 0.01);
+        $this->assertSymmetry();
     }
 
     public function testCostDateOutOfPeriodIsIgnoredByBothFormulas(): void
