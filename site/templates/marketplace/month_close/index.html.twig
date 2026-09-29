@@ -203,9 +203,9 @@
                                         <div class="fw-medium">Оперативного ОПиУ по этапу нет</div>
                                         <div class="small">
                                             {% if is_current_month %}
-                                                Этап переоткрыт, его документ ОПиУ удалён. Ежедневный пересчёт попробует закрыть этап сам; можно закрыть вручную.
+                                                Этап переоткрыт, документы ОПиУ этапа удалены. Ежедневный пересчёт попробует закрыть этап оперативно, если проверка готовности пройдёт; можно закрыть вручную.
                                             {% else %}
-                                                Этап переоткрыт, его документ ОПиУ удалён. Прошлые месяцы автоматически не пересчитываются — закройте этап вручную.
+                                                Этап переоткрыт, документы ОПиУ этапа удалены. Прошлые месяцы автоматически не пересчитываются — закройте этап вручную.
                                             {% endif %}
                                         </div>
                                     </div>
@@ -299,7 +299,7 @@
                                     {% endif %}
                                     <span class="text-muted small ms-1">{{ mc.stageSalesReturnsClosedAt|date('d.m.Y') }}</span>
                                 {% elseif mc.stageSalesReturnsStatus.value == 'reopened' %}
-                                    <span class="badge bg-warning-lt" title="Документ ОПиУ этапа удалён — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
+                                    <span class="badge bg-warning-lt" title="Документы ОПиУ этапа удалены — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
                                 {% else %}
                                     <span class="badge bg-secondary-lt">Не закрыт</span>
                                 {% endif %}
@@ -313,7 +313,7 @@
                                     {% endif %}
                                     <span class="text-muted small ms-1">{{ mc.stageCostsClosedAt|date('d.m.Y') }}</span>
                                 {% elseif mc.stageCostsStatus.value == 'reopened' %}
-                                    <span class="badge bg-warning-lt" title="Документ ОПиУ этапа удалён — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
+                                    <span class="badge bg-warning-lt" title="Документы ОПиУ этапа удалены — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
                                 {% else %}
                                     <span class="badge bg-secondary-lt">Не закрыт</span>
                                 {% endif %}

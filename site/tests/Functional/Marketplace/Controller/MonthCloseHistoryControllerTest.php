@@ -124,9 +124,15 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $crawler = new Crawler((string) $client->getResponse()->getContent());
         $notice = $crawler->filter('[data-role="reopened-notice"]');
-        self::assertSame(1, $notice->count(), 'Предупреждение только у переоткрытого этапа затрат.');
+        self::assertCount(1, $notice, 'Предупреждение только у переоткрытого этапа затрат.');
         self::assertStringContainsString('Оперативного ОПиУ по этапу нет', $notice->text());
         self::assertStringContainsString('закройте этап вручную', $notice->text());
+        self::assertStringNotContainsString('Ежедневный пересчёт', $notice->text());
+
+        $historyBadge = $crawler->filter('table tbody tr span.badge[title]');
+        self::assertCount(1, $historyBadge);
+        self::assertSame('Переоткрыт', trim($historyBadge->text()));
+        self::assertStringContainsString('оперативного ОПиУ нет', (string) $historyBadge->attr('title'));
     }
 
     public function testReopenedStageOfCurrentMonthMentionsDailyRebuild(): void
@@ -146,8 +152,9 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $notice = (new Crawler((string) $client->getResponse()->getContent()))->filter('[data-role="reopened-notice"]');
-        self::assertSame(1, $notice->count());
+        self::assertCount(1, $notice);
         self::assertStringContainsString('Ежедневный пересчёт', $notice->text());
+        self::assertStringNotContainsString('закройте этап вручную', $notice->text());
     }
 
     private function persistReopenedCosts(string $id, int $year, int $month): void
