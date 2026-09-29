@@ -11,6 +11,7 @@ use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarkProcessedQuery;
 use App\Marketplace\Infrastructure\Query\PreflightCostsQuery;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -21,7 +22,8 @@ use Ramsey\Uuid\Uuid;
 /**
  * Гарантирует симметрию "формулы A" (getControlSum / preflight net_amount_for_pl)
  * и "формулы B" (execute → PLEntryDTO-like reduce, повторяет логику
- * CloseMonthStageAction::__invoke строки ~195–205).
+ * CloseMonthStageAction::__invoke строки ~195–205) в финальном и оперативном
+ * режимах; в оперативном — ещё и что markCosts помечает те же строки.
  *
  * Баг до фикса: getControlSum использовал SUM(c.amount) без учёта operation_type,
  * тогда как execute вычитает storno через is_storno-флаг. Поскольку после
@@ -171,6 +173,60 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         $this->assertSymmetry();
     }
 
+    /**
+     * Оперативный режим: все зеркальные формулы берут одно подмножество строк —
+     * без нераспознанных затрат Ozon (PreliminaryCostFilter) и без уже
+     * обработанных; markCosts помечает ровно его.
+     */
+    public function testPreliminaryModeKeepsAllFormulasSymmetric(): void
+    {
+        $logistics = $this->createMappedCategory('ozon_logistic_direct', 'Логистика');
+        $unknown = $this->createMappedCategory('ozon_unknown_7', 'Неразобранная услуга Ozon');
+        $bucket = $this->createMappedCategory('ozon_other_service', 'Прочие услуги Ozon');
+
+        $this->createCost($logistics, '1000.00', MarketplaceCostOperationType::CHARGE, '2026-01-10');
+        $this->createCost($logistics, '100.00', MarketplaceCostOperationType::STORNO, '2026-01-11');
+        $processed = $this->createCost($logistics, '200.00', MarketplaceCostOperationType::CHARGE, '2026-01-12');
+        $this->createCost($unknown, '500.00', MarketplaceCostOperationType::CHARGE, '2026-01-13');
+        $this->createCost($bucket, '300.00', MarketplaceCostOperationType::CHARGE, '2026-01-14');
+        $this->em->flush();
+
+        $processed->setDocument($this->createDocument());
+        $this->em->flush();
+
+        self::assertEqualsWithDelta(900.0, (float) $this->getControlSum(true), 0.01);
+        $this->assertSymmetry(true);
+
+        // Финальный режим берёт и нераспознанные: 1000 − 100 + 500 + 300.
+        self::assertEqualsWithDelta(1700.0, (float) $this->getControlSum(), 0.01);
+        $this->assertSymmetry();
+
+        /** @var MarkProcessedQuery $markProcessed */
+        $markProcessed = self::getContainer()->get(MarkProcessedQuery::class);
+        $plDocument = $this->createDocument();
+        $documentId = (string) $plDocument->getId();
+        $marked = $markProcessed->markCosts(
+            (string) $this->company->getId(),
+            self::MARKETPLACE_VALUE,
+            $documentId,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            true,
+        );
+
+        self::assertSame(2, $marked, 'Помечены charge и storno распознанной категории — и только они.');
+        $markedNet = (float) $this->connection->fetchOne(
+            "SELECT COALESCE(SUM(CASE WHEN operation_type = 'storno' THEN -ABS(amount) ELSE ABS(amount) END), 0)
+             FROM marketplace_costs WHERE document_id = :doc",
+            ['doc' => $documentId],
+        );
+        self::assertEqualsWithDelta(900.0, $markedNet, 0.01, 'markCosts(preliminary) должен пометить ровно строки контрольной суммы.');
+
+        // Оперативному закрытию больше брать нечего; финальному остались нераспознанные 500 + 300.
+        self::assertEqualsWithDelta(0.0, (float) $this->getControlSum(true), 0.01);
+        self::assertEqualsWithDelta(800.0, (float) $this->getControlSum(), 0.01);
+    }
+
     public function testCostDateOutOfPeriodIsIgnoredByBothFormulas(): void
     {
         $category = $this->createMappedCategory('period_cat', 'Period cat');
@@ -260,6 +316,15 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         return $category;
     }
 
+    private function createDocument(): Document
+    {
+        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        return $document;
+    }
+
     private function createCost(
         MarketplaceCostCategory $category,
         string $amount,
@@ -281,23 +346,25 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         return $cost;
     }
 
-    private function getControlSum(): string
+    private function getControlSum(bool $preliminary = false): string
     {
         return $this->unprocessedCostsQuery->getControlSum(
             $this->company->getId(),
             self::MARKETPLACE_VALUE,
             self::PERIOD_FROM,
             self::PERIOD_TO,
+            $preliminary,
         );
     }
 
-    private function getPreflightNetAmount(): string
+    private function getPreflightNetAmount(bool $preliminary = false): string
     {
         $stats = $this->preflightCostsQuery->getCostsStats(
             $this->company->getId(),
             self::MARKETPLACE_VALUE,
             self::PERIOD_FROM,
             self::PERIOD_TO,
+            $preliminary,
         );
 
         return (string) $stats['net_amount_for_pl'];
@@ -307,13 +374,14 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
      * Воспроизводит CloseMonthStageAction::__invoke строки ~195–205:
      *   для каждой entry: isNegative=true → +amount, isNegative=false → -amount.
      */
-    private function handlerPlDocumentSum(): float
+    private function handlerPlDocumentSum(bool $preliminary = false): float
     {
         $rows = $this->unprocessedCostsQuery->execute(
             $this->company->getId(),
             self::MARKETPLACE_VALUE,
             self::PERIOD_FROM,
             self::PERIOD_TO,
+            $preliminary,
         );
 
         $sum = '0';
@@ -329,11 +397,11 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
         return (float) $sum;
     }
 
-    private function assertSymmetry(): void
+    private function assertSymmetry(bool $preliminary = false): void
     {
-        $controlSum = (float) $this->getControlSum();
-        $handlerSum = $this->handlerPlDocumentSum();
-        $preflight = (float) $this->getPreflightNetAmount();
+        $controlSum = (float) $this->getControlSum($preliminary);
+        $handlerSum = $this->handlerPlDocumentSum($preliminary);
+        $preflight = (float) $this->getPreflightNetAmount($preliminary);
 
         self::assertEqualsWithDelta(
             0.0,
