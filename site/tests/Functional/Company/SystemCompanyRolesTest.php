@@ -9,6 +9,7 @@ use App\Company\Entity\CompanyRole;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Security\SystemCompanyRoles;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Db\DbReset;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class SystemCompanyRolesTest extends WebTestCaseBase
@@ -21,7 +22,7 @@ final class SystemCompanyRolesTest extends WebTestCaseBase
     public function testRestoredTemplatesMatchDefinitionsExactly(): void
     {
         static::createClient();
-        $this->resetDb();
+        (new DbReset())->reset($this->em());
 
         $roles = $this->em()->getRepository(CompanyRole::class)->findBy(['company' => null]);
 

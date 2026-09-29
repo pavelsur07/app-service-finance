@@ -78,28 +78,32 @@ test-provision-vf-prod-deploy:
 test-gt:
 	bash tests/shell/gt-test.sh
 
+# Xdebug в dev-образе включён в режиме debug и замедляет прогон на ~22%;
+# для тестов он не нужен. Покрытие (site-test-cov) задаёт свой XDEBUG_MODE.
+TEST_ENV := -e XDEBUG_MODE=off
+
 site-test-telegram:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:smoke
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) site-php-cli composer test:smoke
 
 # Быстрые юнит-тесты (без БД)
 site-test-unit:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer test:unit
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) site-php-cli composer test:unit
 
 # Интеграционные (только запуск; подготовка БД отдельно через site-test-prepare)
 site-test-int: site-test-integration
 
 site-test-integration: site-test-wait-db
-	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:integration
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:integration
 
 # Все тесты
 site-test: site-test-prepare
-	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
 site-test-smoke-init: site-test-env site-test-wait-db site-test-db site-test-migrations
 
 site-test-smoke: site-test-smoke-init
-	$(DOCKER_COMPOSE) run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
+	$(DOCKER_COMPOSE) run --rm -T $(TEST_ENV) site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
 
 # Покрытие (нужен xdebug или pcov в CLI-образе)
 site-test-cov: site-test-prepare
