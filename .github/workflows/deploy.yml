@@ -264,6 +264,7 @@ jobs:
                     -e APP_DEBUG=0 \
                     -e APP_SECRET=test \
                     -e DEFAULT_URI=http://localhost \
+                    -e XDEBUG_MODE=off \
                     site-php-cli composer test:unit
 
     cs-check:
@@ -531,6 +532,7 @@ jobs:
                         --user "$(id -u):$(id -g)" \
                         -e COMPOSER_HOME=/tmp/composer \
                         -e COMPOSER_PROCESS_TIMEOUT=0 \
+                        -e XDEBUG_MODE=off \
                         site-php-cli composer test:integration
                   else
                       PATHS=$(docker compose run --rm -T \
@@ -541,6 +543,7 @@ jobs:
                         --user "$(id -u):$(id -g)" \
                         -e COMPOSER_HOME=/tmp/composer \
                         -e COMPOSER_PROCESS_TIMEOUT=0 \
+                        -e XDEBUG_MODE=off \
                         site-php-cli php bin/phpunit $PATHS
                   fi
 
