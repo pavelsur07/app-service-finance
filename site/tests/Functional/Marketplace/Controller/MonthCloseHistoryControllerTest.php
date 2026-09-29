@@ -110,6 +110,69 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
         );
     }
 
+    public function testReopenedStageOfPastMonthTellsThatOperationalPlIsMissing(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->seedActiveSession($client);
+
+        $year = (int) (new \DateTimeImmutable('now'))->format('Y') - 1;
+        $this->persistReopenedCosts('33333333-3333-3333-3333-c00000000011', $year, 5);
+
+        $client->request('GET', sprintf('/marketplace/month-close?marketplace=ozon&year=%d&month=5', $year));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $crawler = new Crawler((string) $client->getResponse()->getContent());
+        $notice = $crawler->filter('[data-role="reopened-notice"]');
+        self::assertCount(1, $notice, 'Предупреждение только у переоткрытого этапа затрат.');
+        self::assertStringContainsString('Оперативного ОПиУ по этапу нет', $notice->text());
+        self::assertStringContainsString('закройте этап вручную', $notice->text());
+        self::assertStringNotContainsString('Ежедневный пересчёт', $notice->text());
+
+        $historyBadge = $crawler->filter('table tbody tr span.badge[title]');
+        self::assertCount(1, $historyBadge);
+        self::assertSame('Переоткрыт', trim($historyBadge->text()));
+        self::assertStringContainsString('оперативного ОПиУ нет', (string) $historyBadge->attr('title'));
+    }
+
+    public function testReopenedStageOfCurrentMonthMentionsDailyRebuild(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->seedActiveSession($client);
+
+        $now = new \DateTimeImmutable('now');
+        $this->persistReopenedCosts('33333333-3333-3333-3333-c00000000012', (int) $now->format('Y'), (int) $now->format('n'));
+
+        $client->request('GET', sprintf(
+            '/marketplace/month-close?marketplace=ozon&year=%d&month=%d',
+            (int) $now->format('Y'),
+            (int) $now->format('n'),
+        ));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $notice = (new Crawler((string) $client->getResponse()->getContent()))->filter('[data-role="reopened-notice"]');
+        self::assertCount(1, $notice);
+        self::assertStringContainsString('Ежедневный пересчёт', $notice->text());
+        self::assertStringNotContainsString('закройте этап вручную', $notice->text());
+    }
+
+    private function persistReopenedCosts(string $id, int $year, int $month): void
+    {
+        $monthClose = new MarketplaceMonthClose(
+            id: $id,
+            companyId: self::COMPANY_ID,
+            marketplace: MarketplaceType::OZON,
+            year: $year,
+            month: $month,
+        );
+        $monthClose->closeStage(CloseStage::COSTS, self::OWNER_ID, [], []);
+        $monthClose->reopenStage(CloseStage::COSTS);
+
+        $this->em()->persist($monthClose);
+        $this->em()->flush();
+    }
+
     private function seedActiveSession(KernelBrowser $client): void
     {
         $em = $this->em();
