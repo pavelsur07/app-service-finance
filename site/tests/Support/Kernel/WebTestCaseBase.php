@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Support\Kernel;
 
-use App\Tests\Support\Db\DbReset;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -22,15 +21,18 @@ abstract class WebTestCaseBase extends WebTestCase
         return static::getContainer()->get(EntityManagerInterface::class);
     }
 
+    /**
+     * Ничего не делает: изоляция между тестами обеспечена транзакцией
+     * DAMA\DoctrineTestBundle (rollback после каждого теста), как и в
+     * IntegrationTestCase. TRUNCATE всех таблиц здесь выполнялся внутри той же
+     * транзакции, терялся при откате и стоил ~180 мс на вызов (замер: functional-
+     * сьют 319 с → 71 с). Метод оставлен, чтобы не трогать вызовы в тестах.
+     *
+     * Последовательности между тестами больше не сбрасываются: не проверяйте
+     * конкретные значения автоинкремента (например, publicId).
+     */
     protected function resetDb(): void
     {
-        $wasBooted = static::$booted;
-
-        (new DbReset())->reset($this->em());
-
-        if (!$wasBooted) {
-            static::ensureKernelShutdown();
-        }
     }
 
     protected function setClientSessionValue(KernelBrowser $client, string $key, mixed $value): void
