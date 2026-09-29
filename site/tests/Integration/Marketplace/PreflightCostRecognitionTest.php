@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace;
 
 use App\Company\Entity\Company;
+use App\Finance\Entity\Document;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
 use App\Marketplace\Application\DTO\PreflightCheck;
 use App\Marketplace\Application\DTO\PreflightResult;
@@ -155,6 +156,36 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         self::assertSame(6, $this->check($preliminary, 'costs_count')->value);
         self::assertSame(1, $this->check($preliminary, 'costs_without_mapping')->value);
         self::assertSame(1, $this->check($preliminary, 'costs_excluded')->value);
+    }
+
+    /**
+     * Уже обработанная строка в ОПиУ повторно не уйдёт — и в контрольную сумму
+     * не входит; сама аномалия видна и блокирует в «Уже обработанные затраты».
+     */
+    public function testControlSumExcludesAlreadyProcessedCosts(): void
+    {
+        $plCategoryId = Uuid::uuid4()->toString();
+        $logistics = $this->category(MarketplaceType::OZON, 'ozon_logistic_direct', 'Логистика к покупателю Ozon');
+        $this->mapping($logistics, plCategoryId: $plCategoryId);
+        $this->cost($logistics, MarketplaceType::OZON);
+        $this->cost($logistics, MarketplaceType::OZON);
+        $this->em->flush();
+
+        $this->em->getConnection()->executeStatement(
+            'UPDATE marketplace_costs SET document_id = :doc WHERE id = (SELECT id FROM marketplace_costs WHERE company_id = :c ORDER BY id LIMIT 1)',
+            ['doc' => $this->createDocumentId(), 'c' => self::COMPANY_ID],
+        );
+
+        $result = $this->preflight(MarketplaceType::OZON);
+
+        /** @var UnprocessedCostsQuery $unprocessed */
+        $unprocessed = self::getContainer()->get(UnprocessedCostsQuery::class);
+        $closeTakes = $unprocessed->getControlSum(self::COMPANY_ID, MarketplaceType::OZON->value, '2026-03-01', '2026-03-31');
+
+        self::assertEqualsWithDelta(100.0, (float) $this->check($result, 'costs_control_sum')->value, 0.001);
+        self::assertEqualsWithDelta((float) $closeTakes, (float) $this->check($result, 'costs_control_sum')->value, 0.001);
+        self::assertTrue($this->check($result, 'costs_already_processed')->blocking);
+        self::assertSame(2, $this->check($result, 'costs_count')->value);
     }
 
     public function testControlSumBeforePreliminaryCloseExcludesLegacyBucketForWildberries(): void
@@ -360,6 +391,15 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         }
 
         self::fail(sprintf('Проверка %s отсутствует', $key));
+    }
+
+    private function createDocumentId(): string
+    {
+        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->persist($document);
+        $this->em->flush();
+
+        return (string) $document->getId();
     }
 
     private function category(MarketplaceType $marketplace, string $code, string $name): MarketplaceCostCategory

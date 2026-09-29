@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  *   - количество затрат с include_in_pl = false (информационно)
  *   - наличие уже обработанных затрат (аномалия — блокирующее)
  *   - затраты в категориях вне каталога маркетплейса (нераспознанные)
- *   - контрольная сумма для сверки с PLDocument после закрытия
+ *   - контрольная сумма — сколько возьмёт закрытие (информационно, в snapshot проверок)
  */
 final class PreflightCostsQuery
 {
@@ -26,9 +26,10 @@ final class PreflightCostsQuery
     }
 
     /**
-     * $preliminary — считать net_amount_for_pl на тех же строках, что возьмёт
-     * оперативное закрытие (PreliminaryCostFilter); остальные счётчики — по
-     * всем затратам периода.
+     * net_amount_for_pl — сумма, которую возьмёт закрытие: только ещё не
+     * обработанные строки (document_id IS NULL), как UnprocessedCostsQuery;
+     * $preliminary — ещё и фильтр оперативного закрытия (PreliminaryCostFilter).
+     * Остальные счётчики — по всем затратам периода.
      */
     public function getCostsStats(
         string $companyId,
@@ -58,7 +59,7 @@ final class PreflightCostsQuery
                 )                                                               AS excluded_from_pl,
                 COALESCE(
                     SUM(CASE WHEN c.operation_type = 'storno' THEN -ABS(c.amount) ELSE ABS(c.amount) END)
-                        FILTER (WHERE m.include_in_pl = true AND m.pl_category_id IS NOT NULL $preliminaryFilter),
+                        FILTER (WHERE c.document_id IS NULL AND m.include_in_pl = true AND m.pl_category_id IS NOT NULL $preliminaryFilter),
                     0
                 )                                                               AS net_amount_for_pl
             FROM marketplace_costs c
