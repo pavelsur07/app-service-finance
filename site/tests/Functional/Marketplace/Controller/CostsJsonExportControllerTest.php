@@ -21,7 +21,6 @@ final class CostsJsonExportControllerTest extends WebTestCaseBase
     public function testDefaultsToOzonAndCurrentMonthWhenNoParamsAndHandlesInvalidInputs(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $category] = $this->seedCompanyA();
 
@@ -69,7 +68,6 @@ final class CostsJsonExportControllerTest extends WebTestCaseBase
     public function testJsonExportPayloadAndCompanyIsolation(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$ownerA, $companyA, $categoryA, $listingA] = $this->seedCompanyA(withListing: true);
         [$ownerB, $companyB, $categoryB] = $this->seedCompanyB();

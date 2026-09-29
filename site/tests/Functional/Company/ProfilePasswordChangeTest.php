@@ -21,7 +21,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testAnonymousUserIsRedirectedToLogin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/profile/password');
 
@@ -32,7 +31,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testUserCanChangePassword(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = $this->createUserWithPassword($client);
 
@@ -85,7 +83,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testWrongCurrentPasswordIsRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = $this->createUserWithPassword($client);
 
@@ -103,7 +100,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testRateLimitBlocksRepeatedAttempts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = $this->createUserWithPassword($client);
 
@@ -128,7 +124,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testHoneypotSubmissionIsRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = $this->createUserWithPassword($client);
 
@@ -154,7 +149,6 @@ final class ProfilePasswordChangeTest extends WebTestCaseBase
     public function testInvalidCsrfTokenIsRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = $this->createUserWithPassword($client);
 

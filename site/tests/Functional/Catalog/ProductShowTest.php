@@ -15,7 +15,6 @@ final class ProductShowTest extends WebTestCaseBase
     public function testShowReturns200ForProductFromActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 
@@ -50,7 +49,6 @@ final class ProductShowTest extends WebTestCaseBase
     public function testShowReturns404ForProductFromAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

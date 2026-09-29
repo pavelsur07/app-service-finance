@@ -33,7 +33,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testValidOzonKeyUpdatesExistingConnectionWithoutChangingIdentityOrHistory(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -82,7 +81,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
      */
     public function testValidKeyClearsBrokenAuthStateAndReturnsConnectionToSync(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -115,7 +113,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testInvalidOzonKeyDoesNotReplaceStoredCredentialsOrState(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -140,7 +137,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testTemporaryOzonFailureDoesNotReplaceStoredKey(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -160,7 +156,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testOzonRateLimitKeepsStoredKeyAndShowsRetryMessage(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -184,7 +179,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testValidWbKeyUpdatesExistingConnection(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -217,7 +211,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testRejectedWbKeyDoesNotReplaceStoredCredentials(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -235,7 +228,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testTemporaryWbFailureDoesNotReplaceStoredCredentials(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -253,7 +245,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testWbRateLimitDoesNotReplaceStoredCredentials(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -278,7 +269,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testWbKeyFromAnotherSellerDoesNotReplaceStoredCredentials(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -296,7 +286,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
     #[DataProvider('malformedWbKeyProvider')]
     public function testMalformedWbKeyDoesNotReplaceStoredCredentials(string $apiKey): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::WILDBERRIES);
@@ -326,7 +315,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testEmptyKeyDoesNotReplaceStoredCredentials(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -343,7 +331,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testUpdateRejectsMissingCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -356,7 +343,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testUpdateDoesNotAllowConnectionFromAnotherCompany(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $otherCompany = CompanyBuilder::aCompany()->withIndex(2)->withOwner($user)->build();
@@ -375,7 +361,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testReadOnlyMarketplaceMemberCannotUpdateKey(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         $owner = UserBuilder::aUser()->withEmail('api-key-owner@test.local')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -416,7 +401,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testPerformanceConnectionCannotBeUpdatedAndHasNoKeyForm(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON, MarketplaceConnectionType::PERFORMANCE);
@@ -439,7 +423,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testUnsupportedSellerMarketplaceCannotBeUpdatedAndHasNoKeyForm(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::YANDEX_MARKET);
@@ -460,7 +443,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testEditFormDoesNotExposeCurrentKeyAndKeepsOzonClientIdReadonly(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -479,7 +461,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testUpdateIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company, MarketplaceType::OZON);
@@ -492,7 +473,6 @@ final class UpdateMarketplaceConnectionApiKeyControllerTest extends WebTestCaseB
 
     public function testMalformedConnectionIdDoesNotReachDatabaseQuery(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);

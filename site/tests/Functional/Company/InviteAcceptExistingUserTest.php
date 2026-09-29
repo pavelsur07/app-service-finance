@@ -18,7 +18,6 @@ final class InviteAcceptExistingUserTest extends WebTestCaseBase
     public function testAcceptInviteCreatesMemberAndMarksInviteAccepted(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withIndex(1)->withEmail('owner@example.test')->build();

@@ -14,7 +14,6 @@ final class ProductPurchasePriceCreateTest extends WebTestCaseBase
     public function testCreatesPurchasePriceWithCsrfProtectedPost(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

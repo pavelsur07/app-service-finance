@@ -117,8 +117,6 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail(sprintf('document-%s@example.test', $suffix));
         $user->setPassword($hasher->hashPassword($user, 'password'));

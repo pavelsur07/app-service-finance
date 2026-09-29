@@ -25,7 +25,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testRedirectsToInventoryIndexWhenRefererIsIndex(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-index@example.test', 'sku-redirect-1');
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -62,7 +61,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testRedirectsToInventoryIndexWithQueryWhenRefererHasFilter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-filter@example.test', 'sku-redirect-2');
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -85,7 +83,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testRedirectsToInventoryIndexPreservesQueryParam(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-q@example.test', 'sku-redirect-q');
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -113,7 +110,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testRedirectsBackToHistoryWhenRefererIsHistory(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-history@example.test', 'sku-redirect-3');
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -138,7 +134,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testRedirectsToHistoryWhenReturnToFieldIsPresentWithoutReferer(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-return-to@example.test', 'sku-redirect-4');
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -162,7 +157,6 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
     public function testOverwritesExistingPriceAndShowsWarning(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $listing] = $this->seedCompanyAndListing('overwrite-cost@example.test', 'sku-overwrite');
         $effectiveFrom = new \DateTimeImmutable('2026-04-20');

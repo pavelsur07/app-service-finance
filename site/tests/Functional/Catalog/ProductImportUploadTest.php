@@ -21,7 +21,6 @@ final class ProductImportUploadTest extends WebTestCaseBase
     public function testUploadStoresFileThroughObjectStorage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

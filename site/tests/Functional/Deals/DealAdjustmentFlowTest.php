@@ -22,7 +22,6 @@ final class DealAdjustmentFlowTest extends WebTestCaseBase
     public function testConfirmedDealAllowsAdjustmentButRejectsItemChanges(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $dealManager = static::getContainer()->get(DealManager::class);

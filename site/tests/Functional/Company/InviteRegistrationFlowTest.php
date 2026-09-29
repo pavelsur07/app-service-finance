@@ -20,7 +20,6 @@ final class InviteRegistrationFlowTest extends WebTestCaseBase
     public function testInviteRegistrationCreatesMemberWithoutNewCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
         $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
 

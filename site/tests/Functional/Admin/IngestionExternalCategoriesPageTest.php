@@ -14,7 +14,6 @@ final class IngestionExternalCategoriesPageTest extends WebTestCaseBase
     public function testMappingFormIsRenderedInsideRowDialog(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin@example.test')

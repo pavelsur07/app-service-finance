@@ -36,7 +36,6 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
     public function testHappyPathInvokesPlannerAndDoesNotDispatchLegacyMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $this->seedOwnerCompanyWithConnection($em);
@@ -85,7 +84,6 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
     public function testReturns400ForPeriodLongerThanOneDay(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $this->seedOwnerCompanyWithConnection($em);
@@ -123,7 +121,6 @@ final class OzonAdLoadRangeControllerTest extends WebTestCaseBase
     public function testReturns400ForReversedDates(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $this->seedOwnerCompanyWithConnection($em);

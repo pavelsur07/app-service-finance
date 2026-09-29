@@ -24,7 +24,6 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
 
     public function testDryRunDoesNotChangeEitherSecret(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $result = ($this->action())(self::COMPANY, false);
         $connection = $this->reload($connection);
@@ -38,7 +37,6 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
 
     public function testExecuteEncryptsBothAndIsIdempotentAndCompanyScoped(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $foreign = $this->existing('22222222-2222-2222-2222-222222222222');
         $result = ($this->action())(self::COMPANY, true);
@@ -59,7 +57,6 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
 
     public function testFailedVerificationRollsBackBothSecretsAndCommandHidesPayload(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->setRefreshTokenEncrypted('private-invalid-payload');
         $this->em()->flush();
@@ -82,7 +79,6 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
 
     public function testProcessesMoreThanOneBatch(): void
     {
-        $this->resetDb();
         for ($i = 0; $i < 101; ++$i) {
             $connection = new MoySkladConnection(Uuid::uuid7()->toString(), self::COMPANY, 'Склад '.$i, 'https://example.test');
             $connection->setAccessToken('private-access');
@@ -96,7 +92,6 @@ final class EncryptConnectionSecretsTest extends WebTestCaseBase
 
     public function testCommandRequiresCompanyAndDefaultsToDryRun(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $tester = new CommandTester(new EncryptConnectionSecretsCommand($this->action()));
         self::assertSame(Command::INVALID, $tester->execute([]));

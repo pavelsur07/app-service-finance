@@ -23,7 +23,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 {
     public function testConnectionTestIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -36,7 +35,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionTestRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -49,7 +47,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -62,7 +59,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -75,7 +71,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncPeriodIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -91,7 +86,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncPeriodRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -107,7 +101,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingToggleIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $mapping = $this->seedMapping($company);
@@ -120,7 +113,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingToggleRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $mapping = $this->seedMapping($company);
@@ -133,7 +125,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingToggleWithValidCsrfTokenFlipsState(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $mapping = $this->seedMapping($company);
@@ -154,7 +145,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingCreateRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -170,7 +160,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingCreateWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -186,7 +175,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSaleMappingEditWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $mapping = $this->seedMapping($company);
@@ -201,7 +189,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -218,7 +205,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionSyncPeriodWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -237,7 +223,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testProcessRealizationIsNotAllowedViaGet(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $rawDoc = $this->seedRawDocument($company);
@@ -250,7 +235,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testProcessRealizationRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $rawDoc = $this->seedRawDocument($company);
@@ -263,7 +247,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionCreateRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -279,7 +262,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionCreateWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->seedConnection($company); // дубликат OZON SELLER — контроллер выйдет редиректом до внешней валидации
@@ -297,7 +279,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testPerformanceConnectionCreateRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -312,7 +293,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionEditRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -327,7 +307,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionEditWithValidCsrfTokenSavesSettings(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -343,7 +322,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSyncRealizationRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company);
@@ -356,7 +334,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testSyncRealizationWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedConnection($company); // неактивно — ручная синхронизация заблокирована, внешние API не вызываются
@@ -371,7 +348,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testReprocessRejectsPostWithoutCsrfToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -387,7 +363,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testReprocessWithValidCsrfTokenPassesTokenCheck(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -403,7 +378,6 @@ final class MarketplaceMutationSecurityTest extends WebTestCaseBase
 
     public function testConnectionsIndexPageIsAccessible(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);

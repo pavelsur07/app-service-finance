@@ -16,7 +16,6 @@ final class MarketplaceIndexHistoryFilterMonthTest extends WebTestCaseBase
     public function testHistoryFilterFormKeepsSelectedMonth(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('history-month@example.test')->withRoles(['ROLE_COMPANY_OWNER'])->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

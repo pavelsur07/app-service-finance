@@ -24,8 +24,6 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('structured-opening@example.com');
         $user->setPassword($hasher->hashPassword($user, 'password'));
@@ -99,8 +97,6 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         $container = static::getContainer();
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $this->resetDb();
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('test@example.com');
@@ -256,8 +252,6 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         $container = static::getContainer();
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $this->resetDb();
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('filter@example.com');

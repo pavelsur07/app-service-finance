@@ -106,7 +106,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testSnapshotsOfAnotherCompanyAreNeverVisible(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-idor-owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112008')->withOwner($owner)->build();
@@ -154,7 +153,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testSourceFilterSeparatesMarketplaces(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-source@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112005')->withOwner($owner)->build();
@@ -189,7 +187,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testRemovedFiltersAreIgnoredAndAvailableForSaleIsShown(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-legacy-filters@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112006')->withOwner($owner)->build();
@@ -220,7 +217,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testRowsAreGroupedBySkuWithFulfillmentTypeBreakdown(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-rollup@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112011')->withOwner($owner)->build();
@@ -265,7 +261,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testWildberriesBreaksDownByStockStatus(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-wb-breakdown@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112012')->withOwner($owner)->build();
@@ -310,7 +305,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testPaginationCountsSkuNotSnapshotRows(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-pagination@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112013')->withOwner($owner)->build();
@@ -349,7 +343,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     public function testPaginationKeepsFiltersInPageLinks(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('stocks-page-links@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112014')->withOwner($owner)->build();
@@ -393,7 +386,6 @@ final class StockReportControllerTest extends WebTestCaseBase
     private function seedTwoOzonDays(string $email, string $companyId, string $suffix): KernelBrowser
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail($email)->build();
         $company = CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build();

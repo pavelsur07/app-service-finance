@@ -21,7 +21,6 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
     public function testSnapshotGoldenValuesForCurrentMonthFromA22Fixtures(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->loadA22Fixtures();
 
         $em = $this->em();

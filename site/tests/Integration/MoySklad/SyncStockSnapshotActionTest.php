@@ -48,7 +48,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testLoadsStoresAndPublishesProductAndVariantSnapshotWithoutChangingDecimals(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
 
         $snapshotId = ($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId());
@@ -73,7 +72,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testRepeatedRunCreatesNewCompletedSnapshotAndUpsertsStores(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $first = ($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId());
         $second = ($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId());
@@ -87,7 +85,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testUnknownStoreFailsOnlyStockAndKeepsSuccessfulStoreCursorAndPreviousSnapshot(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $previous = ($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId());
         $oldStockCursor = $this->em()->getConnection()->fetchOne("SELECT last_completed_at FROM moysklad_sync_cursors WHERE connection_id = ? AND entity_type = 'stock'", [$connection->getId()]);
@@ -116,7 +113,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testRejectsStoreRepeatedAcrossPagesWithoutAdvancingCursor(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $first = $this->generatedStorePage(range(1000, 1099), 101, 0);
         $second = $this->generatedStorePage([1000], 101, 100);
@@ -141,7 +137,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testRejectsStockRowMissingAnActiveStore(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $stock = json_decode($this->fixture('Stock/stock_bystore_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
         $stock['meta']['limit'] = 1000;
@@ -163,7 +158,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testAllowsKnownArchivedStoreInStockReport(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $stock = json_decode($this->fixture('Stock/stock_bystore_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
         $stock['meta']['limit'] = 1000;
@@ -187,7 +181,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testAllowsStoreToMoveFromActiveToArchivedBetweenPasses(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $active = json_decode($this->storePage('Store/stores_active_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
         $archived = json_decode($this->storePage('Store/stores_archived_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
@@ -210,7 +203,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testHttpRequestsRunOutsideDatabaseTransactions(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $responses = $this->successfulResponses();
         $index = 0;
@@ -226,7 +218,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testForeignTenantAndHeldAdvisoryLockSkipWithoutHttp(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         self::assertNull(($this->action([]))('99999999-9999-4999-8999-999999999999', $connection->getId()));
 
@@ -244,7 +235,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testRepairsStaleRunsAndBuildingSnapshotUnderLock(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $staleAt = new \DateTimeImmutable('2026-09-20T10:00:00+00:00');
         $storeRun = new MoySkladSyncRun('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaa1', $connection->getCompanyId(), $connection->getId(), 'store', $staleAt);
@@ -263,7 +253,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testEmptyReportPublishesSnapshotWithoutLines(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $empty = '{"meta":{"type":"stockbystore","size":0,"limit":1000,"offset":0},"rows":[]}';
 
@@ -280,7 +269,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testMissingStoreIsRetainedAndArchiveChangesOnlyOnExplicitRow(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         ($this->action($this->successfulResponses()))($connection->getCompanyId(), $connection->getId());
         $active = json_decode($this->storePage('Store/stores_active_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
@@ -308,7 +296,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
     #[DataProvider('unknownAssortments')]
     public function testUnknownAssortmentIsTemporary(string $type): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $stock = json_decode($this->fixture('Stock/stock_bystore_page_0.json'), true, 512, \JSON_THROW_ON_ERROR);
         $stock['meta']['limit'] = 1000;
@@ -336,7 +323,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testPaginatesStableReportAndSuccessfulRetryRestartsAtZeroAfterSecondPageFailure(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $ids = $this->addProducts($connection, 1001);
         $firstPage = new MockResponse($this->stockPage(array_slice($ids, 0, 1000), 1001, 0));
@@ -389,7 +375,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
     #[DataProvider('unstableSecondPages')]
     public function testRejectsUnstableSecondPage(string $mode, string $category): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $ids = $this->addProducts($connection, 1002);
         $second = match ($mode) {
@@ -424,7 +409,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testClosedEntityManagerStillRecordsSafeStoreFailure(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $db = $this->em()->getConnection();
         $db->executeStatement("CREATE FUNCTION test_fail_moysklad_store_insert() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''forced store failure''; END'");
@@ -446,7 +430,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testUnexpectedActionFailureIsNormalizedAsPermanentInternalError(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $action = $this->action([]);
         $this->em()->close();
@@ -462,7 +445,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testHandlerUsesRateLimitDelayAndIncrementsAttempt(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $dispatched = null;
         $bus = $this->createMock(MessageBusInterface::class);
@@ -487,7 +469,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testHandlerUsesExponentialDelayForTemporaryFailure(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $delay = null;
         $bus = $this->createMock(MessageBusInterface::class);
@@ -506,7 +487,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
     #[DataProvider('permanentFailures')]
     public function testHandlerDoesNotRetryPermanentFailure(int $status, string $body): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
@@ -528,7 +508,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testHandlerDoesNotRetryInternalFailure(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $connection->setAccessTokenEncrypted('invalid-encrypted-payload');
         $this->em()->flush();
@@ -544,7 +523,6 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
     public function testHandlerStopsAfterFourthAttempt(): void
     {
-        $this->resetDb();
         $connection = $this->catalog();
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');

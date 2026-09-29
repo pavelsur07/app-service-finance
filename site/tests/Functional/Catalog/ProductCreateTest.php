@@ -17,7 +17,6 @@ final class ProductCreateTest extends WebTestCaseBase
     public function testCreateSuccess(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner-create@example.test')->build();
@@ -60,7 +59,6 @@ final class ProductCreateTest extends WebTestCaseBase
     public function testDuplicateSkuShowsFormError(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner-create-duplicate@example.test')->build();
@@ -100,8 +98,6 @@ final class ProductCreateTest extends WebTestCaseBase
 
     public function testSkuMustBeUniquePerCompanyAtDatabaseLevel(): void
     {
-        $this->resetDb();
-
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner-db-unique@example.test')->build();
         $company = CompanyBuilder::aCompany()
@@ -131,8 +127,6 @@ final class ProductCreateTest extends WebTestCaseBase
 
     public function testSameSkuForDifferentCompaniesIsAllowedAtDatabaseLevel(): void
     {
-        $this->resetDb();
-
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner-db-cross-company@example.test')->build();
         $companyA = CompanyBuilder::aCompany()

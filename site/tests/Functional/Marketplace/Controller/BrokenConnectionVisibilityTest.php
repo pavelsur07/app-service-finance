@@ -28,7 +28,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
 {
     public function testConnectionsPageShowsRejectedKeyAndOffersToUpdateIt(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company, $connection] = $this->seedBrokenConnection();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -50,7 +49,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
      */
     public function testManualSyncIsDisabledForRejectedKey(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBrokenConnection();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -63,7 +61,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
 
     public function testHealthyConnectionShowsNoWarning(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedConnection(false);
         $this->loginWithActiveCompany($client, $user, $company);
@@ -76,7 +73,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
 
     public function testDashboardWarnsAboutRejectedKey(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBrokenConnection();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -92,7 +88,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
 
     public function testDashboardStaysCleanWhenEveryKeyWorks(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedConnection(false);
         $this->loginWithActiveCompany($client, $user, $company);
@@ -111,7 +106,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
      */
     public function testManualSyncEndpointRefusesRejectedKeyEvenWithValidToken(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company, $connection] = $this->seedBrokenConnection();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -134,7 +128,6 @@ final class BrokenConnectionVisibilityTest extends WebTestCaseBase
      */
     public function testWarningLeaksNeitherHttpStatusNorKeyMaterial(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company, $connection] = $this->seedBrokenConnection();
         $this->loginWithActiveCompany($client, $user, $company);

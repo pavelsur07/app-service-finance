@@ -18,7 +18,6 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
     public function testPageIsAvailableForAuthorizedUserAndShowsOnlyOwnCompanyRows(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 
@@ -77,7 +76,6 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
     public function testPaginationWorksWithThirtyItemsPerPage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-pagination@example.test')->build();
@@ -117,7 +115,6 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
     public function testEmptyStateIsShownWhenNoSessions(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-empty@example.test')->build();

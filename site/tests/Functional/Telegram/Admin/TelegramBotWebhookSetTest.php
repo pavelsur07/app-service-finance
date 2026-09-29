@@ -25,7 +25,6 @@ final class TelegramBotWebhookSetTest extends WebTestCaseBase
     public function testWebhookSetUsesConfiguredUrl(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->seedActiveBot('TEST-TOKEN-123');
 

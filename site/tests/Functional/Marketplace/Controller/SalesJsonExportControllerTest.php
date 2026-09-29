@@ -23,7 +23,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testReturnsJsonWithAttachmentHeader(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyA();
         $this->seedSale($wbListing, '2026-04-15');
@@ -45,7 +44,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testIncludesAllSalesForCompanyWhenNoFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$ownerA, $companyA, $wbListingA] = $this->seedCompanyA();
         [$ownerB, $companyB, $wbListingB] = $this->seedCompanyB();
@@ -74,7 +72,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testFiltersByMarketplaceAndDates(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing, $ozonListing] = $this->seedCompanyA();
 
@@ -104,7 +101,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testIgnoresArrayQueryParamsAndShowsAll(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyA();
         $this->seedSale($wbListing, '2026-04-15');
@@ -127,7 +123,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testReturnsEmptyArrayWhenNoMatches(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyA();
         $this->seedSale($wbListing, '2026-04-15');
@@ -147,7 +142,6 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
     public function testPayloadStructureContainsRequiredFields(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyA();
         $this->seedSale($wbListing, '2026-04-15');

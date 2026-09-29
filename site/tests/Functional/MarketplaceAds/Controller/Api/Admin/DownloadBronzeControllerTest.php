@@ -36,7 +36,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturnsZipFileForSuperAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->createSuperAdmin('bronze-zip@example.test');
         $this->persistCompany($admin);
@@ -76,7 +75,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturnsCsvFileForSuperAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->createSuperAdmin('bronze-csv@example.test');
         $this->persistCompany($admin);
@@ -116,7 +114,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturns403ForCompanyOwnerWithoutSuperAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withId(self::OWNER_ID)
@@ -144,7 +141,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturns404ForNonexistentDocument(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->createSuperAdmin('bronze-404-missing@example.test');
         $this->persistCompany($admin);
@@ -159,7 +155,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturns404WhenDocumentHasNoStoragePath(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->createSuperAdmin('bronze-404-nopath@example.test');
         $this->persistCompany($admin);
@@ -186,7 +181,6 @@ final class DownloadBronzeControllerTest extends WebTestCaseBase
     public function testReturns404WhenStorageFileMissingOnDisk(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->createSuperAdmin('bronze-404-nofile@example.test');
         $this->persistCompany($admin);

@@ -96,8 +96,6 @@ final class RawPlReportControllerTest extends WebTestCaseBase
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('pl-raw-cfo@example.test');
         $user->setPassword($hasher->hashPassword($user, 'password'));

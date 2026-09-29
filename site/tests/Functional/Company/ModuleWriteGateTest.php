@@ -58,7 +58,6 @@ final class ModuleWriteGateTest extends WebTestCaseBase
     public function testReadOnlyRoleReadsButCannotWrite(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMemberWithPermissions(
             $module->value.'-read',
@@ -79,7 +78,6 @@ final class ModuleWriteGateTest extends WebTestCaseBase
     public function testWriteRolePassesTheGate(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMemberWithPermissions(
             $module->value.'-write',
@@ -102,7 +100,6 @@ final class ModuleWriteGateTest extends WebTestCaseBase
     public function testEmptyPermissionsRoleIsDeniedEvenOnRead(Module $module, string $readUrl, string $writeUrl, ?string $csrfTokenId = null): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMemberWithPermissions($module->value.'-none', []);
 

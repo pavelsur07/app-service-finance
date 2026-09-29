@@ -15,7 +15,6 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
     public function testShowsPurchasePriceForTodayAndRequestedDate(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

@@ -23,7 +23,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testRendersLoadedRawTotalsForActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedCompany(501);
         $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [[
             'reportId' => 9001,
@@ -56,7 +55,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testRendersDeductionBreakdownFromRawReasons(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedCompany(506);
         $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [
             [
@@ -110,7 +108,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testDoesNotExposeRawRowsOfAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user] = $this->seedCompany(502);
         [, $otherCompany] = $this->seedCompany(503);
         $this->seedLoadedDay($otherCompany, new \DateTimeImmutable('2026-07-01'), [[
@@ -144,7 +141,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testRejectsInvalidOrOversizedPeriod(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user] = $this->seedCompany(504);
         $client->loginUser($user);
 
@@ -160,7 +156,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testCsvUsesSameRawTotalsAndEscapesExternalSpreadsheetFormula(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedCompany(505);
         $this->seedLoadedDay($company, new \DateTimeImmutable('2026-07-01'), [
             [
@@ -206,7 +201,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testRendersSkuCostsBetweenDeductionsAndReportSummaryAndExportsCsv(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedCompany(507);
         $this->seedListingWithCost(
             $company,
@@ -359,7 +353,6 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
     public function testRendersFallbackPartialConflictAndUnallocatedWarnings(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedCompany(508);
         $this->seedListingWithCost(
             $company,

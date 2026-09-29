@@ -20,7 +20,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCanListSystemAndCompanyRoles(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -56,7 +55,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCanCreateRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -99,7 +97,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCanEditOwnRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -148,7 +145,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotDeleteAssignedRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -189,7 +185,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCanDeleteUnassignedRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -222,7 +217,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testNonOwnerCannotAccessRoles(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -250,7 +244,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotEditRoleOfAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $otherOwner = UserBuilder::aUser()->withIndex(2)->withEmail('other@example.test')->build();
@@ -302,7 +295,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotDeleteRoleOfAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $otherOwner = UserBuilder::aUser()->withIndex(2)->withEmail('other@example.test')->build();
@@ -339,7 +331,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotEditSystemRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -381,7 +372,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotCreateRoleWithEmptyName(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -422,7 +412,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testCompanyDeletionStillCascadesUnassignedRoles(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -459,7 +448,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotRemoveAdminWriteFromLastAdminRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('admin-member@example.test')->build();
@@ -521,7 +509,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testRevokedInviteDoesNotBlockRoleDeletion(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -564,7 +551,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotCreateRoleWithDuplicateName(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -614,7 +600,6 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
     public function testOwnerCannotCreateRoleWithOverlongName(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

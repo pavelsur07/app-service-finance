@@ -31,7 +31,6 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturnsFileAsAttachment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -95,7 +94,6 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404ForOtherCompanyDocument(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -162,7 +160,6 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404WhenStoragePathIsNull(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -202,7 +199,6 @@ final class AdRawDocumentDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404WhenFileMissingOnDisk(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

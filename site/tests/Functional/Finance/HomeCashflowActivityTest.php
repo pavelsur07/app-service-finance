@@ -62,7 +62,6 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
     public function testCashflowActivityFilterInBothUiModes(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()->withEmail('home-cashflow-activity@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()
@@ -138,7 +137,6 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
     public function testLegacyDashboardUsesSelectedPeriodWhileAppKeepsThirtyDays(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()->withEmail('home-cashflow-period@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()

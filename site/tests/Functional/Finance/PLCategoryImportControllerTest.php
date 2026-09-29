@@ -16,7 +16,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testImportFormListsOnlyAccessibleCompaniesAndExcludesActiveOne(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $source = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->withName('Source Co')->build();
@@ -44,7 +43,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testPreviewIsForbiddenForInaccessibleSourceCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -68,7 +66,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testPreviewShowsCreateAndUpdateCounts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $source = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -100,7 +97,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testApplyRequiresValidCsrfToken(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $source = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -126,7 +122,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testApplyIsForbiddenForInaccessibleSourceCompanyEvenWithValidCsrf(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -165,7 +160,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // сам на себя. Проверка живёт в контроллере — Action про компанию-
         // источник больше не знает.
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -202,7 +196,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testApplyCreatesAndUpdatesTreeAndReimportIsIdempotent(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $source = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -259,7 +252,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // пользователя нет к той компании никакого доступа — перенос всё равно
         // обязан пройти.
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -306,7 +298,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testReuploadingSameFileIsIdempotent(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -351,7 +342,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testUploadRequiresValidCsrfToken(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -376,7 +366,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testBrokenFileIsRejectedWithMessageAndChangesNothing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -410,7 +399,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // Применяется ровно то, что показано на странице предпросмотра.
         // Запрос без payload применять нечему.
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -443,7 +431,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testPreviewWarnsAboutFormulaCodesMissingInTargetCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -478,7 +465,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // всю сессию слот подменил бы его файлом B, и пользователь получил бы
         // в справочник ОПиУ не то, что видел на экране.
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -517,7 +503,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
     public function testApplyReportsUnresolvedFormulaCodesAfterImport(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -553,7 +538,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // загружаются другим пользователем, у которого нет и не может быть
         // доступа к компании-источнику.
         $client = static::createClient();
-        $this->resetDb();
 
         $sourceUser = UserBuilder::aUser()->asCompanyOwner()->build();
         $sourceCompany = CompanyBuilder::aCompany()->withIndex(1)->withOwner($sourceUser)->withName('Компания А')->build();
@@ -615,7 +599,6 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // Тот же сценарий, что в unit-тесте Action, но на реальной БД: сюда
         // попадает настоящий запрос за формулами компании.
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();

@@ -16,7 +16,6 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
     public function testHappyPathReturnsXlsxAttachment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('owner-export@example.test')
@@ -59,7 +58,6 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
     public function testReturnsErrorWhenNotAuthenticated(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', self::EXPORT_URL, [
             'marketplace' => 'ozon',
@@ -74,7 +72,6 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
     public function testReturns400WhenPeriodFormatIsInvalid(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('owner-export-bad-date@example.test')
@@ -104,7 +101,6 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
     public function testReturns400WhenPeriodFromMissing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('owner-export-missing@example.test')

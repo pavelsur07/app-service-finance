@@ -16,7 +16,6 @@ final class AccountBalancesOpeningBalanceTest extends WebTestCaseBase
     public function testReportUsesOpeningBalanceBeforeSelectedDayTransactions(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()
             ->withId(Uuid::uuid4()->toString())

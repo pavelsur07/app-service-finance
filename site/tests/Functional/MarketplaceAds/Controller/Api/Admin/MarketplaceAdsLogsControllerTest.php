@@ -47,7 +47,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testReturns200AndTailForSuperAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $admin = UserBuilder::aUser()
@@ -88,7 +87,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testReturns403ForCompanyOwnerWithoutSuperAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -115,7 +113,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testRedirectsOrDeniesWhenNotAuthenticated(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', self::URL);
 
@@ -129,7 +126,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testReturns200WithMessageWhenNoLogFile(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $this->cleanupLogFiles();
@@ -159,7 +155,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testLinesParameterLimitsOutput(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $admin = UserBuilder::aUser()
@@ -197,7 +192,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testSearchFiltersLines(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $admin = UserBuilder::aUser()
@@ -236,7 +230,6 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
     public function testPicksLatestFileByMtime(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $admin = UserBuilder::aUser()

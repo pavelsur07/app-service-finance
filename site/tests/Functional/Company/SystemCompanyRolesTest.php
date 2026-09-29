@@ -44,7 +44,6 @@ final class SystemCompanyRolesTest extends WebTestCaseBase
     public function testOwnerMembershipCreatorAssignsSystemOwnerTemplate(): void
     {
         static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('roles-owner@example.test')

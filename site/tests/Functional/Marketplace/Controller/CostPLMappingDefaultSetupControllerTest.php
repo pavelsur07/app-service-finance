@@ -44,7 +44,6 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testPreviewReturnsOkAndIsReadOnly(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -65,7 +64,6 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testPreviewAcceptsJsonBody(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -88,7 +86,6 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testApplyIsIdempotentAndUsesActiveCompany(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -120,7 +117,6 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testApplyReturnsErrorForBlockingIssuesAndInvalidMarketplace(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData(false);
         $this->loginWithActiveCompany($client, $user, $company);
@@ -143,7 +139,6 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testInvalidCsrfReturnsError(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);

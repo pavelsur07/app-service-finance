@@ -22,7 +22,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testDeletedDocumentCannotBeOpenedEditedCopiedOrExported(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         $active = $this->createDocument($company, 'ACTIVE-DOCUMENT');
         $document = $this->createDocument($company, 'DELETED-DOCUMENT');
@@ -55,7 +54,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testCashTransactionPageListsOnlyActivePnlDocuments(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         $account = MoneyAccountBuilder::aMoneyAccount()
             ->withId(Uuid::uuid4()->toString())
@@ -93,7 +91,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testTabsSeparateActiveAndDeletedDocumentsByCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         [, $foreignCompany] = $this->createCompanyContext();
         $this->createDocument($company, 'ACTIVE-OWN');
@@ -126,7 +123,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testIndexRendersModalDeleteConfirmationWithCsrfData(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         $document = $this->createDocument($company, 'DELETE-CONFIRMATION');
         $longLabelDocument = $this->createDocument($company, str_repeat('X', 81));
@@ -170,7 +166,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testManualDeleteAndRestoreLifecycle(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         $document = $this->createDocument($company, 'LIFECYCLE-DOCUMENT');
         $documentId = (string) $document->getId();
@@ -203,7 +198,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testInvalidCsrfDoesNotChangeDeletionState(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         $active = $this->createDocument($company, 'ACTIVE-CSRF');
         $deleted = $this->createDocument($company, 'DELETED-CSRF');
@@ -225,7 +219,6 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
     public function testForeignDeletedDocumentCannotBeRestored(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->createCompanyContext();
         [, $foreignCompany] = $this->createCompanyContext();
         $foreignDocument = $this->createDocument($foreignCompany, 'FOREIGN-RESTORE');

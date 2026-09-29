@@ -31,7 +31,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testPreviewIsReadOnlyAndProposesEveryRule(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -61,7 +60,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testApplyCreatesRulesWithCorrectSignAndIsIdempotent(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -90,7 +88,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testExistingRuleIsNeverOverwritten(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -121,7 +118,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
      */
     public function testExistingRuleWithWrongSignIsShownAsIsAndFlagged(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -155,7 +151,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testDisabledRuleWithSameTargetIsReportedAndNotResurrected(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
@@ -186,7 +181,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testApplyTouchesOnlyActiveCompany(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         [, $otherCompany] = $this->seedBaseData(true, 'other-sale-mapping@test.local', 2);
@@ -208,7 +202,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
      */
     public function testWriterRefusesSecondActiveRuleForSameAmountSource(): void
     {
-        $this->resetDb();
         static::createClient();
         [, $company] = $this->seedBaseData();
 
@@ -242,7 +235,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
      */
     public function testDatabaseRejectsSecondActiveRuleWithAnotherCategory(): void
     {
-        $this->resetDb();
         static::createClient();
         [, $company] = $this->seedBaseData();
 
@@ -254,7 +246,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testWriterIgnoresPlCategoryOfAnotherCompany(): void
     {
-        $this->resetDb();
         static::createClient();
         [, $company] = $this->seedBaseData();
         [, $otherCompany] = $this->seedBaseData(true, 'writer-other@test.local', 2);
@@ -281,7 +272,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testApplyIsBlockedWhenPlTreeHasNoCodes(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData(false);
         $this->loginWithActiveCompany($client, $user, $company);
@@ -295,7 +285,6 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
 
     public function testUnknownMarketplaceAndInvalidCsrfAreRejected(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);

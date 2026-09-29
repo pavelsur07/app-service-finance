@@ -15,7 +15,6 @@ final class ProductIndexTest extends WebTestCaseBase
     public function testShowsOnlyProductsFromActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

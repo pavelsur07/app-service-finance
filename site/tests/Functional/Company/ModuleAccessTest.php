@@ -30,7 +30,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testOwnerCanOpenFinanceAndMarketplacePages(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $owner] = $this->seedCompanyWithOwner();
 
@@ -47,7 +46,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testOperatorWithoutAccessRoleIsDenied(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
         $memberUser = $this->seedMember($company, CompanyMember::ROLE_OPERATOR, null);
@@ -68,7 +66,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testMemberWithFinanceOnlyRoleCanOpenFinanceButNotMarketplace(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
 
@@ -91,7 +88,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testReadOnlyFinanceRoleDeniesWriteAttribute(): void
     {
         static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedCompanyWithReadOnlyFinanceMember();
 
@@ -122,7 +118,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testReadOnlyFinanceRoleCanOpenFinancePage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedCompanyWithReadOnlyFinanceMember();
 
@@ -137,7 +132,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testRootRedirectsOwnerToFinanceDashboard(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $owner] = $this->seedCompanyWithOwner();
 
@@ -151,7 +145,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testRootRedirectKeepsSelectedCashCurrency(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $owner] = $this->seedCompanyWithOwner();
 
@@ -166,7 +159,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testRootRedirectsMarketplaceOnlyMemberToMarketplace(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
 
@@ -188,7 +180,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testDisabledMemberIsDeniedEvenWithAccessRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
 
@@ -217,7 +208,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testLoginPageStaysPublic(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/login');
         self::assertResponseIsSuccessful();
@@ -226,7 +216,6 @@ final class ModuleAccessTest extends WebTestCaseBase
     public function testCounterpartySearchRequiresFinanceOrDealsAccess(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company] = $this->seedCompanyWithOwner();
 

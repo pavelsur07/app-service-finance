@@ -189,7 +189,6 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
 
     private function loginOwner(KernelBrowser $client): Company
     {
-        $this->resetDb();
         $user = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $this->em()->persist($user);
@@ -207,8 +206,6 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $container = static::getContainer();
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $this->resetDb();
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('balance-test@example.com');

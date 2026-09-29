@@ -17,7 +17,6 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
     public function testNonAdminCannotCreateAccount(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $nonAdmin = UserBuilder::aUser()
             ->withEmail('owner@example.test')
@@ -46,7 +45,6 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
     public function testAdminSeesAddAccountButton(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->persistAdmin();
 
@@ -60,7 +58,6 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
     public function testValidPostCreatesUserCompanyAndOwnerCompanyMemberWithoutAdminRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->persistAdmin();
         $client->loginUser($admin, 'admin');
@@ -108,7 +105,6 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
     public function testDuplicateNormalizedEmailReturnsFormErrorAndDoesNotCreateSecondCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = $this->persistAdmin();
         $client->loginUser($admin, 'admin');

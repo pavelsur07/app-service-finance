@@ -26,7 +26,6 @@ final class StockStorageTest extends WebTestCaseBase
 {
     public function testPersistsCompletedSnapshotWithProductAndVariantLines(): void
     {
-        $this->resetDb();
         [$connection, $product, $variant, $store] = $this->catalog();
         $startedAt = new \DateTimeImmutable('2026-09-21T08:00:00.123+00:00');
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), $startedAt);
@@ -61,7 +60,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testRejectsDuplicateAssortmentStoreLine(): void
     {
-        $this->resetDb();
         [$connection, $product, , $store] = $this->catalog();
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable());
         foreach ([$connection, $product, $store, $snapshot] as $entity) {
@@ -77,7 +75,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testRejectsLineWithUnknownStore(): void
     {
-        $this->resetDb();
         [$connection, $product] = $this->catalog();
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable());
         foreach ([$connection, $product, $snapshot] as $entity) {
@@ -91,7 +88,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testRejectsLineWhoseStoreBelongsToAnotherTenant(): void
     {
-        $this->resetDb();
         [$connection, $product] = $this->catalog();
         $foreignCompanyId = '99999999-9999-4999-8999-999999999999';
         $foreignConnection = MoySkladConnectionBuilder::aConnection()->withIndex(2)->withCompanyId($foreignCompanyId)->build();
@@ -109,7 +105,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testOnlyOneBuildingSnapshotPerConnection(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-21T08:00:00+00:00');
         $this->em()->persist($connection);
@@ -122,7 +117,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testDatabaseRejectsInconsistentSnapshotStatus(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -136,7 +130,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testDatabaseRejectsLineWithoutAssortment(): void
     {
-        $this->resetDb();
         [$connection, , , $store] = $this->catalog();
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable());
         foreach ([$connection, $store, $snapshot] as $entity) {
@@ -153,7 +146,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testCompletedSnapshotLinesCannotBeChanged(): void
     {
-        $this->resetDb();
         [$connection, $product, , $store] = $this->catalog();
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable());
         $line = new MoySkladStockSnapshotLine('bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb', $connection->getCompanyId(), $connection->getId(), $snapshot->getId(), $store->getExternalId(), 'product', $product->getExternalId(), '1', '0', '0');
@@ -170,7 +162,6 @@ final class StockStorageTest extends WebTestCaseBase
 
     public function testCompletedSnapshotCannotBeReopened(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $snapshot = new MoySkladStockSnapshot('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), new \DateTimeImmutable());
         $this->em()->persist($connection);

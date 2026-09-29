@@ -13,26 +13,17 @@ use Symfony\Component\HttpFoundation\Request;
 /**
  * Базовый класс для web-тестов (builders-first);
  * работа с БД остаётся явной и не скрывается.
+ *
+ * Изоляция между тестами — транзакция DAMA\DoctrineTestBundle (rollback после
+ * каждого теста), чистить БД в тесте не нужно. Последовательности при откате
+ * не сбрасываются: не проверяйте конкретные значения автоинкремента (например,
+ * publicId).
  */
 abstract class WebTestCaseBase extends WebTestCase
 {
     protected function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);
-    }
-
-    /**
-     * Ничего не делает: изоляция между тестами обеспечена транзакцией
-     * DAMA\DoctrineTestBundle (rollback после каждого теста), как и в
-     * IntegrationTestCase. TRUNCATE всех таблиц здесь выполнялся внутри той же
-     * транзакции, терялся при откате и стоил ~180 мс на вызов (замер: functional-
-     * сьют 319 с → 71 с). Метод оставлен, чтобы не трогать вызовы в тестах.
-     *
-     * Последовательности между тестами больше не сбрасываются: не проверяйте
-     * конкретные значения автоинкремента (например, publicId).
-     */
-    protected function resetDb(): void
-    {
     }
 
     protected function setClientSessionValue(KernelBrowser $client, string $key, mixed $value): void

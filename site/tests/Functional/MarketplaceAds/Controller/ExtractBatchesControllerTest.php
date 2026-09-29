@@ -38,7 +38,6 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
     public function testHappyPathCreatesRawDocumentAndDispatchesMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -121,7 +120,6 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
     public function testSecondInvocationSkipsExistingDocumentAndDispatchesNothing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -202,7 +200,6 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
     public function testForeignJobIdReturns0ProcessedWithoutException(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -280,7 +277,6 @@ final class ExtractBatchesControllerTest extends WebTestCaseBase
     public function testInvalidCsrfTokenReturns400(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

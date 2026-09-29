@@ -16,7 +16,6 @@ final class CashTransactionAutoRuleApplyControllerTest extends WebTestCaseBase
     public function testLaunchUsesCurrentCalendarYear(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('auto-rule-apply@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -95,7 +94,6 @@ final class CashTransactionAutoRuleApplyControllerTest extends WebTestCaseBase
     private function openApplyPage(string $email): array
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail($email)->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

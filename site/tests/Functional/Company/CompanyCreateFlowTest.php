@@ -22,7 +22,6 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
     public function testCreateCompanyAddsOwnerCompanyMember(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('owner@example.test')
@@ -89,7 +88,6 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
     public function testInvalidMinimumBalanceShowsValidationError(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('invalid-balance-owner@example.test')
@@ -116,7 +114,6 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
     public function testSystemProjectCannotBeDeletedThroughController(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('system-project-owner@example.test')

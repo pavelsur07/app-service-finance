@@ -22,7 +22,6 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
     public function testHistoryKeepsFullyPreliminaryFinalAndMixedPeriodsVisible(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $now = new \DateTimeImmutable('now');
@@ -113,7 +112,6 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
     public function testReopenedStageOfPastMonthTellsThatOperationalPlIsMissing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $year = (int) (new \DateTimeImmutable('now'))->format('Y') - 1;
@@ -138,7 +136,6 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
     public function testReopenedStageOfCurrentMonthMentionsDailyRebuild(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $now = new \DateTimeImmutable('now');

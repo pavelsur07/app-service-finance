@@ -19,7 +19,6 @@ final class WbFinanceSyncStatusControllerTest extends WebTestCaseBase
     public function testReturnsFailedDayWithErrorMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
 
@@ -43,7 +42,6 @@ final class WbFinanceSyncStatusControllerTest extends WebTestCaseBase
     public function testRejectsLimitOverMaximumWith422(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
 
@@ -57,7 +55,6 @@ final class WbFinanceSyncStatusControllerTest extends WebTestCaseBase
     public function testDoesNotLeakStatusesOfOtherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
 
@@ -87,7 +84,6 @@ final class WbFinanceSyncStatusControllerTest extends WebTestCaseBase
     public function testDoesNotLeakOtherMarketplaceOrReportTypeStatuses(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->seedBaseData();
         $this->loginWithActiveCompany($client, $user, $company);
 

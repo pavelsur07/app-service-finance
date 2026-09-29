@@ -22,7 +22,6 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
     public function testPageIsProtectedAndNavigationIsActive(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/financial-responsibility-centers/');
         self::assertResponseRedirects('/login');
@@ -43,7 +42,6 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
     public function testCreatesEditsConfiguresAndArchivesCenter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->createCompany($client, 802);
         $companyId = (string) $company->getId();
         $project = new ProjectDirection('33333333-3333-3333-3333-000000000802', $company, 'Продажи');
@@ -120,7 +118,6 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
     public function testOtherCompanyCenterReturnsNotFound(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->createCompany($client, 803);
         [, $otherCompany] = $this->createCompany($client, 804);
 
@@ -139,7 +136,6 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
     public function testProjectChoicesPreserveDuplicateNames(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->createCompany($client, 805);
 
         $firstParent = new ProjectDirection('33333333-3333-3333-3333-000000000805', $company, 'Краснодар');

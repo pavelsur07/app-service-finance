@@ -21,7 +21,6 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
     public function testFilterReturnsOnlyTaggedListings(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $tagged, $untagged, $tagId] = $this->seed();
         $client->loginUser($owner);
@@ -45,7 +44,6 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
     public function testTagSummaryReturnedOnlyWithFlag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, , , $tagId] = $this->seed();
         $client->loginUser($owner);
@@ -91,7 +89,6 @@ final class UnitExtendedTagFilterControllerTest extends WebTestCaseBase
     public function testRejectsNonUuidTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner] = $this->seed();
         $client->loginUser($owner);

@@ -29,7 +29,6 @@ final class CashTransactionAutoRuleFormTest extends WebTestCaseBase
     public function testEditFormRendersOneRowPerConditionAndRowPrototype(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -103,7 +102,6 @@ final class CashTransactionAutoRuleFormTest extends WebTestCaseBase
     public function testEmptyNameIsValidationErrorNotServerError(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();

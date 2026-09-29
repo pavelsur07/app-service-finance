@@ -17,7 +17,6 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
     public function testNewFormOffersRootAndOnlyAllowedParents(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->persistCompany();
 
         $operating = $this->category('11111111-1111-4111-8111-111111111111', $company, 'Операционная деятельность')
@@ -61,7 +60,6 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
     public function testEditDetachesCategoryAndChangesFlowKindInOneSubmit(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->persistCompany();
 
         $parent = $this->category('44444444-4444-4444-8444-444444444444', $company, 'Инвестиции')
@@ -101,7 +99,6 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
     public function testEditingChildWithoutSubmittedFlowKindKeepsInheritedValue(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company] = $this->persistCompany();
 
         $parent = $this->category('88888888-8888-4888-8888-888888888888', $company, 'Инвестиции')

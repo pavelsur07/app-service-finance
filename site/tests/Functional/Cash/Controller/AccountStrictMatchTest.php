@@ -153,8 +153,6 @@ TXT);
         $em = static::getContainer()->get('doctrine.orm.entity_manager');
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('bank-import@example.com');
         $user->setPassword($hasher->hashPassword($user, 'password'));

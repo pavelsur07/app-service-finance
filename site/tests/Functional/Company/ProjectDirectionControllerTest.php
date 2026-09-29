@@ -18,7 +18,6 @@ final class ProjectDirectionControllerTest extends WebTestCaseBase
     public function testNewProjectSuggestsNextSiblingSortAndKeepsManualValue(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->createCompany($client, 821);
 
         $parent = (new ProjectDirection('33333333-3333-3333-3333-000000000821', $company, 'Parent'))

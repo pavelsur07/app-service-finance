@@ -29,7 +29,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testVerificationEndpointsReturnExpectedPayloads(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->persistVerificationFixture();
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -85,7 +84,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testCoverageUsesTransactionOccurredDateForBackfillHeatmap(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withIndex(9150)->build();
         $company = CompanyBuilder::aCompany()
@@ -178,7 +176,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testCoverageEndpointReturnsRawOnlyIngestionRecords(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withIndex(9151)->build();
         $company = CompanyBuilder::aCompany()
@@ -236,7 +233,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testCoverageEndpointFallsBackToFetchedDateForRawOnlyRecordsWithoutJobWindow(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withIndex(9152)->build();
         $company = CompanyBuilder::aCompany()
@@ -292,7 +288,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testInvalidPeriodUsesUnifiedErrorFormat(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withIndex(9101)->build();
         $company = CompanyBuilder::aCompany()
@@ -319,7 +314,6 @@ final class VerificationApiControllerTest extends WebTestCaseBase
     public function testVerificationEndpointsDoNotLeakOtherCompanyData(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$ownerA, $companyA] = $this->persistTenantLeakFixture();
         $this->loginWithActiveCompany($client, $ownerA, $companyA);

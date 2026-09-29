@@ -13,7 +13,6 @@ final class MoneyAccountCreateAccessTest extends WebTestCaseBase
     public function testCompanyOwnerCanAccessMoneyAccountEndpoint(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

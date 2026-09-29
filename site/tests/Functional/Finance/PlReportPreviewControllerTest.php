@@ -944,8 +944,6 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
 
     private function loginWithCompany(KernelBrowser $client, string $email): object
     {
-        $this->resetDb();
-
         $user = UserBuilder::aUser()->withEmail($email)->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $this->em()->persist($user);

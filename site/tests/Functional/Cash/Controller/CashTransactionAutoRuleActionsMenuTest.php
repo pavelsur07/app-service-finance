@@ -241,8 +241,6 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
     /** @return array{0: User, 1: Company, 2: CashTransactionAutoRule} */
     private function fixtures(): array
     {
-        $this->resetDb();
-
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
         $category = CashflowCategoryBuilder::aCashflowCategory()

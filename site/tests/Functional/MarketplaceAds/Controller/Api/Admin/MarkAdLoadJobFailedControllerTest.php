@@ -21,7 +21,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testMarksPendingJobAsFailed(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -72,7 +71,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns400WhenReasonIsEmpty(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -115,7 +113,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns400WhenReasonIsWhitespaceOnly(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -158,7 +155,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns404WhenJobBelongsToAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -218,7 +214,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns404WhenJobIsAlreadyCompleted(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -265,7 +260,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns403WhenUserIsNotCompanyOwner(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -312,7 +306,6 @@ final class MarkAdLoadJobFailedControllerTest extends WebTestCaseBase
     public function testReturns404WhenJobIdIsNotUuid(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

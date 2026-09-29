@@ -34,7 +34,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testLoadsProductsThenVariantsAndRepeatedRunIsIdempotent(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -60,7 +59,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testVariantFailureKeepsProductCursorAndOldVariantCursor(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -83,7 +81,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testRejectsMissingParentWithoutCreatingVariant(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -103,7 +100,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testRejectsUnsortedVariantPageWithoutAdvancingCursor(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -126,7 +122,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testAdvancesOffsetAcrossProductPages(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -163,7 +158,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testChangingPageSizeIsRetriedAsTemporaryDrift(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -184,7 +178,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testCannotSyncConnectionOfAnotherCompany(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -194,7 +187,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testSecondProductPageFailureKeepsCommittedPageButNoCursor(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -216,7 +208,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testRestartRepairsStaleRunningRun(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $staleId = 'aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa';
@@ -232,7 +223,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testTokenDecodeFailureRecordsSafeRunStatus(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $connection->setAccessTokenEncrypted('invalid-encrypted-payload');
         $this->em()->persist($connection);
@@ -251,7 +241,6 @@ final class SyncCatalogActionTest extends WebTestCaseBase
 
     public function testRateLimitSchedulesBoundedRetry(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();

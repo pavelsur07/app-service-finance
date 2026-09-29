@@ -18,7 +18,6 @@ final class BalanceDynamicsControllerTest extends WebTestCaseBase
     public function testReturnsTypedSeriesForActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withEmail('balance-dynamics-api@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
@@ -74,7 +73,6 @@ final class BalanceDynamicsControllerTest extends WebTestCaseBase
     public function testRejectsInvalidPeriodAndCurrencyWithStableErrorShape(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withEmail('balance-dynamics-errors@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();

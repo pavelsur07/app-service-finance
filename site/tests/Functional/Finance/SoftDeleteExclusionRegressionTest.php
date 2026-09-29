@@ -176,7 +176,6 @@ final class SoftDeleteExclusionRegressionTest extends WebTestCaseBase
     /** @return array{0: \App\Company\Entity\User, 1: \App\Company\Entity\Company, 2: \App\Cash\Entity\Accounts\MoneyAccount} */
     private function prepareCompanyContext(): array
     {
-        $this->resetDb();
         $em = $this->em();
 
         $user = UserBuilder::aUser()
