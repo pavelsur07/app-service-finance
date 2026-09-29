@@ -203,8 +203,9 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
 
         /** @var MarkProcessedQuery $markProcessed */
         $markProcessed = self::getContainer()->get(MarkProcessedQuery::class);
-        $documentId = (string) $this->createDocument()->getId();
-        $markProcessed->markCosts(
+        $plDocument = $this->createDocument();
+        $documentId = (string) $plDocument->getId();
+        $marked = $markProcessed->markCosts(
             (string) $this->company->getId(),
             self::MARKETPLACE_VALUE,
             $documentId,
@@ -213,12 +214,17 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
             true,
         );
 
-        $markedNet = (float) $this->em->getConnection()->fetchOne(
+        self::assertSame(2, $marked, 'Помечены charge и storno распознанной категории — и только они.');
+        $markedNet = (float) $this->connection->fetchOne(
             "SELECT COALESCE(SUM(CASE WHEN operation_type = 'storno' THEN -ABS(amount) ELSE ABS(amount) END), 0)
              FROM marketplace_costs WHERE document_id = :doc",
             ['doc' => $documentId],
         );
         self::assertEqualsWithDelta(900.0, $markedNet, 0.01, 'markCosts(preliminary) должен пометить ровно строки контрольной суммы.');
+
+        // Оперативному закрытию больше брать нечего; финальному остались нераспознанные 500 + 300.
+        self::assertEqualsWithDelta(0.0, (float) $this->getControlSum(true), 0.01);
+        self::assertEqualsWithDelta(800.0, (float) $this->getControlSum(), 0.01);
     }
 
     public function testCostDateOutOfPeriodIsIgnoredByBothFormulas(): void
