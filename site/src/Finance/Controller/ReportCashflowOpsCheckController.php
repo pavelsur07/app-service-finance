@@ -88,7 +88,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
                     'Сумма (абс.)', 'Сумма (со знаком)', 'Категория',
                     'Источник', 'ExternalId',
                     'Флаг: Знак', 'Флаг: Нет категории', 'Флаг: Дубль',
-                ], $delimiter);
+                ], $delimiter, '"', '');
 
                 foreach ($this->fetchTrxRows($ctx) as $r) {
                     fputcsv($out, [
@@ -104,7 +104,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
                         (int) $r['flag_wrong_sign'],
                         (int) $r['flag_no_category'],
                         (int) $r['flag_dup'],
-                    ], $delimiter);
+                    ], $delimiter, '"', '');
                 }
             } else {
                 fputcsv($out, [
@@ -117,7 +117,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
                     'Расход (по транз.)',
                     'Закрытие (по транз.)',
                     'Δ Закрытия (баланс - по транз.)',
-                ], $delimiter);
+                ], $delimiter, '"', '');
 
                 foreach ($this->fetchReconRows($ctx) as $r) {
                     fputcsv($out, [
@@ -131,7 +131,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
                         number_format((float) $r['outflow_trx'], 2, '.', ''),
                         number_format((float) $r['closing_by_trx'], 2, '.', ''),
                         number_format((float) $r['diff_closing'], 2, '.', ''),
-                    ], $delimiter);
+                    ], $delimiter, '"', '');
                 }
             }
 

@@ -79,7 +79,7 @@ final class PublicCashflowReportController extends AbstractController
 
         $resp = new StreamedResponse(static function () use ($periods, $categoryTotals, $openings, $closings) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Период', 'КатегорияID', 'Валюта', 'Сальдо нач.', 'Нетто', 'Сальдо кон.']);
+            fputcsv($out, ['Период', 'КатегорияID', 'Валюта', 'Сальдо нач.', 'Нетто', 'Сальдо кон.'], ',', '"', '');
             foreach ($periods as $i => $p) {
                 $label = $p['label'];
                 foreach ($categoryTotals as $catId => $catRow) {
@@ -90,7 +90,7 @@ final class PublicCashflowReportController extends AbstractController
                         $opening = $openings[$currency][$i] ?? 0.0;
                         $net = $vals[$i] ?? 0.0;
                         $closing = $closings[$currency][$i] ?? 0.0;
-                        fputcsv($out, [$label, $catId, $currency, $opening, $net, $closing]);
+                        fputcsv($out, [$label, $catId, $currency, $opening, $net, $closing], ',', '"', '');
                     }
                 }
             }

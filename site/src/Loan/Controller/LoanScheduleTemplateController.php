@@ -30,7 +30,7 @@ final class LoanScheduleTemplateController extends AbstractController
             ];
 
             foreach ($rows as $row) {
-                fputcsv($handle, $row, ';');
+                fputcsv($handle, $row, ';', '"', '');
             }
 
             fclose($handle);

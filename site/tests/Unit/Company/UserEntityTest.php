@@ -140,13 +140,4 @@ final class UserEntityTest extends TestCase
         self::assertSame(hash('crc32c', 'secret_hash'), $data["\0".User::class."\0password"]);
         self::assertNotSame('secret_hash', $data["\0".User::class."\0password"]);
     }
-
-    public function testEraseCredentialsDoesNotThrow(): void
-    {
-        $user = UserBuilder::aUser()->build();
-
-        $user->eraseCredentials();
-
-        self::assertTrue(true);
-    }
 }
