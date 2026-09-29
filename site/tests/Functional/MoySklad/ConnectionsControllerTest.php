@@ -700,7 +700,6 @@ final class ConnectionsControllerTest extends WebTestCaseBase
     /** @return array{KernelBrowser, MoySkladConnection} */
     private function seed(int $status = 200): array
     {
-        $this->resetDb();
         $client = static::createClient();
         $client->disableReboot();
         static::getContainer()->set('moysklad.http_client', new MockHttpClient(new MockResponse('{"accountId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}', ['http_code' => $status])));

@@ -23,7 +23,6 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
     public function testNewFormIsPrefilledFromTransaction(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -93,7 +92,6 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
     public function testSourceCardSurvivesInvalidSubmit(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -150,7 +148,6 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
     public function testTransactionOfAnotherCompanyIsNotFound(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();

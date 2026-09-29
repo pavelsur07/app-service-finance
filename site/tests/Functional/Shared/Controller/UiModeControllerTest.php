@@ -17,7 +17,6 @@ final class UiModeControllerTest extends WebTestCaseBase
     public function testAdminCanSwitchModeAndKeepSameOriginLocation(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $admin = UserBuilder::aUser()
             ->withEmail('ui-mode-admin@example.test')
             ->withRoles(['ROLE_ADMIN'])
@@ -112,7 +111,6 @@ final class UiModeControllerTest extends WebTestCaseBase
     public function testLegacyCookieSelectsAppButtonForUser(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()
             ->withEmail('ui-mode-legacy-cookie-user@example.test')
             ->withRoles(['ROLE_USER'])
@@ -134,7 +132,6 @@ final class UiModeControllerTest extends WebTestCaseBase
     public function testUserCanSwitchMode(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()
             ->withEmail('ui-mode-user@example.test')
             ->withRoles(['ROLE_USER'])
@@ -158,7 +155,6 @@ final class UiModeControllerTest extends WebTestCaseBase
     public function testAnonymousUserCannotSwitchMode(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('POST', '/settings/ui-mode', [
             'mode' => UiModeResolver::APP,
@@ -195,7 +191,6 @@ final class UiModeControllerTest extends WebTestCaseBase
 
     private function loginAdmin(KernelBrowser $client): void
     {
-        $this->resetDb();
         $admin = UserBuilder::aUser()
             ->withEmail('ui-mode-admin@example.test')
             ->withRoles(['ROLE_ADMIN'])

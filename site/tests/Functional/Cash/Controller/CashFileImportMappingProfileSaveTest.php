@@ -23,7 +23,6 @@ final class CashFileImportMappingProfileSaveTest extends WebTestCaseBase
     public function testInflowOutflowWinOverLeftoverAmountValue(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-import-mapping-bug@example.test')->build();

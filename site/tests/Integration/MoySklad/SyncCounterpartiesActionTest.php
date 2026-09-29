@@ -37,7 +37,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testLoadsBothPassesAndRepeatedRunDoesNotDuplicateRows(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -69,7 +68,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testAdvancesOffsetAcrossTwoActivePages(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -98,7 +96,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testFailedSecondPassKeepsCommittedFirstPageAndOldCursor(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -121,7 +118,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testAnotherCompanyCannotStartConnection(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -132,7 +128,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testUpdatedRowsAreVisibleButFailedRunDoesNotMoveCompletedCursor(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -167,7 +162,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testRateLimitSchedulesOneDelayedRetryWithoutLeakingResponse(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -215,7 +209,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testHandlerLogsStartAndTerminalOutcomeWhenConnectionIsSkipped(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -245,7 +238,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testRepairsStaleRunningRowBeforeNewPass(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->persist(new MoySkladSyncRun('aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa', $connection->getCompanyId(), $connection->getId(), 'counterparty', new \DateTimeImmutable('2026-09-19T09:00:00+00:00')));
@@ -263,7 +255,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testRetryExhaustionEmitsSafeErrorWithoutSchedulingAgain(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -287,7 +278,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testConcurrentSessionLockPreventsSecondPass(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -306,7 +296,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testFailedPageFlushRollsBackPageAndMarksRunFailed(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -331,7 +320,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
     #[DataProvider('fatalPages')]
     public function testFatalPageKeepsOldCursorAndRows(int $status, string $body, string $category): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -363,7 +351,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testCompletedPassWithoutRowsDoesNotDeletePreviouslyLoadedCounterparties(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();
@@ -382,7 +369,6 @@ final class SyncCounterpartiesActionTest extends WebTestCaseBase
 
     public function testScheduledRetryRestartsAtZeroAndReusesCommittedRows(): void
     {
-        $this->resetDb();
         $connection = $this->verifiedConnection();
         $this->em()->persist($connection);
         $this->em()->flush();

@@ -18,7 +18,6 @@ final class MarketplaceListingsTagsColumnTest extends WebTestCaseBase
     public function testRendersAssignedTagChipsAndLeavesUntaggedListingEmpty(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withEmail('listing-tags-column@example.test')

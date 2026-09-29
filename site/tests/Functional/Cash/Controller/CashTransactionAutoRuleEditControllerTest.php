@@ -25,7 +25,6 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
     public function testResponsibilityCenterTargetIsCompanyScopedAndPairValidated(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
@@ -108,7 +107,6 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
     public function testRevisionChangesOnlyWhenRuleDefinitionChanges(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();

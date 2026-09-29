@@ -26,7 +26,6 @@ final class PLCategoryExportControllerTest extends WebTestCaseBase
     public function testExportsActiveCompanyTreeAsAttachment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->withName('Target Co')->build();
@@ -78,7 +77,6 @@ final class PLCategoryExportControllerTest extends WebTestCaseBase
     public function testCyrillicCompanyNameKeepsAsciiFallbackInDisposition(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->withName('ООО «Ромашка»')->build();

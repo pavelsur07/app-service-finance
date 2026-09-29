@@ -106,7 +106,6 @@ final class HomeUiModeTest extends WebTestCaseBase
 
     private function loginWithCompany(KernelBrowser $client, bool $admin): void
     {
-        $this->resetDb();
         $builder = UserBuilder::aUser()->withEmail(
             $admin ? 'home-ui-admin@example.test' : 'home-ui-user@example.test',
         );

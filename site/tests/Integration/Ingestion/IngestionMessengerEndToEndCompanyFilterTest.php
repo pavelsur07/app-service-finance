@@ -17,8 +17,6 @@ final class IngestionMessengerEndToEndCompanyFilterTest extends IntegrationTestC
 {
     public function testCompanyAwareMessageThroughTransportLimitsHandlerQueriesToMessageCompany(): void
     {
-        $this->resetDb();
-
         $companyA = Uuid::uuid7()->toString();
         $companyB = Uuid::uuid7()->toString();
         $probeA = new IngestionTenantProbe($companyA);

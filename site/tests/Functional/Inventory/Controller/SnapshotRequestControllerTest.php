@@ -27,7 +27,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testValidCsrfRequestsSnapshotAndRedirectsWithSuccessFlash(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-ok@example.test');
         $this->persistActiveOzonConnection($company);
@@ -51,7 +50,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testInvalidCsrfRedirectsWithDangerFlashAndDoesNotDispatch(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-csrf@example.test');
         $this->persistActiveOzonConnection($company);
@@ -70,7 +68,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testNoActiveConnectionShowsWarningFlash(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner] = $this->seedOwnerAndCompany('inventory-request-no-connection@example.test');
         $this->login($client, $owner, self::COMPANY_ID);
@@ -90,7 +87,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testActiveSessionExistsShowsAlreadyRunningWarning(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-request-already-running@example.test');
         $this->persistActiveOzonConnection($company);
@@ -110,7 +106,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testRouteRequiresAuthenticatedOwnerWithActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('POST', '/inventory/snapshots/request', ['_token' => 'noop']);
         self::assertResponseStatusCodeSame(Response::HTTP_FOUND);
@@ -132,7 +127,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testWildberriesRequestDispatchesDedicatedMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-wb-request-ok@example.test');
         $this->persistActiveWbConnection($company);
@@ -152,7 +146,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testWildberriesRequestRejectsInvalidCsrf(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedOwnerAndCompany('inventory-wb-request-csrf@example.test');
         $this->persistActiveWbConnection($company);
@@ -167,7 +160,6 @@ final class SnapshotRequestControllerTest extends WebTestCaseBase
     public function testWildberriesRouteRequiresOwner(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()
             ->withId(self::OWNER_ID)

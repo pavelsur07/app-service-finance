@@ -30,7 +30,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testExportsAllRowsInPeriodBeyondFirstPage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export@example.test')->build();
@@ -113,7 +112,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testExportExcludesOtherCompanyTransactions(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export-own@example.test')->build();
@@ -151,7 +149,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testExportAppliesCurrencyFilter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export-currency@example.test')->build();
@@ -201,7 +198,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testMalformedPeriodRedirectsInsteadOfBreakingTheDownload(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export-bad-date@example.test')->build();
@@ -219,7 +215,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testUnsupportedCurrencyRedirectsInsteadOfExporting(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export-bad-currency@example.test')->build();
@@ -237,7 +232,6 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
     public function testIndexPageRendersExportLinkWithCurrentFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-export-link@example.test')->build();

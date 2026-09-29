@@ -16,7 +16,6 @@ final class ProductEditTest extends WebTestCaseBase
     public function testEditReturns404ForProductFromAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 
@@ -55,7 +54,6 @@ final class ProductEditTest extends WebTestCaseBase
     public function testEditUpdatesProductFields(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

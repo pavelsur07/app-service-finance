@@ -22,7 +22,6 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     public function testReturnsJobsOrderedByCreatedAtDesc(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -107,7 +106,6 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     public function testLimitsTo10Items(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -150,7 +148,6 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     public function testReturnsOnlyOzonJobs(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -213,7 +210,6 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     public function testJobWithScheduledBatchesExposesBatchStatsWithoutBatchDownloadFiles(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -293,7 +289,6 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     public function testJobWithoutScheduledBatchesFallsBackToRawDocumentFilesAndHasBatchesFalse(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

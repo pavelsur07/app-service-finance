@@ -20,7 +20,6 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
     public function testReturns200WithCorrectCounts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -88,7 +87,6 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
     public function testReturns404ForNonExistentJob(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -115,7 +113,6 @@ final class OzonAdLoadJobStatusControllerTest extends WebTestCaseBase
     public function testIdorReturns404ForOtherCompanysJob(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

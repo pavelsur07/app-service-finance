@@ -20,7 +20,6 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
     public function testReturnsDocumentsFilteredByDateRange(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -82,7 +81,6 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
     public function testDefaultsToLast30DaysWhenNoDatesProvided(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -133,7 +131,6 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
     public function testReturns400ForInvalidDateFormat(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -163,7 +160,6 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
     public function testLimitsTo20Items(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -207,7 +203,6 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
     public function testIdorDoesNotLeakOtherCompanyDocuments(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

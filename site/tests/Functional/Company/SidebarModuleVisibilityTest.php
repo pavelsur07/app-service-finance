@@ -34,7 +34,6 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
     public function testFinanceOnlyMemberDoesNotSeeMarketplaceSections(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMember('finance', [Module::FINANCE->value => AccessLevel::READ->value], 1);
 
@@ -60,7 +59,6 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
     public function testMarketplaceOnlyMemberDoesNotSeeFinanceSections(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMember(
             'marketplace',
@@ -88,7 +86,6 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
     public function testCatalogItemIsVisibleOnlyWithCatalogAccess(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedMember(
             'finance-catalog',
@@ -122,7 +119,6 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
     public function testOwnerSeesEverySection(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()
             ->withIndex(40)

@@ -19,7 +19,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
     public function testOwnCompanySessionWithRawSnapshotsReturns200AndPayload(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-json-own@example.test')->build();
@@ -63,7 +62,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
     public function testForeignCompanySessionReturns404(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-json-foreign@example.test')->build();
@@ -90,7 +88,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
     public function testNotExistingSessionReturns404(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-json-missing@example.test')->build();
@@ -109,7 +106,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
     public function testFailedSessionWithoutRawSnapshotsReturns200WithMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('inventory-json-empty@example.test')->build();
@@ -139,7 +135,6 @@ final class SnapshotRawJsonControllerTest extends WebTestCaseBase
     public function testUnauthenticatedUserIsRedirectedToLogin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/inventory/snapshots/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/json');
 

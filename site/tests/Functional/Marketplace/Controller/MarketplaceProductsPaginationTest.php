@@ -16,7 +16,6 @@ final class MarketplaceProductsPaginationTest extends WebTestCaseBase
 {
     public function testProductsIndexPaginatesListings(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseDataWithListings(55);
         $this->loginWithActiveCompany($client, $user, $company);
@@ -33,7 +32,6 @@ final class MarketplaceProductsPaginationTest extends WebTestCaseBase
 
     public function testProductsIndexShowsEmptyStateWithoutListings(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseDataWithListings(0);
         $this->loginWithActiveCompany($client, $user, $company);

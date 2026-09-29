@@ -32,7 +32,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testUnauthenticatedAccessIsDenied(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', self::URL.'?periodFrom=2026-04-01&periodTo=2026-04-30');
 
@@ -46,7 +45,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testReturns400WhenPeriodFromIsAfterPeriodTo(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedCompanyA($this->em());
         $this->loginAsCompanyA($client);
 
@@ -60,7 +58,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testReturns400WhenPeriodFromIsNotInYmdFormat(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedCompanyA($this->em());
         $this->loginAsCompanyA($client);
 
@@ -72,7 +69,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testReturns400WhenMarketplaceIsInvalid(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedCompanyA($this->em());
         $this->loginAsCompanyA($client);
 
@@ -89,7 +85,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testInvalidSortBySilentlyFallsBackToDefaultAndReturns200(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
         $this->seedCompanyA($em);
         $this->seedCompanyAData($em);
@@ -109,7 +104,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testHappyPathReturnsExpectedStructure(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
         $this->seedCompanyA($em);
         $this->seedCompanyAData($em);
@@ -155,7 +149,6 @@ final class AdEfficiencyControllerTest extends WebTestCaseBase
     public function testIdorReturnsEmptyItemsWhenActiveCompanyDoesNotOwnData(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $this->seedCompanyA($em);

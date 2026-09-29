@@ -382,7 +382,6 @@ final class DocumentIndexFilterTest extends WebTestCaseBase
      */
     private function prepareCompanyContext(): array
     {
-        $this->resetDb();
         $em = $this->em();
 
         $user = UserBuilder::aUser()

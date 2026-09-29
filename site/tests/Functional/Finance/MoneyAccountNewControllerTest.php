@@ -15,7 +15,6 @@ final class MoneyAccountNewControllerTest extends WebTestCaseBase
     public function testNewAndEditFormsUseAccountDesign(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();

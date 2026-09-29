@@ -349,7 +349,6 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
 
     private function loginOwner(KernelBrowser $client): string
     {
-        $this->resetDb();
         $user = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $this->em()->persist($user);

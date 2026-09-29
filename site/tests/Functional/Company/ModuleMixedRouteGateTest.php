@@ -68,7 +68,6 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
     public function testMixedRoutesAllowReadAndDenyWriteForReadOnlyRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $router = self::getContainer()->get(RouterInterface::class);
         $map = new ModuleAccessMap();

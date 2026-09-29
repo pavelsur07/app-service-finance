@@ -26,7 +26,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testPageRendersTagsWithCounts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(2);
         $winter = $this->seedTag(self::COMPANY_ID, 'Зима');
         $this->assign($listings[0]->getId(), $winter, self::COMPANY_ID);
@@ -44,7 +43,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testRenameChangesName(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $tagId = $this->seedTag(self::COMPANY_ID, 'Зма');
         $this->login($client, $owner, $company);
@@ -62,7 +60,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testRenameToExistingNameConflicts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $this->seedTag(self::COMPANY_ID, 'Зима');
         $other = $this->seedTag(self::COMPANY_ID, 'Лето');
@@ -77,7 +74,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testRenameRejectsForeignTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $foreign = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой');
         $this->login($client, $owner, $company);
@@ -90,7 +86,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testDeleteRemovesTagAndAssignments(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(1);
         $tagId = $this->seedTag(self::COMPANY_ID, 'Мусор');
         $this->assign($listings[0]->getId(), $tagId, self::COMPANY_ID);
@@ -106,7 +101,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testDeleteRejectsForeignTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $foreign = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой');
         $this->login($client, $owner, $company);
@@ -120,7 +114,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testMergeReassignsListingsAndDeletesSource(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(3);
         // Дубли-мусор = разные названия одного смысла (одинаковый slug в компании невозможен).
         $source = $this->seedTag(self::COMPANY_ID, 'Зимняя коллекция');
@@ -144,7 +137,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testMergeIntoSelfRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $tagId = $this->seedTag(self::COMPANY_ID, 'Зима');
         $this->login($client, $owner, $company);
@@ -157,7 +149,6 @@ final class ListingTagsManageTest extends WebTestCaseBase
     public function testMergeRejectsForeignTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $mine = $this->seedTag(self::COMPANY_ID, 'Мой');
         $foreign = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой');

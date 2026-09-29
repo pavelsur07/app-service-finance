@@ -27,7 +27,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testCreatesTagOnTheFlyAndAssignsItToSelectedListings(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(3);
         $this->login($client, $owner, $company);
 
@@ -54,7 +53,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testAssignsExistingTagById(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(1);
         $tag = $this->seedTag(self::COMPANY_ID, 'Распродажа');
         $this->login($client, $owner, $company);
@@ -71,7 +69,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testRepeatedAssignIsIdempotent(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(2);
         $this->login($client, $owner, $company);
 
@@ -93,7 +90,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testDoesNotTagListingOfAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $foreignListingId = $this->seedForeignCompanyWithListing();
         $this->login($client, $owner, $company);
@@ -114,7 +110,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testDetachRemovesOnlyRequestedAssignment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(2);
         $this->login($client, $owner, $company);
 
@@ -135,7 +130,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testDetachDoesNotTouchAnotherCompanyAssignment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $foreignListingId = $this->seedForeignCompanyWithListing();
         $foreignTagId = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой тег');
@@ -158,7 +152,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testReturns404ForUnknownTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(1);
         $this->login($client, $owner, $company);
 
@@ -174,7 +167,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testForeignCompanyTagIsNotReusable(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company, $listings] = $this->seedCompanyWithListings(1);
         $this->seedForeignCompanyWithListing();
         $foreignTagId = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой тег');
@@ -195,7 +187,6 @@ final class ListingTagsApiTest extends WebTestCaseBase
     public function testRejectsInvalidPayload(array $payload, string $expectedCode): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$owner, $company] = $this->seedCompanyWithListings(1);
         $this->login($client, $owner, $company);
 

@@ -75,7 +75,6 @@ final class CounterpartySearchControllerTest extends WebTestCaseBase
     {
         self::ensureKernelShutdown();
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/api/counterparties/search?q=ромашка');
 
@@ -92,8 +91,6 @@ final class CounterpartySearchControllerTest extends WebTestCaseBase
         $container = static::getContainer();
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $this->resetDb();
 
         $user = $this->createUser($hasher, 'search-api@example.com');
         $otherUser = $this->createUser($hasher, 'search-api-foreign@example.com');

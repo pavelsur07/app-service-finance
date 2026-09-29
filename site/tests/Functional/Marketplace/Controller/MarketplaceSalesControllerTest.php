@@ -22,7 +22,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testLoadsIndexPageWithoutFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -45,7 +44,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testFiltersByDateFromAndTo(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -68,7 +66,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testIgnoresInvalidDateAndShowsAll(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -91,7 +88,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testIgnoresOutOfRangeDateAndShowsAll(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -116,7 +112,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testIgnoresArrayDateAndShowsAll(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -139,7 +134,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testIgnoresArrayQueryParamsAndShowsAll(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
 
@@ -165,7 +159,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testCombinesMarketplaceAndDateFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing, $ozonListing] = $this->seedCompanyAndListings();
 
@@ -190,7 +183,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testPaginationLinksPreserveFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
         $this->seedFiveAndAHalfPagesOfSales($wbListing);
@@ -216,7 +208,6 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
     public function testPaginationLinksWithoutFiltersProduceCleanUrls(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
         $this->seedFiveAndAHalfPagesOfSales($wbListing);

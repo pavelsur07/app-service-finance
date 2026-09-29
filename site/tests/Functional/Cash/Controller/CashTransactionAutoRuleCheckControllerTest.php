@@ -28,7 +28,6 @@ final class CashTransactionAutoRuleCheckControllerTest extends WebTestCaseBase
     public function testPreviewIsCompanyScopedExactAndReadOnly(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
@@ -139,7 +138,6 @@ final class CashTransactionAutoRuleCheckControllerTest extends WebTestCaseBase
     public function testPreviewShowsAtomicProjectAndResponsibilityCenterPlanWithoutMutation(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();

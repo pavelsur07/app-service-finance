@@ -21,7 +21,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCanChangeMemberAccessRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -58,7 +57,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCannotAssignRoleOfAnotherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $otherOwner = UserBuilder::aUser()->withIndex(2)->withEmail('other@example.test')->build();
@@ -105,7 +103,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCannotChangeOwnerMemberAccessRole(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -140,7 +137,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCannotAssignOwnerRoleTemplateToMember(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -176,7 +172,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCannotRemoveLastAdminAccess(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -235,7 +230,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCanAssignLimitedRoleToMemberWhoWasNeverAdmin(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -275,7 +269,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testOwnerCannotDisableLastAdminMember(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $memberUser = UserBuilder::aUser()->withIndex(2)->withEmail('member@example.test')->build();
@@ -321,7 +314,6 @@ final class CompanyMemberAccessRoleTest extends WebTestCaseBase
     public function testInviteWithSelectedRoleAssignsRoleOnAccept(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $operator = UserBuilder::aUser()->withIndex(2)->withEmail('operator@example.test')->build();

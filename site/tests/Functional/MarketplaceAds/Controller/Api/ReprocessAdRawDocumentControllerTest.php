@@ -23,7 +23,6 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
     public function testReprocessResetsFailedDocumentToDraft(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
@@ -82,7 +81,6 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
     public function testReprocessReturns404WhenDocumentBelongsToOtherCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
@@ -148,7 +146,6 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
     public function testReprocessReturns404ForUnknownDocumentId(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
@@ -182,7 +179,6 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
     public function testReprocessAcceptsAlreadyDraftDocumentAsNoopSuccess(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */

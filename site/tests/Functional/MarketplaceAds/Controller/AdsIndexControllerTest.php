@@ -20,7 +20,6 @@ final class AdsIndexControllerTest extends WebTestCaseBase
     public function testReturns200WithoutPerformanceConnection(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -50,7 +49,6 @@ final class AdsIndexControllerTest extends WebTestCaseBase
     public function testReturns200WithPerformanceConnection(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -88,7 +86,6 @@ final class AdsIndexControllerTest extends WebTestCaseBase
     public function testRedirectsWhenNotAuthenticated(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/marketplace-ads');
 

@@ -15,7 +15,6 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
     public function testCreateAccountRedirectsAndCreatesOwnerCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin@example.test')
@@ -59,7 +58,6 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
     public function testInvalidCreateAccountRendersUsersIndexWithModalOpen(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin@example.test')

@@ -39,7 +39,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testReturnsJsonAttachmentWithOperationRows(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a1');
         $category = $this->seedCategory($company, 'Выручка', 'REVENUE');
@@ -78,7 +77,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testEachOperationOfDocumentBecomesOwnRow(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a1');
         $income = $this->seedCategory($company, 'Выручка', 'REVENUE');
@@ -114,7 +112,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testCounterpartyAndProjectFallBackToDocument(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a1');
         $category = $this->seedCategory($company, 'Выручка', 'REVENUE');
@@ -150,7 +147,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testDoesNotLeakForeignCompanyReferenceNames(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$userA, $companyA] = $this->seedCompanyContext('a1');
         [, $companyB] = $this->seedCompanyContext('b2');
@@ -183,7 +179,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testExcludesOtherCompanyOperations(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$userA, $companyA] = $this->seedCompanyContext('a1');
         [, $companyB] = $this->seedCompanyContext('b2');
@@ -211,7 +206,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
     public function testExcludesSoftDeletedDocumentOperations(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a1');
         $category = $this->seedCategory($company, 'Выручка', 'REVENUE');

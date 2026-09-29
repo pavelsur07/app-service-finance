@@ -194,8 +194,6 @@ final class SyncOzonListingCatalogButtonTest extends WebTestCaseBase
      */
     private function seed(KernelBrowser $client): array
     {
-        $this->resetDb();
-
         $owner = UserBuilder::aUser()->withEmail('ozon-catalog-button@example.test')->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)

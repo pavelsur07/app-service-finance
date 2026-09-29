@@ -20,7 +20,6 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
     public function testPublicRegistrationCreatesUserCompanyAndOwnerCompanyMember(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
         $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
 
@@ -88,7 +87,6 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
     public function testInvalidEmailIsRejectedByFormInsteadOfCrashing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
 
         foreach (['not-an-email', 'ivan@company', ''] as $email) {
@@ -122,7 +120,6 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
     public function testUnicodeEmailIsAcceptedAndFieldIsNotHtml5Constrained(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
         $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
 

@@ -24,7 +24,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 {
     public function testIndexRendersDefaultMappingUiElements(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         $this->em()->flush();
@@ -47,7 +46,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testIndexRendersReadOnlyRowsWithSingleSelect(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         $pl = $this->persistPl($company, 'Логистика');
@@ -67,7 +65,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testIndexQueryCountDoesNotGrowWithPlTree(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         $root = $this->persistPl($company, 'Root');
@@ -96,7 +93,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testUpdateSavesRowAndReturnsJson(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         $pl = $this->persistPl($company, 'Логистика');
@@ -115,7 +111,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testUpdateOfForeignCostCategoryIsNotFound(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         [, $foreign] = $this->seedCompany(2);
@@ -132,7 +127,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testUpdateRejectsForeignPlCategoryInvalidSortOrderAndCsrf(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         [, $foreign] = $this->seedCompany(2);
@@ -157,7 +151,6 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
 
     public function testDeleteWithSharedTokenSoftDeletesCategory(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedCompany(1);
         $cost = $this->persistCost($company, 'Пользовательская');

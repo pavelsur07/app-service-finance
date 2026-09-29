@@ -19,7 +19,6 @@ final class CompanyMemberAccessTest extends WebTestCaseBase
     public function testActiveMemberCanOpenCompanyUsersPage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedCompanyMember(CompanyMember::STATUS_ACTIVE);
 
@@ -33,7 +32,6 @@ final class CompanyMemberAccessTest extends WebTestCaseBase
     public function testDisabledMemberCannotOpenCompanyUsersPage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$company, $memberUser] = $this->seedCompanyMember(CompanyMember::STATUS_DISABLED);
 

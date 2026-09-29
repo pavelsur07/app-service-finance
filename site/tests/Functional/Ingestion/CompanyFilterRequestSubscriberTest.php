@@ -12,7 +12,6 @@ final class CompanyFilterRequestSubscriberTest extends WebTestCaseBase
     public function testAuthenticatedRequestWithoutActiveCompanyDoesNotEnableCompanyFilter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin-no-company@example.test')

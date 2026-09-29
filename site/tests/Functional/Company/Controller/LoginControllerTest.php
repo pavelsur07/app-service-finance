@@ -20,7 +20,6 @@ final class LoginControllerTest extends WebTestCaseBase
         $this->client = static::createClient();
         $container = static::getContainer();
         $em = $container->get('doctrine.orm.entity_manager');
-        $this->resetDb();
 
         // Create a User fixture
         /** @var UserPasswordHasherInterface $passwordHasher */

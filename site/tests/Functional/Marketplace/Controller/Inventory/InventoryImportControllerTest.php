@@ -216,7 +216,6 @@ final class InventoryImportControllerTest extends WebTestCaseBase
     private function authenticatedClient(string $email): KernelBrowser
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail($email)->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

@@ -20,7 +20,6 @@ final class CashTransactionCurrencyFilterTest extends WebTestCaseBase
     public function testIndexFiltersByCurrencyWithoutBreakingTenantScopeOrPagination(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-currency-list@example.test')->build();
@@ -84,7 +83,6 @@ final class CashTransactionCurrencyFilterTest extends WebTestCaseBase
     public function testIndexRejectsUnsupportedCurrency(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('cash-currency-invalid@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();

@@ -15,7 +15,6 @@ final class ProductPurchasePriceHistoryPageTest extends WebTestCaseBase
     public function testShowsFullPurchasePriceHistoryInDescendingOrder(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 

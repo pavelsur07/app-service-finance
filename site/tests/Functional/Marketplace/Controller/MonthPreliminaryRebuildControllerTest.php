@@ -18,7 +18,6 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
     public function testHappyPathQueuesMessage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $client->request(
@@ -38,7 +37,6 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
     public function testRateLimitedOnSecondCallWithinMinute(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         // первый запрос — должен пройти
@@ -70,7 +68,6 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
     public function testRejectsInvalidMarketplace(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $client->request(
@@ -88,7 +85,6 @@ final class MonthPreliminaryRebuildControllerTest extends WebTestCaseBase
     public function testRejectsInvalidPeriod(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedActiveSession($client);
 
         $client->request(

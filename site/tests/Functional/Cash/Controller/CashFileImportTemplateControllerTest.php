@@ -22,7 +22,6 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
     public function testTemplateHeadersAreAutoMappedToAllImportFields(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-import-template@example.test')->build();
@@ -73,7 +72,6 @@ final class CashFileImportTemplateControllerTest extends WebTestCaseBase
     public function testUploadPageRendersTemplateLink(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()->withEmail('cash-import-template-link@example.test')->build();

@@ -44,7 +44,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testAuthorizedUserGetsJsonAttachment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a1');
         $this->seedCashflowData($company, '100.00', '2026-04-15');
@@ -66,7 +65,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testQueryParametersAreReflectedInPayloadAndAffectPeriods(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a2');
         $this->seedCashflowData($company, '150.00', '2026-04-02');
@@ -96,7 +94,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testAuthorizedExportSupportsDashboardReconciliationScope(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('c1');
         $this->seedCashflowData($company, '125.00', '2026-08-15');
@@ -133,7 +130,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testCashflowPageRendersDashboardReconciliationAndPreservesScope(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('c2');
         $this->seedCashflowData($company, '125.00', '2026-08-15');
@@ -207,7 +203,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testPayloadContainsRequiredTopLevelKeys(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a3');
         $this->seedCashflowData($company, '100.00', '2026-04-15');
@@ -242,7 +237,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testPayloadContainsProjectCenterMatrix(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a5');
         $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Продажа компьютеров');
@@ -273,7 +267,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testCashflowPageRendersProjectCenterMatrixBothWays(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a6');
         $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Сервисные услуги');
@@ -323,7 +316,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testCashflowPageUsesPreviewControlsAndPreservesFilterState(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a9');
         $projectA = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Project A');
@@ -466,7 +458,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testCashflowControlsOmitDefaultMarkersForEmptyCatalogues(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('b9');
         $this->seedCashflowData($company, '100.00', '2026-04-15');
@@ -502,7 +493,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testExportIsScopedToCurrentUsersActiveCompany(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$userA, $companyA] = $this->seedCompanyContext('a4');
         [, $companyB] = $this->seedCompanyContext('b4');
@@ -527,7 +517,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testPluralFiltersUseProjectSubtreesAndKeepBalancesCompanyWide(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company] = $this->seedCompanyContext('a7');
         $parent = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Consulting');
@@ -575,7 +564,6 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
     public function testPublicJsonAndCsvKeepLegacyRequestContracts(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [, $company] = $this->seedCompanyContext('a8');
         $category = $this->seedCashflowData($company, '125.00', '2026-04-15');

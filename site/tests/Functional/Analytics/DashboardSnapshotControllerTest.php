@@ -22,7 +22,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     public function testSnapshotContainsAllWidgetKeys(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
 
@@ -127,7 +126,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     public function testMarketplaceOnlyMemberDoesNotSeeFinanceWidgets(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -168,7 +166,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     public function testCurrencyFiltersCashWidgetsAndSeparatesCachedSnapshots(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $user = UserBuilder::aUser()->build();
@@ -218,7 +215,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     public function testRejectsUnsupportedCurrency(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $user = UserBuilder::aUser()->build();

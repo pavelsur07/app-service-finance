@@ -16,7 +16,6 @@ final class MarketplaceCostsControllerTest extends WebTestCaseBase
     public function testCostsPageUsesDefaultFiltersForCurrentMonthAndOzon(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompany();
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -48,7 +47,6 @@ final class MarketplaceCostsControllerTest extends WebTestCaseBase
     public function testCostsPageHandlesInvalidAndArrayQueryParamsWithout500(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompany();
         $this->loginWithActiveCompany($client, $owner, $company);

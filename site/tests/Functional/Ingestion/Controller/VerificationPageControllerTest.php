@@ -17,7 +17,6 @@ final class VerificationPageControllerTest extends WebTestCaseBase
     public function testVerificationPagesRenderForAuthenticatedCompanyUser(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $owner = UserBuilder::aUser()->withIndex(9200)->build();
         $company = CompanyBuilder::aCompany()

@@ -27,7 +27,6 @@ final class CashTransactionRouteRequirementTest extends WebTestCaseBase
     public function testManualCreateAcceptsAllowedProjectAndResponsibilityCenterPair(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company, $account, $project, $center] = $this->seedCompanyGraph();
         $client->loginUser($user);
@@ -57,7 +56,6 @@ final class CashTransactionRouteRequirementTest extends WebTestCaseBase
     public function testManualEditPreservesArchivedCurrentResponsibilityCenter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$user, $company, $account, $project, $center] = $this->seedCompanyGraph();
         $center->archive();

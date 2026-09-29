@@ -14,8 +14,6 @@ final class ProductPurchasePricePersistenceTest extends IntegrationTestCase
 {
     public function testItPersistsAndLoadsPurchasePriceHistory(): void
     {
-        $this->resetDb();
-
         $em = $this->em;
         $owner = UserBuilder::aUser()->withEmail('owner-product-purchase-price@example.test')->build();
         $company = CompanyBuilder::aCompany()

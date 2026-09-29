@@ -19,7 +19,6 @@ final class TelegramWebhookSecretTokenTest extends WebTestCaseBase
     public function testMissingSecretIsRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->postUpdate($client, null);
 
@@ -29,7 +28,6 @@ final class TelegramWebhookSecretTokenTest extends WebTestCaseBase
     public function testWrongSecretIsRejected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->postUpdate($client, 'wrong-secret');
 
@@ -39,7 +37,6 @@ final class TelegramWebhookSecretTokenTest extends WebTestCaseBase
     public function testValidSecretPassesGate(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         // Корректный секрет, но активного бота нет → проходит проверку и доходит до выбора бота (200)
         $this->postUpdate($client, self::SECRET);

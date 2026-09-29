@@ -14,7 +14,6 @@ final class MarketplaceMappingErrorsPageTest extends WebTestCaseBase
     public function testEmptyUnresolvedListUsesEmptyState(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin@example.test')
@@ -35,7 +34,6 @@ final class MarketplaceMappingErrorsPageTest extends WebTestCaseBase
     public function testUnresolvedErrorUsesUiKitComponentsAndDialog(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $admin = UserBuilder::aUser()
             ->withEmail('admin@example.test')

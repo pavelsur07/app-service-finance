@@ -19,8 +19,6 @@ final class BalanceControllerTest extends WebTestCaseBase
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('balance-report@example.com');
         $user->setPassword($hasher->hashPassword($user, 'password'));

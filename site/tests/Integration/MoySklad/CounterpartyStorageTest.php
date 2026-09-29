@@ -23,7 +23,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 {
     public function testPersistsCounterpartyCursorAndRunWithoutDeletingConnection(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
         $snapshot = new CounterpartySnapshot(
@@ -58,7 +57,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testRepositoriesRequireMatchingCompanyAndConnection(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $otherCompany = '99999999-9999-4999-8999-999999999999';
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
@@ -89,7 +87,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testConnectionWithImportedDataCannotBeDeleted(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $connection->setIsActive(false);
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
@@ -110,7 +107,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testSameExternalIdCannotBeStoredTwiceForConnection(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
         $snapshot = new CounterpartySnapshot('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Тест', 'individual', null, null, null, null, null, null, false, $now);
@@ -125,7 +121,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testUtcMillisecondsSurvivePersistence(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00.123456+00:00');
         $snapshot = new CounterpartySnapshot('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '0', 'legal', null, null, null, null, null, null, false, $now);
@@ -144,7 +139,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testUtcWholeSecondSurvivesPersistenceWithoutCurrentMicroseconds(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00.000000+00:00');
         $snapshot = new CounterpartySnapshot('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Тест', 'legal', null, null, null, null, null, null, false, $now);
@@ -164,7 +158,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testOnlyOneRunningRunPerConnectionAndType(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
         $this->em()->persist($connection);
@@ -178,7 +171,6 @@ final class CounterpartyStorageTest extends WebTestCaseBase
 
     public function testDatabaseRejectsCounterpartyWithForeignCompanyId(): void
     {
-        $this->resetDb();
         $connection = MoySkladConnectionBuilder::aConnection()->build();
         $now = new \DateTimeImmutable('2026-09-20T09:00:00+00:00');
         $snapshot = new CounterpartySnapshot('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Тест', 'legal', null, null, null, null, null, null, false, $now);

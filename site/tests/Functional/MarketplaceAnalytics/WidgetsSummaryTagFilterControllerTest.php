@@ -37,7 +37,6 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
     public function testWidgetsRevenueCountsOnlyTaggedListings(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $tagId] = $this->seed();
         $client->loginUser($owner);
@@ -64,7 +63,6 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
     public function testWidgetRevenueMatchesTableTotalsUnderSameTagFilter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $tagId] = $this->seed();
         $client->loginUser($owner);
@@ -95,7 +93,6 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
     public function testPreviousPeriodUsesSameTagFilter(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $tagId] = $this->seed();
         $client->loginUser($owner);
@@ -119,7 +116,6 @@ final class WidgetsSummaryTagFilterControllerTest extends WebTestCaseBase
     public function testRejectsNonUuidTag(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner] = $this->seed();
         $client->loginUser($owner);

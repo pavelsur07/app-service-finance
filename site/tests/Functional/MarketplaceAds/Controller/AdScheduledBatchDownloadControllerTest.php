@@ -33,7 +33,6 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturnsFileAsAttachment(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -100,7 +99,6 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404ForOtherCompanyBatch(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -167,7 +165,6 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404WhenStoragePathIsNull(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()
@@ -212,7 +209,6 @@ final class AdScheduledBatchDownloadControllerTest extends WebTestCaseBase
     public function testDownloadReturns404WhenFileMissingOnDisk(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

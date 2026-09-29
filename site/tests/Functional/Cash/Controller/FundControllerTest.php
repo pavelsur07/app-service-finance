@@ -29,8 +29,6 @@ final class FundControllerTest extends WebTestCaseBase
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = $this->createUser($hasher, 'disabled@example.com');
         $company = $this->createCompany($user, 'Disabled Co');
         $account = $this->createAccount($company, '100.00');
@@ -59,8 +57,6 @@ final class FundControllerTest extends WebTestCaseBase
         $container = static::getContainer();
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
-
-        $this->resetDb();
 
         $user = $this->createUser($hasher, 'enabled@example.com');
         $company = $this->createCompany($user, 'Enabled Co');

@@ -22,7 +22,6 @@ final class OzonAdInitialLoadControllerTest extends WebTestCaseBase
     public function testReturns400WhenNoPerformanceConnection(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $em = $this->em();
 
         $owner = UserBuilder::aUser()

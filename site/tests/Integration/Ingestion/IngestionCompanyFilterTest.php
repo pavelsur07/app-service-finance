@@ -13,8 +13,6 @@ final class IngestionCompanyFilterTest extends IntegrationTestCase
 {
     public function testCompanyFilterPreventsTenantLeakAcrossOrmReadPaths(): void
     {
-        $this->resetDb();
-
         [$companyA, $companyB, $probeA, $probeB] = $this->createTwoCompanyProbes();
 
         $filters = $this->em->getFilters();
@@ -41,8 +39,6 @@ final class IngestionCompanyFilterTest extends IntegrationTestCase
 
     public function testSystemQueryWithDisabledCompanyFilterSeesAllCompanies(): void
     {
-        $this->resetDb();
-
         [, , $probeA, $probeB] = $this->createTwoCompanyProbes();
 
         $filters = $this->em->getFilters();

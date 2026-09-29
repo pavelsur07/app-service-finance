@@ -24,7 +24,6 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
     public function testReportIsAuthenticatedCompanyScopedAndReadOnly(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $client->request('GET', '/cash-transaction-auto-rules/candidates');
         self::assertResponseRedirects();

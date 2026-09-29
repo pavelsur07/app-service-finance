@@ -20,7 +20,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testRendersIndexWithoutFilters(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -33,7 +32,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testRendersIndexWithMarketplaceFilterSelected(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -48,7 +46,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testRendersIndexWithSearchInputValue(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -64,7 +61,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testGracefulFallbackOnArrayMarketplaceParam(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -77,7 +73,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testGracefulFallbackOnArrayQParam(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -90,7 +85,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testGracefulFallbackOnArrayPageParam(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -103,7 +97,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testEmptyQStringIsIgnored(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);
@@ -118,7 +111,6 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
     public function testEmptySearchResultShowsFilteredEmptyState(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         [$owner, $company] = $this->seedCompanyWithListing($client);
         $this->loginWithActiveCompany($client, $owner, $company);

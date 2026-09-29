@@ -26,7 +26,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testCreateEncryptsTokenAndBindsAccount(): void
     {
-        $this->resetDb();
         $connection = ($this->action())(new ManageConnectionCommand(self::COMPANY, 'actor', 'create', name: 'Склад', token: 'new-secret'));
         self::assertNotNull($connection);
         self::assertSame(self::ACCOUNT, $connection->getAccountId());
@@ -38,7 +37,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testRejectedReplacementPreservesTokenAndStatus(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->bindAccount(self::ACCOUNT);
         $this->em()->flush();
@@ -54,7 +52,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testDifferentAccountReplacementIsRejected(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->bindAccount('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
         $this->em()->flush();
@@ -64,7 +61,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testCannotDeleteActiveConnection(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $this->expectException(ConnectionOperationException::class);
         ($this->action())(new ManageConnectionCommand(self::COMPANY, 'actor', 'delete', $connection->getId(), version: $connection->getVersion()));
@@ -72,7 +68,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testForeignCompanyCannotCheckConnection(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $this->expectException(ConnectionOperationException::class);
         ($this->action())(new ManageConnectionCommand('22222222-2222-2222-2222-222222222222', 'actor', 'check', $connection->getId(), version: $connection->getVersion()));
@@ -80,7 +75,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testDuplicateAccountIsRejectedAcrossCompanies(): void
     {
-        $this->resetDb();
         $existing = $this->existing();
         $existing->bindAccount(self::ACCOUNT);
         $existing->setIsActive(false);
@@ -91,7 +85,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testCheckRecordsFailureButKeepsLastSuccess(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->bindAccount(self::ACCOUNT);
         $connection->recordCheck(\App\MoySklad\Enum\ConnectionCheckStatus::CONNECTED, new \DateTimeImmutable('2026-09-01'));
@@ -110,7 +103,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testReplacementDoesNotEnableDisabledConnection(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->bindAccount(self::ACCOUNT);
         $connection->setIsActive(false);
@@ -123,7 +115,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testStaleHttpResponseCannotUndoConcurrentDisable(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $http = new MockHttpClient(function () use ($connection): MockResponse {
             self::assertFalse($this->em()->getConnection()->isTransactionActive(), 'HTTP must run outside a DB transaction');
@@ -145,7 +136,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testCheckCooldownPreventsSecondRequest(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $action = $this->action();
         $action(new ManageConnectionCommand(self::COMPANY, 'actor', 'check', $connection->getId(), version: $connection->getVersion()));
@@ -159,7 +149,6 @@ final class ManageConnectionActionTest extends WebTestCaseBase
 
     public function testConcurrentEnableBetweenLookupAndDeletePreservesConnection(): void
     {
-        $this->resetDb();
         $connection = $this->existing();
         $connection->setIsActive(false);
         $this->em()->flush();

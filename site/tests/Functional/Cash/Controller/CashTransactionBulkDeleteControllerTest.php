@@ -23,7 +23,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testListRendersCurrentPageSelectionAndWarningModal(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $transactions] = $this->seedCompanyWithTransactions(2);
         $this->login($client, $user, $company);
 
@@ -46,7 +45,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testDeletesSelectedTransactionsAndPreservesListQuery(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $transactions] = $this->seedCompanyWithTransactions(2);
         $this->login($client, $user, $company);
 
@@ -103,7 +101,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testForeignTransactionMakesWholeRequestFail(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $ownTransactions] = $this->seedCompanyWithTransactions(1);
         [, , , $foreignTransactions] = $this->seedCompanyWithTransactions(1);
         $this->login($client, $user, $company);
@@ -118,7 +115,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testStaleDeletedTransactionMakesWholeRequestFail(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $transactions] = $this->seedCompanyWithTransactions(2);
         $transactions[1]->markDeleted($user->getId());
         $this->em()->flush();
@@ -134,7 +130,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testLockedTransactionMakesWholeRequestFail(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $transactions] = $this->seedCompanyWithTransactions(2);
         $company->setFinanceLockBefore(new \DateTimeImmutable('today'));
         $this->em()->flush();
@@ -150,7 +145,6 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
     public function testInvalidCsrfDoesNotDeleteTransaction(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         [$user, $company, , $transactions] = $this->seedCompanyWithTransactions(1);
         $this->login($client, $user, $company);
 

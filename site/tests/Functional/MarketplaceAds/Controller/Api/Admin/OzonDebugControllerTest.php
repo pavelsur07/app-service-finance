@@ -28,7 +28,6 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     public function testAllCampaignsHappyPath(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->setHttpClient($client, [
             new MockResponse(json_encode(['access_token' => 'TKN-campaigns'], \JSON_THROW_ON_ERROR)),
             new MockResponse(json_encode([
@@ -74,7 +73,6 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     public function testAllCampaignsReturns400WithoutCompanyId(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $admin = $this->seedAdminAndCompany(withConnection: false);
         $this->loginAs($client, $admin);
 
@@ -87,7 +85,6 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     public function testAllCampaignsReturns404WithoutCredentials(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $admin = $this->seedAdminAndCompany(withConnection: false);
         $this->loginAs($client, $admin);
 
@@ -100,7 +97,6 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     public function testListReportsHappyPathWithPendingReportProbe(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->setHttpClient($client, [
             new MockResponse(json_encode(['access_token' => 'TKN-list'], \JSON_THROW_ON_ERROR), ['http_code' => 200]),
             new MockResponse(json_encode([
@@ -142,7 +138,6 @@ final class OzonDebugControllerTest extends WebTestCaseBase
     public function testListReportsReturns502WhenTokenIsMissing(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->setHttpClient($client, [
             new MockResponse(json_encode(['error' => 'invalid credentials'], \JSON_THROW_ON_ERROR), ['http_code' => 401]),
         ]);

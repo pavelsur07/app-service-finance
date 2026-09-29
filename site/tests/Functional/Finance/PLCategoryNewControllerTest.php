@@ -16,7 +16,6 @@ final class PLCategoryNewControllerTest extends WebTestCaseBase
     public function testNewUsesEditUi(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();

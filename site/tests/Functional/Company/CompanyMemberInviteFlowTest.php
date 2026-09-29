@@ -16,7 +16,6 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
     public function testInviteCreatesCompanyInvite(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
@@ -56,7 +55,6 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
     public function testRevokeInviteSetsRevokedAt(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $em = $this->em();
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();

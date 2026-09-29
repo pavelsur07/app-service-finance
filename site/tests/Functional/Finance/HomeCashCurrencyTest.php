@@ -21,7 +21,6 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
     public function testHomeKpisUseSelectedCashCurrency(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()->withEmail('home-cash-currency@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $rubAccount = MoneyAccountBuilder::aMoneyAccount()
@@ -79,7 +78,6 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
     public function testHomeRejectsUnsupportedCashCurrency(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $user = UserBuilder::aUser()->withEmail('home-cash-currency-invalid@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $this->em()->persist($user);

@@ -32,8 +32,6 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $em = $container->get(EntityManagerInterface::class);
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
-        $this->resetDb();
-
         $user = $this->createUser($hasher, 'copy@example.com');
         $company = $this->createCompany($user, 'Copy Co');
         $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, (new CounterpartyNameNormalizer())->normalize('Client'), CounterpartyType::LEGAL_ENTITY);

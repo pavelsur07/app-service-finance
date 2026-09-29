@@ -39,7 +39,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testClosedPeriodReportsReasonToUser(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         // Закрытый период: дата операции (сегодня) раньше замка → доменное исключение «Период закрыт»
         $this->seedBoundUserWithAccount(financeLockBefore: new \DateTimeImmutable('2099-01-01'));
@@ -60,7 +59,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testZeroAmountReturnsFormatHint(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
@@ -79,7 +77,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testValidOperationIsRecorded(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
@@ -98,7 +95,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testPlusSignMeansInflowEvenWithPaymentWord(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $captured = [];
@@ -116,7 +112,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testMinusSignMeansOutflow(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $captured = [];
@@ -136,7 +131,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testDuplicateMessageAnswersUserInsteadOfSilence(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
@@ -176,7 +170,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testBrokenChannelIsLoggedAsError(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -211,7 +204,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testHttp200WithNonJsonBodyIsTreatedAsBrokenChannel(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -238,7 +230,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testBotTokenNeverReachesTheLog(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -277,7 +268,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testTelegramRejectionIsWarningNotError(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -320,7 +310,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testSystemApiErrorIsErrorNotWarning(int $httpCode, array $body): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -377,7 +366,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testTimeoutIsWarningAndKeepsTokenOut(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -405,7 +393,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testRateLimitStaysWarning(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $client->getContainer()->set('http_client', new MockHttpClient(
@@ -432,7 +419,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testDocumentUploadIsStoredInObjectStorage(): void
     {
         $client = static::createClient();
-        $this->resetDb();
         $this->seedBoundUserWithAccount(financeLockBefore: null);
 
         $csv = "Дата;Сумма\n01.12.2025;1000\n";

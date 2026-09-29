@@ -23,7 +23,6 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
     public function testEditPreservesFieldsExcludedFromSubmission(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
@@ -112,7 +111,6 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
     public function testDeleteMergesDailyTotalsIntoUncategorizedBucket(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
@@ -179,7 +177,6 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
     public function testDeleteFailsGracefullyWhenDocumentOperationsReferenceCategory(): void
     {
         $client = static::createClient();
-        $this->resetDb();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();

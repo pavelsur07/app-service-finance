@@ -26,7 +26,6 @@ final class OzonManualSyncTest extends WebTestCaseBase
 {
     public function testSyncPeriodQueuesAccrualByDayTasksFromSafeDay(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedActiveOzonConnection($company);
@@ -59,7 +58,6 @@ final class OzonManualSyncTest extends WebTestCaseBase
 
     public function testSyncPeriodWithReversedDatesIsRejectedBeforeQueueing(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedActiveOzonConnection($company);
@@ -84,7 +82,6 @@ final class OzonManualSyncTest extends WebTestCaseBase
 
     public function testSyncPeriodEntirelyBeforeSafeDayQueuesNothingAndSaysWhy(): void
     {
-        $this->resetDb();
         $client = static::createClient();
         [$user, $company] = $this->seedBaseData();
         $connection = $this->seedActiveOzonConnection($company);
