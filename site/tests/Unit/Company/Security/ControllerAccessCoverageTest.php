@@ -15,8 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
  *
  * Скан: все *.php в каталогах src/.../Controller/ плюс *Controller.php в остальном src.
  * Класс считается контроллером при атрибуте Route на классе или методах
- * (IS_INSTANCEOF обязателен: ~76 контроллеров импортируют Routing\Annotation\Route — class_alias,
- * литеральное сравнение имён их не находит).
+ * (IS_INSTANCEOF — чтобы находить и наследников атрибута, а не только точное имя класса).
  *
  * Логика согласована с ModuleAccessSubscriber (method-level #[PublicAccess] освобождает
  * только свой метод). Класс классифицирован, если:

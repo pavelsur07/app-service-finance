@@ -8,7 +8,7 @@ use App\Company\Facade\CompanyFacade;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/marketplace-ads/admin/debug', name: 'marketplace_ads_admin_debug', methods: ['GET'])]
