@@ -6547,12 +6547,6 @@ parameters:
 			path: src/Marketplace/Infrastructure/Query/PreflightCostsQuery.php
 
 		-
-			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\PreflightCostsQuery\:\:getCostsCategoryBreakdown\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Infrastructure/Query/PreflightCostsQuery.php
-
-		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Query\\PreflightCostsQuery\:\:getCostsStats\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
