@@ -1597,6 +1597,102 @@ final class WbCostsRawProcessorTest extends TestCase
         )));
     }
 
+    public function testWbDeliveryOperationWithReturnCounterUsesReturnCategory(): void
+    {
+        $calculator = new WbLogisticsReturnCalculator();
+        $row = $this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 1,
+            deliveryRub: 54.50,
+            overrides: [
+                'supplier_oper_name' => 'Доставка',
+                'doc_type_name' => '',
+                'rrd_id' => '2101',
+            ],
+        );
+        $camelRow = [
+            'sellerOperName' => 'Доставка',
+            'rrdId' => '2102',
+            'saleDt' => '2026-01-15 10:00:00',
+            'deliveryAmount' => 0,
+            'returnAmount' => 1,
+            'deliveryService' => 54.50,
+        ];
+
+        foreach ([$row, $camelRow] as $candidateRow) {
+            self::assertTrue($calculator->supports($candidateRow));
+            self::assertCount(1, array_filter(
+                $this->allWbCostCalculators(),
+                static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($candidateRow),
+            ));
+        }
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_return', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(54.50, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:2101:logistics_return', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('wb:2102:logistics_return', $camelEntries[0]['external_id']);
+    }
+
+    public function testWbDeliveryReturnCalculatorIgnoresDeliveryCounterAndZeroAmount(): void
+    {
+        $calculator = new WbLogisticsReturnCalculator();
+
+        self::assertFalse($calculator->supports($this->logisticsItem(
+            deliveryAmount: 1,
+            returnAmount: 0,
+            deliveryRub: 80.00,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        )));
+        self::assertSame([], $calculator->calculate($this->logisticsItem(
+            deliveryAmount: 0,
+            returnAmount: 1,
+            deliveryRub: 0.0,
+            overrides: ['supplier_oper_name' => 'Доставка'],
+        ), null));
+    }
+
+    public function testWbDeliveryCostCorrectionUsesLogisticsCorrectionCategory(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+        $row = $this->supplierOpItem('Коррекция стоимости доставки', [
+            'rrd_id' => '3134767714096',
+            'sale_dt' => '2026-09-14T08:15:26Z',
+            'delivery_rub' => 1.6,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция стоимости доставки',
+        ]);
+        $camelRow = [
+            'sellerOperName' => 'Коррекция стоимости доставки',
+            'rrdId' => '3134767714097',
+            'saleDt' => '2026-09-14T08:15:26Z',
+            'deliveryService' => 2.69,
+        ];
+
+        foreach ([$row, $camelRow] as $candidateRow) {
+            self::assertTrue($calculator->supports($candidateRow));
+            self::assertCount(1, array_filter(
+                $this->allWbCostCalculators(),
+                static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($candidateRow),
+            ));
+        }
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_correction', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(1.6, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3134767714096:logistics_correction', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertEqualsWithDelta(2.69, (float) $camelEntries[0]['amount'], 0.001);
+    }
+
     public function testProcessWbCostsActionClearsDeliveryFromUnprocessedTypes(): void
     {
         $companyId = '11111111-1111-1111-1111-111111111111';
