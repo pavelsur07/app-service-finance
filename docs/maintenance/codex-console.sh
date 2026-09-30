@@ -124,6 +124,35 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:reprocess)
+    # Мутирующая: переобрабатывает raw-документы WB за период тем же
+    # ReprocessMarketplacePeriodAction, что и кнопка UI — sales, returns и
+    # costs пересоздаются, строки, уже связанные с ОПиУ, сохраняются.
+    # Запуск без --dry-run — отдельное одобрение Владельца (AGENTS.md §3.3).
+    #
+    # Только wildberries и ровно четыре позиционных аргумента по порядку:
+    # companyId, marketplace, periodFrom, periodTo. Так нельзя пропустить
+    # компанию или запустить весь объём без границ. Ozon осознанно вне списка:
+    # его realization-путь пишет иначе и не проверялся для этого wrapper'а.
+    # Опции: --only=all|sales_report, --dry-run.
+    pos=0
+    for arg in "$@"; do
+      case "$pos" in
+        0) [[ "$arg" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] && { pos=1; continue; } ;;
+        1) [ "$arg" = "wildberries" ] && { pos=2; continue; } ;;
+        2) [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && { pos=3; continue; } ;;
+        3) [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && { pos=4; continue; } ;;
+      esac
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q|--dry-run|--only=all|--only=sales_report) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    if [ "$pos" -ne 4 ]; then
+      echo "Usage for $cmd: <companyId> wildberries <periodFrom> <periodTo> [--only=all|sales_report] [--dry-run]" >&2
+      exit 2
+    fi
+    ;;
   messenger:failed:remove)
     # Мутирующая команда: удаляет сообщение из failed-очереди безвозвратно.
     # Поэтому первым аргументом допускается только числовой id. Это заодно
