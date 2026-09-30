@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 class WbLogisticsReturnCalculator implements CostCalculatorInterface
 {
+    private const array OPERATION_NAMES = ['Логистика', 'Доставка'];
+
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
 
@@ -22,7 +24,8 @@ class WbLogisticsReturnCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Логистика' === $this->normalizer->sellerOperName($item)
+        // Новые отчёты WB называют операцию «Доставка»; счётчик возврата остаётся признаком.
+        return in_array($this->normalizer->sellerOperName($item), self::OPERATION_NAMES, true)
             && 1 === (int) $this->normalizer->returnAmount($item);
     }
 

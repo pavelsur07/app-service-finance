@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 class WbLogisticsCorrectionCalculator implements CostCalculatorInterface
 {
+    private const array OPERATION_NAMES = ['Коррекция логистики', 'Коррекция стоимости доставки'];
+
     private WbSalesReportRowNormalizer $normalizer;
     private WbCostExternalIdBuilder $externalIdBuilder;
 
@@ -22,7 +24,7 @@ class WbLogisticsCorrectionCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Коррекция логистики' === $this->normalizer->sellerOperName($item);
+        return in_array($this->normalizer->sellerOperName($item), self::OPERATION_NAMES, true);
     }
 
     public function requiresListing(): bool

@@ -24,8 +24,8 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        // New delivery rows omit the legacy counter. Return signals keep the row
-        // visible as unsupported until their financial mapping is confirmed.
+        // New delivery rows omit the legacy counter. Rows with the return signal
+        // are handled by WbLogisticsReturnCalculator.
         return match ($this->normalizer->sellerOperName($item)) {
             'Логистика' => 1 === (int) $this->normalizer->deliveryAmount($item),
             'Доставка' => 0 === (int) $this->normalizer->returnAmount($item)
