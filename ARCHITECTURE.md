@@ -3359,6 +3359,7 @@ config/
 | `app:inventory:wb-daily-sync` | `04:15 daily` | Диспатч загрузки Wildberries Inventory snapshot по активным WB SELLER подключениям |
 | `app:marketplace:wb-financial-reports:sync --mode=daily` | `03:10 daily` | Ежедневное планирование WB financial sync за рабочий день (новая date-based команда) |
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 * * * *` | Hourly safe planner: current-month daily/retry/missing/empty recovery, then rolling refresh of the last 14 days; max one task per connection per run |
+| `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `06:40 daily` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `07:25 daily` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 
 The production PHP CLI image used by workers and the scheduler disables only

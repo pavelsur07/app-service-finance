@@ -27,6 +27,13 @@
 # накопленном backlog восстановления ротация обновления 14 дней сдвигается.
 20 3-23 * * * cd /app && php bin/console app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Гейт нераспознанных затрат WB: за окно 14 дней (как --refresh-days-back выше)
+# у активных seller-подключений не должно быть операций, которые не поддерживает
+# ни один калькулятор затрат. Ненулевой exit code = появился новый тип операции.
+# Read-only. Починка под гейт — калькулятор + app:marketplace:reprocess по
+# компании и периоду; документы старше окна гейт не краснят.
+40 6 * * * cd /app && php bin/console app:marketplace:wb-costs:unrecognized-check --days-back=14 --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Почасовой обход заказов Ozon. Отдельная строка с --resource, а НЕ перевод
 # всей команды run-incremental на час: иначе финансовые стратегии просыпались бы
 # 24 раза в сутки без нужды. Каденция принадлежит ресурсу и выражена его
