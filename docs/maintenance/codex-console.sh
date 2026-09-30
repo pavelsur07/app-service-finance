@@ -108,6 +108,20 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:wb-costs:unrecognized-check)
+    # Read-only гейт: нераспознанные операции затрат WB за окно последних N дней
+    # у активных seller-подключений. Читает счётчики документов, ничего не пишет
+    # и во внешний API не ходит, поэтому запускается как рутинная проверка, без
+    # отдельного одобрения. Ненулевой exit code — рабочий сигнал команды: найден
+    # новый тип операции, а не сбой wrapper'а.
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q) ;;
+        --days-back=[1-9]|--days-back=[1-9][0-9]) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   app:marketplace:cost-pl-mapping:apply-default)
     # Базовый маппинг затрат в ОПиУ для одной компании — то же, что кнопка UI.
     # Без --execute read-only предпросмотр; с --execute пишет

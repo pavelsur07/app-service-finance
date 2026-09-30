@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Enum\PipelineStep;
 use Ramsey\Uuid\Uuid;
 
 final class MarketplaceRawDocumentBuilder
@@ -23,6 +24,10 @@ final class MarketplaceRawDocumentBuilder
     private ?string $apiEndpoint = null;
     private ?PipelineStatus $processingStatus = null;
     private ?\DateTimeImmutable $syncedAt = null;
+    /** @var array<string, int> */
+    private array $unprocessedCostTypes = [];
+    /** @var list<PipelineStep> */
+    private array $succeededSteps = [];
 
     private function __construct()
     {
@@ -111,6 +116,25 @@ final class MarketplaceRawDocumentBuilder
         return $clone;
     }
 
+    /**
+     * @param array<string, int> $types операция => число строк, как пишет ProcessWbCostsAction
+     */
+    public function withUnprocessedCostTypes(array $types): self
+    {
+        $clone = clone $this;
+        $clone->unprocessedCostTypes = $types;
+
+        return $clone;
+    }
+
+    public function withSucceededSteps(PipelineStep ...$steps): self
+    {
+        $clone = clone $this;
+        $clone->succeededSteps = array_values($steps);
+
+        return $clone;
+    }
+
     public function build(): MarketplaceRawDocument
     {
         if (null === $this->company) {
@@ -147,6 +171,15 @@ final class MarketplaceRawDocumentBuilder
                 PipelineStatus::FAILED => $doc->markFailed(),
                 PipelineStatus::PENDING => $doc->resetProcessingStatus(),
             };
+        }
+
+        if ([] !== $this->unprocessedCostTypes) {
+            $doc->setUnprocessedCostsCount(array_sum($this->unprocessedCostTypes));
+            $doc->setUnprocessedCostTypes($this->unprocessedCostTypes);
+        }
+
+        foreach ($this->succeededSteps as $step) {
+            $doc->markStepSucceeded($step);
         }
 
         return $doc;
