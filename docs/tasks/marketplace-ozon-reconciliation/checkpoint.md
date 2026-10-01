@@ -4,4 +4,4 @@ Baseline (01.10.2026, master 89e0a8f9): `make site-test-unit` — OK 3032 tests,
 Ветка: feat/marketplace-ozon-reconciliation.
 
 ## Текущее
-Handoff: полные гейты зелёные, внутреннее ревью в свежей сессии учтено, внешнее ревью запущено; handoff.md написан. Следующее: результат внешнего ревью → Ready PR → вопрос «merge and deploy #2547».
+Handoff готов: полные гейты зелёные (тесты 5385 OK, PHPStan 0, cs 0), внутреннее ревью в свежей сессии и внешнее ревью (2 раунда, BLOCKER и IMPORTANT исправлены, без повторного запуска) учтены. PR Ready, ждём «merge and deploy #2547».
