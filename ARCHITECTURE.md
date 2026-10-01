@@ -417,6 +417,10 @@
   `OzonRealizationTotalsQuery` (нет строк → `null`, т.е. «нет данных»), `OzonRawAccrualTotalsQuery` (разворачивает JSON документа by-day
   через jsonb и пересчитывает продажи/возвраты в двух базах и затраты по категориям независимо от процессоров; не-массивы и нечисловые
   суммы пропускает), `OzonLedgerTotalsQuery` (учёт; только строки с `raw_document_id` на by-day документ). Нетто-расход = затраты − сторно.
+- `RunOzonReconciliationAction` (`Ozon/Application/Action/`) — сверка за календарный месяц: три Query → чистый `OzonReconciliationCalculator`
+  (без БД) → снимок в одной транзакции (upsert Run, строки пересоздаются). Нет «Реализации» или сырья — `NO_DATA` с пояснением в `note`;
+  неполная загрузка дней by-day (`OzonRawCoverage`: от `EARLIEST_SAFE_DAY` до вчера по Москве) не даёт общий статус лучше `NO_DATA`;
+  общий статус — худший из итоговых строк блоков с данными. Ручной запуск: `app:marketplace:ozon-reconciliation:run --company-id --month=YYYY-MM`.
 
 ### Marketplace: загрузка каталога товаров Ozon
 

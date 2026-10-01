@@ -4,4 +4,4 @@ Baseline (01.10.2026, master 89e0a8f9): `make site-test-unit` — OK 3032 tests,
 Ветка: feat/marketplace-ozon-reconciliation.
 
 ## Текущее
-Stage 2 закрыт (stages/stage-2-report.md). Следующее: Stage 3 — планирование Action и команды.
+Stage 3 закрыт (stages/stage-3-report.md). Следующее: Stage 4 — планирование backend страницы.
