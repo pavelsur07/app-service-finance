@@ -6,8 +6,10 @@ namespace App\Tests\Integration\Marketplace\Ozon\Infrastructure\Query\Reconcilia
 
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\OzonReconciliationBlock;
 use App\Marketplace\Ozon\Application\Service\OzonAccrualServiceCategoryResolver;
 use App\Marketplace\Ozon\Domain\OzonCostCategory;
+use App\Marketplace\Ozon\Infrastructure\Query\Reconciliation\OzonLedgerOperationsQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\Reconciliation\OzonLedgerTotalsQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\Reconciliation\OzonRawAccrualTotalsQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\Reconciliation\OzonRealizationTotalsQuery;
@@ -144,6 +146,42 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
 
         self::assertNull($this->realizationQuery()->fetch($this->otherCompanyId, $this->from, $this->to));
         self::assertNull($this->realizationQuery()->fetch($this->companyId, new \DateTimeImmutable('2026-07-01'), new \DateTimeImmutable('2026-07-31')));
+    }
+
+    public function testOperationsDrillDownMatchesTotalsAndIsScoped(): void
+    {
+        $legacyDocId = $this->seedDocument($this->companyId, 'ozon::v3/finance/transaction/list', '2026-06-05', []);
+        $logistics = $this->seedCategory($this->companyId, 'ozon_logistic_direct');
+        $commission = $this->seedCategory($this->companyId, 'ozon_sale_commission');
+        $unknown = $this->seedCategory($this->companyId, 'ozon_unknown_99');
+
+        $this->insertCost(11800, 'charge', self::DAY, $logistics, $this->byDayDocId);
+        $this->insertCost(1800, 'storno', '2026-06-11', $logistics, $this->byDayDocId);
+        $this->insertCost(16192, 'charge', self::DAY, $commission, $this->byDayDocId);
+        $this->insertCost(700, 'charge', self::DAY, $unknown, $this->byDayDocId);
+        $this->insertCost(300, 'charge', self::DAY, null, $this->byDayDocId);
+        $this->insertCost(777, 'charge', '2026-06-05', $logistics, $legacyDocId);
+        $this->insertSale('ozon-accrual-A-product-0', 299900, self::DAY, $this->byDayDocId);
+        $this->insertSale('legacy', 100, '2026-06-05', $legacyDocId);
+
+        $ops = new OzonLedgerOperationsQuery($this->connection);
+
+        $byCategory = $ops->createCostsQueryBuilder($this->companyId, $this->from, $this->to, OzonReconciliationBlock::LOGISTICS, 'ozon_logistic_direct')->executeQuery()->fetchAllAssociative();
+        self::assertCount(2, $byCategory);
+        self::assertSame('2026-06-11', $byCategory[0]['operation_date']);
+
+        $byBlock = $ops->createCostsQueryBuilder($this->companyId, $this->from, $this->to, OzonReconciliationBlock::LOGISTICS)->executeQuery()->fetchAllAssociative();
+        self::assertCount(2, $byBlock);
+
+        $unrecognized = $ops->createCostsQueryBuilder($this->companyId, $this->from, $this->to, OzonReconciliationBlock::UNRECOGNIZED)->executeQuery()->fetchAllAssociative();
+        self::assertCount(2, $unrecognized, 'неизвестная категория и затрата без категории');
+
+        $all = $ops->createCostsQueryBuilder($this->companyId, $this->from, $this->to)->executeQuery()->fetchAllAssociative();
+        self::assertCount(5, $all, 'легаси-затрата вне by-day не входит');
+
+        self::assertCount(1, $ops->createSalesQueryBuilder($this->companyId, $this->from, $this->to)->executeQuery()->fetchAllAssociative());
+        self::assertSame([], $ops->createSalesQueryBuilder($this->otherCompanyId, $this->from, $this->to)->executeQuery()->fetchAllAssociative());
+        self::assertSame([], $ops->createCostsQueryBuilder($this->otherCompanyId, $this->from, $this->to)->executeQuery()->fetchAllAssociative());
     }
 
     /**

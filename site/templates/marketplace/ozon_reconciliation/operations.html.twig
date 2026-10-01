@@ -1,0 +1,20 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% block title %}Записи сверки Ozon{% endblock %}
+
+{% block tab_content %}
+    <div class="p-3" data-testid="ozon-reconciliation-operations">
+        <h3>{{ kind }} · {{ month_label }}</h3>
+        <table class="table">
+            <tbody>
+            {% for row in pager.currentPageResults %}
+                <tr>
+                    <td>{{ row.operation_date }}</td>
+                    <td>{{ row.reference }}</td>
+                    <td>{{ row.amount }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

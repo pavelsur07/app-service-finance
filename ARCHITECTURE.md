@@ -421,6 +421,10 @@
   (без БД) → снимок в одной транзакции (upsert Run, строки пересоздаются). Нет «Реализации» или сырья — `NO_DATA` с пояснением в `note`;
   неполная загрузка дней by-day (`OzonRawCoverage`: от `EARLIEST_SAFE_DAY` до вчера по Москве) не даёт общий статус лучше `NO_DATA`;
   общий статус — худший из итоговых строк блоков с данными. Ручной запуск: `app:marketplace:ozon-reconciliation:run --company-id --month=YYYY-MM`.
+- HTTP (`Ozon/Controller/`): `GET /marketplace/ozon-reconciliation?month=YYYY-MM` (сводка из снимка, `MARKETPLACE_READ`, невалидный месяц → текущий по Москве),
+  `POST /marketplace/ozon-reconciliation/run` (пересчёт синхронно, CSRF `marketplace_ozon_reconciliation_run`, `MARKETPLACE_WRITE`),
+  `GET /marketplace/ozon-reconciliation/operations?month&kind=sales|returns|costs&block&category&page&limit` (drill-down по записям учёта из документов by-day,
+  Pagerfanta, `limit` ≤ 200, любая ошибка параметров или страница вне диапазона → 422). Модель страницы строит `OzonReconciliationViewFactory` из Run и его строк.
 
 ### Marketplace: загрузка каталога товаров Ozon
 
