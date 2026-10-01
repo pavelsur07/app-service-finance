@@ -56,6 +56,8 @@
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
+| `OzonReconciliationRun` | Marketplace | `string $companyId` ✅ |
+| `OzonReconciliationLine` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncError` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceListingTag` | Marketplace | `string $companyId` ✅ |
@@ -394,6 +396,23 @@
 `OzonMonthRawRefreshCommand`, `SyncOzonReportMessage`, `InitialSyncMessage`,
 `OzonAdapter` и реестр адаптеров. Формат `MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3`
 и его процессоры остаются: 967 документов переобрабатываются по сохранённому сырью.
+
+### Marketplace: сверка с Ozon
+
+Вкладка «Сверка Ozon» отвечает на вопрос «можно ли доверять данным». Две проверки (`OzonReconciliationCheck`):
+`REALIZATION_VS_RAW` — «Реализация» против сырого by-day в базе `sale_price` (продажи и возвраты);
+`RAW_VS_LEDGER` — сырой by-day против учёта: продажи/возвраты в базе `sale_amount` и затраты по категориям.
+Напрямую «Реализация» и учёт не сравниваются: `marketplace_sales`/`marketplace_returns` хранят цену продавца
+(`sale_amount`), «Реализация» — цену покупателя (`sale_price`). Комиссии в `marketplace_ozon_realizations` нет,
+поэтому у блоков затрат только вторая проверка.
+
+- Блок (`OzonReconciliationBlock`) выводит `Ozon/Domain/Reconciliation/OzonReconciliationBlockMap` из `OzonCostCategory::$xlsxGroup`;
+  код вне `OzonCostCategory::recognizedCodes()` — блок `UNRECOGNIZED`. Отдельного справочника нет.
+- Допуск (`OzonReconciliationTolerance`, 1 ₽): знаковая разница «цель − источник»; 0 — `MATCHED`, до 1.00 — `WITHIN_TOLERANCE`,
+  больше — `MISMATCH`, нет данных у стороны — `NO_DATA`. Пустой набор статусов даёт `NO_DATA`, а не «сошлось».
+- `OzonReconciliationRun` — один актуальный снимок на (компания, период); `OzonReconciliationLine` — проверка × блок × категория
+  (пустой код — итог блока). Суммы — `bigint` в минорных единицах, валюта на Run; арифметика через `Money`. Истории прогонов нет.
+- Затраты, чей `raw_document_id` не указывает на by-day документ (легаси v3), в сверку не входят; сумма пишется в `outside_raw_costs_minor`.
 
 ### Marketplace: загрузка каталога товаров Ozon
 
