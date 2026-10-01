@@ -16,7 +16,10 @@ use Doctrine\DBAL\Connection;
  * Что система записала в учёт из сырых начислений by-day.
  *
  * В сверку входят только строки, чей `raw_document_id` указывает на документ by-day: затраты и продажи
- * снятого формата v3 (до 08.09.2026) сверять не с чем. Затраты вне by-day считаются отдельно.
+ * снятого формата v3 (до 08.09.2026) сверять не с чем. Строка считается только за день, по которому есть
+ * завершённо обработанный документ by-day: статус берётся у дня, а не у документа строки — после пересоздания
+ * документа дня прежние продажи остаются привязанными к старому (failed) документу, и отбор по его статусу
+ * терял бы их (так было у продаж 09.09.2026). Затраты вне by-day считаются отдельно.
  * Нетто-расход = затраты − сторно (`operation_type`), как в `CostReconciliationQuery`.
  */
 final readonly class OzonLedgerTotalsQuery
@@ -41,7 +44,14 @@ final readonly class OzonLedgerTotalsQuery
                   AND s.sale_date >= :from
                   AND s.sale_date <= :to
                   AND d.api_endpoint = :endpoint
-                  AND d.processing_status = :completed
+                  AND EXISTS (
+                      SELECT 1 FROM marketplace_raw_documents dc
+                      WHERE dc.company_id = s.company_id
+                        AND dc.marketplace = :marketplace
+                        AND dc.api_endpoint = :endpoint
+                        AND dc.processing_status = :completed
+                        AND dc.period_from = s.sale_date
+                  )
                 SQL,
             $params,
         );
@@ -56,7 +66,14 @@ final readonly class OzonLedgerTotalsQuery
                   AND r.return_date >= :from
                   AND r.return_date <= :to
                   AND d.api_endpoint = :endpoint
-                  AND d.processing_status = :completed
+                  AND EXISTS (
+                      SELECT 1 FROM marketplace_raw_documents dc
+                      WHERE dc.company_id = r.company_id
+                        AND dc.marketplace = :marketplace
+                        AND dc.api_endpoint = :endpoint
+                        AND dc.processing_status = :completed
+                        AND dc.period_from = r.return_date
+                  )
                 SQL,
             $params,
         );
@@ -88,7 +105,14 @@ final readonly class OzonLedgerTotalsQuery
                   AND c.cost_date >= :from
                   AND c.cost_date <= :to
                   AND d.api_endpoint = :endpoint
-                  AND d.processing_status = :completed
+                  AND EXISTS (
+                      SELECT 1 FROM marketplace_raw_documents dc
+                      WHERE dc.company_id = c.company_id
+                        AND dc.marketplace = :marketplace
+                        AND dc.api_endpoint = :endpoint
+                        AND dc.processing_status = :completed
+                        AND dc.period_from = c.cost_date
+                  )
                 GROUP BY 1
                 SQL,
             $this->params($companyId, $from, $to) + ['noCategory' => self::NO_CATEGORY_CODE],

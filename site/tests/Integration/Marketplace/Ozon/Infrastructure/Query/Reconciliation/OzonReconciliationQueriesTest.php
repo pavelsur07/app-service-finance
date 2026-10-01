@@ -160,6 +160,7 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
         $commission = $this->seedCategory($this->companyId, 'ozon_sale_commission');
         $unknown = $this->seedCategory($this->companyId, 'ozon_unknown_99');
 
+        $this->seedByDayDocument($this->companyId, '2026-06-11', []);
         $this->insertCost(11800, 'charge', self::DAY, $logistics, $this->byDayDocId);
         $this->insertCost(1800, 'storno', '2026-06-11', $logistics, $this->byDayDocId);
         $this->insertCost(16192, 'charge', self::DAY, $commission, $this->byDayDocId);
@@ -229,6 +230,36 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
             ->executeQuery()->fetchAllAssociative();
 
         self::assertCount(1, $rows);
+    }
+
+    public function testRowsKeptOnSupersededFailedDocumentStillCountForProcessedDay(): void
+    {
+        // День 11-го: старый документ failed (продажа осталась привязанной к нему), новый — завершён. Сырьё берёт день один раз.
+        $accruals = [[
+            'accrual_id' => 31, 'date' => '2026-06-11', 'unit_number' => 'U31', 'posting' => ['products' => [[
+                'sku' => '1', 'commission' => ['sale_amount' => ['amount' => '500'], 'sale_price' => ['amount' => '200']],
+            ]]],
+        ]];
+        // Документы одного дня различаются document_type (уникальный индекс по типу): так на проде появился второй документ 09.09.2026.
+        $oldFailed = $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-11', ['accruals' => $accruals, 'service_types' => []], 'legacy_by_day', null, 'failed');
+        $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-11', ['accruals' => $accruals, 'service_types' => []]);
+        $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-11', ['accruals' => $accruals, 'service_types' => []], 'second_completed', null);
+        $this->insertSale('ozon-accrual-U31-product-0', 50000, '2026-06-11', $oldFailed);
+
+        $raw = $this->rawQuery()->flows($this->companyId, new \DateTimeImmutable('2026-06-11'), new \DateTimeImmutable('2026-06-11'));
+        $ledger = $this->ledgerQuery()->flows($this->companyId, new \DateTimeImmutable('2026-06-11'), new \DateTimeImmutable('2026-06-11'));
+
+        self::assertSame(1, $raw->salesCount, 'два завершённых документа одного дня не удваивают сырьё');
+        self::assertSame(1, $ledger->salesCount, 'продажа на старом failed-документе дня учитывается');
+        self::assertSame(50000, $ledger->sales->amountMinor());
+    }
+
+    public function testRowsOfDayWithoutProcessedDocumentAreNotCounted(): void
+    {
+        $pending = $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-13', ['accruals' => [], 'service_types' => []], 'accrual_by_day', null, 'failed');
+        $this->insertSale('ozon-accrual-U99-product-0', 70000, '2026-06-13', $pending);
+
+        self::assertSame(0, $this->ledgerQuery()->flows($this->companyId, new \DateTimeImmutable('2026-06-13'), new \DateTimeImmutable('2026-06-13'))->salesCount);
     }
 
     /**
