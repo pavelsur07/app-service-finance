@@ -94,6 +94,15 @@
 # Починка под гейт — команда выше, её окно вчерашний день покрывает.
 50 6 * * * cd /app && php bin/console app:marketplace:ozon-financial-reports:freshness-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Гейт сверки с Ozon: пересчёт снимков «Реализация ↔ сырьё ↔ учёт» за текущий и
+# прошлый месяц у компаний с активным seller-подключением (вкладка «Сверка Ozon»).
+# После загрузки дня (04:00) и её гейта свежести (06:50). Ненулевой exit code =
+# расхождение «сырые данные ↔ учёт» или сбой сверки; расхождение «Реализации»
+# с сырьём — данные самого Ozon, это warning без падения. Пишет только снимки
+# сверки. Починка под гейт — ozon-financial-reports:sync по дню и
+# app:marketplace:reprocess по компании и периоду.
+10 7 * * * cd /app && php bin/console app:marketplace:ozon-reconciliation:check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Inventory Ozon snapshot: запуск в 04:05 MSK, команда только инициирует pipeline; HTTP-загрузка выполняется async worker'ом.
 5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 

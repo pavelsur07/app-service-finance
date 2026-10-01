@@ -1,0 +1,171 @@
+{% extends 'marketplace/layout.html.twig' %}
+{% import 'marketplace/ozon_reconciliation/_macros.html.twig' as ui %}
+
+{% block title %}Сверка с Ozon{% endblock %}
+
+{% block tab_content %}
+    <div class="p-3" data-testid="ozon-reconciliation">
+        <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+            <form method="get" class="d-flex align-items-end gap-2">
+                <div>
+                    <label class="form-label" for="ozon-reconciliation-month">Месяц</label>
+                    <select class="form-select" id="ozon-reconciliation-month" name="month" onchange="this.form.submit()">
+                        {% for value, label in months %}
+                            <option value="{{ value }}" {{ value == month ? 'selected' : '' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <noscript><button type="submit" class="btn btn-outline-secondary">Показать</button></noscript>
+            </form>
+
+            {% if is_granted('module.marketplace.write') %}
+                <form method="post" action="{{ path('marketplace_ozon_reconciliation_run') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('marketplace_ozon_reconciliation_run') }}">
+                    <input type="hidden" name="month" value="{{ month }}">
+                    <button type="submit" class="btn btn-primary" data-testid="ozon-reconciliation-run">
+                        {{ view is null ? 'Выполнить сверку' : 'Пересчитать сверку' }}
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+
+        {% if view is null %}
+            <div class="alert alert-info" data-testid="ozon-reconciliation-empty">
+                <h4 class="alert-title">Сверка за {{ month_label }} ещё не выполнялась</h4>
+                <div class="text-secondary">
+                    Сверка сравнивает данные Ozon (отчёт «Реализация» и начисления по дням) с тем, что записано в учёте системы,
+                    по продажам, возвратам и каждой категории затрат.
+                </div>
+            </div>
+        {% else %}
+            {% set verdict_class = view.status.value == 'mismatch' ? 'danger' : (view.status.value == 'no_data' ? 'secondary' : 'success') %}
+            <div class="card border-{{ verdict_class }} mb-3" data-testid="ozon-reconciliation-verdict" data-status="{{ view.status.value }}">
+                <div class="card-body">
+                    <h3 class="card-title mb-2" data-testid="ozon-reconciliation-summary">
+                        {% if view.status.value == 'mismatch' %}
+                            <span class="text-danger">Есть расхождения: {{ view.mismatchCount }}</span>
+                        {% elseif view.status.value == 'no_data' %}
+                            <span class="text-secondary">Данных недостаточно, чтобы подтвердить корректность</span>
+                        {% elseif not view.realizationPresent %}
+                            <span class="text-success">Учёт совпадает с сырыми данными Ozon за {{ view.monthLabel }}</span>
+                        {% else %}
+                            <span class="text-success">Данные за {{ view.monthLabel }} сходятся с Ozon</span>
+                        {% endif %}
+                        <span class="ms-2">{{ ui.status_badge(view.status) }}</span>
+                    </h3>
+                    <p class="text-secondary mb-2">
+                        {% if view.status.value == 'mismatch' %}
+                            Строкам с расхождением доверять нельзя, пока причина не разобрана. Раскройте блок, чтобы увидеть категории и записи.
+                        {% elseif view.status.value == 'no_data' %}
+                            Часть источников не загружена — см. причины ниже. «Сошлось» не показывается, пока сверена только часть данных.
+                        {% elseif not view.realizationPresent %}
+                            Отчёт «Реализация» не загружен, поэтому сверка с официальным отчётом Ozon не выполнена: проверено только, что система не потеряла и не исказила загруженные данные. Допуск на строку — 1 ₽.
+                        {% else %}
+                            Допуск на строку — 1 ₽.
+                        {% endif %}
+                    </p>
+                    <ul class="mb-0" data-testid="ozon-reconciliation-reasons">
+                        <li class="{{ view.rawDaysPresent < view.rawDaysExpected ? 'text-warning' : '' }}">
+                            Сырые данные Ozon: загружено дней {{ view.rawDaysPresent }} из {{ view.rawDaysExpected }}
+                            {% if view.rawDaysExpected == 0 %}<span class="text-muted">(для этого периода загрузка по дням не предусмотрена)</span>{% endif %}
+                        </li>
+                        <li class="{{ view.realizationPresent ? '' : 'text-warning' }}">
+                            Отчёт «Реализация»:
+                            {% if view.realizationPresent %}загружен{% else %}не загружен (Ozon формирует его после закрытия месяца){% endif %}
+                        </li>
+                        {% if view.outsideRawCosts != '0.00' %}
+                            <li class="text-muted">
+                                Затраты, загруженные прежним способом и не входящие в сверку: {{ view.outsideRawCosts|number_format(2, '.', ' ') }} ₽
+                            </li>
+                        {% endif %}
+                        <li class="text-muted">Проверено: {{ view.checkedAt|date('d.m.Y H:i') }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% for check_view in view.checks %}
+                {% set check = check_view.check %}
+                {% set can_drill = check.value == 'raw_vs_ledger' %}
+                <div class="card mb-3" data-testid="ozon-reconciliation-check-{{ check.value }}">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">{{ check.label }}</h3>
+                            <div class="text-secondary small">Источник: {{ check.sourceLabel }} → проверяется: {{ check.targetLabel }}</div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Блок</th>
+                                <th class="text-end">{{ check.sourceLabel }}</th>
+                                <th class="text-end">{{ check.targetLabel }}</th>
+                                <th class="text-end">Разница</th>
+                                <th>Статус</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% if check_view.blocks is empty %}
+                                <tr><td colspan="6" class="text-muted text-center py-3">Нет данных для этой проверки</td></tr>
+                            {% endif %}
+                            {% for row in check_view.blocks %}
+                                {% set row_id = check.value ~ '-' ~ row.block.value %}
+                                {% set expanded = row.status.value == 'mismatch' %}
+                                <tr data-testid="ozon-reconciliation-block" data-block="{{ row.block.value }}" data-status="{{ row.status.value }}">
+                                    <td>
+                                        <div class="fw-semibold">{{ row.block.label }}</div>
+                                        {% if row.note %}<div class="small {{ row.status.value == 'mismatch' ? 'text-danger' : 'text-secondary' }}" data-testid="ozon-reconciliation-note">{{ row.note }}</div>{% endif %}
+                                        <div class="d-md-none mt-1">{{ ui.delta(row.delta, row.status) }} {{ ui.status_badge(row.status) }}</div>
+                                        {% if row.categories is not empty %}
+                                            <button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="collapse"
+                                                    data-bs-target=".cat-{{ row_id }}" aria-expanded="{{ expanded ? 'true' : 'false' }}"
+                                                    aria-controls="cat-{{ row_id }}-first">
+                                                Категории ({{ row.categories|length }})
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ ui.money(row.source) }}{{ ui.count(row.sourceCount) }}</td>
+                                    <td class="text-end">{{ ui.money(row.target) }}{{ ui.count(row.targetCount) }}</td>
+                                    <td class="text-end">{{ ui.delta(row.delta, row.status) }}</td>
+                                    <td>{{ ui.status_badge(row.status) }}</td>
+                                    <td class="text-end">
+                                        {% if can_drill %}
+                                            {% if row.block.value == 'sales' %}
+                                                <a href="{{ path('marketplace_ozon_reconciliation_operations', {month: view.monthValue, kind: 'sales'}) }}">Записи</a>
+                                            {% elseif row.block.value == 'returns' %}
+                                                <a href="{{ path('marketplace_ozon_reconciliation_operations', {month: view.monthValue, kind: 'returns'}) }}">Записи</a>
+                                            {% else %}
+                                                <a href="{{ path('marketplace_ozon_reconciliation_operations', {month: view.monthValue, kind: 'costs', block: row.block.value}) }}">Записи</a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% for cat in row.categories %}
+                                    <tr class="collapse {{ expanded ? 'show' : '' }} cat-{{ row_id }} bg-body-tertiary" {% if loop.first %}id="cat-{{ row_id }}-first"{% endif %}
+                                        data-testid="ozon-reconciliation-category" data-status="{{ cat.status.value }}">
+                                        <td class="ps-5">
+                                            <div>{{ cat.name }}</div>
+                                            {% if cat.note %}<div class="small text-secondary">{{ cat.note }}</div>{% endif %}
+                                            <div class="d-md-none mt-1">{{ ui.delta(cat.delta, cat.status) }} {{ ui.status_badge(cat.status) }}</div>
+                                        </td>
+                                        <td class="text-end">{{ ui.money(cat.source) }}{{ ui.count(cat.sourceCount) }}</td>
+                                        <td class="text-end">{{ ui.money(cat.target) }}{{ ui.count(cat.targetCount) }}</td>
+                                        <td class="text-end">{{ ui.delta(cat.delta, cat.status) }}</td>
+                                        <td>{{ ui.status_badge(cat.status) }}</td>
+                                        <td class="text-end">
+                                            {% if can_drill %}
+                                                <a href="{{ path('marketplace_ozon_reconciliation_operations', {month: view.monthValue, kind: 'costs', block: row.block.value, category: cat.code}) }}">Записи</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+{% endblock %}

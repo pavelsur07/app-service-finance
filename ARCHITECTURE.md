@@ -56,6 +56,8 @@
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
+| `OzonReconciliationRun` | Marketplace | `string $companyId` ✅ |
+| `OzonReconciliationLine` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncError` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceListingTag` | Marketplace | `string $companyId` ✅ |
@@ -394,6 +396,43 @@
 `OzonMonthRawRefreshCommand`, `SyncOzonReportMessage`, `InitialSyncMessage`,
 `OzonAdapter` и реестр адаптеров. Формат `MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3`
 и его процессоры остаются: 967 документов переобрабатываются по сохранённому сырью.
+
+### Marketplace: сверка с Ozon
+
+Вкладка «Сверка Ozon» отвечает на вопрос «можно ли доверять данным». Две проверки (`OzonReconciliationCheck`):
+`REALIZATION_VS_RAW` — «Реализация» против сырого by-day в базе `sale_price` (продажи и возвраты);
+`RAW_VS_LEDGER` — сырой by-day против учёта: продажи/возвраты в базе `sale_amount` и затраты по категориям.
+Напрямую «Реализация» и учёт не сравниваются: `marketplace_sales`/`marketplace_returns` хранят цену продавца
+(`sale_amount`), «Реализация» — цену покупателя (`sale_price`). Комиссии в `marketplace_ozon_realizations` нет,
+поэтому у блоков затрат только вторая проверка.
+
+- Блок (`OzonReconciliationBlock`) выводит `Ozon/Domain/Reconciliation/OzonReconciliationBlockMap` из `OzonCostCategory::$xlsxGroup`;
+  код вне `OzonCostCategory::recognizedCodes()` — блок `UNRECOGNIZED`. Отдельного справочника нет.
+- Допуск (`OzonReconciliationTolerance`, 1 ₽): знаковая разница «цель − источник»; 0 — `MATCHED`, до 1.00 — `WITHIN_TOLERANCE`,
+  больше — `MISMATCH`, нет данных у стороны — `NO_DATA`. Пустой набор статусов даёт `NO_DATA`, а не «сошлось».
+- `OzonReconciliationRun` — один актуальный снимок на (компания, период); `OzonReconciliationLine` — проверка × блок × категория
+  (пустой код — итог блока). Суммы — `bigint` в минорных единицах, валюта на Run; арифметика через `Money`. Истории прогонов нет.
+- Затраты, чей `raw_document_id` не указывает на by-day документ (легаси v3), в сверку не входят; сумма пишется в `outside_raw_costs_minor`.
+- Источники (`Ozon/Infrastructure/Query/Reconciliation/`, DBAL, только чтение, DTO в `Ozon/Application/Reconciliation/DTO/`):
+  `OzonRealizationTotalsQuery` (нет строк → `null`, т.е. «нет данных»), `OzonRawAccrualTotalsQuery` (разворачивает JSON документа by-day
+  через jsonb и пересчитывает продажи/возвраты в двух базах и затраты по категориям независимо от процессоров; не-массивы и нечисловые
+  суммы пропускает), `OzonLedgerTotalsQuery` (учёт; только строки с `raw_document_id` на by-day документ). Нетто-расход = затраты − сторно.
+  Сырьё и учёт читают только документы by-day с `processing_status = completed` (необработанный день — неполное покрытие, а не расхождение); «Реализация» — только
+  документы с `records_created > 0` (счётчик пишется в финале первичной обработки, строки вставляются пакетами без общей транзакции, частичный отчёт нельзя принимать за полный).
+  Суммы сырья округляются построчно до копеек, как делают процессоры.
+- Правила статуса строки: знаковая разница в допуске 1 ₽ **и** равное число записей (равные суммы при разном числе записей — `MISMATCH`: потерянные списание и сторно дают нулевое нетто);
+  итог блока красный, если красна любая его категория (взаимно компенсирующие ошибки категорий не прячутся); `mismatch_count` снимка считает листья (категории и итоги блоков без категорий).
+- `RunOzonReconciliationAction` (`Ozon/Application/Action/`) — сверка за календарный месяц: три Query → чистый `OzonReconciliationCalculator`
+  (без БД) → снимок в одной транзакции (upsert Run, строки пересоздаются). Нет «Реализации» или сырья — `NO_DATA` с пояснением в `note`;
+  неполная загрузка дней by-day (`OzonRawCoverage`: от `EARLIEST_SAFE_DAY` до вчера по Москве) не даёт общий статус лучше `NO_DATA`;
+  общий статус — худший из итоговых строк блоков с данными. Ручной запуск: `app:marketplace:ozon-reconciliation:run --company-id --month=YYYY-MM`.
+- HTTP (`Ozon/Controller/`): `GET /marketplace/ozon-reconciliation?month=YYYY-MM` (сводка из снимка, `MARKETPLACE_READ`, невалидный месяц → текущий по Москве),
+  `POST /marketplace/ozon-reconciliation/run` (пересчёт синхронно, CSRF `marketplace_ozon_reconciliation_run`, `MARKETPLACE_WRITE`),
+  `GET /marketplace/ozon-reconciliation/operations?month&kind=sales|returns|costs&block&category&page&limit` (drill-down по записям учёта из документов by-day,
+  Pagerfanta, `limit` ≤ 200, любая ошибка параметров или страница вне диапазона → 422). Модель страницы строит `OzonReconciliationViewFactory` из Run и его строк.
+- Гейт: `app:marketplace:ozon-reconciliation:check` (cron 07:10) пересчитывает снимки за текущий и прошлый месяц (МСК) у компаний с активным Ozon seller-подключением.
+  Красное (exit 1 + один агрегированный `error`): расхождение «сырьё ↔ учёт» в итоговых строках блоков или сбой сверки компании; расхождение «Реализация ↔ сырьё» — `warning`;
+  `NO_DATA` красным не бывает. `--report-only` — без падения и без `error`. В лог не попадают суммы.
 
 ### Marketplace: загрузка каталога товаров Ozon
 

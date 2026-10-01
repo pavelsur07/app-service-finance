@@ -1,0 +1,27 @@
+{# Общие куски страницы сверки с Ozon. Классы — те же Tabler/Bootstrap, что у соседних вкладок Marketplace. #}
+
+{% macro status_badge(status) %}
+    {% if status.value == 'matched' %}
+        <span class="badge bg-success-lt">{{ status.label }}</span>
+    {% elseif status.value == 'within_tolerance' %}
+        <span class="badge bg-success-lt">{{ status.label }}</span>
+    {% elseif status.value == 'mismatch' %}
+        <span class="badge bg-danger-lt">{{ status.label }}</span>
+    {% else %}
+        <span class="badge bg-secondary-lt">{{ status.label }}</span>
+    {% endif %}
+{% endmacro %}
+
+{# Сумма: null — «нет данных», а не ноль. #}
+{% macro money(value) %}{% if value is null %}<span class="text-muted">—</span>{% else %}<span class="text-nowrap">{{ value|number_format(2, '.', ' ') }} ₽</span>{% endif %}{% endmacro %}
+
+{# Знаковая разница «цель − источник»; красным при расхождении. #}
+{% macro delta(value, status) %}
+    {% if value is null %}
+        <span class="text-muted">—</span>
+    {% else %}
+        <span class="text-nowrap {{ status.value == 'mismatch' ? 'text-danger fw-bold' : (value == 0 ? 'text-muted' : '') }}">{% if value > 0 %}+{% endif %}{{ value|number_format(2, '.', ' ') }} ₽</span>
+    {% endif %}
+{% endmacro %}
+
+{% macro count(value) %}{% if value is not null %}<div class="text-muted small">{{ value }} шт.</div>{% endif %}{% endmacro %}

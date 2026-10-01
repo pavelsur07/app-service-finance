@@ -1,0 +1,58 @@
+{% extends 'marketplace/layout.html.twig' %}
+{% import 'marketplace/ozon_reconciliation/_macros.html.twig' as ui %}
+
+{% block title %}Записи сверки Ozon{% endblock %}
+
+{% block tab_content %}
+    {% set kind_label = kind == 'sales' ? 'Продажи' : (kind == 'returns' ? 'Возвраты' : 'Затраты') %}
+    <div class="p-3" data-testid="ozon-reconciliation-operations">
+        <a href="{{ path('marketplace_ozon_reconciliation_index', {month: month}) }}" class="btn btn-link px-0 mb-2">← К сверке за {{ month_label }}</a>
+        <h3 class="mb-1">{{ kind_label }} · {{ month_label }}</h3>
+        <p class="text-secondary" data-testid="ozon-reconciliation-operations-filter">
+            Записи учёта, загруженные из начислений Ozon по дням.
+            {% if block %}Блок: {{ block.label }}.{% endif %}
+            {% if category %}Категория: {{ category }}.{% endif %}
+            Всего: {{ pager.nbResults }}.
+        </p>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Идентификатор</th>
+                        {% if kind == 'costs' %}<th>Категория</th><th>Тип</th>{% endif %}
+                        <th class="text-end">Сумма</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in pager.currentPageResults %}
+                        <tr>
+                            <td>{{ row.operation_date|date('d.m.Y') }}</td>
+                            <td><small class="text-muted">{{ row.reference ?? '—' }}</small></td>
+                            {% if kind == 'costs' %}
+                                <td>{{ row.category_name ?? row.category_code ?? 'Без категории' }}</td>
+                                <td>{{ row.operation_type == 'storno' ? 'Возврат (сторно)' : 'Затрата' }}</td>
+                            {% endif %}
+                            <td class="text-end {{ kind == 'costs' and row.operation_type == 'storno' ? 'text-success' : '' }}">
+                                {{ kind == 'costs' and row.operation_type == 'storno' ? '−' : '' }}{{ row.amount|number_format(2, '.', ' ') }} ₽
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="{{ kind == 'costs' ? 5 : 3 }}" class="text-muted text-center py-3">Записей нет</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if pager.haveToPaginate %}
+                <div class="card-footer d-flex align-items-center">
+                    {% include 'partials/_pagerfanta.html.twig' with {
+                        'pager': pager,
+                        'route': 'marketplace_ozon_reconciliation_operations',
+                        'params': {month: month, kind: kind, block: block ? block.value : null, category: category, limit: limit}|filter(v => v is not null),
+                    } %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
