@@ -20,6 +20,33 @@ use PHPUnit\Framework\TestCase;
 
 final class OzonReconciliationCalculatorTest extends TestCase
 {
+    public function testOffsettingCategoryErrorsInOneBlockAreNotHiddenByMatchingTotal(): void
+    {
+        // Логистика: категория завышена на 100 ₽, соседняя занижена на 100 ₽ — итог блока сходится.
+        $in = $this->inputs(
+            rawCosts: ['ozon_logistic_direct' => $this->bucket(10000, 1), 'ozon_delivery' => $this->bucket(20000, 1)],
+            ledgerCosts: ['ozon_logistic_direct' => $this->bucket(20000, 1), 'ozon_delivery' => $this->bucket(10000, 1)],
+        );
+
+        $result = $this->calculator()->calculate($in);
+
+        $total = $this->find($result->lines, OzonReconciliationCheck::RAW_VS_LEDGER, OzonReconciliationBlock::LOGISTICS);
+        self::assertSame(30000, $total->source?->amountMinor());
+        self::assertSame(30000, $total->target?->amountMinor());
+        self::assertSame(OzonReconciliationStatus::MISMATCH, $total->status);
+        self::assertStringContainsString('компенсируют', (string) $total->note);
+        self::assertSame(OzonReconciliationStatus::MISMATCH, $result->overall);
+        // Две проблемные категории — два расхождения, итог блока отдельно не считается.
+        self::assertSame(2, $result->mismatchCount);
+    }
+
+    public function testBlockTotalMismatchWithCategoriesIsCountedOncePerCategory(): void
+    {
+        $in = $this->inputs(ledgerCosts: ['ozon_logistic_direct' => $this->bucket(10000, 2)]);
+
+        self::assertSame(1, $this->calculator()->calculate($in)->mismatchCount);
+    }
+
     public function testEverythingMatches(): void
     {
         $result = $this->calculator()->calculate($this->inputs());

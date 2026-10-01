@@ -4,4 +4,4 @@ Baseline (01.10.2026, master 89e0a8f9): `make site-test-unit` — OK 3032 tests,
 Ветка: feat/marketplace-ozon-reconciliation.
 
 ## Текущее
-Stage 6 закрыт (stages/stage-6-report.md). Следующее: Handoff — полные гейты, финальное ревью, handoff.md, Ready PR.
+Handoff: полные гейты зелёные, внутреннее ревью в свежей сессии учтено, внешнее ревью запущено; handoff.md написан. Следующее: результат внешнего ревью → Ready PR → вопрос «merge and deploy #2547».

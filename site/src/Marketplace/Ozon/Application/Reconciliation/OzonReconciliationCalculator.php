@@ -98,7 +98,16 @@ final readonly class OzonReconciliationCalculator
             $overall = OzonReconciliationStatus::NO_DATA;
         }
 
-        $mismatches = count(array_filter($totals, static fn (ReconciledLine $l): bool => OzonReconciliationStatus::MISMATCH === $l->status));
+        // Считаем «листья»: категории затрат и итоги блоков без категорий (продажи, возвраты, реализация).
+        // Итог блока с категориями отдельно не считается, иначе одна проблема считалась бы дважды.
+        $blocksWithCategories = [];
+        foreach ($lines as $l) {
+            if ('' !== $l->categoryCode) {
+                $blocksWithCategories[$l->check->value.'|'.$l->block->value] = true;
+            }
+        }
+        $mismatches = count(array_filter($lines, static fn (ReconciledLine $l): bool => OzonReconciliationStatus::MISMATCH === $l->status
+            && ('' !== $l->categoryCode || !isset($blocksWithCategories[$l->check->value.'|'.$l->block->value]))));
 
         return new OzonReconciliationResult($lines, $overall, $mismatches);
     }
@@ -114,6 +123,8 @@ final readonly class OzonReconciliationCalculator
 
         /** @var array<string, array{raw: CostBucket, ledger: CostBucket}> $byBlock */
         $byBlock = [];
+        /** @var array<string, list<ReconciledLine>> $categoryLines */
+        $categoryLines = [];
         $lines = [];
 
         foreach ($codes as $code) {
@@ -121,7 +132,7 @@ final readonly class OzonReconciliationCalculator
             $ledger = $in->ledgerCosts[$code] ?? $zero;
             $block = OzonReconciliationBlockMap::forCategoryCode($code);
 
-            $lines[] = $this->line(
+            $categoryLine = $this->line(
                 OzonReconciliationCheck::RAW_VS_LEDGER,
                 $block,
                 $code,
@@ -131,6 +142,8 @@ final readonly class OzonReconciliationCalculator
                 $ledger->count,
                 $rawLoaded ? $this->unrecognizedNote($block) : $noRawNote,
             );
+            $lines[] = $categoryLine;
+            $categoryLines[$block->value][] = $categoryLine;
 
             $sum = $byBlock[$block->value] ?? ['raw' => $zero, 'ledger' => $zero];
             $byBlock[$block->value] = ['raw' => $sum['raw']->plus($raw), 'ledger' => $sum['ledger']->plus($ledger)];
@@ -138,7 +151,7 @@ final readonly class OzonReconciliationCalculator
 
         foreach ($byBlock as $blockValue => $sum) {
             $block = OzonReconciliationBlock::from($blockValue);
-            $lines[] = $this->line(
+            $total = $this->line(
                 OzonReconciliationCheck::RAW_VS_LEDGER,
                 $block,
                 '',
@@ -148,6 +161,27 @@ final readonly class OzonReconciliationCalculator
                 $sum['ledger']->count,
                 $rawLoaded ? $this->unrecognizedNote($block) : $noRawNote,
             );
+
+            // Итог блока не должен скрывать расхождение категорий: ошибки +100 ₽ и −100 ₽ в одном блоке сходятся в ноль.
+            $categoryMismatch = array_filter(
+                $categoryLines[$blockValue] ?? [],
+                static fn (ReconciledLine $c): bool => OzonReconciliationStatus::MISMATCH === $c->status,
+            );
+            if ([] !== $categoryMismatch && OzonReconciliationStatus::MISMATCH !== $total->status) {
+                $total = new ReconciledLine(
+                    $total->check,
+                    $total->block,
+                    $total->categoryCode,
+                    $total->source,
+                    $total->target,
+                    OzonReconciliationStatus::MISMATCH,
+                    $total->sourceCount,
+                    $total->targetCount,
+                    'Сумма блока сошлась, но категории расходятся и компенсируют друг друга',
+                );
+            }
+
+            $lines[] = $total;
         }
 
         return $lines;
