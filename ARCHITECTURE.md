@@ -425,6 +425,9 @@
   `POST /marketplace/ozon-reconciliation/run` (пересчёт синхронно, CSRF `marketplace_ozon_reconciliation_run`, `MARKETPLACE_WRITE`),
   `GET /marketplace/ozon-reconciliation/operations?month&kind=sales|returns|costs&block&category&page&limit` (drill-down по записям учёта из документов by-day,
   Pagerfanta, `limit` ≤ 200, любая ошибка параметров или страница вне диапазона → 422). Модель страницы строит `OzonReconciliationViewFactory` из Run и его строк.
+- Гейт: `app:marketplace:ozon-reconciliation:check` (cron 07:10) пересчитывает снимки за текущий и прошлый месяц (МСК) у компаний с активным Ozon seller-подключением.
+  Красное (exit 1 + один агрегированный `error`): расхождение «сырьё ↔ учёт» в итоговых строках блоков или сбой сверки компании; расхождение «Реализация ↔ сырьё» — `warning`;
+  `NO_DATA` красным не бывает. `--report-only` — без падения и без `error`. В лог не попадают суммы.
 
 ### Marketplace: загрузка каталога товаров Ozon
 

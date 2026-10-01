@@ -4,4 +4,4 @@ Baseline (01.10.2026, master 89e0a8f9): `make site-test-unit` — OK 3032 tests,
 Ветка: feat/marketplace-ozon-reconciliation.
 
 ## Текущее
-Stage 5 закрыт (stages/stage-5-report.md). Следующее: Stage 6 — cron и алерт.
+Stage 6 закрыт (stages/stage-6-report.md). Следующее: Handoff — полные гейты, финальное ревью, handoff.md, Ready PR.

@@ -183,6 +183,13 @@ Read-only проверки можно выполнять после запрос
   code — рабочий сигнал команды: загрузка встала сейчас. Починка под гейт —
   `ozon-financial-reports:sync`, её окно вчерашний день покрывает.
 
+- `app:marketplace:ozon-reconciliation:run --company-id=<uuid> [--month=YYYY-MM]` и
+  `app:marketplace:ozon-reconciliation:check [--company-id=<uuid>] [--report-only]` —
+  сверка с Ozon (вкладка «Сверка Ozon»). Учёт и сырые данные не меняют, во внешний
+  API не ходят, но **пишут снимки** в `marketplace_ozon_reconciliation_*`, поэтому на
+  проде это мутация: разрешение в `codex-console` не выдано, ручной запуск — только по
+  решению Владельца. Ночной запуск `check` — cron 07:10 в контейнере scheduler.
+
 - `app:marketplace:wb-costs:unrecognized-check [--days-back=N]` — read-only гейт
   нераспознанных затрат WB: за окно N дней (по умолчанию 14, как
   `--refresh-days-back` ночного orchestrate, максимум 90) у активных
