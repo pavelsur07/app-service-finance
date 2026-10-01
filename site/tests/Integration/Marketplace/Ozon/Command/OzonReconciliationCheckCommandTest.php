@@ -130,6 +130,8 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
             'period_from' => '2026-09-01', 'period_to' => '2026-09-30', 'created_at' => '2026-10-01 00:00:00',
         ]);
 
+        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 1 WHERE id = :id', ['id' => $realizationDoc]);
+
         $tester = $this->runCommand();
 
         self::assertSame(0, $tester->getStatusCode());

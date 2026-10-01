@@ -11,6 +11,11 @@ use Doctrine\DBAL\Connection;
 /**
  * Итоги отчёта «Реализация» из `marketplace_ozon_realizations`. Нет строк — `null`:
  * отчёт за период не загружен, и это не то же самое, что нулевые продажи.
+ *
+ * Берутся только строки документов, чья первичная обработка дошла до конца: `records_created` пишется
+ * в самом её финале (`ProcessOzonRealizationAction`), а строки вставляются пакетами без общей транзакции,
+ * поэтому сбой посреди обработки оставляет частичный отчёт. Его нельзя принимать за полный — это дало бы ложное расхождение.
+ * Переобработка (DELETE + пересоздание) атомарна и счётчик не трогает.
  */
 final readonly class OzonRealizationTotalsQuery
 {
@@ -29,7 +34,9 @@ final readonly class OzonRealizationTotalsQuery
                     COALESCE(SUM(r.return_amount), 0)       AS returns_amount,
                     COALESCE(SUM(r.return_quantity), 0)     AS returns_quantity
                 FROM marketplace_ozon_realizations r
+                INNER JOIN marketplace_raw_documents d ON d.id = r.raw_document_id
                 WHERE r.company_id = :companyId
+                  AND d.records_created > 0
                   AND r.period_from >= :from
                   AND r.period_to <= :to
                 SQL,

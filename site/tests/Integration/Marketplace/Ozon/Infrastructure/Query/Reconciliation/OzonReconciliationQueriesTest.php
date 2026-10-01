@@ -136,6 +136,10 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
         $this->insertRealization($docId, 'sku-1', 116857, 1, null, null);
         $this->insertRealization($docId, 'sku-2', 0, 0, 147743, 1);
 
+        // Обработка не дошла до конца (records_created не записан): отчёт частичный и за загруженный не считается.
+        self::assertNull($this->realizationQuery()->fetch($this->companyId, $this->from, $this->to));
+        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 2 WHERE id = :id', ['id' => $docId]);
+
         $totals = $this->realizationQuery()->fetch($this->companyId, $this->from, $this->to);
 
         self::assertNotNull($totals);

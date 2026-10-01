@@ -204,13 +204,22 @@ final readonly class OzonReconciliationCalculator
         ?int $targetCount,
         ?string $note,
     ): ReconciledLine {
+        $status = $this->tolerance->evaluate($source, $target);
+
+        // Равные суммы при разном числе записей — не «сошлось»: потерянные списание и равное ему сторно
+        // дают нулевое нетто, но обе записи пропали из учёта.
+        if ($status->isOk() && null !== $sourceCount && null !== $targetCount && $sourceCount !== $targetCount) {
+            $status = OzonReconciliationStatus::MISMATCH;
+            $note = sprintf('Количество записей не совпало: %d у Ozon, %d в системе%s', $sourceCount, $targetCount, null === $note ? '' : '. '.$note);
+        }
+
         return new ReconciledLine(
             $check,
             $block,
             $categoryCode,
             $source,
             $target,
-            $this->tolerance->evaluate($source, $target),
+            $status,
             $sourceCount,
             $targetCount,
             $note,

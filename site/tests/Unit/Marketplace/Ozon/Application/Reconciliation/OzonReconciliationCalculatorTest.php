@@ -47,6 +47,22 @@ final class OzonReconciliationCalculatorTest extends TestCase
         self::assertSame(1, $this->calculator()->calculate($in)->mismatchCount);
     }
 
+    public function testEqualNetWithDifferentRecordCountIsMismatch(): void
+    {
+        // В учёте пропали списание и равное ему сторно: нетто то же, записей меньше.
+        $in = $this->inputs(
+            rawCosts: ['ozon_logistic_direct' => $this->bucket(11800, 4)],
+            ledgerCosts: ['ozon_logistic_direct' => $this->bucket(11800, 2)],
+        );
+
+        $result = $this->calculator()->calculate($in);
+
+        $line = $this->find($result->lines, OzonReconciliationCheck::RAW_VS_LEDGER, OzonReconciliationBlock::LOGISTICS, 'ozon_logistic_direct');
+        self::assertSame(OzonReconciliationStatus::MISMATCH, $line->status);
+        self::assertStringContainsString('4 у Ozon, 2 в системе', (string) $line->note);
+        self::assertSame(OzonReconciliationStatus::MISMATCH, $result->overall);
+    }
+
     public function testEverythingMatches(): void
     {
         $result = $this->calculator()->calculate($this->inputs());
