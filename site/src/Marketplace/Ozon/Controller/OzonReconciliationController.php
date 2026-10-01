@@ -26,6 +26,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class OzonReconciliationController extends AbstractController
 {
     private const TIMEZONE = 'Europe/Moscow';
+    private const LIST_MONTHS = 12;
 
     public function __construct(
         private readonly ActiveCompanyService $companyService,
@@ -48,8 +49,12 @@ final class OzonReconciliationController extends AbstractController
             ? null
             : $this->viewFactory->create($run, $this->lineRepository->findByRun($companyId, $run->getId()));
 
-        // В списке месяцев — все месяцы со снимками плюс текущий и выбранный.
-        $months = [$current->value() => $current->label(), $month->value() => $month->label()];
+        // В списке месяцев — последний год (сверку можно запустить за любой из них), выбранный месяц и все месяцы со снимками.
+        $months = [$month->value() => $month->label()];
+        for ($i = 0; $i < self::LIST_MONTHS; ++$i) {
+            $listed = ReconciliationMonth::containing($current->from->modify(sprintf('-%d months', $i)));
+            $months[$listed->value()] = $listed->label();
+        }
         foreach ($this->runRepository->findRecentByCompany($companyId) as $recent) {
             $recentMonth = ReconciliationMonth::containing($recent->getPeriodFrom());
             $months[$recentMonth->value()] = $recentMonth->label();
