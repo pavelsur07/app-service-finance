@@ -167,6 +167,28 @@ case "$cmd" in
       exit 2
     fi
     ;;
+  app:marketplace:ozon-reconciliation:run)
+    # Сверка с Ozon за месяц одной компании (вкладка «Сверка Ozon»). Мутирует
+    # только таблицы снимков marketplace_ozon_reconciliation_*: учёт и сырые
+    # данные не меняются, во внешний API команда не ходит. На проде это всё равно
+    # запись, поэтому запуск — по явной просьбе Владельца (AGENTS.md §3.3).
+    #
+    # Оба параметра обязательны и проверяются здесь: компания (UUID) и месяц
+    # (YYYY-MM). Без компании команда не запустится, обхода всех компаний нет —
+    # его делает ночной cron через :check, который сюда намеренно не добавлен.
+    seen_company=0; seen_month=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--company-id=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then seen_company=1
+      elif [[ "$arg" =~ ^--month=20[0-9]{2}-(0[1-9]|1[0-2])$ ]]; then seen_month=1
+      elif [[ "$arg" =~ ^(--no-interaction|-n|--quiet|-q)$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ] || [ "$seen_month" -ne 1 ]; then
+      echo "Usage for $cmd: --company-id=<uuid> --month=YYYY-MM" >&2
+      exit 2
+    fi
+    ;;
   messenger:failed:remove)
     # Мутирующая команда: удаляет сообщение из failed-очереди безвозвратно.
     # Поэтому первым аргументом допускается только числовой id. Это заодно
