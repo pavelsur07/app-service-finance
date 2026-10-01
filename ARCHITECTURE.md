@@ -413,6 +413,10 @@
 - `OzonReconciliationRun` — один актуальный снимок на (компания, период); `OzonReconciliationLine` — проверка × блок × категория
   (пустой код — итог блока). Суммы — `bigint` в минорных единицах, валюта на Run; арифметика через `Money`. Истории прогонов нет.
 - Затраты, чей `raw_document_id` не указывает на by-day документ (легаси v3), в сверку не входят; сумма пишется в `outside_raw_costs_minor`.
+- Источники (`Ozon/Infrastructure/Query/Reconciliation/`, DBAL, только чтение, DTO в `Ozon/Application/Reconciliation/DTO/`):
+  `OzonRealizationTotalsQuery` (нет строк → `null`, т.е. «нет данных»), `OzonRawAccrualTotalsQuery` (разворачивает JSON документа by-day
+  через jsonb и пересчитывает продажи/возвраты в двух базах и затраты по категориям независимо от процессоров; не-массивы и нечисловые
+  суммы пропускает), `OzonLedgerTotalsQuery` (учёт; только строки с `raw_document_id` на by-day документ). Нетто-расход = затраты − сторно.
 
 ### Marketplace: загрузка каталога товаров Ozon
 
