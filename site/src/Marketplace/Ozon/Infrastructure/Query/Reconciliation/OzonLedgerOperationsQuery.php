@@ -7,6 +7,7 @@ namespace App\Marketplace\Ozon\Infrastructure\Query\Reconciliation;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\OzonReconciliationBlock;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Ozon\Domain\OzonCostCategory;
 use App\Marketplace\Ozon\Domain\Reconciliation\OzonReconciliationBlockMap;
 use Doctrine\DBAL\ArrayParameterType;
@@ -39,6 +40,7 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('s.sale_date >= :from')
             ->andWhere('s.sale_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
+            ->andWhere('d.processing_status = :completed')
             ->orderBy('s.sale_date', 'DESC')
             ->addOrderBy('s.id', 'ASC');
     }
@@ -54,6 +56,7 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('r.return_date >= :from')
             ->andWhere('r.return_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
+            ->andWhere('d.processing_status = :completed')
             ->orderBy('r.return_date', 'DESC')
             ->addOrderBy('r.id', 'ASC');
     }
@@ -86,11 +89,15 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('c.cost_date >= :from')
             ->andWhere('c.cost_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
+            ->andWhere('d.processing_status = :completed')
             ->orderBy('c.cost_date', 'DESC')
             ->addOrderBy('c.id', 'ASC');
 
         if (null !== $categoryCode) {
-            return $qb->andWhere('cc.code = :categoryCode')->setParameter('categoryCode', $categoryCode);
+            // Затраты без категории в итогах стоят под служебным кодом: у них нет cc.code, отбираем по отсутствию связи.
+            return OzonLedgerTotalsQuery::NO_CATEGORY_CODE === $categoryCode
+                ? $qb->andWhere('c.category_id IS NULL')
+                : $qb->andWhere('cc.code = :categoryCode')->setParameter('categoryCode', $categoryCode);
         }
 
         if (null === $block || !$block->isCostBlock()) {
@@ -119,6 +126,7 @@ final readonly class OzonLedgerOperationsQuery
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', MarketplaceType::OZON->value)
             ->setParameter('endpoint', MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value)
+            ->setParameter('completed', PipelineStatus::COMPLETED->value)
             ->setParameter('from', $from->format('Y-m-d'))
             ->setParameter('to', $to->format('Y-m-d'));
     }

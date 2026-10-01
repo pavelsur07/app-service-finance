@@ -17,7 +17,6 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: OzonReconciliationRunRepository::class)]
 #[ORM\Table(name: 'marketplace_ozon_reconciliation_runs')]
 #[ORM\UniqueConstraint(name: 'uniq_mozrr_company_period', columns: ['company_id', 'period_from', 'period_to'])]
-#[ORM\Index(name: 'idx_mozrr_company_period_from', columns: ['company_id', 'period_from'])]
 class OzonReconciliationRun
 {
     #[ORM\Id]

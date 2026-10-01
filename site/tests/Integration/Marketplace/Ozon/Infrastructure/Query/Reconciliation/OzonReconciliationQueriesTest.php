@@ -184,6 +184,48 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
         self::assertSame([], $ops->createCostsQueryBuilder($this->otherCompanyId, $this->from, $this->to)->executeQuery()->fetchAllAssociative());
     }
 
+    public function testDocumentsNotFullyProcessedAreExcludedFromBothSides(): void
+    {
+        // День 11-го загружен, но обработка не завершена: ни сырьё, ни учёт его не считают — это неполное покрытие, а не расхождение.
+        $pendingDoc = $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-11', [
+            'accruals' => [[
+                'accrual_id' => 9, 'date' => '2026-06-11', 'posting' => ['products' => [[
+                    'sku' => '1', 'commission' => ['sale_amount' => ['amount' => '500'], 'sale_price' => ['amount' => '200']],
+                ]]],
+            ]],
+            'service_types' => [],
+        ], 'accrual_by_day', null, 'pending');
+        $this->insertSale('ozon-accrual-PENDING-product-0', 50000, '2026-06-11', $pendingDoc);
+
+        self::assertSame(['2026-06-10'], $this->rawQuery()->presentDays($this->companyId, $this->from, $this->to));
+        self::assertSame(1, $this->rawQuery()->flows($this->companyId, $this->from, $this->to)->salesCount);
+        self::assertSame(0, $this->ledgerQuery()->flows($this->companyId, $this->from, $this->to)->salesCount);
+    }
+
+    public function testEntriesAreRoundedPerRowLikeProcessors(): void
+    {
+        $this->seedByDayDocument($this->companyId, '2026-06-12', [
+            ['accrual_id' => 21, 'date' => '2026-06-12', 'non_item_fee' => ['type_id' => 52, 'accrued' => ['amount' => '-1.004']]],
+            ['accrual_id' => 22, 'date' => '2026-06-12', 'non_item_fee' => ['type_id' => 52, 'accrued' => ['amount' => '-1.004']]],
+        ]);
+
+        $costs = $this->rawQuery()->costsByCategory($this->companyId, new \DateTimeImmutable('2026-06-12'), new \DateTimeImmutable('2026-06-12'));
+
+        // Процессоры пишут каждую строку с двумя знаками: 2 × 1.00, а не округлённые 2.008.
+        self::assertSame(200, $costs[$this->codeOf('PremiumSubscription')]->net->amountMinor());
+    }
+
+    public function testUncategorizedCostsDrillDownByServiceCode(): void
+    {
+        $this->insertCost(300, 'charge', self::DAY, null, $this->byDayDocId);
+
+        $rows = (new OzonLedgerOperationsQuery($this->connection))
+            ->createCostsQueryBuilder($this->companyId, $this->from, $this->to, OzonReconciliationBlock::UNRECOGNIZED, OzonLedgerTotalsQuery::NO_CATEGORY_CODE)
+            ->executeQuery()->fetchAllAssociative();
+
+        self::assertCount(1, $rows);
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -302,7 +344,7 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
     /**
      * @param array<string, mixed> $payload
      */
-    private function seedDocument(string $companyId, string $endpoint, string $day, array $payload, string $type = 'accrual_by_day', ?string $to = null): string
+    private function seedDocument(string $companyId, string $endpoint, string $day, array $payload, string $type = 'accrual_by_day', ?string $to = null, string $status = 'completed'): string
     {
         $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
         self::assertNotNull($company);
@@ -310,6 +352,7 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::OZON)
             ->withDocumentType($type)
+            ->withProcessingStatus($status)
             ->withPeriod(new \DateTimeImmutable($day), new \DateTimeImmutable($to ?? $day))
             ->build();
         $doc->setApiEndpoint($endpoint);

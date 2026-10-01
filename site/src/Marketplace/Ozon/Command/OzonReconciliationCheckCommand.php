@@ -39,6 +39,7 @@ final class OzonReconciliationCheckCommand extends Command
 {
     private const TIMEZONE = 'Europe/Moscow';
     private const MAX_LOGGED_COMPANIES = 20;
+    private const MAX_LOGGED_FAILURES = 3;
 
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
@@ -83,6 +84,7 @@ final class OzonReconciliationCheckCommand extends Command
         $ledgerLines = 0;
         $realizationLines = 0;
         $failures = 0;
+        $failureSamples = [];
         $checked = 0;
         $redCompanies = [];
         $realizationCompanies = [];
@@ -126,6 +128,9 @@ final class OzonReconciliationCheckCommand extends Command
                     ));
                 } catch (\Throwable $e) {
                     ++$failures;
+                    if (count($failureSamples) < self::MAX_LOGGED_FAILURES) {
+                        $failureSamples[] = ['company_id' => $companyId, 'month' => $month->value(), 'exception' => $e::class];
+                    }
                     $output->writeln(sprintf('FAILED company %s %s: %s', $companyId, $month->value(), $e::class));
                     if (!$this->em->isOpen()) {
                         // Закрытый EntityManager дальше не восстановить: остаток обхода молча падал бы тем же.
@@ -161,6 +166,7 @@ final class OzonReconciliationCheckCommand extends Command
                 'raw_vs_ledger_mismatch_lines' => $ledgerLines,
                 'affected_companies' => count($redCompanies),
                 'failures' => $failures,
+                'failure_samples' => $failureSamples,
                 'company_ids' => array_slice(array_keys($redCompanies), 0, self::MAX_LOGGED_COMPANIES),
             ]);
 

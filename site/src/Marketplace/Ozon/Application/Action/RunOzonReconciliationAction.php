@@ -27,8 +27,8 @@ use Webmozart\Assert\Assert;
  * Сверка с Ozon за календарный месяц: собирает три источника, считает и сохраняет снимок.
  *
  * Идемпотентна: на (компания, период) живёт один снимок, повторный запуск пересоздаёт его строки.
- * Параллельный первый запуск одного периода упрётся в уникальный индекс — запуски идут последовательно
- * (команда, cron), поэтому гонка здесь не обрабатывается.
+ * Параллельные запуски одного периода (кнопка и ночной cron) сериализует транзакционная advisory-блокировка:
+ * второй ждёт первого и обновляет уже созданный снимок, а не падает на уникальном индексе.
  */
 final class RunOzonReconciliationAction
 {
@@ -73,6 +73,11 @@ final class RunOzonReconciliationAction
         $result = (new OzonReconciliationCalculator(OzonReconciliationTolerance::oneRuble(), self::CURRENCY))->calculate($inputs);
 
         $run = $this->em->wrapInTransaction(function () use ($companyId, $from, $to, $inputs, $result, $now): OzonReconciliationRun {
+            $this->em->getConnection()->executeStatement(
+                'SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))',
+                ['key' => sprintf('ozon_reconciliation:%s:%s', $companyId, $from->format('Y-m'))],
+            );
+
             $run = $this->runRepository->findByPeriod($companyId, $from, $to);
             if (null === $run) {
                 $run = new OzonReconciliationRun(Uuid::uuid7()->toString(), $companyId, $from, $to, self::CURRENCY);

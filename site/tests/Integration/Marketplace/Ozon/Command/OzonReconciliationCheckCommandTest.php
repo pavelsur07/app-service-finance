@@ -62,7 +62,7 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
 
         $listing = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('700000000')->build();
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
-            ->withDocumentType('accrual_by_day')->withPeriod(new \DateTimeImmutable(self::DAY), new \DateTimeImmutable(self::DAY))->build();
+            ->withDocumentType('accrual_by_day')->withProcessingStatus('completed')->withPeriod(new \DateTimeImmutable(self::DAY), new \DateTimeImmutable(self::DAY))->build();
         $doc->setApiEndpoint(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
         $doc->setRawData(['accruals' => [[
             'accrual_id' => 1, 'date' => self::DAY, 'unit_number' => 'A',

@@ -10,6 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Снимки сверки с Ozon: одна запись на компанию и период + строки по блокам и категориям.
  * Аддитивная миграция: существующие таблицы и данные не затрагиваются.
+ * Отдельного индекса (company_id, period_from) нет: его покрывает левый префикс уникального индекса.
  */
 final class Version20261001100000 extends AbstractMigration
 {
@@ -39,7 +40,6 @@ final class Version20261001100000 extends AbstractMigration
             )
         SQL);
         $this->addSql('CREATE UNIQUE INDEX uniq_mozrr_company_period ON marketplace_ozon_reconciliation_runs (company_id, period_from, period_to)');
-        $this->addSql('CREATE INDEX idx_mozrr_company_period_from ON marketplace_ozon_reconciliation_runs (company_id, period_from)');
         $this->addSql("COMMENT ON COLUMN marketplace_ozon_reconciliation_runs.period_from IS '(DC2Type:date_immutable)'");
         $this->addSql("COMMENT ON COLUMN marketplace_ozon_reconciliation_runs.period_to IS '(DC2Type:date_immutable)'");
         $this->addSql("COMMENT ON COLUMN marketplace_ozon_reconciliation_runs.checked_at IS '(DC2Type:datetime_immutable)'");

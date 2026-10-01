@@ -46,6 +46,8 @@
                             <span class="text-danger">Есть расхождения: {{ view.mismatchCount }}</span>
                         {% elseif view.status.value == 'no_data' %}
                             <span class="text-secondary">Данных недостаточно, чтобы подтвердить корректность</span>
+                        {% elseif not view.realizationPresent %}
+                            <span class="text-success">Учёт совпадает с сырыми данными Ozon за {{ view.monthLabel }}</span>
                         {% else %}
                             <span class="text-success">Данные за {{ view.monthLabel }} сходятся с Ozon</span>
                         {% endif %}
@@ -56,6 +58,8 @@
                             Строкам с расхождением доверять нельзя, пока причина не разобрана. Раскройте блок, чтобы увидеть категории и записи.
                         {% elseif view.status.value == 'no_data' %}
                             Часть источников не загружена — см. причины ниже. «Сошлось» не показывается, пока сверена только часть данных.
+                        {% elseif not view.realizationPresent %}
+                            Отчёт «Реализация» не загружен, поэтому сверка с официальным отчётом Ozon не выполнена: проверено только, что система не потеряла и не исказила загруженные данные. Допуск на строку — 1 ₽.
                         {% else %}
                             Допуск на строку — 1 ₽.
                         {% endif %}

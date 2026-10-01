@@ -18,6 +18,7 @@ final class OzonReconciliationRunBuilder
     private \DateTimeImmutable $periodTo;
     private OzonReconciliationStatus $status = OzonReconciliationStatus::MATCHED;
     private int $mismatchCount = 0;
+    private bool $realizationPresent = true;
 
     private function __construct()
     {
@@ -64,6 +65,14 @@ final class OzonReconciliationRunBuilder
         return $clone;
     }
 
+    public function withoutRealization(): self
+    {
+        $clone = clone $this;
+        $clone->realizationPresent = false;
+
+        return $clone;
+    }
+
     public function asNoData(): self
     {
         $clone = clone $this;
@@ -75,7 +84,7 @@ final class OzonReconciliationRunBuilder
     public function build(): OzonReconciliationRun
     {
         $run = new OzonReconciliationRun($this->id, $this->companyId, $this->periodFrom, $this->periodTo);
-        $run->recordResult(30, 30, true, 0, $this->status, $this->mismatchCount, new \DateTimeImmutable('2026-07-01 03:00:00'));
+        $run->recordResult(30, 30, $this->realizationPresent, 0, $this->status, $this->mismatchCount, new \DateTimeImmutable('2026-07-01 03:00:00'));
 
         return $run;
     }

@@ -6,6 +6,7 @@ namespace App\Marketplace\Ozon\Infrastructure\Query\Reconciliation;
 
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\CostBucket;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\LedgerFlowTotals;
 use App\Shared\Domain\ValueObject\Money;
@@ -20,7 +21,7 @@ use Doctrine\DBAL\Connection;
  */
 final readonly class OzonLedgerTotalsQuery
 {
-    private const NO_CATEGORY_CODE = 'ozon_no_category';
+    public const NO_CATEGORY_CODE = 'ozon_no_category';
 
     public function __construct(private Connection $connection)
     {
@@ -40,6 +41,7 @@ final readonly class OzonLedgerTotalsQuery
                   AND s.sale_date >= :from
                   AND s.sale_date <= :to
                   AND d.api_endpoint = :endpoint
+                  AND d.processing_status = :completed
                 SQL,
             $params,
         );
@@ -54,6 +56,7 @@ final readonly class OzonLedgerTotalsQuery
                   AND r.return_date >= :from
                   AND r.return_date <= :to
                   AND d.api_endpoint = :endpoint
+                  AND d.processing_status = :completed
                 SQL,
             $params,
         );
@@ -85,6 +88,7 @@ final readonly class OzonLedgerTotalsQuery
                   AND c.cost_date >= :from
                   AND c.cost_date <= :to
                   AND d.api_endpoint = :endpoint
+                  AND d.processing_status = :completed
                 GROUP BY 1
                 SQL,
             $this->params($companyId, $from, $to) + ['noCategory' => self::NO_CATEGORY_CODE],
@@ -137,6 +141,7 @@ final readonly class OzonLedgerTotalsQuery
             'companyId' => $companyId,
             'marketplace' => MarketplaceType::OZON->value,
             'endpoint' => MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value,
+            'completed' => PipelineStatus::COMPLETED->value,
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
         ];

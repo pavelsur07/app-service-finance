@@ -126,7 +126,7 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
         $sales = $crawler->filter('[data-testid="ozon-reconciliation-check-realization_vs_raw"] [data-testid="ozon-reconciliation-block"]');
         self::assertCount(1, $sales);
         self::assertStringContainsString('Нет данных', $sales->text());
-        self::assertSame(0, $sales->filter('a')->count());
+        self::assertCount(0, $sales->filter('a'));
         self::assertStringContainsString('Отчёт «Реализация»: загружен', preg_replace('/\s+/', ' ', $crawler->filter('[data-testid="ozon-reconciliation-reasons"]')->text()) ?? '');
     }
 
@@ -147,6 +147,15 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
         self::assertSame('matched', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-verdict"]')->attr('data-status'));
         self::assertStringContainsString('сходятся с Ozon', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-summary"]')->text());
+
+        // Без «Реализации» заголовок не утверждает сверку с Ozon: сверен только учёт с нашими сырыми данными.
+        $this->em()->persist(OzonReconciliationRunBuilder::aRun()->withIndex(3)->withCompanyId($companyId)->forMonth(2026, 7)->withoutRealization()->build());
+        $this->em()->flush();
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-07');
+        $summary = $client->getCrawler()->filter('[data-testid="ozon-reconciliation-summary"]')->text();
+        self::assertStringContainsString('Учёт совпадает с сырыми данными Ozon', $summary);
+        self::assertStringNotContainsString('сходятся с Ozon', $summary);
+        self::assertStringContainsString('не выполнена', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-verdict"]')->text());
     }
 
     public function testRunButtonLabelDependsOnSnapshot(): void
@@ -281,7 +290,7 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
     {
         $listing = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('700000000')->build();
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
-            ->withDocumentType('accrual_by_day')->withPeriod(new \DateTimeImmutable('2026-06-10'), new \DateTimeImmutable('2026-06-10'))->build();
+            ->withDocumentType('accrual_by_day')->withProcessingStatus('completed')->withPeriod(new \DateTimeImmutable('2026-06-10'), new \DateTimeImmutable('2026-06-10'))->build();
         $doc->setApiEndpoint(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
         $this->em()->persist($listing);
         $this->em()->persist($doc);

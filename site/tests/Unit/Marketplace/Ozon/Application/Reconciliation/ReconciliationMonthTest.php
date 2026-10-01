@@ -32,6 +32,8 @@ final class ReconciliationMonthTest extends TestCase
         yield 'месяц 00' => ['2026-00'];
         yield 'с днём' => ['2026-02-01'];
         yield 'мусор' => ['abc'];
+        yield 'слишком давно' => ['0001-01'];
+        yield 'слишком далеко' => ['9999-12'];
     }
 
     #[DataProvider('invalid')]

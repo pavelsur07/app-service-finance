@@ -6,6 +6,7 @@ namespace App\Marketplace\Ozon\Infrastructure\Query\Reconciliation;
 
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\CostBucket;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\RawFlowTotals;
 use App\Marketplace\Ozon\Application\Service\OzonAccrualServiceCategoryResolver;
@@ -38,6 +39,7 @@ final readonly class OzonRawAccrualTotalsQuery
             WHERE d.company_id = :companyId
               AND d.marketplace = :marketplace
               AND d.api_endpoint = :endpoint
+              AND d.processing_status = :completed
               AND d.period_from >= :from
               AND d.period_from <= :to
         ),
@@ -82,6 +84,7 @@ final readonly class OzonRawAccrualTotalsQuery
                 WHERE d.company_id = :companyId
                   AND d.marketplace = :marketplace
                   AND d.api_endpoint = :endpoint
+                  AND d.processing_status = :completed
                   AND d.period_from >= :from
                   AND d.period_from <= :to
                 ORDER BY day
@@ -107,9 +110,9 @@ final readonly class OzonRawAccrualTotalsQuery
                 FROM (
                     SELECT
                         CASE WHEN (pr.item -> 'commission' -> 'sale_amount' ->> 'amount') ~ :number
-                             THEN (pr.item -> 'commission' -> 'sale_amount' ->> 'amount')::numeric END AS sale_amount,
+                             THEN ROUND((pr.item -> 'commission' -> 'sale_amount' ->> 'amount')::numeric, 2) END AS sale_amount,
                         CASE WHEN (pr.item -> 'commission' -> 'sale_price' ->> 'amount') ~ :number
-                             THEN (pr.item -> 'commission' -> 'sale_price' ->> 'amount')::numeric END AS sale_price
+                             THEN ROUND((pr.item -> 'commission' -> 'sale_price' ->> 'amount')::numeric, 2) END AS sale_price
                     FROM product_rows pr
                 ) t
                 WHERE t.sale_amount IS NOT NULL
@@ -141,12 +144,12 @@ final readonly class OzonRawAccrualTotalsQuery
                 entries AS (
                     SELECT 'commission' AS kind, NULL::text AS type_id, NULL::text AS type_name,
                            CASE WHEN (pr.item -> 'commission' -> 'commission' ->> 'amount') ~ :number
-                                THEN (pr.item -> 'commission' -> 'commission' ->> 'amount')::numeric END AS amount
+                                THEN ROUND((pr.item -> 'commission' -> 'commission' ->> 'amount')::numeric, 2) END AS amount
                     FROM product_rows pr
                     UNION ALL
                     SELECT 'service', s.item ->> 'type_id', pr.payload -> 'service_types' ->> (s.item ->> 'type_id'),
                            CASE WHEN (s.item -> 'accrued' ->> 'amount') ~ :number
-                                THEN (s.item -> 'accrued' ->> 'amount')::numeric END
+                                THEN ROUND((s.item -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM product_rows pr
                     CROSS JOIN LATERAL jsonb_array_elements(
                         CASE WHEN jsonb_typeof(pr.item -> 'delivery' -> 'services') = 'array' THEN pr.item -> 'delivery' -> 'services' ELSE '[]'::jsonb END
@@ -155,7 +158,7 @@ final readonly class OzonRawAccrualTotalsQuery
                     UNION ALL
                     SELECT 'item_fee', f.item ->> 'type_id', ar.payload -> 'service_types' ->> (f.item ->> 'type_id'),
                            CASE WHEN (f.item -> 'accrued' ->> 'amount') ~ :number
-                                THEN (f.item -> 'accrued' ->> 'amount')::numeric END
+                                THEN ROUND((f.item -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM accrual_rows ar
                     CROSS JOIN LATERAL jsonb_array_elements(
                         CASE WHEN jsonb_typeof(ar.item -> 'item_fees' -> 'fees') = 'array' THEN ar.item -> 'item_fees' -> 'fees' ELSE '[]'::jsonb END
@@ -167,7 +170,7 @@ final readonly class OzonRawAccrualTotalsQuery
                     UNION ALL
                     SELECT 'non_item', ar.item -> 'non_item_fee' ->> 'type_id', ar.payload -> 'service_types' ->> (ar.item -> 'non_item_fee' ->> 'type_id'),
                            CASE WHEN (ar.item -> 'non_item_fee' -> 'accrued' ->> 'amount') ~ :number
-                                THEN (ar.item -> 'non_item_fee' -> 'accrued' ->> 'amount')::numeric END
+                                THEN ROUND((ar.item -> 'non_item_fee' -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM accrual_rows ar
                     WHERE jsonb_typeof(ar.item -> 'non_item_fee') = 'object'
                 )
@@ -207,6 +210,7 @@ final readonly class OzonRawAccrualTotalsQuery
             'companyId' => $companyId,
             'marketplace' => MarketplaceType::OZON->value,
             'endpoint' => MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value,
+            'completed' => PipelineStatus::COMPLETED->value,
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
         ];
