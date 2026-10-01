@@ -16,7 +16,8 @@ use Doctrine\DBAL\Connection;
 /**
  * Итоги сырых начислений Ozon (`/v1/finance/accrual/by-day`) за период — то, что Ozon отдал, до нашей обработки.
  *
- * Документ by-day: `raw_data = {accruals: [...], service_types: {type_id: name}}`, один на день.
+ * Документ by-day: `raw_data = {accruals: [...], service_types: {type_id: name}}`, один на день; если документов дня несколько
+ * (пересоздание), берётся самый свежий завершённо обработанный, чтобы день не считался дважды.
  * Разбор повторяет форму, по которой процессоры строят продажи, возвраты и затраты, но считает суммы заново
  * и независимо от них — иначе сверка проверяла бы процессор самим процессором.
  * Числа читаются только если похожи на число; не массивы на месте массивов пропускаются, а не роняют запрос.
@@ -34,7 +35,7 @@ final readonly class OzonRawAccrualTotalsQuery
      */
     private const ACCRUALS_CTE = <<<'SQL'
         WITH docs AS (
-            SELECT d.raw_data::jsonb AS payload
+            SELECT DISTINCT ON (d.period_from) d.raw_data::jsonb AS payload
             FROM marketplace_raw_documents d
             WHERE d.company_id = :companyId
               AND d.marketplace = :marketplace
@@ -42,6 +43,7 @@ final readonly class OzonRawAccrualTotalsQuery
               AND d.processing_status = :completed
               AND d.period_from >= :from
               AND d.period_from <= :to
+            ORDER BY d.period_from, d.synced_at DESC, d.id
         ),
         accrual_rows AS (
             SELECT a.item AS item, docs.payload AS payload

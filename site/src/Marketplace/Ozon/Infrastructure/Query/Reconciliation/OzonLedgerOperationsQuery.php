@@ -40,7 +40,7 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('s.sale_date >= :from')
             ->andWhere('s.sale_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
-            ->andWhere('d.processing_status = :completed')
+            ->andWhere(self::dayProcessed('s', 'sale_date'))
             ->orderBy('s.sale_date', 'DESC')
             ->addOrderBy('s.id', 'ASC');
     }
@@ -56,7 +56,7 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('r.return_date >= :from')
             ->andWhere('r.return_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
-            ->andWhere('d.processing_status = :completed')
+            ->andWhere(self::dayProcessed('r', 'return_date'))
             ->orderBy('r.return_date', 'DESC')
             ->addOrderBy('r.id', 'ASC');
     }
@@ -89,7 +89,7 @@ final readonly class OzonLedgerOperationsQuery
             ->andWhere('c.cost_date >= :from')
             ->andWhere('c.cost_date <= :to')
             ->andWhere('d.api_endpoint = :endpoint')
-            ->andWhere('d.processing_status = :completed')
+            ->andWhere(self::dayProcessed('c', 'cost_date'))
             ->orderBy('c.cost_date', 'DESC')
             ->addOrderBy('c.id', 'ASC');
 
@@ -118,6 +118,18 @@ final readonly class OzonLedgerOperationsQuery
         return $qb
             ->andWhere('cc.code IN (:blockCodes)')
             ->setParameter('blockCodes', [] === $codes ? [''] : $codes, ArrayParameterType::STRING);
+    }
+
+    /**
+     * День записи обработан завершённо: статус берётся у дня, а не у документа записи (см. `OzonLedgerTotalsQuery`).
+     */
+    private static function dayProcessed(string $alias, string $dateColumn): string
+    {
+        return sprintf(
+            'EXISTS (SELECT 1 FROM marketplace_raw_documents dc WHERE dc.company_id = %1$s.company_id AND dc.marketplace = :marketplace AND dc.api_endpoint = :endpoint AND dc.processing_status = :completed AND dc.period_from = %1$s.%2$s)',
+            $alias,
+            $dateColumn,
+        );
     }
 
     private function base(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): QueryBuilder
