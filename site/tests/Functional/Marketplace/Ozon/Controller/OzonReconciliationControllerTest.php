@@ -62,8 +62,7 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('[data-testid="ozon-reconciliation-summary"]', 'Есть расхождения: 2');
 
-        // Месяц чужого снимка (июль) не предлагается в выборе, а по прямой ссылке сверка «ещё не выполнялась».
-        self::assertCount(0, $client->getCrawler()->filter('option[value="2026-07"]'));
+        // Месяц чужого снимка (июль) в списке есть как обычный месяц, но данных чужой компании на нём нет.
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-07');
         self::assertSelectorExists('[data-testid="ozon-reconciliation-empty"]');
         self::assertSelectorNotExists('[data-testid="ozon-reconciliation-summary"]');
@@ -171,6 +170,24 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
 
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-05');
         self::assertStringContainsString('Выполнить сверку', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
+    }
+
+    public function testMonthListOffersLastYearEvenWithoutSnapshots(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/ozon-reconciliation');
+
+        self::assertResponseIsSuccessful();
+        $values = $crawler->filter('#ozon-reconciliation-month option')->each(static fn ($o): string => (string) $o->attr('value'));
+        $currentMonth = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Moscow')))->format('Y-m');
+        $previousMonth = (new \DateTimeImmutable('first day of last month', new \DateTimeZone('Europe/Moscow')))->format('Y-m');
+        self::assertContains($currentMonth, $values);
+        self::assertContains($previousMonth, $values);
+        self::assertGreaterThanOrEqual(12, count($values));
+        self::assertCount(count($values), array_unique($values));
     }
 
     public function testInvalidMonthFallsBackWithoutError(): void
