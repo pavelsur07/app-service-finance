@@ -4,4 +4,4 @@ Baseline (01.10.2026, master 89e0a8f9): `make site-test-unit` — OK 3032 tests,
 Ветка: feat/marketplace-ozon-reconciliation.
 
 ## Текущее
-Stage 4 закрыт (stages/stage-4-report.md). Следующее: Stage 5 — UI вкладка (планирование, CLAUDE.frontend.md).
+Stage 5 закрыт (stages/stage-5-report.md). Следующее: Stage 6 — cron и алерт.

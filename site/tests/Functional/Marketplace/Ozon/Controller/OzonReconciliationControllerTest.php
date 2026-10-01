@@ -13,6 +13,10 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
+use App\Tests\Builders\Marketplace\OzonReconciliationLineBuilder;
+use App\Marketplace\Enum\OzonReconciliationBlock;
+use App\Marketplace\Enum\OzonReconciliationCheck;
+use App\Marketplace\Enum\OzonReconciliationStatus;
 use App\Tests\Builders\Marketplace\OzonReconciliationRunBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
@@ -56,13 +60,108 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
 
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('[data-testid="ozon-reconciliation-summary"]', 'расхождений: 2');
+        self::assertSelectorTextContains('[data-testid="ozon-reconciliation-summary"]', 'Есть расхождения: 2');
 
         // Месяц чужого снимка (июль) не предлагается в выборе, а по прямой ссылке сверка «ещё не выполнялась».
         self::assertCount(0, $client->getCrawler()->filter('option[value="2026-07"]'));
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-07');
         self::assertSelectorExists('[data-testid="ozon-reconciliation-empty"]');
         self::assertSelectorNotExists('[data-testid="ozon-reconciliation-summary"]');
+    }
+
+    public function testNavigationShowsReconciliationTab(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/ozon-reconciliation');
+
+        self::assertResponseIsSuccessful();
+        $tab = $crawler->filter('ul.nav-tabs a.nav-link.active');
+        self::assertCount(1, $tab);
+        self::assertStringContainsString('Сверка Ozon', $tab->text());
+
+        $other = $client->request('GET', '/marketplace/sales');
+        self::assertSame('/marketplace/ozon-reconciliation', $other->filter('ul.nav-tabs a:contains("Сверка Ozon")')->attr('href'));
+    }
+
+    public function testMismatchVerdictShowsVisibleReasonsNotesAndDrillDownLinks(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $companyId = (string) $company->getId();
+        $run = OzonReconciliationRunBuilder::aRun()->withCompanyId($companyId)->forMonth(2026, 6)->asMismatch(1)->build();
+        $line = OzonReconciliationLineBuilder::aLine()->withCompanyId($companyId)->withRunId($run->getId());
+        $this->em()->persist($run);
+        $this->em()->persist($line->withIndex(1)->forCheck(OzonReconciliationCheck::RAW_VS_LEDGER)->forBlock(OzonReconciliationBlock::LOGISTICS)
+            ->withAmounts(11800, 10000, OzonReconciliationStatus::MISMATCH)->build());
+        $this->em()->persist($line->withIndex(2)->forCheck(OzonReconciliationCheck::RAW_VS_LEDGER)->forBlock(OzonReconciliationBlock::LOGISTICS, 'ozon_logistic_direct')
+            ->withAmounts(11800, 10000, OzonReconciliationStatus::MISMATCH)->build());
+        $this->em()->persist($line->withIndex(3)->forCheck(OzonReconciliationCheck::REALIZATION_VS_RAW)->forBlock(OzonReconciliationBlock::SALES)
+            ->withAmounts(null, 116857, OzonReconciliationStatus::NO_DATA)->build());
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('mismatch', $crawler->filter('[data-testid="ozon-reconciliation-verdict"]')->attr('data-status'));
+        self::assertStringContainsString('Есть расхождения: 1', $crawler->filter('[data-testid="ozon-reconciliation-summary"]')->text());
+        self::assertStringContainsString('загружено дней 30 из 30', $crawler->filter('[data-testid="ozon-reconciliation-reasons"]')->text());
+
+        $logistics = $crawler->filter('[data-testid="ozon-reconciliation-check-raw_vs_ledger"] [data-testid="ozon-reconciliation-block"][data-block="logistics"]');
+        self::assertCount(1, $logistics);
+        self::assertStringContainsString('118.00', $logistics->text());
+        self::assertStringContainsString('-18.00', $logistics->text());
+        self::assertStringContainsString('Расхождение', $logistics->text());
+        // Блок с расхождением раскрыт, категория видна и ведёт в drill-down.
+        $category = $crawler->filter('[data-testid="ozon-reconciliation-category"]');
+        self::assertCount(1, $category);
+        self::assertStringContainsString('show', (string) $category->attr('class'));
+        self::assertStringContainsString('category=ozon_logistic_direct', (string) $category->filter('a')->attr('href'));
+        self::assertStringContainsString('kind=costs&block=logistics', (string) $logistics->filter('a')->attr('href'));
+
+        // «Реализация» не загружена: прочерк вместо нуля, без ссылки на записи.
+        $sales = $crawler->filter('[data-testid="ozon-reconciliation-check-realization_vs_raw"] [data-testid="ozon-reconciliation-block"]');
+        self::assertCount(1, $sales);
+        self::assertStringContainsString('Нет данных', $sales->text());
+        self::assertSame(0, $sales->filter('a')->count());
+        self::assertStringContainsString('Отчёт «Реализация»: загружен', preg_replace('/\s+/', ' ', $crawler->filter('[data-testid="ozon-reconciliation-reasons"]')->text()) ?? '');
+    }
+
+    public function testNoDataAndMatchedVerdictsDoNotClaimMoreThanTheyKnow(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $companyId = (string) $company->getId();
+        $this->em()->persist(OzonReconciliationRunBuilder::aRun()->withIndex(1)->withCompanyId($companyId)->forMonth(2026, 5)->asNoData()->build());
+        $this->em()->persist(OzonReconciliationRunBuilder::aRun()->withIndex(2)->withCompanyId($companyId)->forMonth(2026, 6)->build());
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-05');
+        self::assertSame('no_data', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-verdict"]')->attr('data-status'));
+        self::assertStringContainsString('Данных недостаточно', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-summary"]')->text());
+
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
+        self::assertSame('matched', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-verdict"]')->attr('data-status'));
+        self::assertStringContainsString('сходятся с Ozon', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-summary"]')->text());
+    }
+
+    public function testRunButtonLabelDependsOnSnapshot(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $this->em()->persist(OzonReconciliationRunBuilder::aRun()->withCompanyId((string) $company->getId())->forMonth(2026, 6)->build());
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
+        self::assertStringContainsString('Пересчитать сверку', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
+
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-05');
+        self::assertStringContainsString('Выполнить сверку', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
     }
 
     public function testInvalidMonthFallsBackWithoutError(): void

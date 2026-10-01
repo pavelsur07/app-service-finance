@@ -64,6 +64,14 @@ final class OzonReconciliationRunBuilder
         return $clone;
     }
 
+    public function asNoData(): self
+    {
+        $clone = clone $this;
+        $clone->status = OzonReconciliationStatus::NO_DATA;
+
+        return $clone;
+    }
+
     public function build(): OzonReconciliationRun
     {
         $run = new OzonReconciliationRun($this->id, $this->companyId, $this->periodFrom, $this->periodTo);
