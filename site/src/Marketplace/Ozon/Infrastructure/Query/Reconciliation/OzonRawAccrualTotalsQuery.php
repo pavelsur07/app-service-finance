@@ -31,6 +31,10 @@ final readonly class OzonRawAccrualTotalsQuery
 
     /**
      * Общая часть: документы периода → начисления периода.
+     *
+     * По строкам тянется только справочник `service_types` (мелкий), а не весь документ: CTE материализуется,
+     * и документ в 2 МБ, скопированный в каждое из ~2000 начислений дня, превращал пересчёт месяца
+     * у крупного кабинета в минуты и гигабайты временных данных.
      * Дата начисления — календарная строка `Y-m-d`, сравнивается как строка.
      */
     private const ACCRUALS_CTE = <<<'SQL'
@@ -46,7 +50,7 @@ final readonly class OzonRawAccrualTotalsQuery
             ORDER BY d.period_from, d.synced_at DESC, d.id
         ),
         accrual_rows AS (
-            SELECT a.item AS item, docs.payload AS payload
+            SELECT a.item AS item, docs.payload -> 'service_types' AS service_types
             FROM docs
             CROSS JOIN LATERAL jsonb_array_elements(
                 CASE WHEN jsonb_typeof(docs.payload -> 'accruals') = 'array' THEN docs.payload -> 'accruals' ELSE '[]'::jsonb END
@@ -56,7 +60,7 @@ final readonly class OzonRawAccrualTotalsQuery
               AND (a.item ->> 'date') <= :to
         ),
         product_rows AS (
-            SELECT p.item AS item, ar.payload AS payload
+            SELECT p.item AS item, ar.service_types AS service_types
             FROM accrual_rows ar
             CROSS JOIN LATERAL jsonb_array_elements(
                 CASE WHEN jsonb_typeof(ar.item -> 'posting' -> 'products') = 'array' THEN ar.item -> 'posting' -> 'products' ELSE '[]'::jsonb END
@@ -149,7 +153,7 @@ final readonly class OzonRawAccrualTotalsQuery
                                 THEN ROUND((pr.item -> 'commission' -> 'commission' ->> 'amount')::numeric, 2) END AS amount
                     FROM product_rows pr
                     UNION ALL
-                    SELECT 'service', s.item ->> 'type_id', pr.payload -> 'service_types' ->> (s.item ->> 'type_id'),
+                    SELECT 'service', s.item ->> 'type_id', pr.service_types ->> (s.item ->> 'type_id'),
                            CASE WHEN (s.item -> 'accrued' ->> 'amount') ~ :number
                                 THEN ROUND((s.item -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM product_rows pr
@@ -158,7 +162,7 @@ final readonly class OzonRawAccrualTotalsQuery
                     ) AS s(item)
                     WHERE jsonb_typeof(s.item) = 'object'
                     UNION ALL
-                    SELECT 'item_fee', f.item ->> 'type_id', ar.payload -> 'service_types' ->> (f.item ->> 'type_id'),
+                    SELECT 'item_fee', f.item ->> 'type_id', ar.service_types ->> (f.item ->> 'type_id'),
                            CASE WHEN (f.item -> 'accrued' ->> 'amount') ~ :number
                                 THEN ROUND((f.item -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM accrual_rows ar
@@ -170,7 +174,7 @@ final readonly class OzonRawAccrualTotalsQuery
                     ) AS f(item)
                     WHERE jsonb_typeof(g.item) = 'object' AND jsonb_typeof(f.item) = 'object'
                     UNION ALL
-                    SELECT 'non_item', ar.item -> 'non_item_fee' ->> 'type_id', ar.payload -> 'service_types' ->> (ar.item -> 'non_item_fee' ->> 'type_id'),
+                    SELECT 'non_item', ar.item -> 'non_item_fee' ->> 'type_id', ar.service_types ->> (ar.item -> 'non_item_fee' ->> 'type_id'),
                            CASE WHEN (ar.item -> 'non_item_fee' -> 'accrued' ->> 'amount') ~ :number
                                 THEN ROUND((ar.item -> 'non_item_fee' -> 'accrued' ->> 'amount')::numeric, 2) END
                     FROM accrual_rows ar
