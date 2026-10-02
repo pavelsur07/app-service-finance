@@ -193,6 +193,11 @@ Read-only проверки можно выполнять после запрос
   `ozon-reconciliation:check` в wrapper намеренно не добавлен — это ночной обход всех
   компаний (cron 07:10 в контейнере scheduler).
 
+- `app:marketplace:ozon-realization-poll` (cron каждый час, `:17`) — опрос и автозагрузка «Реализации» Ozon в окне 18:00 МСК 1-го — 8-е число; пишет сырой документ и статус пары,
+  ставит обработку (строки `marketplace_ozon_realizations`, пересчёт сверки). Мутирует прод, в `codex-console` не добавлен. `app:marketplace:ozon-realization-check`
+  (cron 07:20, с 9-го по 16-е) — read-only гейт; при красном: у кого нет отчёта, видно в выводе (`MISSING company … : <статус>`); починка — ручная загрузка отчёта
+  (синхронизация подключения или `ozon-realization-sync --company-id --year --month` по просьбе Владельца) либо обновление ключа при `auth_failed`.
+
 - `app:marketplace:wb-costs:unrecognized-check [--days-back=N]` — read-only гейт
   нераспознанных затрат WB: за окно N дней (по умолчанию 14, как
   `--refresh-days-back` ночного orchestrate, максимум 90) у активных

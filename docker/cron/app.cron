@@ -185,8 +185,17 @@
 # Scheduler container uses TZ=Europe/Moscow, so this starts at 06:15 MSK.
 15 6 * * * cd /app && php bin/console app:marketplace-ads:wb-daily-spend --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
-0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod
+# Отчёт Ozon «Реализация» за прошлый месяц. Ozon формирует его не ранее 5–8 числа, поэтому одной попытки 5-го мало:
+# опрос идёт каждый час с 18:00 МСК 1-го числа до конца 8-го. Окно, срок повтора и статус пары (company × месяц)
+# решает сама команда (OzonRealizationPollWindow), вне окна она выходит сразу — расписание «каждый час» от месяца не зависит.
+# Загруженный отчёт обрабатывается автоматически (кроме месяцев с окончательно закрытым этапом «Продажи и возвраты»)
+# и сразу пересчитывает сверку Ozon. Ручная загрузка: app:marketplace:ozon-realization-sync.
+17 * * * * cd /app && php bin/console app:marketplace:ozon-realization-poll --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Гейт «Реализации» Ozon: с 9-го по 16-е число отчёт за прошлый месяц обязан быть получен и применён. Ненулевой exit code =
+# у кого-то отчёта нет (read-only). Починка под гейт — ручная загрузка («Проверить»/синхронизация подключения или
+# app:marketplace:ozon-realization-sync) либо обновление ключа при auth_failed; закрытый месяц (conflict) — только warning.
+20 7 * * * cd /app && php bin/console app:marketplace:ozon-realization-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Ежедневная пересборка предварительного («оперативного») закрытия
 # текущего открытого месяца для всех активных SELLER-подключений.
