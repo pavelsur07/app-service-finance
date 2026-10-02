@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace App\Marketplace\Ozon\Infrastructure\Api;
 
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Exception\MarketplaceApiException;
+use App\Marketplace\Exception\MarketplaceAuthException;
+use App\Marketplace\Exception\MarketplaceBadRequestException;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Загружает отчёт о реализации товаров Ozon за месяц.
@@ -24,6 +30,7 @@ final class OzonRealizationFetcher
 {
     private const BASE_URL = 'https://api-seller.ozon.ru';
     private const ENDPOINT = '/v2/finance/realization';
+    private const ERROR_EXCERPT_LIMIT = 300;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -35,7 +42,7 @@ final class OzonRealizationFetcher
     /**
      * @return array Полный ответ API: result.rows[], result.header_additional и т.д.
      *
-     * @throws \RuntimeException если API вернул ошибку
+     * @throws MarketplaceApiException если API вернул ошибку (лимит, сбой Ozon, ключ, «не готово»); сетевой сбой — TransportExceptionInterface
      */
     public function fetch(MarketplaceConnection $connection, int $year, int $month): array
     {
@@ -57,7 +64,7 @@ final class OzonRealizationFetcher
         $statusCode = $response->getStatusCode();
 
         if (200 !== $statusCode) {
-            throw new \RuntimeException(sprintf('Ozon realization API returned HTTP %d for %d-%02d', $statusCode, $year, $month));
+            throw $this->apiFailure($statusCode, $response, $year, $month);
         }
 
         $data = $response->toArray();
@@ -71,6 +78,35 @@ final class OzonRealizationFetcher
         ]);
 
         return $data;
+    }
+
+    /**
+     * Статус ответа → тип исключения, чтобы вызывающий отличал лимит, сбой Ozon, ключ и «отчёт ещё не готов».
+     * В исключение уезжает короткий фрагмент ответа неуспешного запроса (не данные продавца).
+     */
+    private function apiFailure(int $status, ResponseInterface $response, int $year, int $month): MarketplaceApiException
+    {
+        $from = sprintf('%04d-%02d-01', $year, $month);
+        $to = (new \DateTimeImmutable($from))->modify('last day of this month')->format('Y-m-d');
+        $excerpt = mb_substr($response->getContent(false), 0, self::ERROR_EXCERPT_LIMIT);
+
+        return match (true) {
+            429 === $status => new MarketplaceRateLimitException($status, $excerpt, $from, $to, $this->retryAfterSeconds($response)),
+            401 === $status, 403 === $status => new MarketplaceAuthException('Ozon realization API rejected the API key.', $status, $excerpt, $from, $to),
+            $status >= 500 => new MarketplaceTemporaryApiException('Ozon realization API is temporarily unavailable.', $status, $excerpt, $from, $to),
+            default => new MarketplaceBadRequestException(sprintf('Ozon realization API returned HTTP %d for %d-%02d', $status, $year, $month), $status, $excerpt, $from, $to),
+        };
+    }
+
+    private function retryAfterSeconds(ResponseInterface $response): ?int
+    {
+        try {
+            $value = $response->getHeaders(false)['retry-after'][0] ?? null;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_string($value) && ctype_digit(trim($value)) ? (int) trim($value) : null;
     }
 
     /**
