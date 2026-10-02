@@ -11,6 +11,7 @@ use App\Marketplace\Ozon\Application\Reconciliation\DTO\CostBucket;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\OzonReconciliationInputs;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\OzonReconciliationResult;
 use App\Marketplace\Ozon\Application\Reconciliation\DTO\ReconciledLine;
+use App\Marketplace\Ozon\Application\Service\OzonAccrualSyncPlanner;
 use App\Marketplace\Ozon\Domain\Reconciliation\OzonReconciliationBlockMap;
 use App\Marketplace\Ozon\Domain\Reconciliation\OzonReconciliationTolerance;
 use App\Shared\Domain\ValueObject\Money;
@@ -43,10 +44,21 @@ final readonly class OzonReconciliationCalculator
         $lines = [];
 
         // Реализация ↔ сырьё (база sale_price).
+        $wholeMonthNote = sprintf(
+            'Сырые данные Ozon по дням есть только с %s, а «Реализация» — за весь месяц: сравнение станет возможным для месяцев, начатых после этой даты',
+            (new \DateTimeImmutable(OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY))->format('d.m.Y'),
+        );
         foreach ([
             [OzonReconciliationBlock::SALES, $in->realization?->sales, $in->rawFlows->salesBuyerBase],
             [OzonReconciliationBlock::RETURNS, $in->realization?->returns, $in->rawFlows->returnsBuyerBase],
         ] as [$block, $source, $rawTarget]) {
+            // Сырьё покрывает месяц не целиком (сентябрь 2026: by-day с 08.09): суммы несопоставимы, это не расхождение.
+            if (!$in->rawCoversWholeMonth) {
+                $lines[] = $this->line(OzonReconciliationCheck::REALIZATION_VS_RAW, $block, '', $source, null, null, null, $wholeMonthNote);
+
+                continue;
+            }
+
             $target = $rawLoaded ? $rawTarget : null;
             $lines[] = $this->line(
                 OzonReconciliationCheck::REALIZATION_VS_RAW,
