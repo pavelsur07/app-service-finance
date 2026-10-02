@@ -194,6 +194,22 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
         self::assertCount(count($values), array_unique($values));
     }
 
+    public function testRealizationStateIsShownForMonthWithoutReport(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seed(1);
+        $this->em()->persist(OzonReconciliationRunBuilder::aRun()->withCompanyId((string) $company->getId())->forMonth(2026, 6)->withoutRealization()->build());
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
+
+        $state = $client->getCrawler()->filter('[data-testid="ozon-reconciliation-realization-state"]');
+        self::assertCount(1, $state);
+        self::assertSame('warning', $state->attr('data-tone'));
+        self::assertStringContainsString('загрузите отчёт вручную', $state->text());
+    }
+
     public function testInvalidMonthFallsBackWithoutError(): void
     {
         $client = static::createClient();

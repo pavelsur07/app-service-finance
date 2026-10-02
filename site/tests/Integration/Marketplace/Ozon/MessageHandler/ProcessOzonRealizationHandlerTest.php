@@ -74,6 +74,13 @@ final class ProcessOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_ozon_reconciliation_runs WHERE company_id = :c AND period_from = :f', ['c' => $this->companyId, 'f' => '2026-09-01']));
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT realization_present::int FROM marketplace_ozon_reconciliation_runs WHERE company_id = :c AND period_from = :f', ['c' => $this->companyId, 'f' => '2026-09-01']));
         self::assertSame([], $this->logsOf('error'));
+
+        // Итоги из сырого документа (источник сверки) совпадают с тем, что записала обработка.
+        $totals = (new OzonRealizationTotalsQuery($this->connection))->fetch($this->companyId, new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'));
+        self::assertNotNull($totals);
+        self::assertSame(20000, $totals->sales->amountMinor());
+        self::assertSame(5000, $totals->returns->amountMinor());
+        self::assertSame('50.00', $this->connection->fetchOne('SELECT SUM(return_amount)::numeric(12,2)::text FROM marketplace_ozon_realizations WHERE company_id = :c', ['c' => $this->companyId]));
     }
 
     public function testRedeliveryDoesNotReprocess(): void

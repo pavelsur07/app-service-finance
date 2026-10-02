@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Ozon\Controller;
 
 use App\Company\Security\ModuleAccess;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
+use App\Marketplace\Ozon\Application\Realization\OzonRealizationStateFactory;
 use App\Marketplace\Ozon\Application\Reconciliation\OzonReconciliationViewFactory;
 use App\Marketplace\Ozon\Application\Reconciliation\ReconciliationMonth;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Marketplace\Repository\OzonReconciliationLineRepository;
 use App\Marketplace\Repository\OzonReconciliationRunRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -33,6 +37,8 @@ final class OzonReconciliationController extends AbstractController
         private readonly OzonReconciliationRunRepository $runRepository,
         private readonly OzonReconciliationLineRepository $lineRepository,
         private readonly OzonReconciliationViewFactory $viewFactory,
+        private readonly MarketplaceFinancialReportSyncStatusRepository $realizationStatuses,
+        private readonly OzonRealizationStateFactory $realizationStateFactory,
         private readonly ClockInterface $clock,
     ) {
     }
@@ -48,6 +54,13 @@ final class OzonReconciliationController extends AbstractController
         $view = null === $run
             ? null
             : $this->viewFactory->create($run, $this->lineRepository->findByRun($companyId, $run->getId()));
+
+        $realizationState = null === $view ? null : $this->realizationStateFactory->create(
+            $month,
+            $view->realizationPresent,
+            $this->realizationStatuses->findByBusinessDay($companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, $month->from),
+            $this->clock->now(),
+        );
 
         // В списке месяцев — последний год (сверку можно запустить за любой из них), выбранный месяц и все месяцы со снимками.
         $months = [$month->value() => $month->label()];
@@ -67,6 +80,7 @@ final class OzonReconciliationController extends AbstractController
             'month_label' => $month->label(),
             'months' => $months,
             'view' => $view,
+            'realization_state' => $realizationState,
         ]);
     }
 }

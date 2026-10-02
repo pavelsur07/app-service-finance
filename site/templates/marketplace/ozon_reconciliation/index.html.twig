@@ -86,9 +86,8 @@
                             Сырые данные Ozon: загружено дней {{ view.rawDaysPresent }} из {{ view.rawDaysExpected }}
                             {% if view.rawDaysExpected == 0 %}<span class="text-muted">(для этого периода загрузка по дням не предусмотрена)</span>{% endif %}
                         </li>
-                        <li class="{{ view.realizationPresent ? '' : 'text-warning' }}">
-                            Отчёт «Реализация»:
-                            {% if view.realizationPresent %}загружен{% else %}не загружен (Ozon формирует его после закрытия месяца){% endif %}
+                        <li class="text-{{ realization_state.tone }}" data-testid="ozon-reconciliation-realization-state" data-tone="{{ realization_state.tone }}">
+                            Отчёт «Реализация»: {{ realization_state.text }}
                         </li>
                         {% if view.outsideRawCosts != '0.00' %}
                             <li class="text-muted">
