@@ -91,7 +91,9 @@ final class OzonRealizationCheckCommand extends Command
 
             $status = $this->statusRepository->findByBusinessDay($companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, $monthStart);
 
-            if (FinancialReportSyncStatus::SUCCESS === $status?->getStatus() || $this->appliedQuery->isApplied($companyId, $monthStart)) {
+            // Строки реализации принимаются как доказательство только когда конвейер пары не запускался (месяцы, применённые вручную
+            // до автоматизации): иначе старые строки скрыли бы изменённый отчёт, ждущий обработки.
+            if (FinancialReportSyncStatus::SUCCESS === $status?->getStatus() || (null === $status && $this->appliedQuery->isApplied($companyId, $monthStart))) {
                 ++$ok;
                 $output->writeln(sprintf('OK company %s', $companyId));
 

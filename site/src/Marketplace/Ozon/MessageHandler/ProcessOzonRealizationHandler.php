@@ -125,7 +125,12 @@ final class ProcessOzonRealizationHandler
         }
 
         // Action сбрасывает EntityManager каждые 250 строк, и `$status` после него отсоединён: его нельзя ни сохранять
-        // (persist вставил бы дубликат пары), ни помечать успехом. Перечитываем управляемый экземпляр.
+        // (persist вставил бы дубликат пары), ни помечать успехом. В отчёте поменьше 250 строк сброса нет, и в памяти остался
+        // устаревший экземпляр — загрузчик мог за это время сменить хеш в БД. Поэтому в обоих случаях сбрасываем менеджер и
+        // читаем состояние пары из базы заново.
+        if ($this->em->isOpen()) {
+            $this->em->clear();
+        }
         $status = $this->freshStatus($message);
         if (null === $status) {
             $this->logger->error('Ozon realization processing: status row disappeared', $context);

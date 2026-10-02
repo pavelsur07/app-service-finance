@@ -94,6 +94,12 @@ final class OzonRealizationStateFactoryTest extends TestCase
         $processing->markProcessing();
         self::assertStringContainsString('применяется', $this->factory->create($this->month('2026-09'), true, $processing, $now)->text);
 
+        $final = $this->pair();
+        $final->markFailedFinal('E', 'boom', null, null);
+        $state = $this->factory->create($this->month('2026-09'), true, $final, $now);
+        self::assertSame('danger', $state->tone);
+        self::assertStringContainsString('остановлена', $state->text);
+
         $failed = $this->pair();
         $failed->markFailedRetryable('E', 'boom', null, null, new \DateTimeImmutable('2026-10-03 11:00:00 Europe/Moscow'));
         $state = $this->factory->create($this->month('2026-09'), true, $failed, $now);

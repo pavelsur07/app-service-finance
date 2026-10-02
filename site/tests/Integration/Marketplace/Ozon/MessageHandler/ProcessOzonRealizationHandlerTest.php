@@ -30,6 +30,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\Events;
 use Psr\Log\AbstractLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
@@ -130,6 +131,32 @@ final class ProcessOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
         self::assertSame('2026-10-03 11:00:00', $status->getNextRetryAt()?->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m-d H:i:s'));
         self::assertNotSame([], $this->logsOf('error'));
+    }
+
+    public function testReportChangedDuringSmallProcessingIsNotMarkedSuccessful(): void
+    {
+        $status = $this->statuses()->findOrCreateForDay($this->connectionId, $this->companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, OzonRealizationReport::apiEndpoint(), new \DateTimeImmutable('2026-09-01'));
+        $status->markRawLoaded($this->docId, 2, 'old-hash');
+        $this->statuses()->save($status);
+        $this->em->flush();
+
+        // Загрузчик подменяет хеш, пока идёт обработка (во время flush внутри Action): отчёт меньше 250 строк, сброса менеджера нет.
+        $this->em->getEventManager()->addEventListener(Events::postFlush, new class($this->connection) {
+            public function __construct(private readonly \Doctrine\DBAL\Connection $connection)
+            {
+            }
+
+            public function postFlush(): void
+            {
+                $this->connection->executeStatement("UPDATE marketplace_financial_report_sync_statuses SET rows_hash = 'newer-hash' WHERE status = 'processing'");
+            }
+        });
+
+        $this->handle();
+
+        $after = $this->pairStatus();
+        self::assertNotSame(FinancialReportSyncStatus::SUCCESS, $after->getStatus());
+        self::assertSame('newer-hash', $after->getRowsHash());
     }
 
     public function testLargeReportSurvivesBatchClearsAndMarksSuccess(): void

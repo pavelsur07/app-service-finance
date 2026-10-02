@@ -55,6 +55,7 @@ final class OzonRealizationStateFactory
         return match ($status?->getStatus()) {
             FinancialReportSyncStatus::SUCCESS => new OzonRealizationState('success', 'загружена и применена в учёт'.$this->when($status->getFinishedAt())),
             FinancialReportSyncStatus::CONFLICT => new OzonRealizationState('warning', 'загружена, но не применена в учёт: этап «Продажи и возвраты» месяца закрыт'),
+            FinancialReportSyncStatus::FAILED_FINAL => new OzonRealizationState('danger', 'загружена, но не применена в учёт: автоматическая обработка остановлена после нескольких неудач — примените выручку вручную или обратитесь в поддержку'),
             FinancialReportSyncStatus::FAILED => new OzonRealizationState('warning', 'загружена, но обработка не удалась; повтор'.$this->retryAt($status)),
             FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING, FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::LOADING => new OzonRealizationState('secondary', 'загружена, применяется в учёт'),
             default => new OzonRealizationState('success', 'загружена'),

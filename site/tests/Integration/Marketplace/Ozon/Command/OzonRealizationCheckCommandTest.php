@@ -92,6 +92,36 @@ final class OzonRealizationCheckCommandTest extends IntegrationTestCase
         self::assertSame([], $this->logsOf('error'));
     }
 
+    public function testPartialRowsOfAnUnfinishedProcessingDoNotCountAsApplied(): void
+    {
+        $company = $this->seedCompany(1);
+        $this->seedAppliedRows($company);
+        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 0');
+
+        $tester = $this->runCommand(self::IN_PERIOD);
+
+        self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('MISSING company '.$company, $tester->getDisplay());
+    }
+
+    public function testPipelineStateWinsOverOldRows(): void
+    {
+        $company = $this->seedCompany(1);
+        $this->seedAppliedRows($company);
+        // Изменённый отчёт ждёт обработки: старые строки не должны скрывать это.
+        $connectionId = (string) $this->connection->fetchOne('SELECT id FROM marketplace_connections WHERE company_id = :c', ['c' => $company]);
+        $status = $this->statuses->findOrCreateForDay($connectionId, $company, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, OzonRealizationReport::apiEndpoint(), new \DateTimeImmutable('2026-09-01'));
+        $status->markRawLoaded(Uuid::uuid4()->toString(), 5, 'new-hash');
+        $this->statuses->save($status);
+        $this->em->flush();
+        $this->em->clear();
+
+        $tester = $this->runCommand(self::IN_PERIOD);
+
+        self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('MISSING company '.$company.': raw_loaded', $tester->getDisplay());
+    }
+
     public function testClosedStageIsWarningNotRed(): void
     {
         $company = $this->seedCompany(1);
@@ -191,6 +221,8 @@ final class OzonRealizationCheckCommandTest extends IntegrationTestCase
             ->withDocumentType('realization')->withPeriod(new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'))->build();
         $this->em->persist($doc);
         $this->em->flush();
+        // Первичная обработка дошла до конца (records_created пишется в её финале).
+        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 1 WHERE id = :id', ['id' => (string) $doc->getId()]);
         $this->connection->insert('marketplace_ozon_realizations', [
             'id' => Uuid::uuid4()->toString(), 'company_id' => $companyId, 'raw_document_id' => (string) $doc->getId(), 'sku' => '1',
             'seller_price_per_instance' => '10.00', 'quantity' => 1, 'total_amount' => '10.00',
