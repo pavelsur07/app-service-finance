@@ -49,13 +49,4 @@ final class OzonRealizationPollWindowTest extends TestCase
         self::assertSame($expectedReportMonth, sprintf('%04d-%02d', $window->reportYear, $window->reportMonth));
         self::assertSame($expectedReportMonth.'-01', $window->businessDate()->format('Y-m-d'));
     }
-
-    public function testWindowEndsAtTheEndOfTheEighthDayMoscow(): void
-    {
-        $window = OzonRealizationPollWindow::at(new \DateTimeImmutable('2026-10-03 10:00:00 Europe/Moscow'));
-
-        self::assertNotNull($window);
-        self::assertSame('2026-10-08 23:59:59', $window->closesAt->format('Y-m-d H:i:s'));
-        self::assertSame('Europe/Moscow', $window->closesAt->getTimezone()->getName());
-    }
 }

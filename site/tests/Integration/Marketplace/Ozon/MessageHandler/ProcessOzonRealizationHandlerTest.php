@@ -132,6 +132,56 @@ final class ProcessOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertNotSame([], $this->logsOf('error'));
     }
 
+    public function testLargeReportSurvivesBatchClearsAndMarksSuccess(): void
+    {
+        // Action сбрасывает EntityManager каждые 250 строк: статус пары после этого нужно перечитывать, иначе persist() вставил бы дубликат.
+        $rows = [];
+        for ($i = 1; $i <= 600; ++$i) {
+            $rows[] = ['item' => ['sku' => (string) (800000 + $i), 'offer_id' => 'O'.$i, 'name' => 'Товар '.$i], 'delivery_commission' => ['price_per_instance' => 10.0, 'quantity' => 1]];
+        }
+        $docId = $this->seedRealizationDocument($this->otherCompanyId, $rows);
+
+        $this->handle($this->otherCompanyId, $docId);
+
+        $status = $this->pairStatus($this->otherCompanyId);
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $status->getStatus());
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_financial_report_sync_statuses WHERE company_id = :c AND report_type = 'ozon_realization'", ['c' => $this->otherCompanyId]));
+        self::assertSame(600, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_ozon_realizations WHERE company_id = :c', ['c' => $this->otherCompanyId]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_ozon_reconciliation_runs WHERE company_id = :c AND period_from = :f', ['c' => $this->otherCompanyId, 'f' => '2026-09-01']));
+        self::assertSame([], $this->logsOf('error'));
+    }
+
+    public function testRepeatedProcessingFailuresBecomeTerminal(): void
+    {
+        $docId = $this->seedRealizationDocument($this->otherCompanyId, [
+            ['item' => ['sku' => '1', 'offer_id' => 'X', 'name' => 'Ломаный'], 'delivery_commission' => ['price_per_instance' => 1e12, 'quantity' => 1]],
+        ]);
+        $status = $this->statuses()->findOrCreateForDay($this->connectionId, $this->otherCompanyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, OzonRealizationReport::apiEndpoint(), new \DateTimeImmutable('2026-09-01'));
+        for ($i = 0; $i < 4; ++$i) {
+            $status->markLoading(FinancialReportSyncMode::POLL);
+        }
+        $this->statuses()->save($status);
+        $this->em->flush();
+
+        $this->handle($this->otherCompanyId, $docId);
+
+        $after = $this->pairStatus($this->otherCompanyId);
+        self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $after->getStatus());
+        self::assertNull($after->getNextRetryAt());
+    }
+
+    public function testForeignDocumentFailsAnExistingPairFinally(): void
+    {
+        $status = $this->statuses()->findOrCreateForDay($this->connectionId, $this->otherCompanyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, OzonRealizationReport::apiEndpoint(), new \DateTimeImmutable('2026-09-01'));
+        $status->markRawLoaded($this->docId, 2, 'hash');
+        $this->statuses()->save($status);
+        $this->em->flush();
+
+        $this->handle($this->otherCompanyId, $this->docId);
+
+        self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $this->pairStatus($this->otherCompanyId)->getStatus());
+    }
+
     public function testForeignDocumentIsRejectedWithoutTouchingStatus(): void
     {
         $this->handle($this->otherCompanyId, $this->docId);
@@ -191,7 +241,6 @@ final class ProcessOzonRealizationHandlerTest extends IntegrationTestCase
         $this->em->clear();
         $status = $this->statuses()->findByBusinessDay($companyId ?? $this->companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, new \DateTimeImmutable('2026-09-01'));
         self::assertNotNull($status);
-        self::assertSame(FinancialReportSyncMode::MANUAL, $status->getMode() ?? FinancialReportSyncMode::MANUAL);
 
         return $status;
     }

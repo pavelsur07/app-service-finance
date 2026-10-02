@@ -18,6 +18,7 @@ use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
+use App\Marketplace\Ozon\Application\Realization\OzonRealizationPollWindow;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Ozon\Infrastructure\Api\OzonRealizationFetcher;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
@@ -27,6 +28,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
@@ -49,6 +51,7 @@ final class SyncOzonRealizationHandler
     private const TEMPORARY_RETRY = 'PT30M';
     private const DEFAULT_RATE_LIMIT_RETRY_SECONDS = 900;
     private const MIN_RATE_LIMIT_RETRY_SECONDS = 60;
+    private const MAX_RATE_LIMIT_RETRY_SECONDS = 3600;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -131,9 +134,13 @@ final class SyncOzonRealizationHandler
         // Хеш и статус прошлой загрузки нужны, чтобы не обрабатывать повторно тот же отчёт: markLoading() их сбрасывает.
         $previousStatus = $status->getStatus();
         $previousHash = $status->getRowsHash();
-        $status->markLoading($status->getMode() ?? FinancialReportSyncMode::MANUAL);
-        $this->statusRepository->save($status);
-        $this->em->flush();
+        // Пара, уже получившая успех, не «разжалуется» неудачной перепроверкой (ручная загрузка, пустой ответ, сбой Ozon):
+        // данные в учёте верны, а понижение статуса краснило бы гейт и заставляло опрос перезаливать месяц.
+        $keepSuccess = FinancialReportSyncStatus::SUCCESS === $previousStatus;
+        if (!$keepSuccess) {
+            $status->markLoading($status->getMode() ?? FinancialReportSyncMode::MANUAL);
+            $this->saveAndFlush($status);
+        }
 
         $context = [
             'company_id' => $message->companyId,
@@ -148,47 +155,74 @@ final class SyncOzonRealizationHandler
             $rows = $rawData['result']['rows'] ?? [];
 
             if (!is_array($rows) || [] === $rows) {
-                $this->deferNotReady($status, $context, 'empty response');
+                $this->deferNotReady($status, $keepSuccess, $context, 'empty response');
 
                 return;
             }
 
             $rawDocId = $this->storeDocument($company, $rawData, $rows, $year, $month);
             $hash = hash('sha256', json_encode($rows, \JSON_UNESCAPED_UNICODE) ?: '');
+
+            if ($keepSuccess && $previousHash === $hash) {
+                // Тот же отчёт уже обработан: статус не трогаем, строки не пересоздаём.
+                $this->logger->info('Ozon realization unchanged since the last processing', $context + ['raw_doc_id' => $rawDocId]);
+
+                return;
+            }
+
             $status->markRawLoaded($rawDocId, count($rows), $hash);
             $this->saveAndFlush($status);
 
             $this->logger->info('Ozon realization raw document stored', $context + ['raw_doc_id' => $rawDocId, 'rows_count' => count($rows)]);
 
-            if (FinancialReportSyncStatus::SUCCESS === $previousStatus && $previousHash === $hash) {
-                // Тот же отчёт уже обработан: возвращаем успех, не пересоздавая строки.
-                $status->markSuccess();
-                $this->saveAndFlush($status);
-
-                return;
-            }
-
             $this->dispatchProcessing($status, $message, $rawDocId, $context);
         } catch (MarketplaceAuthException $e) {
-            $status->markAuthFailed($e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt());
-            $this->saveAndFlush($status);
+            if (!$keepSuccess) {
+                $status->markAuthFailed($e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt());
+                $this->saveAndFlush($status);
+            }
             $this->logger->warning('Ozon realization sync: API key rejected', $context + ['http_status' => $e->getStatusCode()]);
         } catch (MarketplaceRateLimitException $e) {
-            $seconds = max(self::MIN_RATE_LIMIT_RETRY_SECONDS, $e->getRetryAfter() ?? self::DEFAULT_RATE_LIMIT_RETRY_SECONDS);
-            $status->markFailedRetryable($e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt(), $this->clock->now()->modify(sprintf('+%d seconds', $seconds)));
-            $this->saveAndFlush($status);
+            $seconds = min(self::MAX_RATE_LIMIT_RETRY_SECONDS, max(self::MIN_RATE_LIMIT_RETRY_SECONDS, $e->getRetryAfter() ?? self::DEFAULT_RATE_LIMIT_RETRY_SECONDS));
+            if (!$keepSuccess) {
+                $status->markFailedRetryable($e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt(), $this->clock->now()->modify(sprintf('+%d seconds', $seconds)));
+                $this->saveAndFlush($status);
+            }
             $this->logger->warning('Ozon realization sync: rate limited, will retry', $context + ['retry_in_seconds' => $seconds]);
+            $this->retryOutsideWindow($message, $e, $seconds * 1000);
         } catch (MarketplaceBadRequestException $e) {
             // Отчёт за месяц ещё не сформирован: Ozon отвечает ошибкой клиента. Это ожидание, а не сбой.
-            $this->deferNotReady($status, $context, sprintf('HTTP %d', $e->getStatusCode()));
+            $this->deferNotReady($status, $keepSuccess, $context, sprintf('HTTP %d', $e->getStatusCode()));
         } catch (MarketplaceTemporaryApiException|TransportExceptionInterface $e) {
-            $this->markRetryable($status, $e, $this->clock->now()->add(new \DateInterval(self::TEMPORARY_RETRY)));
+            if (!$keepSuccess) {
+                $this->markRetryable($status, $e, $this->clock->now()->add(new \DateInterval(self::TEMPORARY_RETRY)));
+            }
             $this->logger->warning('Ozon realization sync: temporary failure, will retry', $context + ['error_class' => $e::class]);
+            $this->retryOutsideWindow($message, $e, null);
+        } catch (RecoverableMessageHandlingException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             // Неожиданное (в т.ч. баг кода): повтор ведёт опрос, а инцидент виден сразу и не теряется до конца окна.
-            $this->markRetryable($status, $e, $this->clock->now()->add(new \DateInterval(self::NOT_READY_RETRY)));
-            $this->logger->error('Ozon realization sync failed', $context + ['error_class' => $e::class, 'error' => $e->getMessage()]);
+            if (!$keepSuccess) {
+                $this->markRetryable($status, $e, $this->clock->now()->add(new \DateInterval(self::NOT_READY_RETRY)));
+            }
+            $this->logger->error('Ozon realization sync failed', $context + ['error_class' => $e::class, 'error' => mb_substr($e->getMessage(), 0, 300)]);
+            $this->retryOutsideWindow($message, $e, null);
         }
+    }
+
+    /**
+     * Повторы внутри окна ведёт часовой опрос; загрузка вне окна (ручная кнопка, `ozon-realization-sync --year --month`)
+     * опросом не охвачена, поэтому сбой возвращается в Messenger и повторяется по его стратегии.
+     */
+    private function retryOutsideWindow(SyncOzonRealizationMessage $message, \Throwable $e, ?int $delayMs): void
+    {
+        $window = OzonRealizationPollWindow::at($this->clock->now());
+        if (null !== $window && $window->reportYear === $message->year && $window->reportMonth === $message->month) {
+            return;
+        }
+
+        throw new RecoverableMessageHandlingException($e::class, 0, $e, $delayMs);
     }
 
     /**
@@ -200,7 +234,7 @@ final class SyncOzonRealizationHandler
             $this->messageBus->dispatch(new ProcessOzonRealizationMessage($message->companyId, $message->connectionId, $rawDocId, $message->year, $message->month));
         } catch (\Throwable $e) {
             // Без постановки пара осталась бы в raw_loaded, которую опрос не берёт: переводим в failed с повтором.
-            $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 500), null, null, $this->clock->now()->add(new \DateInterval('PT10M')));
+            $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 300), null, null, $this->clock->now()->add(new \DateInterval('PT10M')));
             $this->saveAndFlush($status);
             $this->logger->warning('Ozon realization: processing could not be queued, will retry', $context + ['error_class' => $e::class]);
         }
@@ -209,8 +243,14 @@ final class SyncOzonRealizationHandler
     /**
      * @param array<string, mixed> $context
      */
-    private function deferNotReady(MarketplaceFinancialReportSyncStatus $status, array $context, string $reason): void
+    private function deferNotReady(MarketplaceFinancialReportSyncStatus $status, bool $keepSuccess, array $context, string $reason): void
     {
+        if ($keepSuccess) {
+            $this->logger->info('Ozon realization is not available now, keeping the processed state', $context + ['reason' => $reason]);
+
+            return;
+        }
+
         $status->markEmpty();
         $status->scheduleNextRetryAt($this->clock->now()->add(new \DateInterval(self::NOT_READY_RETRY)));
         $this->saveAndFlush($status);
@@ -223,7 +263,7 @@ final class SyncOzonRealizationHandler
         $statusCode = $e instanceof MarketplaceApiException ? $e->getStatusCode() : null;
         $excerpt = $e instanceof MarketplaceApiException ? $e->getResponseExcerpt() : null;
 
-        $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 500), $statusCode, $excerpt, $nextRetryAt);
+        $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 300), $statusCode, $excerpt, $nextRetryAt);
         $this->saveAndFlush($status);
     }
 

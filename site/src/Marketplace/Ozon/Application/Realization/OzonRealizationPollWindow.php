@@ -18,7 +18,6 @@ final readonly class OzonRealizationPollWindow
     private function __construct(
         public int $reportYear,
         public int $reportMonth,
-        public \DateTimeImmutable $closesAt,
     ) {
     }
 
@@ -39,11 +38,7 @@ final readonly class OzonRealizationPollWindow
 
         $reportMonth = $local->modify('first day of last month');
 
-        return new self(
-            (int) $reportMonth->format('Y'),
-            (int) $reportMonth->format('n'),
-            $local->modify('first day of this month')->setTime(23, 59, 59)->modify(sprintf('+%d days', self::LAST_DAY - 1)),
-        );
+        return new self((int) $reportMonth->format('Y'), (int) $reportMonth->format('n'));
     }
 
     public function businessDate(): \DateTimeImmutable

@@ -22,7 +22,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class OzonRealizationCheckCommandTest extends IntegrationTestCase
 {
-    private const IN_PERIOD = '2026-10-10 07:20:00 Europe/Moscow';
+    private const IN_PERIOD = '2026-10-09 07:20:00 Europe/Moscow';
 
     private MarketplaceFinancialReportSyncStatusRepository $statuses;
 
@@ -64,6 +64,18 @@ final class OzonRealizationCheckCommandTest extends IntegrationTestCase
         self::assertCount(1, $errors);
         self::assertSame(2, $errors[0]['context']['missing']);
         self::assertSame('2026-09', $errors[0]['context']['report_month']);
+    }
+
+    public function testStillMissingAfterTheFirstDayIsWarningOnly(): void
+    {
+        $this->seedCompany(1);
+
+        $tester = $this->runCommand('2026-10-12 07:20:00 Europe/Moscow');
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('missing count: 1', $tester->getDisplay());
+        self::assertSame([], $this->logsOf('error'));
+        self::assertCount(1, $this->logsOf('warning'));
     }
 
     public function testReceivedAndAppliedReportsAreGreen(): void
@@ -164,6 +176,7 @@ final class OzonRealizationCheckCommandTest extends IntegrationTestCase
             'success' => $status->markSuccess(),
             'conflict' => $status->markConflict('MonthStageClosed', 'closed', null, null),
             'auth' => $status->markAuthFailed('X', 'rejected', 403, null),
+            default => throw new \LogicException($kind),
         };
         $this->statuses->save($status);
         $this->em->flush();

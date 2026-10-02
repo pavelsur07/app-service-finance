@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  * и не зависит от ручного или автоматического шага «применить выручку», а источник остаётся независимым от учёта.
  * Правила разбора строки те же, что у `ProcessOzonRealizationAction`: строка без sku пропускается; продажа —
  * `delivery_commission` с количеством и ценой больше нуля (цена округляется до копеек), возврат — `return_commission`
- * с количеством и ценой больше нуля. Документ без строк — отчёт не загружен (`null`), а не нулевые продажи.
+ * с количеством и ценой больше нуля. Документ без строк — отчёт не загружен (`null`), а не нулевые продажи; отчёт, где у всех строк нет sku, загруженным считается (нули).
  */
 final readonly class OzonRealizationTotalsQuery
 {
@@ -63,12 +63,11 @@ final readonly class OzonRealizationTotalsQuery
                 )
                 SELECT
                     COUNT(*) AS rows_count,
-                    COALESCE(SUM(sale_price * sale_qty) FILTER (WHERE sale_price > 0 AND sale_qty > 0), 0) AS sales_amount,
-                    COALESCE(SUM(sale_qty) FILTER (WHERE sale_price > 0 AND sale_qty > 0), 0) AS sales_quantity,
-                    COALESCE(SUM(return_price * return_qty) FILTER (WHERE return_price > 0 AND return_qty > 0), 0) AS returns_amount,
-                    COALESCE(SUM(return_qty) FILTER (WHERE return_price > 0 AND return_qty > 0), 0) AS returns_quantity
+                    COALESCE(SUM(sale_price * sale_qty) FILTER (WHERE sku <> '' AND sale_price > 0 AND sale_qty > 0), 0) AS sales_amount,
+                    COALESCE(SUM(sale_qty) FILTER (WHERE sku <> '' AND sale_price > 0 AND sale_qty > 0), 0) AS sales_quantity,
+                    COALESCE(SUM(return_price * return_qty) FILTER (WHERE sku <> '' AND return_price > 0 AND return_qty > 0), 0) AS returns_amount,
+                    COALESCE(SUM(return_qty) FILTER (WHERE sku <> '' AND return_price > 0 AND return_qty > 0), 0) AS returns_quantity
                 FROM parsed
-                WHERE sku <> ''
                 SQL,
             [
                 'companyId' => $companyId,

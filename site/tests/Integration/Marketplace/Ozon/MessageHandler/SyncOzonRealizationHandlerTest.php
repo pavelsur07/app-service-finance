@@ -28,6 +28,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
@@ -36,6 +37,8 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
 
     private string $companyId;
     private string $connectionId;
+
+    private int $month = 9;
 
     /** @var \ArrayObject<int, array{level: string, message: string, context: array<mixed>}> */
     private \ArrayObject $logs;
@@ -138,6 +141,53 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
         self::assertNotNull($status->getNextRetryAt());
         self::assertSame([], $this->logsOf('error'));
+    }
+
+    public function testSuccessfulPairIsNeverDemotedByAFailedRecheck(): void
+    {
+        $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 10]])));
+        $status = $this->pairStatus();
+        $status->markProcessing();
+        $status->markSuccess();
+        $this->statuses()->save($status);
+        $this->em->flush();
+        $this->bus->exchangeArray([]);
+
+        foreach ([
+            new MockResponse($this->body([])),
+            new MockResponse('{"message":"not found"}', ['http_code' => 404]),
+            new MockResponse('', ['http_code' => 429, 'response_headers' => ['Retry-After: 120']]),
+            new MockResponse('boom', ['http_code' => 503]),
+            new MockResponse('{"message":"forbidden"}', ['http_code' => 403]),
+        ] as $response) {
+            $this->handle($response);
+            self::assertSame(FinancialReportSyncStatus::SUCCESS, $this->pairStatus()->getStatus());
+        }
+
+        self::assertCount(0, $this->bus);
+    }
+
+    public function testFailureOutsideThePollWindowIsReturnedToMessengerForRetry(): void
+    {
+        $this->month = 7; // окно открыто только для сентября: ручная загрузка июля опросом не охвачена
+
+        $this->expectException(RecoverableMessageHandlingException::class);
+
+        $this->handle(new MockResponse('boom', ['http_code' => 503]));
+    }
+
+    public function testFailureInsideThePollWindowIsLeftToThePoll(): void
+    {
+        $this->handle(new MockResponse('boom', ['http_code' => 503]));
+
+        self::assertSame(FinancialReportSyncStatus::FAILED, $this->pairStatus()->getStatus());
+    }
+
+    public function testRetryAfterIsCapped(): void
+    {
+        $this->handle(new MockResponse('', ['http_code' => 429, 'response_headers' => ['Retry-After: 999999']]));
+
+        self::assertSame('2026-10-03 11:00:00', $this->pairStatus()->getNextRetryAt()?->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m-d H:i:s'));
     }
 
     public function testEmptyResponseIsWaitingNotFailureAndKeepsNoDocument(): void
@@ -269,7 +319,7 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
             $logger,
         );
 
-        $handler(new SyncOzonRealizationMessage($this->companyId, $this->connectionId, 2026, 9));
+        $handler(new SyncOzonRealizationMessage($this->companyId, $this->connectionId, 2026, $this->month));
     }
 
     private function messageBus(): MessageBusInterface
@@ -303,7 +353,7 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
     private function pairStatus(): MarketplaceFinancialReportSyncStatus
     {
         $this->em->clear();
-        $status = $this->statuses()->findByBusinessDay($this->companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, new \DateTimeImmutable('2026-09-01'));
+        $status = $this->statuses()->findByBusinessDay($this->companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, new \DateTimeImmutable(sprintf('2026-%02d-01', $this->month)));
         self::assertNotNull($status);
         self::assertSame(FinancialReportSyncMode::MANUAL, $status->getMode());
 

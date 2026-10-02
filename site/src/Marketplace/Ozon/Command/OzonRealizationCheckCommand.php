@@ -27,7 +27,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - красным считается отсутствие отчёта, ошибка ключа и сбой обработки — чинится ручной загрузкой/«Применить выручку»
  *   или обновлением ключа; после этого пара становится `success` или строки появляются в `marketplace_ozon_realizations`;
  * - `conflict` (этап «Продажи/возвраты» закрыт) — `warning`: отчёт получен, а решение о закрытом месяце за человеком;
- * - гейт работает с 9-го по 16-е число (неделя на починку), дальше молчит, чтобы не краснеть до конца месяца.
+ * - гейт работает с 9-го по 16-е число (неделя на починку), дальше молчит, чтобы не краснеть до конца месяца;
+ * - `error` и ненулевой exit code — один раз, 9-го числа (человека будят один раз); с 10-го по 16-е отсутствие отчёта —
+ *   `warning` и строки в выводе: компания без продаж за месяц или с пустым отчётом Ozon иначе краснила бы гейт без возможности починить.
  */
 #[AsCommand(
     name: 'app:marketplace:ozon-realization-check',
@@ -118,6 +120,16 @@ final class OzonRealizationCheckCommand extends Command
         }
 
         if ([] === $missing || $reportOnly) {
+            return self::SUCCESS;
+        }
+
+        if ($day > self::FIRST_DAY) {
+            $this->logger->warning('Ozon realization report is still missing.', [
+                'report_month' => $monthStart->format('Y-m'),
+                'missing' => count($missing),
+                'company_ids' => array_slice(array_keys($missing), 0, self::MAX_LOGGED_COMPANIES),
+            ]);
+
             return self::SUCCESS;
         }
 

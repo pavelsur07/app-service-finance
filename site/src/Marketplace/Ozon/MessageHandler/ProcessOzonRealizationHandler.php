@@ -37,6 +37,8 @@ final class ProcessOzonRealizationHandler
 {
     private const LOCK_TTL_SECONDS = 900;
     private const RETRY = 'PT1H';
+    /** Сколько загрузок/обработок подряд допускаем до терминального сбоя: неустранимая ошибка иначе повторялась бы весь период. */
+    private const MAX_ATTEMPTS = 4;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -78,6 +80,8 @@ final class ProcessOzonRealizationHandler
         $document = $this->rawDocumentRepository->find($message->rawDocumentId);
         if (!$document instanceof MarketplaceRawDocument || (string) $document->getCompany()->getId() !== $message->companyId || 'realization' !== $document->getDocumentType() || MarketplaceType::OZON !== $document->getMarketplace()) {
             $this->logger->error('Ozon realization processing: document not found or does not belong to the company', $context);
+            // Без этого пара висела бы в raw_loaded/processing, и опрос ставил бы ту же обработку каждый час.
+            $this->failPairFinally($message);
 
             return;
         }
@@ -106,6 +110,7 @@ final class ProcessOzonRealizationHandler
             return;
         }
 
+        $startHash = $status->getRowsHash();
         $status->markProcessing();
         $this->saveAndFlush($status);
         $this->logger->info('Ozon realization processing started', $context);
@@ -113,17 +118,66 @@ final class ProcessOzonRealizationHandler
         try {
             $result = ($this->processAction)($message->companyId, $message->rawDocumentId);
         } catch (\Throwable $e) {
-            $this->logger->error('Ozon realization processing failed', $context + ['error_class' => $e::class, 'error' => $e->getMessage()]);
+            $this->logger->error('Ozon realization processing failed', $context + ['error_class' => $e::class, 'error' => mb_substr($e->getMessage(), 0, 300)]);
             $this->recordFailure($message, $e);
 
             return;
         }
 
-        $status->markSuccess();
-        $this->saveAndFlush($status);
+        // Action сбрасывает EntityManager каждые 250 строк, и `$status` после него отсоединён: его нельзя ни сохранять
+        // (persist вставил бы дубликат пары), ни помечать успехом. Перечитываем управляемый экземпляр.
+        $status = $this->freshStatus($message);
+        if (null === $status) {
+            $this->logger->error('Ozon realization processing: status row disappeared', $context);
+
+            return;
+        }
+
+        if ($status->getRowsHash() !== $startHash) {
+            // Пока шла обработка, загрузчик положил новую версию отчёта: успех относился бы к старой. Новую обработку он уже поставил.
+            $this->logger->info('Ozon realization changed during processing, newer version will be processed', $context);
+
+            return;
+        }
+
+        try {
+            $status->markSuccess();
+            $this->saveAndFlush($status);
+        } catch (\Throwable $e) {
+            $this->logger->error('Ozon realization processed but the status could not be saved', $context + ['error_class' => $e::class]);
+            $this->recordFailure($message, $e);
+
+            return;
+        }
+
         $this->logger->info('Ozon realization processed', $context + ['created' => $result['created'], 'updated' => $result['updated'], 'skipped' => $result['skipped']]);
 
         $this->refreshReconciliation($message, $context);
+    }
+
+    private function freshStatus(ProcessOzonRealizationMessage $message): ?MarketplaceFinancialReportSyncStatus
+    {
+        if (!$this->em->isOpen()) {
+            return null;
+        }
+
+        return $this->statusRepository->findByBusinessDay(
+            $message->companyId,
+            MarketplaceType::OZON,
+            OzonRealizationReport::REPORT_TYPE,
+            OzonRealizationReport::businessDate($message->year, $message->month),
+        );
+    }
+
+    private function failPairFinally(ProcessOzonRealizationMessage $message): void
+    {
+        $status = $this->freshStatus($message);
+        if (null === $status) {
+            return;
+        }
+
+        $status->markFailedFinal('DocumentMismatch', 'Документ отчёта не найден или принадлежит другой компании.', null, null);
+        $this->saveAndFlush($status);
     }
 
     /**
@@ -160,17 +214,16 @@ final class ProcessOzonRealizationHandler
         }
 
         $this->em->clear();
-        $status = $this->statusRepository->findByBusinessDay(
-            $message->companyId,
-            MarketplaceType::OZON,
-            OzonRealizationReport::REPORT_TYPE,
-            OzonRealizationReport::businessDate($message->year, $message->month),
-        );
+        $status = $this->freshStatus($message);
         if (null === $status) {
             return;
         }
 
-        $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 500), null, null, $this->clock->now()->add(new \DateInterval(self::RETRY)));
+        if ($status->getAttempts() >= self::MAX_ATTEMPTS) {
+            $status->markFailedFinal($e::class, mb_substr($e->getMessage(), 0, 300), null, null);
+        } else {
+            $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 300), null, null, $this->clock->now()->add(new \DateInterval(self::RETRY)));
+        }
         $this->saveAndFlush($status);
     }
 
@@ -179,12 +232,17 @@ final class ProcessOzonRealizationHandler
         try {
             $this->em->getConnection()->executeStatement(
                 'UPDATE marketplace_financial_report_sync_statuses
-                 SET status = :status, last_error_class = :errorClass, last_error_message = :errorMessage, next_retry_at = :nextRetryAt, finished_at = NULL, updated_at = :now
+                 SET status = CASE WHEN attempts >= :maxAttempts THEN :finalStatus ELSE :status END,
+                     last_error_class = :errorClass, last_error_message = :errorMessage,
+                     next_retry_at = CASE WHEN attempts >= :maxAttempts THEN NULL ELSE CAST(:nextRetryAt AS timestamp) END,
+                     finished_at = NULL, updated_at = :now
                  WHERE company_id = :companyId AND marketplace = :marketplace AND report_type = :reportType AND business_date = :businessDate',
                 [
                     'status' => FinancialReportSyncStatus::FAILED->value,
+                    'finalStatus' => FinancialReportSyncStatus::FAILED_FINAL->value,
+                    'maxAttempts' => self::MAX_ATTEMPTS,
                     'errorClass' => $e::class,
-                    'errorMessage' => mb_substr($e->getMessage(), 0, 500),
+                    'errorMessage' => mb_substr($e->getMessage(), 0, 300),
                     'nextRetryAt' => $this->clock->now()->add(new \DateInterval(self::RETRY))->format('Y-m-d H:i:s'),
                     'now' => $this->clock->now()->format('Y-m-d H:i:s'),
                     'companyId' => $message->companyId,
