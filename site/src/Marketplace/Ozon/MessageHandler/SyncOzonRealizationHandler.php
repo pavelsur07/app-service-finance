@@ -9,12 +9,14 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\FinancialReportSyncMode;
+use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceApiException;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
+use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Ozon\Infrastructure\Api\OzonRealizationFetcher;
@@ -25,6 +27,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 /**
@@ -51,6 +54,7 @@ final class SyncOzonRealizationHandler
         private readonly EntityManagerInterface $em,
         private readonly OzonRealizationFetcher $fetcher,
         private readonly MarketplaceFinancialReportSyncStatusRepository $statusRepository,
+        private readonly MessageBusInterface $messageBus,
         private readonly LockFactory $lockFactory,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -124,6 +128,9 @@ final class SyncOzonRealizationHandler
             OzonRealizationReport::apiEndpoint(),
             OzonRealizationReport::businessDate($year, $month),
         );
+        // Хеш и статус прошлой загрузки нужны, чтобы не обрабатывать повторно тот же отчёт: markLoading() их сбрасывает.
+        $previousStatus = $status->getStatus();
+        $previousHash = $status->getRowsHash();
         $status->markLoading($status->getMode() ?? FinancialReportSyncMode::MANUAL);
         $this->statusRepository->save($status);
         $this->em->flush();
@@ -147,11 +154,21 @@ final class SyncOzonRealizationHandler
             }
 
             $rawDocId = $this->storeDocument($company, $rawData, $rows, $year, $month);
-            $status->markRawLoaded($rawDocId, count($rows), hash('sha256', json_encode($rows, \JSON_UNESCAPED_UNICODE) ?: ''));
-            $this->statusRepository->save($status);
-            $this->em->flush();
+            $hash = hash('sha256', json_encode($rows, \JSON_UNESCAPED_UNICODE) ?: '');
+            $status->markRawLoaded($rawDocId, count($rows), $hash);
+            $this->saveAndFlush($status);
 
             $this->logger->info('Ozon realization raw document stored', $context + ['raw_doc_id' => $rawDocId, 'rows_count' => count($rows)]);
+
+            if (FinancialReportSyncStatus::SUCCESS === $previousStatus && $previousHash === $hash) {
+                // Тот же отчёт уже обработан: возвращаем успех, не пересоздавая строки.
+                $status->markSuccess();
+                $this->saveAndFlush($status);
+
+                return;
+            }
+
+            $this->dispatchProcessing($status, $message, $rawDocId, $context);
         } catch (MarketplaceAuthException $e) {
             $status->markAuthFailed($e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt());
             $this->saveAndFlush($status);
@@ -171,6 +188,21 @@ final class SyncOzonRealizationHandler
             // Неожиданное (в т.ч. баг кода): повтор ведёт опрос, а инцидент виден сразу и не теряется до конца окна.
             $this->markRetryable($status, $e, $this->clock->now()->add(new \DateInterval(self::NOT_READY_RETRY)));
             $this->logger->error('Ozon realization sync failed', $context + ['error_class' => $e::class, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function dispatchProcessing(MarketplaceFinancialReportSyncStatus $status, SyncOzonRealizationMessage $message, string $rawDocId, array $context): void
+    {
+        try {
+            $this->messageBus->dispatch(new ProcessOzonRealizationMessage($message->companyId, $message->connectionId, $rawDocId, $message->year, $message->month));
+        } catch (\Throwable $e) {
+            // Без постановки пара осталась бы в raw_loaded, которую опрос не берёт: переводим в failed с повтором.
+            $status->markFailedRetryable($e::class, mb_substr($e->getMessage(), 0, 500), null, null, $this->clock->now()->add(new \DateInterval('PT10M')));
+            $this->saveAndFlush($status);
+            $this->logger->warning('Ozon realization: processing could not be queued, will retry', $context + ['error_class' => $e::class]);
         }
     }
 

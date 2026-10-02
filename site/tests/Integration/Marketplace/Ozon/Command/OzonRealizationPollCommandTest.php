@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Marketplace\Ozon\Command;
 
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Ozon\Command\OzonRealizationPollCommand;
@@ -148,6 +149,36 @@ final class OzonRealizationPollCommandTest extends IntegrationTestCase
         self::assertCount(1, $this->bus);
         self::assertInstanceOf(SyncOzonRealizationMessage::class, $this->bus[0]);
         self::assertSame($other, $this->bus[0]->companyId);
+    }
+
+    public function testStuckLoadedReportGetsProcessingRequeuedButFreshOneDoesNot(): void
+    {
+        $company = $this->seedCompanyWithConnection(1);
+        $connectionId = (string) $this->connection->fetchOne('SELECT id FROM marketplace_connections WHERE company_id = :c', ['c' => $company]);
+        $rawDocId = Uuid::uuid4()->toString();
+        $status = $this->statuses->findOrCreateForDay($connectionId, $company, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, OzonRealizationReport::apiEndpoint(), new \DateTimeImmutable('2026-09-01'));
+        $status->markRawLoaded($rawDocId, 5, 'hash');
+        $this->statuses->save($status);
+        $this->em->flush();
+
+        // Обновлена только что: обработка ещё идёт, ничего не ставим.
+        $this->connection->executeStatement("UPDATE marketplace_financial_report_sync_statuses SET updated_at = '2026-10-03 09:45:00'");
+        $this->em->clear();
+        $fresh = $this->runCommand(self::IN_WINDOW);
+        self::assertCount(0, $this->bus);
+        self::assertStringContainsString('raw_loaded in progress', $fresh->getDisplay());
+
+        // Залипла на час и больше: ставим именно обработку, а не загрузку.
+        $this->connection->executeStatement("UPDATE marketplace_financial_report_sync_statuses SET updated_at = '2026-10-03 08:30:00'");
+        $this->em->clear();
+        $stuck = $this->runCommand(self::IN_WINDOW);
+
+        self::assertCount(1, $this->bus);
+        $message = $this->bus[0];
+        self::assertInstanceOf(ProcessOzonRealizationMessage::class, $message);
+        self::assertSame($rawDocId, $message->rawDocumentId);
+        self::assertSame(9, $message->month);
+        self::assertStringContainsString('processing re-queued: 1', $stuck->getDisplay());
     }
 
     public function testDryRunWritesAndDispatchesNothing(): void

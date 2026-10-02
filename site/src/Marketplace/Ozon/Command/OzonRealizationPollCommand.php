@@ -7,6 +7,7 @@ namespace App\Marketplace\Ozon\Command;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationPollWindow;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
@@ -42,6 +43,9 @@ final class OzonRealizationPollCommand extends Command
         FinancialReportSyncStatus::FAILED_FINAL,
         FinancialReportSyncStatus::CONFLICT,
     ];
+
+    /** Пара в raw_loaded/processing дольше этого срока считается «залипшей» (сообщение потеряно, воркер упал). */
+    private const STUCK_AFTER = 'PT1H';
 
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
@@ -90,6 +94,7 @@ final class OzonRealizationPollCommand extends Command
         $queued = 0;
         $skippedTerminal = 0;
         $skippedNotDue = 0;
+        $requeuedProcessing = 0;
 
         foreach ($connections as $companyId => $connectionId) {
             $status = $this->statusRepository->findByBusinessDay($companyId, MarketplaceType::OZON, OzonRealizationReport::REPORT_TYPE, $businessDate);
@@ -97,6 +102,23 @@ final class OzonRealizationPollCommand extends Command
             if (null !== $status && in_array($status->getStatus(), self::TERMINAL_STATUSES, true)) {
                 ++$skippedTerminal;
                 $output->writeln(sprintf('SKIP company %s: %s', $companyId, $status->getStatus()->value));
+
+                continue;
+            }
+
+            // Отчёт загружен, но обработка не дошла до конца: повторно ставим обработку, а не загрузку.
+            if (null !== $status && in_array($status->getStatus(), [FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING], true)) {
+                $rawDocumentId = $status->getRawDocumentId();
+                if (null !== $rawDocumentId && $status->getUpdatedAt() <= $now->sub(new \DateInterval(self::STUCK_AFTER))) {
+                    if (!$dryRun) {
+                        $this->messageBus->dispatch(new ProcessOzonRealizationMessage($companyId, $connectionId, $rawDocumentId, $window->reportYear, $window->reportMonth));
+                    }
+                    ++$requeuedProcessing;
+                    $output->writeln(sprintf('%s company %s: processing re-queued', $dryRun ? 'WOULD RE-QUEUE' : 'RE-QUEUED', $companyId));
+                } else {
+                    ++$skippedNotDue;
+                    $output->writeln(sprintf('SKIP company %s: %s in progress', $companyId, $status->getStatus()->value));
+                }
 
                 continue;
             }
@@ -140,7 +162,7 @@ final class OzonRealizationPollCommand extends Command
             $output->writeln(sprintf('QUEUED company %s', $companyId));
         }
 
-        $output->writeln(sprintf('companies: %d, queued: %d, skipped terminal: %d, skipped not due: %d', count($connections), $queued, $skippedTerminal, $skippedNotDue));
+        $output->writeln(sprintf('companies: %d, queued: %d, processing re-queued: %d, skipped terminal: %d, skipped not due: %d', count($connections), $queued, $requeuedProcessing, $skippedTerminal, $skippedNotDue));
         $output->writeln('finish');
 
         $this->logger->info('Ozon realization poll finished', [
@@ -148,6 +170,7 @@ final class OzonRealizationPollCommand extends Command
             'report_month' => $window->reportMonth,
             'companies' => count($connections),
             'queued' => $queued,
+            'processing_requeued' => $requeuedProcessing,
             'skipped_terminal' => $skippedTerminal,
             'skipped_not_due' => $skippedNotDue,
             'dry_run' => $dryRun,

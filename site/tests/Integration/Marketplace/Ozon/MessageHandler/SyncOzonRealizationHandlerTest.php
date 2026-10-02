@@ -9,6 +9,7 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Ozon\Infrastructure\Api\OzonRealizationFetcher;
@@ -26,6 +27,8 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
 {
@@ -37,11 +40,19 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
     /** @var \ArrayObject<int, array{level: string, message: string, context: array<mixed>}> */
     private \ArrayObject $logs;
 
+    /** @var \ArrayObject<int, object> */
+    private \ArrayObject $bus;
+
+    /** @var \ArrayObject<string, bool> */
+    private \ArrayObject $busControl;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->logs = new \ArrayObject();
+        $this->bus = new \ArrayObject();
+        $this->busControl = new \ArrayObject(['fails' => false]);
         $user = UserBuilder::aUser()->withIndex(1)->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
         $this->em->persist($user);
@@ -78,6 +89,55 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertNotSame($firstHash, $status->getRowsHash());
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id = :c AND document_type = 'realization'", ['c' => $this->companyId]));
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT records_count FROM marketplace_raw_documents WHERE id = :id', ['id' => $docId]));
+    }
+
+    public function testLoadedReportQueuesProcessingOnce(): void
+    {
+        $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 10]])));
+
+        self::assertCount(1, $this->bus);
+        $message = $this->bus[0];
+        self::assertInstanceOf(ProcessOzonRealizationMessage::class, $message);
+        self::assertSame($this->companyId, $message->companyId);
+        self::assertSame($this->connectionId, $message->connectionId);
+        self::assertSame(2026, $message->year);
+        self::assertSame(9, $message->month);
+        self::assertSame($this->pairStatus()->getRawDocumentId(), $message->rawDocumentId);
+    }
+
+    public function testSameReportAfterSuccessIsNotProcessedAgain(): void
+    {
+        $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 10]])));
+        $status = $this->pairStatus();
+        $status->markProcessing();
+        $status->markSuccess();
+        $this->statuses()->save($status);
+        $this->em->flush();
+        $this->bus->exchangeArray([]);
+
+        // Ozon отдал те же строки: успех сохраняется, обработка не ставится.
+        $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 10]])));
+
+        self::assertCount(0, $this->bus);
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $this->pairStatus()->getStatus());
+
+        // Ozon изменил отчёт: пара снова ждёт обработки.
+        $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 11]])));
+
+        self::assertCount(1, $this->bus);
+        self::assertSame(FinancialReportSyncStatus::RAW_LOADED, $this->pairStatus()->getStatus());
+    }
+
+    public function testQueueingFailureMovesPairToRetryInsteadOfLeavingItStuck(): void
+    {
+        $this->busControl['fails'] = true;
+
+        $this->handle(new MockResponse($this->body([['sku' => '1']])));
+
+        $status = $this->pairStatus();
+        self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
+        self::assertNotNull($status->getNextRetryAt());
+        self::assertSame([], $this->logsOf('error'));
     }
 
     public function testEmptyResponseIsWaitingNotFailureAndKeepsNoDocument(): void
@@ -155,9 +215,11 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
 
         $this->runHandler($client);
 
-        self::assertSame('POST', $captured[0]);
-        self::assertStringEndsWith('/v2/finance/realization', (string) $captured[1]);
-        self::assertSame(['month' => 9, 'year' => 2026], $captured[2]);
+        /** @var array{0: string, 1: string, 2: mixed} $request */
+        $request = $captured->getArrayCopy();
+        self::assertSame('POST', $request[0]);
+        self::assertStringEndsWith('/v2/finance/realization', $request[1]);
+        self::assertSame(['month' => 9, 'year' => 2026], $request[2]);
     }
 
     public function testInactiveConnectionIsSkippedWithoutStatus(): void
@@ -201,12 +263,36 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
             $this->em,
             new OzonRealizationFetcher($client, new NullLogger(), self::getContainer()->get(ConnectionApiKeyCodec::class)),
             $this->statuses(),
+            $this->messageBus(),
             new LockFactory(new InMemoryStore()),
             new MockClock(self::NOW),
             $logger,
         );
 
         $handler(new SyncOzonRealizationMessage($this->companyId, $this->connectionId, 2026, 9));
+    }
+
+    private function messageBus(): MessageBusInterface
+    {
+        return new class($this->bus, $this->busControl) implements MessageBusInterface {
+            /**
+             * @param \ArrayObject<int, object> $dispatched
+             * @param \ArrayObject<string, bool> $control
+             */
+            public function __construct(private readonly \ArrayObject $dispatched, private readonly \ArrayObject $control)
+            {
+            }
+
+            public function dispatch(object $message, array $stamps = []): Envelope
+            {
+                if ($this->control['fails']) {
+                    throw new \RuntimeException('bus down');
+                }
+                $this->dispatched->append($message);
+
+                return new Envelope($message);
+            }
+        };
     }
 
     private function statuses(): MarketplaceFinancialReportSyncStatusRepository
