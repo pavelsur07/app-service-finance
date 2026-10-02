@@ -29,7 +29,7 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
     private const COMPANY_ID = 'company-1';
     private const RAW_DOC_ID = '11111111-1111-4111-8111-111111111111';
 
-    /** @var list<array{externalOrderId: string, quantity: int, pricePerUnit: string, totalRevenue: string}> */
+    /** @var list<array{externalOrderId: string, quantity: int, pricePerUnit: string, totalRevenue: string, rawAccrualId: mixed}> */
     private array $persisted = [];
 
     public function testRevenueUsesSellerBasisLikeLegacyRowsInTheSameTable(): void

@@ -52,6 +52,11 @@ final class OzonAccrualRecordKey
      */
     public static function resolve(string $baseKey, string $accrualId, string $date, array $stamps): ?string
     {
+        // Это начисление уже записано под своим суффиксным ключом (например, базовую запись удалили): второй раз не пишем.
+        if (isset($stamps[self::suffixed($baseKey, $accrualId)])) {
+            return null;
+        }
+
         $known = $stamps[$baseKey] ?? null;
         if (null === $known) {
             return $baseKey;
@@ -61,8 +66,6 @@ final class OzonAccrualRecordKey
             return null;
         }
 
-        $suffixed = self::suffixed($baseKey, $accrualId);
-
-        return isset($stamps[$suffixed]) ? null : $suffixed;
+        return self::suffixed($baseKey, $accrualId);
     }
 }

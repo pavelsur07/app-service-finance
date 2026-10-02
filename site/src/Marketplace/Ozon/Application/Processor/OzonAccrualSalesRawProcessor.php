@@ -105,6 +105,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             OzonAccrualRecordKey::probeKeys($sales),
         );
 
+        $suffixedCount = 0;
         foreach ($sales as $sale) {
             $externalId = OzonAccrualRecordKey::resolve($sale['externalId'], $sale['accrualId'], $sale['date']->format('Y-m-d'), $stamps);
             if (null === $externalId) {
@@ -139,10 +140,21 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             }
 
             $this->em->persist($entity);
+            if ($externalId !== $sale['externalId']) {
+                ++$suffixedCount;
+            }
             $stamps[$externalId] = ['accrualId' => $sale['accrualId'], 'date' => $sale['date']->format('Y-m-d')];
         }
 
         $this->em->flush();
+
+        if ($suffixedCount > 0) {
+            // Объём наблюдаем: рост числа «вторых начислений» одного дня сигнализирует о переоформлении, а не о нескольких единицах.
+            $this->logger->info('[Ozon by-day] sales recorded under suffixed keys (several accruals of one posting on one day)', [
+                'company_id' => $companyId,
+                'count' => $suffixedCount,
+            ]);
+        }
     }
 
     /**
@@ -219,7 +231,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 // сходиться с sale_amount, иначе строка внутренне противоречива.
                 'pricePerUnit' => $this->money((float) $sellerPrice),
                 'totalRevenue' => $this->money((float) $saleAmount),
-                'raw' => $product + [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId],
+                'raw' => [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId] + $product,
             ];
         }
 

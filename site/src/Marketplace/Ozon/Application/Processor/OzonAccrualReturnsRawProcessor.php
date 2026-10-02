@@ -92,6 +92,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             OzonAccrualRecordKey::probeKeys($returns),
         );
 
+        $suffixedCount = 0;
         foreach ($returns as $return) {
             $externalId = OzonAccrualRecordKey::resolve($return['externalId'], $return['accrualId'], $return['date']->format('Y-m-d'), $stamps);
             if (null === $externalId) {
@@ -142,10 +143,21 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             }
 
             $this->em->persist($entity);
+            if ($externalId !== $return['externalId']) {
+                ++$suffixedCount;
+            }
             $stamps[$externalId] = ['accrualId' => $return['accrualId'], 'date' => $return['date']->format('Y-m-d')];
         }
 
         $this->em->flush();
+
+        if ($suffixedCount > 0) {
+            // Объём наблюдаем: рост числа «вторых начислений» одного дня сигнализирует о переоформлении, а не о нескольких единицах.
+            $this->logger->info('[Ozon by-day] returns recorded under suffixed keys (several accruals of one posting on one day)', [
+                'company_id' => $companyId,
+                'count' => $suffixedCount,
+            ]);
+        }
     }
 
     /**
@@ -225,7 +237,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 // 204 911.00 на 77 строках против суммы |sale_amount| по
                 // возвратам 204 911 на тех же 77. Сумма хранится положительной.
                 'refund' => $this->money(abs((float) $saleAmount)),
-                'raw' => $product + [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId],
+                'raw' => [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId] + $product,
             ];
         }
 
