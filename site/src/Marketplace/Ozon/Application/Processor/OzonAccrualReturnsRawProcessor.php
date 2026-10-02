@@ -11,6 +11,7 @@ use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Ozon\Application\Service\OzonAccrualRecordKey;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -86,13 +87,15 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             array_fill_keys(array_column($returns, 'sku'), null),
         );
 
-        $existing = $this->returnRepository->getExistingExternalIds(
+        $stamps = $this->returnRepository->getAccrualStamps(
             $companyId,
-            array_values(array_unique(array_column($returns, 'externalId'))),
+            OzonAccrualRecordKey::probeKeys($returns),
         );
 
+        $suffixedCount = 0;
         foreach ($returns as $return) {
-            if (isset($existing[$return['externalId']])) {
+            $externalId = OzonAccrualRecordKey::resolve($return['externalId'], $return['accrualId'], $return['date']->format('Y-m-d'), $stamps);
+            if (null === $externalId) {
                 continue;
             }
 
@@ -112,7 +115,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 MarketplaceType::OZON,
             );
 
-            $entity->setExternalReturnId($return['externalId']);
+            $entity->setExternalReturnId($externalId);
             $entity->setReturnDate($return['date']);
             $entity->setQuantity($return['quantity']);
             $entity->setRefundAmount($return['refund']);
@@ -140,16 +143,27 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             }
 
             $this->em->persist($entity);
-            $existing[$return['externalId']] = true;
+            if ($externalId !== $return['externalId']) {
+                ++$suffixedCount;
+            }
+            $stamps[$externalId] = ['accrualId' => $return['accrualId'], 'date' => $return['date']->format('Y-m-d')];
         }
 
         $this->em->flush();
+
+        if ($suffixedCount > 0) {
+            // Объём наблюдаем: рост числа «вторых начислений» одного дня сигнализирует о переоформлении, а не о нескольких единицах.
+            $this->logger->info('[Ozon by-day] returns recorded under suffixed keys (several accruals of one posting on one day)', [
+                'company_id' => $companyId,
+                'count' => $suffixedCount,
+            ]);
+        }
     }
 
     /**
      * @param array<string, mixed> $row
      *
-     * @return list<array{externalId: string, saleExternalId: string, sku: string, date: \DateTimeImmutable, quantity: int, refund: string, raw: array<string, mixed>}>
+     * @return list<array{externalId: string, accrualId: string, saleExternalId: string, sku: string, date: \DateTimeImmutable, quantity: int, refund: string, raw: array<string, mixed>}>
      */
     private function extractReturns(array $row): array
     {
@@ -213,6 +227,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
 
             $returns[] = [
                 'externalId' => sprintf('ozon-accrual-%s-return-product-%d', $postingRef, $index),
+                'accrualId' => $accrualId,
                 'saleExternalId' => OzonAccrualSalesRawProcessor::externalId($postingRef, $index),
                 'sku' => $sku,
                 'date' => $date,
@@ -222,7 +237,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 // 204 911.00 на 77 строках против суммы |sale_amount| по
                 // возвратам 204 911 на тех же 77. Сумма хранится положительной.
                 'refund' => $this->money(abs((float) $saleAmount)),
-                'raw' => $product,
+                'raw' => [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId] + $product,
             ];
         }
 

@@ -87,6 +87,38 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertSame([], $this->persisted);
     }
 
+    public function testAnotherReturnAccrualOfTheSamePostingOnTheSameDayIsAnIndependentReturn(): void
+    {
+        $first = $this->returnRow();
+        $second = $this->returnRow();
+        $second['accrual_id'] = 50000000098;
+        $second['posting']['products'][0]['commission']['sale_amount']['amount'] = '-1000';
+        $second['posting']['products'][0]['commission']['seller_price']['amount'] = '-1000';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$first, $second], self::RAW_DOC_ID);
+
+        // Разные суммы одного отправления в один день — два возврата (частичные возвраты), а не один.
+        self::assertCount(2, $this->persisted);
+        self::assertStringEndsWith('-acc50000000098', $this->persisted[1]['externalId']);
+        self::assertSame('1000.00', $this->persisted[1]['refund']);
+        self::assertSame('2647.00', $this->persisted[0]['refund']);
+    }
+
+    public function testReturnKeyHeldByHistoricalOrOtherDayRecordBlocksAsBefore(): void
+    {
+        $other = $this->returnRow();
+        $other['accrual_id'] = 50000000098;
+        $base = 'ozon-accrual-80000002-1002-1-return-product-0';
+
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
+        self::assertSame([], $this->persisted);
+
+        $this->processor(stamps: [$base => ['accrualId' => '50000000002', 'date' => '2026-05-31']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
+        self::assertSame([], $this->persisted);
+    }
+
     public function testReturnLooksUpOriginalSaleByPostingNumber(): void
     {
         // Себестоимость возврата обязана сторнировать ТУ ЖЕ, что была у продажи.
@@ -170,9 +202,10 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     }
 
     /**
-     * @param list<string> $existingIds
+     * @param list<string> $existingIds ключи возвратов, созданных этим же начислением (фикстура, 2026-06-01)
+     * @param array<string, array{accrualId: ?string, date: string}> $stamps явные метки существующих возвратов
      */
-    private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null, ?MarketplaceSale $sale = null): OzonAccrualReturnsRawProcessor
+    private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null, ?MarketplaceSale $sale = null, array $stamps = []): OzonAccrualReturnsRawProcessor
     {
         $this->persisted = [];
 
@@ -209,7 +242,10 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         $this->setProperty($costPrice, 'costPriceResolver', $inner);
 
         $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
-        $returnRepository->method('getExistingExternalIds')->willReturn(array_fill_keys($existingIds, true));
+        $returnRepository->method('getAccrualStamps')->willReturn($stamps + array_map(
+            static fn (): array => ['accrualId' => '50000000002', 'date' => '2026-06-01'],
+            array_fill_keys($existingIds, true),
+        ));
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('findByMarketplaceOrderAndSku')->willReturnCallback(
