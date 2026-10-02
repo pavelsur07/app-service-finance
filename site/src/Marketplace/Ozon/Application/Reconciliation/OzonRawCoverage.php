@@ -14,6 +14,15 @@ final class OzonRawCoverage
 {
     private const TIMEZONE = 'Europe/Moscow';
 
+    /**
+     * Покрывает ли загрузка по дням весь месяц целиком: by-day вправе заводить дни только с `EARLIEST_SAFE_DAY`,
+     * раньше лежит снятый формат v3. Месячный отчёт «Реализация» сравним с сырьём by-day только если месяц начинается не раньше.
+     */
+    public static function coversWholeMonth(\DateTimeImmutable $from): bool
+    {
+        return $from->format('Y-m-d') >= OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY;
+    }
+
     public static function expectedDays(\DateTimeImmutable $from, \DateTimeImmutable $to, \DateTimeImmutable $now): int
     {
         $first = max($from->format('Y-m-d'), OzonAccrualSyncPlanner::EARLIEST_SAFE_DAY);

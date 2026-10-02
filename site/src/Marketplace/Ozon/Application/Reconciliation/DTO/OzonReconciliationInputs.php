@@ -19,6 +19,7 @@ final readonly class OzonReconciliationInputs
         public array $rawCosts,
         public int $rawDaysPresent,
         public int $rawDaysExpected,
+        public bool $rawCoversWholeMonth,
         public LedgerFlowTotals $ledgerFlows,
         public array $ledgerCosts,
         public CostBucket $costsOutsideRaw,

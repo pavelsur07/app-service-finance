@@ -63,6 +63,22 @@ final class OzonReconciliationCalculatorTest extends TestCase
         self::assertSame(OzonReconciliationStatus::MISMATCH, $result->overall);
     }
 
+    public function testPartialMonthByDayCoverageMakesRealizationComparisonNoDataNotMismatch(): void
+    {
+        // Сентябрь 2026: by-day есть с 08.09, «Реализация» — за весь месяц, поэтому её сумма заведомо больше сырья.
+        $in = $this->inputs(realization: new RealizationTotals($this->money(995659), 10, $this->money(77169), 2), coversWholeMonth: false);
+
+        $result = $this->calculator()->calculate($in);
+
+        $line = $this->find($result->lines, OzonReconciliationCheck::REALIZATION_VS_RAW, OzonReconciliationBlock::SALES);
+        self::assertSame(OzonReconciliationStatus::NO_DATA, $line->status);
+        self::assertSame(995659, $line->source?->amountMinor());
+        self::assertNull($line->target);
+        self::assertStringContainsString('с 08.09.2026', (string) $line->note);
+        self::assertSame(OzonReconciliationStatus::MATCHED, $result->overall);
+        self::assertSame(0, $result->mismatchCount);
+    }
+
     public function testEverythingMatches(): void
     {
         $result = $this->calculator()->calculate($this->inputs());
@@ -211,6 +227,7 @@ final class OzonReconciliationCalculatorTest extends TestCase
         int $daysPresent = 30,
         int $daysExpected = 30,
         bool $noRealization = false,
+        bool $coversWholeMonth = true,
     ): OzonReconciliationInputs {
         // По умолчанию «Реализация» совпадает с сырьём в базе покупателя.
         $realization = $noRealization
@@ -223,6 +240,7 @@ final class OzonReconciliationCalculatorTest extends TestCase
             $rawCosts ?? ['ozon_logistic_direct' => $this->bucket(11800, 2)],
             $daysPresent,
             $daysExpected,
+            $coversWholeMonth,
             new LedgerFlowTotals($this->money(299900), 1, $this->money(264700), 1),
             $ledgerCosts ?? ['ozon_logistic_direct' => $this->bucket(11800, 2)],
             new CostBucket($this->money(0), 0),

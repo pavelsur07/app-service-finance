@@ -29,7 +29,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
 {
-    private const DAY = '2026-09-10';
+    private const DAY = '2026-10-10';
 
     private string $companyId;
     private string $docId;
@@ -87,8 +87,8 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
         $tester = $this->runCommand();
 
         self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('OK company '.$this->companyId.' 2026-09', $tester->getDisplay());
-        self::assertStringContainsString('months: 2026-09, 2026-08', $tester->getDisplay());
+        self::assertStringContainsString('OK company '.$this->companyId.' 2026-10', $tester->getDisplay());
+        self::assertStringContainsString('months: 2026-10, 2026-09', $tester->getDisplay());
         self::assertStringContainsString('raw vs ledger mismatches count: 0', $tester->getDisplay());
         self::assertSame([], array_values(array_filter($this->records->getArrayCopy(), static fn (array $r): bool => in_array($r['level'], ['warning', 'error'], true))));
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_ozon_reconciliation_runs WHERE company_id = :c', ['c' => $this->companyId]));
@@ -100,7 +100,7 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
         $tester = $this->runCommand();
 
         self::assertSame(1, $tester->getStatusCode());
-        self::assertStringContainsString('MISMATCH company '.$this->companyId.' 2026-09', $tester->getDisplay());
+        self::assertStringContainsString('MISMATCH company '.$this->companyId.' 2026-10', $tester->getDisplay());
 
         $errors = array_values(array_filter($this->records->getArrayCopy(), static fn (array $r): bool => 'error' === $r['level']));
         self::assertCount(1, $errors);
@@ -166,7 +166,7 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
      */
     private function runCommand(array $options = []): CommandTester
     {
-        $clock = new MockClock('2026-09-12 09:00:00');
+        $clock = new MockClock('2026-10-12 09:00:00');
         $lines = self::getContainer()->get(OzonReconciliationLineRepository::class);
 
         $tester = new CommandTester(new OzonReconciliationCheckCommand(
@@ -216,7 +216,7 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
         $this->connection->insert('marketplace_sales', [
             'id' => Uuid::uuid4()->toString(), 'company_id' => $this->companyId, 'listing_id' => $this->listingId, 'marketplace' => 'ozon',
             'external_order_id' => 'ozon-accrual-A-product-0', 'sale_date' => self::DAY, 'quantity' => 1, 'price_per_unit' => $amount,
-            'total_revenue' => $amount, 'raw_document_id' => $this->docId, 'created_at' => '2026-09-11 00:00:00', 'updated_at' => '2026-09-11 00:00:00',
+            'total_revenue' => $amount, 'raw_document_id' => $this->docId, 'created_at' => '2026-10-11 00:00:00', 'updated_at' => '2026-10-11 00:00:00',
         ]);
     }
 
@@ -228,7 +228,7 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
         $company = $this->em->find(Company::class, $this->companyId);
         self::assertNotNull($company);
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
-            ->withDocumentType('realization')->withPeriod(new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'))->build();
+            ->withDocumentType('realization')->withPeriod(new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-31'))->build();
         $doc->setApiEndpoint(MarketplaceRawFormat::OZON_REALIZATION_V2->value);
         $doc->setRawData(['result' => ['rows' => $rows]]);
         $this->em->persist($doc);

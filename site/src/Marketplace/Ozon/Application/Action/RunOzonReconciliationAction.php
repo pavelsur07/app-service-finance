@@ -65,6 +65,7 @@ final class RunOzonReconciliationAction
             $this->rawQuery->costsByCategory($companyId, $from, $to, self::CURRENCY),
             count($presentDays),
             OzonRawCoverage::expectedDays($from, $to, $now),
+            OzonRawCoverage::coversWholeMonth($from),
             $this->ledgerQuery->flows($companyId, $from, $to, self::CURRENCY),
             $this->ledgerQuery->costsByCategory($companyId, $from, $to, self::CURRENCY),
             $this->ledgerQuery->costsOutsideRaw($companyId, $from, $to, self::CURRENCY),

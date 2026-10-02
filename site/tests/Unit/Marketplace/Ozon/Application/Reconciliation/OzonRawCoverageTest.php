@@ -40,4 +40,12 @@ final class OzonRawCoverageTest extends TestCase
     {
         self::assertSame(0, OzonRawCoverage::expectedDays(new \DateTimeImmutable('2026-12-01'), new \DateTimeImmutable('2026-12-31'), new \DateTimeImmutable('2026-10-05')));
     }
+
+    public function testWholeMonthCoverageStartsWithTheFirstSafeDay(): void
+    {
+        self::assertFalse(OzonRawCoverage::coversWholeMonth(new \DateTimeImmutable('2026-09-01')));
+        self::assertFalse(OzonRawCoverage::coversWholeMonth(new \DateTimeImmutable('2026-08-01')));
+        self::assertTrue(OzonRawCoverage::coversWholeMonth(new \DateTimeImmutable('2026-10-01')));
+        self::assertTrue(OzonRawCoverage::coversWholeMonth(new \DateTimeImmutable('2027-01-01')));
+    }
 }
