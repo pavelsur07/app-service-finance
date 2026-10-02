@@ -35,36 +35,9 @@ final class ReconciliationAgainstRealProcessorsTest extends IntegrationTestCase
 
     public function testReconciliationMatchesWhatTheRealProcessorsWrote(): void
     {
-        $user = UserBuilder::aUser()->withIndex(1)->build();
-        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
-        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
-            ->withDocumentType('accrual_by_day')->withProcessingStatus('completed')
-            ->withPeriod(new \DateTimeImmutable(self::DAY), new \DateTimeImmutable(self::DAY))->build();
-        $doc->setApiEndpoint(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
-        $doc->setRawData($this->payload());
-        $this->em->persist($user);
-        $this->em->persist($company);
-        $this->em->persist($doc);
-        $this->em->flush();
+        [$companyId, $docId] = $this->seedDocument($this->payload());
 
-        $companyId = (string) $company->getId();
-        $docId = (string) $doc->getId();
-        $process = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class);
-        foreach (['sales', 'returns', 'costs'] as $kind) {
-            $process(new ProcessMarketplaceRawDocumentCommand($companyId, $docId, $kind));
-        }
-        $this->em->clear();
-
-        $run = (new RunOzonReconciliationAction(
-            new OzonRealizationTotalsQuery($this->connection),
-            new OzonRawAccrualTotalsQuery($this->connection, new OzonAccrualServiceCategoryResolver()),
-            new OzonLedgerTotalsQuery($this->connection),
-            self::getContainer()->get(OzonReconciliationRunRepository::class),
-            self::getContainer()->get(OzonReconciliationLineRepository::class),
-            $this->em,
-            new MockClock('2026-09-12 09:00:00'),
-            new NullLogger(),
-        ))($companyId, new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'));
+        $run = $this->processAndReconcile($companyId, $docId);
 
         $lines = self::getContainer()->get(OzonReconciliationLineRepository::class)->findByRun($companyId, $run->getId());
         $ledgerLines = array_values(array_filter($lines, static fn ($l): bool => OzonReconciliationCheck::RAW_VS_LEDGER === $l->getCheck()));
@@ -84,6 +57,85 @@ final class ReconciliationAgainstRealProcessorsTest extends IntegrationTestCase
             );
         }
         self::assertSame(0, $run->getMismatchCount());
+    }
+
+    public function testSeveralAccrualsOfOnePostingOnOneDayAreAllKeptAndReprocessingIsIdempotent(): void
+    {
+        $payload = $this->payload();
+        $sale = static fn (int $accrualId, string $amount): array => [
+            'accrual_id' => $accrualId, 'date' => self::DAY, 'unit_number' => '51100626-0301-2', 'accrued_category' => 'POSTING',
+            'posting' => ['products' => [[
+                'sku' => '308866704', 'delivery' => null,
+                'commission' => ['seller_price' => ['amount' => $amount], 'sale_price' => ['amount' => '1161.9'], 'sale_amount' => ['amount' => $amount], 'commission' => ['amount' => '0']],
+            ]]],
+        ];
+        $return = static fn (int $accrualId, string $amount): array => [
+            'accrual_id' => $accrualId, 'date' => self::DAY, 'unit_number' => '0156228731-0949-3', 'accrued_category' => 'POSTING',
+            'posting' => ['products' => [[
+                'sku' => '308866704', 'delivery' => null,
+                'commission' => ['seller_price' => ['amount' => '-'.$amount], 'sale_price' => ['amount' => '-500'], 'sale_amount' => ['amount' => '-'.$amount], 'commission' => ['amount' => '0']],
+            ]]],
+        ];
+        // Продажа: две одинаковые единицы; возврат: два частичных возврата с РАЗНЫМИ суммами (случаи с прода, сентябрь 2026).
+        array_push($payload['accruals'], $sale(64793331570, '3800'), $sale(64795093458, '3800'), $return(70000000001, '16346'), $return(70000000002, '9242'));
+        [$companyId, $docId] = $this->seedDocument($payload);
+
+        $run = $this->processAndReconcile($companyId, $docId);
+
+        self::assertSame(0, $run->getMismatchCount());
+        self::assertSame(1 + 2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_sales WHERE company_id = :c', ['c' => $companyId]));
+        self::assertSame('7600.00', $this->connection->fetchOne("SELECT SUM(total_revenue)::numeric(12,2)::text FROM marketplace_sales WHERE company_id = :c AND external_order_id LIKE 'ozon-accrual-51100626-0301-2-product-0%'", ['c' => $companyId]));
+        self::assertSame('25588.00', $this->connection->fetchOne("SELECT SUM(refund_amount)::numeric(12,2)::text FROM marketplace_returns WHERE company_id = :c AND external_return_id LIKE 'ozon-accrual-0156228731-0949-3-return-product-0%'", ['c' => $companyId]));
+
+        // Повторная обработка дня заменяет строки документа, а не наращивает их.
+        $rowsBefore = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_sales WHERE company_id = :c', ['c' => $companyId]) + (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_returns WHERE company_id = :c', ['c' => $companyId]);
+        $rerun = $this->processAndReconcile($companyId, $docId);
+        $rowsAfter = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_sales WHERE company_id = :c', ['c' => $companyId]) + (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_returns WHERE company_id = :c', ['c' => $companyId]);
+
+        self::assertSame($rowsBefore, $rowsAfter);
+        self::assertSame(0, $rerun->getMismatchCount());
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function seedDocument(array $payload): array
+    {
+        $user = UserBuilder::aUser()->withIndex(1)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
+            ->withDocumentType('accrual_by_day')->withProcessingStatus('completed')
+            ->withPeriod(new \DateTimeImmutable(self::DAY), new \DateTimeImmutable(self::DAY))->build();
+        $doc->setApiEndpoint(MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value);
+        $doc->setRawData($payload);
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($doc);
+        $this->em->flush();
+
+        return [(string) $company->getId(), (string) $doc->getId()];
+    }
+
+    private function processAndReconcile(string $companyId, string $docId): \App\Marketplace\Entity\OzonReconciliationRun
+    {
+        $process = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class);
+        foreach (['sales', 'returns', 'costs'] as $kind) {
+            $process(new ProcessMarketplaceRawDocumentCommand($companyId, $docId, $kind));
+        }
+        $this->em->clear();
+
+        return (new RunOzonReconciliationAction(
+            new OzonRealizationTotalsQuery($this->connection),
+            new OzonRawAccrualTotalsQuery($this->connection, new OzonAccrualServiceCategoryResolver()),
+            new OzonLedgerTotalsQuery($this->connection),
+            self::getContainer()->get(OzonReconciliationRunRepository::class),
+            self::getContainer()->get(OzonReconciliationLineRepository::class),
+            $this->em,
+            new MockClock('2026-09-12 09:00:00'),
+            new NullLogger(),
+        ))($companyId, new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'));
     }
 
     /**

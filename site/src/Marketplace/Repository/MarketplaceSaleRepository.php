@@ -130,6 +130,39 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     }
 
     /**
+     * Метки записей по external id: начисление-источник (`raw_data._accrual_id`, у исторических записей его нет) и дата.
+     * Нужны Ozon by-day, чтобы отличить повторную обработку того же начисления от другого начисления того же отправления.
+     *
+     * @param list<string> $externalIds
+     *
+     * @return array<string, array{accrualId: ?string, date: string}>
+     */
+    public function getAccrualStamps(string $companyId, array $externalIds): array
+    {
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT external_order_id AS external_id, sale_date AS stamp_date, raw_data ->> \'_accrual_id\' AS accrual_id
+             FROM marketplace_sales
+             WHERE company_id = :companyId AND external_order_id IN (:ids)',
+            ['companyId' => $companyId, 'ids' => $externalIds],
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        );
+
+        $stamps = [];
+        foreach ($rows as $row) {
+            $stamps[(string) $row['external_id']] = [
+                'accrualId' => null === $row['accrual_id'] ? null : (string) $row['accrual_id'],
+                'date' => (string) $row['stamp_date'],
+            ];
+        }
+
+        return $stamps;
+    }
+
+    /**
      * Найти продажи для пересчёта себестоимости.
      * Себестоимость привязана к листингу (Inventory), привязка к продукту не требуется.
      *

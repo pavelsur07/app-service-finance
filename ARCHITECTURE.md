@@ -449,6 +449,13 @@
 - **Сверка** считает «Реализацию» из сырого документа (`OzonRealizationTotalsQuery`), не из обработанной таблицы; на вкладке «Сверка Ozon» состояние отчёта показывает `OzonRealizationStateFactory`.
 - **Гейт** `app:marketplace:ozon-realization-check` (cron 07:20, активен с 9-го по 16-е число): отчёт получен и применён (статус `success` либо строки в `marketplace_ozon_realizations`); иначе один агрегированный `error`, `conflict` — warning.
 
+### Marketplace: ключ записи продаж и возвратов Ozon by-day
+
+Ключ `external_order_id` / `external_return_id` строится как «отправление + индекс товара» (`ozon-accrual-{ref}-product-{i}`, для возвратов `…-return-product-{i}`) и не содержит `accrual_id`; по нему возврат находит исходную продажу.
+`OzonAccrualRecordKey` различает начисления одного отправления и товара **в один день**: свободный ключ — запись под базовым ключом с меткой `raw_data._accrual_id`; занят записью с меткой ДРУГОГО начисления в ТОТ ЖЕ день — запись под ключом `…-acc{accrual_id}`;
+занят записью без метки (историческая), тем же начислением или записью другого дня — запись пропускается, как раньше (закрытые периоды не меняются, возможное переоформление в другой день не удваивается).
+Метки читает `MarketplaceSaleRepository::getAccrualStamps` / `MarketplaceReturnRepository::getAccrualStamps` (по списку ключей, с `companyId`). Решение и открытые вопросы — `docs/tasks/marketplace-ozon-sale-key/TASK.md`.
+
 ### Marketplace: загрузка каталога товаров Ozon
 
 Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либо

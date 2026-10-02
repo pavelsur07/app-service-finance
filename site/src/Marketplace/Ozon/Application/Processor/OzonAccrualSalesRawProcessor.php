@@ -11,6 +11,7 @@ use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Ozon\Application\Service\OzonAccrualRecordKey;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -99,13 +100,14 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             array_fill_keys(array_column($sales, 'sku'), null),
         );
 
-        $existing = $this->saleRepository->getExistingExternalIds(
+        $stamps = $this->saleRepository->getAccrualStamps(
             $companyId,
-            array_values(array_unique(array_column($sales, 'externalId'))),
+            OzonAccrualRecordKey::probeKeys($sales),
         );
 
         foreach ($sales as $sale) {
-            if (isset($existing[$sale['externalId']])) {
+            $externalId = OzonAccrualRecordKey::resolve($sale['externalId'], $sale['accrualId'], $sale['date']->format('Y-m-d'), $stamps);
+            if (null === $externalId) {
                 continue;
             }
 
@@ -125,7 +127,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 MarketplaceType::OZON,
             );
 
-            $entity->setExternalOrderId($sale['externalId']);
+            $entity->setExternalOrderId($externalId);
             $entity->setSaleDate($sale['date']);
             $entity->setQuantity($sale['quantity']);
             $entity->setPricePerUnit($sale['pricePerUnit']);
@@ -137,7 +139,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             }
 
             $this->em->persist($entity);
-            $existing[$sale['externalId']] = true;
+            $stamps[$externalId] = ['accrualId' => $sale['accrualId'], 'date' => $sale['date']->format('Y-m-d')];
         }
 
         $this->em->flush();
@@ -146,7 +148,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
     /**
      * @param array<string, mixed> $row
      *
-     * @return list<array{externalId: string, sku: string, date: \DateTimeImmutable, quantity: int, pricePerUnit: string, totalRevenue: string, raw: array<string, mixed>}>
+     * @return list<array{externalId: string, accrualId: string, sku: string, date: \DateTimeImmutable, quantity: int, pricePerUnit: string, totalRevenue: string, raw: array<string, mixed>}>
      */
     private function extractSales(array $row): array
     {
@@ -209,6 +211,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 // Ключ детерминирован: повторный прогон дня даёт те же значения,
                 // поэтому версии вида _v2 из легаси-пути здесь не нужны.
                 'externalId' => self::externalId($postingRef, $index),
+                'accrualId' => $accrualId,
                 'sku' => $sku,
                 'date' => $day,
                 'quantity' => $quantity,
@@ -216,7 +219,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 // сходиться с sale_amount, иначе строка внутренне противоречива.
                 'pricePerUnit' => $this->money((float) $sellerPrice),
                 'totalRevenue' => $this->money((float) $saleAmount),
-                'raw' => $product,
+                'raw' => $product + [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId],
             ];
         }
 
