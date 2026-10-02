@@ -19,14 +19,31 @@
             </form>
 
             {% if is_granted('module.marketplace.write') %}
-                <form method="post" action="{{ path('marketplace_ozon_reconciliation_run') }}">
+                <form method="post" action="{{ path('marketplace_ozon_reconciliation_run') }}" data-testid="ozon-reconciliation-run-form"
+                      data-busy-text="Идёт пересчёт…">
                     <input type="hidden" name="_token" value="{{ csrf_token('marketplace_ozon_reconciliation_run') }}">
                     <input type="hidden" name="month" value="{{ month }}">
                     <button type="submit" class="btn btn-primary" data-testid="ozon-reconciliation-run">
-                        {{ view is null ? 'Выполнить сверку' : 'Пересчитать сверку' }}
+                        {{ view is null ? 'Выполнить сверку' : 'Пересчитать сейчас' }}
                     </button>
                 </form>
             {% endif %}
+            {% if view is not null %}
+                <div class="text-secondary small pb-2" data-testid="ozon-reconciliation-updated">
+                    Обновлено {{ view.checkedAt|date('d.m.Y H:i') }}. Сверка пересчитывается автоматически каждую ночь —
+                    «Пересчитать сейчас» нужна после исправления данных.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="alert alert-info d-none" role="status" aria-live="polite" id="ozon-reconciliation-busy" data-testid="ozon-reconciliation-busy">
+            <div class="d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <div>
+                    <div class="fw-semibold">Сверка за {{ month_label }} выполняется</div>
+                    <div class="text-secondary">Обычно это от нескольких секунд до минуты, у крупных кабинетов дольше. Не закрывайте страницу — результат появится здесь.</div>
+                </div>
+            </div>
         </div>
 
         {% if view is null %}
@@ -168,4 +185,23 @@
             {% endfor %}
         {% endif %}
     </div>
+
+    <script>
+        // Пересчёт идёт на сервере синхронно: даём понять, что страница не зависла, и не даём запустить его повторно.
+        (function () {
+            var form = document.querySelector('[data-testid="ozon-reconciliation-run-form"]');
+            if (!form) { return; }
+            form.addEventListener('submit', function (event) {
+                if (form.dataset.submitted === '1') { event.preventDefault(); return; }
+                form.dataset.submitted = '1';
+                var button = form.querySelector('button[type="submit"]');
+                if (button) {
+                    button.disabled = true;
+                    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' + form.dataset.busyText;
+                }
+                var banner = document.getElementById('ozon-reconciliation-busy');
+                if (banner) { banner.classList.remove('d-none'); }
+            });
+        })();
+    </script>
 {% endblock %}
