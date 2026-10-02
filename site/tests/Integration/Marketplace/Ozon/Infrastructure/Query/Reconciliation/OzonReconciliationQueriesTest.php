@@ -128,29 +128,42 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $otherFlows->salesCount);
     }
 
-    public function testRealizationIsNullWithoutReportAndSumsWithIt(): void
+    public function testRealizationIsNullWithoutReportAndSumsRawDocumentRegardlessOfProcessing(): void
     {
         self::assertNull($this->realizationQuery()->fetch($this->companyId, $this->from, $this->to));
 
-        $docId = $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_REALIZATION_V2->value, '2026-06-01', [], 'realization', '2026-06-30');
-        $this->insertRealization($docId, 'sku-1', 116857, 1, null, null);
-        $this->insertRealization($docId, 'sku-2', 0, 0, 147743, 1);
+        $rows = [
+            // Продажа и возврат в одной строке; цена округляется до копеек, как при обработке.
+            ['item' => ['sku' => 100], 'delivery_commission' => ['price_per_instance' => 1168.574, 'quantity' => 1], 'return_commission' => ['price_per_instance' => 100.0, 'quantity' => 2]],
+            // Только возврат.
+            ['item' => ['sku' => '200'], 'return_commission' => ['price_per_instance' => '1477.43', 'quantity' => 1]],
+            // Нулевая продажа без возврата, строка без sku, мусор — не считаются и не роняют запрос.
+            ['item' => ['sku' => '300'], 'delivery_commission' => ['price_per_instance' => 0, 'quantity' => 5]],
+            ['item' => ['sku' => ''], 'delivery_commission' => ['price_per_instance' => 999, 'quantity' => 9]],
+            ['item' => ['sku' => '400'], 'delivery_commission' => ['price_per_instance' => 'n/a', 'quantity' => 'x']],
+            'не строка',
+        ];
+        $docId = $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_REALIZATION_V2->value, '2026-06-01', ['result' => ['rows' => $rows]], 'realization', '2026-06-30');
+        self::assertNotSame('', $docId);
 
-        // Обработка не дошла до конца (records_created не записан): отчёт частичный и за загруженный не считается.
-        $partial = $this->realizationQuery()->fetch($this->companyId, $this->from, $this->to);
-        self::assertNull($partial);
-        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 2 WHERE id = :id', ['id' => $docId]);
-
+        // Обработка («применить выручку») не выполнялась: таблица реализаций пуста, а отчёт уже виден.
         $totals = $this->realizationQuery()->fetch($this->companyId, $this->from, $this->to);
 
         self::assertNotNull($totals);
         self::assertSame(116857, $totals->sales->amountMinor());
         self::assertSame(1, $totals->salesQuantity);
-        self::assertSame(147743, $totals->returns->amountMinor());
-        self::assertSame(1, $totals->returnsQuantity);
+        self::assertSame(20000 + 147743, $totals->returns->amountMinor());
+        self::assertSame(3, $totals->returnsQuantity);
 
         self::assertNull($this->realizationQuery()->fetch($this->otherCompanyId, $this->from, $this->to));
         self::assertNull($this->realizationQuery()->fetch($this->companyId, new \DateTimeImmutable('2026-07-01'), new \DateTimeImmutable('2026-07-31')));
+    }
+
+    public function testRealizationDocumentWithoutRowsIsNotALoadedReport(): void
+    {
+        $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_REALIZATION_V2->value, '2026-06-01', ['result' => ['rows' => []]], 'realization', '2026-06-30');
+
+        self::assertNull($this->realizationQuery()->fetch($this->companyId, $this->from, $this->to));
     }
 
     public function testOperationsDrillDownMatchesTotalsAndIsScoped(): void
@@ -465,16 +478,6 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
             'id' => Uuid::uuid4()->toString(), 'company_id' => $this->companyId, 'marketplace' => 'ozon', 'category_id' => $categoryId,
             'amount' => $this->dec($minor), 'operation_type' => $operationType, 'cost_date' => $date, 'raw_document_id' => $docId,
             'created_at' => '2026-06-30 00:00:00', 'updated_at' => '2026-06-30 00:00:00',
-        ]);
-    }
-
-    private function insertRealization(string $docId, string $sku, int $salesMinor, int $qty, ?int $returnMinor, ?int $returnQty): void
-    {
-        $this->connection->insert('marketplace_ozon_realizations', [
-            'id' => Uuid::uuid4()->toString(), 'company_id' => $this->companyId, 'raw_document_id' => $docId, 'sku' => $sku,
-            'seller_price_per_instance' => $this->dec($salesMinor), 'quantity' => $qty, 'total_amount' => $this->dec($salesMinor),
-            'return_quantity' => $returnQty, 'return_amount' => null === $returnMinor ? null : $this->dec($returnMinor),
-            'period_from' => '2026-06-01', 'period_to' => '2026-06-30', 'created_at' => '2026-07-05 00:00:00',
         ]);
     }
 

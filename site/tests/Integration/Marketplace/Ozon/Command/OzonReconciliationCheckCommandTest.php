@@ -122,15 +122,8 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
     public function testRealizationDisagreementIsWarningNotRed(): void
     {
         $this->seedSale(299900);
-        $realizationDoc = $this->seedRealizationDocument();
-        // Реализация говорит 5 000 ₽ при 1 168.57 ₽ в сырье в той же базе.
-        $this->connection->insert('marketplace_ozon_realizations', [
-            'id' => Uuid::uuid4()->toString(), 'company_id' => $this->companyId, 'raw_document_id' => $realizationDoc, 'sku' => '700000000',
-            'seller_price_per_instance' => '5000.00', 'quantity' => 1, 'total_amount' => '5000.00',
-            'period_from' => '2026-09-01', 'period_to' => '2026-09-30', 'created_at' => '2026-10-01 00:00:00',
-        ]);
-
-        $this->connection->executeStatement('UPDATE marketplace_raw_documents SET records_created = 1 WHERE id = :id', ['id' => $realizationDoc]);
+        // Реализация говорит 5 000 ₽ при 1 168.57 ₽ в сырье в той же базе (отчёт не обрабатывался — сверке это не нужно).
+        $this->seedRealizationDocument([['item' => ['sku' => '700000000'], 'delivery_commission' => ['price_per_instance' => 5000, 'quantity' => 1]]]);
 
         $tester = $this->runCommand();
 
@@ -227,13 +220,17 @@ final class OzonReconciliationCheckCommandTest extends IntegrationTestCase
         ]);
     }
 
-    private function seedRealizationDocument(): string
+    /**
+     * @param list<array<string, mixed>> $rows
+     */
+    private function seedRealizationDocument(array $rows): string
     {
         $company = $this->em->find(Company::class, $this->companyId);
         self::assertNotNull($company);
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
             ->withDocumentType('realization')->withPeriod(new \DateTimeImmutable('2026-09-01'), new \DateTimeImmutable('2026-09-30'))->build();
         $doc->setApiEndpoint(MarketplaceRawFormat::OZON_REALIZATION_V2->value);
+        $doc->setRawData(['result' => ['rows' => $rows]]);
         $this->em->persist($doc);
         $this->em->flush();
 

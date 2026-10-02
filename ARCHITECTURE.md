@@ -434,6 +434,20 @@
   Красное (exit 1 + один агрегированный `error`): расхождение «сырьё ↔ учёт» в итоговых строках блоков или сбой сверки компании; расхождение «Реализация ↔ сырьё» — `warning`;
   `NO_DATA` красным не бывает. `--report-only` — без падения и без `error`. В лог не попадают суммы.
 
+### Marketplace: автозагрузка и автообработка «Реализации» Ozon
+
+Отчёт «Реализация» (`POST /v2/finance/realization`, Ozon отдаёт его не ранее 5–8 числа следующего месяца) приходит без ручных шагов.
+- **Расписание.** Cron каждый час (`:17`) запускает `app:marketplace:ozon-realization-poll`. Окно задаёт `OzonRealizationPollWindow` (МСК): с 18:00 1-го числа до конца 8-го, отчётный месяц — предыдущий; вне окна команда выходит сразу.
+  Старая единственная попытка `0 6 5 * *` убрана; ручная загрузка — `app:marketplace:ozon-realization-sync`.
+- **Состояние** пары «компания × месяц» — `marketplace_financial_report_sync_statuses` (`report_type = ozon_realization`, `business_date` = первый день месяца, режим `poll`): миграции нет.
+  Команда пропускает терминальные статусы (`success`, `auth_failed`, `failed_final`, `conflict`) и пары, чей `next_retry_at` не наступил; залипшие `raw_loaded/processing` (> 1 ч) получают повторную постановку именно обработки.
+- **Загрузка** (`SyncOzonRealizationHandler`, `async_sync`): исход фиксируется в статусе, а не пробрасывается в Messenger (повторы ведёт опрос). Пустой ответ или 4xx → `empty` + повтор через час; 429 → `failed` по Retry-After; 5xx/сеть → через 30 мин; 401/403 → `auth_failed`;
+  строки → документ `realization` сохраняется/перезаписывается, `raw_loaded` + хеш строк. `OzonRealizationFetcher` бросает типизированные исключения (`MarketplaceRateLimit/Auth/BadRequest/TemporaryApiException`).
+- **Обработка** (`ProcessOzonRealizationMessage` → `async_pipeline`, `ProcessOzonRealizationHandler`): тот же `ProcessOzonRealizationAction`, что и «Применить выручку»; затем пересчёт сверки за месяц. Тот же отчёт повторно не обрабатывается (хеш),
+  окончательно закрытый этап «Продажи и возвраты» → `conflict` + warning (предварительное закрытие не блокирует), сбой → `failed` + повтор через час и `error`.
+- **Сверка** считает «Реализацию» из сырого документа (`OzonRealizationTotalsQuery`), не из обработанной таблицы; на вкладке «Сверка Ozon» состояние отчёта показывает `OzonRealizationStateFactory`.
+- **Гейт** `app:marketplace:ozon-realization-check` (cron 07:20, активен с 9-го по 16-е число): отчёт получен и применён (статус `success` либо строки в `marketplace_ozon_realizations`); иначе один агрегированный `error`, `conflict` — warning.
+
 ### Marketplace: загрузка каталога товаров Ozon
 
 Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либо

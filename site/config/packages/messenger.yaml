@@ -84,6 +84,7 @@ framework:
             # --- async_pipeline: local CPU/DB processing of already-fetched data ---
             'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline
             'App\Marketplace\Message\ProcessRawDocumentStepMessage': async_pipeline
+            'App\Marketplace\Message\ProcessOzonRealizationMessage': async_pipeline
             'App\Marketplace\Message\ReprocessCostsMessage': async_pipeline
             'App\Marketplace\Message\CloseMonthStageMessage': async_pipeline
             'App\Marketplace\Message\RebuildPreliminaryForPeriodMessage': async_pipeline

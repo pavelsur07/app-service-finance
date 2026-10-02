@@ -11,6 +11,7 @@ enum FinancialReportSyncMode: string
     case REFRESH_14D = 'refresh_14d';
     case MISSING = 'missing';
     case MANUAL = 'manual';
+    case POLL = 'poll';
 
     public function getLabel(): string
     {
@@ -20,6 +21,7 @@ enum FinancialReportSyncMode: string
             self::REFRESH_14D => 'Обновление за 14 дней',
             self::MISSING => 'Дозагрузка пропусков',
             self::MANUAL => 'Ручной запуск',
+            self::POLL => 'Опрос готовности отчёта',
         };
     }
 }
