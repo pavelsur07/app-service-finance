@@ -262,6 +262,37 @@ final class OzonReconciliationQueriesTest extends IntegrationTestCase
         self::assertSame(0, $this->ledgerQuery()->flows($this->companyId, new \DateTimeImmutable('2026-06-13'), new \DateTimeImmutable('2026-06-13'))->salesCount);
     }
 
+    public function testLargeDocumentDoesNotMakeMonthQueryExplode(): void
+    {
+        // Регрессия по проду: документ дня в мегабайты, копировавшийся в каждое начисление, превращал пересчёт месяца
+        // крупного кабинета в минуты. Раздутый документ с сотнями начислений обязан считаться за секунды.
+        $accruals = [];
+        for ($i = 0; $i < 400; ++$i) {
+            $accruals[] = [
+                'accrual_id' => 5000 + $i, 'date' => '2026-06-15', 'unit_number' => 'BIG'.$i, 'posting' => ['products' => [[
+                    'sku' => '1',
+                    'delivery' => ['services' => [['type_id' => 32, 'accrued' => ['amount' => '-10']]]],
+                    'commission' => ['sale_amount' => ['amount' => '100'], 'sale_price' => ['amount' => '50'], 'commission' => ['amount' => '-5']],
+                ]]],
+            ];
+        }
+        $this->seedDocument($this->companyId, MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY->value, '2026-06-15', [
+            'accruals' => $accruals,
+            'service_types' => ['32' => 'Logistic'],
+            'junk' => str_repeat('x', 3_000_000),
+        ]);
+
+        $started = microtime(true);
+        $flows = $this->rawQuery()->flows($this->companyId, new \DateTimeImmutable('2026-06-15'), new \DateTimeImmutable('2026-06-15'));
+        $costs = $this->rawQuery()->costsByCategory($this->companyId, new \DateTimeImmutable('2026-06-15'), new \DateTimeImmutable('2026-06-15'));
+        $elapsed = microtime(true) - $started;
+
+        self::assertSame(400, $flows->salesCount);
+        self::assertSame(400 * 1000, $costs[$this->codeOf('Logistic')]->net->amountMinor());
+        self::assertSame(400 * 500, $costs['ozon_sale_commission']->net->amountMinor());
+        self::assertLessThan(10.0, $elapsed, 'пересчёт раздутого документа должен занимать секунды');
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
