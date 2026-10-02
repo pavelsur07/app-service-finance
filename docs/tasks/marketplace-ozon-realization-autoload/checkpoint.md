@@ -1,4 +1,4 @@
 # checkpoint
 
 Ветка docs/task-ozon-realization-autoload (PR #2554 = реализация). Baseline: unit OK 3085, PHPStan 0.
-Stage 5 закрыт (stages/stage-5-report.md). Следующее: Handoff — полные гейты, свежее ревью, внешнее ревью, handoff.md.
+Handoff: итоговые гейты зелёные (тесты 5455 OK, PHPStan 0, cs 0), ревью в свежей сессии и внешнее ревью (2 раунда) учтены. PR Ready, ждём «merge and deploy #2554».
