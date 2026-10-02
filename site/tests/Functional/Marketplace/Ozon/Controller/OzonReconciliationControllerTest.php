@@ -166,7 +166,11 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
         $this->login($client, $owner, $company);
 
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-06');
-        self::assertStringContainsString('Пересчитать сверку', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
+        self::assertStringContainsString('Пересчитать сейчас', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
+        self::assertStringContainsString('Обновлено', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-updated"]')->text());
+        // Плашка прогресса есть в разметке, скрыта до отправки формы; кнопка знает свой текст ожидания.
+        self::assertStringContainsString('d-none', (string) $client->getCrawler()->filter('[data-testid="ozon-reconciliation-busy"]')->attr('class'));
+        self::assertSame('Идёт пересчёт…', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run-form"]')->attr('data-busy-text'));
 
         $client->request('GET', '/marketplace/ozon-reconciliation?month=2026-05');
         self::assertStringContainsString('Выполнить сверку', $client->getCrawler()->filter('[data-testid="ozon-reconciliation-run"]')->text());
