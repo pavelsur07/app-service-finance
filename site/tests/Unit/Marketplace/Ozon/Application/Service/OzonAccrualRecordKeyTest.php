@@ -10,45 +10,75 @@ use PHPUnit\Framework\TestCase;
 final class OzonAccrualRecordKeyTest extends TestCase
 {
     private const BASE = 'ozon-accrual-A-product-0';
+    private const DAY = '2026-09-30';
 
     public function testFreeKeyIsUsedAsIs(): void
     {
-        self::assertSame(self::BASE, OzonAccrualRecordKey::resolve(self::BASE, '1', '2026-09-30', []));
+        self::assertSame(['action' => 'insert', 'key' => self::BASE], OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '3800.00', []));
     }
 
-    public function testSameDayOtherAccrualGetsSuffixedKey(): void
+    public function testSameDayOtherStampedAccrualGetsSuffixedKey(): void
     {
-        $stamps = [self::BASE => ['accrualId' => '1', 'date' => '2026-09-30']];
+        $stamps = [self::BASE => $this->stamp('1', '3800.00')];
 
-        self::assertSame(self::BASE.'-acc2', OzonAccrualRecordKey::resolve(self::BASE, '2', '2026-09-30', $stamps));
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc2'], OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', $stamps));
     }
 
-    public function testSameAccrualLegacyAndOtherDayAreSkipped(): void
+    public function testSameAccrualAndOtherDayAreSkipped(): void
     {
-        self::assertNull(OzonAccrualRecordKey::resolve(self::BASE, '1', '2026-09-30', [self::BASE => ['accrualId' => '1', 'date' => '2026-09-30']]));
-        self::assertNull(OzonAccrualRecordKey::resolve(self::BASE, '2', '2026-09-30', [self::BASE => ['accrualId' => null, 'date' => '2026-09-30']]));
-        self::assertNull(OzonAccrualRecordKey::resolve(self::BASE, '2', '2026-09-30', [self::BASE => ['accrualId' => '1', 'date' => '2026-09-29']]));
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '3800.00', [self::BASE => $this->stamp('1', '3800.00')])['action']);
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', [self::BASE => $this->stamp('1', '3800.00', '2026-09-29')])['action']);
+        // Историческая запись другого дня тоже блокирует: возможное переоформление не удваиваем.
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', [self::BASE => $this->stamp(null, '3800.00', '2026-09-12')])['action']);
+    }
+
+    public function testLegacyRowWithEqualAmountBelongsToThisAccrual(): void
+    {
+        $stamps = [self::BASE => $this->stamp(null, '9242.00')];
+
+        self::assertSame(['action' => 'claim_legacy', 'key' => self::BASE], OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '9242.00', $stamps));
+        // Сумма записана без хвостовых нулей — всё равно равна.
+        self::assertSame('claim_legacy', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '9242.00', [self::BASE => $this->stamp(null, '9242.0')])['action']);
+    }
+
+    public function testLegacyRowWithDifferentAmountMeansAnotherAccrual(): void
+    {
+        $stamps = [self::BASE => $this->stamp(null, '9242.00')];
+
+        // Случай «ИП Лазарева»: историческая запись 9 242 ₽, второе начисление 16 346 ₽ того же дня.
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc1'], OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '16346.00', $stamps));
+    }
+
+    public function testLegacyRowIsClaimedOnceAndTheTwinGetsItsOwnKey(): void
+    {
+        // Случай «Вумджой»: историческая запись 3 800 ₽, два начисления по 3 800 ₽.
+        $stamps = [self::BASE => $this->stamp(null, '3800.00')];
+
+        $first = OzonAccrualRecordKey::decide(self::BASE, 'A', self::DAY, '3800.00', $stamps);
+        self::assertSame('claim_legacy', $first['action']);
+
+        $stamps[self::BASE] = $this->stamp('A', '3800.00');
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-accB'], OzonAccrualRecordKey::decide(self::BASE, 'B', self::DAY, '3800.00', $stamps));
     }
 
     public function testAccrualAlreadyStoredUnderItsSuffixedKeyIsNeverBookedTwice(): void
     {
-        // Базовую запись удалили, а запись этого же начисления под суффиксным ключом осталась: под базовым ключом его не пишем.
-        $stamps = [self::BASE.'-acc2' => ['accrualId' => '2', 'date' => '2026-09-30']];
+        $stamps = [self::BASE.'-acc2' => $this->stamp('2', '3800.00')];
 
-        self::assertNull(OzonAccrualRecordKey::resolve(self::BASE, '2', '2026-09-30', $stamps));
-        // Другое начисление свободный базовый ключ занять может.
-        self::assertSame(self::BASE, OzonAccrualRecordKey::resolve(self::BASE, '3', '2026-09-30', $stamps));
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', $stamps)['action']);
+        self::assertSame('insert', OzonAccrualRecordKey::decide(self::BASE, '3', self::DAY, '3800.00', $stamps)['action']);
     }
 
-    public function testThirdAccrualGetsItsOwnSuffixAndRepeatsStayIdempotent(): void
+    public function testRerunIsIdempotent(): void
     {
         $stamps = [
-            self::BASE => ['accrualId' => '1', 'date' => '2026-09-30'],
-            self::BASE.'-acc2' => ['accrualId' => '2', 'date' => '2026-09-30'],
+            self::BASE => $this->stamp('1', '3800.00'),
+            self::BASE.'-acc2' => $this->stamp('2', '3800.00'),
         ];
 
-        self::assertSame(self::BASE.'-acc3', OzonAccrualRecordKey::resolve(self::BASE, '3', '2026-09-30', $stamps));
-        self::assertNull(OzonAccrualRecordKey::resolve(self::BASE, '2', '2026-09-30', $stamps));
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '3800.00', $stamps)['action']);
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', $stamps)['action']);
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc3'], OzonAccrualRecordKey::decide(self::BASE, '3', self::DAY, '3800.00', $stamps));
     }
 
     public function testProbeKeysCoverBaseAndSuffixedForms(): void
@@ -59,5 +89,13 @@ final class OzonAccrualRecordKeyTest extends TestCase
         ]);
 
         self::assertEqualsCanonicalizing([self::BASE, self::BASE.'-acc1', self::BASE.'-acc2'], $keys);
+    }
+
+    /**
+     * @return array{accrualId: ?string, date: string, amount: string}
+     */
+    private function stamp(?string $accrualId, string $amount, string $date = self::DAY): array
+    {
+        return ['accrualId' => $accrualId, 'date' => $date, 'amount' => $amount];
     }
 }

@@ -34,6 +34,9 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     /** @var array<int, array{externalId: string, quantity: int, refund: string, sale: MarketplaceSale|null}> */
     private array $persisted = [];
 
+    /** @var list<array{string, string}> */
+    private array $claimed = [];
+
     public function testRefundAmountIsPositiveAndUsesSellerBasis(): void
     {
         // Та же база, что у легаси-строк в этой таблице: сверка за июнь сошлась
@@ -104,17 +107,41 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertSame('2647.00', $this->persisted[0]['refund']);
     }
 
+    public function testHistoricalReturnOfTheSameDayWithDifferentAmountIsAnotherReturn(): void
+    {
+        $base = 'ozon-accrual-80000002-1002-1-return-product-0';
+
+        // Случай «ИП Лазарева»: историческая запись 1 000 ₽, начисление 2 647 ₽ того же дня — другое событие.
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01', 'amount' => '1000.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->claimed);
+        self::assertCount(1, $this->persisted);
+        self::assertSame($base.'-acc50000000002', $this->persisted[0]['externalId']);
+    }
+
+    public function testHistoricalReturnOfTheSameAmountIsClaimed(): void
+    {
+        $base = 'ozon-accrual-80000002-1002-1-return-product-0';
+
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01', 'amount' => '2647.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
+        self::assertSame([[$base, '50000000002']], $this->claimed);
+    }
+
     public function testReturnKeyHeldByHistoricalOrOtherDayRecordBlocksAsBefore(): void
     {
         $other = $this->returnRow();
         $other['accrual_id'] = 50000000098;
         $base = 'ozon-accrual-80000002-1002-1-return-product-0';
 
-        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01']])
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-05-31', 'amount' => '2647.00']])
             ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
         self::assertSame([], $this->persisted);
 
-        $this->processor(stamps: [$base => ['accrualId' => '50000000002', 'date' => '2026-05-31']])
+        $this->processor(stamps: [$base => ['accrualId' => '50000000002', 'date' => '2026-05-31', 'amount' => '2647.00']])
             ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
         self::assertSame([], $this->persisted);
     }
@@ -243,9 +270,15 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
 
         $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
         $returnRepository->method('getAccrualStamps')->willReturn($stamps + array_map(
-            static fn (): array => ['accrualId' => '50000000002', 'date' => '2026-06-01'],
+            static fn (): array => ['accrualId' => '50000000002', 'date' => '2026-06-01', 'amount' => '2647.00'],
             array_fill_keys($existingIds, true),
         ));
+
+        $returnRepository->method('claimLegacyRecord')->willReturnCallback(function (string $companyId, string $externalId, string $accrualId): int {
+            $this->claimed[] = [$externalId, $accrualId];
+
+            return 1;
+        });
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('findByMarketplaceOrderAndSku')->willReturnCallback(

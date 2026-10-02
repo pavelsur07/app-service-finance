@@ -106,11 +106,25 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
         );
 
         $suffixedCount = 0;
+        $claimedCount = 0;
         foreach ($sales as $sale) {
-            $externalId = OzonAccrualRecordKey::resolve($sale['externalId'], $sale['accrualId'], $sale['date']->format('Y-m-d'), $stamps);
-            if (null === $externalId) {
+            $day = $sale['date']->format('Y-m-d');
+            $decision = OzonAccrualRecordKey::decide($sale['externalId'], $sale['accrualId'], $day, $sale['totalRevenue'], $stamps);
+
+            if (OzonAccrualRecordKey::CLAIM_LEGACY === $decision['action']) {
+                // Историческая запись принадлежит этому начислению: ставим метку (метаданные, не суммы), новую запись не создаём.
+                $this->saleRepository->claimLegacyRecord($companyId, $decision['key'], $sale['accrualId']);
+                $stamps[$decision['key']] = ['accrualId' => $sale['accrualId'], 'date' => $stamps[$decision['key']]['date'], 'amount' => $stamps[$decision['key']]['amount']];
+                ++$claimedCount;
+
                 continue;
             }
+
+            if (OzonAccrualRecordKey::INSERT !== $decision['action']) {
+                continue;
+            }
+
+            $externalId = $decision['key'];
 
             $listing = $listings[$sale['sku']] ?? null;
             if (null === $listing) {
@@ -143,10 +157,14 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
             if ($externalId !== $sale['externalId']) {
                 ++$suffixedCount;
             }
-            $stamps[$externalId] = ['accrualId' => $sale['accrualId'], 'date' => $sale['date']->format('Y-m-d')];
+            $stamps[$externalId] = ['accrualId' => $sale['accrualId'], 'date' => $day, 'amount' => $sale['totalRevenue']];
         }
 
         $this->em->flush();
+
+        if ($claimedCount > 0) {
+            $this->logger->info('[Ozon by-day] historical sales got an accrual marker', ['company_id' => $companyId, 'count' => $claimedCount]);
+        }
 
         if ($suffixedCount > 0) {
             // Объём наблюдаем: рост числа «вторых начислений» одного дня сигнализирует о переоформлении, а не о нескольких единицах.

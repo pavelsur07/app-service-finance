@@ -130,12 +130,12 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     }
 
     /**
-     * Метки записей по external id: начисление-источник (`raw_data._accrual_id`, у исторических записей его нет) и дата.
+     * Метки записей по external id: начисление-источник (`raw_data._accrual_id`, у исторических записей его нет), дата и сумма.
      * Нужны Ozon by-day, чтобы отличить повторную обработку того же начисления от другого начисления того же отправления.
      *
      * @param list<string> $externalIds
      *
-     * @return array<string, array{accrualId: ?string, date: string}>
+     * @return array<string, array{accrualId: ?string, date: string, amount: string}>
      */
     public function getAccrualStamps(string $companyId, array $externalIds): array
     {
@@ -144,7 +144,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         }
 
         $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
-            'SELECT external_order_id AS external_id, sale_date AS stamp_date, raw_data ->> \'_accrual_id\' AS accrual_id
+            'SELECT external_order_id AS external_id, sale_date AS stamp_date, total_revenue AS stamp_amount, raw_data ->> \'_accrual_id\' AS accrual_id
              FROM marketplace_sales
              WHERE company_id = :companyId AND external_order_id IN (:ids)',
             ['companyId' => $companyId, 'ids' => $externalIds],
@@ -156,10 +156,25 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             $stamps[(string) $row['external_id']] = [
                 'accrualId' => null === $row['accrual_id'] ? null : (string) $row['accrual_id'],
                 'date' => (string) $row['stamp_date'],
+                'amount' => number_format((float) $row['stamp_amount'], 2, '.', ''),
             ];
         }
 
         return $stamps;
+    }
+
+    /**
+     * Проставляет метку начисления исторической записи, которая ему принадлежит (в `raw_data` добавляется `_accrual_id`).
+     * Суммы, даты и привязки к ОПиУ не меняются; запись с уже стоящей меткой не трогается. Возвращает число изменённых строк.
+     */
+    public function claimLegacyRecord(string $companyId, string $externalId, string $accrualId): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE marketplace_sales
+             SET raw_data = (COALESCE(raw_data::jsonb, \'{}\'::jsonb) || jsonb_build_object(\'_accrual_id\', CAST(:accrualId AS text)))::json
+             WHERE company_id = :companyId AND external_order_id = :externalId AND raw_data ->> \'_accrual_id\' IS NULL',
+            ['companyId' => $companyId, 'externalId' => $externalId, 'accrualId' => $accrualId],
+        );
     }
 
     /**

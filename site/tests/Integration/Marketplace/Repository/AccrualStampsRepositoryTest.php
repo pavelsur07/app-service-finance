@@ -43,9 +43,9 @@ final class AccrualStampsRepositoryTest extends IntegrationTestCase
 
         $stamps = self::getContainer()->get(MarketplaceSaleRepository::class)->getAccrualStamps($this->companyId, ['new-key', 'legacy-key', 'no-raw-key', 'foreign-key', 'missing']);
 
-        self::assertSame(['accrualId' => '64793331570', 'date' => '2026-09-30'], $stamps['new-key']);
-        self::assertSame(['accrualId' => null, 'date' => '2026-09-29'], $stamps['legacy-key']);
-        self::assertSame(['accrualId' => null, 'date' => '2026-09-28'], $stamps['no-raw-key']);
+        self::assertSame(['accrualId' => '64793331570', 'date' => '2026-09-30', 'amount' => '10.00'], $stamps['new-key']);
+        self::assertSame(['accrualId' => null, 'date' => '2026-09-29', 'amount' => '10.00'], $stamps['legacy-key']);
+        self::assertSame(['accrualId' => null, 'date' => '2026-09-28', 'amount' => '10.00'], $stamps['no-raw-key']);
         self::assertArrayNotHasKey('foreign-key', $stamps, 'чужая компания не видна');
         self::assertArrayNotHasKey('missing', $stamps);
         self::assertSame([], self::getContainer()->get(MarketplaceSaleRepository::class)->getAccrualStamps($this->companyId, []));
@@ -61,7 +61,31 @@ final class AccrualStampsRepositoryTest extends IntegrationTestCase
 
         $stamps = self::getContainer()->get(MarketplaceReturnRepository::class)->getAccrualStamps($this->companyId, ['ret-key']);
 
-        self::assertSame(['accrualId' => '70000000001', 'date' => '2026-09-27'], $stamps['ret-key']);
+        self::assertSame(['accrualId' => '70000000001', 'date' => '2026-09-27', 'amount' => '10.00'], $stamps['ret-key']);
+    }
+
+    public function testClaimingStampsOnlyUnmarkedRowsOfTheCompanyAndKeepsTheFigures(): void
+    {
+        $this->insertSale('legacy-key', '2026-09-29', ['sku' => '1', 'extra' => 'kept']);
+        $this->insertSale('marked-key', '2026-09-29', ['sku' => '1', '_accrual_id' => 'OLD']);
+        $this->insertSale('foreign-legacy', '2026-09-29', ['sku' => '1'], $this->otherCompanyId);
+        $repository = self::getContainer()->get(MarketplaceSaleRepository::class);
+
+        self::assertSame(1, $repository->claimLegacyRecord($this->companyId, 'legacy-key', 'NEW'));
+        self::assertSame(0, $repository->claimLegacyRecord($this->companyId, 'marked-key', 'NEW'), 'уже поставленная метка не перезаписывается');
+        self::assertSame(0, $repository->claimLegacyRecord($this->companyId, 'foreign-legacy', 'NEW'), 'чужая компания не затрагивается');
+        self::assertSame(0, $repository->claimLegacyRecord($this->companyId, 'foreign-legacy', 'NEW'));
+
+        $row = $this->connection->fetchAssociative("SELECT raw_data::text AS raw, total_revenue, sale_date FROM marketplace_sales WHERE company_id = :c AND external_order_id = 'legacy-key'", ['c' => $this->companyId]);
+        self::assertIsArray($row);
+        self::assertSame(['sku' => '1', 'extra' => 'kept', '_accrual_id' => 'NEW'], json_decode((string) $row['raw'], true));
+        self::assertSame('10.00', $row['total_revenue']);
+        self::assertSame('2026-09-29', $row['sale_date']);
+        self::assertSame('OLD', json_decode((string) $this->connection->fetchOne("SELECT raw_data::text FROM marketplace_sales WHERE company_id = :c AND external_order_id = 'marked-key'", ['c' => $this->companyId]), true)['_accrual_id']);
+
+        // Запись без raw_data тоже получает метку.
+        $this->insertSale('no-raw', '2026-09-28', null);
+        self::assertSame(1, $repository->claimLegacyRecord($this->companyId, 'no-raw', 'NEW2'));
     }
 
     /**

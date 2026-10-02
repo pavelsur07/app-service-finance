@@ -12,15 +12,23 @@ namespace App\Marketplace\Ozon\Application\Service;
  * поэтому второе начисление раньше молча отбрасывалось как «уже учтённое» (выручка и возвраты занижались).
  *
  * Правило (решение по `docs/tasks/marketplace-ozon-sale-key/`):
- * - ключ свободен — запись идёт под базовым ключом, в `raw_data` кладётся метка `_accrual_id`;
- * - занят записью с меткой ДРУГОГО начисления в ТОТ ЖЕ день — это отдельное событие (две единицы, частичный возврат):
- *   запись идёт под ключом с суффиксом `-acc{accrual_id}`;
- * - занят записью без метки (историческая), тем же начислением или записью другого дня — запись пропускается как раньше:
- *   исторические и закрытые периоды не меняются, а начисление другого дня (возможное переоформление) не удваивается.
+ * - базовый ключ свободен — запись под ним, в `raw_data` метка `_accrual_id`;
+ * - базовый ключ занят, но это то же начисление, либо запись другого дня — пропуск, как раньше
+ *   (возможное переоформление в другой день не удваивается);
+ * - занят записью с меткой ДРУГОГО начисления в ТОТ ЖЕ день — это отдельное событие: запись под ключом `-acc{accrual_id}`;
+ * - занят исторической записью БЕЗ метки в тот же день: если сумма начисления равна сумме записи, запись принадлежит
+ *   этому начислению — ей проставляется метка (суммы, привязки и даты не меняются, закрытые периоды не затрагиваются),
+ *   новая запись не создаётся; если суммы различаются — это другое начисление, запись под ключом `-acc{accrual_id}`.
+ *   Метка фиксирует «занятость», поэтому второе начисление с той же суммой уже получит собственный ключ.
  */
 final class OzonAccrualRecordKey
 {
     public const ACCRUAL_MARKER = '_accrual_id';
+
+    public const SKIP = 'skip';
+    public const INSERT = 'insert';
+    /** Запись под базовым ключом — историческая, принадлежит этому начислению: проставить метку, не создавать новую. */
+    public const CLAIM_LEGACY = 'claim_legacy';
 
     public static function suffixed(string $baseKey, string $accrualId): string
     {
@@ -46,26 +54,31 @@ final class OzonAccrualRecordKey
     }
 
     /**
-     * @param array<string, array{accrualId: ?string, date: string}> $stamps метки уже существующих и добавленных в этом прогоне записей
+     * @param array<string, array{accrualId: ?string, date: string, amount: string}> $stamps метки уже существующих и добавленных в этом прогоне записей
+     * @param string $amount сумма начисления, положительная, два знака
      *
-     * @return string|null ключ, под которым создать запись, либо `null` — пропустить
+     * @return array{action: string, key: string} действие и ключ записи (для `skip` — базовый)
      */
-    public static function resolve(string $baseKey, string $accrualId, string $date, array $stamps): ?string
+    public static function decide(string $baseKey, string $accrualId, string $date, string $amount, array $stamps): array
     {
         // Это начисление уже записано под своим суффиксным ключом (например, базовую запись удалили): второй раз не пишем.
         if (isset($stamps[self::suffixed($baseKey, $accrualId)])) {
-            return null;
+            return ['action' => self::SKIP, 'key' => $baseKey];
         }
 
         $known = $stamps[$baseKey] ?? null;
         if (null === $known) {
-            return $baseKey;
+            return ['action' => self::INSERT, 'key' => $baseKey];
         }
 
-        if (null === $known['accrualId'] || $known['accrualId'] === $accrualId || $known['date'] !== $date) {
-            return null;
+        if ($known['accrualId'] === $accrualId || $known['date'] !== $date) {
+            return ['action' => self::SKIP, 'key' => $baseKey];
         }
 
-        return self::suffixed($baseKey, $accrualId);
+        if (null === $known['accrualId'] && 0 === bccomp($known['amount'], $amount, 2)) {
+            return ['action' => self::CLAIM_LEGACY, 'key' => $baseKey];
+        }
+
+        return ['action' => self::INSERT, 'key' => self::suffixed($baseKey, $accrualId)];
     }
 }

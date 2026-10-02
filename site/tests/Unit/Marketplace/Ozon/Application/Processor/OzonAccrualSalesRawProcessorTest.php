@@ -32,6 +32,9 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
     /** @var list<array{externalOrderId: string, quantity: int, pricePerUnit: string, totalRevenue: string, rawAccrualId: mixed}> */
     private array $persisted = [];
 
+    /** @var list<array{string, string}> */
+    private array $claimed = [];
+
     public function testRevenueUsesSellerBasisLikeLegacyRowsInTheSameTable(): void
     {
         // Регрессия. marketplace_sales ведёт базу ПРОДАВЦА: сверка за июнь по
@@ -103,26 +106,64 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
         $base = 'ozon-accrual-80000001-1001-1-product-0';
 
         $this->processor(stamps: [
-            $base => ['accrualId' => '50000000001', 'date' => '2026-06-01'],
-            $base.'-acc50000000099' => ['accrualId' => '50000000099', 'date' => '2026-06-01'],
+            $base => ['accrualId' => '50000000001', 'date' => '2026-06-01', 'amount' => '2999.00'],
+            $base.'-acc50000000099' => ['accrualId' => '50000000099', 'date' => '2026-06-01', 'amount' => '2999.00'],
         ])->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$first, $second], self::RAW_DOC_ID);
 
         self::assertSame([], $this->persisted);
     }
 
-    public function testRecordWithoutAccrualMarkerOrOfAnotherDayBlocksTheKeyAsBefore(): void
+    public function testHistoricalRecordOfTheSameDayAndAmountIsClaimedNotDuplicated(): void
+    {
+        $base = 'ozon-accrual-80000001-1001-1-product-0';
+
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01', 'amount' => '2999.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->saleRow()], self::RAW_DOC_ID);
+
+        // Историческая запись без метки принадлежит этому начислению: ей ставится метка, новая запись не создаётся.
+        self::assertSame([], $this->persisted);
+        self::assertSame([[$base, '50000000001']], $this->claimed);
+    }
+
+    public function testHistoricalRecordWithDifferentAmountMeansAnotherAccrualOfTheSameDay(): void
+    {
+        $base = 'ozon-accrual-80000001-1001-1-product-0';
+
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01', 'amount' => '1500.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->saleRow()], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->claimed);
+        self::assertSame([$base.'-acc50000000001'], array_column($this->persisted, 'externalOrderId'));
+    }
+
+    public function testTwinAccrualsOverOneHistoricalRowKeepBothSales(): void
+    {
+        $first = $this->saleRow();
+        $second = $this->saleRow();
+        $second['accrual_id'] = 50000000099;
+        $base = 'ozon-accrual-80000001-1001-1-product-0';
+
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01', 'amount' => '2999.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$first, $second], self::RAW_DOC_ID);
+
+        // Первое начисление забирает историческую запись, второе получает собственную: итого две продажи.
+        self::assertSame([[$base, '50000000001']], $this->claimed);
+        self::assertSame([$base.'-acc50000000099'], array_column($this->persisted, 'externalOrderId'));
+    }
+
+    public function testRecordOfAnotherDayBlocksTheKeyAsBefore(): void
     {
         $other = $this->saleRow();
         $other['accrual_id'] = 50000000099;
         $base = 'ozon-accrual-80000001-1001-1-product-0';
 
-        // Историческая запись без метки (закрытые периоды не меняются).
-        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-06-01']])
+        // Историческая запись другого дня (закрытые периоды не меняются).
+        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-05-31', 'amount' => '2999.00']])
             ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
         self::assertSame([], $this->persisted);
 
         // Запись другого дня: возможное переоформление того же начисления, выручку не удваиваем.
-        $this->processor(stamps: [$base => ['accrualId' => '50000000001', 'date' => '2026-05-31']])
+        $this->processor(stamps: [$base => ['accrualId' => '50000000001', 'date' => '2026-05-31', 'amount' => '2999.00']])
             ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
         self::assertSame([], $this->persisted);
     }
@@ -214,7 +255,7 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
 
     /**
      * @param list<string> $existingIds ключи записей, созданных этим же начислением (фикстура, 2026-06-01)
-     * @param array<string, array{accrualId: ?string, date: string}> $stamps явные метки существующих записей
+     * @param array<string, array{accrualId: ?string, date: string, amount: string}> $stamps явные метки существующих записей
      */
     private function processor(array $existingIds = [], array $stamps = []): OzonAccrualSalesRawProcessor
     {
@@ -251,9 +292,15 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('getAccrualStamps')->willReturn($stamps + array_map(
-            static fn (): array => ['accrualId' => '50000000001', 'date' => '2026-06-01'],
+            static fn (): array => ['accrualId' => '50000000001', 'date' => '2026-06-01', 'amount' => '2999.00'],
             array_fill_keys($existingIds, true),
         ));
+
+        $saleRepository->method('claimLegacyRecord')->willReturnCallback(function (string $companyId, string $externalId, string $accrualId): int {
+            $this->claimed[] = [$externalId, $accrualId];
+
+            return 1;
+        });
 
         $costPrice = (new \ReflectionClass(MarketplaceCostPriceResolver::class))->newInstanceWithoutConstructor();
         $innerResolver = $this->createMock(CostPriceResolverInterface::class);
