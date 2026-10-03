@@ -196,7 +196,14 @@
                                 <td><span class="badge bg-secondary">{{ doc.recordsSkipped }}</span></td>
                                 <td><small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small></td>
                                 <td>
-                                    {% if doc.processingStatus is not null %}
+                                    {% if doc.documentType == 'realization' and doc.processingStatus is null %}
+                                        {# У «Реализации» нет статуса конвейера: применена ли она, видно по созданным строкам. #}
+                                        {% if doc.recordsCreated > 0 %}
+                                            <span class="badge bg-success" data-testid="realization-applied">Применена</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary" data-testid="realization-not-applied">Не применена</span>
+                                        {% endif %}
+                                    {% elseif doc.processingStatus is not null %}
                                         {% if doc.processingStatus.value == 'completed' %}
                                             <span class="badge bg-success">Готово</span>
                                         {% elseif doc.processingStatus.value == 'running' %}
