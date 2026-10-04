@@ -198,6 +198,10 @@ Read-only проверки можно выполнять после запрос
   (cron 07:20, с 9-го по 16-е) — read-only гейт; при красном: у кого нет отчёта, видно в выводе (`MISSING company … : <статус>`); починка — ручная загрузка отчёта
   (синхронизация подключения или `ozon-realization-sync --company-id --year --month` по просьбе Владельца) либо обновление ключа при `auth_failed`.
 
+- `app:marketplace:ozon-realization-catchup [--months-back=3] [--limit=5] [--dry-run]` (cron 05:30) — догоняющая обработка загруженных, но не применённых «Реализаций» последних месяцев;
+  `--dry-run` показывает, что было бы поставлено. Применение пишет строки реализации в учёт, поэтому в `codex-console` не добавлен. `app:marketplace:ozon-realization-unapplied-check`
+  (cron 07:25) — read-only гейт «загружена больше суток назад, но не применена».
+
 - `app:marketplace:wb-costs:unrecognized-check [--days-back=N]` — read-only гейт
   нераспознанных затрат WB: за окно N дней (по умолчанию 14, как
   `--refresh-days-back` ночного orchestrate, максимум 90) у активных

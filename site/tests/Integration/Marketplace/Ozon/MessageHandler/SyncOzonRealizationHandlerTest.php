@@ -83,7 +83,8 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
         $firstHash = $status->getRowsHash();
         $docId = $status->getRawDocumentId();
 
-        // Повторная загрузка с другими строками перезаписывает тот же документ, хеш меняется.
+        // Повторная загрузка с другими строками перезаписывает тот же документ, хеш меняется, время загрузки обновляется.
+        $this->connection->executeStatement("UPDATE marketplace_raw_documents SET synced_at = '2026-09-01 00:00:00' WHERE id = :id", ['id' => $docId]);
         $this->handle(new MockResponse($this->body([['sku' => '1', 'price' => 10], ['sku' => '2', 'price' => 20]])));
 
         $status = $this->pairStatus();
@@ -92,6 +93,7 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
         self::assertNotSame($firstHash, $status->getRowsHash());
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_raw_documents WHERE company_id = :c AND document_type = 'realization'", ['c' => $this->companyId]));
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT records_count FROM marketplace_raw_documents WHERE id = :id', ['id' => $docId]));
+        self::assertSame('2026-10-03 10:00:00', $this->connection->fetchOne('SELECT to_char(synced_at, \'YYYY-MM-DD HH24:MI:SS\') FROM marketplace_raw_documents WHERE id = :id', ['id' => $docId]));
     }
 
     public function testLoadedReportQueuesProcessingOnce(): void

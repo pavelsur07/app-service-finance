@@ -295,6 +295,8 @@ final class SyncOzonRealizationHandler
             $existing->setRawData($rawData);
             $existing->setRecordsCount(count($rows));
             $existing->setSyncNotes(null);
+            // Время загрузки обновляется: по нему гейт «загружена больше суток назад, но не применена» отсчитывает срок.
+            $existing->touchSyncedAt($this->clock->now());
             $this->em->flush();
 
             return (string) $existing->getId();

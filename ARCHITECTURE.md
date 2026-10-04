@@ -448,6 +448,10 @@
   окончательно закрытый этап «Продажи и возвраты» → `conflict` + warning (предварительное закрытие не блокирует), сбой → `failed` + повтор через час и `error`.
 - **Сверка** считает «Реализацию» из сырого документа (`OzonRealizationTotalsQuery`), не из обработанной таблицы; на вкладке «Сверка Ozon» состояние отчёта показывает `OzonRealizationStateFactory`.
 - **Гейт** `app:marketplace:ozon-realization-check` (cron 07:20, активен с 9-го по 16-е число): отчёт получен и применён (статус `success` либо строки в `marketplace_ozon_realizations`); иначе один агрегированный `error`, `conflict` — warning.
+- **Догоняющий проход** `app:marketplace:ozon-realization-catchup` (cron 05:30): документы последних N (по умолчанию 3) закрытых месяцев (`OzonRealizationCatchupWindow`), загруженные, но не применённые
+  (`records_created = 0`, пара не `success/conflict/failed_final/auth_failed`, `failed` с наступившим сроком, «залипшие» в работе дольше часа; нужно активное seller-подключение), получают `ProcessOzonRealizationMessage`
+  (`OzonUnappliedRealizationQuery`; ≤ `--limit` за прогон, новые месяцы первыми). Закрытый этап → `conflict` в обработчике; старше окна — по слову Владельца. Гейт `app:marketplace:ozon-realization-unapplied-check` (cron 07:25, read-only):
+  то же для документов, загруженных больше суток назад; один агрегированный `error`, `conflict` не краснит.
 
 ### Marketplace: ключ записи продаж и возвратов Ozon by-day
 
