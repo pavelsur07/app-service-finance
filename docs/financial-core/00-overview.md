@@ -1,11 +1,12 @@
 # Financial Core — Stage 0: обзор
 
-> Статус: Stage 0, архитектурный контракт. Production-поведение не менялось.
+> Статус: Stage 0, архитектурный контракт, Q1–Q5 утверждены 2026-10-04.
+> Production-поведение не менялось.
 > Дата базового среза: 2026-10-04, `master` @ `524caaec`.
 > Все утверждения о «сейчас» сверены с кодом; ссылки `файл:строка` даны там, где
 > факт критичен. Всё, что помечено **Решение**, — проектное решение Stage 0 и
-> обязательно для Stage 1–N; всё, что помечено **Вопрос Владельцу**, — бизнес-
-> семантика, которую нельзя угадывать (AGENTS.md §3.4 п.1).
+> обязательно для Stage 1–N. Бизнес-вопросы Владельцу Q1–Q5 закрыты
+> (раздел «Owner decisions» ниже, ADR-005…008).
 
 ## Состав
 
@@ -21,7 +22,8 @@
 | `08-queue-topology.md` | будущая топология очередей |
 | `09-recovery-reconciliation.md` | retry → DLQ → correction → replay → reconciliation |
 | `10-migration-roadmap.md` | Stage 1–N |
-| `adr/001…004` | решения: события, outbox, оркестратор, разделение очередей |
+| `adr/001…004` | решения: события, outbox, оркестратор (+Balance adapter), разделение очередей |
+| `adr/005…008` | решения Владельца Q1–Q5: AR/AP, признание отдельно от денег, состояния периода, денежная модель |
 
 ## Главные выводы baseline (коротко)
 
@@ -34,7 +36,7 @@
    Invoice cancellation. Есть Deals (заказ без оплат), Loan (график без связи с
    Cash), PaymentPlan (прогноз ДДС), аллокация `CashTransaction` на P&L-документы
    (`allocatedAmount`). Подробно — `02-financial-flows.md` §0. Следствие: AR/AP
-   — **новая возможность**, а не миграция; для неё нужны решения Владельца.
+   — **новая возможность**, а не миграция; решение о ней принято (Q1, ADR-005), раздел «Owner decisions».
 3. **Outbox, доменных событий и `doctrine_transaction`-middleware нет.** Публикация
    сообщений — прямой `dispatch()` после `flush()` (или из Doctrine-listener
    внутри `flush()`). Везде есть окно «БД закоммичена, сообщение не ушло».
@@ -82,18 +84,25 @@ Business Operation ─┐ (одна БД-транзакция)
   `request_hash` (Balance), content-hash + natural-key upsert и `pending`-sweeper
   (Ingestion), `claimForQueue` с advisory-lock (Marketplace sync status).
 
-## Открытые вопросы Владельцу (блокируют только указанные Stage)
+## Owner decisions (Q1–Q5) — утверждённый контракт Stage 0
 
-| # | Вопрос | Блокирует |
-|---|---|---|
-| Q1 | Нужен ли в продукте AR/AP (дебиторка/кредиторка) и по каким первичным документам (счёт, акт, УПД, накладная), или достаточно маркетплейсных расчётов? | Stage 7 |
-| Q2 | Единое правило признания: выручка/расход — по дате документа, отгрузки, периода отчёта маркетплейса или оплаты? Сейчас: маркетплейс — конец месяца, Cash — дата оплаты, Loan — дата платежа по графику | Stage 4–5 |
-| Q3 | Должен ли Balance получать данные автоматически (какие счета/статьи соответствуют ДДС, AR/AP, остаткам маркетплейсов)? | Stage 8 |
-| Q4 | Единая политика закрытия периода: достаточно `Company::financeLockBefore` или нужны статусы периодов (open/soft-closed/closed) в ядре? | Stage 5 |
-| Q5 | Многовалютность: все проводки в RUB или хранить валюту операции + курс? Сейчас Cash хранит `currency` и FX у переводов, P&L — только суммы | Stage 2 (схема), Stage 6 |
+Вопросы Q1–Q5 закрыты Владельцем 2026-10-04. Решения — часть архитектурного
+контракта и **не пересматриваются внутри Stage 1–10**; изменение — только новым
+ADR. Подробности и альтернативы — в указанных ADR.
 
-До ответа Stage 1–6 реализуются без этих решений: ядро проектируется
-валюто-нейтральным, правило признания — параметром posting-rule.
+| # | Решение | Архитектурное следствие | ADR | Зависящие Stage |
+|---|---|---|---|---|
+| Q1 | **AR/AP входит в целевую функциональность.** Invoice, Bill, Payment, allocation, частичная оплата, предоплата/аванс, возврат, отмена/сторно, credit-adjustment. Это отдельный settlement-контур, не производная Cash. Нормализованная семантика, без привязки к российским первичным документам (акт/УПД/накладная — источники событий) | книга `SETTLEMENT` + проекция AR/AP; оплата не признаёт доход/расход повторно; бизнес-модули владеют документами и платежами, ядро — проводками; инварианты INV-10…12 обязательны | ADR-005 | 6 (CASH-основа), **7** |
+| Q2 | **Признание — по экономическому факту, не по деньгам.** Дата оплаты влияет на Cash и settlement, но не определяет recognition. Marketplace сохраняет текущую семантику как versioned-правило `marketplace_month_stage_v1`, не универсальное | `occurred_at` / `effective_date` / `recorded_at` в событии; `PostingRule` использует `effective_date`, не определяет бизнес-факт и не переопределяет дату; payment-события порождают только CASH/SETTLEMENT; legacy-семантики оформлены правилами `marketplace_month_stage_v1`, `loan_schedule_v1`, `legacy_cash_basis_v1` | ADR-006 | 4, 5, 6, 7 |
+| Q3 | **Balance получает данные из ядра автоматически**, но ядро не пишет в его таблицы: только `Balance Intake Adapter` | `Posting Group → Balance operation`, `request_key = fincore:{posting_group_id}`; маппинг `posting/account/category → Balance account/article/dimension` — отдельная версионируемая конфигурация, не в Orchestrator; первый режим — `draft/suggestion`, затем автоматический `post`; Balance остаётся отдельным ledger | ADR-003 (п.6), ADR-008 (п.7) | **8** |
+| Q4 | **`financeLockBefore` — только переходная совместимость.** Целевая модель — состояния периода `OPEN / SOFT_CLOSED / CLOSED` | Orchestrator проверяет период перед проводками; обычные события в закрытый период → `blocked`, корректировка — только adjustment-flow (причина, пользователь, исходное событие, аудит); replay соблюдает ту же политику; эффективное состояние = более строгое из ядра и `financeLockBefore` | ADR-007 | 2 (схема), **3** (проверка), 5 (legacy-писатели), 10 |
+| Q5 | **Ядро не RUB-only.** Каждая сумма — `amount_minor` + `currency` (ISO 4217); `float` запрещён; исходная валюта сохраняется всегда; FX-поля (`reporting_amount_minor`, `reporting_currency`, `fx_rate`, `fx_rate_date`, `fx_rate_source`) предусмотрены в схеме, полный FX engine не требуется | value object `Money`; CHECK «reporting/fx — все или ничего»; reporting currency — настройка компании; отсутствие курса — finding `fx_missing`, не подстановка 1.0; курсовые разницы вне Stage 0–8 | ADR-008 | **2** (схема), 5, 6, 8 |
+
+Следствие для планирования: **открытых вопросов Владельцу в Stage 0 нет.**
+Stage 7 зависит от завершения Stage 5 и 6, Stage 8 — от 5 и 6; решений
+Владельца ждать не нужно. Конкретное содержимое маппинга Balance (какие
+статьи/счета) — это конфигурационные данные Stage 8 (Phase 0), а не
+архитектурное решение.
 
 ## Чек-лист готовности Stage 0
 
@@ -103,7 +112,7 @@ Business Operation ─┐ (одна БД-транзакция)
 | Потоки: revenue/expense recognition, bank, refund, cancellation, balance; Invoice/AR/AP/Bill/Prepayment | описаны; **Invoice/AR/AP/Bill/Prepayment в коде отсутствуют**, зафиксировано | `02 §0` |
 | Потеря сообщения, duplicate delivery/processing, рестарт воркера, отказ очереди, частичная транзакция, replay | да | `03`, `09` |
 | Financial Event, Posting, source of truth, Outbox, Orchestrator, idempotency, queue topology, reconciliation, recovery | да | `04`–`09`, ADR |
-| Инварианты, связи Revenue↔AR, Expense↔AP, Payment↔AR/AP/Cash, Postings↔Balance | да (AR/AP — условно, Q1) | `04 §4–5` |
+| Инварианты, связи Revenue↔AR, Expense↔AP, Payment↔AR/AP/Cash, Postings↔Balance | да | `04 §4–5`, ADR-005 |
 | Roadmap Stage 1–10 со scope/зависимостями/BC/Legacy/rollback | да | `10` |
 | Production-поведение, схема БД, API, очереди не менялись | да: изменены только файлы `docs/financial-core/**` | `git diff --stat` |
 
@@ -111,4 +120,4 @@ Business Operation ─┐ (одна БД-транзакция)
 `WbGeneratedRowsSafeReplaceService`, `MarketplaceListingLinkingFacade`; не
 проверены `redeliver_timeout` Redis-транспорта и `maxmemory`; прод-данные не
 запрашивались (замеров «сколько WB-дней сейчас застряло» нет — это первый
-замер Stage 1). Список вопросов Владельцу — выше (Q1–Q5).
+замер Stage 1). Решения Владельца Q1–Q5 приняты и перечислены выше.

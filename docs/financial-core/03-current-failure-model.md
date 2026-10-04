@@ -117,10 +117,10 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 | R-11 | Float и двойная знаковая конвенция в P&L; `abs()` после неттинга | P1 | Finance | Stage 5 |
 | R-12 | Unique-индексы returns/costs/raw только в миграциях, не в ORM; `marketplace_sales.uniq_marketplace_srid` без `company_id` | P1 | Marketplace | Stage 1 |
 | R-13 | Нет идемпотентности создания Document (Finance, Loan, Cash→P&L) | P1 | Finance | Stage 5 |
-| R-14 | `financeLockBefore` не защищает Finance/Loan/импорты Cash | P1 | сквозной | Stage 5 |
+| R-14 | `financeLockBefore` не защищает Finance/Loan/импорты Cash | P1 | сквозной | Stage 5 (ADR-007) |
 | R-15 | Тихие пропуски в `PLRegisterUpdater` (нет проекта/категории) | P1 | Finance | Stage 5 |
-| R-16 | Нет понятий Invoice/Bill/AR/AP; платёж не связан с обязательством | — (функциональный пробел) | домен | Stage 7 |
-| R-17 | Единая модель признания отсутствует (Q2) | — | домен | Stage 4–5 |
+| R-16 | Нет понятий Invoice/Bill/AR/AP; платёж не связан с обязательством | — (функциональный пробел) | домен | Stage 7 (ADR-005) |
+| R-17 | Единая модель признания отсутствует | — | домен | Stage 4–5 (ADR-006) |
 | R-18 | Debug-маркеры `DBG:` в `errorMessage` пользователя и flush на каждой стадии в `CashFileImportHandler` | P2 | Cash | Stage 1 |
 | R-19 | Telegram `occurredAt` = серверное «сейчас», а не время сообщения | P2 | Cash | Stage 6 |
 | R-20 | `CashTransactionToDocumentService` создаёт `Document` в обход Facade | P2 | границы модулей | Stage 5 |

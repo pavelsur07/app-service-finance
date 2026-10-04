@@ -17,7 +17,8 @@
 | Задержанное событие/нарушение порядка | `source_revision` и `causation_id`: «рано» ⇒ retry/бэкоф, «поздно» ⇒ `superseded` | порядок не требуется от транспорта |
 | Невалидный payload / неподдержанная версия | `Unrecoverable` → processing `failed(invalid_payload)` → `fincore_failed`, ERROR (один агрегированный) | без ретраев вхолостую |
 | Правило не найдено | `Unrecoverable`, `failed(no_rule)`; событие остаётся в журнале | попадает под replay после добавления правила |
-| Закрытый период | processing `failed(period_locked)` либо `late_correction` по политике (Q4) | не пишем молча в закрытое |
+| Закрытый период (`SOFT_CLOSED`/`CLOSED`, ADR-007) | processing `blocked(period_soft_closed\|period_closed)`: не ретрай, не DLQ; проводок нет; выход — открытие периода, пере-датирование (новая ревизия) или adjustment | не пишем молча в закрытое и не сдвигаем период |
+| Закрыт период Balance | intake `blocked(balance_period_closed)`; проводки ядра уже зафиксированы | сбой периферии не откатывает факт |
 | Downstream недоступен (Balance, проекция) | отдельный consumer/транспорт ретраится независимо; проводки уже зафиксированы | сбой периферии не откатывает факт |
 | Timeout | `Recoverable`; транзакции короткие, внешние вызовы внутри транзакции запрещены | нет долгих блокировок |
 | Частичная обработка (часть consumer'ов) | processing по `(event, consumer)` — видно, кто не сделал; повтор только его | гранулярное восстановление |
@@ -61,7 +62,9 @@ retry  →  backoff  →  DLQ  →  correction  →  replay  →  reconciliation
 - Replay пишет `fincore_replay_runs` (кто, scope, режим, счётчики до/после) и
   `metadata.origin=replay` в порождаемых outbox-строках.
 - Запрещено: replay с удалением проводок; replay без `company_id`-ограничения;
-  replay закрытого периода без политики Q4.
+  replay, игнорирующий политику периода: в `SOFT_CLOSED/CLOSED` replay
+  по умолчанию даёт `blocked`, dry-run показывает их число; запись возможна
+  только как adjustment (`--as-adjustment --reason "…"`, право по ADR-007).
 - **Что можно replay:** любое событие любого типа (факт неизменяем, правило
   детерминированно). **Что нельзя:** внешние побочные эффекты (письма,
   вызовы API) — они не живут в consumer'ах ядра; Balance intake безопасен
@@ -88,7 +91,11 @@ retry  →  backoff  →  DLQ  →  correction  →  replay  →  reconciliation
 | M-01 | закрытый месяц Marketplace: нет строк `marketplace_*` с `document_id IS NULL` по периоду; все дни `success` (закрывает R-04) | догрузка/rebuild | 1, 4 |
 | A-01…A-03 | AR/AP: выручка/расход ↔ SETTLEMENT; аллокации ≤ платежа; остаток = документ − аллокации | replay/корректирующее событие | 7 |
 | B-01 | на каждую `balance_mapped` группу — ровно одна операция Balance, суммы совпадают | повторный intake | 8 |
-| X-01 | `financeLockBefore`: нет проводок в закрытом периоде без `late_correction` | расследование | 5 |
+| X-01 | политика периода: нет проводок от обычных событий в `SOFT_CLOSED/CLOSED`; эффективное состояние = max(ядро, `financeLockBefore`) | расследование | 3 |
+| E-05 | `blocked` processing старше SLA (период открыт, а событие не разблокировано) либо блокировка без найденной причины | повторная постановка в очередь | 3 |
+| P-02 | предусловие перехода в `CLOSED`: нет событий без processing, нет `failed`/`blocked` за период, проверки периода (P-01, C-01, A-01…A-03, B-01) = 0 | блокировать закрытие | 3 (+ проверки по Stage) |
+| F-01 | `fx_missing`: проводки в валюте ≠ reporting currency без `reporting_*` (ADR-008) | запросить курс/событие-коррекция | 5, 6 |
+| B-02 | intake в `blocked`/`unmapped` (неполный маппинг Balance, закрытый период Balance, валюта книги) | настроить маппинг/повторить | 8 |
 
 Результат — строки `fincore_reconcile_findings (check, company, window, severity,
 detected_at, resolved_at)`; ERROR в Sentry — только по агрегату за прогон, не
