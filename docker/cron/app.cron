@@ -197,6 +197,15 @@
 # app:marketplace:ozon-realization-sync) либо обновление ключа при auth_failed; закрытый месяц (conflict) — только warning.
 20 7 * * * cd /app && php bin/console app:marketplace:ozon-realization-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Догоняющая обработка «Реализации» Ozon: документы последних 3 закрытых месяцев, загруженные, но не применённые в учёт
+# (загружены прежним cron до автоматизации, обработка упала или «залипла»), — ставится та же обработка, что и после загрузки.
+# Не больше 5 документов за прогон, новые месяцы первыми. Окончательно закрытый этап «Продажи и возвраты» не меняется (conflict).
+30 5 * * * cd /app && php bin/console app:marketplace:ozon-realization-catchup --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Гейт к проходу выше (read-only): «Реализация», загруженная больше суток назад, обязана быть применена. Ненулевой exit code =
+# обработка не получается (разбор причины или кнопка «Применить выручку»); закрытый месяц (conflict) гейт не краснит.
+25 7 * * * cd /app && php bin/console app:marketplace:ozon-realization-unapplied-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневная пересборка предварительного («оперативного») закрытия
 # текущего открытого месяца для всех активных SELLER-подключений.
 # Запуск после ozon-financial-reports:sync (04:00) и marketplace-ads:daily-sync (04:30),
