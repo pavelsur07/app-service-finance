@@ -10,13 +10,16 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportPeriodResolver;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncPlanner;
+use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportSyncStatusUpdater;
 use App\Marketplace\Wildberries\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
@@ -256,6 +259,93 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(['initial', 'initial', 'initial'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
     }
 
+    public function testPlanDueRetryRecoversStaleProcessingDayOnceAndNeverTouchesFreshOrSuccessDays(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $now = new \DateTimeImmutable();
+        $stale = new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow');
+        $fresh = new \DateTimeImmutable('2026-05-19 00:00:00 Europe/Moscow');
+        $success = new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow');
+        $this->persistLoadedProcessingStatus($companyId, $connectionId, $stale);
+        $this->persistLoadedProcessingStatus($companyId, $connectionId, $fresh);
+        $this->persistStatus($companyId, $connectionId, $success, FinancialReportSyncStatus::SUCCESS);
+        $this->backdate($companyId, $stale, '-7 hours');
+        $this->backdate($companyId, $success, '-72 hours');
+        $this->em->clear();
+
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, $now);
+        $from = new \DateTimeImmutable('2026-05-01 00:00:00 Europe/Moscow');
+        $to = new \DateTimeImmutable('2026-05-31 00:00:00 Europe/Moscow');
+
+        // R-01: до фикса такой день не возвращался ни одним планировщиком и висел навсегда.
+        self::assertSame(1, $planner->planDueRetry($companyId, $connectionId, 10, $from, $to));
+        self::assertSame([], $bus->messages, 'Повторная загрузка из API не запускается.');
+        self::assertSame(1, $bus->processMessagesCount());
+        self::assertSame('2026-05-18', $bus->processMessages[0]->businessDate);
+        self::assertSame('daily', $bus->processMessages[0]->mode);
+
+        $this->em->clear();
+        $recovered = $this->statusRepository->findByBusinessDay($companyId, MarketplaceType::WILDBERRIES, self::REPORT_TYPE, $stale);
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $recovered);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $recovered->getStatus());
+        self::assertSame($bus->processMessages[0]->rawDocumentId, $recovered->getRawDocumentId(), 'raw-документ не потерян и не пересоздан.');
+
+        // Второй проход (следующий cron) не должен повторно отправить тот же день.
+        self::assertSame(0, $planner->planDueRetry($companyId, $connectionId, 10, $from, $to));
+        self::assertSame(1, $bus->processMessagesCount());
+    }
+
+    public function testReclaimedDayIsFinalizedToSuccessWithTheContextOfTheRedispatchedMessage(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $day = new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow');
+        $this->persistLoadedProcessingStatus($companyId, $connectionId, $day);
+        $this->backdate($companyId, $day, '-7 hours');
+        $this->em->clear();
+
+        $status = $this->statusRepository->findByBusinessDay($companyId, MarketplaceType::WILDBERRIES, self::REPORT_TYPE, $day);
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $status);
+        $rawDocumentId = $status->getRawDocumentId();
+        self::assertNotNull($rawDocumentId);
+
+        $company = $this->em->find(Company::class, $companyId);
+        self::assertInstanceOf(Company::class, $company);
+        $rawDocument = MarketplaceRawDocumentBuilder::aDocument()
+            ->withId($rawDocumentId)
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->build();
+        $this->em->persist($rawDocument);
+        $this->em->flush();
+
+        $bus = new InMemoryMessageBus();
+        $this->planner($bus, new \DateTimeImmutable())->planDueRetry($companyId, $connectionId, 1, new \DateTimeImmutable('2026-05-01 00:00:00 Europe/Moscow'), new \DateTimeImmutable('2026-05-31 00:00:00 Europe/Moscow'));
+        self::assertSame(1, $bus->processMessagesCount());
+        $message = $bus->processMessages[0];
+
+        // Pipeline дошёл до конца: ровно тот контекст, который шаги получают из ProcessDayReportMessage.
+        $rawDocument->markCompleted();
+        $this->em->flush();
+        self::getContainer()->get(WbFinancialReportSyncStatusUpdater::class)->syncByRawPipelineResult($rawDocument, null, [
+            'sync_status_id' => $message->syncStatusId,
+            'company_id' => $message->companyId,
+            'connection_id' => $message->connectionId,
+            'marketplace' => $message->marketplace,
+            'report_type' => $message->reportType,
+            'mode' => $message->mode,
+            'business_date' => $message->businessDate,
+            'raw_document_id' => $message->rawDocumentId,
+        ]);
+        $this->em->flush();
+        $this->em->clear();
+
+        $finalized = $this->statusRepository->findByBusinessDay($companyId, MarketplaceType::WILDBERRIES, self::REPORT_TYPE, $day);
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $finalized);
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $finalized->getStatus(), 'Иначе день перехватывался бы каждые 6 часов.');
+    }
+
     private function planner(InMemoryMessageBus $bus, \DateTimeImmutable $clockNow): WbFinancialReportSyncPlanner
     {
         $clock = new MockClock($clockNow);
@@ -304,6 +394,37 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         $this->em->flush();
     }
 
+    private function persistLoadedProcessingStatus(string $companyId, string $connectionId, \DateTimeImmutable $day): void
+    {
+        $entity = new MarketplaceFinancialReportSyncStatus(
+            Uuid::uuid7()->toString(),
+            $companyId,
+            $connectionId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            $day,
+        );
+        $entity->markLoading(FinancialReportSyncMode::DAILY);
+        $entity->markRawLoaded(Uuid::uuid4()->toString(), 10, 'hash');
+        $entity->markProcessing();
+
+        $this->statusRepository->save($entity);
+        $this->em->flush();
+    }
+
+    private function backdate(string $companyId, \DateTimeImmutable $day, string $modify): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE marketplace_financial_report_sync_statuses SET updated_at = :ts WHERE company_id = :companyId AND business_date = :day',
+            [
+                'ts' => (new \DateTimeImmutable($modify))->format('Y-m-d H:i:s'),
+                'companyId' => $companyId,
+                'day' => $day->format('Y-m-d'),
+            ],
+        );
+    }
+
     /** @return array{0:string,1:string} */
     private function seedActiveConnection(?string $companyId = null, ?string $connectionId = null): array
     {
@@ -348,10 +469,22 @@ final class InMemoryMessageBus implements MessageBusInterface
     /** @var list<SyncWbFinancialReportDayMessage> */
     public array $messages = [];
 
+    /** @var list<ProcessDayReportMessage> */
+    public array $processMessages = [];
+
+    public function processMessagesCount(): int
+    {
+        return \count($this->processMessages);
+    }
+
     public function dispatch(object $message, array $stamps = []): Envelope
     {
         if ($message instanceof SyncWbFinancialReportDayMessage) {
             $this->messages[] = $message;
+        }
+
+        if ($message instanceof ProcessDayReportMessage) {
+            $this->processMessages[] = $message;
         }
 
         return new Envelope($message, $stamps);

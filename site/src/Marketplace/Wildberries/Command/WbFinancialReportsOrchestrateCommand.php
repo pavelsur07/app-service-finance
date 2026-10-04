@@ -245,6 +245,7 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                     OR (status = 'failed' AND next_retry_at IS NULL AND last_error_status_code = 429 AND last_error_class = :rateLimitErrorClass)
                     OR (status = 'queued' AND next_retry_at IS NULL AND updated_at <= :stuckBefore)
                     OR (status = 'loading' AND updated_at <= :stuckBefore)
+                    OR (status IN ('raw_loaded', 'processing') AND updated_at <= :processingStuckBefore)
                )",
             [
                 'companyId' => $companyId,
@@ -255,6 +256,9 @@ final class WbFinancialReportsOrchestrateCommand extends Command
                 'rateLimitErrorClass' => MarketplaceRateLimitException::class,
                 'stuckBefore' => (new \DateTimeImmutable())
                     ->sub(new \DateInterval(MarketplaceFinancialReportSyncStatusRepository::STUCK_RECLAIM_INTERVAL))
+                    ->format('Y-m-d H:i:s'),
+                'processingStuckBefore' => (new \DateTimeImmutable())
+                    ->sub(new \DateInterval(MarketplaceFinancialReportSyncStatusRepository::PROCESSING_STUCK_RECLAIM_INTERVAL))
                     ->format('Y-m-d H:i:s'),
             ],
         );

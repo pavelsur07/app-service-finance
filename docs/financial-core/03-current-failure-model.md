@@ -25,8 +25,8 @@
 
 | # | Точка | Сбой | Эффект | Rec |
 |---|---|---|---|---|
-| G1 | `SyncWbFinancialReportDayHandler:316 flush` → `:318 dispatch(ProcessDayReport)` | kill/OOM между ними | день `processing`, сырьё загружено, обработки нет — **L** | **Нет.** `canClaimForQueue` возвращает false для `RAW_LOADED/PROCESSING` (`MarketplaceFinancialReportSyncStatusRepository.php:249-254`); планировщик пропускает. Только ручной reprocess |
-| G2 | `ProcessDayReportHandler:59 flush` → цикл из 3 dispatch | смерть после 1–2 из 3 | raw-документ не достигает `COMPLETED`, sync-статус вечно `processing` — **L/I** | WB — нет; Ozon by-day — grace 3600 с + cron |
+| G1 | `SyncWbFinancialReportDayHandler:316 flush` → `:318 dispatch(ProcessDayReport)` | kill/OOM между ними | день `processing`, сырьё загружено, обработки нет — **L** | **Закрыто Stage 1.1:** день `processing` старше 6 ч перехватывается `reclaimStaleProcessing()` (повторный `ProcessDayReportMessage`). `canClaimForQueue` по-прежнему возвращает false для `RAW_LOADED/PROCESSING`, его контракт не менялся. Примечание: у WB `raw_loaded` не сохраняется отдельно (выставляется вместе с `processing` одним flush), кроме legacy-reconcile |
+| G2 | `ProcessDayReportHandler:59 flush` → цикл из 3 dispatch | смерть после 1–2 из 3 | raw-документ не достигает `COMPLETED`, sync-статус вечно `processing` — **L/I** | WB — **закрыто Stage 1.1** (перехват через 6 ч, повтор идемпотентен: sales/returns по srid, затраты — удаление открытых и пересоздание); Ozon by-day — grace 3600 с + cron |
 | G3 | `claimForQueue` commit `queued` → `planner->dispatch` | потеря сообщения | `queued` без retry-time — **L** | Да, через 2 ч (`STUCK_RECLAIM_INTERVAL`) |
 | G4 | flush страницы → `dispatchContinuation` | смерть между | пагинация остановилась — **L** | Да: `next_retry_at` + ежечасный orchestrate |
 | G5 | Ozon by-day flush → dispatch | kill | день не обработан — **L** | Да: grace + 04:00 sync + rolling refresh |
@@ -104,7 +104,7 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 
 | ID | Риск | Приоритет | Источник | Куда адресуется |
 |---|---|---|---|---|
-| R-01 | WB-день вечно в `raw_loaded/processing` после потери dispatch (G1, G2) | P0 | Marketplace | Stage 1 (reclaim), Stage 4 |
+| R-01 | WB-день вечно в `raw_loaded/processing` после потери dispatch (G1, G2) | P0 | Marketplace | **Закрыт Stage 1.1** (reclaim, порог 6 ч); системное закрытие окна commit→dispatch — Stage 2/4 |
 | R-02 | Нет outbox: окно commit→dispatch во всех потоках | P0 | сквозной | Stage 2 |
 | R-03 | Redis как единственное хранилище очереди; `failed` без алерта/автоповтора | P0 | инфраструктура | Stage 1 (алерт), Stage 3 |
 | R-04 | Нет проверки «pipeline дня завершён» перед закрытием месяца; 04:45 может закрыть неполный месяц; поздние строки закрытого месяца остаются с `document_id NULL` | P0 | Marketplace | Stage 1 (гейт), Stage 4 |

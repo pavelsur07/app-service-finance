@@ -8,6 +8,7 @@ use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbFinancialReportPeriodResolver;
@@ -30,6 +31,9 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
     /** @var list<SyncWbFinancialReportDayMessage> */
     private array $dispatchedMessages = [];
 
+    /** @var list<ProcessDayReportMessage> */
+    private array $processMessages = [];
+
     private \Closure $claimForQueueCallback;
 
     protected function setUp(): void
@@ -41,6 +45,10 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $this->bus->method('dispatch')->willReturnCallback(function (object $message): Envelope {
             if ($message instanceof SyncWbFinancialReportDayMessage) {
                 $this->dispatchedMessages[] = $message;
+            }
+
+            if ($message instanceof ProcessDayReportMessage) {
+                $this->processMessages[] = $message;
             }
 
             return new Envelope($message);
@@ -623,6 +631,89 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         self::assertSame('refresh_14d', $this->dispatchedMessages[0]->mode);
     }
 
+    public function testPlanDueRetryReclaimsStaleProcessingDayByReprocessingExistingRawDocument(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findRetryDueDays')->willReturn([
+            ['business_date' => new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), 'mode' => FinancialReportSyncMode::MISSING, 'status' => FinancialReportSyncStatus::PROCESSING],
+        ]);
+        $this->statuses->expects(self::never())->method('claimForQueue');
+        $this->statuses->expects(self::once())->method('reclaimStaleProcessing')->willReturn($this->reclaimResult(reprocess: true));
+
+        self::assertSame(1, $planner->planDueRetry(null, null, 1));
+        self::assertSame([], $this->dispatchedMessages, 'Повторная загрузка из API не запускается: raw уже загружен.');
+        self::assertCount(1, $this->processMessages);
+        $message = $this->processMessages[0];
+        self::assertSame('co1', $message->companyId);
+        self::assertSame('raw-doc-1', $message->rawDocumentId);
+        self::assertSame('sync-status-1', $message->syncStatusId);
+        self::assertSame('c1', $message->connectionId);
+        self::assertSame('wildberries', $message->marketplace);
+        self::assertSame('sales_report', $message->reportType);
+        self::assertSame('daily', $message->mode, 'mode берётся из статуса, иначе финализация статуса не найдёт контекст.');
+        self::assertSame('2026-05-20', $message->businessDate);
+        self::assertFalse($message->forceRefresh);
+    }
+
+    public function testPlanDueRetrySkipsStaleProcessingDayWhenAnotherPlannerAlreadyReclaimedIt(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findRetryDueDays')->willReturn([
+            ['business_date' => new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), 'mode' => FinancialReportSyncMode::MISSING, 'status' => FinancialReportSyncStatus::RAW_LOADED],
+        ]);
+        $this->statuses->method('reclaimStaleProcessing')->willReturn(null);
+
+        self::assertSame(0, $planner->planDueRetry(null, null, 1));
+        self::assertSame([], $this->processMessages);
+        self::assertSame([], $this->dispatchedMessages);
+    }
+
+    public function testPlanDueRetryResyncsDayWhenReclaimHasNoRawDocumentToReprocess(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findRetryDueDays')->willReturn([
+            ['business_date' => new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), 'mode' => FinancialReportSyncMode::MISSING, 'status' => FinancialReportSyncStatus::PROCESSING],
+        ]);
+        $this->statuses->method('reclaimStaleProcessing')->willReturn($this->reclaimResult(reprocess: false));
+
+        self::assertSame(1, $planner->planDueRetry(null, null, 1));
+        self::assertSame([], $this->processMessages);
+        self::assertCount(1, $this->dispatchedMessages);
+        self::assertSame('missing', $this->dispatchedMessages[0]->mode);
+    }
+
+    public function testPlanDueRetryUsesRegularClaimForNonProcessingStatuses(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findRetryDueDays')->willReturn([
+            ['business_date' => new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), 'mode' => FinancialReportSyncMode::DAILY, 'status' => FinancialReportSyncStatus::LOADING],
+        ]);
+        $this->statuses->expects(self::never())->method('reclaimStaleProcessing');
+
+        self::assertSame(1, $planner->planDueRetry(null, null, 1));
+        self::assertCount(1, $this->dispatchedMessages);
+        self::assertSame([], $this->processMessages);
+    }
+
+    public function testPlanMissingReclaimsStaleProcessingDayFromRetryDueSelection(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->statuses->method('findStatusesForDateRange')->willReturn([]);
+        $this->statuses->method('findRetryDueDays')->willReturn([
+            ['business_date' => new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), 'mode' => FinancialReportSyncMode::MISSING, 'status' => FinancialReportSyncStatus::PROCESSING],
+        ]);
+        $this->statuses->expects(self::once())->method('reclaimStaleProcessing')->willReturn($this->reclaimResult(reprocess: true));
+
+        $planner->planMissing(null, null, 1, new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'), new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow'));
+
+        self::assertCount(1, $this->processMessages);
+    }
+
     public function testPlanEmptyRefreshForceRefreshesRetryableEmptyDaysOnly(): void
     {
         $planner = $this->planner();
@@ -718,6 +809,25 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         $entity->method('getAttempts')->willReturn($attempts);
 
         return $entity;
+    }
+
+    /** @return array{status: MarketplaceFinancialReportSyncStatus, previous_status: FinancialReportSyncStatus, previous_updated_at: \DateTimeImmutable, reprocess: bool} */
+    private function reclaimResult(bool $reprocess): array
+    {
+        $status = $this->createMock(MarketplaceFinancialReportSyncStatus::class);
+        $status->method('getId')->willReturn('sync-status-1');
+        $status->method('getRawDocumentId')->willReturn($reprocess ? 'raw-doc-1' : null);
+        $status->method('getMode')->willReturn($reprocess ? FinancialReportSyncMode::DAILY : FinancialReportSyncMode::MISSING);
+        $status->method('getStatus')->willReturn($reprocess ? FinancialReportSyncStatus::PROCESSING : FinancialReportSyncStatus::QUEUED);
+        $status->method('getNextRrdId')->willReturn(null);
+        $status->method('getStagingRawDocumentId')->willReturn(null);
+
+        return [
+            'status' => $status,
+            'previous_status' => FinancialReportSyncStatus::PROCESSING,
+            'previous_updated_at' => new \DateTimeImmutable('2026-05-20T01:00:00+03:00'),
+            'reprocess' => $reprocess,
+        ];
     }
 
     /** @return array{id: string, connection_id: string, company_id: string} */
