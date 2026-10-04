@@ -158,6 +158,16 @@ class MarketplaceRawDocument
         return $this;
     }
 
+    /**
+     * Отмечает повторную загрузку документа сейчас, не трогая счётчики обработки (в отличие от `refreshRawData`).
+     */
+    public function touchSyncedAt(?\DateTimeImmutable $at = null): self
+    {
+        $this->syncedAt = $at ?? new \DateTimeImmutable();
+
+        return $this;
+    }
+
     public function refreshRawData(
         array $rawData,
         string $apiEndpoint,

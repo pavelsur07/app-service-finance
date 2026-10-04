@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\Ozon\Command;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\ProcessOzonRealizationMessage;
 use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
@@ -134,6 +133,18 @@ final class OzonRealizationCatchupTest extends IntegrationTestCase
         self::assertCount(1, $this->bus);
     }
 
+    public function testOnlyTheNewestDocumentOfAMonthIsConsidered(): void
+    {
+        $company = $this->seedCompany(1);
+        $older = $this->seedDocument($company, '2026-09-01', 100, 0, syncedAt: '2026-10-01 08:00:00');
+        $newer = $this->seedDocument($company, '2026-09-01', 100, 0, syncedAt: '2026-10-02 08:00:00', endpoint: 'ozon::v2/finance/realization-legacy');
+
+        $this->runCatchup();
+
+        self::assertSame([$newer], array_map(static fn (ProcessOzonRealizationMessage $m): string => $m->rawDocumentId, $this->messages()));
+        self::assertNotSame($older, $newer);
+    }
+
     public function testGateIsRedOnlyForDocumentsLoadedMoreThanADayAgoAndIgnoresConflicts(): void
     {
         $company = $this->seedCompany(1);
@@ -258,14 +269,14 @@ final class OzonRealizationCatchupTest extends IntegrationTestCase
         return $companyId;
     }
 
-    private function seedDocument(string $companyId, string $periodFrom, int $records, int $created, string $syncedAt = '2026-10-01 08:00:00'): string
+    private function seedDocument(string $companyId, string $periodFrom, int $records, int $created, string $syncedAt = '2026-10-01 08:00:00', string $endpoint = 'ozon::v2/finance/realization'): string
     {
         $company = $this->em->find(Company::class, $companyId);
         self::assertNotNull($company);
         $from = new \DateTimeImmutable($periodFrom);
         $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->withMarketplace(MarketplaceType::OZON)
             ->withDocumentType('realization')->withPeriod($from, $from->modify('last day of this month'))->build();
-        $doc->setApiEndpoint(MarketplaceRawFormat::OZON_REALIZATION_V2->value);
+        $doc->setApiEndpoint($endpoint);
         $doc->setRecordsCount($records);
         $doc->setRecordsCreated($created);
         $this->em->persist($doc);

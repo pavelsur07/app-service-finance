@@ -49,6 +49,12 @@ final readonly class OzonUnappliedRealizationQuery
               AND d.period_from <= :monthTo
               AND d.records_count > 0
               AND d.records_created = 0
+              AND NOT EXISTS (
+                    SELECT 1 FROM marketplace_raw_documents newer
+                    WHERE newer.company_id = d.company_id AND newer.marketplace = 'ozon' AND newer.document_type = 'realization'
+                      AND newer.period_from = d.period_from
+                      AND (newer.synced_at > d.synced_at OR (newer.synced_at = d.synced_at AND newer.id > d.id))
+              )
               AND (
                     s.id IS NULL
                  OR (s.status = :failed AND (s.next_retry_at IS NULL OR s.next_retry_at <= :now))
