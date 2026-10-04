@@ -14,22 +14,35 @@
 | `source_id` | string(UUID/составной) | да | ID агрегата |
 | `source_revision` | int ≥1 | да | номер ревизии факта; исправление = новая ревизия с `corrects_event_id` |
 | `idempotency_key` | string ≤200 | да | `{source_type}:{source_id}:{event_type}:r{source_revision}`; `UNIQUE(company_id, idempotency_key)` |
-| `occurred_at` | timestamptz | да | когда факт случился в мире (дата платежа, отгрузки…) |
-| `effective_date` | date | да | дата, по которой факт попадает в учётный период (МСК-календарь компании); см. §4 |
-| `recorded_at` | timestamptz | да | когда записан (серверное время транзакции) |
+| `occurred_at` | timestamptz | да | **когда произошёл бизнес-факт** в мире (оказание услуги, отгрузка, платёж) |
+| `effective_date` | date | да | **в какой финансовый период относится факт** (календарь компании); задаёт продюсер, `PostingRule` использует её как есть; см. §4 |
+| `recorded_at` | timestamptz | да | **когда событие записано системой** (серверное время транзакции); не участвует в определении периода |
 | `correlation_id` | UUID | да | сквозной ID пользовательского действия/запуска cron |
 | `causation_id` | UUID? | нет | `event_id` родителя |
-| `corrects_event_id` | UUID? | нет | какое событие исправляет |
-| `currency` | CHAR(3) | да* | ISO 4217; `*` для событий без суммы — `XXX` |
-| `amount_minor` | BIGINT? | нет | заголовочная сумма, целые minor units (для ускоренной выборки/сверки) |
+| `corrects_event_id` | UUID? | нет | какое событие исправляет/сторнирует (correction/reversal reference); обязательно при `source_revision` > 1 и для adjustment |
+| `currency` | CHAR(3) | да* | ISO 4217 валюта **операции** (не приводится к валюте компании); `*` для событий без суммы — `XXX` |
+| `amount_minor` | BIGINT? | нет | заголовочная сумма в валюте операции, целые minor units (для выборки/сверки) |
 | `payload` | jsonb | да | данные события (см. §3), ≤ 64 KB |
 | `metadata` | jsonb | да | `{origin: ui|api|cron|replay, actor_user_id?, trace_id?, app_version}` |
 
 ## 2. Правила
 
-1. **Сумма — целое число minor units** (RUB: копейки) плюс валюта; в JSON —
-   строка (`"amount_minor":"123456"`), чтобы не терять точность. Конвертации из
-   `decimal(…,2)` — `bcmul`/строки, не `float`.
+1. **Любая денежная величина — пара `amount_minor` + `currency`** (ADR-008):
+   целое число minor units по ISO 4217 (RUB: копейки, JPY: иены) и код валюты;
+   в JSON — строка (`"amount_minor":"123456"`). `float` для денег запрещён.
+   Конвертации из legacy `decimal(…,2)` — на границе продюсера, `bcmul`/строки.
+   Каждая сумма в `payload` оформляется **денежным объектом**:
+
+   ```json
+   {"amount_minor":"105000","currency":"USD",
+    "fx":{"reporting_amount_minor":"9900000","reporting_currency":"RUB",
+          "fx_rate":"94.285714","fx_rate_date":"2026-10-02","fx_rate_source":"bank"}}
+   ```
+
+   Блок `fx` необязателен, но если задан — задан целиком. Событие
+   **сохраняет исходную валюту**; необратимое приведение к RUB при записи
+   запрещено. Курс поставляет продюсер, если он его знает (например,
+   FX-перевод Cash).
 2. **Событие — факт, а не команда:** прошедшее время (`booked`, `closed`,
    `issued`), без «сделай».
 3. **Payload самодостаточен для постинга**: правилу не разрешено читать
@@ -59,21 +72,38 @@
 | `cash.transaction.reversed` | Cash | мягкое удаление/исправление | 6 |
 | `cash.transfer.booked` | `CreateCashTransferAction` | перевод между счетами | 6 |
 | `loan.payment.due` | Loan | строка графика → признание процентов/комиссии | 6 |
-| `finance.document.created/voided` | Finance (ручные документы) | совместимость на время миграции | 5 |
-| `sales.invoice.issued/cancelled` | будущий Invoice | AR (Q1) | 7 |
-| `purchase.bill.received/cancelled` | будущий Bill | AP (Q1) | 7 |
-| `payment.received/made/allocated/refunded` | будущий Payment | Q1 | 7 |
+| `finance.document.created/voided` | Finance (ручные документы, «документ из транзакции Cash», Loan) | совместимость на время миграции; единственный триггер `legacy_cash_basis_v1` | 5 |
+| `fincore.adjustment.posted` | FinancialCore (Action пользователя) | корректировка закрытого/мягко закрытого периода: payload обязан содержать `reason`, `actor_user_id`, `original_event_id` (ADR-007) | 3 |
+| `sales.invoice.issued/cancelled`, `sales.invoice.credit_issued` | модуль Invoice (Stage 7) | Revenue + AR (ADR-005) | 7 |
+| `purchase.bill.received/cancelled`, `purchase.bill.credit_received` | модуль Bill (Stage 7) | Expense + AP | 7 |
+| `payment.received/made/allocated/refunded` | модуль Payment (Stage 7) | Cash + Settlement; **без** Recognition (ADR-006) | 7 |
 
-## 4. effective_date и occurred_at
+## 4. effective_date, occurred_at, recorded_at
 
-- `occurred_at` — момент в мире; `effective_date` — учётная дата, выбираемая
-  **правилом продюсера** (политика признания, Q2). До ответа Q2 продюсеры
-  сохраняют текущую семантику: Marketplace — последний день периода; Cash —
-  дата оплаты; Loan — `dueDate`.
-- Правило — чистая функция; смена политики = новая версия правила и коррекция
-  по `06`, а не правка старых событий.
-- Период определяется как `effective_date` в календаре компании; граница
-  `financeLockBefore` проверяется оркестратором (Q4).
+Решение Q2 (ADR-006): признание определяется экономическим фактом, а не
+движением денег.
+
+- `occurred_at` — когда произошёл бизнес-факт; `effective_date` — в какой
+  финансовый период он относится; `recorded_at` — когда записан системой.
+  Периодом управляет **только** `effective_date`.
+- Бизнес-модуль определяет, **что произошло и в какой период это относится**
+  (тип события и `effective_date`). Один факт с разными датами признания и
+  оплаты — **два события** (например, `loan.payment.due` и
+  `cash.transaction.booked`), а не одно событие с двумя датами.
+- `PostingRule` использует `effective_date` события и **не переопределяет её**;
+  правило не определяет бизнес-факт (`06 §6`).
+- До миграции продюсеры сохраняют текущую семантику как versioned-правила, а
+  не как универсальное правило: Marketplace — последний день отчётного периода
+  (`marketplace_month_stage_v1`); Loan — `dueDate` (`loan_schedule_v1`);
+  ручной документ из Cash-транзакции — дата оплаты (`legacy_cash_basis_v1`,
+  только по явному `finance.document.created`).
+- Смена политики = новая версия правила и коррекция по `06 §5`, а не правка
+  старых событий.
+- Период (`YYYY-MM`) выводится из `effective_date` в календаре компании;
+  состояние периода (`OPEN/SOFT_CLOSED/CLOSED`) проверяет оркестратор
+  (ADR-007). Для обычного события в закрытом периоде продюсер может записать
+  новую ревизию с другой `effective_date` (если это бизнес-корректно) или
+  оформить adjustment (§3).
 
 ## 5. Минимальный пример
 

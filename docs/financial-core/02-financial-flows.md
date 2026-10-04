@@ -67,7 +67,7 @@ Redis-lock) → попадает в P&L через `RealizationDataSource` на 
 | Loan → P&L | кнопка → `LoanScheduleToDocumentService` → `Document(LOANS)` (flush, **регистр не пересчитывается**) | `dueDate` графика; сумма = % + комиссия (+ тело при флаге) |
 | Ручной документ | `DocumentController` | введённая дата |
 
-Единого правила признания нет (вопрос Q2). Тип документа у Cash→P&L всегда
+Единого правила признания нет (целевое правило — ADR-006). Тип документа у Cash→P&L всегда
 `CASHFLOW_EXPENSE`, включая поступления.
 
 ## 3. Bank transaction
