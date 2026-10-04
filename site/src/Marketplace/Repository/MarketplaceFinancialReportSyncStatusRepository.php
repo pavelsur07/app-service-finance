@@ -28,6 +28,20 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
      */
     public const STUCK_RECLAIM_INTERVAL = 'PT2H';
 
+    /**
+     * RAW_LOADED / PROCESSING: raw-документ уже загружен, но pipeline обработки не дошёл до
+     * SUCCESS/FAILED_FINAL (потеря dispatch ProcessDayReportMessage между flush и отправкой,
+     * неполный fan-out трёх шагов, потеря Redis-очереди). Без порога такие дни зависают
+     * навсегда: canClaimForQueue() их не отдаёт, а retry-выборка не видит.
+     *
+     * Во время PROCESSING updatedAt не обновляется (heartbeat'а нет), а шаги стоят в
+     * async_pipeline за остальными сообщениями. Порог выбран с запасом относительно
+     * STUCK_RECLAIM_INTERVAL и redelivery-окна Redis-транспорта (по умолчанию 1 ч); это
+     * оценка, а не замер задержки async_pipeline. Если обработка легитимно длится дольше
+     * порога, повторный ProcessDayReportMessage может пересечься с ещё идущей (см. ARCHITECTURE.md).
+     */
+    public const PROCESSING_STUCK_RECLAIM_INTERVAL = 'PT6H';
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceFinancialReportSyncStatus::class);
@@ -90,7 +104,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     }
 
     /**
-     * @return list<array{business_date: \DateTimeImmutable, mode: FinancialReportSyncMode}>
+     * @return list<array{business_date: \DateTimeImmutable, mode: FinancialReportSyncMode, status: ?FinancialReportSyncStatus}>
      */
     public function findRetryDueDays(
         string $companyId,
@@ -110,7 +124,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         }
 
         $rows = $this->createQueryBuilder('s')
-            ->select('s.businessDate', 's.mode')
+            ->select('s.businessDate', 's.mode', 's.status')
             ->where('s.companyId = :companyId')
             ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.reportType = :reportType')
@@ -121,6 +135,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 OR (s.status = :failedStatus AND s.nextRetryAt IS NULL AND s.lastErrorStatusCode = :rateLimitStatusCode AND s.lastErrorClass = :rateLimitErrorClass)
                 OR (s.status = :queuedStatus AND s.nextRetryAt IS NULL AND s.updatedAt <= :stuckBefore)
                 OR (s.status = :loadingStatus AND s.updatedAt <= :stuckBefore)
+                OR (s.status IN (:processingStatuses) AND s.updatedAt <= :processingStuckBefore)
             )')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
@@ -132,6 +147,8 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->setParameter('loadingStatus', FinancialReportSyncStatus::LOADING)
             ->setParameter('now', $now)
             ->setParameter('stuckBefore', $now->sub(new \DateInterval(self::STUCK_RECLAIM_INTERVAL)))
+            ->setParameter('processingStatuses', [FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING])
+            ->setParameter('processingStuckBefore', $now->sub(new \DateInterval(self::PROCESSING_STUCK_RECLAIM_INTERVAL)))
             ->setParameter('rateLimitStatusCode', 429)
             ->setParameter('rateLimitErrorClass', MarketplaceRateLimitException::class)
             ->orderBy('s.businessDate', 'ASC')
@@ -151,9 +168,15 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
                 $mode = is_string($mode) ? FinancialReportSyncMode::tryFrom($mode) : null;
             }
 
+            $status = $row['status'] ?? null;
+            if (!$status instanceof FinancialReportSyncStatus) {
+                $status = is_string($status) ? FinancialReportSyncStatus::tryFrom($status) : null;
+            }
+
             $retryItems[] = [
                 'business_date' => $date,
                 'mode' => $mode ?? FinancialReportSyncMode::MISSING,
+                'status' => $status,
             ];
         }
 
@@ -235,6 +258,104 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
 
             throw $e;
         }
+    }
+
+    /**
+     * Восстановление зависшего RAW_LOADED / PROCESSING дня без повторной загрузки из API.
+     *
+     * Проверка «зависло ли» и захват делаются в одной транзакции под тем же advisory-lock
+     * и PESSIMISTIC_WRITE, что и claimForQueue(): второй конкурирующий claim ждёт lock и
+     * после commit видит свежий updatedAt, поэтому день уходит ровно одному планировщику.
+     * Захват = markProcessing() (обновляет updatedAt и сбрасывает next_retry_at); тем же
+     * действием статус остаётся PROCESSING, новой state machine нет. Если dispatch после
+     * commit потеряется, день снова станет stale и будет подобран через PROCESSING_STUCK_RECLAIM_INTERVAL.
+     *
+     * Если у дня нет raw-документа или mode (дальше обрабатывать нечего или нельзя
+     * корректно финализировать статус), день возвращается в QUEUED и идёт обычным
+     * повторным синком (reprocess = false).
+     *
+     * @return array{status: MarketplaceFinancialReportSyncStatus, previous_status: FinancialReportSyncStatus, previous_updated_at: \DateTimeImmutable, reprocess: bool}|null
+     */
+    public function reclaimStaleProcessing(
+        string $connectionId,
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        string $apiEndpoint,
+        \DateTimeImmutable $businessDate,
+        FinancialReportSyncMode $mode,
+        \DateTimeImmutable $now,
+    ): ?array {
+        Assert::uuid($connectionId);
+        Assert::uuid($companyId);
+
+        $em = $this->getEntityManager();
+
+        try {
+            $em->beginTransaction();
+            $this->acquireBusinessDayAdvisoryLock($companyId, $marketplace, $reportType, $businessDate);
+
+            $syncStatus = $this->createQueryBuilder('s')
+                ->where('s.companyId = :companyId')
+                ->andWhere('s.marketplace = :marketplace')
+                ->andWhere('s.businessDate = :businessDate')
+                ->andWhere('s.reportType = :reportType')
+                ->setParameter('companyId', $companyId)
+                ->setParameter('marketplace', $marketplace)
+                ->setParameter('businessDate', $businessDate)
+                ->setParameter('reportType', $reportType)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+                ->getOneOrNullResult();
+
+            if (!$syncStatus instanceof MarketplaceFinancialReportSyncStatus
+                || !$this->isStaleProcessing($syncStatus, $now)
+            ) {
+                $em->commit();
+
+                return null;
+            }
+
+            $previousStatus = $syncStatus->getStatus();
+            $previousUpdatedAt = $syncStatus->getUpdatedAt();
+            $rawDocumentId = $syncStatus->getRawDocumentId();
+            $statusMode = $syncStatus->getMode();
+            $reprocess = null !== $rawDocumentId && null !== $statusMode;
+
+            $syncStatus->updateTechnicalContext($connectionId, $apiEndpoint);
+            if ($reprocess) {
+                $syncStatus->markProcessing();
+            } else {
+                $syncStatus->markQueued($mode, false);
+            }
+
+            $em->persist($syncStatus);
+            $em->flush();
+            $em->commit();
+
+            return [
+                'status' => $syncStatus,
+                'previous_status' => $previousStatus,
+                'previous_updated_at' => $previousUpdatedAt,
+                'reprocess' => $reprocess,
+            ];
+        } catch (\Throwable $e) {
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
+            }
+
+            throw $e;
+        }
+    }
+
+    private function isStaleProcessing(MarketplaceFinancialReportSyncStatus $syncStatus, \DateTimeImmutable $now): bool
+    {
+        if (!\in_array($syncStatus->getStatus(), [FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING], true)) {
+            return false;
+        }
+
+        return $syncStatus->getUpdatedAt() <= $now->sub(new \DateInterval(self::PROCESSING_STUCK_RECLAIM_INTERVAL));
     }
 
     private function canClaimForQueue(

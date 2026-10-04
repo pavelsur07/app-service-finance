@@ -3296,6 +3296,24 @@ Payload (только scalar):
 - `AUTH_FAILED` — ошибка авторизации WB API.
 - `CONFLICT` — terminal-результат: in-flight raw блокирует запуск (`WbRawDocumentRefreshConflictException`) либо legacy reconcile. Частичная переобработка с сохранёнными linked rows этот статус не выставляет.
 
+### Восстановление зависших дней
+
+Источник времени у всех порогов — `MarketplaceFinancialReportSyncStatus::updatedAt`; heartbeat'а нет. Зависший день возвращается в работу штатным `orchestrate` (cron раз в час): счётчик due-retry оркестратора и `findRetryDueDays()` используют один и тот же предикат — область гейта равна области repair.
+
+| Состояние | Порог | Что делается |
+|---|---|---|
+| `QUEUED` без `next_retry_at` (потерян dispatch после claim), `LOADING` | `STUCK_RECLAIM_INTERVAL` = 2 ч | `claimForQueue()` → заново `SyncWbFinancialReportDayMessage` |
+| `RAW_LOADED`, `PROCESSING` (потерян dispatch `ProcessDayReportMessage`, неполный fan-out трёх шагов, потеря Redis-очереди) | `PROCESSING_STUCK_RECLAIM_INTERVAL` = 6 ч | `reclaimStaleProcessing()` → заново `ProcessDayReportMessage` для **уже загруженного** raw-документа, `forceRefresh=false`; повторной загрузки из WB API нет |
+
+`reclaimStaleProcessing()`: одна транзакция, тот же advisory-lock и `PESSIMISTIC_WRITE`, что у `claimForQueue()`; «зависло ли» проверяется под lock, захват = `markProcessing()` (свежий `updatedAt`), поэтому конкурирующий планировщик получает `null`. Если у дня нет raw-документа или режима — день возвращается в `QUEUED` и идёт обычным синком. `claimForQueue()` статусы `RAW_LOADED/PROCESSING` по-прежнему не отдаёт (его использует и Ozon realization со своей логикой). Каждый перехват пишет `warning` с компанией, датой, прежним статусом и возрастом.
+
+Пределы механизма (осознанные, не дефекты):
+- **Порог 6 ч — оценка, не замер.** Он заметно больше redelivery-окна Redis-транспорта (1 ч по умолчанию), но задержку шагов в `async_pipeline` (общий с `CloseMonthStage`, `RebuildPreliminary`, `ReprocessCosts`) никто не измерял. Heartbeat'а нет: если обработка дня идёт дольше порога, повторный `ProcessDayReportMessage` пересечётся с ещё идущей. Продажи/возвраты защищены уникальностью srid (шаг-дубль упадёт и пометит день `FAILED_FINAL`), затраты уникального ограничения не имеют, только прикладной дедуп — теоретически возможны дубли строк затрат. Перед массовым применением на проде стоит измерить фактическое время `processing` (read-only).
+- **Скорость и очерёдность.** Восстановление идёт внутри обычного прогона `orchestrate` (раз в час): не более одного дня на подключение за прогон, и пока в окне есть день `QUEUED` с будущим `next_retry_at` (ожидание следующей страницы / 429), ветка due-retry в этом прогоне не выполняется — перехват откладывается на ближайший прогон после наступления срока (минуты), а не навсегда. То же ограничение уже действовало для `QUEUED/LOADING`.
+- **`forceRefresh` не хранится в статусе**, поэтому повторная обработка идёт с `forceRefresh=false`: если день зависал после refresh (`refresh_14d`), существующие srid не перезаписываются, а исчезнувшие у WB строки не удаляются; день завершится `SUCCESS`, а ближайший refresh это выровняет.
+- **Raw-документа нет** (удалён): `ProcessDayReportHandler` бросает `UnrecoverableMessageHandlingException`, статус остаётся `PROCESSING` со свежим `updatedAt`, и день будет перехватываться раз в 6 ч с сообщением в `failed` каждый раз — это видимо в `messenger:failed`.
+- Если `dispatch` после commit упадёт (Redis недоступен), исключение выйдет из планировщика, а день повторно станет кандидатом через 6 ч (так же ведёт себя `claimAndDispatch` с порогом 2 ч).
+
 ### Modes
 
 - `daily` — вчерашний business day.
@@ -3484,6 +3502,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.92 | 2026-10-04 | Marketplace: автоматическое восстановление WB-дней, зависших в `raw_loaded/processing` (R-01) — `reclaimStaleProcessing()`, порог `PROCESSING_STUCK_RECLAIM_INTERVAL` = 6 ч, расширен счётчик due-retry оркестратора |
 | 1.91 | 2026-09-11 | Marketplace: услуги by-day разбираются `OzonAccrualServiceCategoryResolver` по каталогу `OzonCostCategory` — коды сведены с теми, на которых построен маппинг ОПиУ; имена справочника by-day живут в `accrualTypeNames` отдельным индексом от имён снятого v3 |
 | 1.90 | 2026-09-10 | Ingestion: запрет на создание операций ОПиУ закреплён двумя правилами PHPat (в обе стороны); удалён осиротевший `getTransactions`, надгробия `Pnl*Message` и транспорт `pnl_rebuild` |
 | 1.89 | 2026-09-10 | Marketplace: обработка Ozon accrual by-day — классификатор по формату, процессоры продаж, затрат и возвратов рядом с легаси; затраты разбирались через `OzonAccrualCategoryFacade` (заменён в 1.91) |

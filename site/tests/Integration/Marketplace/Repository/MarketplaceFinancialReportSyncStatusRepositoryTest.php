@@ -413,6 +413,194 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         self::assertSame(1, $count);
     }
 
+    public function testFindRetryDueDaysReturnsStaleRawLoadedAndProcessingButNotFreshYoungOrTerminal(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::PROCESSING);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-03', FinancialReportSyncStatus::PROCESSING);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-04', FinancialReportSyncStatus::RAW_LOADED);
+        $this->persistStatus($companyId, $connectionId, '2026-01-05', FinancialReportSyncStatus::SUCCESS);
+        $this->persistStatus($companyId, $connectionId, '2026-01-06', FinancialReportSyncStatus::FAILED_FINAL);
+
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01', '-7 hours');
+        // 01-02 свежий; 01-03 старше порога QUEUED/LOADING (2 ч), но моложе порога обработки (6 ч).
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-03', '-3 hours');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-04', '-7 hours');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-05', '-48 hours');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-06', '-48 hours');
+        $this->em->clear();
+
+        $days = $this->repository->findRetryDueDays(
+            $companyId,
+            $connectionId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            new \DateTimeImmutable('2026-01-10 00:00:00'),
+            new \DateTimeImmutable(),
+            10,
+        );
+
+        self::assertSame(
+            ['2026-01-01', '2026-01-04'],
+            array_map(static fn (array $item): string => $item['business_date']->format('Y-m-d'), $days),
+            'R-01: зависшие PROCESSING/RAW_LOADED попадают в recovery; свежие, моложе порога и терминальные — нет.',
+        );
+        self::assertSame(
+            [FinancialReportSyncStatus::PROCESSING, FinancialReportSyncStatus::RAW_LOADED],
+            array_map(static fn (array $item): ?FinancialReportSyncStatus => $item['status'], $days),
+        );
+    }
+
+    public function testReclaimStaleProcessingTakesStaleDayExactlyOnceAndKeepsItProcessing(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01', '-7 hours');
+        $this->em->clear();
+
+        $first = $this->reclaim($companyId, $connectionId, '2026-01-01');
+
+        self::assertNotNull($first);
+        self::assertTrue($first['reprocess']);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $first['previous_status']);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $first['status']->getStatus(), 'Новой state machine нет: день остаётся PROCESSING.');
+        self::assertNotNull($first['status']->getRawDocumentId(), 'raw-документ сохраняется, повторная загрузка не нужна.');
+        self::assertEqualsWithDelta(time() - 7 * 3600, $first['previous_updated_at']->getTimestamp(), 120, 'В лог/результат уходит прежний updatedAt (≈7 ч назад), а не обновлённый.');
+        self::assertGreaterThan(time() - 60, $first['status']->getUpdatedAt()->getTimestamp());
+
+        self::assertNull($this->reclaim($companyId, $connectionId, '2026-01-01'), 'Второй конкурирующий claim не забирает уже захваченный день.');
+
+        $this->em->clear();
+        $due = $this->repository->findRetryDueDays($companyId, $connectionId, MarketplaceType::WILDBERRIES, self::REPORT_TYPE, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-10'), new \DateTimeImmutable(), 10);
+        self::assertSame([], $due, 'После захвата день снова свежий и не виден recovery-выборке.');
+    }
+
+    public function testReclaimStaleProcessingRefusesFreshYoungSuccessAndUnknownDay(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-02', FinancialReportSyncStatus::PROCESSING);
+        $this->persistStatus($companyId, $connectionId, '2026-01-03', FinancialReportSyncStatus::SUCCESS);
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-02', '-3 hours');
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-03', '-48 hours');
+        $this->em->clear();
+
+        self::assertNull($this->reclaim($companyId, $connectionId, '2026-01-01'), 'Свежий PROCESSING не перехватывается.');
+        self::assertNull($this->reclaim($companyId, $connectionId, '2026-01-02'), 'Моложе порога обработки (6 ч) — легитимно долгая обработка.');
+        self::assertNull($this->reclaim($companyId, $connectionId, '2026-01-03'), 'SUCCESS никогда не возвращается в обработку по возрасту.');
+        self::assertNull($this->reclaim($companyId, $connectionId, '2026-01-04'), 'Нет строки статуса — нечего захватывать.');
+
+        $this->em->clear();
+        $success = $this->repository->findByBusinessDay($companyId, MarketplaceType::WILDBERRIES, self::REPORT_TYPE, new \DateTimeImmutable('2026-01-03'));
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $success?->getStatus());
+    }
+
+    public function testReclaimStaleProcessingIsScopedToCompany(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01', '-7 hours');
+        $this->em->clear();
+
+        $otherCompanyId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $otherConnectionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        $this->seedActiveConnection($otherCompanyId, $otherConnectionId);
+
+        self::assertNull($this->reclaim($otherCompanyId, $otherConnectionId, '2026-01-01'));
+        self::assertNotNull($this->reclaim($companyId, $connectionId, '2026-01-01'));
+    }
+
+    public function testReclaimStaleProcessingWithoutRawDocumentFallsBackToQueuedResync(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01', '-7 hours');
+        $this->em->clear();
+
+        $reclaim = $this->reclaim($companyId, $connectionId, '2026-01-01');
+
+        self::assertNotNull($reclaim);
+        self::assertFalse($reclaim['reprocess'], 'Нет raw-документа/режима — обрабатывать нечего, нужен обычный синк дня.');
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $reclaim['status']->getStatus());
+        self::assertSame(FinancialReportSyncMode::MISSING, $reclaim['status']->getMode());
+    }
+
+    public function testClaimForQueueStillDoesNotOfferProcessingDays(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $this->persistLoadedStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::PROCESSING);
+        $this->backdateStatusUpdatedAt($companyId, '2026-01-01', '-48 hours');
+        $this->em->clear();
+
+        // Контракт claimForQueue() не менялся (Ozon realization использует его же со своей логикой):
+        // восстановление идёт отдельным reclaimStaleProcessing(), а не через общий claim.
+        self::assertNull($this->repository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            FinancialReportSyncMode::MISSING,
+            true,
+            new \DateTimeImmutable(),
+        ));
+    }
+
+    /**
+     * @return array{status: MarketplaceFinancialReportSyncStatus, previous_status: FinancialReportSyncStatus, previous_updated_at: \DateTimeImmutable, reprocess: bool}|null
+     */
+    private function reclaim(string $companyId, string $connectionId, string $day): ?array
+    {
+        return $this->repository->reclaimStaleProcessing(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable($day.' 00:00:00'),
+            FinancialReportSyncMode::MISSING,
+            new \DateTimeImmutable(),
+        );
+    }
+
+    private function persistLoadedStatus(string $companyId, string $connectionId, string $day, FinancialReportSyncStatus $status): void
+    {
+        $entity = new MarketplaceFinancialReportSyncStatus(
+            Uuid::uuid7()->toString(),
+            $companyId,
+            $connectionId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable($day),
+        );
+
+        $entity->markLoading(FinancialReportSyncMode::DAILY);
+        $entity->markRawLoaded(Uuid::uuid4()->toString(), 10, 'hash');
+        if (FinancialReportSyncStatus::PROCESSING === $status) {
+            $entity->markProcessing();
+        }
+
+        $this->repository->save($entity);
+        $this->em->flush();
+    }
+
     private function persistStatus(
         string $companyId,
         string $connectionId,

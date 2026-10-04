@@ -7,9 +7,12 @@ namespace App\Marketplace\Wildberries\Application\FinancialReport;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Wildberries\Infrastructure\Query\ActiveWbConnectionsQuery;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -26,6 +29,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         private readonly MarketplaceFinancialReportSyncStatusLookupInterface $syncStatusRepository,
         private readonly MessageBusInterface $messageBus,
         private readonly ClockInterface $clock,
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -182,6 +186,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                     $retryItem['business_date'],
                     $retryItem['mode'],
                     false,
+                    $retryItem['status'] ?? null,
                 )) {
                     continue;
                 }
@@ -394,6 +399,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                     $retryItem['business_date'],
                     $retryItem['mode'],
                     false,
+                    $retryItem['status'] ?? null,
                 )) {
                     continue;
                 }
@@ -503,8 +509,15 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    private function claimAndDispatch(string $companyId, string $connectionId, \DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): bool
+    private function claimAndDispatch(string $companyId, string $connectionId, \DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh, ?FinancialReportSyncStatus $dueStatus = null): bool
     {
+        // День из retry-выборки со статусом RAW_LOADED/PROCESSING уже старше порога: raw загружен,
+        // pipeline обработки не завершился. claimForQueue() такие дни не отдаёт (R-01), поэтому
+        // они идут по отдельному восстановлению; свежий PROCESSING сюда не попадает.
+        if (\in_array($dueStatus, [FinancialReportSyncStatus::RAW_LOADED, FinancialReportSyncStatus::PROCESSING], true)) {
+            return $this->reclaimAndDispatch($companyId, $connectionId, $day, $mode);
+        }
+
         $status = $this->syncStatusRepository->claimForQueue(
             $connectionId,
             $companyId,
@@ -522,6 +535,64 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         }
 
         $this->dispatch($companyId, $connectionId, $day, $mode, $forceRefresh, $status->getNextRrdId() ?? 0, $status->getStagingRawDocumentId());
+
+        return true;
+    }
+
+    private function reclaimAndDispatch(string $companyId, string $connectionId, \DateTimeImmutable $day, FinancialReportSyncMode $mode): bool
+    {
+        $now = $this->clock->now();
+        $reclaim = $this->syncStatusRepository->reclaimStaleProcessing(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            self::API_ENDPOINT,
+            $day,
+            $mode,
+            $now,
+        );
+
+        if (null === $reclaim) {
+            return false;
+        }
+
+        $status = $reclaim['status'];
+        $rawDocumentId = $status->getRawDocumentId();
+        $statusMode = $status->getMode();
+
+        $this->logger->warning('WB day reclaimed: processing did not finish within the stale threshold.', [
+            'company_id' => $companyId,
+            'connection_id' => $connectionId,
+            'sync_status_id' => $status->getId(),
+            'business_date' => $day->format('Y-m-d'),
+            'previous_status' => $reclaim['previous_status']->value,
+            'previous_updated_at' => $reclaim['previous_updated_at']->format(\DATE_ATOM),
+            'age_seconds' => $now->getTimestamp() - $reclaim['previous_updated_at']->getTimestamp(),
+            'raw_document_id' => $rawDocumentId,
+            'action' => $reclaim['reprocess'] ? 'reprocess_raw_document' : 'resync_day',
+        ]);
+
+        if ($reclaim['reprocess'] && null !== $rawDocumentId && null !== $statusMode) {
+            // Повторная загрузка из API не нужна и небезопасна: raw уже в работе у pipeline,
+            // повторный append задвоил бы строки многостраничного дня. ProcessDayReportHandler
+            // идемпотентен: сбрасывает шаги и заново ставит sales/returns/costs.
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                rawDocumentId: $rawDocumentId,
+                forceRefresh: false,
+                syncStatusId: $status->getId(),
+                connectionId: $connectionId,
+                marketplace: MarketplaceType::WILDBERRIES->value,
+                reportType: self::REPORT_TYPE,
+                mode: $statusMode->value,
+                businessDate: $day->format('Y-m-d'),
+            ));
+
+            return true;
+        }
+
+        $this->dispatch($companyId, $connectionId, $day, $mode, false, $status->getNextRrdId() ?? 0, $status->getStagingRawDocumentId());
 
         return true;
     }

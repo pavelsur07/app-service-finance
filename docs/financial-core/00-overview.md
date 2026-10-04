@@ -44,7 +44,8 @@
    в БД лежит только `failed`. Потеря Redis = потеря очереди, копии в БД нет.
 5. **Восстановление частично есть** (Ingestion: sweeper `normalize-pending`,
    heartbeat/reaper; Ozon: grace 1 ч + cron; WB: claim 2 ч для `queued`), но
-   **WB-день в `raw_loaded/processing` не переклеймится никогда** (R-01).
+   **WB-день в `raw_loaded/processing` не переклеймится никогда** (R-01; закрыт Stage 1.1:
+   перехват после 6 ч, `reclaimStaleProcessing()`).
 6. **Очередь `failed` пассивна:** нет алерта на глубину, нет автоповтора,
    только ручные команды по согласию Владельца.
 7. **P&L-регистр пересобирается delete+insert по дню без блокировки**, коммит
