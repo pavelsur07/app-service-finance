@@ -25,6 +25,21 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_raw_documents')]
 #[ORM\Index(columns: ['company_id', 'synced_at'], name: 'idx_company_synced')]
 #[ORM\Index(columns: ['marketplace', 'document_type'], name: 'idx_marketplace_type')]
+#[ORM\UniqueConstraint(
+    name: 'uniq_marketplace_raw_documents_active_period',
+    columns: ['company_id', 'marketplace', 'document_type', 'period_from', 'period_to'],
+    options: ['where' => "(((marketplace)::text = 'ozon'::text) AND ((document_type)::text = 'sales_report'::text) AND ((processing_status IS NULL) OR ((processing_status)::text <> 'failed'::text)))"],
+)]
+#[ORM\UniqueConstraint(
+    name: 'uniq_mrd_active_company_marketplace_type_endpoint_period',
+    columns: ['company_id', 'marketplace', 'document_type', 'api_endpoint', 'period_from', 'period_to'],
+    options: ['where' => "((processing_status IS NULL) OR ((processing_status)::text <> 'failed'::text))"],
+)]
+#[ORM\UniqueConstraint(
+    name: 'uniq_mrd_active_sales_report_exact_day',
+    columns: ['company_id', 'marketplace', 'document_type', 'period_from', 'period_to'],
+    options: ['where' => "(((document_type)::text = 'sales_report'::text) AND (period_from = period_to) AND ((processing_status IS NULL) OR ((processing_status)::text <> 'failed'::text)))"],
+)]
 class MarketplaceRawDocument
 {
     #[ORM\Id]

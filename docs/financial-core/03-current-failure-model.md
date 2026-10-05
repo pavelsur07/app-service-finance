@@ -38,8 +38,9 @@
 | G11 | `ByDayRowReplacement` отвязывает строки от предварительного документа | между заменой и 04:45 | документ содержит суммы удалённых/перепривязанных строк — **I** | Следующий rebuild; контрольная сумма только на закрытии |
 | G12 | WB-процессоры (flush батчами, DELETE затрат отдельным коммитом) | падение посреди | частичная запись — **I** | Ретрай безопасен (srid-дедуп, unique); после 3 ретраев — `failed_final`, без автоповтора |
 
-Дубли (**D**): sales/returns/costs защищены unique-индексами (в т.ч. только в
-миграциях, не в ORM — R-12); `marketplace_ozon_realizations` без unique — защита
+Дубли (**D**): sales/returns/costs защищены unique-индексами (с Stage 1.5 они
+объявлены и в ORM — R-12a; единственный не выражаемый в ORM — `uniq_mrd_init_sync_period` с
+`COALESCE(api_endpoint, '')`); `marketplace_ozon_realizations` без unique — защита
 Redis-lock + DELETE/recreate; `documents` без ключа идемпотентности — повторный
 `createPLDocument` создаст второй документ (защита — workflow закрытия +
 `markProcessed`).
@@ -115,7 +116,7 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 | R-09 | `succeeded_steps` — read-modify-write без optimistic lock; безопасно только при одном воркере | P1 | Marketplace | Stage 4 |
 | R-10 | Redis-lock с TTL: потеря lock'а → параллельная обработка; «lock не взят» = молчаливый пропуск | P1 | Marketplace/Ingestion | Stage 3 |
 | R-11 | Float и двойная знаковая конвенция в P&L; `abs()` после неттинга | P1 | Finance | Stage 5 |
-| R-12 | Unique-индексы returns/costs/raw только в миграциях, не в ORM; `marketplace_sales.uniq_marketplace_srid` без `company_id` | P1 | Marketplace | Stage 1 |
+| R-12 | **R-12a CLOSED (Stage 1.5):** 7 unique-индексов sales/returns/costs/raw объявлены в ORM, паритет с БД и migrations-empty-db закреплён тестом `UniqueIndexOrmParityTest`. **R-12b открыт:** `marketplace_sales.uniq_marketplace_srid (marketplace, external_order_id)` без `company_id` — решение `CHANGE_TO_TENANT_SCOPED`, отдельная задача (Owner-вопрос), см. `10-migration-roadmap.md` | P1→P3 | Marketplace | Stage 1 |
 | R-13 | Нет идемпотентности создания Document (Finance, Loan, Cash→P&L) | P1 | Finance | Stage 5 |
 | R-14 | `financeLockBefore` не защищает Finance/Loan/импорты Cash | P1 | сквозной | Stage 5 (ADR-007) |
 | R-15 | Тихие пропуски в `PLRegisterUpdater` (нет проекта/категории) | P1 | Finance | Stage 5 |

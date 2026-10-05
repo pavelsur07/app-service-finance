@@ -3543,6 +3543,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.95 | 2026-10-05 | Marketplace: ORM-метаданные unique-индексов sales/returns/costs/raw приведены к фактической схеме БД (R-12a) — `#[ORM\UniqueConstraint(options: ['where' => …])]` с предикатом в форме `pg_get_expr`; миграций нет; `UniqueIndexOrmParityTest`. `uniq_marketplace_srid` без `company_id` (R-12b) — решение «tenant-scoped», отдельная задача |
 | 1.94 | 2026-10-05 | Messenger: read-only гейт очереди `failed` (R-03) — `app:messenger:failed-queue-check` (cron 07:32), `FailedTransportQuery`, `FailedQueueHealthPolicy`, параметры `app.failed_queue.*` |
 | 1.93 | 2026-10-04 | Marketplace: гейт целостности закрытия месяца (R-04 / M-01) — `report_days_ready` в предпроверке, `MarketplacePeriodIntegrityChecker`, методы готовности в `FinancialReportSyncStatus`, инвариант после привязки в `CloseMonthStageAction` |
 | 1.92 | 2026-10-04 | Marketplace: автоматическое восстановление WB-дней, зависших в `raw_loaded/processing` (R-01) — `reclaimStaleProcessing()`, порог `PROCESSING_STUCK_RECLAIM_INTERVAL` = 6 ч, расширен счётчик due-retry оркестратора |
