@@ -19,6 +19,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceFinancialReportSyncStatusBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -347,6 +348,7 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         $category = $this->category(MarketplaceType::WILDBERRIES, 'wb_novoe_uderzhanie', 'Новое удержание');
         $this->mapping($category, plCategoryId: Uuid::uuid4()->toString());
         $this->cost($category, MarketplaceType::WILDBERRIES);
+        $this->seedReadyWbDays('2026-03-01', '2026-03-31');
         $this->em->flush();
 
         $result = $this->preflight(MarketplaceType::WILDBERRIES);
@@ -368,6 +370,20 @@ final class PreflightCostRecognitionTest extends IntegrationTestCase
         $result = $this->preflight(MarketplaceType::YANDEX_MARKET);
 
         self::assertTrue($this->check($result, 'costs_unknown_service_names')->passed);
+    }
+
+    /**
+     * Тест про распознавание затрат, а не про покрытие дней: период приводим в состояние «все дни готовы»,
+     * чтобы проверка готовности отчётов (R-04) не заслоняла предмет теста.
+     */
+    private function seedReadyWbDays(string $from, string $to): void
+    {
+        for ($day = new \DateTimeImmutable($from); $day <= new \DateTimeImmutable($to); $day = $day->modify('+1 day')) {
+            $this->em->persist(MarketplaceFinancialReportSyncStatusBuilder::aStatus()
+                ->withCompanyId(self::COMPANY_ID)
+                ->withBusinessDate($day->format('Y-m-d'))
+                ->build());
+        }
     }
 
     private function preflight(MarketplaceType $marketplace, bool $preliminary = false): PreflightResult
