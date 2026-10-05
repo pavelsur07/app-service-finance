@@ -256,6 +256,12 @@ case "$cmd" in
     # регулярного прогона строгий запрет проще и надёжнее проверки формы.
     if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
     ;;
+  app:messenger:failed-queue-check)
+    # Read-only гейт очереди failed: только глубина и возраст (SELECT по messenger_messages).
+    # Ничего не retry/remove/ack, внешних вызовов нет. Аргументы запрещены.
+    # Ненулевой exit code — штатный результат гейта (ERROR), а не ошибка wrapper'а.
+    if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 
