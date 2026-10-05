@@ -93,12 +93,6 @@ marketplaces:
       - cost_code: ozon_return_from_stock
         pl_code: COGS_RETURNS_DELIVERY
         include_in_pl: true
-      - cost_code: ozon_package_labor
-        pl_code: COGS_RETURNS_DELIVERY
-        include_in_pl: true
-      - cost_code: ozon_package_materials
-        pl_code: COGS_RETURNS_DELIVERY
-        include_in_pl: true
       - cost_code: ozon_logistic_return_trans
         pl_code: COGS_RETURNS_DELIVERY
         include_in_pl: true
@@ -144,6 +138,14 @@ marketplaces:
       - cost_code: ozon_additional_packaging_warehouse
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
+      - cost_code: ozon_package_labor
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+        note: "Упаковка FBO — услуга склада Ozon, как ozon_additional_packaging_warehouse, а не логистика возвратов"
+      - cost_code: ozon_package_materials
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+        note: "Упаковочные материалы FBO — услуга склада Ozon"
       - cost_code: ozon_temporary_storage
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
