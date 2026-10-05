@@ -199,7 +199,10 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Найти raw-документы типа sales_report за конкретный месяц для пакетной обработки.
+     * Найти raw-документы за конкретный месяц для пакетной обработки: `sales_report` (WB, снятый Ozon v3)
+     * и `accrual_by_day` (Ozon с 08.09.2026 — по одному документу на день).
+     *
+     * `realization` и прочие типы сюда не входят: их конвейер sales/returns/costs не обрабатывает.
      *
      * Документ включается если его период полностью входит в запрошенный месяц:
      * periodFrom >= первый день месяца AND periodTo <= последний день месяца.
@@ -219,13 +222,13 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->join('d.company', 'c')
             ->where('c.id = :companyId')
             ->andWhere('d.marketplace = :marketplace')
-            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.documentType IN (:documentTypes)')
             ->andWhere('d.periodFrom >= :firstDay')
             ->andWhere('d.periodTo <= :lastDay')
             ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :loading)')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
-            ->setParameter('documentType', 'sales_report')
+            ->setParameter('documentTypes', ['sales_report', 'accrual_by_day'])
             ->setParameter('firstDay', $firstDay)
             ->setParameter('lastDay', $lastDay)
             ->setParameter('loading', PipelineStatus::LOADING)

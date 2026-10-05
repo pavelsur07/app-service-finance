@@ -12,7 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Сбрасывает статус обработки всех sales_report-документов за месяц
+ * Сбрасывает статус обработки всех документов конвейера за месяц (sales_report, accrual_by_day)
  * и диспатчит три асинхронных шага (sales/returns/costs) для каждого.
  *
  * flush() вызывается один раз после цикла.

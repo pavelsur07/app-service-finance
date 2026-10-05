@@ -120,4 +120,59 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
         self::assertSame(0, $count);
         self::assertCount(0, $this->transport->get());
     }
+
+    /**
+     * Регрессия: с 08.09.2026 Ozon грузится документами accrual_by_day. Кнопка «Обработать месяц»
+     * брала только sales_report и переобрабатывала лишь дни до 08.09. Теперь в выборке и они;
+     * realization конвейером не обрабатывается и не попадает.
+     */
+    public function testIncludesOzonAccrualByDayAndSkipsRealization(): void
+    {
+        $user = UserBuilder::aUser()->withIndex(3)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(3)->withOwner($user)->build();
+
+        $docs = [];
+        foreach ([
+            ['sales_report', '2026-09-01', '2026-09-07'],
+            ['accrual_by_day', '2026-09-08', '2026-09-08'],
+            ['accrual_by_day', '2026-09-09', '2026-09-09'],
+            ['realization', '2026-09-01', '2026-09-30'],
+            ['accrual_by_day', '2026-10-01', '2026-10-01'],
+        ] as [$type, $from, $to]) {
+            $docs[] = MarketplaceRawDocumentBuilder::aDocument()
+                ->forCompany($company)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withDocumentType($type)
+                ->withPeriod(new \DateTimeImmutable($from), new \DateTimeImmutable($to))
+                ->build();
+        }
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        foreach ($docs as $doc) {
+            $this->em->persist($doc);
+        }
+        $this->em->flush();
+
+        $count = ($this->action)(new BulkProcessMonthCommand(
+            companyId: (string) $company->getId(),
+            marketplace: MarketplaceType::OZON,
+            year: 2026,
+            month: 9,
+        ));
+
+        self::assertSame(3, $count);
+
+        $dispatched = [];
+        foreach ($this->transport->get() as $envelope) {
+            $message = $envelope->getMessage();
+            self::assertInstanceOf(ProcessRawDocumentStepMessage::class, $message);
+            self::assertTrue($message->shouldForceRefresh());
+            $dispatched[$message->rawDocumentId] = ($dispatched[$message->rawDocumentId] ?? 0) + 1;
+        }
+
+        $expected = [$docs[0]->getId(), $docs[1]->getId(), $docs[2]->getId()];
+        self::assertEqualsCanonicalizing($expected, array_keys($dispatched));
+        self::assertSame([3, 3, 3], array_values($dispatched));
+    }
 }
