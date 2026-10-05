@@ -106,7 +106,7 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 |---|---|---|---|---|
 | R-01 | WB-день вечно в `raw_loaded/processing` после потери dispatch (G1, G2) | P0 | Marketplace | **Закрыт Stage 1.1** (reclaim, порог 6 ч); системное закрытие окна commit→dispatch — Stage 2/4 |
 | R-02 | Нет outbox: окно commit→dispatch во всех потоках | P0 | сквозной | Stage 2 |
-| R-03 | Redis как единственное хранилище очереди; `failed` без алерта/автоповтора | P0 | инфраструктура | Stage 1 (алерт), Stage 3 |
+| R-03 | Redis как единственное хранилище очереди; `failed` без алерта/автоповтора | P0 | инфраструктура | **Видимость `failed` закрыта Stage 1.3** (`app:messenger:failed-queue-check`, ARCHITECTURE.md «Messenger: очередь failed»); автоповтора по замыслу нет, Redis как единственное хранилище — Stage 3 |
 | R-04 | Нет проверки «pipeline дня завершён» перед закрытием месяца; 04:45 может закрыть неполный месяц; поздние строки закрытого месяца остаются с `document_id NULL` | P0 | Marketplace | **Закрыт Stage 1.2 для финального закрытия WB** (`report_days_ready`, инвариант после привязки); оперативное закрытие остаётся без блока по замыслу; дрейф уже закрытых месяцев и подневная модель Ozon — не закрыты (Stage 1 follow-up / Stage 4) |
 | R-05 | Регистр P&L: delete+insert без lock, документ и регистр в разных коммитах, нет reconcile (F1–F3) | P0 | Finance | Stage 5, 9 |
 | R-06 | Reopen/rebuild не транзакционны (G9–G11) | P1 | Marketplace | Stage 4 |

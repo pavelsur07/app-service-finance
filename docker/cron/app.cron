@@ -282,6 +282,14 @@
 # Минута 7 — свободный слот: :00/:05/:10/:15/:20/:25/:30/:40/:45 уже заняты.
 7 * * * * cd /app && php bin/console app:mailer:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Раз в сутки в 07:32 (read-only гейт, ничего не повторяет и не удаляет): очередь `failed` Messenger.
+# ERROR (logger->error → GlitchTip + exit 1) — самое старое сообщение пролежало ≥ 12 ч или в очереди ≥ 10 сообщений;
+# единичные свежие сообщения — только warning. Один агрегированный event на запуск со стабильным текстом.
+# Раз в сутки, а не в час: состояние «забытая очередь» не меняется быстрее, а часовой запуск при неизменной
+# очереди слал бы повтор каждый час. Недоступность хранилища даёт отдельный error, а не «очередь пуста».
+# Что делать с сообщениями — решение человека: messenger:failed:show|retry|remove (мутации — с разрешения Владельца).
+32 7 * * * cd /app && php bin/console app:messenger:failed-queue-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.

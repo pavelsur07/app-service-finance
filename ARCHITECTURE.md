@@ -3403,6 +3403,16 @@ Message/worker:
 
 ---
 
+## Messenger: очередь `failed` и её мониторинг (R-03)
+
+- **Failure transport один на всю шину:** `failure_transport: failed` → `doctrine://default?queue_name=failed` (`config/packages/messenger.yaml`). Сюда попадают сообщения после исчерпания ретраев любого транспорта (`async_sync`, `async_pipeline`, `async_wb_finance`, `async_ads`, `ingest_*`); `ingest_fetch/normalize` делят Redis-стримы с `async_sync/pipeline`, поэтому в разбивке они видны как исходный транспорт `async_sync`/`async_pipeline`.
+- **Хранилище:** таблица `messenger_messages` (id, body, headers, queue_name, created_at, available_at, delivered_at; индекс по `queue_name`), строки с `queue_name = 'failed'`. Сериализатор PHP: заголовки пустые, весь конверт (класс сообщения, `SentToFailureTransportStamp` с исходным транспортом, детали ошибки) — в `body` как `addslashes(serialize(Envelope))`.
+- **Время:** `created_at/available_at` Messenger пишет в **UTC** без зоны (`new DateTimeImmutable('UTC')`), в отличие от прикладных таблиц (МСК). `created_at` — момент отправки в `failed` (ретраи исчерпаны), а не создания исходного сообщения.
+- **Гейт `app:messenger:failed-queue-check`** (cron 07:32 ежедневно, read-only): `FailedTransportQuery` — агрегатный SELECT (глубина, `MIN(created_at)`, возраст считается в БД как `NOW() AT TIME ZONE 'UTC' − MIN(created_at)`); разбивка по классу и исходному транспорту берётся регулярным выражением из `body` без `unserialize` по выборке из ≤ 500 старейших (покрытие печатается). Ни ACK, ни retry, ни remove, ни UPDATE; наружу уходят только счётчики и имена классов.
+- **Политика** (`FailedQueueHealthPolicy`, пороги — параметры `app.failed_queue.*`, границы включительные): очередь пуста — OK; есть сообщения, самое старое моложе 12 ч и их меньше 10 — WARNING (`warning`, в GlitchTip не уходит, exit 0); самое старое ≥ 12 ч **или** глубина ≥ 10 — ERROR (при суточном запуске сообщение краснеет в течение 12–36 ч после сбоя) (`logger->error` → GlitchTip, exit 1). Свежее сообщение один раз уже подняло `critical` из воркера; гейт нужен забытым.
+- **Защита от шторма:** один агрегированный `error` на запуск со стабильным текстом `Messenger failed queue unhealthy` (детали — в контексте: `failed_count`, `oldest_age`, `breakdown`), GlitchTip группирует повторы; запуск раз в сутки, поэтому неизменная очередь даёт одно событие в день. Недоступность хранилища — отдельный `error` `Messenger failed queue check unavailable`, а не «очередь пуста».
+- **Починка** — решение человека: `messenger:failed:show|retry|remove`; мутации на проде только по отдельному разрешению Владельца (`docs/maintenance/prod-access.md`). Гейт красный, пока сообщение не разобрано, и это намеренно: ему нечего «починить» самому.
+
 ## Redis — три назначения
 
 | Назначение | DSN |
@@ -3464,6 +3474,7 @@ config/
 
 | Команда | Расписание | Назначение |
 |---|---|---|
+| `app:messenger:failed-queue-check` | `07:32 daily` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
 | `app:marketplace-ads:scheduler` | `* * * * *` | Берёт один PLANNED batch → POST `/statistics` → IN_FLIGHT |
 | `app:marketplace-ads:poller` | `* * * * *` + offset 30s | Обрабатывает все IN_FLIGHT: poll + download + финализация |
 | `app:marketplace-ads:finalizer` | `* * * * *` | RUNNING jobs → COMPLETED / FAILED / PARTIAL_SUCCESS |
@@ -3532,6 +3543,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.94 | 2026-10-05 | Messenger: read-only гейт очереди `failed` (R-03) — `app:messenger:failed-queue-check` (cron 07:32), `FailedTransportQuery`, `FailedQueueHealthPolicy`, параметры `app.failed_queue.*` |
 | 1.93 | 2026-10-04 | Marketplace: гейт целостности закрытия месяца (R-04 / M-01) — `report_days_ready` в предпроверке, `MarketplacePeriodIntegrityChecker`, методы готовности в `FinancialReportSyncStatus`, инвариант после привязки в `CloseMonthStageAction` |
 | 1.92 | 2026-10-04 | Marketplace: автоматическое восстановление WB-дней, зависших в `raw_loaded/processing` (R-01) — `reclaimStaleProcessing()`, порог `PROCESSING_STUCK_RECLAIM_INTERVAL` = 6 ч, расширен счётчик due-retry оркестратора |
 | 1.91 | 2026-09-11 | Marketplace: услуги by-day разбираются `OzonAccrualServiceCategoryResolver` по каталогу `OzonCostCategory` — коды сведены с теми, на которых построен маппинг ОПиУ; имена справочника by-day живут в `accrualTypeNames` отдельным индексом от имён снятого v3 |
