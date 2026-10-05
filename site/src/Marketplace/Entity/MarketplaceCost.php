@@ -20,6 +20,11 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['sale_id'], name: 'idx_cost_sale')]
 #[ORM\Index(columns: ['raw_document_id'], name: 'idx_cost_raw_document')]
 #[ORM\Index(columns: ['operation_type'], name: 'idx_cost_operation_type')]
+#[ORM\UniqueConstraint(
+    name: 'uniq_marketplace_costs_company_marketplace_external',
+    columns: ['company_id', 'marketplace', 'external_id'],
+    options: ['where' => "((external_id IS NOT NULL) AND (TRIM(BOTH FROM external_id) <> ''::text))"],
+)]
 class MarketplaceCost
 {
     #[ORM\Id]

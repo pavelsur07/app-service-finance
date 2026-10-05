@@ -15,6 +15,11 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_returns')]
 #[ORM\Index(columns: ['company_id', 'return_date'], name: 'idx_company_return_date')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_return_sale')]
+#[ORM\UniqueConstraint(
+    name: 'uniq_marketplace_returns_company_marketplace_external_return',
+    columns: ['company_id', 'marketplace', 'external_return_id'],
+    options: ['where' => "((external_return_id IS NOT NULL) AND (TRIM(BOTH FROM external_return_id) <> ''::text))"],
+)]
 class MarketplaceReturn
 {
     #[ORM\Id]

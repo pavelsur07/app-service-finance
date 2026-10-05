@@ -17,6 +17,11 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['marketplace', 'external_order_id'], name: 'idx_marketplace_order')]
 #[ORM\Index(columns: ['raw_document_id'], name: 'idx_sale_raw_document')]
 #[ORM\UniqueConstraint(name: 'uniq_marketplace_srid', columns: ['marketplace', 'external_order_id'])]
+#[ORM\UniqueConstraint(
+    name: 'uniq_marketplace_sales_company_marketplace_external_order',
+    columns: ['company_id', 'marketplace', 'external_order_id'],
+    options: ['where' => "((external_order_id IS NOT NULL) AND (TRIM(BOTH FROM external_order_id) <> ''::text))"],
+)]
 class MarketplaceSale
 {
     #[ORM\Id]

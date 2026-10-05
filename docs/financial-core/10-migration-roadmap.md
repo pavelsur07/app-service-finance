@@ -44,9 +44,13 @@ Stage 9 частично выполняется параллельно с 5–8 
   4. R-07: вернуть cron на `cash:auto-rules:enqueue` (после проверки причины,
      по которой он отключён) и ночной `DailyBalanceRecalc` — **уточнить у Владельца
      причину отключения** (операционный вопрос Stage 1, не Q1–Q5), не включать вслепую.
-  5. R-12: объявить unique-индексы returns/costs/raw в ORM-атрибутах (без
-     миграции, если индексы уже есть; сверка `schema:validate`); план по
-     `uniq_marketplace_srid` без `company_id` — отдельно.
+  5. R-12: **R-12a выполнен (Stage 1.5)** — unique-индексы sales/returns/costs/raw
+     объявлены в ORM-атрибутах без миграции (прод = migrations = ORM, 0 дублей).
+     **R-12b** — `uniq_marketplace_srid` без `company_id`: решение
+     `CHANGE_TO_TENANT_SCOPED` (отдельная задача: DROP глобального индекса при
+     уже существующем tenant-scoped `uniq_marketplace_sales_company_marketplace_external_order`;
+     перед ней — вопрос Владельцу: возможны ли две компании на одном аккаунте
+     маркетплейса). Прод: 0 cross-company коллизий, влияния сейчас нет.
   6. R-18, R-23: убрать `DBG:`-маркеры; синхронизировать `ARCHITECTURE.md`
      «Cron-задачи» с `app.cron`.
 - **Зависимости:** нет.
