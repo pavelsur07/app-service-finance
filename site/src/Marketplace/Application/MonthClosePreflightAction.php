@@ -8,6 +8,7 @@ use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
 use App\Marketplace\Application\DTO\PreflightCheck;
 use App\Marketplace\Application\DTO\PreflightResult;
+use App\Marketplace\Application\Service\MarketplacePeriodIntegrityChecker;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\PreflightCostsQuery;
@@ -45,6 +46,7 @@ final class MonthClosePreflightAction
         private readonly PreflightCostsQuery $costsQuery,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
         private readonly CompanyFacade $companyFacade,
+        private readonly MarketplacePeriodIntegrityChecker $integrityChecker,
     ) {
     }
 
@@ -104,7 +106,63 @@ final class MonthClosePreflightAction
             $checks[] = PreflightCheck::ok('already_closed', 'Этап закрыт', 'Этап ещё не закрыт');
         }
 
-        return $checks;
+        return array_merge($checks, $this->checkReportDays($command));
+    }
+
+    /**
+     * Готовность отчётов по дням закрываемого периода (R-04).
+     *
+     * Финальное закрытие блокируется, если хотя бы один ожидаемый день отсутствует, ещё
+     * обрабатывается или завершился ошибкой/конфликтом. Оперативное закрытие по определению
+     * работает на неполных данных текущего месяца, поэтому там это предупреждение.
+     * Проверка ограничена компанией, маркетплейсом и периодом закрытия.
+     *
+     * @return list<PreflightCheck>
+     */
+    private function checkReportDays(PreflightMonthCloseCommand $command): array
+    {
+        $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
+        $periodTo = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
+
+        $coverage = $this->integrityChecker->checkReportDays(
+            $command->companyId,
+            MarketplaceType::from($command->marketplace),
+            $periodFrom,
+            $periodTo,
+        );
+
+        if (null === $coverage) {
+            return [];
+        }
+
+        $label = 'Готовность отчётов по дням';
+
+        if ($coverage->isReady()) {
+            return [PreflightCheck::ok(
+                'report_days_ready',
+                $label,
+                sprintf('Все ожидаемые дни периода обработаны (%d)', $coverage->expectedDays),
+                $coverage->expectedDays,
+            )];
+        }
+
+        $count = count($coverage->violations);
+        $examples = implode(', ', array_map(
+            static fn ($violation): string => $violation->label(),
+            array_slice($coverage->violations, 0, 5),
+        ));
+        $message = sprintf(
+            'Отчёты за %d из %d ожидаемых дней периода не готовы: %s%s. Дождитесь обработки или загрузите дни заново.',
+            $count,
+            $coverage->expectedDays,
+            $examples,
+            $count > 5 ? sprintf(' и ещё %d', $count - 5) : '',
+        );
+        $details = array_map(static fn ($violation): array => $violation->toArray(), $coverage->violations);
+
+        return [$command->preliminary
+            ? PreflightCheck::warning('report_days_ready', $label, $message, $count, $details)
+            : PreflightCheck::error('report_days_ready', $label, $message, $count, $details)];
     }
 
     // -------------------------------------------------------------------------

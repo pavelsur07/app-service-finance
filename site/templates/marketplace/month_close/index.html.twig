@@ -418,6 +418,9 @@
                                 } else if (item.category_name !== undefined) {
                                     // costs_without_mapping (existing)
                                     detailsHtml += `<li>${escapeHtml(item.category_name)} (${Number(item.costs_count)} шт.)</li>`;
+                                } else if (item.business_date !== undefined) {
+                                    // report_days_ready: день периода, не готовый к закрытию
+                                    detailsHtml += `<li>${escapeHtml(item.business_date)} — ${escapeHtml(item.status ?? 'нет статуса')}</li>`;
                                 }
                             });
                             detailsHtml += '</ul>';

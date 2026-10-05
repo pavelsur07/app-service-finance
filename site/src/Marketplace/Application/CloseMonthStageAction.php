@@ -10,6 +10,7 @@ use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Application\Command\CloseMonthStageCommand;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
 use App\Marketplace\Application\DTO\PreflightResult;
+use App\Marketplace\Application\Service\MarketplacePeriodIntegrityChecker;
 use App\Marketplace\Application\Source\MarketplaceDataSourceInterface;
 use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
@@ -32,7 +33,10 @@ use Ramsey\Uuid\Uuid;
  *   2. Найти или создать MarketplaceMonthClose
  *   3. Для каждого Source этапа — агрегировать → создать PLDocument → пометить обработанными
  *   4. [COSTS only] Контрольная сумма — сверить PLDocument с marketplace_costs
- *   5. Закрыть этап в MarketplaceMonthClose
+ *   5. [финальное закрытие] Инвариант целостности (R-04 / M-01): после привязки источники
+ *      этапа не должны находить подходящих необработанных строк, а дни периода по-прежнему
+ *      должны быть готовы — иначе откат всей транзакции
+ *   6. Закрыть этап в MarketplaceMonthClose
  *
  * Не использует ActiveCompanyService — companyId через Command.
  * Worker-safe.
@@ -50,6 +54,7 @@ final class CloseMonthStageAction
         private readonly LoggerInterface $logger,
         private readonly iterable $dataSources,
         private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
+        private readonly MarketplacePeriodIntegrityChecker $integrityChecker,
     ) {
     }
 
@@ -131,6 +136,17 @@ final class CloseMonthStageAction
         ));
 
         if (!$preflightResult->canClose()) {
+            $this->logger->warning('[MonthClose] Close blocked by preflight', [
+                'company_id' => $command->companyId,
+                'marketplace' => $command->marketplace,
+                'period' => sprintf('%s..%s', $periodFrom, $periodTo),
+                'stage' => $command->stage,
+                'blocking_checks' => array_map(
+                    static fn ($c): array => ['check' => $c->key, 'count' => is_scalar($c->value) ? $c->value : null],
+                    $preflightResult->getErrors(),
+                ),
+            ]);
+
             $errors = implode('; ', array_map(
                 static fn ($c) => $c->message,
                 $preflightResult->getErrors(),
@@ -310,6 +326,13 @@ final class CloseMonthStageAction
                 ]);
             }
 
+            // Только финальное закрытие: оперативный документ пересобирается следующим прогоном (cron 04:45),
+            // а откат из-за строки, пришедшей в миллисекундном окне, шумел бы ошибкой в ночной пересборке.
+            if (!$command->preliminary) {
+                $this->assertSourcesFullyLinked($command, $stage, $marketplace, $periodFrom, $periodTo, $documentId);
+                $this->assertReportDaysStillReady($command, $marketplace, $periodFrom, $periodTo);
+            }
+
             $plDocumentIds[] = $documentId;
 
             $this->logger->info('[MonthClose] PLDocument created', [
@@ -366,6 +389,75 @@ final class CloseMonthStageAction
             'plDocumentIds' => $plDocumentIds,
             'preflightResult' => $preflightResult,
         ];
+    }
+
+    /**
+     * Инвариант после привязки (M-01): ни один источник этапа не находит строк, которые
+     * обязаны войти в документ, но остались без него. Нарушение — строка появилась между
+     * привязкой и проверкой (параллельная обработка дня) либо привязка разошлась с агрегацией.
+     * Бросает RuntimeException, как и контрольная сумма: транзакция откатывается целиком,
+     * ретрай Messenger перечитает данные и закроет уже с новой строкой.
+     */
+    private function assertSourcesFullyLinked(
+        CloseMonthStageCommand $command,
+        CloseStage $stage,
+        MarketplaceType $marketplace,
+        string $periodFrom,
+        string $periodTo,
+        string $documentId,
+    ): void {
+        $remaining = $this->integrityChecker->findStillUnprocessed(
+            $this->getSourcesForStage($stage, $marketplace),
+            $command->companyId,
+            $command->marketplace,
+            $periodFrom,
+            $periodTo,
+            $command->preliminary,
+        );
+
+        if ([] === $remaining) {
+            return;
+        }
+
+        $this->logger->error('[MonthClose] Rows left unlinked after document build', [
+            'company_id' => $command->companyId,
+            'marketplace' => $command->marketplace,
+            'period' => sprintf('%s..%s', $periodFrom, $periodTo),
+            'stage' => $command->stage,
+            'document_id' => $documentId,
+            'check' => 'unlinked_rows',
+            'sources' => $remaining,
+        ]);
+
+        throw new \RuntimeException(sprintf('[MonthClose] После привязки к документу %s остались необработанные строки периода %s..%s: %s. Закрытие отменено.', $documentId, $periodFrom, $periodTo, implode(', ', array_map(static fn (array $row): string => sprintf('%s (%d)', $row['source'], $row['entries']), $remaining))));
+    }
+
+    /**
+     * Повторная проверка дней перед коммитом финального закрытия: статус дня мог измениться
+     * за время сборки документа. Остаточное окно между этой проверкой и коммитом — миллисекунды.
+     */
+    private function assertReportDaysStillReady(
+        CloseMonthStageCommand $command,
+        MarketplaceType $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): void {
+        $coverage = $this->integrityChecker->checkReportDays($command->companyId, $marketplace, $periodFrom, $periodTo);
+
+        if (null === $coverage || $coverage->isReady()) {
+            return;
+        }
+
+        $this->logger->warning('[MonthClose] Close blocked: report days changed during close', [
+            'company_id' => $command->companyId,
+            'marketplace' => $command->marketplace,
+            'period' => sprintf('%s..%s', $periodFrom, $periodTo),
+            'stage' => $command->stage,
+            'check' => 'report_days_ready',
+            'violations' => count($coverage->violations),
+        ]);
+
+        throw new \DomainException(sprintf('Закрытие невозможно: отчёты за %d из %d ожидаемых дней периода изменились во время закрытия и не готовы: %s. Повторите закрытие после обработки.', count($coverage->violations), $coverage->expectedDays, implode(', ', array_map(static fn ($violation): string => $violation->label(), array_slice($coverage->violations, 0, 5)))));
     }
 
     /**
