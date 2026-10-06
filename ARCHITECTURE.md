@@ -1182,6 +1182,16 @@ seedDefaultStructure(string $companyId): bool
 `getPassiveTotals()`, `getDifferences()`, `getTotals()` (только актив, не сумма сторон).
 Дерево и суммы строятся из одного снимка. Архив/видимость не исключают остатки из итогов.
 
+Стартовая структура новой компании: шаблон `site/config/balance/default_structure.yaml`
+(версия 1; `code` — стабильный контракт статьи, порядок задаёт позиция, id в файле нет),
+читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code`,
+`article` без `children`, сторона наследуется от родителя), применяется
+`SeedBalanceStructureAction` (идемпотентно). Запускает его слушатель
+`Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
+`App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
+компании (форма `CompanyController::new` и `CompanyOwnerAccountCreator`) после flush.
+`seedDefaultStructure()` остаётся для ручного восстановления.
+
 Сущности: `BalanceBook`, `BalanceCategory`, `BalanceAccount`, `BalanceOperation`,
 `BalanceOperationLine`, `BalanceAccountState`, `BalancePeriod`, `BalanceAccessGrant`,
 `BalanceAuditEvent`. Все принадлежат компании; новые таблицы и составные FK описаны

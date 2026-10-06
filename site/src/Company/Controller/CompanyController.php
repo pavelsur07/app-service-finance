@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
-use App\Balance\Facade\BalanceFacade;
 use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Event\CompanyCreatedEvent;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -62,7 +63,7 @@ class CompanyController extends AbstractController
     public function new(
         Request $request,
         EntityManagerInterface $em,
-        BalanceFacade $balance,
+        EventDispatcherInterface $eventDispatcher,
         CashflowSystemCategoryService $cashflowSystemCategories,
         CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ): Response {
@@ -78,13 +79,13 @@ class CompanyController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Балансовый seeder ищет свои категории через SQL, поэтому ему нужен flush
-            // до себя и внутри себя. Общая транзакция держит создание компании атомарным.
-            $em->wrapInTransaction(function () use ($company, $user, $em, $balance, $companyOwnerMembershipCreator, $cashflowSystemCategories): void {
+            // Подписчики события (Balance) ищут данные через SQL, поэтому им нужен flush до события.
+            // Общая транзакция держит создание компании со стартовыми данными атомарным.
+            $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator, $cashflowSystemCategories): void {
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
                 $cashflowSystemCategories->ensureStructure($company);
                 $em->flush();
-                $balance->seedDefaultStructure((string) $company->getId());
+                $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
             });
 
             return $this->redirectToRoute('company_index');

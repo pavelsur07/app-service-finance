@@ -9,12 +9,14 @@ use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
+use App\Company\Event\CompanyCreatedEvent;
 use App\Company\Message\SendRegistrationEmailMessage;
 use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -55,15 +57,31 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             }))
             ->willReturn(new Envelope(new \stdClass()));
 
+        $dispatched = [];
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
+        $eventDispatcher
+            ->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $event) use (&$dispatched): object {
+                $dispatched[] = $event;
+
+                return $event;
+            });
+
         $creator = new CompanyOwnerAccountCreator(
             $passwordHasher,
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
+            $eventDispatcher,
         );
 
         $company = $creator->create($user, 'plain-password', '  Acme LLC  ', true);
+
+        self::assertCount(1, $dispatched);
+        self::assertInstanceOf(CompanyCreatedEvent::class, $dispatched[0]);
+        self::assertSame($company->getId(), $dispatched[0]->companyId);
 
         self::assertSame('hashed-password', $user->getPassword());
         self::assertContains('ROLE_COMPANY_OWNER', $user->getRoles());
@@ -116,6 +134,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
+            $this->createMock(EventDispatcherInterface::class),
         );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
@@ -157,6 +176,7 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createSystemCategoryServiceMock(),
+            $this->createMock(EventDispatcherInterface::class),
         );
 
         $company = $creator->create($user, 'plain-password', 'Acme LLC', false);

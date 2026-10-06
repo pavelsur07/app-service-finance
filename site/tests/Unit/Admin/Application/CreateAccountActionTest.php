@@ -24,6 +24,7 @@ use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -71,6 +72,7 @@ final class CreateAccountActionTest extends TestCase
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
             $this->createMock(CashflowSystemCategoryService::class),
+            $this->createMock(EventDispatcherInterface::class),
         );
         $companyFacade = new CompanyFacade(
             $this->createMock(CompanyRepository::class),

@@ -1,0 +1,52 @@
+# Шаблон структуры баланса для новой компании (онбординг).
+# Читается BalanceStructureTemplateReader, применяется SeedBalanceStructureAction.
+#
+# Контракт:
+#   - code — стабильный идентификатор статьи (A-Z, 0-9, _), уникален в файле;
+#     по нему статьи связываются со счетами и фондами, менять его в уже
+#     выданных компаниях нельзя;
+#   - type — asset | passive; дочерние статьи наследуют сторону родителя;
+#   - kind — group (может иметь children) | article (конечная, без children);
+#   - порядок сортировки задаётся позицией в списке;
+#   - идентификаторы компании и статей в файле не хранятся.
+version: 1
+articles:
+    - code: CURRENT_ASSETS
+      name: Оборотные активы
+      type: asset
+      kind: group
+      children:
+          - code: CASH
+            name: Денежные средства
+            type: asset
+            kind: article
+    - code: NON_CURRENT_ASSETS
+      name: Внеоборотные активы
+      type: asset
+      kind: article
+    - code: EQUITY
+      name: Капитал
+      type: passive
+      kind: group
+      children:
+          - code: CONTRIBUTED_CAPITAL
+            name: Внесенный капитал
+            type: passive
+            kind: article
+          - code: RETAINED_RESULT
+            name: Накопленный финансовый результат
+            type: passive
+            kind: article
+    - code: LIABILITIES
+      name: Обязательства
+      type: passive
+      kind: group
+      children:
+          - code: CURRENT_LIABILITIES
+            name: Краткосрочные обязательства
+            type: passive
+            kind: article
+          - code: LONG_LIABILITIES
+            name: Долгосрочные обязательства
+            type: passive
+            kind: article
