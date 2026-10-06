@@ -3253,7 +3253,7 @@ NormalizeInventorySnapshotAction → StockSnapshot
 
 ## Messenger routing — Marketplace (WB financial report day)
 
-- `App\Marketplace\Message\SyncWbFinancialReportDayMessage` → `async_sync`.
+- `App\Marketplace\Message\SyncWbFinancialReportDayMessage` → `async_wb_finance` (воркер `messenger:consume async_wb_finance`, retry до 20 раз).
 
 Назначение:
 - загрузка WB financial report за один `businessDate` (date-based sync для initial / refresh_14d / missing сценариев).
@@ -3474,18 +3474,51 @@ config/
 
 | Команда | Расписание | Назначение |
 |---|---|---|
-| `app:messenger:failed-queue-check` | `07:32 daily` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
-| `app:marketplace-ads:scheduler` | `* * * * *` | Берёт один PLANNED batch → POST `/statistics` → IN_FLIGHT |
-| `app:marketplace-ads:poller` | `* * * * *` + offset 30s | Обрабатывает все IN_FLIGHT: poll + download + финализация |
-| `app:marketplace-ads:finalizer` | `* * * * *` | RUNNING jobs → COMPLETED / FAILED / PARTIAL_SUCCESS |
+| **Marketplace — WB** | | |
+| `app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1` | `10 3 * * *` | Ежедневное планирование WB financial sync за вчерашний день (date-based команда); задачи — `SyncWbFinancialReportDayMessage` → `async_wb_finance` |
+| `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 3-23 * * *` | Почасовой (с 03:20 до 23:20, 21 прогон в сутки) safe planner: current-month daily/retry/missing/empty recovery, затем rolling refresh последних 14 дней; не больше одной задачи на подключение за прогон |
+| `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
+| `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений |
+| **Marketplace — Ozon** | | |
+| `app:marketplace:ozon-listing-catalog:sync` | `40 3 * * *` | Синхронизация каталога листингов Ozon (`SyncOzonListingCatalogMessage` → `async_sync`) |
+| `app:marketplace:ozon-financial-reports:sync --days-back=2` | `0 4 * * *` | Планирование Ozon accrual by-day за последние 2 дня (`SyncOzonAccrualByDayMessage` → `async_sync`) |
+| `app:marketplace:ozon-financial-reports:freshness-check` | `50 6 * * *` | Read-only гейт: у каждого активного seller-подключения Ozon есть документ начислений за вчера |
+| `app:marketplace:ozon-reconciliation:check` | `10 7 * * *` | Гейт сверки: снимки за текущий и прошлый месяц у компаний с активным Ozon seller-подключением |
+| `app:marketplace:ozon-realization-poll` | `17 * * * *` | Почасовой опрос отчёта о реализации Ozon; работает только в окне `OzonRealizationPollWindow` |
+| `app:marketplace:ozon-realization-catchup` | `30 5 * * *` | Догоняющее применение загруженных, но не применённых отчётов за последние закрытые месяцы |
+| `app:marketplace:ozon-realization-check` | `20 7 * * *` | Гейт: отчёт о реализации получен и применён (активен с 9-го по 16-е число) |
+| `app:marketplace:ozon-realization-unapplied-check` | `25 7 * * *` | Read-only гейт: загруженные, но не применённые отчёты о реализации |
+| **Inventory** | | |
+| `app:inventory:ozon-daily-sync` | `5 4 * * *` | Диспатч загрузки Ozon Inventory snapshot по активным Ozon SELLER подключениям |
+| `app:inventory:wb-daily-sync` | `15 4 * * *` | Диспатч загрузки Wildberries Inventory snapshot по активным WB SELLER подключениям |
+| `app:inventory:stock-freshness-check` | `30 5 * * *` | Read-only гейт: у каждого активного подключения есть свежий снимок остатков |
+| `app:inventory:unmapped-stock-check` | `40 5 * * *` | Read-only гейт: нет новых остатков по вариантам, которых нет в каталоге маркетплейса |
+| **MarketplaceAds** | | |
+| `app:marketplace-ads:daily-sync` | `30 4 * * *` | Создаёт `AdLoadJob` за вчера для компаний с подключением Ozon Performance |
+| `app:marketplace-ads:reconcile --marketplace=ozon --all-active --days-back=14 --include-rate-limited` | `10,40 6-23 * * *` | Дозагрузка пропущенных дат рекламных расходов Ozon за 14 дней |
 | `app:marketplace-ads:ozon-poll-reports` | `*/2 * * * *` | Legacy Messenger-pipeline: per-UUID polling (оставлен до Task-11.9b) |
-| `app:marketplace:daily-sync` | `04:30 daily` | Диспатч загрузки данных по активным подключениям |
-| `app:inventory:ozon-daily-sync` | `04:05 daily` | Диспатч загрузки Ozon Inventory snapshot по активным Ozon SELLER подключениям |
-| `app:inventory:wb-daily-sync` | `04:15 daily` | Диспатч загрузки Wildberries Inventory snapshot по активным WB SELLER подключениям |
-| `app:marketplace:wb-financial-reports:sync --mode=daily` | `03:10 daily` | Ежедневное планирование WB financial sync за рабочий день (новая date-based команда) |
-| `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 * * * *` | Hourly safe planner: current-month daily/retry/missing/empty recovery, then rolling refresh of the last 14 days; max one task per connection per run |
-| `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `06:40 daily` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
-| `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `07:25 daily` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
+| `app:marketplace-ads:scheduler` | `* * * * *` | Берёт один PLANNED batch → POST `/statistics` → IN_FLIGHT |
+| `app:marketplace-ads:poller` | `* * * * *` + второй запуск со сдвигом 30 с | Обрабатывает все IN_FLIGHT: poll + download + финализация |
+| `app:marketplace-ads:finalizer` | `* * * * *` | RUNNING jobs → COMPLETED / FAILED / PARTIAL_SUCCESS |
+| `app:marketplace-ads:wb-daily-spend` | `15 6 * * *` | Загрузка расхода рекламы WB за завершённый день с распределением по nmId |
+| **Ingestion** | | |
+| `app:ingestion:run-incremental --resource=<ozon_orders_fbo|ozon_orders_fbs|wildberries_orders_marketplace|wildberries_orders_statistics>` | `35`, `37`, `39`, `41` минута каждого часа | Почасовой обход заказов, отдельная строка на ресурс |
+| `app:ingestion:run-incremental` | `0 3 * * *` | Суточный обход остальных (финансовых) ресурсов |
+| `app:ingestion:orders:refresh-statuses` | `47 * * * *` | Почасовой перепрос статусов заказов |
+| `app:ingestion:reap-stale-jobs` | `52 * * * *` | Перевод застрявших `OPEN`/`RUNNING` задач в `FAILED` (`stale_no_progress`) |
+| `app:ingestion:normalize-pending --limit=50` | `*/10 * * * *` | Safety net: повторный dispatch `NormalizeRawRecordMessage` для записей, оставшихся `PENDING` |
+| `app:ingestion:ozon-accrual:rolling-refresh --days-back=45 --limit=50 --execute` | `30 2 * * *` | Rolling-refresh Ozon accrual за 45 дней |
+| `app:ingestion:ozon-accrual:daily-maintenance --days-back=45 --execute` | `15 5 * * *` | Ежедневное обслуживание таксономии категорий Ozon accrual по сохранённым by-day raw |
+| `app:ingestion:ozon-accrual:reconcile-financial-projection --days-back=30 --execute --dispatch-normalization` | `45 5 * * *` | Сверка финансовой проекции Ozon accrual с очередью нормализации |
+| `app:ingestion:ozon-accrual:reconcile-financial-projection --days-back=30 --execute --repair-enrichment-only` | `30 6 * * *` | Ремонт только enrichment у проекции Ozon accrual |
+| `app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100` | `45 6 * * *` | Проверка результата rolling-refresh |
+| `app:ingestion:raw:prune --dry-run` | `50 5 * * *` | Retention сырья: СОЗНАТЕЛЬНО `--dry-run` — печатает, сколько записей и байт ушло бы; `--execute` — решение Владельца |
+| `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
+| **Инфраструктура** | | |
+| `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
+| `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
+| `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
+| heartbeat GlitchTip (`wget` на `$GLITCHTIP_SCHEDULER_HEARTBEAT_URL`) | `*/30 * * * *` | Сигнал живости scheduler'а; пропускается, если переменная не задана |
 
 The production PHP CLI image used by workers and the scheduler disables only
 the dynamic-load entry for `opcache.so`, which is not needed in this runtime
@@ -3508,6 +3541,24 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | `app:marketplace:wb-daily-sync` (`0 3 * * *`) | После TASK-028-FIX. Команда сохранена для backward compatibility и диспатчит уже новое `SyncWbFinancialReportDayMessage` | `app:marketplace:wb-financial-reports:sync --mode=daily` в 03:10 |
 | `wb-financial-reports:sync --mode=refresh14` (`*/30 6-23 * * *`) | Дублировал работу оркестратора | `wb-financial-reports:orchestrate --refresh-days-back=14`, rolling refresh последних 14 дней |
 | `wb-financial-reports:sync --mode=missing` (`10 * * * *`) | Там же | Тот же оркестратор: режимы `daily/retry/missing/empty` |
+
+**Удалённые закомментированные cron-строки (legacy, не возвращать).**
+
+| Что удалено | Почему | Чем закрыто сегодня |
+|---|---|---|
+| `app:cash:auto-rules:enqueue` (`*/5 * * * *`) | Автоправила ДДС работают событийно (`CashTransactionAutoRulesSubscriber` → `ApplyAutoRulesForTransaction`); команда требует `companyId`, а строка без аргумента неработоспособна; возврат cron породил бы дублирующую массовую работу | Событийный путь. Сама CLI-команда остаётся ручным инструментом (по компании), на неё ссылается страница «Авто-правило прим.» |
+| `app:money-account:snapshot` (`10 2 * * *`) | Команды не существует; ночной пересчёт остатков как обязательное задание не нужен | `AccountBalanceService::recalculateDailyRange` из записывающих путей и CLI `app:daily-balance:recalc` вручную |
+
+**Messenger: транспорты и воркеры** (источник — `config/packages/messenger.yaml`, `docker-compose*.yml`).
+
+| Транспорт | Воркер (`messenger:consume`) | Что идёт |
+|---|---|---|
+| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad |
+| `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
+| `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
+| `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
+| `ingest_fetch`, `ingest_normalize` | отдельных воркеров нет: DSN общие с `async_sync` / `async_pipeline` | `RunSyncChunkMessage`, `NormalizeRawRecordMessage` |
+| `failed` | не потребляется; read-only гейт `app:messenger:failed-queue-check` | Исчерпавшие ретраи сообщения любого транспорта |
 
 ---
 
@@ -3543,6 +3594,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.96 | 2026-10-06 | Stage 1.6 (R-18 / R-23): раздел «Cron-задачи» приведён к `docker/cron/app.cron` (добавлены пропущенные задания, исправлены оркестратор `20 3-23 * * *` и несуществующий `marketplace:daily-sync`); таблица транспортов/воркеров; routing `SyncWbFinancialReportDayMessage` → `async_wb_finance`; удалены закомментированные legacy-строки `auto-rules:enqueue` и `money-account:snapshot` |
 | 1.95 | 2026-10-05 | Marketplace: ORM-метаданные unique-индексов sales/returns/costs/raw приведены к фактической схеме БД (R-12a) — `#[ORM\UniqueConstraint(options: ['where' => …])]` с предикатом в форме `pg_get_expr`; миграций нет; `UniqueIndexOrmParityTest`. `uniq_marketplace_srid` без `company_id` (R-12b) — решение «tenant-scoped», отдельная задача |
 | 1.94 | 2026-10-05 | Messenger: read-only гейт очереди `failed` (R-03) — `app:messenger:failed-queue-check` (cron 07:32), `FailedTransportQuery`, `FailedQueueHealthPolicy`, параметры `app.failed_queue.*` |
 | 1.93 | 2026-10-04 | Marketplace: гейт целостности закрытия месяца (R-04 / M-01) — `report_days_ready` в предпроверке, `MarketplacePeriodIntegrityChecker`, методы готовности в `FinancialReportSyncStatus`, инвариант после привязки в `CloseMonthStageAction` |

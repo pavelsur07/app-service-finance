@@ -1285,12 +1285,6 @@ parameters:
 			path: src/Cash/MessageHandler/Import/BankImportHandler.php
 
 		-
-			message: '#^Parameter \#1 \$job of method App\\Cash\\MessageHandler\\Import\\CashFileImportHandler\:\:debugMark\(\) expects App\\Cash\\Entity\\Import\\CashFileImportJob, App\\Cash\\Entity\\Import\\CashFileImportJob\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/MessageHandler/Import/CashFileImportHandler.php
-
-		-
 			message: '#^Class App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1

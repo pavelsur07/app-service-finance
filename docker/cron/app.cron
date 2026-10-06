@@ -1,9 +1,6 @@
 # ┌─ min  ┌ hour ┌ dom ┌ mon ┌ dow
 # │       │      │     │     │
 
-# Каждые 5 минут: авто-правила ДДС
-#*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction
-
 # Ночная загрузка отчётов WB по реализации за вчерашний день.
 # Режимы refresh14 и missing отдельными строками не запускаются: их работу делает
 # оркестратор ниже. Историю отключённых режимов и legacy-команды wb-daily-sync
@@ -266,9 +263,6 @@
 # Команда только планирует SyncJob/chunks; HTTP-загрузка выполняется async worker'ом.
 # Запуск вынесен после ночного marketplace/inventory/accrual окна.
 25 7 * * * cd /app && php bin/console app:ingestion:ozon-performance:daily-load --window=month-to-date --execute --dispatch-spacing-seconds=120 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
-
-# Ежедневно в 02:10: снапшоты остатков по счетам
-#10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
 #0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
