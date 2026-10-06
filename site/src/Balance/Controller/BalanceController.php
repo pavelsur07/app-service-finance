@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Controller;
 
+use App\Balance\Application\EnsureBalanceStructureAction;
 use App\Balance\Domain\Policy\LedgerAmount;
 use App\Balance\Facade\BalanceFacade;
 use App\Balance\Infrastructure\Query\LedgerQuery;
@@ -23,6 +24,7 @@ final class BalanceController extends AbstractController
         private readonly BalanceAccess $access,
         private readonly LedgerQuery $query,
         private readonly BalanceFacade $facade,
+        private readonly EnsureBalanceStructureAction $ensureStructure,
     ) {
     }
 
@@ -34,6 +36,7 @@ final class BalanceController extends AbstractController
             throw $this->createAccessDeniedException();
         }
         $this->access->actor($companyId);
+        ($this->ensureStructure)($companyId);
         $date = $request->query->getString('date', (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d'));
         $report = $this->facade->getReportForCompany($companyId, LedgerAmount::date($date));
 
