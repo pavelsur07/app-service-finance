@@ -19,6 +19,18 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class BalanceStructureControllerTest extends WebTestCaseBase
 {
+    public function testIndexSeedsStructureForCompanyWithoutIt(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginOwner($client);
+
+        $client->request('GET', '/balance/structure/');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Оборотные активы');
+        self::assertSame(9, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$company->getId()]));
+    }
+
     public function testCreatePersistsSubmittedCategory(): void
     {
         $client = static::createClient();

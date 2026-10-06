@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Controller;
 
+use App\Balance\Application\EnsureBalanceStructureAction;
 use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\Security\BalanceAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -19,6 +20,7 @@ final class BalanceStructureController extends AbstractController
         private readonly ActiveCompanyService $activeCompany,
         private readonly BalanceAccess $access,
         private readonly LedgerQuery $query,
+        private readonly EnsureBalanceStructureAction $ensureStructure,
     ) {
     }
 
@@ -30,6 +32,7 @@ final class BalanceStructureController extends AbstractController
             throw $this->createAccessDeniedException();
         }
         $this->access->actor($companyId);
+        ($this->ensureStructure)($companyId);
 
         return $this->render('balance_structure/index.html.twig', ['items' => $this->query->categories($companyId), 'permissions' => $this->access->permissions($companyId), 'book' => $this->query->book($companyId)]);
     }
