@@ -1791,4 +1791,37 @@ final class WbCostsRawProcessorTest extends TestCase
 
         return $calculators;
     }
+
+    public function testWbRenamedProductProcessingOperationUsesProductProcessingCategory(): void
+    {
+        $calculator = new WbProductProcessingCalculator();
+        $row = $this->supplierOpItem('Услуга по обработке Товара', [
+            'rrd_id' => '3135822946485',
+            'acceptance' => 10,
+        ]);
+        $camelRow = [
+            'sellerOperName' => 'Услуга по обработке Товара',
+            'rrdId' => '3135822946486',
+            'saleDt' => '2026-09-30T21:00:00Z',
+            'paidAcceptance' => '10',
+        ];
+
+        foreach ([$row, $camelRow] as $candidateRow) {
+            self::assertTrue($calculator->supports($candidateRow));
+            self::assertCount(1, array_filter(
+                $this->allWbCostCalculators(),
+                static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($candidateRow),
+            ));
+        }
+
+        $entries = $calculator->calculate($row, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('product_processing', $entries[0]['category_code']);
+        self::assertEqualsWithDelta(10.0, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3135822946485:product_processing', $entries[0]['external_id']);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('wb:3135822946486:product_processing', $camelEntries[0]['external_id']);
+    }
 }

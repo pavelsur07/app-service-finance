@@ -11,6 +11,9 @@ use Psr\Log\NullLogger;
 
 /**
  * Калькулятор для затрат "Обработка товара".
+ *
+ * С октября 2026 WB отдаёт ту же платную приёмку (`paidAcceptance`) под
+ * названием «Услуга по обработке Товара»; суммы и поля те же.
  */
 class WbProductProcessingCalculator implements CostCalculatorInterface
 {
@@ -25,7 +28,11 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return 'Обработка товара' === $this->normalizer->sellerOperName($item);
+        return in_array(
+            $this->normalizer->sellerOperName($item),
+            ['Обработка товара', 'Услуга по обработке Товара'],
+            true,
+        );
     }
 
     public function requiresListing(): bool
