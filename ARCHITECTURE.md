@@ -1190,7 +1190,10 @@ seedDefaultStructure(string $companyId): bool
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
 `App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
 компании (форма `CompanyController::new` и `CompanyOwnerAccountCreator`) после flush.
-`seedDefaultStructure()` остаётся для ручного восстановления.
+`seedDefaultStructure()` остаётся для ручного восстановления. Бэкфилл для компаний без структуры —
+`app:balance:seed-missing-structure` (`SeedMissingBalanceStructuresAction`): по умолчанию dry-run,
+запись только с `--execute --expected-count=<из dry-run>`; кандидат — компания без статей и с
+неинициализированной книгой; останов на первой ошибке, повторный запуск продолжает.
 
 Сущности: `BalanceBook`, `BalanceCategory`, `BalanceAccount`, `BalanceOperation`,
 `BalanceOperationLine`, `BalanceAccountState`, `BalancePeriod`, `BalanceAccessGrant`,
