@@ -50,7 +50,7 @@ Redis-lock + DELETE/recreate; `documents` без ключа идемпотент
 | # | Точка | Сбой | Эффект | Rec |
 |---|---|---|---|---|
 | C1 | `postPersist` dispatch авто-правил внутри `flush()` (для переводов — внутри открытой транзакции) | rollback после dispatch / worker быстрее коммита | сообщение уйдёт, строки нет → handler логирует warning и **молча отбрасывает** | `DelayStamp(10s)` как единственная защита |
-| C2 | commit → dispatch | kill | транзакция без категоризации — **L** | ручная кнопка/CLI; cron закомментирован |
+| C2 | commit → dispatch | kill | транзакция без категоризации — **L** | ручная кнопка/CLI; событийный путь `CashTransactionAutoRulesSubscriber` (cron-строка была legacy и удалена в Stage 1.6) |
 | C3 | `CashTransactionService::add`: flush → матчер → пересчёт остатков | падение между | остатки/`current_balance` устарели — **I** | только позднейшие записи в тот же счёт или CLI |
 | C4 | Alfa-импорт | не пересчитывает остатки/кэш/матчер, не проверяет период | остатки стареют до следующего пересчёта — **I** | нет по расписанию |
 | C5 | Файловый импорт | батчи коммитятся, падение в позднем | частичный импорт + пересчёт остатков пропущен — **I** | job `failed`, повтор — загрузка заново (дедуп по `dedupe_hash`, но без unique-индекса) |
@@ -111,7 +111,7 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 | R-04 | Нет проверки «pipeline дня завершён» перед закрытием месяца; 04:45 может закрыть неполный месяц; поздние строки закрытого месяца остаются с `document_id NULL` | P0 | Marketplace | **Закрыт Stage 1.2 для финального закрытия WB** (`report_days_ready`, инвариант после привязки); оперативное закрытие остаётся без блока по замыслу; дрейф уже закрытых месяцев и подневная модель Ozon — не закрыты (Stage 1 follow-up / Stage 4) |
 | R-05 | Регистр P&L: delete+insert без lock, документ и регистр в разных коммитах, нет reconcile (F1–F3) | P0 | Finance | Stage 5, 9 |
 | R-06 | Reopen/rebuild не транзакционны (G9–G11) | P1 | Marketplace | Stage 4 |
-| R-07 | Cash: остатки не пересчитываются в импортах, `add()` не транзакционен, нет cron-а (C3–C5) | P1 | Cash | Stage 1, 6 |
+| R-07 | Cash: остатки не пересчитываются в импортах, `add()` не транзакционен, нет cron-а (C3–C5) | P1 | Cash | **Stage 1.4: расследован, предположение «вернуть cron» опровергнуто** — auto-rules событийные, ночной пересчёт не нужен, закомментированные cron-строки удалены как legacy (Stage 1.6); импорты/`add()` — Stage 6 |
 | R-08 | Нет сквозного reconcile между Cash, P&L, Balance; Balance без источников | P1 | сквозной | Stage 8, 9 |
 | R-09 | `succeeded_steps` — read-modify-write без optimistic lock; безопасно только при одном воркере | P1 | Marketplace | Stage 4 |
 | R-10 | Redis-lock с TTL: потеря lock'а → параллельная обработка; «lock не взят» = молчаливый пропуск | P1 | Marketplace/Ingestion | Stage 3 |
@@ -122,12 +122,12 @@ subscriber «ретраи исчерпаны ⇒ FAILED»; Redis-lock rate-guard
 | R-15 | Тихие пропуски в `PLRegisterUpdater` (нет проекта/категории) | P1 | Finance | Stage 5 |
 | R-16 | Нет понятий Invoice/Bill/AR/AP; платёж не связан с обязательством | — (функциональный пробел) | домен | Stage 7 (ADR-005) |
 | R-17 | Единая модель признания отсутствует | — | домен | Stage 4–5 (ADR-006) |
-| R-18 | Debug-маркеры `DBG:` в `errorMessage` пользователя и flush на каждой стадии в `CashFileImportHandler` | P2 | Cash | Stage 1 |
+| R-18 | Debug-маркеры `DBG:` в `errorMessage` пользователя и flush на каждой стадии в `CashFileImportHandler` | P2 | Cash | **Закрыт Stage 1.6** (маркеры убраны, причина ошибки сохранена); flush/атомарность стадий не менялись — follow-up Stage 6 |
 | R-19 | Telegram `occurredAt` = серверное «сейчас», а не время сообщения | P2 | Cash | Stage 6 |
 | R-20 | `CashTransactionToDocumentService` создаёт `Document` в обход Facade | P2 | границы модулей | Stage 5 |
 | R-21 | Одна общая Redis-инстанция (очереди+локи+кэш+сессии); нет maxmemory/eviction-политики | P1 | инфраструктура | Stage 3 |
 | R-22 | `ingest_*`-транспорты не изолированы от `async_*` (общий DSN) | P2 | инфраструктура | Stage 3 |
-| R-23 | Дрейф `ARCHITECTURE.md` «Cron-задачи» относительно `app.cron` | P2 | документация | Stage 1 |
+| R-23 | Дрейф `ARCHITECTURE.md` «Cron-задачи» относительно `app.cron` | P2 | документация | **Закрыт Stage 1.6** (таблица сверена с `app.cron` и `messenger.yaml`) |
 | R-24 | Нет `CompanyFilterMiddleware`-защиты для остальных сообщений | P2 | tenancy | Stage 3 |
 
 Не проверено (честно): `redeliver_timeout`/`claim_interval` Redis-транспорта

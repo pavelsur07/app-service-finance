@@ -40,22 +40,11 @@ final class CashFileImportDispatchCommand extends Command
             $job->setStatus(CashFileImportJob::STATUS_QUEUED);
             $job->setStartedAt(null);
             $job->setFinishedAt(null);
-            $job->setErrorMessage(sprintf(
-                'DBG:force_queue %s',
-                (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)
-            ));
+            $job->setErrorMessage(null);
             $this->entityManager->flush();
         }
 
         $this->bus->dispatch(new CashFileImportMessage($jobId));
-
-        if ($job instanceof CashFileImportJob) {
-            $job->setErrorMessage(sprintf(
-                'DBG:manual_dispatch %s',
-                (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)
-            ));
-            $this->entityManager->flush();
-        }
 
         $output->writeln(sprintf('DISPATCHED %s', $jobId));
 
