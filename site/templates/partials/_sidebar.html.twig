@@ -154,6 +154,27 @@
 
             {% include "partials/_sidebar_report.html.twig" %}
 
+            <!-- Баланс -->
+            {% if is_granted('module.finance.read') %}
+            {# «Статьи баланса» живут в «Справочниках» (balance_structure_*), здесь их нет — не дублируем. #}
+            {% set balance_active = current_route starts with 'balance_' and not (current_route starts with 'balance_structure_') %}
+            <li class="nav-item dropdown {{ balance_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ balance_active ? 'show active' : '' }}" href="#navbar-balance" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ balance_active ? 'true' : 'false' }}">
+                    <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
+                    <span class="nav-link-title">Баланс</span>
+                </a>
+                <div class="dropdown-menu {{ balance_active ? 'show' : '' }}" id="navbar-balance">
+                    <a class="dropdown-item {{ current_route == 'balance_index' ? 'active' : '' }}" href="{{ path('balance_index') }}">Баланс</a>
+                    <a class="dropdown-item {{ current_route starts with 'balance_account' ? 'active' : '' }}" href="{{ path('balance_accounts') }}">Счета</a>
+                    <a class="dropdown-item {{ current_route in ['balance_journal', 'balance_document', 'balance_document_new'] ? 'active' : '' }}" href="{{ path('balance_journal') }}">Документы</a>
+                    <a class="dropdown-item {{ current_route == 'balance_statement' ? 'active' : '' }}" href="{{ path('balance_statement') }}">Движения</a>
+                    <a class="dropdown-item {{ current_route == 'balance_compare' ? 'active' : '' }}" href="{{ path('balance_compare') }}">Сравнение</a>
+                    <a class="dropdown-item {{ current_route == 'balance_periods' ? 'active' : '' }}" href="{{ path('balance_periods') }}">Периоды</a>
+                </div>
+            </li>
+            {% endif %}
+            <!-- Баланс -->
+
             <!-- Справочники -->
             {# Блок смешанный: справочники финансов и каталог товаров. Показываем, если доступен
                хотя бы один из модулей, а пункты внутри гейтим по своему модулю. #}

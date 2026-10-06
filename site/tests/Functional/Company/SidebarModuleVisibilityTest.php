@@ -47,6 +47,8 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
 
         self::assertStringContainsString('Деньги', $sidebar);
         self::assertStringContainsString('Отчёты', $sidebar);
+        self::assertStringContainsString('href="/balance/"', $sidebar, 'Раздел «Баланс» должен быть в меню.');
+        self::assertStringContainsString('Статьи баланса', $sidebar);
         // Финансовые raw-отчёты доступны этому участнику, значит должны быть и в меню.
         self::assertStringContainsString('Отладка', $sidebar);
         self::assertStringNotContainsString('Маркетплейсы', $sidebar);
@@ -78,6 +80,8 @@ final class SidebarModuleVisibilityTest extends WebTestCaseBase
         self::assertStringContainsString('Загрузка данных', $sidebar);
         self::assertStringNotContainsString('Доходы и расходы', $sidebar);
         self::assertStringNotContainsString('Категории ДДС', $sidebar);
+        self::assertStringNotContainsString('href="/balance/"', $sidebar);
+        self::assertStringNotContainsString('Статьи баланса', $sidebar);
         self::assertStringNotContainsString('Журнал импорта', $sidebar);
         self::assertStringNotContainsString('Отладка', $sidebar);
         self::assertStringNotContainsString('Компания и доступы', $sidebar);
