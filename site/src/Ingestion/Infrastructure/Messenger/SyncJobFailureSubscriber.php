@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Infrastructure\Messenger;
 
 use App\Ingestion\Application\Command\MarkJobFailedCommand;
+use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Facade\SyncFacade;
 use App\Ingestion\Message\RunSyncChunkMessage;
 use App\Ingestion\Repository\SyncJobRepository;
@@ -12,6 +13,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 
 final readonly class SyncJobFailureSubscriber implements EventSubscriberInterface
 {
@@ -65,6 +67,16 @@ final readonly class SyncJobFailureSubscriber implements EventSubscriberInterfac
             ]);
 
             return;
+        }
+
+        // Транзиентный отказ внешнего API (5xx, таймаут) — не инцидент для очереди
+        // `failed`: задание уже FAILED с причиной, повтор сообщения был бы no-op
+        // (терминальный статус), а следующий плановый запуск подхватит работу.
+        // Стамп — штатный способ Messenger отказаться от failure transport; без
+        // него каждый ночной сбой WB краснит гейт app:messenger:failed-queue-check.
+        // Остальные исключения по-прежнему уходят в `failed`.
+        if ($rootCause instanceof ConnectorTransientException) {
+            $event->addStamps(new SentToFailureTransportStamp($event->getReceiverName()));
         }
 
         $this->logger->warning('Ingestion sync job marked as failed after retries exhausted.', [

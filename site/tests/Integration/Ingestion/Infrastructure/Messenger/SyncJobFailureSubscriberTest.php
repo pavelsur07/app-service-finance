@@ -18,6 +18,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 
 final class SyncJobFailureSubscriberTest extends IntegrationTestCase
 {
@@ -49,6 +50,56 @@ final class SyncJobFailureSubscriberTest extends IntegrationTestCase
         self::assertNotNull($persisted);
         self::assertSame(SyncJobStatus::RUNNING, $persisted->getStatus());
         self::assertNull($persisted->getLastError());
+    }
+
+    public function testExhaustedTransientFailureOptsOutOfFailureTransport(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $job = $this->newBackfillJob($companyId);
+        $job->markRunning();
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $envelope = new Envelope(new RunSyncChunkMessage($companyId, $job->getId()));
+        $event = new WorkerMessageFailedEvent(
+            $envelope,
+            'ingest_fetch',
+            new HandlerFailedException($envelope, [new ConnectorTransientException('WB orders server error (HTTP 500)')]),
+        );
+
+        /** @var SyncJobFailureSubscriber $subscriber */
+        $subscriber = self::getContainer()->get(SyncJobFailureSubscriber::class);
+        $subscriber->onMessageFailed($event);
+        $this->em->clear();
+
+        $persisted = self::getContainer()->get(SyncJobRepository::class)->findByIdAndCompany($job->getId(), $companyId);
+        self::assertSame(SyncJobStatus::FAILED, $persisted?->getStatus());
+
+        $stamp = $event->getEnvelope()->last(SentToFailureTransportStamp::class);
+        self::assertInstanceOf(SentToFailureTransportStamp::class, $stamp);
+        self::assertSame('ingest_fetch', $stamp->getOriginalReceiverName());
+    }
+
+    public function testExhaustedNonTransientFailureStillGoesToFailureTransport(): void
+    {
+        $companyId = Uuid::uuid7()->toString();
+        $job = $this->newBackfillJob($companyId);
+        $job->markRunning();
+        $this->em->persist($job);
+        $this->em->flush();
+
+        $envelope = new Envelope(new RunSyncChunkMessage($companyId, $job->getId()));
+        $event = new WorkerMessageFailedEvent(
+            $envelope,
+            'ingest_fetch',
+            new HandlerFailedException($envelope, [new \RuntimeException('bug')]),
+        );
+
+        /** @var SyncJobFailureSubscriber $subscriber */
+        $subscriber = self::getContainer()->get(SyncJobFailureSubscriber::class);
+        $subscriber->onMessageFailed($event);
+
+        self::assertNull($event->getEnvelope()->last(SentToFailureTransportStamp::class));
     }
 
     public function testExhaustedRetryMarksJobFailedAndFinalizesParent(): void
