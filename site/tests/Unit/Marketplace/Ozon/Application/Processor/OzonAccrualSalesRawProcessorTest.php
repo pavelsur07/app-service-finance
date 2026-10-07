@@ -17,6 +17,7 @@ use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -151,20 +152,39 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
         self::assertSame([$base.'-acc50000000099'], array_column($this->persisted, 'externalOrderId'));
     }
 
-    public function testRecordOfAnotherDayBlocksTheKeyAsBefore(): void
+    /**
+     * Регрессия по Сухоносову, 01.10.2026: продажа уже записана днём раньше (историческая, без метки, и с меткой
+     * другого начисления). Ozon переоформил её (сторно + новое начисление) — новое начисление теряться не должно.
+     */
+    #[DataProvider('oldAccrualMarkers')]
+    public function testRebookedAccrualOfAnotherDayIsRecordedAsSeparateSale(?string $oldAccrual): void
     {
-        $other = $this->saleRow();
-        $other['accrual_id'] = 50000000099;
+        $rebooked = $this->saleRow();
+        $rebooked['accrual_id'] = 50000000099;
         $base = 'ozon-accrual-80000001-1001-1-product-0';
 
-        // Историческая запись другого дня (закрытые периоды не меняются).
-        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-05-31', 'amount' => '2999.00']])
-            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
-        self::assertSame([], $this->persisted);
+        $this->processor(stamps: [$base => ['accrualId' => $oldAccrual, 'date' => '2026-05-31', 'amount' => '2999.00']])
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$rebooked], self::RAW_DOC_ID);
 
-        // Запись другого дня: возможное переоформление того же начисления, выручку не удваиваем.
+        self::assertSame([$base.'-acc50000000099'], array_column($this->persisted, 'externalOrderId'));
+    }
+
+    /**
+     * @return iterable<string, array{?string}>
+     */
+    public static function oldAccrualMarkers(): iterable
+    {
+        yield 'историческая запись без метки' => [null];
+        yield 'запись с меткой другого начисления' => ['50000000001'];
+    }
+
+    public function testSameAccrualOfAnotherDayIsNotRecordedTwice(): void
+    {
+        $base = 'ozon-accrual-80000001-1001-1-product-0';
+
         $this->processor(stamps: [$base => ['accrualId' => '50000000001', 'date' => '2026-05-31', 'amount' => '2999.00']])
-            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->saleRow()], self::RAW_DOC_ID);
+
         self::assertSame([], $this->persisted);
     }
 

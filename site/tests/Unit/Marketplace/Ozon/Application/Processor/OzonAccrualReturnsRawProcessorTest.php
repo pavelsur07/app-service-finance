@@ -19,6 +19,7 @@ use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -131,18 +132,35 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertSame([[$base, '50000000002']], $this->claimed);
     }
 
-    public function testReturnKeyHeldByHistoricalOrOtherDayRecordBlocksAsBefore(): void
+    #[DataProvider('oldAccrualMarkers')]
+    public function testReturnOfAnotherAccrualAndDayIsRecordedUnderSuffixedKey(?string $oldAccrual): void
     {
         $other = $this->returnRow();
         $other['accrual_id'] = 50000000098;
         $base = 'ozon-accrual-80000002-1002-1-return-product-0';
 
-        $this->processor(stamps: [$base => ['accrualId' => null, 'date' => '2026-05-31', 'amount' => '2647.00']])
+        $this->processor(stamps: [$base => ['accrualId' => $oldAccrual, 'date' => '2026-05-31', 'amount' => '2647.00']])
             ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
-        self::assertSame([], $this->persisted);
+
+        self::assertSame([$base.'-acc50000000098'], array_column($this->persisted, 'externalId'));
+    }
+
+    /**
+     * @return iterable<string, array{?string}>
+     */
+    public static function oldAccrualMarkers(): iterable
+    {
+        yield 'историческая запись без метки' => [null];
+        yield 'запись с меткой другого начисления' => ['50000000002'];
+    }
+
+    public function testSameReturnAccrualOfAnotherDayIsNotRecordedTwice(): void
+    {
+        $base = 'ozon-accrual-80000002-1002-1-return-product-0';
 
         $this->processor(stamps: [$base => ['accrualId' => '50000000002', 'date' => '2026-05-31', 'amount' => '2647.00']])
-            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$other], self::RAW_DOC_ID);
+            ->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$this->returnRow()], self::RAW_DOC_ID);
+
         self::assertSame([], $this->persisted);
     }
 
