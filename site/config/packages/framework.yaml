@@ -33,6 +33,11 @@ framework:
             log_level: warning
         Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException:
             log_level: warning
+        # Баланс: ожидаемые отказы пользовательского ввода (удаление статьи с потомками, конфликт версии,
+        # не найдена запись). BalanceExceptionListener превращает их в 404/409/422, но Symfony логирует
+        # исключение раньше, и по умолчанию это CRITICAL — ложный инцидент в GlitchTip.
+        App\Balance\Exception\BalanceLedgerException:
+            log_level: warning
 
     # Note that the session will be started ONLY if you read or write from it.
     session:
