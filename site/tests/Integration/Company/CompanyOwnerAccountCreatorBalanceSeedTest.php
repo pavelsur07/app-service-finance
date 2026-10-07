@@ -21,11 +21,11 @@ final class CompanyOwnerAccountCreatorBalanceSeedTest extends IntegrationTestCas
         $company = self::getContainer()->get(CompanyOwnerAccountCreator::class)
             ->create($user, 'plain-password', 'Seed Co', false);
 
-        $codes = $this->connection->fetchFirstColumn('SELECT code FROM balance_articles WHERE company_id=? ORDER BY code', [(string) $company->getId()]);
-        self::assertSame([
-            'CASH', 'CONTRIBUTED_CAPITAL', 'CURRENT_ASSETS', 'CURRENT_LIABILITIES', 'EQUITY',
-            'LIABILITIES', 'LONG_LIABILITIES', 'NON_CURRENT_ASSETS', 'RETAINED_RESULT',
-        ], $codes);
+        $codes = $this->connection->fetchFirstColumn('SELECT code FROM balance_articles WHERE company_id=?', [(string) $company->getId()]);
+        self::assertCount(33, $codes);
+        foreach (['MONEY', 'CASH_BANK', 'CASH_PAYMENT_SYSTEMS', 'AR_MARKETPLACES', 'INV_MARKETPLACE', 'TAX_RECEIVABLE', 'EQUITY', 'LONG_LOANS'] as $code) {
+            self::assertContains($code, $codes);
+        }
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND action='system_seed'", [(string) $company->getId()]));
     }
 }

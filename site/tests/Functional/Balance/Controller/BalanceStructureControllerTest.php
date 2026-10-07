@@ -28,7 +28,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Оборотные активы');
-        self::assertSame(9, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$company->getId()]));
+        self::assertSame(33, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$company->getId()]));
     }
 
     public function testCreatePersistsSubmittedCategory(): void

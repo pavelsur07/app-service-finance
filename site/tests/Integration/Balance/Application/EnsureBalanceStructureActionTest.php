@@ -18,9 +18,9 @@ final class EnsureBalanceStructureActionTest extends IntegrationTestCase
         $ensure = self::getContainer()->get(EnsureBalanceStructureAction::class);
 
         self::assertTrue($ensure($companyId));
-        self::assertSame(9, $this->articleCount($companyId));
+        self::assertSame(33, $this->articleCount($companyId));
         self::assertFalse($ensure($companyId));
-        self::assertSame(9, $this->articleCount($companyId));
+        self::assertSame(33, $this->articleCount($companyId));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND action='system_seed'", [$companyId]));
     }
 

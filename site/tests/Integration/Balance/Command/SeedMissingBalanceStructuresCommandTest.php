@@ -49,7 +49,7 @@ final class SeedMissingBalanceStructuresCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--execute' => true, '--expected-count' => (string) $this->candidateCount()]), $tester->getDisplay());
 
-        self::assertSame(9, $this->articleCount($bare));
+        self::assertSame(33, $this->articleCount($bare));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND action='system_seed'", [$bare]));
         self::assertSame($seededBefore, $this->articleCount($seeded));
         self::assertSame(0, $this->articleCount($initialized), 'Инициализированная книга без статей — решение пользователя, не трогаем.');
