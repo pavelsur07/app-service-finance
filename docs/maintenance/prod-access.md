@@ -230,16 +230,18 @@ Read-only проверки можно выполнять после запрос
   служебные флаги. Предпросмотр — без отдельного одобрения; запуск с
   `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
 
-- `app:marketplace:reprocess <companyId> wildberries <periodFrom> <periodTo> [--only=all|sales_report] [--dry-run]` —
+- `app:marketplace:reprocess <companyId> wildberries|ozon <periodFrom> <periodTo> [--only=all|sales_report|realization] [--dry-run]` —
   переобработка raw-документов WB за период, тот же
   `ReprocessMarketplacePeriodAction`, что у кнопки UI: sales, returns и costs
   пересоздаются, строки, уже связанные с ОПиУ, сохраняются (счётчики
   `partial_steps` и `linked_rows_preserved` в выводе). Пишет `marketplace_costs`
   и sales/returns — запуск без `--dry-run` отдельное одобрение Владельца по
   AGENTS.md §3.3, по одной компании. Wrapper пропускает ровно четыре
-  позиционных аргумента по порядку (UUID, `wildberries`, две даты `Y-m-d`),
-  `--only=all|sales_report`, `--dry-run` и служебные флаги; Ozon и
-  `--only=realization` не допускаются. `--dry-run` самой команды ничего не
+  позиционных аргумента по порядку (UUID, `wildberries` или `ozon`, две даты
+  `Y-m-d`), `--only=all|sales_report|realization`, `--dry-run` и служебные
+  флаги. Ozon добавлен Владельцем 07.10.2026 (установлено на прод, md5 сверен).
+  У Ozon команда берёт только `sales_report` и `realization`; документы by-day
+  (`accrual_by_day`) она не обрабатывает. `--dry-run` самой команды ничего не
   считает, а лишь печатает заголовок — предпросмотром объёма не служит.
 
 - `app:marketplace:ozon-daily-sync` — **удалена 23.09.2026** вместе с цепочкой
