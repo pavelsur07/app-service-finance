@@ -24,12 +24,32 @@ final class OzonAccrualRecordKeyTest extends TestCase
         self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc2'], OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', $stamps));
     }
 
-    public function testSameAccrualAndOtherDayAreSkipped(): void
+    public function testSameAccrualIsSkippedOnAnyDay(): void
     {
         self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '3800.00', [self::BASE => $this->stamp('1', '3800.00')])['action']);
-        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', [self::BASE => $this->stamp('1', '3800.00', '2026-09-29')])['action']);
-        // Историческая запись другого дня тоже блокирует: возможное переоформление не удваиваем.
-        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', self::DAY, '3800.00', [self::BASE => $this->stamp(null, '3800.00', '2026-09-12')])['action']);
+        // Тот же accrual_id, но Ozon сменил дату начисления: повторно не пишем.
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '1', self::DAY, '3800.00', [self::BASE => $this->stamp('1', '3800.00', '2026-09-29')])['action']);
+    }
+
+    public function testRebookedAccrualOfAnotherDayGetsSuffixedKey(): void
+    {
+        // Переоформление 01.10.2026: продажа 19.09 уже записана, Ozon прислал новое начисление того же отправления.
+        $stamps = [self::BASE => $this->stamp('1', '1187.00', '2026-09-19')];
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc2'], OzonAccrualRecordKey::decide(self::BASE, '2', '2026-10-01', '1187.00', $stamps));
+
+        // Историческая запись без метки: как у Сухоносова, продажа 19.09 создана до появления метки.
+        $legacy = [self::BASE => $this->stamp(null, '1187.00', '2026-09-19')];
+        self::assertSame(['action' => 'insert', 'key' => self::BASE.'-acc2'], OzonAccrualRecordKey::decide(self::BASE, '2', '2026-10-01', '1187.00', $legacy));
+    }
+
+    public function testRebookedAccrualIsBookedOnceOnRerun(): void
+    {
+        $stamps = [
+            self::BASE => $this->stamp(null, '1187.00', '2026-09-19'),
+            self::BASE.'-acc2' => $this->stamp('2', '1187.00', '2026-10-01'),
+        ];
+
+        self::assertSame('skip', OzonAccrualRecordKey::decide(self::BASE, '2', '2026-10-01', '1187.00', $stamps)['action']);
     }
 
     public function testLegacyRowWithEqualAmountBelongsToThisAccrual(): void
