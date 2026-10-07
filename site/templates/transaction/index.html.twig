@@ -442,73 +442,82 @@
       } catch(err) {
         bodyEl.innerHTML = '<div class="text-danger">Ошибка загрузки</div>';
       }
+    });
 
-      // Обработка submit "Применить" внутри модалки (AJAX)
-      modalEl.addEventListener('submit', async (ev) => {
-        const f = ev.target;
-        if (f.id !== 'autoRuleApplyForm') return;
-        ev.preventDefault();
+    // Обработка submit «Применить» внутри модалки (AJAX). Регистрируется ОДИН раз: раньше обработчик
+    // навешивался заново на каждый клик по .js-auto-rule, и после повторных открытий модалки один submit
+    // запускал сразу несколько POST по одной форме (GlitchTip #414, uniq_cts_tx_category).
+    document.addEventListener('submit', async (ev) => {
+      const f = ev.target;
+      if (!(f instanceof HTMLFormElement) || f.id !== 'autoRuleApplyForm') return;
+      ev.preventDefault();
 
-        try {
-          const formData = new FormData(f);
-          const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
-          const data = await res.json();
+      // Повторный submit, пока первый запрос в полёте (двойной клик, Enter), игнорируем.
+      if (f.dataset.submitting === '1') return;
+      f.dataset.submitting = '1';
+      f.querySelectorAll('[type="submit"]').forEach(button => { button.disabled = true; });
 
-          if (data.ok) {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-success mb-2';
-            alert.textContent = `Применено: ${data.changed ? 'да' : 'без изменений'}`;
+      const bodyEl = document.getElementById('autoRuleModalBody');
 
-            const details = document.createElement('div');
-            details.append('Правило: ');
-            const ruleName = document.createElement('strong');
-            ruleName.textContent = data.ruleName ?? '';
-            details.append(ruleName, ` (${data.action ?? ''})`);
+      try {
+        const formData = new FormData(f);
+        const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await res.json();
 
-            const actions = document.createElement('div');
-            actions.className = 'mt-3 text-end';
-            const closeButton = document.createElement('button');
-            closeButton.type = 'button';
-            closeButton.className = 'btn btn-primary';
-            closeButton.dataset.bsDismiss = 'modal';
-            closeButton.textContent = 'Закрыть';
-            actions.append(closeButton);
-
-            bodyEl.replaceChildren(alert, details, actions);
-            return;
-          }
-
+        if (data.ok) {
           const alert = document.createElement('div');
-          alert.className = 'alert alert-warning mb-2';
-          alert.textContent = data.message ?? 'Не найдено';
+          alert.className = 'alert alert-success mb-2';
+          alert.textContent = `Применено: ${data.changed ? 'да' : 'без изменений'}`;
+
+          const details = document.createElement('div');
+          details.append('Правило: ');
+          const ruleName = document.createElement('strong');
+          ruleName.textContent = data.ruleName ?? '';
+          details.append(ruleName, ` (${data.action ?? ''})`);
 
           const actions = document.createElement('div');
           actions.className = 'mt-3 text-end';
           const closeButton = document.createElement('button');
           closeButton.type = 'button';
-          closeButton.className = 'btn btn-secondary';
+          closeButton.className = 'btn btn-primary';
           closeButton.dataset.bsDismiss = 'modal';
           closeButton.textContent = 'Закрыть';
           actions.append(closeButton);
 
-          bodyEl.replaceChildren(alert, actions);
-        } catch {
-          const alert = document.createElement('div');
-          alert.className = 'alert alert-danger mb-2';
-          alert.textContent = 'Не удалось обработать запрос. Попробуйте ещё раз.';
-
-          const actions = document.createElement('div');
-          actions.className = 'mt-3 text-end';
-          const closeButton = document.createElement('button');
-          closeButton.type = 'button';
-          closeButton.className = 'btn btn-secondary';
-          closeButton.dataset.bsDismiss = 'modal';
-          closeButton.textContent = 'Закрыть';
-          actions.append(closeButton);
-
-          bodyEl.replaceChildren(alert, actions);
+          bodyEl.replaceChildren(alert, details, actions);
+          return;
         }
-      }, { once: true });
+
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-warning mb-2';
+        alert.textContent = data.message ?? 'Не найдено';
+
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 text-end';
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'btn btn-secondary';
+        closeButton.dataset.bsDismiss = 'modal';
+        closeButton.textContent = 'Закрыть';
+        actions.append(closeButton);
+
+        bodyEl.replaceChildren(alert, actions);
+      } catch {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-danger mb-2';
+        alert.textContent = 'Не удалось обработать запрос. Попробуйте ещё раз.';
+
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 text-end';
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'btn btn-secondary';
+        closeButton.dataset.bsDismiss = 'modal';
+        closeButton.textContent = 'Закрыть';
+        actions.append(closeButton);
+
+        bodyEl.replaceChildren(alert, actions);
+      }
     });
     </script>
     <script>
