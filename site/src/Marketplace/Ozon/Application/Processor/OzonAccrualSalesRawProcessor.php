@@ -35,11 +35,16 @@ use Ramsey\Uuid\Uuid;
  * базу посреди таблицы и молча занизить выручку в 2.25 раза для всего, что её
  * читает — закрытия месяца и аналитики.
  *
- * **Количество выводится как `sale_amount / seller_price`** — обе величины в
- * одной базе. На всей проверенной выгрузке оно равно единице, но формула
- * переживёт день, когда Ozon пришлёт агрегат. Нецелое частное означает, что
- * предположение о базе неверно; такая строка пропускается и логируется, а не
- * округляется молча.
+ * **Количество берётся из поля `quantity` товара**, если Ozon его прислал, а
+ * цена единицы — `sale_amount / quantity`. Выводить его из
+ * `sale_amount / seller_price` нельзя: `sale_amount` бывает больше цены
+ * продавца, когда Ozon берёт в выручку цену покупателя и удерживает разницу в
+ * комиссии (09.09.2026: quantity 1, sale_amount 233, seller_price 193 — продажа
+ * терялась, а её комиссия и логистика записывались).
+ *
+ * Без поля `quantity` (у части документов его нет) количество по-прежнему
+ * выводится как `sale_amount / seller_price`. В обоих путях нецелый результат
+ * пропускается и логируется, а не округляется молча.
  */
 final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
@@ -222,7 +227,7 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 continue;
             }
 
-            $quantity = $this->quantity((float) $saleAmount, (float) $sellerPrice, $accrualId);
+            $quantity = $this->quantity((float) $saleAmount, (float) $sellerPrice, $product['quantity'] ?? null, $accrualId);
             if (null === $quantity) {
                 continue;
             }
@@ -247,7 +252,8 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
                 'quantity' => $quantity,
                 // Цена единицы и итог в одной базе: их произведение обязано
                 // сходиться с sale_amount, иначе строка внутренне противоречива.
-                'pricePerUnit' => $this->money((float) $sellerPrice),
+                // Делимость проверена в quantity().
+                'pricePerUnit' => $this->money((float) $saleAmount / $quantity),
                 'totalRevenue' => $this->money((float) $saleAmount),
                 'raw' => [OzonAccrualRecordKey::ACCRUAL_MARKER => $accrualId] + $product,
             ];
@@ -274,8 +280,24 @@ final class OzonAccrualSalesRawProcessor implements MarketplaceRawProcessorInter
         return is_string($unitNumber) && '' !== trim($unitNumber) ? trim($unitNumber) : $accrualId;
     }
 
-    private function quantity(float $saleAmount, float $sellerPrice, string $accrualId): ?int
+    private function quantity(float $saleAmount, float $sellerPrice, mixed $declared, string $accrualId): ?int
     {
+        if (is_int($declared) && $declared >= 1) {
+            // Цена единицы = sale_amount / quantity обязана быть точной в
+            // копейках, иначе цена × количество не сойдётся с выручкой.
+            if (0 !== bccomp($this->money(round($saleAmount / $declared, self::MONEY_SCALE) * $declared), $this->money($saleAmount), self::MONEY_SCALE)) {
+                $this->logger->warning('[Ozon by-day] sale_amount is not divisible by quantity, sale skipped', [
+                    'accrual_id' => $accrualId,
+                    'quantity' => $declared,
+                    'sale_amount' => $this->money($saleAmount),
+                ]);
+
+                return null;
+            }
+
+            return $declared;
+        }
+
         if (0.0 === $sellerPrice) {
             $this->logger->warning('[Ozon by-day] seller_price is zero, cannot derive quantity', [
                 'accrual_id' => $accrualId,

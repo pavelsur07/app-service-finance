@@ -29,6 +29,11 @@ use Ramsey\Uuid\Uuid;
  * Ловушка знаков: у возврата отрицательны и `sale_amount`, и `seller_price`,
  * поэтому их частное даёт **+1**. Признак возврата — знак `sale_amount`, а не
  * знак вычисленного количества.
+ *
+ * Количество берётся из поля `quantity` товара (у возврата оно положительное),
+ * если Ozon его прислал; иначе выводится как `sale_amount / seller_price`.
+ * Причина та же, что у продаж (`OzonAccrualSalesRawProcessor`): `sale_amount`
+ * бывает больше цены продавца, и частное тогда нецелое.
  */
 final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInterface
 {
@@ -230,7 +235,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
                 continue;
             }
 
-            $quantity = $this->quantity((float) $saleAmount, (float) $sellerPrice, $accrualId);
+            $quantity = $this->quantity((float) $saleAmount, (float) $sellerPrice, $product['quantity'] ?? null, $accrualId);
             if (null === $quantity) {
                 continue;
             }
@@ -262,8 +267,23 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         return $returns;
     }
 
-    private function quantity(float $saleAmount, float $sellerPrice, string $accrualId): ?int
+    private function quantity(float $saleAmount, float $sellerPrice, mixed $declared, string $accrualId): ?int
     {
+        if (is_int($declared) && $declared >= 1) {
+            $refund = abs($saleAmount);
+            if (0 !== bccomp($this->money(round($refund / $declared, self::MONEY_SCALE) * $declared), $this->money($refund), self::MONEY_SCALE)) {
+                $this->logger->warning('[Ozon by-day] sale_amount is not divisible by quantity, return skipped', [
+                    'accrual_id' => $accrualId,
+                    'quantity' => $declared,
+                    'sale_amount' => $this->money($saleAmount),
+                ]);
+
+                return null;
+            }
+
+            return $declared;
+        }
+
         if (0.0 === $sellerPrice) {
             return null;
         }
