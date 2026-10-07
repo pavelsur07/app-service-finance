@@ -23,8 +23,23 @@ final class BalanceStructureTemplateReaderTest extends TestCase
         self::assertSame([10, 20, 30, 40], array_map(static fn (BalanceStructureTemplateNode $n): int => $n->sortOrder, $nodes));
         self::assertSame(BalanceCategoryType::ASSET, $nodes[0]->type);
         self::assertSame(BalanceCategoryType::PASSIVE, $nodes[2]->type);
-        self::assertSame('CASH', $nodes[0]->children[0]->code);
-        self::assertSame([], $nodes[1]->children);
+        self::assertSame(['MONEY', 'RECEIVABLES', 'INVENTORY', 'TAX_RECEIVABLE'], array_map(static fn (BalanceStructureTemplateNode $n): string => $n->code, $nodes[0]->children));
+
+        $total = 0;
+        $maxLevel = 0;
+        $walk = function (array $level, int $depth) use (&$walk, &$total, &$maxLevel): void {
+            foreach ($level as $node) {
+                ++$total;
+                $maxLevel = max($maxLevel, $depth);
+                // Группа обязана иметь потомков, конечная статья — нет: счета привязываются только к article.
+                self::assertSame('group' === $node->kind, [] !== $node->children, $node->code);
+                $walk($node->children, $depth + 1);
+            }
+        };
+        $walk($nodes, 1);
+
+        self::assertSame(33, $total);
+        self::assertSame(3, $maxLevel, 'Стартовый набор — три уровня, четвёртый пользователь добавляет сам.');
     }
 
     public function testMissingFileIsRejected(): void
@@ -39,18 +54,18 @@ final class BalanceStructureTemplateReaderTest extends TestCase
      */
     public static function invalidTemplates(): iterable
     {
-        $node = static fn (string $extra = ''): string => "version: 1\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: group\n{$extra}";
+        $node = static fn (string $extra = ''): string => "version: 2\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: group\n{$extra}";
 
-        yield 'broken yaml' => ["version: 1\narticles: [", 'не разобран'];
-        yield 'wrong version' => ["version: 2\narticles: []", 'версии 1'];
-        yield 'empty list' => ["version: 1\narticles: []", 'пуст'];
-        yield 'bad code' => ["version: 1\narticles:\n  - code: bad-code\n    name: A\n    type: asset\n    kind: group", 'code обязателен'];
-        yield 'missing name' => ["version: 1\narticles:\n  - code: A\n    type: asset\n    kind: group", 'name обязателен'];
-        yield 'bad type' => ["version: 1\narticles:\n  - code: A\n    name: A\n    type: equity\n    kind: group", 'asset или passive'];
-        yield 'bad kind' => ["version: 1\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: leaf", 'group или article'];
-        yield 'duplicate code' => ["version: 1\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: article\n  - code: A\n    name: B\n    type: asset\n    kind: article", 'повторяется'];
+        yield 'broken yaml' => ["version: 2\narticles: [", 'не разобран'];
+        yield 'wrong version' => ["version: 1\narticles: []", 'версии 2'];
+        yield 'empty list' => ["version: 2\narticles: []", 'пуст'];
+        yield 'bad code' => ["version: 2\narticles:\n  - code: bad-code\n    name: A\n    type: asset\n    kind: group", 'code обязателен'];
+        yield 'missing name' => ["version: 2\narticles:\n  - code: A\n    type: asset\n    kind: group", 'name обязателен'];
+        yield 'bad type' => ["version: 2\narticles:\n  - code: A\n    name: A\n    type: equity\n    kind: group", 'asset или passive'];
+        yield 'bad kind' => ["version: 2\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: leaf", 'group или article'];
+        yield 'duplicate code' => ["version: 2\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: article\n  - code: A\n    name: B\n    type: asset\n    kind: article", 'повторяется'];
         yield 'article with children' => [
-            "version: 1\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: article\n    children:\n      - code: B\n        name: B\n        type: asset\n        kind: article",
+            "version: 2\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: article\n    children:\n      - code: B\n        name: B\n        type: asset\n        kind: article",
             'не бывает children',
         ];
         yield 'child on other side' => [
@@ -58,7 +73,7 @@ final class BalanceStructureTemplateReaderTest extends TestCase
             'сторона баланса',
         ];
         yield 'too deep' => [
-            "version: 1\narticles:\n  - {code: L1, name: L1, type: asset, kind: group, children: [{code: L2, name: L2, type: asset, kind: group, children: [{code: L3, name: L3, type: asset, kind: group, children: [{code: L4, name: L4, type: asset, kind: group, children: [{code: L5, name: L5, type: asset, kind: article}]}]}]}]}",
+            "version: 2\narticles:\n  - {code: L1, name: L1, type: asset, kind: group, children: [{code: L2, name: L2, type: asset, kind: group, children: [{code: L3, name: L3, type: asset, kind: group, children: [{code: L4, name: L4, type: asset, kind: group, children: [{code: L5, name: L5, type: asset, kind: article}]}]}]}]}",
             'глубина',
         ];
     }

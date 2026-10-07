@@ -57,8 +57,8 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
             ['Оборотные активы', 'Внеоборотные активы', 'Капитал', 'Обязательства'],
             array_column($balanceTree, 'name'),
         );
-        self::assertSame(['Денежные средства'], array_column($balanceTree[0]['children'], 'name'));
-        self::assertSame(['Внесенный капитал', 'Накопленный финансовый результат'], array_column($balanceTree[2]['children'], 'name'));
+        self::assertSame(['Денежные средства', 'Дебиторская задолженность', 'Товарные запасы', 'Налоги к возмещению'], array_column($balanceTree[0]['children'], 'name'));
+        self::assertSame(['Внесённый капитал', 'Накопленный финансовый результат'], array_column($balanceTree[2]['children'], 'name'));
         self::assertFalse($balance->seedDefaultStructure((string) $company->getId()));
 
         $member = $em->getRepository(CompanyMember::class)->findOneByCompanyAndUser($company, $owner);

@@ -34,6 +34,6 @@ final class BalanceControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1.wz-title', 'Баланс');
         // Ленивый сид: компания без структуры получает её при первом открытии раздела.
-        self::assertSame(9, (int) $em->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$company->getId()]));
+        self::assertSame(33, (int) $em->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$company->getId()]));
     }
 }

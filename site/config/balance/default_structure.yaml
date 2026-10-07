@@ -1,36 +1,109 @@
 # Шаблон структуры баланса для новой компании (онбординг).
 # Читается BalanceStructureTemplateReader, применяется SeedBalanceStructureAction.
 #
+# Версия 2 (2026-10): детализация под продавца на маркетплейсах — деньги по видам счетов,
+# расчёты с маркетплейсами, склады, налоги, кредиты. Применяется только к компаниям, у
+# которых ещё нет статей; существующие структуры (версия 1) не меняются.
+#
 # Контракт:
 #   - code — стабильный идентификатор статьи (A-Z, 0-9, _), уникален в файле;
 #     по нему статьи связываются со счетами и фондами, менять его в уже
 #     выданных компаниях нельзя;
 #   - type — asset | passive; дочерние статьи наследуют сторону родителя;
 #   - kind — group (может иметь children) | article (конечная, без children);
+#     счета привязываются только к article;
 #   - порядок сортировки задаётся позицией в списке;
 #   - идентификаторы компании и статей в файле не хранятся.
-version: 1
+version: 2
 articles:
     - code: CURRENT_ASSETS
       name: Оборотные активы
       type: asset
       kind: group
       children:
-          - code: CASH
+          - code: MONEY
             name: Денежные средства
+            type: asset
+            kind: group
+            children:
+                - code: CASH_BANK
+                  name: Расчётные счета
+                  type: asset
+                  kind: article
+                - code: CASH_REGISTER
+                  name: Касса
+                  type: asset
+                  kind: article
+                - code: CASH_PAYMENT_SYSTEMS
+                  name: Платёжные системы и эквайринг
+                  type: asset
+                  kind: article
+          - code: RECEIVABLES
+            name: Дебиторская задолженность
+            type: asset
+            kind: group
+            children:
+                - code: AR_MARKETPLACES
+                  name: Маркетплейсы, к выплате
+                  type: asset
+                  kind: article
+                - code: AR_BUYERS
+                  name: Покупатели и заказчики
+                  type: asset
+                  kind: article
+                - code: ADVANCES_PAID
+                  name: Авансы поставщикам
+                  type: asset
+                  kind: article
+                - code: AR_OTHER
+                  name: Прочая дебиторская
+                  type: asset
+                  kind: article
+          - code: INVENTORY
+            name: Товарные запасы
+            type: asset
+            kind: group
+            children:
+                - code: INV_WAREHOUSE
+                  name: Собственный склад
+                  type: asset
+                  kind: article
+                - code: INV_MARKETPLACE
+                  name: Склады маркетплейсов
+                  type: asset
+                  kind: article
+                - code: INV_IN_TRANSIT
+                  name: Товар в пути
+                  type: asset
+                  kind: article
+          - code: TAX_RECEIVABLE
+            name: Налоги к возмещению
             type: asset
             kind: article
     - code: NON_CURRENT_ASSETS
       name: Внеоборотные активы
       type: asset
-      kind: article
+      kind: group
+      children:
+          - code: FIXED_ASSETS
+            name: Основные средства
+            type: asset
+            kind: article
+          - code: INTANGIBLES
+            name: Нематериальные активы
+            type: asset
+            kind: article
+          - code: LONG_INVESTMENTS
+            name: Долгосрочные вложения и выданные займы
+            type: asset
+            kind: article
     - code: EQUITY
       name: Капитал
       type: passive
       kind: group
       children:
           - code: CONTRIBUTED_CAPITAL
-            name: Внесенный капитал
+            name: Внесённый капитал
             type: passive
             kind: article
           - code: RETAINED_RESULT
@@ -45,8 +118,42 @@ articles:
           - code: CURRENT_LIABILITIES
             name: Краткосрочные обязательства
             type: passive
-            kind: article
+            kind: group
+            children:
+                - code: AP_SUPPLIERS
+                  name: Поставщики
+                  type: passive
+                  kind: article
+                - code: ADVANCES_RECEIVED
+                  name: Авансы от покупателей
+                  type: passive
+                  kind: article
+                - code: TAX_PAYABLE
+                  name: Налоги и взносы
+                  type: passive
+                  kind: article
+                - code: PAYROLL_PAYABLE
+                  name: Зарплата сотрудникам
+                  type: passive
+                  kind: article
+                - code: SHORT_LOANS
+                  name: Кредиты и займы до года
+                  type: passive
+                  kind: article
+                - code: AP_OTHER
+                  name: Прочая кредиторская
+                  type: passive
+                  kind: article
           - code: LONG_LIABILITIES
             name: Долгосрочные обязательства
             type: passive
-            kind: article
+            kind: group
+            children:
+                - code: LONG_LOANS
+                  name: Кредиты и займы свыше года
+                  type: passive
+                  kind: article
+                - code: LONG_OTHER
+                  name: Прочие долгосрочные
+                  type: passive
+                  kind: article

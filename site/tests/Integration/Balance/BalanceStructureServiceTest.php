@@ -67,13 +67,17 @@ final class BalanceStructureServiceTest extends IntegrationTestCase
         $rows = $this->connection->fetchAllAssociative('SELECT a.code, p.code AS parent_code, a.type, a.kind, a.sort_order FROM balance_articles a LEFT JOIN balance_articles p ON p.id=a.parent_id AND p.company_id=a.company_id WHERE a.company_id=? ORDER BY a.code', [$this->companyId]);
         $byCode = array_column($rows, null, 'code');
 
-        self::assertCount(9, $rows);
+        self::assertCount(33, $rows);
         self::assertNull($byCode['CURRENT_ASSETS']['parent_code']);
-        self::assertSame('CURRENT_ASSETS', $byCode['CASH']['parent_code']);
+        self::assertSame('MONEY', $byCode['CASH_BANK']['parent_code']);
+        self::assertSame('CURRENT_ASSETS', $byCode['MONEY']['parent_code']);
+        self::assertSame('article', $byCode['CASH_BANK']['kind']);
+        self::assertSame('group', $byCode['MONEY']['kind']);
         self::assertSame('EQUITY', $byCode['RETAINED_RESULT']['parent_code']);
         self::assertSame('20', (string) $byCode['RETAINED_RESULT']['sort_order']);
         self::assertSame('passive', $byCode['LONG_LIABILITIES']['type']);
-        self::assertSame('article', $byCode['NON_CURRENT_ASSETS']['kind']);
+        self::assertSame('group', $byCode['NON_CURRENT_ASSETS']['kind']);
+        self::assertSame('NON_CURRENT_ASSETS', $byCode['FIXED_ASSETS']['parent_code']);
     }
 
     public function testAccountsRequireTerminalArticlesAndUniqueCompanyCode(): void
@@ -122,7 +126,7 @@ final class BalanceStructureServiceTest extends IntegrationTestCase
     public function testReportCountsEachAccountOnceAndRetainsArchivedHiddenAmounts(): void
     {
         self::getContainer()->get(SeedBalanceStructureAction::class)($this->companyId);
-        $cashArticle = (string) $this->connection->fetchOne("SELECT id FROM balance_articles WHERE company_id=? AND code='CASH'", [$this->companyId]);
+        $cashArticle = (string) $this->connection->fetchOne("SELECT id FROM balance_articles WHERE company_id=? AND code='CASH_BANK'", [$this->companyId]);
         $capitalArticle = (string) $this->connection->fetchOne("SELECT id FROM balance_articles WHERE company_id=? AND code='CONTRIBUTED_CAPITAL'", [$this->companyId]);
         $cash = $this->structure->saveAccount($this->companyId, $this->actorId, $cashArticle, 'Bank', 'BANK', false);
         $capital = $this->structure->saveAccount($this->companyId, $this->actorId, $capitalArticle, 'Capital', 'CAPITAL', true);

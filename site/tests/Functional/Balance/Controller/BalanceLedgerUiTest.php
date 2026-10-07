@@ -54,7 +54,7 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $client->request('GET', '/balance/setup');
         $client->submitForm('Создать базовую структуру');
         self::assertResponseRedirects('/balance/structure/');
-        self::assertSame(9, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id=?', [$companyId]));
+        self::assertSame(33, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id=?', [$companyId]));
     }
 
     public function testUninitializedBalanceDoesNotShowConfirmedZeroReport(): void
