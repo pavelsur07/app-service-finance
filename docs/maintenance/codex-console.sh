@@ -153,12 +153,12 @@ case "$cmd" in
     for arg in "$@"; do
       case "$pos" in
         0) [[ "$arg" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] && { pos=1; continue; } ;;
-        1) [ "$arg" = "wildberries" ] && { pos=2; continue; } ;;
+        1) [[ "$arg" =~ ^(wildberries|ozon)$ ]] && { pos=2; continue; } ;;
         2) [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && { pos=3; continue; } ;;
         3) [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && { pos=4; continue; } ;;
       esac
       case "$arg" in
-        --no-interaction|-n|--quiet|-q|--dry-run|--only=all|--only=sales_report) ;;
+        --no-interaction|-n|--quiet|-q|--dry-run|--only=all|--only=sales_report|--only=realization) ;;
         *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
       esac
     done
