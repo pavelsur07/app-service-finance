@@ -248,6 +248,50 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
         self::assertSame('3000.00', $this->persisted[0]['totalRevenue']);
     }
 
+    public function testDeclaredQuantityKeepsSaleWhenSaleAmountExceedsSellerPrice(): void
+    {
+        // Регрессия по Сухоносову, 09.09.2026: Ozon взял в выручку цену покупателя 233 и удержал 40 в комиссии,
+        // цена продавца 193. Частное 1.207 отбрасывало продажу, а её комиссия и логистика записывались.
+        $row = $this->saleRow();
+        $row['posting']['products'][0]['quantity'] = 1;
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '233';
+        $row['posting']['products'][0]['commission']['sale_price']['amount'] = '233';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '193';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertCount(1, $this->persisted);
+        self::assertSame(1, $this->persisted[0]['quantity']);
+        self::assertSame('233.00', $this->persisted[0]['pricePerUnit']);
+        self::assertSame('233.00', $this->persisted[0]['totalRevenue']);
+    }
+
+    public function testDeclaredQuantitySplitsRevenueIntoPricePerUnit(): void
+    {
+        $row = $this->saleRow();
+        $row['posting']['products'][0]['quantity'] = 3;
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '8997';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '2999';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame(3, $this->persisted[0]['quantity']);
+        self::assertSame('2999.00', $this->persisted[0]['pricePerUnit']);
+        self::assertSame('8997.00', $this->persisted[0]['totalRevenue']);
+    }
+
+    public function testDeclaredQuantityThatDoesNotDivideRevenueIsSkipped(): void
+    {
+        // 1000.00 / 3 не делится в копейках: цена × количество не сошлась бы с выручкой.
+        $row = $this->saleRow();
+        $row['posting']['products'][0]['quantity'] = 3;
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
+    }
+
     public function testProcessorClaimsOnlyByDayFormat(): void
     {
         $processor = $this->processor();

@@ -59,6 +59,34 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
         self::assertGreaterThan(0, $this->persisted[0]['quantity']);
     }
 
+    public function testDeclaredQuantityKeepsReturnWhenAmountExceedsSellerPrice(): void
+    {
+        // Возврат продажи, где Ozon взял в выручку цену покупателя (233) выше цены продавца (193):
+        // частное 1.207 отбрасывало возврат так же, как продажу 09.09.2026.
+        $row = $this->returnRow();
+        $row['posting']['products'][0]['quantity'] = 1;
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '-233';
+        $row['posting']['products'][0]['commission']['sale_price']['amount'] = '-233';
+        $row['posting']['products'][0]['commission']['seller_price']['amount'] = '-193';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertCount(1, $this->persisted);
+        self::assertSame(1, $this->persisted[0]['quantity']);
+        self::assertSame('233.00', $this->persisted[0]['refund']);
+    }
+
+    public function testDeclaredQuantityThatDoesNotDivideRefundIsSkipped(): void
+    {
+        $row = $this->returnRow();
+        $row['posting']['products'][0]['quantity'] = 3;
+        $row['posting']['products'][0]['commission']['sale_amount']['amount'] = '-1000.00';
+
+        $this->processor()->processBatch(self::COMPANY_ID, MarketplaceType::OZON, [$row], self::RAW_DOC_ID);
+
+        self::assertSame([], $this->persisted);
+    }
+
     public function testAmountsThatDoNotMultiplyBackAreSkippedNotRounded(): void
     {
         // Зеркало регрессии из продаж. Частное 1.0005 попадало в прежний допуск
