@@ -444,64 +444,68 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $company = $companyService->getActiveCompany();
 
-        /** @var CashTransaction|null $t */
-        $t = $txRepo->findOneByIdAndCompanyId($transactionId, (string) $company->getId());
-        if (!$t) {
-            throw $this->createNotFoundException();
-        }
+        // Блокировка транзакции держится от чтения до flush: параллельное применение (воркер автоправил,
+        // двойной клик) иначе вставило бы ту же строку разбивки дважды — GlitchTip #414.
+        return $entityManager->wrapInTransaction(function () use ($txRepo, $transactionId, $company, $autoRuleService, $request, $entityManager, $dispatchGuard, $auditContextProvider, $splitSynchronizer): Response {
+            /** @var CashTransaction|null $t */
+            $t = $txRepo->findOneByIdAndCompanyIdForUpdate($transactionId, (string) $company->getId());
+            if (!$t) {
+                throw $this->createNotFoundException();
+            }
 
-        $skipReason = $autoRuleService->getSkipReason($t);
-        if (null !== $skipReason) {
+            $skipReason = $autoRuleService->getSkipReason($t);
+            if (null !== $skipReason) {
+                return new JsonResponse([
+                    'ok' => false,
+                    'changed' => false,
+                    'reason' => $skipReason->value,
+                    'message' => $skipReason->label(),
+                ], 200);
+            }
+
+            $match = $autoRuleService->match($t);
+            if (!$match->hasWinners() && $match->hasConflict()) {
+                return new JsonResponse([
+                    'ok' => false,
+                    'changed' => false,
+                    'reason' => 'conflict',
+                    'message' => 'Все найденные поля конфликтуют и не будут изменены',
+                ], 200);
+            }
+
+            $requestedRuleId = (string) $request->request->get('ruleId', '');
+            $rule = $match->rule;
+            if (!$rule || ('' !== $requestedRuleId && !$match->hasWinnerId($requestedRuleId))) {
+                return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
+            }
+
+            $applicationPlan = $autoRuleService->applyRule($rule, $t, $match);
+            $changed = $applicationPlan?->hasChanges() ?? false;
+            if ($changed) {
+                $entityManager->persist(new AuditLog(
+                    (string) $t->getCompany()->getId(),
+                    CashTransaction::class,
+                    (string) $t->getId(),
+                    AuditLogAction::UPDATE,
+                    $applicationPlan->auditDiff(Uuid::uuid7()->toString()),
+                    $auditContextProvider->getActorUserId(),
+                ));
+                $dispatchGuard->suppress(
+                    static function () use ($splitSynchronizer, $t, $entityManager): void {
+                        $splitSynchronizer->sync($t, CashTransactionSplitSource::AUTO);
+                        $entityManager->flush();
+                    },
+                    $applicationPlan,
+                );
+            }
+
             return new JsonResponse([
-                'ok' => false,
-                'changed' => false,
-                'reason' => $skipReason->value,
-                'message' => $skipReason->label(),
+                'ok' => true,
+                'changed' => $changed,
+                'ruleName' => $rule->getName(),
+                'action' => $rule->getAction()->value,
             ], 200);
-        }
-
-        $match = $autoRuleService->match($t);
-        if (!$match->hasWinners() && $match->hasConflict()) {
-            return new JsonResponse([
-                'ok' => false,
-                'changed' => false,
-                'reason' => 'conflict',
-                'message' => 'Все найденные поля конфликтуют и не будут изменены',
-            ], 200);
-        }
-
-        $requestedRuleId = (string) $request->request->get('ruleId', '');
-        $rule = $match->rule;
-        if (!$rule || ('' !== $requestedRuleId && !$match->hasWinnerId($requestedRuleId))) {
-            return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
-        }
-
-        $applicationPlan = $autoRuleService->applyRule($rule, $t, $match);
-        $changed = $applicationPlan?->hasChanges() ?? false;
-        if ($changed) {
-            $entityManager->persist(new AuditLog(
-                (string) $t->getCompany()->getId(),
-                CashTransaction::class,
-                (string) $t->getId(),
-                AuditLogAction::UPDATE,
-                $applicationPlan->auditDiff(Uuid::uuid7()->toString()),
-                $auditContextProvider->getActorUserId(),
-            ));
-            $dispatchGuard->suppress(
-                static function () use ($splitSynchronizer, $t, $entityManager): void {
-                    $splitSynchronizer->sync($t, CashTransactionSplitSource::AUTO);
-                    $entityManager->flush();
-                },
-                $applicationPlan,
-            );
-        }
-
-        return new JsonResponse([
-            'ok' => true,
-            'changed' => $changed,
-            'ruleName' => $rule->getName(),
-            'action' => $rule->getAction()->value,
-        ], 200);
+        });
     }
 
     #[Route('/{id}/disable', name: 'cash_transaction_auto_rule_disable', methods: ['POST'])]

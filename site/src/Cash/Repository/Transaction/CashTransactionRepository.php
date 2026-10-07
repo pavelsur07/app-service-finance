@@ -12,6 +12,7 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -33,6 +34,27 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->setParameter('companyId', $companyId)
             ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Загружает транзакцию под PESSIMISTIC_WRITE: параллельное применение автоправил (ручное и из воркера)
+     * по одной транзакции выстраивается в очередь, и второй видит строки разбивки, уже записанные первым.
+     * Без блокировки оба читают транзакцию без строк и вставляют одну и ту же пару (транзакция, категория) —
+     * нарушение uniq_cts_tx_category (GlitchTip #414).
+     *
+     * Вызывать внутри транзакции и до первого чтения этой транзакции в текущем EntityManager:
+     * уже загруженная сущность (и её коллекция строк) не обновляется.
+     */
+    public function findOneByIdAndCompanyIdForUpdate(string $id, string $companyId): ?CashTransaction
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.id = :id')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->getOneOrNullResult();
     }
 
