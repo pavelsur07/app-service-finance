@@ -39,7 +39,17 @@ final class ApplyAutoRulesForTransactionHandler
     public function __invoke(ApplyAutoRulesForTransaction $message): void
     {
         $correlationId = $message->correlationId ?? Uuid::uuid7()->toString();
-        $transaction = $this->transactionRepository->findOneByIdAndCompanyId(
+
+        // Блокировка транзакции держится от чтения до flush: параллельное ручное применение правила
+        // иначе вставило бы ту же строку разбивки дважды — GlitchTip #414.
+        $this->entityManager->wrapInTransaction(function () use ($message, $correlationId): void {
+            $this->handle($message, $correlationId);
+        });
+    }
+
+    private function handle(ApplyAutoRulesForTransaction $message, string $correlationId): void
+    {
+        $transaction = $this->transactionRepository->findOneByIdAndCompanyIdForUpdate(
             $message->transactionId,
             $message->companyId,
         );

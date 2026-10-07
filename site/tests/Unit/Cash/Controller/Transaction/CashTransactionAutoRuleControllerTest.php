@@ -49,7 +49,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $companyService = $this->createMock(ActiveCompanyService::class);
         $companyService->method('getActiveCompany')->willReturn($company);
         $transactionRepository = $this->createMock(CashTransactionRepository::class);
-        $transactionRepository->method('findOneByIdAndCompanyId')
+        $transactionRepository->method('findOneByIdAndCompanyIdForUpdate')
             ->with($transaction->getId(), $company->getId())
             ->willReturn($transaction);
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
@@ -66,6 +66,9 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
                 && 'valid-token' === $token->getValue()))
             ->willReturn(true);
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $operation): mixed => $operation(),
+        );
         $entityManager->expects(self::never())->method('persist');
         $entityManager->expects(self::never())->method('flush');
         $auditContextProvider = $this->createMock(AuditContextProvider::class);
@@ -106,7 +109,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $companyService = $this->createMock(ActiveCompanyService::class);
         $companyService->method('getActiveCompany')->willReturn($company);
         $transactionRepository = $this->createMock(CashTransactionRepository::class);
-        $transactionRepository->method('findOneByIdAndCompanyId')
+        $transactionRepository->method('findOneByIdAndCompanyIdForUpdate')
             ->with($transaction->getId(), $company->getId())
             ->willReturn($transaction);
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
@@ -144,6 +147,9 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $auditContextProvider = $this->createMock(AuditContextProvider::class);
         $auditContextProvider->method('getActorUserId')->willReturn($actorUserId);
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $operation): mixed => $operation(),
+        );
         $entityManager->expects(self::once())
             ->method('persist')
             ->with(self::callback(static function (object $entity) use ($company, $transaction, $applicationPlan, $actorUserId): bool {
@@ -191,13 +197,14 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $companyService = $this->createMock(ActiveCompanyService::class);
         $companyService->expects(self::never())->method('getActiveCompany');
         $transactionRepository = $this->createMock(CashTransactionRepository::class);
-        $transactionRepository->expects(self::never())->method('findOneByIdAndCompanyId');
+        $transactionRepository->expects(self::never())->method('findOneByIdAndCompanyIdForUpdate');
         $autoRuleService = $this->createMock(CashTransactionAutoRuleService::class);
         $autoRuleService->expects(self::never())->method('match');
         $autoRuleService->expects(self::never())->method('applyRule');
         $csrfTokenManager = $this->createMock(CsrfTokenManagerInterface::class);
         $csrfTokenManager->method('isTokenValid')->willReturn(false);
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('wrapInTransaction');
         $entityManager->expects(self::never())->method('persist');
         $entityManager->expects(self::never())->method('flush');
         $auditContextProvider = $this->createMock(AuditContextProvider::class);
