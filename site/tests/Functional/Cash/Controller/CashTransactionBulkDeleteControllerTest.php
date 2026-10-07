@@ -42,6 +42,35 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
         self::assertSame($expectedIds, $renderedIds);
     }
 
+    /**
+     * GlitchTip #414: обработчик submit «Применить автоправило» навешивался заново на каждый клик по
+     * .js-auto-rule, и один submit уходил несколькими POST по одной транзакции. Скриптов в проекте без
+     * браузерных тестов нет, поэтому закрепляем форму защиты в разметке страницы.
+     */
+    public function testAutoRuleApplyScriptSubmitsOnceAndBlocksRepeatedSubmit(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompanyWithTransactions(1);
+        $this->login($client, $user, $company);
+
+        $client->request('GET', '/finance/cash-transactions/');
+        self::assertResponseIsSuccessful();
+        $html = (string) $client->getResponse()->getContent();
+
+        self::assertSame(
+            1,
+            substr_count($html, "addEventListener('submit', async (ev)"),
+            'Обработчик submit автоправила должен регистрироваться один раз, а не на каждый клик.',
+        );
+        self::assertStringNotContainsString(
+            "modalEl.addEventListener('submit'",
+            $html,
+            'Регистрация обработчика внутри клика по .js-auto-rule вернёт многократную отправку.',
+        );
+        self::assertStringContainsString("f.dataset.submitting === '1'", $html, 'Повторный submit в полёте должен игнорироваться.');
+        self::assertStringContainsString('button.disabled = true', $html, 'Кнопка «Применить» должна блокироваться на время запроса.');
+    }
+
     public function testDeletesSelectedTransactionsAndPreservesListQuery(): void
     {
         $client = static::createClient();
