@@ -171,7 +171,8 @@ final class PerformanceRecorderTest extends TestCase
         self::assertCount(2, $handler->getRecords());
 
         // Минута прошла: окно открывается заново, первое событие несёт счёт отброшенных.
-        (new \ReflectionProperty(PerformanceRecorder::class, 'windowStartedAt'))->setValue($recorder, 0);
+        // Сдвиг от текущего hrtime, а не 0: на только что поднятом хосте (CI) hrtime < 60 с.
+        (new \ReflectionProperty(PerformanceRecorder::class, 'windowStartedAt'))->setValue($recorder, hrtime(true) - 61_000_000_000);
         $recorder->beginScope('C');
         $recorder->recordQueueWait(1.0, 'redis_stream_id');
 
