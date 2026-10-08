@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 — done; next handoff
-**Status:** implementing
+**Phase:** handoff
+**Status:** done — ждёт «merge and deploy #2590»
 **Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: `915eeb36`; Stage 3: `87cdc0d4`
 
 ### Completed
@@ -75,11 +75,11 @@ P0-3 (`--restore`): массовое удаление применялось к 
 - 15 задач `queued` с 2026-02-07/08 — устаревшие, к фиксу не относятся.
 
 ### Review status
-- internal: iteration 0, open: none
-- external: round 0, result: pending
+- internal: финальное (свежий контекст) — IMPORTANT 2 исправлены (960b51ac)
+- external: round 1, result: REVIEW_GREEN
 
 ### Exact next action
-- Handoff: полные гейты по одному, затем финальное ревью в свежей сессии и внешнее ревью.
+- Ждать «merge and deploy #2590»; затем пост-деплойная сверка и запрос §3.3 по 66 задачам.
 
 ### Files to inspect first on resume
 - docs/tasks/cash-p0-import-restore/plan.md
