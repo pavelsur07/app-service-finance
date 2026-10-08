@@ -25,9 +25,13 @@ deploy and a migration cannot run at the same time. The default `none` action is
 non-mutating and runs neither gate.
 
 The deploy keeps its selected `IMAGE_TAG` in the Compose project `.env`. Images
-not used by a container and older than 14 days are removed after a successful
-deploy; running images are retained, and older SHA-tagged images remain
-available in GHCR when a rollback requires pulling them again.
+not used by a container and older than 14 days are removed twice per release:
+by `schema-ready` before its first `docker compose pull` (together with the
+whole build cache) and again at the end of `deploy`. Running images are
+retained, and older SHA-tagged images remain available in GHCR when a rollback
+requires pulling them again. The prune before the pull is what lets a release
+recover a full disk by itself; its "Диск до/после чистки" lines in the job log
+show inode and byte usage.
 
 ## Runtime logs
 
@@ -175,12 +179,13 @@ quarantine. Deletion requires its own explicit production approval.
 `app:disk:healthcheck` (scheduler, daily 07:34) raises one `error` and exits 1
 when the host filesystem under the Docker data directory is at or above 85%
 by inodes or by bytes (percent as `df` shows it: used / (used + available)).
-Inodes run out first: every merge pulls four image tags. A successful deploy
-prunes images older than 14 days (`until=336h`, see "Production gates"), but
-nothing prunes the build cache, and a deploy that fails on `docker compose
-pull` never reaches its own prune step, so it cannot unblock itself. On
-2026-09-19 inodes hit 100% with 6.9G of bytes free, and every deploy failed for
-ten hours.
+Inodes run out first: every merge pulls four image tags. On 2026-09-19 inodes
+hit 100% with 6.9G of bytes free, and every deploy failed for ten hours: the
+only prune ran at the end of a successful deploy, which a failed pull never
+reached. Since then `schema-ready` prunes images older than 14 days and the
+build cache before pulling (see "Production gates"), so a release frees space
+itself; the gate covers growth between releases and anything that is not an
+image.
 
 Check on the host: `docker info -f '{{.DockerRootDir}}'`, then `df -i` and
 `df -h` on that path (the gate measures the filesystem of the Docker data

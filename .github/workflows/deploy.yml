@@ -623,6 +623,17 @@ jobs:
                     export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
                     export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
 
+                    # Чистка ДО первого pull выкатки. 19.09.2026 pull здесь падал на исчерпанных
+                    # inode, а чистка образов стояла в конце deploy и до неё упавшая выкатка не
+                    # доходила — прод десять часов не мог разблокироваться сам. Build-кэш на проде
+                    # не нужен (образы собирает CI), его не чистило ничто. Образы — та же политика,
+                    # что в конце deploy: не используемые контейнером и старше 14 дней.
+                    # Сбой чистки выкатку не валит: если места правда нет, это скажет сам pull.
+                    echo "🧹 Диск до чистки: $(df -Pi / | awk 'NR==2 {print "inodes " $5}'), $(df -Pk / | awk 'NR==2 {print "bytes " $5}')"
+                    docker builder prune -af || echo "⚠️ docker builder prune не выполнен"
+                    docker image prune -af --filter "until=336h" || echo "⚠️ docker image prune не выполнен"
+                    echo "🧹 Диск после чистки: $(df -Pi / | awk 'NR==2 {print "inodes " $5}'), $(df -Pk / | awk 'NR==2 {print "bytes " $5}')"
+
                     docker compose -f docker-compose.prod.yml pull site-php-cli
                     docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction
                   EOF
