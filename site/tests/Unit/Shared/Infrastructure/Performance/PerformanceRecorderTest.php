@@ -12,7 +12,6 @@ use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
-use Psr\Log\NullLogger;
 
 final class PerformanceRecorderTest extends TestCase
 {
@@ -28,7 +27,7 @@ final class PerformanceRecorderTest extends TestCase
     public function testDisabledRecorderMeasuresNothingAndPassesResultThrough(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), false);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), false);
 
         $recorder->beginScope('SyncOzonAccrualByDayMessage', 'ozon', self::COMPANY);
         self::assertNull($recorder->start());
@@ -125,35 +124,43 @@ final class PerformanceRecorderTest extends TestCase
         self::assertSame(1, $done['errors']);
     }
 
-    public function testFailingLogWriterNeverBreaksTheBusinessCallAndWarnsOnce(): void
+    public function testFailingLogWriterNeverBreaksTheBusinessCallAndNotifiesStderrOnce(): void
     {
-        $fallback = new TestHandler();
+        $errorLog = tempnam(sys_get_temp_dir(), 'perf-errlog');
+        $previous = ini_set('error_log', (string) $errorLog);
         $recorder = new PerformanceRecorder(new class extends AbstractLogger {
             public function log($level, \Stringable|string $message, array $context = []): void
             {
-                throw new \RuntimeException('disk full');
+                throw new \RuntimeException('disk full /secret/path');
             }
-        }, new Logger('app', [$fallback]), true);
+        }, true);
 
-        $recorder->beginScope('ProcessDayReportMessage');
-        $payload = new \stdClass();
-        $result = $recorder->measure(PerformanceStage::StorageRead, static fn (PerformanceProbe $p): \stdClass => $payload);
-        $recorder->recordQueueWait(5.0, 'redis_stream_id');
-        $recorder->endScope(PerformanceOutcome::Ok);
-        $recorder->beginScope('ProcessDayReportMessage');
-        $recorder->endScope(PerformanceOutcome::Ok);
+        try {
+            $recorder->beginScope('ProcessDayReportMessage');
+            $payload = new \stdClass();
+            $result = $recorder->measure(PerformanceStage::StorageRead, static fn (PerformanceProbe $p): \stdClass => $payload);
+            $recorder->recordQueueWait(5.0, 'redis_stream_id');
+            $recorder->endScope(PerformanceOutcome::Ok);
+            $recorder->beginScope('ProcessDayReportMessage');
+            $recorder->endScope(PerformanceOutcome::Ok);
+            $written = (string) file_get_contents((string) $errorLog);
+        } finally {
+            ini_set('error_log', false === $previous ? '' : $previous);
+            @unlink((string) $errorLog);
+        }
 
         self::assertSame($payload, $result);
         self::assertGreaterThanOrEqual(3, $recorder->failedWrites());
-        self::assertCount(1, $fallback->getRecords());
-        self::assertSame('WARNING', $fallback->getRecords()[0]->level->getName());
-        self::assertSame(['exception_class' => \RuntimeException::class], $fallback->getRecords()[0]->context);
+        // Одна строка на процесс, класс исключения без его текста (в нём мог быть путь).
+        self::assertSame(1, substr_count($written, PerformanceRecorder::FAILURE_NOTICE));
+        self::assertStringContainsString(\RuntimeException::class, $written);
+        self::assertStringNotContainsString('/secret/path', $written);
     }
 
-    public function testRateLimitDropsExcessEventsAndReportsTheCount(): void
+    public function testRateLimitDropsExcessEventsAndReportsTheCountWithTheNextWindow(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), true, 2);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true, 2);
 
         $recorder->beginScope('A');
         $recorder->recordQueueWait(1.0, 'redis_stream_id');
@@ -161,8 +168,15 @@ final class PerformanceRecorderTest extends TestCase
         $recorder->beginScope('B');
         $recorder->recordQueueWait(1.0, 'redis_stream_id');
         $recorder->endScope(PerformanceOutcome::Ok);
-
         self::assertCount(2, $handler->getRecords());
+
+        // Минута прошла: окно открывается заново, первое событие несёт счёт отброшенных.
+        (new \ReflectionProperty(PerformanceRecorder::class, 'windowStartedAt'))->setValue($recorder, 0);
+        $recorder->beginScope('C');
+        $recorder->recordQueueWait(1.0, 'redis_stream_id');
+
+        self::assertCount(3, $handler->getRecords());
+        self::assertSame(2, $handler->getRecords()[2]->context['dropped_events']);
     }
 
     public function testUntrustedLabelsAreNormalisedToBoundedValues(): void
@@ -213,7 +227,7 @@ final class PerformanceRecorderTest extends TestCase
 
     private function enabled(TestHandler $handler): PerformanceRecorder
     {
-        return new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), true);
+        return new PerformanceRecorder(new Logger('performance', [$handler]), true);
     }
 
     /**

@@ -10,8 +10,9 @@
 хранение и формат raw, нормализация, финансовые расчёты, закрытие месяца и порядок posting не
 изменены. Ни одна существующая проверка, исключение или ретрай не перехватываются: `measure()`
 пробрасывает исходное исключение тем же объектом. Существующие 3223 unit-теста проходят без
-единой правки; интеграционный `PerformanceDiagnosticsPipelineTest` обрабатывает один и тот же raw
-WB с выключенной и включённой диагностикой и сверяет строки продаж, возвратов и затрат до копейки.
+единой правки (и 266 тестов затронутых классов — с `MARKETPLACE_PERF_DIAGNOSTICS=1`); интеграционный
+`PerformanceDiagnosticsPipelineTest` обрабатывает один и тот же raw WB без замера (регистратор вне области —
+тот же путь, что при выключенном флаге) и с замером и сверяет строки продаж, возвратов и затрат до копейки.
 
 ### Расхождение с исходной посылкой: где лежит raw
 
@@ -46,7 +47,7 @@ S3 (`ObjectStorageInterface`, драйвер `s3`) хранит raw Ingestion (`
 
 | stage | Где измеряется | rows / bytes |
 |---|---|---|
-| `api_fetch` | `OzonAccrualByDayClient::request()` (страница), `fetchServiceTypes()`; `OzonRealizationFetcher::fetch()`; `WbFinanceSalesReportClient::fetchDetailedPage()` (HTTP + тело) | rows — строк в ответе; bytes — `size_download` / длина тела. Неуспешный статус (429, 5xx, 401) — `errors+1` |
+| `api_fetch` | `OzonAccrualByDayClient::request()` (страница), `fetchServiceTypes()`; `OzonRealizationFetcher::fetch()`; `WbFinanceSalesReportClient::fetchDetailedPage()` (HTTP + тело) | rows — строк в ответе; bytes: Ozon — `size_download` (байты по сети, при gzip — сжатые), WB — длина распакованного тела; bytes/s между провайдерами **не сравнимы**. Неуспешный статус (429, 5xx, 401) — `errors+1` |
 | `source_parse` | WB: `json_decode` тела ответа | rows, bytes |
 | `storage_read` | `postgres`: первая загрузка `MarketplaceRawDocument` в `ProcessDayReportHandler` и `ProcessRawDocumentStepMessageHandler` (гидрация JSON); `s3`/`local`: `PerformanceObjectStorage::read/readStream/exists` | rows — `recordsCount` документа; bytes для S3 |
 | `storage_write` | `postgres`: Doctrine flush, в котором есть `MarketplaceRawDocument` (`MarketplaceFlushPerformanceListener`); `s3`/`local`: `write/delete` | bytes для S3; rows для postgres недоступны |
@@ -88,10 +89,13 @@ JSON-строка Monolog: `message="perf"`, поля в `context`:
 - **Время постановки.** Redis transport добавляет запись `XADD … '*'`, id = `<unix ms>-<seq>`;
   Symfony кладёт его в `TransportMessageIdStamp`. lag = время старта обработки − ms из id. Контракт
   сообщений не меняется.
-- **Отложенные** (`DelayStamp`, ретраи) лежат в sorted set `<stream>__queue` и попадают в поток
-  при наступлении срока: lag отсчитывается от момента готовности, без самой задержки.
-- **Повторная доставка зависшего** (claim после `redeliver_timeout`) сохраняет старый id: lag включает
-  время первой попытки.
+- **Отложенные** (`DelayStamp`, ретраи) лежат в sorted set `<stream>__queue` и переносятся в поток,
+  только когда воркер опрашивает транспорт (`Connection::get()`): новый id = момент опроса, а не срок
+  готовности. Время, которое созревшее отложенное сообщение ждало занятого воркера, **не видно** —
+  lag повторов занижен (≈ 0). Поэтому в отчёте отдельно считается `redelivered`; lag повторов
+  трактовать как нижнюю границу.
+- **Повторная доставка своего pending** после рестарта воркера и claim после `redeliver_timeout`
+  сохраняют старый id: lag завышен на время первой попытки.
 - **failed** (Doctrine, целочисленный id) — lag недоступен, событие с `lag_source=unavailable`.
 - **Часы:** Redis и воркеры на одном хосте; при рассинхронизации lag смещается на разницу.
 - **Снимок очередей** в отчёте: `XLEN`, сводка `XPENDING`, старейшая запись `XRANGE - + COUNT 1`,
@@ -108,14 +112,19 @@ JSON-строка Monolog: `message="perf"`, поля в `context`:
 | Локально / тесты | по умолчанию `0` (`site/.env`, параметр `app.performance_diagnostics_default`) |
 
 **Объём и retention.** `rotating_file`, 14 суточных файлов, `file_permission 0666` (файл дня может
-создать процесс под `app` или ручной запуск под `root`). Событие ≈ 380 байт. Лимит — 1200 событий в
-минуту на процесс, излишек отбрасывается и считается в `dropped_events`. Оценка для 2–3 кабинетов:
+создать процесс под `app` или ручной запуск под `root`; принятый риск: любой процесс контейнеров может
+дописать в файл ложное событие — данные только диагностические). Событие ≈ 380 байт. Лимит — 300 событий
+в минуту на процесс (`app.performance_diagnostics_max_events_per_minute`), излишек отбрасывается и
+считается в `dropped_events`. Худший случай: 300 × 1440 × 380 Б ≈ 165 МБ/сутки на процесс, ~6 PHP-процессов
+пишут — до ~1 ГБ/сутки и ~14 ГБ за 14 дней; при росте `dropped_events` выключать флагом (инцидент 19.09 —
+диск по inode, файлов здесь не больше 14). Оценка для 2–3 кабинетов:
 каждое сообщение даёт 2 события (`queue_wait`, `handler`) плюс по одному на затронутый этап (обычно
 2–6) — порядка 10–40 тыс. событий в сутки, 4–15 МБ/сутки, до ~200 МБ за 14 дней на томе
 `site_var_log`. Фактический объём — в первой строке отчёта.
 
-**Отказоустойчивость.** Любая ошибка записи (нет прав, диск) перехватывается внутри регистратора,
-один `warning` в основной лог на процесс, дальше счётчик. Исключение подписчика на Received не
+**Отказоустойчивость.** Любая ошибка записи (нет прав, диск) перехватывается внутри регистратора:
+одна строка `Performance diagnostics write failed; …: <класс исключения>` на процесс прямо в `error_log`
+(stderr контейнера, мимо буфера fingers_crossed), дальше счётчик. Исключение подписчика на Received не
 роняет воркер. Исключение бизнес-кода проходит через `measure()` без изменений.
 
 ## CLI-отчёт
@@ -154,7 +163,9 @@ redelivered), обработчики по типу сообщения (врем�
 4. **`financial_posting` — только Doctrine flush.** Не входят: `commit` внешней транзакции DBAL
    (замена строк by-day), DELETE/UPDATE через DBAL (`deleteByRawDocument`, очистка затрат), upsert
    `pl_daily_totals` в `PLRegisterUpdater`. Сбойный flush до `postFlush` не доходит и не учитывается —
-   его видно по `outcome` события `handler`.
+   его видно по `outcome` события `handler`. Flush, в котором одновременно raw-документ и строки учёта,
+   считается только как `storage_write`; flush, запущенный из чужого `postFlush`, перезаписывает замер
+   внешнего.
 5. **Память.** `memory_reset_peak_usage()` в начале области опускает пик до текущего потребления,
    поэтому `memory_peak_bytes` включает базу процесса (ядро, контейнер; ~120–150 МБ). Прирост от
    сообщения — `memory_peak_bytes − memory_base_bytes` («max growth» в отчёте). Пик относится ко всей
@@ -201,11 +212,16 @@ production-baseline до любых решений M2.
 
 ## Post-deploy sanity (после «merge and deploy», read-only wrappers)
 
+0. **Wrapper.** `app:marketplace:perf-report` добавлен в репозиторную копию `docs/maintenance/codex-console.sh`
+   (read-only, без `--log-dir`). Установка обновлённого wrapper'а на прод — расширение доступа, отдельное
+   согласование (AGENTS.md §3.3); до неё шаги 2 и шаблон [10](10-m1-baseline-template.md) недоступны.
 1. Воркеры `sync`, `pipeline`, `wb-finance`, `ads` в `Up (healthy)`; рестартов после деплоя нет.
 2. `app:marketplace:perf-report --from=<день деплоя>` через `codex-console`: события есть, `invalid_lines=0`,
    `dropped_events` близко к 0; есть этапы `api_fetch`, `storage_*`, `financial_*` для обоих провайдеров
    после ближайшего ночного синка.
-3. В основном логе нет `Performance diagnostics write failed`.
+3. В stderr контейнеров (логи docker) нет `Performance diagnostics write failed`, и в отчёте есть события
+   от каждого типа воркера (`transport` sync / pipeline / wb_finance / ads) — иначе процесс не может писать
+   в `var/log`.
 4. Очереди: снимок отчёта и `app:messenger:failed-queue-check` — без роста относительно дня до деплоя.
 5. Синки Ozon/WB за день деплоя завершились (статусы дней), сверки и гейты (`wb-unrecognized-costs`,
    reconciliation) не покраснели; суммы дня по `marketplace_sales/returns/costs` совпадают с ожиданием

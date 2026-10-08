@@ -20,6 +20,9 @@ final class ConsolePerformanceSubscriber implements EventSubscriberInterface
     private const PREFIX = 'app:marketplace:';
     private const EXCLUDED = ['app:marketplace:perf-report'];
 
+    /** Закрывать только свою область: у messenger:consume открытая область принадлежит сообщению. */
+    private bool $ownsScope = false;
+
     public function __construct(private readonly PerformanceRecorder $recorder)
     {
     }
@@ -40,10 +43,16 @@ final class ConsolePerformanceSubscriber implements EventSubscriberInterface
         }
 
         $this->recorder->beginScope(job: $name);
+        $this->ownsScope = $this->recorder->hasScope();
     }
 
     public function onTerminate(ConsoleTerminateEvent $event): void
     {
+        if (!$this->ownsScope) {
+            return;
+        }
+
+        $this->ownsScope = false;
         $this->recorder->endScope(Command::SUCCESS === $event->getExitCode() ? PerformanceOutcome::Ok : PerformanceOutcome::Error);
     }
 }

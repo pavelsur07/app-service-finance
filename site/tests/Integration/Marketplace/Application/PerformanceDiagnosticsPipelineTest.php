@@ -17,7 +17,6 @@ use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
-use Psr\Log\NullLogger;
 
 /**
  * Acceptance M1 №1/№9: включённая диагностика не меняет результат денежного конвейера.
@@ -30,7 +29,7 @@ final class PerformanceDiagnosticsPipelineTest extends IntegrationTestCase
     public function testEnabledDiagnosticsProducesIdenticalAccountingRowsAndStageEvents(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), true);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true);
         // До первого flush и до создания сервисов конвейера: их зависимости получат этот экземпляр.
         self::getContainer()->set(PerformanceRecorder::class, $recorder);
 

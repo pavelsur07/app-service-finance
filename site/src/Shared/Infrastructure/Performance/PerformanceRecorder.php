@@ -20,8 +20,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *
  * Гарантии:
  *  - выключенный флаг → `start()` возвращает null, остальное выходит после одной проверки;
- *  - сбой записи лога не прерывает бизнес-операцию: перехватывается, один warning в
- *    основной лог на процесс, дальше молча считается в `failedWrites`;
+ *  - сбой записи лога не прерывает бизнес-операцию: перехватывается, одна строка в
+ *    stderr процесса (error_log), дальше молча считается в `failedWrites`;
  *  - объём ограничен `maxEventsPerMinute` на процесс, отброшенное число уходит полем
  *    `dropped_events` со следующим событием;
  *  - кардинальность ограничена: provider — из списка, job/transport — по шаблону,
@@ -32,6 +32,8 @@ final class PerformanceRecorder
     public const SCHEMA_VERSION = 1;
     public const LOG_MESSAGE = 'perf';
     public const PROVIDERS = ['ozon', 'wb', 'none'];
+    /** Стабильный текст для поиска в логах контейнеров (post-deploy sanity). */
+    public const FAILURE_NOTICE = 'Performance diagnostics write failed; further failures in this process are counted silently:';
 
     private const IDENTIFIER_PATTERN = '/^[A-Za-z0-9_.:\-]{1,80}$/';
     private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
@@ -55,11 +57,10 @@ final class PerformanceRecorder
      */
     public function __construct(
         private readonly LoggerInterface $performanceLogger = new NullLogger(),
-        private readonly LoggerInterface $logger = new NullLogger(),
         #[Autowire('%app.performance_diagnostics_enabled%')]
         private readonly bool $enabled = false,
         #[Autowire('%app.performance_diagnostics_max_events_per_minute%')]
-        private readonly int $maxEventsPerMinute = 1200,
+        private readonly int $maxEventsPerMinute = 300,
     ) {
     }
 
@@ -345,9 +346,11 @@ final class PerformanceRecorder
     }
 
     /**
-     * Диагностика не должна ронять бизнес-операцию. Сбой — WARNING (ожидаемо и
-     * обрабатывается само), один раз на процесс, без сообщения исключения: в нём
-     * может оказаться путь или фрагмент данных.
+     * Диагностика не должна ронять бизнес-операцию. О сбое — одна строка на процесс
+     * прямо в error_log (stderr контейнера), без сообщения исключения: в нём может
+     * оказаться путь или фрагмент данных. Не через Monolog: в prod основной канал —
+     * fingers_crossed с порогом error, и warning без ошибки в том же сообщении был бы
+     * отброшен вместе с буфером; а сбой пишущего канала мог бы повториться и там.
      */
     public function reportFailure(\Throwable $e): void
     {
@@ -357,14 +360,7 @@ final class PerformanceRecorder
             return;
         }
 
-        try {
-            $this->logger->warning('Performance diagnostics write failed; further failures in this process are counted silently.', [
-                'exception_class' => $e::class,
-            ]);
-        } catch (\Throwable) {
-            // Основной лог тоже недоступен — последний канал: error_log процесса (stderr контейнера).
-            error_log('Performance diagnostics write failed: '.$e::class);
-        }
+        error_log(self::FAILURE_NOTICE.' '.$e::class);
     }
 
     private function provider(string $provider): string

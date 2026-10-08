@@ -122,6 +122,23 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:perf-report)
+    # Read-only отчёт диагностики M1 (docs/architecture/marketplace-audit/09-m1-diagnostics.md):
+    # читает var/log/performance-*.jsonl с потолком байт/событий и снимает состояние очередей
+    # O(1)-командами Redis и агрегатным SELECT по failed. Ничего не пишет и во внешний API не
+    # ходит — рутинная проверка без отдельного одобрения. --log-dir намеренно запрещён: отчёт
+    # читает только каталог логов приложения. Числа ограничены по форме, период (≤ 31 дня) и
+    # формат дат проверяет сама команда.
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q|--skip-queues|--format=md|--format=json) ;;
+        --from=[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]|--to=[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+        --max-mb=[1-9]|--max-mb=[1-9][0-9]|--max-mb=[1-9][0-9][0-9]) ;;
+        --max-events=[1-9]|--max-events=[1-9][0-9]*) [[ "$arg" =~ ^--max-events=[1-9][0-9]{0,6}$ ]] || { echo "Argument not allowed for $cmd: $arg" >&2; exit 2; } ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   app:marketplace:cost-pl-mapping:apply-default)
     # Базовый маппинг затрат в ОПиУ для одной компании — то же, что кнопка UI.
     # Без --execute read-only предпросмотр; с --execute пишет

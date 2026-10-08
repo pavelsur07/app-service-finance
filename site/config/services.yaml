@@ -19,10 +19,11 @@ parameters:
     app.object_storage_slow_ms: 1000
     # Диагностика производительности Marketplace M1 (PerformanceRecorder). Флаг читается при
     # старте процесса: смена значения требует перезапуска воркеров. По умолчанию выключено;
-    # prod включает через docker-compose.prod.yml. Лимит — событий в минуту на процесс.
+    # prod включает через docker-compose.prod.yml. Лимит — событий в минуту на процесс:
+    # 300 × 1440 × ~380 Б ≈ 165 МБ/сутки на процесс в худшем случае; ожидаемо 10–40 тыс. событий/сутки на всё.
     app.performance_diagnostics_default: '0'
     app.performance_diagnostics_enabled: '%env(bool:default:app.performance_diagnostics_default:MARKETPLACE_PERF_DIAGNOSTICS)%'
-    app.performance_diagnostics_max_events_per_minute: 1200
+    app.performance_diagnostics_max_events_per_minute: 300
     # Гейт очереди failed (app:messenger:failed-queue-check, раз в сутки в 07:32): сообщение, пролежавшее не меньше 12 ч
     # (пережило рабочий вечер и ночь), или очередь от 10 сообщений — ERROR. При пороге 24 ч и суточном запуске сообщение
     # краснело бы до 48 ч после сбоя.

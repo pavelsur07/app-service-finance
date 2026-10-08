@@ -12,7 +12,6 @@ use App\Shared\Infrastructure\Performance\PerformanceRecorder;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
@@ -118,7 +117,14 @@ final class MessengerPerformanceSubscriberTest extends TestCase
             }
         };
 
-        $subscriber->onReceived(new WorkerMessageReceivedEvent(new Envelope($message), 'async_sync'));
+        $errorLog = tempnam(sys_get_temp_dir(), 'perf-errlog');
+        $previous = ini_set('error_log', (string) $errorLog);
+        try {
+            $subscriber->onReceived(new WorkerMessageReceivedEvent(new Envelope($message), 'async_sync'));
+        } finally {
+            ini_set('error_log', false === $previous ? '' : $previous);
+            @unlink((string) $errorLog);
+        }
 
         self::assertSame(1, $recorder->failedWrites());
     }
@@ -133,7 +139,7 @@ final class MessengerPerformanceSubscriberTest extends TestCase
 
     private function recorder(TestHandler $handler, bool $enabled): PerformanceRecorder
     {
-        return new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), $enabled);
+        return new PerformanceRecorder(new Logger('performance', [$handler]), $enabled);
     }
 
     private function wbMessage(): SyncWbFinancialReportDayMessage

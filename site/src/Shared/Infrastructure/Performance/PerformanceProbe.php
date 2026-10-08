@@ -20,9 +20,13 @@ final class PerformanceProbe
         return $this;
     }
 
-    public function bytes(int|float|null $bytes): self
+    /**
+     * Принимает что угодно (например, `ResponseInterface::getInfo()` возвращает mixed):
+     * нечисловое значение игнорируется — вызов из бизнес-кода не может бросить TypeError.
+     */
+    public function bytes(mixed $bytes): self
     {
-        $this->bytes = null === $bytes ? null : (int) $bytes;
+        $this->bytes = \is_int($bytes) || \is_float($bytes) ? (int) $bytes : null;
 
         return $this;
     }

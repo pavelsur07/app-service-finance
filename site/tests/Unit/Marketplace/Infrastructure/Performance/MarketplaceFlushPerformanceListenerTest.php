@@ -18,7 +18,6 @@ use Doctrine\ORM\UnitOfWork;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class MarketplaceFlushPerformanceListenerTest extends TestCase
 {
@@ -50,7 +49,7 @@ final class MarketplaceFlushPerformanceListenerTest extends TestCase
     public function testDisabledDiagnosticsDoesNotEvenInspectTheUnitOfWork(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), false);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), false);
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::never())->method('getUnitOfWork');
         $listener = new MarketplaceFlushPerformanceListener($recorder);
@@ -72,7 +71,7 @@ final class MarketplaceFlushPerformanceListenerTest extends TestCase
     private function flush(bool $enabled, array $insertions = [], array $updates = []): array
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), $enabled);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), $enabled);
         $uow = $this->createMock(UnitOfWork::class);
         $uow->method('getScheduledEntityInsertions')->willReturn($insertions);
         $uow->method('getScheduledEntityUpdates')->willReturn($updates);

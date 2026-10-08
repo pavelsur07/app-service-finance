@@ -12,6 +12,10 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Wildberries\Infrastructure\Api\WbFinanceSalesReportClient;
+use App\Shared\Infrastructure\Performance\PerformanceOutcome;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Symfony\Component\Clock\MockClock;
@@ -574,6 +578,59 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
         $this->expectException(MarketplaceTemporaryApiException::class);
         $client->probeAccess('token');
+    }
+
+    /**
+     * Диагностика M1 включена и в области замера: исключения клиента прежние, этапы считают ошибки.
+     *
+     * @return iterable<string, array{MockResponse, class-string<\Throwable>, string}>
+     */
+    public static function failingResponses(): iterable
+    {
+        yield '429' => [new MockResponse('{"title":"too many"}', ['http_code' => 429]), MarketplaceRateLimitException::class, 'api_fetch'];
+        yield '500' => [new MockResponse('oops', ['http_code' => 500]), MarketplaceTemporaryApiException::class, 'api_fetch'];
+        yield 'invalid JSON' => [new MockResponse('[{"rrdId":', ['http_code' => 200]), MarketplaceInvalidApiResponseException::class, 'source_parse'];
+    }
+
+    /**
+     * @param class-string<\Throwable> $exception
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('failingResponses')]
+    public function testEnabledDiagnosticsKeepsExceptionsAndCountsStageErrors(MockResponse $response, string $exception, string $failedStage): void
+    {
+        $handler = new TestHandler();
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true);
+        $client = new WbFinanceSalesReportClient(new MockHttpClient($response), $this->createRateLimiter(), null, $recorder);
+
+        $recorder->beginScope('SyncWbFinancialReportDayMessage', 'wb');
+        try {
+            $client->fetchDetailedDayPage('conn-1', 'token', new \DateTimeImmutable('2026-01-15'), 0);
+            self::fail('Exception expected');
+        } catch (\Throwable $e) {
+            self::assertInstanceOf($exception, $e);
+        }
+        $recorder->endScope(PerformanceOutcome::Retry);
+
+        $events = array_column(array_map(static fn ($r): array => $r->context, $handler->getRecords()), null, 'stage');
+        self::assertSame(1, $events[$failedStage]['errors']);
+        self::assertStringNotContainsString('too many', (string) json_encode($events));
+    }
+
+    public function testEnabledDiagnosticsMeasuresFetchAndParseOfASuccessfulPage(): void
+    {
+        $handler = new TestHandler();
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true);
+        $body = '[{"rrdId":10},{"rrdId":11}]';
+        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse($body, ['http_code' => 200])), $this->createRateLimiter(), null, $recorder);
+
+        $recorder->beginScope('SyncWbFinancialReportDayMessage', 'wb');
+        $page = $client->fetchDetailedDayPage('conn-1', 'token', new \DateTimeImmutable('2026-01-15'), 0);
+        $recorder->endScope(PerformanceOutcome::Ok);
+
+        self::assertCount(2, $page->rows);
+        $events = array_column(array_map(static fn ($r): array => $r->context, $handler->getRecords()), null, 'stage');
+        self::assertSame([0, \strlen($body)], [$events['api_fetch']['errors'], $events['api_fetch']['bytes']]);
+        self::assertSame([2, \strlen($body)], [$events['source_parse']['rows'], $events['source_parse']['bytes']]);
     }
 
     private function createRateLimiter(?MockClock $clock = null, ?WbFinanceCooldownStorageInterface $storage = null): WbFinanceRateLimiter

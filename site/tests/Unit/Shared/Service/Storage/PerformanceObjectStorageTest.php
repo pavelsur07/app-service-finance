@@ -13,14 +13,13 @@ use App\Shared\Service\Storage\StoredObject;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class PerformanceObjectStorageTest extends TestCase
 {
     public function testReadAndWriteAreMeasuredWithBytesButWithoutPaths(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), true);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true);
         $inner = $this->createMock(ObjectStorageInterface::class);
         $inner->method('read')->with('companies/x/raw/secret-name.json')->willReturn('0123456789');
         $inner->method('write')->willReturn(new StoredObject('companies/x/raw/a.json', 4));
@@ -40,7 +39,7 @@ final class PerformanceObjectStorageTest extends TestCase
     public function testFailureIsRethrownUnchangedAndCountedAsError(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), true);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), true);
         $inner = $this->createMock(ObjectStorageInterface::class);
         $failure = new ObjectStorageException('boom');
         $inner->method('read')->willThrowException($failure);
@@ -61,7 +60,7 @@ final class PerformanceObjectStorageTest extends TestCase
     public function testDisabledDiagnosticsIsAPlainPassThrough(): void
     {
         $handler = new TestHandler();
-        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), new NullLogger(), false);
+        $recorder = new PerformanceRecorder(new Logger('performance', [$handler]), false);
         $inner = $this->createMock(ObjectStorageInterface::class);
         $inner->expects(self::once())->method('exists')->with('a')->willReturn(true);
         $inner->expects(self::once())->method('delete')->with('a');
