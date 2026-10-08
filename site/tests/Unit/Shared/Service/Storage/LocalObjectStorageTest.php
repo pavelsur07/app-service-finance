@@ -87,14 +87,10 @@ final class LocalObjectStorageTest extends TestCase
      */
     public function testReadFailureKeepsPathOutOfMessage(): void
     {
-        $missing = sprintf('%s/no-such-%s', sys_get_temp_dir(), bin2hex(random_bytes(6)));
-
-        /** @var StorageService&MockObject $storageService */
-        $storageService = $this->createMock(StorageService::class);
-        $storageService->method('getAbsolutePath')->willReturn($missing);
+        $root = sprintf('%s/no-such-%s', sys_get_temp_dir(), bin2hex(random_bytes(6)));
 
         try {
-            (new LocalObjectStorage($storageService))->read('company/missing.ndjson.gz');
+            (new LocalObjectStorage(new StorageService($root)))->read('company/missing.ndjson.gz');
             self::fail('Read of a missing object was expected to fail.');
         } catch (ObjectStorageException $exception) {
             self::assertSame('Failed to read object.', $exception->getMessage());
