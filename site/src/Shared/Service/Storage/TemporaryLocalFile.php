@@ -40,7 +40,7 @@ final readonly class TemporaryLocalFile
             if (!@rename($tmpPath, $tmpWithExt)) {
                 @unlink($tmpPath);
 
-                throw new ObjectStorageException(sprintf('Failed to prepare a temporary file for object "%s".', $path));
+                throw new ObjectStorageException('Failed to prepare a temporary file for object.', path: $path);
             }
             $tmpPath = $tmpWithExt;
         }
@@ -49,12 +49,12 @@ final readonly class TemporaryLocalFile
             $source = $this->storage->readStream($path);
             $target = @fopen($tmpPath, 'w');
             if (false === $target) {
-                throw new ObjectStorageException(sprintf('Failed to open temporary file for object "%s".', $path));
+                throw new ObjectStorageException('Failed to open temporary file for object.', path: $path);
             }
 
             try {
                 if (false === stream_copy_to_stream($source, $target)) {
-                    throw new ObjectStorageException(sprintf('Failed to buffer object "%s" to a temporary file.', $path));
+                    throw new ObjectStorageException('Failed to buffer object to a temporary file.', path: $path);
                 }
             } finally {
                 fclose($target);

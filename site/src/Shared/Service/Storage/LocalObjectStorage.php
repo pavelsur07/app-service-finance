@@ -21,7 +21,7 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
     {
         $contents = @file_get_contents($this->storageService->getAbsolutePath($path));
         if (false === $contents) {
-            throw new ObjectStorageException(sprintf('Failed to read object "%s".', $path));
+            throw new ObjectStorageException('Failed to read object.', path: $path);
         }
 
         return $contents;
@@ -31,7 +31,7 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
     {
         $stream = @fopen($this->storageService->getAbsolutePath($path), 'r');
         if (false === $stream) {
-            throw new ObjectStorageException(sprintf('Failed to open object "%s" for reading.', $path));
+            throw new ObjectStorageException('Failed to open object for reading.', path: $path);
         }
 
         return $stream;
@@ -49,7 +49,7 @@ final readonly class LocalObjectStorage implements ObjectStorageInterface
         // неудачного unlink. Гонка (кто-то удалил между is_file и unlink) —
         // не ошибка, итог тот же: файла нет.
         if (is_file($absolutePath) && !@unlink($absolutePath) && is_file($absolutePath)) {
-            throw new ObjectStorageException(sprintf('Failed to delete object "%s".', $path));
+            throw new ObjectStorageException('Failed to delete object.', path: $path);
         }
     }
 }
