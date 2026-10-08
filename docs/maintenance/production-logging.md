@@ -169,3 +169,24 @@ Do not delete or overwrite them during logging setup. Before a separate cleanup
 gate, record filename, size, modification time and checksum; classify logs,
 backups, scripts and temporary audits; then move approved files to a dated
 quarantine. Deletion requires its own explicit production approval.
+
+## Host disk: inodes and Docker images
+
+`app:disk:healthcheck` (scheduler, daily 07:34) raises one `error` and exits 1
+when the host filesystem under the Docker data directory is at or above 85%
+by inodes or by bytes. Inodes run out first: every merge pulls four image
+tags and nothing on production prunes images or the build cache. On
+2026-09-19 inodes hit 100% with 6.9G of bytes free, and `docker compose pull`
+failed every deploy for ten hours.
+
+Check: `df -i /` and `df -h /` on the host. Remedy, a production mutation that
+needs the owner's approval each time:
+
+```bash
+docker builder prune -af
+docker image prune -af --filter 'until=168h'
+```
+
+A week of tags stays as rollback targets; the running image is protected by
+its container. On 2026-09-19 this took inodes from 100% to 19% and disk from
+87% to 44%.
