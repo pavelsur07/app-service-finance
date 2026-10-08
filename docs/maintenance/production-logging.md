@@ -25,9 +25,15 @@ deploy and a migration cannot run at the same time. The default `none` action is
 non-mutating and runs neither gate.
 
 The deploy keeps its selected `IMAGE_TAG` in the Compose project `.env`. Images
-not used by a container and older than 14 days are removed after a successful
-deploy; running images are retained, and older SHA-tagged images remain
-available in GHCR when a rollback requires pulling them again.
+not used by a container are pruned twice per release: by `schema-ready` before
+its first `docker compose pull` (older than 7 days, `until=168h`, together with
+the whole build cache) and at the end of `deploy` (older than 14 days). Running
+images are retained, and older SHA-tagged images remain available in GHCR when
+a rollback requires pulling them again. The pre-pull prune uses a week because
+the 14-day prune was already running before 2026-09-19 and did not prevent the
+outage: images younger than two weeks filled the inodes, and the manual
+`until=168h` prune is what freed them. Its "Диск … до/после чистки" lines in the
+job log show inode and byte usage of the Docker data directory.
 
 ## Runtime logs
 
@@ -175,12 +181,14 @@ quarantine. Deletion requires its own explicit production approval.
 `app:disk:healthcheck` (scheduler, daily 07:34) raises one `error` and exits 1
 when the host filesystem under the Docker data directory is at or above 85%
 by inodes or by bytes (percent as `df` shows it: used / (used + available)).
-Inodes run out first: every merge pulls four image tags. A successful deploy
-prunes images older than 14 days (`until=336h`, see "Production gates"), but
-nothing prunes the build cache, and a deploy that fails on `docker compose
-pull` never reaches its own prune step, so it cannot unblock itself. On
-2026-09-19 inodes hit 100% with 6.9G of bytes free, and every deploy failed for
-ten hours.
+Inodes run out first: every merge pulls four image tags. On 2026-09-19 inodes
+hit 100% with 6.9G of bytes free, and every deploy failed for ten hours: the
+only prune ran at the end of a successful deploy, which a failed pull never
+reached. Since then `schema-ready` prunes images older than 7 days and the
+build cache before pulling (see "Production gates"). That reproduces the
+manual remedy of 19.09 on every release, but it frees nothing if a week of
+images alone fills the disk; the gate covers that, growth between releases and
+anything that is not an image.
 
 Check on the host: `docker info -f '{{.DockerRootDir}}'`, then `df -i` and
 `df -h` on that path (the gate measures the filesystem of the Docker data
