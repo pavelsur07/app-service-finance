@@ -92,7 +92,7 @@ final class EnqueueAutoRulesForRangeHandler
             ++$enqueued;
 
             if (0 === $selected % self::BATCH_SIZE) {
-                $this->entityManager->clear(CashTransaction::class);
+                $this->entityManager->clear();
             }
         }
 
@@ -109,6 +109,6 @@ final class EnqueueAutoRulesForRangeHandler
             'durationMs' => (int) ((microtime(true) - $startTime) * 1000),
         ]);
 
-        $this->entityManager->clear(CashTransaction::class);
+        $this->entityManager->clear();
     }
 }

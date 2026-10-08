@@ -1,13 +1,15 @@
 ## Current checkpoint
 
-**Phase:** Phase 0 — done; next Stage 1 / Work item 1.1
-**Status:** planned
-**Stage base commit:** — (записать перед WI 1.1)
+**Phase:** Stage 1 — done; next Stage 2 / Work item 2.1
+**Status:** implementing
+**Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: — (записать перед WI 2.1)
 
 ### Completed
 - plan.md составлен 2026-10-08 по аудиту модуля Cash (P0-1…P0-3).
 - Phase 0 (2026-10-08): baseline зелёный, факты прода сняты (ниже), план
   уточнён по ним.
+- Stage 1 DONE: фикс `flushBatch()` (detach вместо clear), `flush()` без
+  аргумента, red 6/6 → green 6/6; отчёт `stages/stage-1.md`.
 
 ### Checks and baseline
 - `docker compose run --rm -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Cash/Service/Import/File tests/Unit/Cash/MessageHandler/Import tests/Integration/Cash/Service/Import/File tests/Integration/Cash/Command/SoftDeleteCompanyTransactionsCommandTest.php tests/Integration/Cash/MessageHandler`
@@ -73,8 +75,8 @@ P0-3 (`--restore`): массовое удаление применялось к 
 - external: round 0, result: pending
 
 ### Exact next action
-- Stage 1: записать `stage_base_commit`, затем WI 1.1 — регрессионные тесты
-  (см. уточнённый DoD Stage 1 в plan.md).
+- Stage 2: записать `stage_base_commit` (коммит Stage 1), WI 2.1 — grep
+  потребителей `external_id` у `import_source='file'`.
 
 ### Files to inspect first on resume
 - docs/tasks/cash-p0-import-restore/plan.md

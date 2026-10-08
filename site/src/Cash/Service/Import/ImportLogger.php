@@ -50,6 +50,7 @@ final class ImportLogger
             $log->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
         }
         $this->entityManager->persist($log);
-        $this->entityManager->flush($log);
+        // ORM 3 игнорирует аргумент flush(): сбрасывается весь UnitOfWork.
+        $this->entityManager->flush();
     }
 }

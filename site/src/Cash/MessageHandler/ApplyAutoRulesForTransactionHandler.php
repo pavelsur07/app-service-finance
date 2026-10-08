@@ -77,7 +77,7 @@ final class ApplyAutoRulesForTransactionHandler
                 'mode' => $message->mode->value,
             ]);
 
-            $this->entityManager->clear(CashTransaction::class);
+            $this->entityManager->clear();
 
             return;
         }
@@ -158,6 +158,6 @@ final class ApplyAutoRulesForTransactionHandler
             'initiatedByUserId' => $message->initiatedByUserId,
         ]);
 
-        $this->entityManager->clear(CashTransaction::class);
+        $this->entityManager->clear();
     }
 }

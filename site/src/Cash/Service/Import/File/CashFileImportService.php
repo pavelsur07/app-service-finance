@@ -32,6 +32,9 @@ final class CashFileImportService
     /** @var array<string, Counterparty> */
     private array $counterpartyCache = [];
 
+    /** @var list<CashTransaction> */
+    private array $batchTransactions = [];
+
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
         private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
@@ -85,6 +88,11 @@ final class CashFileImportService
             ProjectDirection::class,
             $responsibilityPair->projectDirectionId
         );
+
+        // Сервис живёт в воркере между сообщениями: хвост упавшего импорта не
+        // должен попасть в пачку следующего.
+        $this->batchTransactions = [];
+        $this->counterpartyCache = [];
 
         $created = 0;
         $createdMinDate = null;
@@ -208,6 +216,7 @@ final class CashFileImportService
                         }
 
                         $this->entityManager->persist($transaction);
+                        $this->batchTransactions[] = $transaction;
 
                         ++$created;
                         if ($importLog) {
@@ -396,11 +405,21 @@ final class CashFileImportService
         return $this->counterpartyCache[$cacheKey] = $counterparty;
     }
 
+    /**
+     * Отсоединяет только сущности пачки. clear() в ORM 3 не принимает класс и
+     * очищает весь UnitOfWork: компания, счёт, журнал и job отсоединялись, и
+     * импорт падал после первой пачки или на закрытии журнала.
+     */
     private function flushBatch(): void
     {
         $this->entityManager->flush();
-        $this->entityManager->clear(CashTransaction::class);
-        $this->entityManager->clear(Counterparty::class);
+        foreach ($this->batchTransactions as $transaction) {
+            $this->entityManager->detach($transaction);
+        }
+        foreach ($this->counterpartyCache as $counterparty) {
+            $this->entityManager->detach($counterparty);
+        }
+        $this->batchTransactions = [];
         $this->counterpartyCache = [];
     }
 
