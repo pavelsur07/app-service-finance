@@ -94,6 +94,39 @@ final class SyncJobRepository extends ServiceEntityRepository
         return $jobs;
     }
 
+    /**
+     * Последние завершённые задания ресурса, от новых к старым.
+     *
+     * @return list<SyncJob>
+     */
+    public function findRecentFinishedForResource(
+        string $companyId,
+        string $connectionRef,
+        string $resourceType,
+        string $shopRef,
+        int $limit,
+    ): array {
+        /** @var list<SyncJob> $jobs */
+        $jobs = $this->createQueryBuilder('job')
+            ->andWhere('job.companyId = :companyId')
+            ->andWhere('job.connectionRef = :connectionRef')
+            ->andWhere('job.resourceType = :resourceType')
+            ->andWhere('job.shopRef = :shopRef')
+            ->andWhere('job.status IN (:statuses)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('connectionRef', $connectionRef)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('shopRef', $shopRef)
+            ->setParameter('statuses', [SyncJobStatus::COMPLETED->value, SyncJobStatus::FAILED->value])
+            ->orderBy('job.createdAt', 'DESC')
+            ->addOrderBy('job.id', 'DESC')
+            ->setMaxResults(max(1, min(50, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return $jobs;
+    }
+
     public function findLatestForResource(
         string $companyId,
         string $connectionRef,

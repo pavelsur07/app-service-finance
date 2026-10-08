@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Infrastructure\Messenger;
 
 use App\Ingestion\Application\Command\MarkJobFailedCommand;
+use App\Ingestion\Enum\SyncJobStatus;
 use App\Ingestion\Exception\ConnectorTransientException;
 use App\Ingestion\Facade\SyncFacade;
 use App\Ingestion\Message\RunSyncChunkMessage;
@@ -18,6 +19,9 @@ use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 final readonly class SyncJobFailureSubscriber implements EventSubscriberInterface
 {
     private const REASON_MAX_LENGTH = 2000;
+
+    /** Подряд упавших по 5xx/таймауту заданий одного ресурса до `error`: у почасового синка — около 3 часов. */
+    public const TRANSIENT_STREAK_ALERT = 3;
 
     public function __construct(
         private SyncJobRepository $syncJobRepository,
@@ -77,6 +81,7 @@ final readonly class SyncJobFailureSubscriber implements EventSubscriberInterfac
         // Остальные исключения по-прежнему уходят в `failed`.
         if ($rootCause instanceof ConnectorTransientException) {
             $event->addStamps(new SentToFailureTransportStamp($event->getReceiverName()));
+            $this->alertOnSustainedOutage($job->getCompanyId(), $job->getConnectionRef(), $job->getResourceType(), $job->getShopRef());
         }
 
         $this->logger->warning('Ingestion sync job marked as failed after retries exhausted.', [
@@ -85,6 +90,39 @@ final readonly class SyncJobFailureSubscriber implements EventSubscriberInterfac
             'messageType' => $message::class,
             'errorClass' => $rootCause::class,
             'errorMessage' => $rootCause->getMessage(),
+        ]);
+    }
+
+    /**
+     * Единственный сигнал GlitchTip о транзиентных отказах внешнего API.
+     *
+     * Сами отказы в GlitchTip не уходят (`ignore_exceptions` в sentry.yaml):
+     * разовый 5xx маркетплейса лечится следующим плановым запуском, а раньше
+     * каждый давал два события (#230, #384). Инцидент — когда ресурс не
+     * загружается подряд TRANSIENT_STREAK_ALERT заданий. `error` пишется ровно
+     * на пороге, а не на каждом следующем отказе серии.
+     */
+    private function alertOnSustainedOutage(string $companyId, string $connectionRef, string $resourceType, string $shopRef): void
+    {
+        // На одно задание больше порога: иначе серия длиннее порога упиралась бы
+        // в лимит выборки, считалась равной ему и будила на каждом отказе.
+        $streak = 0;
+        foreach ($this->syncJobRepository->findRecentFinishedForResource($companyId, $connectionRef, $resourceType, $shopRef, self::TRANSIENT_STREAK_ALERT + 1) as $recent) {
+            if (SyncJobStatus::FAILED !== $recent->getStatus() || !str_starts_with((string) $recent->getLastError(), ConnectorTransientException::class)) {
+                break;
+            }
+            ++$streak;
+        }
+
+        if (self::TRANSIENT_STREAK_ALERT !== $streak) {
+            return;
+        }
+
+        $this->logger->error('Marketplace API keeps failing for a sync resource; data is not being loaded.', [
+            'companyId' => $companyId,
+            'connectionRef' => $connectionRef,
+            'resourceType' => $resourceType,
+            'consecutiveFailedJobs' => $streak,
         ]);
     }
 
