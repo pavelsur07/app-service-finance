@@ -1249,21 +1249,9 @@ parameters:
 			path: src/Cash/Message/EnqueueAutoRulesForRange.php
 
 		-
-			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:clear\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 2
-			path: src/Cash/MessageHandler/ApplyAutoRulesForTransactionHandler.php
-
-		-
 			message: '#^Cannot call method getFinanceLockBefore\(\) on App\\Company\\Entity\\Company\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: src/Cash/MessageHandler/EnqueueAutoRulesForRangeHandler.php
-
-		-
-			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:clear\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 2
 			path: src/Cash/MessageHandler/EnqueueAutoRulesForRangeHandler.php
 
 		-
@@ -1735,21 +1723,9 @@ parameters:
 			path: src/Cash/Service/Import/ClientBank1CImportService.php
 
 		-
-			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:flush\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportFacade.php
-
-		-
 			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:openReaderByExtension\(\) return type with generic interface OpenSpout\\Reader\\ReaderInterface does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
-
-		-
-			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:clear\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 2
 			path: src/Cash/Service/Import/File/CashFileImportService.php
 
 		-
@@ -1829,12 +1805,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Service/Import/File/FileTabularReader.php
-
-		-
-			message: '#^Method Doctrine\\Persistence\\ObjectManager\:\:flush\(\) invoked with 1 parameter, 0 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: src/Cash/Service/Import/ImportLogger.php
 
 		-
 			message: '#^Parameter \#1 \$cashflowCategory of method App\\Cash\\Entity\\PaymentPlan\\PaymentPlan\:\:setCashflowCategory\(\) expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
