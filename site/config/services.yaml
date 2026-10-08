@@ -17,6 +17,13 @@ parameters:
     app.object_storage_s3_path_style_endpoint_default: '0'
     # Порог «медленной» операции хранилища (мс) для LoggingObjectStorage → warning
     app.object_storage_slow_ms: 1000
+    # Диагностика производительности Marketplace M1 (PerformanceRecorder). Флаг читается при
+    # старте процесса: смена значения требует перезапуска воркеров. По умолчанию выключено;
+    # prod включает через docker-compose.prod.yml. Лимит — событий в минуту на процесс:
+    # 300 × 1440 × ~380 Б ≈ 165 МБ/сутки на процесс в худшем случае; ожидаемо 10–40 тыс. событий/сутки на всё.
+    app.performance_diagnostics_default: '0'
+    app.performance_diagnostics_enabled: '%env(bool:default:app.performance_diagnostics_default:MARKETPLACE_PERF_DIAGNOSTICS)%'
+    app.performance_diagnostics_max_events_per_minute: 300
     # Гейт очереди failed (app:messenger:failed-queue-check, раз в сутки в 07:32): сообщение, пролежавшее не меньше 12 ч
     # (пережило рабочий вечер и ночь), или очередь от 10 сообщений — ERROR. При пороге 24 ч и суточном запуске сообщение
     # краснело бы до 48 ч после сбоя.
@@ -134,6 +141,14 @@ services:
         arguments:
             $inner: '@.inner'
             $slowMs: '%app.object_storage_slow_ms%'
+
+    # Диагностика M1: время и байты операций хранилища (выключено флагом → прямой проброс).
+    App\Shared\Service\Storage\PerformanceObjectStorage:
+        decorates: App\Shared\Service\Storage\ObjectStorageInterface
+        decoration_priority: -10
+        arguments:
+            $inner: '@.inner'
+            $backend: '%env(default:app.object_storage_driver_default:APP_OBJECT_STORAGE_DRIVER)%'
 
     App\Shared\Service\Storage\ObjectStorageFactory:
         arguments:

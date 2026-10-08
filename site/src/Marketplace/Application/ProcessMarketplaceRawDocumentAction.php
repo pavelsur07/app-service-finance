@@ -22,6 +22,8 @@ use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -53,6 +55,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private ByDayRowReplacement $byDayRowReplacement,
         private Connection $connection,
         private AppLogger $appLogger,
+        private PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -142,7 +145,11 @@ final readonly class ProcessMarketplaceRawDocumentAction
             }
 
             $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace, $command->kind, $format);
+            // Процессор затрат сам перечитывает документ, нормализует, сопоставляет и пишет:
+            // processor_total — всё вместе, mapping/posting замеряются внутри отдельно.
+            $processStartedAt = $this->performance->start();
             $result = $processor->process($command->companyId, $command->rawDocId);
+            $this->performance->add(PerformanceStage::ProcessorTotal, $processStartedAt, rows: $result);
             $this->costCategoryResolver->clearCache();
 
             return $this->buildResult($command->rawDocId, $command->kind, $result, $linkedRows);
@@ -356,24 +363,36 @@ final readonly class ProcessMarketplaceRawDocumentAction
         string $targetBucketKey,
     ): int {
         $totalProcessed = 0;
+        // Классификация строки — source normalization; время копится локально, без
+        // вызова регистратора на каждую строку.
+        $timed = null !== $this->performance->start();
+        $classifyNs = 0;
+        $classified = 0;
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
             }
 
+            $classifyStartedAt = $timed ? hrtime(true) : 0;
             $type = $classifier->classify($row);
+            if ($timed) {
+                $classifyNs += hrtime(true) - $classifyStartedAt;
+                ++$classified;
+            }
             $bucketKey = $type->value;
             $buckets[$bucketKey][] = $row;
 
             if (count($buckets[$bucketKey]) >= 500) {
                 if ($bucketKey === $targetBucketKey) {
+                    $batchStartedAt = $this->performance->start();
                     $processor->processBatch(
                         $command->companyId,
                         $marketplace,
                         $buckets[$bucketKey],
                         $command->rawDocId,
                     );
+                    $this->performance->add(PerformanceStage::ProcessorTotal, $batchStartedAt, rows: count($buckets[$bucketKey]));
                     $totalProcessed += count($buckets[$bucketKey]);
                     $this->entityManager->clear();
                     $this->costCategoryResolver->resetCache();
@@ -381,6 +400,10 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
                 $buckets[$bucketKey] = [];
             }
+        }
+
+        if ($timed) {
+            $this->performance->addElapsed(PerformanceStage::SourceNormalize, $classifyNs, rows: $classified);
         }
 
         foreach ($buckets as $bucketKey => $bucketRows) {
@@ -392,12 +415,14 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 continue;
             }
 
+            $batchStartedAt = $this->performance->start();
             $processor->processBatch(
                 $command->companyId,
                 $marketplace,
                 $bucketRows,
                 $command->rawDocId,
             );
+            $this->performance->add(PerformanceStage::ProcessorTotal, $batchStartedAt, rows: count($bucketRows));
             $totalProcessed += count($bucketRows);
             $this->entityManager->clear();
             $this->costCategoryResolver->resetCache();

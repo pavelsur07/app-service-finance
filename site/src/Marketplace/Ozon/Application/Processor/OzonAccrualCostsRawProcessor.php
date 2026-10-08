@@ -18,6 +18,8 @@ use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery
 use App\Marketplace\Ozon\Application\Service\OzonAccrualServiceCategoryResolver;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Ozon\MessageHandler\SyncOzonAccrualByDayHandler;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -54,6 +56,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         private readonly OzonListingEnsureService $listingEnsureService,
         private readonly ByDayRowReplacement $byDayRowReplacement,
         private readonly LoggerInterface $logger,
+        private readonly PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -93,6 +96,8 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
         $accruals = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_ACCRUALS];
         $serviceTypes = $payload[SyncOzonAccrualByDayHandler::PAYLOAD_SERVICE_TYPES];
 
+        // Диагностика M1: извлечение записей из строк by-day — source normalization.
+        $normalizeStartedAt = $this->performance->start();
         $entries = [];
         foreach ($accruals as $accrual) {
             if (is_array($accrual)) {
@@ -101,6 +106,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
                 }
             }
         }
+        $this->performance->add(PerformanceStage::SourceNormalize, $normalizeStartedAt, rows: count($entries));
 
         $this->reportUnknownServices($entries, $rawDocId);
 

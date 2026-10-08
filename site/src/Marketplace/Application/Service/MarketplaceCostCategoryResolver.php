@@ -8,6 +8,8 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Contracts\Service\ResetInterface;
@@ -17,10 +19,15 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
     /** @var array<string, MarketplaceCostCategory> */
     private array $cache = [];
 
+    /** Не readonly и с умолчанием: тесты создают сервис и без конструктора (partial mock). */
+    private ?PerformanceRecorder $performance = null;
+
     public function __construct(
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly EntityManagerInterface $em,
+        ?PerformanceRecorder $performance = null,
     ) {
+        $this->performance = $performance;
     }
 
     /**
@@ -28,6 +35,20 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
      * flush() НЕ вызывается — ответственность вызывающего кода.
      */
     public function resolve(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $code,
+        string $name,
+    ): MarketplaceCostCategory {
+        // Диагностика M1: сопоставление с категорией затрат — этап financial_mapping.
+        $startedAt = $this->performance?->start();
+        $category = $this->doResolve($company, $marketplace, $code, $name);
+        $this->performance?->add(PerformanceStage::FinancialMapping, $startedAt, rows: 1);
+
+        return $category;
+    }
+
+    private function doResolve(
         Company $company,
         MarketplaceType $marketplace,
         string $code,
@@ -53,6 +74,7 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
         // следом INSERT падал на уникальном индексе и ронял весь шаг затрат.
         // Так на проде упала загрузка 09.09: код `ozon_logistics` был удалён
         // 28.03.2026, а Ozon снова начислил по этой услуге.
+        /** @var MarketplaceCostCategory|null $category репозиторий не параметризован типом сущности */
         $category = $this->costCategoryRepository->findOneBy([
             'company' => $company,
             'marketplace' => $marketplace,

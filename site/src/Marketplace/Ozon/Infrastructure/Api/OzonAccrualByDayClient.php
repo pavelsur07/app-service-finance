@@ -12,6 +12,9 @@ use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
+use App\Shared\Infrastructure\Performance\PerformanceProbe;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use App\Shared\Service\AppLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -48,6 +51,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         private HttpClientInterface $httpClient,
         private MarketplaceCredentialsQuery $credentialsQuery,
         private AppLogger $appLogger,
+        private PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -119,6 +123,14 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
      */
     public function fetchServiceTypes(string $companyId): array
     {
+        return $this->performance->measure(PerformanceStage::ApiFetch, fn (PerformanceProbe $probe): array => $this->doFetchServiceTypes($companyId, $probe));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function doFetchServiceTypes(string $companyId, PerformanceProbe $probe): array
+    {
         $response = $this->httpClient->request('POST', self::BASE_URL.self::TYPES_ENDPOINT, [
             'headers' => $this->buildHeaders($companyId),
             'json' => new \stdClass(),
@@ -131,6 +143,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         }
 
         $payload = $response->toArray(false);
+        $probe->bytes($response->getInfo('size_download'));
         $types = $payload['accrual_types'] ?? null;
 
         if (!is_array($types)) {
@@ -147,6 +160,8 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
             }
         }
 
+        $probe->rows(count($map));
+
         return $map;
     }
 
@@ -157,6 +172,22 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
      * @return array<string, mixed>
      */
     private function request(array $headers, array $json, string $companyId, string $day, int $page): array
+    {
+        // Время страницы включает toArray(): разбор JSON Ozon от загрузки здесь не отделить
+        // без замены toArray() — source_parse для Ozon API не замеряется (09-m1-diagnostics.md).
+        return $this->performance->measure(
+            PerformanceStage::ApiFetch,
+            fn (PerformanceProbe $probe): array => $this->doRequest($headers, $json, $companyId, $day, $page, $probe),
+        );
+    }
+
+    /**
+     * @param array<string, string> $headers
+     * @param array<string, mixed> $json
+     *
+     * @return array<string, mixed>
+     */
+    private function doRequest(array $headers, array $json, string $companyId, string $day, int $page, PerformanceProbe $probe): array
     {
         $response = $this->httpClient->request('POST', self::BASE_URL.self::ENDPOINT, [
             'headers' => $headers,
@@ -171,12 +202,14 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
         }
 
         $payload = $response->toArray(false);
+        $rows = is_array($payload['accruals'] ?? null) ? count($payload['accruals']) : 0;
+        $probe->rows($rows)->bytes($response->getInfo('size_download'));
 
         $this->appLogger->info('Ozon accrual by-day page fetched', [
             'company_id' => $companyId,
             'date' => $day,
             'page' => $page,
-            'rows' => is_array($payload['accruals'] ?? null) ? count($payload['accruals']) : 0,
+            'rows' => $rows,
         ]);
 
         return $payload;
