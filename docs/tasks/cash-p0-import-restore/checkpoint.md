@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 — done; next Stage 2 / Work item 2.1
+**Phase:** Stage 2 — done; next Stage 3 / Work item 3.1
 **Status:** implementing
-**Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: — (записать перед WI 2.1)
+**Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: `915eeb36`; Stage 3: — (коммит Stage 2)
 
 ### Completed
 - plan.md составлен 2026-10-08 по аудиту модуля Cash (P0-1…P0-3).
@@ -10,6 +10,9 @@
   уточнён по ним.
 - Stage 1 DONE: фикс `flushBatch()` (detach вместо clear), `flush()` без
   аргумента, red 6/6 → green 6/6; отчёт `stages/stage-1.md`.
+- Stage 2 DONE: номер документа не в external_id; handler доводит до failed
+  при закрытом EM, error-лог без текста; red 3/3 → green; `stages/stage-2.md`.
+- Draft PR #2590.
 
 ### Checks and baseline
 - `docker compose run --rm -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Cash/Service/Import/File tests/Unit/Cash/MessageHandler/Import tests/Integration/Cash/Service/Import/File tests/Integration/Cash/Command/SoftDeleteCompanyTransactionsCommandTest.php tests/Integration/Cash/MessageHandler`
@@ -75,8 +78,7 @@ P0-3 (`--restore`): массовое удаление применялось к 
 - external: round 0, result: pending
 
 ### Exact next action
-- Stage 2: записать `stage_base_commit` (коммит Stage 1), WI 2.1 — grep
-  потребителей `external_id` у `import_source='file'`.
+- Stage 3, WI 3.1: красные тесты restore в `SoftDeleteCompanyTransactionsCommandTest`.
 
 ### Files to inspect first on resume
 - docs/tasks/cash-p0-import-restore/plan.md

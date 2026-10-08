@@ -200,13 +200,9 @@ final class CashFileImportService
                             'mapping' => $mapping,
                         ]);
                         $transaction->setUpdatedAt(new \DateTimeImmutable());
-
-                        if (is_string($docNumber)) {
-                            $trimmedDocNumber = trim($docNumber);
-                            if ('' !== $trimmedDocNumber) {
-                                $transaction->setExternalId($trimmedDocNumber);
-                            }
-                        }
+                        // Номер документа не идёт в external_id: он повторяется между годами
+                        // и счетами, а uniq_cashflow_import валил на нём весь импорт.
+                        // Дубли файла ловит dedupeHash, номер хранится в doc_number.
 
                         if (null !== $counterpartyName) {
                             $counterparty = $this->getOrCreateCounterparty($companyId, $counterpartyName, $company);
@@ -256,7 +252,9 @@ final class CashFileImportService
                 $this->accountBalanceService->recalculateDailyRange($company, $moneyAccount, $createdMinDate, $toDate);
             }
         } finally {
-            if ($importLog) {
+            // На закрытом EM finish() бросил бы и подменил исходное исключение;
+            // журнал тогда закрывает CashFileImportHandler после resetManager().
+            if ($importLog && $this->entityManager->isOpen()) {
                 $this->importLogger->finish($importLog);
             }
         }
