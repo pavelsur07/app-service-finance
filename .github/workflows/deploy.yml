@@ -595,7 +595,8 @@ jobs:
             group: production-release
             cancel-in-progress: false
         runs-on: ubuntu-latest
-        timeout-minutes: 10
+        # 20, а не 10: на забитом хосте чистка ниже сама может идти минутами.
+        timeout-minutes: 20
         steps:
             - name: 🔐 Setup SSH key
               uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
@@ -626,13 +627,17 @@ jobs:
                     # Чистка ДО первого pull выкатки. 19.09.2026 pull здесь падал на исчерпанных
                     # inode, а чистка образов стояла в конце deploy и до неё упавшая выкатка не
                     # доходила — прод десять часов не мог разблокироваться сам. Build-кэш на проде
-                    # не нужен (образы собирает CI), его не чистило ничто. Образы — та же политика,
-                    # что в конце deploy: не используемые контейнером и старше 14 дней.
+                    # не нужен (образы собирает CI), его не чистило ничто. Образы — неделя, а не
+                    # 14 дней, как в конце deploy: 336h чистка в конце успешных выкаток шла и до
+                    # 19.09, а inode забили образы моложе двух недель; освободила место ручная
+                    # чистка с until=168h (268 → 39 образов, inode 100% → 19%). Неделя тегов
+                    # остаётся целями отката, более старые SHA-образы лежат в GHCR.
                     # Сбой чистки выкатку не валит: если места правда нет, это скажет сам pull.
-                    echo "🧹 Диск до чистки: $(df -Pi / | awk 'NR==2 {print "inodes " $5}'), $(df -Pk / | awk 'NR==2 {print "bytes " $5}')"
+                    DOCKER_ROOT="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /)"
+                    echo "🧹 Диск $DOCKER_ROOT до чистки: $(df -Pi "$DOCKER_ROOT" | awk 'NR==2 {print "inodes " $5}'), $(df -Pk "$DOCKER_ROOT" | awk 'NR==2 {print "bytes " $5}')"
                     docker builder prune -af || echo "⚠️ docker builder prune не выполнен"
-                    docker image prune -af --filter "until=336h" || echo "⚠️ docker image prune не выполнен"
-                    echo "🧹 Диск после чистки: $(df -Pi / | awk 'NR==2 {print "inodes " $5}'), $(df -Pk / | awk 'NR==2 {print "bytes " $5}')"
+                    docker image prune -af --filter "until=168h" || echo "⚠️ docker image prune не выполнен"
+                    echo "🧹 Диск $DOCKER_ROOT после чистки: $(df -Pi "$DOCKER_ROOT" | awk 'NR==2 {print "inodes " $5}'), $(df -Pk "$DOCKER_ROOT" | awk 'NR==2 {print "bytes " $5}')"
 
                     docker compose -f docker-compose.prod.yml pull site-php-cli
                     docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction
