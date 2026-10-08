@@ -21,6 +21,11 @@ sentry:
         ignore_exceptions:
             - 'Symfony\Component\ErrorHandler\Error\FatalError'
             - 'Symfony\Component\Debug\Exception\FatalErrorException'
+            # Транзиентный отказ API маркетплейса (5xx, таймаут). Проверяется вся
+            # цепочка, поэтому отсекает и CRITICAL Messenger, и захват сбоя
+            # воркера (#230, #384). Сигнал о затяжном сбое — один error из
+            # SyncJobFailureSubscriber после серии упавших заданий ресурса.
+            - 'App\Ingestion\Exception\ConnectorTransientException'
 
     messenger:
         capture_soft_fails: false
