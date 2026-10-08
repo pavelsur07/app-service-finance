@@ -1,0 +1,48 @@
+# Marketplace Stage 0: данные и финансовые потоки
+
+## Два существующих контура
+
+```text
+Ozon/WB API → MarketplaceRawDocument(JSON) → sales/returns/costs/realization
+  → CloseMonthStageAction → FinanceFacade → Document/operations → pl_daily_totals
+
+Ozon/WB API → Ingestion raw(gzip NDJSON + metadata) → FinancialTransaction
+  → verification/reconciliation; в ОПиУ этот контур не пишет
+```
+
+Первый поток следует из `site/src/Marketplace/{Ozon,Wildberries}/MessageHandler/`, `ProcessDayReportHandler.php:58-74`, `ProcessMarketplaceRawDocumentAction.php:119-250`, `CloseMonthStageAction.php:175-279` и `site/src/Finance/Facade/FinanceFacade.php:65-117`. Второй — `site/src/Ingestion/MessageHandler/{RunSyncChunkHandler,NormalizeRawRecordHandler}.php`, `site/src/Ingestion/Application/Action/NormalizeRawRecordAction.php:53-197` и `docs/ingestion/INGESTION_ARCHITECTURE.md:5-32`. Два представления одного внешнего факта нельзя использовать как два независимых producer финансового события.
+
+## От сырья до признания
+
+| Шаг | Ozon | Wildberries | Финансовый смысл |
+|---|---|---|---|
+| Источник | `/v1/finance/accrual/by-day`, отдельно `/v2/finance/realization` (`site/src/Marketplace/Ozon/Infrastructure/Api/OzonAccrualByDayClient.php:62-107`; `OzonRealizationFetcher.php:47-80`) | `WbFinanceSalesReportClient` с `rrd_id` и cooldown (`site/src/Marketplace/Wildberries/Infrastructure/Api/WbFinanceSalesReportClient.php:39-181`) | Внешние сведения, ещё не проводки |
+| Raw | дневной/месячный `MarketplaceRawDocument.rawData` и статус (`site/src/Marketplace/Ozon/MessageHandler/SyncOzonAccrualByDayHandler.php:226-275`; `SyncOzonRealizationHandler.php:282-320`) | тот же Entity, append по страницам (`site/src/Marketplace/Wildberries/MessageHandler/SyncWbFinancialReportDayHandler.php:264-318`) | Доказательство источника/replay, нужен hash и полнота |
+| Классификация | `OzonAccrualByDayRowClassifier`, `OzonAccrualSales/Returns/CostsRawProcessor` (`site/src/Marketplace/Ozon/Infrastructure/Normalizer/OzonAccrualByDayRowClassifier.php:38-56`; `site/src/Marketplace/Ozon/Application/Processor/`) | `WbSalesReportRowNormalizer`, `WbSales/Returns/CostsRawProcessor`, cost calculators (`site/src/Marketplace/Wildberries/Infrastructure/Normalizer/WbSalesReportRowNormalizer.php:106-204`; `site/src/Marketplace/Wildberries/Application/Processor/`) | Создают MarketplaceSale/Return/Cost, не PL Document напрямую |
+| Связи | sale key учитывает accrual/posting; return ищет sale для cost price (`site/src/Marketplace/Ozon/Application/Service/OzonAccrualRecordKey.php`; `site/src/Marketplace/Ozon/Application/Processor/OzonAccrualReturnsRawProcessor.php:95-168`) | sale и return по SRID, cost calculators выводят комиссии/логистику/удержания (`site/src/Marketplace/Wildberries/Application/Processor/WbSalesRawProcessor.php:122-173`; `WbReturnsRawProcessor.php:123-182`; `WbCostsRawProcessor.php:199-262`) | Порядок sale/return и полнота listing/cost price имеют значение |
+| Признание | `SalesReturnsDataSource`, `RealizationDataSource`, `CostsDataSource` | `SalesReturnsDataSource`, `CostsDataSource`, WB preflight | `CloseMonthStageAction` агрегирует на конец периода и вызывает `FinanceFacade::createPLDocument` в одной транзакции с markProcessed (`site/src/Marketplace/Application/CloseMonthStageAction.php:66-101,175-279`) |
+| Регистр | `FinanceFacade`/`CreatePLDocumentAction` | то же | `PLRegisterUpdater` пересчитывает `pl_daily_totals` (`site/src/Finance/Application/CreatePLDocumentAction.php:68-70`; `site/src/Finance/Application/Service/PLRegisterUpdater.php:33-62`) |
+
+Маппинг суммы — часть финансового контракта: `AmountSource::SALE_GROSS` для WB считает `price_per_unit × quantity`, для Ozon — `total_revenue`, чтобы не умножать сумму posting на число товаров (`site/src/Marketplace/Enum/AmountSource.php:7-30,75-95`; `site/src/Marketplace/Infrastructure/Query/UnprocessedSalesQuery.php:43-78`). `UnprocessedCostsQuery` включает только разрешённые категории и учитывает знак сторно (`site/src/Marketplace/Infrastructure/Query/UnprocessedCostsQuery.php:101-140`). Go parser не должен молча менять эти правила.
+
+**Выплаты и AR/AP:** наличие `payout_ref` в канонической Ingestion transaction не означает бухгалтерскую проводку выплаты (`site/src/Ingestion/Entity/FinancialTransaction.php:43-98`). Нынешний Marketplace month close даёт P&L/Recognition-подобный результат; автоматической цепи «marketplace payout → AR/AP → Cash → Balance» в проверенном контуре нет (`docs/financial-core/02-financial-flows.md:5-58`; `docs/financial-core/adr/005-settlement-ar-ap.md:15-53`). Cash имеет свой `CashTransactionService`, Balance — свой `BalanceLedgerService`; правила расчётов с маркетплейсом отложены в Financial Core. Не заполнять этот пробел предположенной формулой.
+
+## Таблицы, ключи, транзакции
+
+| Данные | Хранение и защита | Владелец после возможного Go split |
+|---|---|---|
+| Legacy raw | `marketplace_raw_documents`: JSON, company, marketplace, endpoint/period, status; активные partial unique по дню/периоду (`site/src/Marketplace/Entity/MarketplaceRawDocument.php:24-42,65-103`; `site/migrations/Version20260520143000.php:74-90`) | Symfony до полного replay/retention cutover; Go может владеть **новым** source raw по контракту |
+| Ingestion raw | `ingest_raw_records`: `storage_path/hash/byte_size`, unique company/source/resource/external/hash (`site/migrations/Version20260615160000.php:26-28`) | Symfony metadata/inbox; физическое source blob может обслуживаться Go, если checksum/replay гарантированы |
+| Marketplace sale/return/cost | `marketplace_sales`, `marketplace_returns`, `marketplace_costs`; tenant-aware partial unique keys; sales также имеет глобальный `uniq_marketplace_srid` (`site/src/Marketplace/Entity/MarketplaceSale.php:14-24`; `MarketplaceReturn.php:14-22`; `MarketplaceCost.php:15-27`) | Только Symfony Marketplace |
+| Canonical transactions | `ingest_financial_transactions`: unique `(company_id,source,external_id,type)`, amount minor/currency, order/payout refs/raw ID (`site/migrations/Version20260618130000.php:29-35`; `site/src/Ingestion/Entity/FinancialTransaction.php:19-27`) | Symfony Ingestion; пока verification, не P&L writer |
+| Финансовые документы/регистр | `documents`, `pl_daily_totals`; FinanceFacade/PLRegisterUpdater (`site/src/Finance/Facade/FinanceFacade.php:65-117`; `site/src/Finance/Application/Service/PLRegisterUpdater.php:33-62`) | Symfony Finance / будущий Financial Core |
+
+Повторы: raw unique ограничивает активный период, sale/return/cost имеют natural-key ограничения, Ingestion upsert сверяет source hash/версию (`site/src/Ingestion/Application/Action/UpsertFinancialTransactionAction.php:24-119`). Это несколько локальных защит, **не** атомарная exactly-once цепь от API до P&L. Нынешний raw processing status хранит `succeededSteps` как JSON (`site/src/Marketplace/Entity/MarketplaceRawDocument.php:92-104`); Financial Core roadmap планирует processing rows. `CloseMonthStageAction` уже берёт advisory lock и общую транзакцию (`site/src/Marketplace/Application/CloseMonthStageAction.php:66-101`), а `ReopenMonthStageAction` имеет отдельные commit boundaries (`site/src/Marketplace/Application/ReopenMonthStageAction.php:47-100`; `docs/financial-core/03-current-failure-model.md:36-46`). Глобальный unique sales SRID без `company_id` вынесен в нерешённый пункт Financial Core Stage 1; менять его в рамках аудита нельзя (`docs/financial-core/10-migration-roadmap.md:49-63`).
+
+Ozon by-day замена sales/returns защищена транзакцией; `ByDayRowReplacement` учитывает закрытый/предварительный период (`site/src/Marketplace/Application/ProcessMarketplaceRawDocumentAction.php:215-247`; `site/src/Marketplace/Application/Service/ByDayRowReplacement.php:27-40,87-145`). При текущем предварительном закрытии обновлённые строки могут временно расходиться с PL Document до ночной пересборки (`ByDayRowReplacement.php:37-40`). Для **прошлого предварительно закрытого месяца** linked rows сохраняются и исправление Ozon по ним сейчас не доходит до учёта; это известное ограничение, а не гарантия полной backdated correction (`ByDayRowReplacement.php:132-145`). Финально закрытые и заблокированные периоды не меняются (`ByDayRowReplacement.php:27-31,118-129`). Комментарий `ProcessMarketplaceRawDocumentAction.php:185-198` о будущей реализации split устарел относительно вызова ниже; при миграции брать поведение кода, не этот комментарий.
+
+## Согласование с Financial Core
+
+`site/src/FinancialCore` и миграций `fincore_*` в этом срезе нет: Events/Outbox/Posting Orchestrator описаны как **будущая** архитектура (`docs/financial-core/00-overview.md:1-8`; `docs/financial-core/10-migration-roadmap.md:71-147`). Согласно утверждённому порядку, Stage 2 вводит события/outbox, Stage 3 orchestrator/очереди, Stage 4 делает Marketplace close/reopen producer **в той же транзакции** и shadow Recognition; Stage 5 — P&L cutover. Событие+outbox атомарны с бизнес-операцией, публикация at-least-once, уникальный idempotency key и версия правила обязательны (`docs/financial-core/04-target-architecture.md:31-57`; `docs/financial-core/07-idempotency.md:13-49`; `docs/financial-core/adr/002-outbox.md:13-27`). Go отправляет source facts в Symfony inbox, **не** финансовые события напрямую.
+
+Открытые семантические вопросы для соответствующего Financial Core Stage: идентичность события при предварительном close→reopen→reclose; единственный владелец CASH при `payment.*` и `cash.transaction.booked`; будущая marketplace settlement модель. Эти вопросы не разрешаются этим аудитом (`docs/financial-core/05-financial-events.md:65-79`; `docs/financial-core/adr/005-settlement-ar-ap.md`; `docs/financial-core/adr/006-recognition-separate-from-cash.md`).
