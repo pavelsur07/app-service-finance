@@ -31,7 +31,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * изменений — частичный массовый delete оставил бы регистры в состоянии, которое
  * владелец замка не санкционировал.
  *
- * Идемпотентна: предикаты delete/restore взаимно симметричны, повторный запуск —
+ * Restore снимает только пометку этой команды (deleted_by = ACTOR): операции,
+ * удалённые вручную через UI до или после массового удаления, остаются удалёнными.
+ *
+ * Идемпотентна: delete ставит ACTOR, restore снимает только ACTOR; повторный запуск —
  * no-op, обрыв после UPDATE лечится повторным запуском (пересчёт остатков
  * идемпотентен). Финальный вердикт строится по пересчёту строк из БД, а не по
  * счётчику executeStatement, чтобы прерванный прогон не отчитался успехом.
@@ -70,7 +73,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         $this
             ->addArgument('companyId', InputArgument::REQUIRED, 'UUID компании')
             ->addOption('execute', null, InputOption::VALUE_NONE, 'Применить изменения; без флага команда только считает')
-            ->addOption('restore', null, InputOption::VALUE_NONE, 'Откат: снять soft delete со всех транзакций компании')
+            ->addOption('restore', null, InputOption::VALUE_NONE, 'Откат: снять soft delete с транзакций, удалённых этой командой')
             ->addOption('reason', null, InputOption::VALUE_REQUIRED, 'Причина удаления (пишется в delete_reason)');
     }
 
@@ -100,7 +103,10 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         $io->writeln(sprintf('Компания: %s', $company->getName() ?? $companyId));
         $io->writeln(sprintf('Активных транзакций: %d, soft-deleted: %d', $active, $deleted));
 
-        $target = $restore ? $deleted : $active;
+        $target = $this->countTarget($companyId, $restore);
+        if ($restore && $deleted > $target) {
+            $io->writeln(sprintf('Удалены вручную, restore их не тронет: %d', $deleted - $target));
+        }
         if (0 === $target) {
             $io->success($restore ? 'Восстанавливать нечего.' : 'Удалять нечего.');
 
@@ -145,8 +151,8 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         if ($restore) {
             $connection->executeStatement(
                 'UPDATE cash_transaction SET deleted_at = NULL, deleted_by = NULL, delete_reason = NULL
-                 WHERE company_id = :companyId AND deleted_at IS NOT NULL',
-                ['companyId' => $companyId],
+                 WHERE company_id = :companyId AND '.$this->targetCondition(true),
+                $this->targetParams($companyId, true),
             );
         } else {
             $connection->executeStatement(
@@ -176,7 +182,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
 
         // Верификация по пересчёту из БД: после delete в исходном состоянии (активные)
         // не должно остаться строк, после restore — в исходном состоянии (deleted).
-        $remaining = $this->countByDeletedState($companyId, $restore);
+        $remaining = $this->countTarget($companyId, $restore);
         if ($remaining > 0) {
             $io->error(sprintf(
                 'Операция не завершена: %d транзакций остались в исходном состоянии. Повторите команду.',
@@ -204,6 +210,32 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         );
     }
 
+    /**
+     * Целевой набор операции: delete берёт активные строки, restore — только
+     * строки, помеченные этой командой. Удалённые вручную через UI (deleted_by =
+     * user id или NULL) откат не трогает: иначе вернулись бы дубли импорта.
+     */
+    private function targetCondition(bool $restore): string
+    {
+        return $restore ? 'deleted_at IS NOT NULL AND deleted_by = :actor' : 'deleted_at IS NULL';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function targetParams(string $companyId, bool $restore): array
+    {
+        return $restore ? ['companyId' => $companyId, 'actor' => self::ACTOR] : ['companyId' => $companyId];
+    }
+
+    private function countTarget(string $companyId, bool $restore): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM cash_transaction WHERE company_id = :companyId AND '.$this->targetCondition($restore),
+            $this->targetParams($companyId, $restore),
+        );
+    }
+
     private function hasLockedRows(string $companyId, bool $restore, \DateTimeImmutable $lock): bool
     {
         // Не SELECT EXISTS(...): pdo_pgsql отдаёт boolean строками 't'/'f', а (bool) 'f'
@@ -213,10 +245,10 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         $row = $this->entityManager->getConnection()->fetchOne(
             'SELECT 1 FROM cash_transaction
              WHERE company_id = :companyId
-               AND deleted_at IS '.($restore ? 'NOT NULL' : 'NULL').'
+               AND '.$this->targetCondition($restore).'
                AND occurred_at < :lock
              LIMIT 1',
-            ['companyId' => $companyId, 'lock' => $lock->format('Y-m-d')],
+            $this->targetParams($companyId, $restore) + ['lock' => $lock->format('Y-m-d')],
         );
 
         return false !== $row;
@@ -226,8 +258,8 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
     {
         $value = $this->entityManager->getConnection()->fetchOne(
             'SELECT min(occurred_at) FROM cash_transaction
-             WHERE company_id = :companyId AND deleted_at IS '.($restore ? 'NOT NULL' : 'NULL'),
-            ['companyId' => $companyId],
+             WHERE company_id = :companyId AND '.$this->targetCondition($restore),
+            $this->targetParams($companyId, $restore),
         );
 
         return false === $value || null === $value ? null : new \DateTimeImmutable((string) $value);

@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 — done; next Stage 3 / Work item 3.1
+**Phase:** Stage 3 — done; next handoff
 **Status:** implementing
-**Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: `915eeb36`; Stage 3: — (коммит Stage 2)
+**Stage base commit:** Stage 1: `0bb5fad1`; Stage 2: `915eeb36`; Stage 3: `87cdc0d4`
 
 ### Completed
 - plan.md составлен 2026-10-08 по аудиту модуля Cash (P0-1…P0-3).
@@ -12,6 +12,7 @@
   аргумента, red 6/6 → green 6/6; отчёт `stages/stage-1.md`.
 - Stage 2 DONE: номер документа не в external_id; handler доводит до failed
   при закрытом EM, error-лог без текста; red 3/3 → green; `stages/stage-2.md`.
+- Stage 3 DONE: restore только по deleted_by = ACTOR; red 3 → green 12/12; `stages/stage-3.md`.
 - Draft PR #2590.
 
 ### Checks and baseline
@@ -78,7 +79,7 @@ P0-3 (`--restore`): массовое удаление применялось к 
 - external: round 0, result: pending
 
 ### Exact next action
-- Stage 3, WI 3.1: красные тесты restore в `SoftDeleteCompanyTransactionsCommandTest`.
+- Handoff: полные гейты по одному, затем финальное ревью в свежей сессии и внешнее ревью.
 
 ### Files to inspect first on resume
 - docs/tasks/cash-p0-import-restore/plan.md
