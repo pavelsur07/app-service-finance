@@ -52,7 +52,7 @@ final class PerformanceReportTest extends TestCase
         $builder->add(['stage' => 'api_fetch', 'provider' => 'wb', 'duration_ms' => 2000.0, 'calls' => 1, 'rows' => 1000, 'bytes' => 4_000_000, 'errors' => 0, 'memory_peak_bytes' => 50_000_000, 'outcome' => 'ok', 'trace' => '1-0']);
         $builder->add(['stage' => 'source_parse', 'provider' => 'wb', 'duration_ms' => 500.0, 'calls' => 1, 'rows' => 1000, 'bytes' => 4_000_000, 'errors' => 0, 'memory_peak_bytes' => 50_000_000, 'outcome' => 'ok', 'trace' => '1-0']);
         $builder->add(['stage' => 'storage_write', 'provider' => 'wb', 'backend' => 'postgres', 'duration_ms' => 300.0, 'calls' => 1, 'rows' => null, 'errors' => 0, 'memory_peak_bytes' => 50_000_000, 'outcome' => 'ok', 'trace' => '1-0']);
-        $builder->add(['stage' => 'handler', 'provider' => 'wb', 'job' => 'SyncWbFinancialReportDayMessage', 'duration_ms' => 3000.0, 'memory_peak_bytes' => 60_000_000, 'memory_base_bytes' => 45_000_000, 'outcome' => 'ok', 'trace' => '1-0']);
+        $builder->add(['stage' => 'handler', 'provider' => 'wb', 'job' => 'SyncWbFinancialReportDayMessage', 'duration_ms' => 3000.0, 'memory_peak_bytes' => 60_000_000, 'memory_base_bytes' => 45_000_000, 'outcome' => 'ok', 'transport' => 'async_wb_finance', 'trace' => '1-0']);
         $builder->add(['stage' => 'queue_wait', 'provider' => 'wb', 'duration_ms' => null, 'transport' => 'failed', 'trace' => '2', 'retry_count' => 3, 'dropped_events' => 4]);
 
         $report = $builder->build();
@@ -83,6 +83,32 @@ final class PerformanceReportTest extends TestCase
         self::assertSame(0, $report['completeness']['handler_events_without_queue_wait']);
         self::assertSame(1, $report['completeness']['events_without_duration']);
         self::assertSame(4, $report['completeness']['dropped_events']);
+    }
+
+    public function testPairingUsesTransportAndCountsRepeatedAttempts(): void
+    {
+        $builder = new PerformanceReportBuilder();
+        // Один и тот же id в двух потоках — разные сообщения; первое завершилось, второе нет.
+        $builder->add(['stage' => 'queue_wait', 'duration_ms' => 1.0, 'transport' => 'async_sync', 'trace' => '5-0']);
+        $builder->add(['stage' => 'queue_wait', 'duration_ms' => 1.0, 'transport' => 'async_pipeline', 'trace' => '5-0']);
+        $builder->add(['stage' => 'handler', 'job' => 'X', 'duration_ms' => 2.0, 'transport' => 'async_sync', 'trace' => '5-0', 'outcome' => 'ok']);
+        // Повторная доставка с тем же id: две попытки, завершилась одна (первую убили).
+        $builder->add(['stage' => 'queue_wait', 'duration_ms' => 1.0, 'transport' => 'async_wb_finance', 'trace' => '7-0']);
+        $builder->add(['stage' => 'queue_wait', 'duration_ms' => 1.0, 'transport' => 'async_wb_finance', 'trace' => '7-0', 'retry_count' => 0]);
+        $builder->add(['stage' => 'handler', 'job' => 'Y', 'duration_ms' => 2.0, 'transport' => 'async_wb_finance', 'trace' => '7-0', 'outcome' => 'ok']);
+
+        self::assertSame(2, $builder->build()['completeness']['messages_without_handler_event']);
+    }
+
+    public function testRowAndByteRatesUseTheirOwnDurations(): void
+    {
+        $builder = new PerformanceReportBuilder();
+        $builder->add(['stage' => 'storage_read', 'provider' => 'wb', 'backend' => 'postgres', 'duration_ms' => 1000.0, 'rows' => 100, 'bytes' => null]);
+        $builder->add(['stage' => 'storage_read', 'provider' => 'wb', 'backend' => 'postgres', 'duration_ms' => 3000.0, 'rows' => null, 'bytes' => 3000]);
+
+        $row = $builder->build()['stages'][0];
+        self::assertSame(100.0, $row['rows_per_sec']);
+        self::assertSame(1000.0, $row['bytes_per_sec']);
     }
 
     public function testReaderReadsOnlyDaysInPeriodAndSkipsForeignAndBrokenLines(): void

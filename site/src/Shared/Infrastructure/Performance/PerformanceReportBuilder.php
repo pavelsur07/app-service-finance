@@ -14,7 +14,7 @@ namespace App\Shared\Infrastructure\Performance;
  */
 final class PerformanceReportBuilder
 {
-    /** @var array<string, array{stage: string, provider: string, backend: ?string, durations: list<float>, calls: int, rows: int, rowsMissing: int, bytes: int, bytesSeen: bool, durationForRates: float, errors: int, memoryPeak: ?int, outcomes: array<string, int>}> */
+    /** @var array<string, array{stage: string, provider: string, backend: ?string, durations: list<float>, calls: int, rows: int, rowsMissing: int, bytes: int, bytesSeen: bool, durationForRows: float, durationForBytes: float, errors: int, memoryPeak: ?int, outcomes: array<string, int>}> */
     private array $stages = [];
 
     /** @var array<string, array{transport: string, lags: list<float>, unavailable: int, redelivered: int}> */
@@ -23,10 +23,15 @@ final class PerformanceReportBuilder
     /** @var array<string, array{job: string, provider: string, durations: list<float>, failed: int, retried: int, unknown: int, memoryPeak: ?int, memoryDelta: ?int}> */
     private array $handlers = [];
 
-    /** @var array<string, true> */
+    /**
+     * Попытки по ключу `transport|trace`: id Redis уникален только внутри потока, а повторная
+     * доставка своего pending сохраняет id — поэтому ключ с транспортом и счётчик, а не множество.
+     *
+     * @var array<string, int>
+     */
     private array $tracesQueued = [];
 
-    /** @var array<string, true> */
+    /** @var array<string, int> */
     private array $tracesHandled = [];
 
     private int $events = 0;
@@ -63,7 +68,8 @@ final class PerformanceReportBuilder
             }
             $this->queues[$transport] = $queue;
             if (null !== $trace) {
-                $this->tracesQueued[$trace] = true;
+                $traceKey = $transport.'|'.$trace;
+                $this->tracesQueued[$traceKey] = ($this->tracesQueued[$traceKey] ?? 0) + 1;
             }
 
             return;
@@ -92,7 +98,8 @@ final class PerformanceReportBuilder
             }
             $this->handlers[$key] = $handler;
             if (null !== $trace) {
-                $this->tracesHandled[$trace] = true;
+                $traceKey = (self::str($event['transport'] ?? null) ?? 'unknown').'|'.$trace;
+                $this->tracesHandled[$traceKey] = ($this->tracesHandled[$traceKey] ?? 0) + 1;
             }
 
             return;
@@ -110,7 +117,8 @@ final class PerformanceReportBuilder
             'rowsMissing' => 0,
             'bytes' => 0,
             'bytesSeen' => false,
-            'durationForRates' => 0.0,
+            'durationForRows' => 0.0,
+            'durationForBytes' => 0.0,
             'errors' => 0,
             'memoryPeak' => null,
             'outcomes' => [],
@@ -132,8 +140,12 @@ final class PerformanceReportBuilder
             $group['bytes'] += $bytes;
             $group['bytesSeen'] = true;
         }
-        if (null !== $duration && (null !== $rows || null !== $bytes)) {
-            $group['durationForRates'] += $duration;
+        // Свой знаменатель на каждую скорость: событие без rows не должно занижать rows/s.
+        if (null !== $duration && null !== $rows) {
+            $group['durationForRows'] += $duration;
+        }
+        if (null !== $duration && null !== $bytes) {
+            $group['durationForBytes'] += $duration;
         }
         $group['memoryPeak'] = self::max($group['memoryPeak'], $memory);
         $group['outcomes'][$outcome] = ($group['outcomes'][$outcome] ?? 0) + 1;
@@ -147,7 +159,8 @@ final class PerformanceReportBuilder
     {
         $stages = [];
         foreach ($this->stages as $group) {
-            $seconds = $group['durationForRates'] / 1000;
+            $rowSeconds = $group['durationForRows'] / 1000;
+            $byteSeconds = $group['durationForBytes'] / 1000;
             $hasRows = \count($group['durations']) > $group['rowsMissing'];
             $stages[] = [
                 'stage' => $group['stage'],
@@ -158,8 +171,8 @@ final class PerformanceReportBuilder
                 'duration_ms' => self::percentiles($group['durations']),
                 'rows' => $hasRows ? $group['rows'] : null,
                 'bytes' => $group['bytesSeen'] ? $group['bytes'] : null,
-                'rows_per_sec' => $hasRows && $seconds > 0 ? round($group['rows'] / $seconds, 1) : null,
-                'bytes_per_sec' => $group['bytesSeen'] && $seconds > 0 ? round($group['bytes'] / $seconds, 1) : null,
+                'rows_per_sec' => $hasRows && $rowSeconds > 0 ? round($group['rows'] / $rowSeconds, 1) : null,
+                'bytes_per_sec' => $group['bytesSeen'] && $byteSeconds > 0 ? round($group['bytes'] / $byteSeconds, 1) : null,
                 'errors' => $group['errors'],
                 'max_memory_peak_bytes' => $group['memoryPeak'],
                 'rows_missing_events' => $group['rowsMissing'],
@@ -204,8 +217,8 @@ final class PerformanceReportBuilder
             'completeness' => [
                 // Сообщение взято из очереди, но завершения нет: воркер убит (OOM, SIGKILL,
                 // деплой) или событие отброшено лимитом / за границей периода.
-                'messages_without_handler_event' => \count(array_diff_key($this->tracesQueued, $this->tracesHandled)),
-                'handler_events_without_queue_wait' => \count(array_diff_key($this->tracesHandled, $this->tracesQueued)),
+                'messages_without_handler_event' => self::excess($this->tracesQueued, $this->tracesHandled),
+                'handler_events_without_queue_wait' => self::excess($this->tracesHandled, $this->tracesQueued),
                 'events_without_duration' => $this->durationMissing,
                 'dropped_events' => $this->droppedEvents,
             ],
@@ -228,6 +241,22 @@ final class PerformanceReportBuilder
         $rank = static fn (float $p): float => $values[max(0, (int) ceil($p / 100 * $n) - 1)];
 
         return ['p50' => $rank(50), 'p95' => $rank(95), 'p99' => $rank(99), 'max' => $values[$n - 1]];
+    }
+
+    /**
+     * Сколько попыток из $left не нашли пары в $right (по ключу и числу).
+     *
+     * @param array<string, int> $left
+     * @param array<string, int> $right
+     */
+    private static function excess(array $left, array $right): int
+    {
+        $missing = 0;
+        foreach ($left as $key => $count) {
+            $missing += max(0, $count - ($right[$key] ?? 0));
+        }
+
+        return $missing;
     }
 
     private static function str(mixed $value): ?string

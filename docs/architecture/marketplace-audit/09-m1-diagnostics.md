@@ -34,8 +34,11 @@ S3 (`ObjectStorageInterface`, драйвер `s3`) хранит raw Ingestion (`
                                          └─ Monolog channel `performance` → var/log/performance-<Y-m-d>.jsonl
 ```
 
-- **Область** — одно сообщение воркера (`MessengerPerformanceSubscriber`) или один запуск
-  `app:marketplace:*` команды (`ConsolePerformanceSubscriber`). Вне области (php-fpm, прочие
+- **Область** — одно сообщение воркера из `App\Marketplace\*` или `App\Ingestion\*`
+  (`MessengerPerformanceSubscriber`) или один запуск `app:marketplace:*` команды
+  (`ConsolePerformanceSubscriber`). Сообщения других модулей на тех же воркерах (Cash, Inventory,
+  MarketplaceAds, почта) не замеряются и не расходуют лимит событий; их влияние на очередь видно через
+  lag замеряемых сообщений того же транспорта. Вне области (php-fpm, прочие
   команды, `messenger:consume` между сообщениями) ничего не замеряется.
 - **Накопление.** Строки классифицируются тысячами, mapping вызывается на каждую строку — писать
   событие на вызов значило бы залить диск. Внутри области этап копится в памяти и пишется одним
@@ -140,8 +143,8 @@ php bin/console app:marketplace:perf-report --skip-queues --max-mb=64
 агрегат по `failed`. Разделы: этапы (events, calls, p50/p95/p99/max, rows, rows/s, bytes, bytes/s,
 errors, max peak memory, событий без rows), очередь по транспортам (lag p50/p95/p99, lag n/a,
 redelivered), обработчики по типу сообщения (время, failed/retried/unknown, пик и прирост памяти),
-полнота (сообщения без события завершения — убитый воркер или граница периода; события без
-длительности; отброшенные), живой снимок очередей. Нет данных — явное сообщение с чек-листом.
+полнота (попытки без события завершения по ключу `transport|trace` с учётом повторов — убитый воркер
+или граница периода; события без длительности; отброшенные), живой снимок очередей. Нет данных — явное сообщение с чек-листом.
 
 Перцентили — nearest-rank по событиям. Событие этапа — сумма за сообщение, поэтому p95 этапа =
 «95% сообщений тратят на этап не больше», а не латентность одного HTTP-запроса. rows/s и bytes/s —
@@ -174,8 +177,9 @@ redelivered), обработчики по типу сообщения (врем�
    повторной доставки сообщения; число попыток статуса синка (`getAttempts()`) не пишется.
 7. **Scheduler не замеряется:** у контейнера нет тома `site_var_log`, флаг ему не передаётся. Cron-команды
    лишь ставят сообщения; их обработка замеряется в воркерах.
-8. **Не покрыто:** MarketplaceAds, Inventory, Ingestion-нормализация как этапы (их сообщения получают
-   только `queue_wait`/`handler`, обращения к S3 — `storage_*`), `ReprocessCostsMessage`, ручной
+8. **Не покрыто:** сообщения MarketplaceAds, Inventory, Cash и др. — вовсе (только косвенно через lag);
+   Ingestion-нормализация как этапы (её сообщения получают только `queue_wait`/`handler`, обращения к
+   S3 — `storage_*`), `ReprocessCostsMessage`, ручной
    `ProcessRawDocumentAction` вне конвейера, `cleanupWbOpenRowsByExternalIds()` (повторная
    классификация при forceRefresh).
 9. **Права на файл.** Если том `site_var_log` уже содержит каталог с владельцем, в который не может

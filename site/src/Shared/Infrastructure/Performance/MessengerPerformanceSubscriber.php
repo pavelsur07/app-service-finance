@@ -29,6 +29,14 @@ final class MessengerPerformanceSubscriber implements EventSubscriberInterface
 {
     private const REDIS_STREAM_ID = '/^(\d{10,16})-\d+$/';
 
+    /**
+     * Замеряются только сообщения маркетплейсов: Marketplace и Ingestion (параллельный
+     * конвейер данных Ozon/WB). Сообщения Cash, Inventory, MarketplaceAds и др. делят те же
+     * воркеры, но в отчёт M1 и в лимит событий не попадают; их влияние видно через lag
+     * замеряемых сообщений того же транспорта.
+     */
+    private const MEASURED_NAMESPACES = ['App\\Marketplace\\', 'App\\Ingestion\\'];
+
     public function __construct(private readonly PerformanceRecorder $recorder)
     {
     }
@@ -54,6 +62,10 @@ final class MessengerPerformanceSubscriber implements EventSubscriberInterface
         try {
             $envelope = $event->getEnvelope();
             $message = $envelope->getMessage();
+            if (!self::isMeasured($message)) {
+                return;
+            }
+
             $messageId = $envelope->last(TransportMessageIdStamp::class)?->getId();
             $trace = \is_string($messageId) || \is_int($messageId) ? (string) $messageId : null;
 
@@ -84,6 +96,17 @@ final class MessengerPerformanceSubscriber implements EventSubscriberInterface
     public function onFailed(WorkerMessageFailedEvent $event): void
     {
         $this->recorder->endScope($event->willRetry() ? PerformanceOutcome::Retry : PerformanceOutcome::Error);
+    }
+
+    public static function isMeasured(object $message): bool
+    {
+        foreach (self::MEASURED_NAMESPACES as $namespace) {
+            if (str_starts_with($message::class, $namespace)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

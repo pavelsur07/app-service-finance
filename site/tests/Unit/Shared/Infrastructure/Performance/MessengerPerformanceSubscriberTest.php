@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Performance;
 
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Message\CloseMonthStageMessage;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
@@ -110,7 +111,12 @@ final class MessengerPerformanceSubscriberTest extends TestCase
         $handler = new TestHandler();
         $recorder = $this->recorder($handler, true);
         $subscriber = new MessengerPerformanceSubscriber($recorder);
-        $message = new class {
+        // Имя анонимного наследника начинается с имени родителя — App\Marketplace\…, то есть замеряемое.
+        $message = new class extends MarketplaceRawDocument {
+            public function __construct()
+            {
+            }
+
             public function getCompanyId(): string
             {
                 throw new \LogicException('broken message');
@@ -127,6 +133,20 @@ final class MessengerPerformanceSubscriberTest extends TestCase
         }
 
         self::assertSame(1, $recorder->failedWrites());
+    }
+
+    public function testMessagesOfOtherModulesAreNotMeasured(): void
+    {
+        $handler = new TestHandler();
+        $recorder = $this->recorder($handler, true);
+        $subscriber = new MessengerPerformanceSubscriber($recorder);
+        $envelope = new Envelope(new \stdClass(), [new TransportMessageIdStamp('1728380000000-3')]);
+
+        $subscriber->onReceived(new WorkerMessageReceivedEvent($envelope, 'async_sync'));
+        $subscriber->onHandled(new WorkerMessageHandledEvent($envelope, 'async_sync'));
+
+        self::assertSame([], $handler->getRecords());
+        self::assertFalse($recorder->hasScope());
     }
 
     public function testProviderComesFromMarketplaceFieldOrClassName(): void

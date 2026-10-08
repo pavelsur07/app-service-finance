@@ -45,7 +45,7 @@ final class PerformanceReportCommandTest extends TestCase
         $lines = [
             ['stage' => 'queue_wait', 'provider' => 'ozon', 'duration_ms' => 250.0, 'transport' => 'async_sync', 'trace' => '1-0', 'lag_source' => 'redis_stream_id'],
             ['stage' => 'api_fetch', 'provider' => 'ozon', 'duration_ms' => 1200.0, 'calls' => 3, 'rows' => 900, 'bytes' => 300000, 'errors' => 1, 'memory_peak_bytes' => 40000000, 'outcome' => 'ok', 'trace' => '1-0'],
-            ['stage' => 'handler', 'provider' => 'ozon', 'job' => 'SyncOzonAccrualByDayMessage', 'duration_ms' => 1500.0, 'memory_peak_bytes' => 41000000, 'outcome' => 'ok', 'trace' => '1-0'],
+            ['stage' => 'handler', 'provider' => 'ozon', 'job' => 'SyncOzonAccrualByDayMessage', 'duration_ms' => 1500.0, 'memory_peak_bytes' => 41000000, 'outcome' => 'ok', 'transport' => 'async_sync', 'trace' => '1-0'],
         ];
         file_put_contents($this->dir.'/performance-2026-10-01.jsonl', implode("\n", array_map(
             static fn (array $c): string => (string) json_encode(['message' => 'perf', 'context' => ['v' => 1] + $c]),
