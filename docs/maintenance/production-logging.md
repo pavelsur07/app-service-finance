@@ -174,19 +174,25 @@ quarantine. Deletion requires its own explicit production approval.
 
 `app:disk:healthcheck` (scheduler, daily 07:34) raises one `error` and exits 1
 when the host filesystem under the Docker data directory is at or above 85%
-by inodes or by bytes. Inodes run out first: every merge pulls four image
-tags and nothing on production prunes images or the build cache. On
-2026-09-19 inodes hit 100% with 6.9G of bytes free, and `docker compose pull`
-failed every deploy for ten hours.
+by inodes or by bytes (percent as `df` shows it: used / (used + available)).
+Inodes run out first: every merge pulls four image tags. A successful deploy
+prunes images older than 14 days (`until=336h`, see "Production gates"), but
+nothing prunes the build cache, and a deploy that fails on `docker compose
+pull` never reaches its own prune step, so it cannot unblock itself. On
+2026-09-19 inodes hit 100% with 6.9G of bytes free, and every deploy failed for
+ten hours.
 
-Check: `df -i /` and `df -h /` on the host. Remedy, a production mutation that
-needs the owner's approval each time:
+Check on the host: `docker info -f '{{.DockerRootDir}}'`, then `df -i` and
+`df -h` on that path (the gate measures the filesystem of the Docker data
+directory through the scheduler's overlay root). Remedy, a production mutation
+that needs the owner's approval each time:
 
 ```bash
 docker builder prune -af
 docker image prune -af --filter 'until=168h'
 ```
 
-A week of tags stays as rollback targets; the running image is protected by
-its container. On 2026-09-19 this took inodes from 100% to 19% and disk from
+The manual prune is deliberately deeper than the automatic one (one week
+instead of two): it runs when the disk is already full. A week of tags stays as
+rollback targets; the running image is protected by its container. On 2026-09-19 this took inodes from 100% to 19% and disk from
 87% to 44%.

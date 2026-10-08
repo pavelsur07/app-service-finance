@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Command;
 
 use App\Shared\Command\DiskHealthCheckCommand;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -67,6 +68,56 @@ final class DiskHealthCheckCommandTest extends TestCase
         $tester = $this->tester($logger, inodes: 'overlay 3276800 3273113 3687 100% /', bytes: 'overlay 40000000 17600000 22400000 44% /');
 
         self::assertSame(Command::FAILURE, $tester->execute([]));
+    }
+
+    /**
+     * ext4 держит 5% блоков за root: used / total дал бы 81%, а `df -h` показывает 85%.
+     * Гейт считает как df, иначе срабатывал бы только около 90%.
+     */
+    public function testReservedBlocksCountAsUnavailable(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->with('Disk usage above threshold', self::callback(
+                static fn (array $context): bool => ['bytes'] === $context['exceeded'] && 85 === $context['bytes_used_percent'],
+            ));
+
+        $tester = $this->tester($logger, inodes: 'overlay 3276800 622592 2654208 19% /', bytes: 'overlay 40000000 32300000 5700000 85% /');
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+    }
+
+    public function testPercentIsRoundedUpToTheThreshold(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with('Disk usage above threshold', self::anything());
+
+        // 84.01% → 85%: гейт не должен молчать на доле процента ниже порога.
+        $tester = $this->tester($logger, inodes: 'overlay 10000 8401 1599 84% /', bytes: 'overlay 40000000 17600000 22400000 44% /');
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+    }
+
+    #[DataProvider('invalidThresholds')]
+    public function testInvalidThresholdIsRejected(string $threshold): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+
+        $tester = $this->tester($logger, inodes: 'overlay 3276800 622592 2654208 19% /', bytes: 'overlay 40000000 17600000 22400000 44% /');
+
+        self::assertSame(Command::INVALID, $tester->execute(['--threshold' => $threshold]));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidThresholds(): iterable
+    {
+        yield 'not a number' => ['abc'];
+        yield 'zero' => ['0'];
+        yield 'above 100' => ['150'];
     }
 
     public function testFilesystemWithoutInodeLimitIsNotApplicable(): void

@@ -17,8 +17,10 @@ use Symfony\Component\Process\Process;
  *
  * 19.09.2026 деплой молча не доезжал почти десять часов: `docker compose pull`
  * падал с «no space left on device», хотя байтов было свободно 6.9G — кончились
- * inode (образы и build-кэш, которые на проде ничто не чистит). `df -h` этого не
- * показывает, поэтому inode проверяются отдельно.
+ * inode. Образы старше 14 дней деплой чистит только после УСПЕШНОЙ выкатки, а
+ * build-кэш не чистит никто: упавший на pull деплой до чистки не доходит и сам
+ * себя не разблокирует. `df -h` этого не показывает, поэтому inode проверяются
+ * отдельно.
  *
  * Корень контейнера — overlay, а statfs у overlay отдаёт файловую систему его
  * верхнего слоя, то есть каталог данных Docker на хосте: именно её заполняют образы.
@@ -52,7 +54,13 @@ final class DiskHealthCheckCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $path = (string) $input->getOption('path');
-        $threshold = (int) $input->getOption('threshold');
+        $rawThreshold = (string) $input->getOption('threshold');
+        $threshold = ctype_digit($rawThreshold) ? (int) $rawThreshold : 0;
+        if ($threshold < 1 || $threshold > 100) {
+            $output->writeln('<error>--threshold должен быть целым числом от 1 до 100.</error>');
+
+            return Command::INVALID;
+        }
 
         try {
             $usage = [
@@ -94,9 +102,12 @@ final class DiskHealthCheckCommand extends Command
 
     /**
      * POSIX-вывод df: заголовок и одна строка «fs total used available capacity mount».
-     * Процент считается из used/total, а не из колонки capacity: busybox и coreutils
-     * округляют её по-разному. total = 0 — файловая система без фиксированного
-     * числа inode (btrfs): показатель неприменим, это не сбой.
+     * Процент — used / (used + available) с округлением вверх, как Use% у coreutils:
+     * зарезервированные root блоки ext4 (5%) иначе занижали бы показатель, и гейт
+     * расходился бы с `df -h`, по которому человек его перепроверяет. Колонку
+     * capacity не берём: busybox округляет её до ближайшего. used + available = 0 —
+     * файловая система без фиксированного числа inode (btrfs): показатель
+     * неприменим, это не сбой.
      *
      * @param list<string> $arguments
      */
@@ -112,16 +123,18 @@ final class DiskHealthCheckCommand extends Command
 
         $lines = preg_split('/\R/', trim($process->getOutput())) ?: [];
         $columns = preg_split('/\s+/', trim((string) end($lines))) ?: [];
-        if (count($lines) < 2 || count($columns) < 6 || !ctype_digit($columns[1]) || !ctype_digit($columns[2])) {
-            throw new \RuntimeException(sprintf('Unexpected df %s output.', implode(' ', $arguments)));
+        if (count($lines) < 2 || count($columns) < 6 || !ctype_digit($columns[2]) || !ctype_digit($columns[3])) {
+            // Строка df — имя устройства, счётчики и точка монтирования: секретов в ней нет.
+            throw new \RuntimeException(sprintf('Unexpected df %s output: "%s".', implode(' ', $arguments), mb_substr((string) end($lines), 0, 200)));
         }
 
-        $total = (int) $columns[1];
-        if (0 === $total) {
+        $used = (int) $columns[2];
+        $capacity = $used + (int) $columns[3];
+        if (0 === $capacity) {
             return null;
         }
 
-        return (int) ceil((int) $columns[2] * 100 / $total);
+        return (int) ceil($used * 100 / $capacity);
     }
 
     private function format(?int $percent): string
