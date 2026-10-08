@@ -61,6 +61,10 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'PremiumSubscription' => ['52', 'PremiumSubscription', 'ozon_premium_promotion'];
         // «Краткосрочное размещение возврата FBS» — решение Владельца от 26.09.2026.
         yield 'TemporaryPlacement' => ['78', 'TemporaryPlacement', 'ozon_temporary_storage'];
+        // До 08.10.2026 уходили в ozon_unknown_126 и ozon_unknown_92: подписка
+        // 8 500 руб. за 30.09–30.10 у двух компаний и штраф 417,29 руб. по отправлению.
+        yield 'AnalyticsPremium' => ['126', 'AnalyticsPremium', 'ozon_analytics_premium'];
+        yield 'DefectFineComplaint' => ['92', 'DefectFineComplaint', 'ozon_fines_customer_complaint'];
         // Compensation разводится по знаку отдельными тестами ниже: направление
         // у неё кодируется категорией, а не только видом операции.
     }

@@ -252,6 +252,11 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_fines_customer_complaint
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "По аналогии с ozon_fines_wrong_item"
       - cost_code: ozon_defect_rate_shipment_delay
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
@@ -303,6 +308,11 @@ marketplaces:
       - cost_code: ozon_premium_promotion
         pl_code: PROMO_INTERNAL
         include_in_pl: true
+      - cost_code: ozon_analytics_premium
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+        confidence: medium
+        note: "Подписка площадки, по аналогии с ozon_premium_promotion"
       - cost_code: ozon_premium_cashback
         pl_code: PROMO_INTERNAL
         include_in_pl: true

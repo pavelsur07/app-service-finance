@@ -13321,12 +13321,6 @@ parameters:
 			path: tests/Unit/Marketplace/Ozon/Domain/Backward/OzonResolveBackwardCompatTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertCount\(\) with arguments 85, array\{ozon_sale_commission\: ''Вознаграждение'', ozon_brand_commission\: ''Вознаграждение'', ozon_logistic_direct\: ''Услуги доставки и…'', ozon_logistic_direct_vdc\: ''Услуги доставки и…'', ozon_logistic_direct_trans\: ''Услуги доставки и…'', ozon_logistic_delivery\: ''Услуги доставки и…'', ozon_logistic_kgt\: ''Услуги доставки и…'', ozon_logistic_return\: ''Услуги доставки и…'', \.\.\.\} and ''EXPECTED_GROUPS…'' will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Unit/Marketplace/Domain/Backward/WidgetGroupBackwardCompatTest.php
-
-		-
 			message: '#^Method App\\Tests\\Unit\\Marketplace\\Ozon\\Infrastructure\\Api\\OzonSellerCredentialValidatorTest\:\:assertHeaderValue\(\) has parameter \$options with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1

@@ -79,7 +79,7 @@ final class OzonCostCategoryTest extends TestCase
         'ClickAndCollect', 'QuantProcessingDrop', 'PackageUnitProcessing', 'OversizedExtraHandling',
         'ItemSealing', 'PackmanCisPacking', 'Marking',
         // Штрафы и индекс ошибок без однозначной категории
-        'DefectRate', 'DefectFineModeration', 'DefectFineCounterfeitGoods', 'DefectFineComplaint', 'DefectFineErrors',
+        'DefectRate', 'DefectFineModeration', 'DefectFineCounterfeitGoods', 'DefectFineErrors',
         // Взаиморасчёты, претензии, обеспечительные платежи — не услуги
         'SaleCommission', 'ClaimCommission', 'CorrectionCommission', 'SetOff', 'VolumeObligationReward',
         'BrandDeposit', 'KazakhstanBuyerInstallment',
@@ -220,6 +220,7 @@ final class OzonCostCategoryTest extends TestCase
         yield 'RealizationReportCorrection' => ['RealizationReportCorrection', 'ozon_service_correction'];
         yield 'ReviewsPin' => ['ReviewsPin', 'ozon_pin_review'];
         yield 'VolumeWeightCharacteristicsProcessing' => ['VolumeWeightCharacteristicsProcessing', 'ozon_ovh_processing'];
+        yield 'DefectFineComplaint' => ['DefectFineComplaint', 'ozon_fines_customer_complaint'];
     }
 
     #[DataProvider('exactDictionaryMatches')]
