@@ -15,6 +15,8 @@ use App\Marketplace\Ozon\Application\Service\OzonAccrualRecordKey;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -46,6 +48,7 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
+        private readonly PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -76,12 +79,15 @@ final class OzonAccrualReturnsRawProcessor implements MarketplaceRawProcessorInt
             throw new \RuntimeException('Company not found: '.$companyId);
         }
 
+        // Диагностика M1: извлечение записей из строк by-day — source normalization.
+        $normalizeStartedAt = $this->performance->start();
         $returns = [];
         foreach ($rawRows as $row) {
             foreach ($this->extractReturns($row) as $return) {
                 $returns[] = $return;
             }
         }
+        $this->performance->add(PerformanceStage::SourceNormalize, $normalizeStartedAt, rows: count($returns));
 
         if ([] === $returns) {
             return;

@@ -11,6 +11,8 @@ use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Wildberries\Application\Service\WbFinanceRateLimiter;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -31,6 +33,7 @@ final readonly class WbFinanceSalesReportClient
         private HttpClientInterface $httpClient,
         WbFinanceRateLimiter $rateLimiter,
         ?LoggerInterface $logger = null,
+        private PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
         $this->logger = $logger ?? new NullLogger();
         $this->rateLimiter = $rateLimiter;
@@ -101,6 +104,8 @@ final readonly class WbFinanceSalesReportClient
             }
         }
 
+        $fetchStartedAt = $this->performance->start();
+
         try {
             $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
                 'headers' => ['Authorization' => $apiKey],
@@ -117,8 +122,13 @@ final readonly class WbFinanceSalesReportClient
             $headers = $response->getHeaders(false);
             $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
+            $this->performance->add(PerformanceStage::ApiFetch, $fetchStartedAt, failed: true);
+
             throw new MarketplaceTemporaryApiException('WB API transport error.', 0, '', $dateFrom, $dateTo, $e);
         }
+
+        // Неуспешный статус (429, 5xx, 401) — ошибка этапа fetch, хотя HTTP-обмен состоялся.
+        $this->performance->add(PerformanceStage::ApiFetch, $fetchStartedAt, bytes: \strlen($body), failed: 200 !== $statusCode && 204 !== $statusCode);
 
         $excerpt = $this->createSafeExcerpt($body);
 
@@ -149,11 +159,17 @@ final readonly class WbFinanceSalesReportClient
             throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
         }
 
+        $parseStartedAt = $this->performance->start();
+
         try {
             $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
+            $this->performance->add(PerformanceStage::SourceParse, $parseStartedAt, bytes: \strlen($body), failed: true);
+
             throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
         }
+
+        $this->performance->add(PerformanceStage::SourceParse, $parseStartedAt, rows: is_array($decoded) ? count($decoded) : null, bytes: \strlen($body));
 
         if (!is_array($decoded) || !array_is_list($decoded)) {
             throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);

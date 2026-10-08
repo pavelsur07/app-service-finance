@@ -4819,7 +4819,7 @@ parameters:
 			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\MarketplaceCostCategoryResolver\:\:resolve\(\) should return App\\Marketplace\\Entity\\MarketplaceCostCategory but returns object\.$#'
+			message: '#^Method App\\Marketplace\\Application\\Service\\MarketplaceCostCategoryResolver\:\:doResolve\(\) should return App\\Marketplace\\Entity\\MarketplaceCostCategory but returns object\.$#'
 			identifier: return.type
 			count: 1
 			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php

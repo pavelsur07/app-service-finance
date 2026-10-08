@@ -11,6 +11,9 @@ use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
+use App\Shared\Infrastructure\Performance\PerformanceProbe;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -36,6 +39,7 @@ final class OzonRealizationFetcher
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly ConnectionApiKeyCodec $connectionApiKeyCodec,
+        private readonly PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -53,21 +57,28 @@ final class OzonRealizationFetcher
             'month' => $month,
         ]);
 
-        $response = $this->httpClient->request('POST', self::BASE_URL.self::ENDPOINT, [
-            'headers' => $this->buildHeaders($connection),
-            'json' => [
-                'month' => $month,
-                'year' => $year,
-            ],
-        ]);
+        // Время включает toArray(): разбор JSON от загрузки не отделён (09-m1-diagnostics.md).
+        $data = $this->performance->measure(PerformanceStage::ApiFetch, function (PerformanceProbe $probe) use ($connection, $year, $month): array {
+            $response = $this->httpClient->request('POST', self::BASE_URL.self::ENDPOINT, [
+                'headers' => $this->buildHeaders($connection),
+                'json' => [
+                    'month' => $month,
+                    'year' => $year,
+                ],
+            ]);
 
-        $statusCode = $response->getStatusCode();
+            $statusCode = $response->getStatusCode();
 
-        if (200 !== $statusCode) {
-            throw $this->apiFailure($statusCode, $response, $year, $month);
-        }
+            if (200 !== $statusCode) {
+                throw $this->apiFailure($statusCode, $response, $year, $month);
+            }
 
-        $data = $response->toArray();
+            $data = $response->toArray();
+            $probe->rows(is_countable($data['result']['rows'] ?? null) ? count($data['result']['rows']) : 0)
+                ->bytes($response->getInfo('size_download'));
+
+            return $data;
+        });
 
         $rows = $data['result']['rows'] ?? [];
 

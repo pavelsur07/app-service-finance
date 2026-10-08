@@ -16,6 +16,8 @@ use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
@@ -50,6 +52,7 @@ final class ProcessOzonRealizationHandler
         private readonly LockFactory $lockFactory,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
+        private readonly PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
@@ -115,9 +118,15 @@ final class ProcessOzonRealizationHandler
         $this->saveAndFlush($status);
         $this->logger->info('Ozon realization processing started', $context);
 
+        // Диагностика M1: в действии чтение raw, нормализация, сопоставление и запись идут
+        // одним циклом — замеряется целиком (processor_total); flush — отдельно, как posting.
+        $processStartedAt = $this->performance->start();
+
         try {
             $result = ($this->processAction)($message->companyId, $message->rawDocumentId);
+            $this->performance->add(PerformanceStage::ProcessorTotal, $processStartedAt, rows: $result['created'] + $result['updated'] + $result['skipped']);
         } catch (\Throwable $e) {
+            $this->performance->add(PerformanceStage::ProcessorTotal, $processStartedAt, failed: true);
             $this->logger->error('Ozon realization processing failed', $context + ['error_class' => $e::class, 'error' => mb_substr($e->getMessage(), 0, 300)]);
             $this->recordFailure($message, $e);
 

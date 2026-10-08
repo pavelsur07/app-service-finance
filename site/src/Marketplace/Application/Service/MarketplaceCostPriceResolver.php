@@ -7,6 +7,8 @@ namespace App\Marketplace\Application\Service;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 
 /**
  * Резолвер себестоимости для документов маркетплейса.
@@ -20,9 +22,14 @@ use App\Marketplace\Inventory\CostPriceResolverInterface;
  */
 final class MarketplaceCostPriceResolver
 {
+    /** Не readonly и с умолчанием: тесты создают сервис и без конструктора (partial mock). */
+    private ?PerformanceRecorder $performance = null;
+
     public function __construct(
         private readonly CostPriceResolverInterface $costPriceResolver,
+        ?PerformanceRecorder $performance = null,
     ) {
+        $this->performance = $performance;
     }
 
     /**
@@ -93,10 +100,15 @@ final class MarketplaceCostPriceResolver
 
     private function resolve(MarketplaceListing $listing, \DateTimeImmutable $date): string
     {
-        return $this->costPriceResolver->resolve(
+        // Диагностика M1: поиск себестоимости — этап financial_mapping.
+        $startedAt = $this->performance?->start();
+        $costPrice = $this->costPriceResolver->resolve(
             companyId: (string) $listing->getCompany()->getId(),
             listingId: $listing->getId(),
             date: $date,
         );
+        $this->performance?->add(PerformanceStage::FinancialMapping, $startedAt, rows: 1);
+
+        return $costPrice;
     }
 }

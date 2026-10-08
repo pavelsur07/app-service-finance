@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Marketplace\MessageHandler;
 
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
+use App\Marketplace\Infrastructure\Performance\MarketplacePerformanceProvider;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Wildberries\Application\FinancialReport\WbGeneratedRowsSafeReplaceServiceInterface;
+use App\Shared\Infrastructure\Performance\PerformanceRecorder;
+use App\Shared\Infrastructure\Performance\PerformanceStage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -31,15 +35,24 @@ final class ProcessDayReportHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
         private readonly WbGeneratedRowsSafeReplaceServiceInterface $safeReplaceService,
+        private readonly PerformanceRecorder $performance = new PerformanceRecorder(),
     ) {
     }
 
     public function __invoke(ProcessDayReportMessage $message): void
     {
+        // Первая загрузка в сообщении гидрирует JSON-колонку raw_data целиком: это и есть
+        // чтение raw (PostgreSQL, не S3) вместе с его разбором json_decode.
+        $loadStartedAt = $this->performance->start();
         $doc = $this->repository->find($message->rawDocumentId);
 
         if (null === $doc) {
             throw new UnrecoverableMessageHandlingException(sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId));
+        }
+
+        if ($doc instanceof MarketplaceRawDocument) {
+            $this->performance->setProvider(MarketplacePerformanceProvider::of($doc->getMarketplace()));
+            $this->performance->add(PerformanceStage::StorageRead, $loadStartedAt, rows: $doc->getRecordsCount(), backend: 'postgres');
         }
 
         if ((string) $doc->getCompany()->getId() !== $message->companyId) {

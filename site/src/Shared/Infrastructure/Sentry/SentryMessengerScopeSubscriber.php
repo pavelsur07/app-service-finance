@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Sentry;
 
+use App\Shared\Infrastructure\Messenger\MessageCompanyId;
 use Sentry\State\HubInterface;
 use Sentry\State\Scope;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -37,7 +38,7 @@ final class SentryMessengerScopeSubscriber implements EventSubscriberInterface
     public function onMessageReceived(WorkerMessageReceivedEvent $event): void
     {
         $message = $event->getEnvelope()->getMessage();
-        $companyId = $this->companyId($message);
+        $companyId = MessageCompanyId::of($message);
 
         $this->hub->configureScope(static function (Scope $scope) use ($message, $companyId): void {
             $scope->setTag('messenger.message', $message::class);
@@ -48,38 +49,5 @@ final class SentryMessengerScopeSubscriber implements EventSubscriberInterface
                 $scope->removeTag('company_id');
             }
         });
-    }
-
-    private function companyId(object $message): ?string
-    {
-        if (method_exists($message, 'getCompanyId')) {
-            return $this->stringify($message->getCompanyId());
-        }
-
-        // isset() (а не property_exists + прямой доступ) безопасно вернёт false
-        // для private/protected/неинициализированного свойства — воркер не упадёт.
-        if (isset($message->companyId)) {
-            return $this->stringify($message->companyId);
-        }
-
-        return null;
-    }
-
-    private function stringify(mixed $value): ?string
-    {
-        if (\is_string($value)) {
-            return $value;
-        }
-
-        if (\is_int($value)) {
-            return (string) $value;
-        }
-
-        // PHP 8: класс с __toString() неявно реализует Stringable (UUID VO и т.п.).
-        if ($value instanceof \Stringable) {
-            return (string) $value;
-        }
-
-        return null;
     }
 }
