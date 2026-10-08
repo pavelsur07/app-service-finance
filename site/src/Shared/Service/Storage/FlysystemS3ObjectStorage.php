@@ -68,7 +68,7 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         try {
             $this->filesystem->write($path, $contents);
         } catch (FilesystemException $exception) {
-            throw new ObjectStorageException(sprintf('Failed to write object "%s".', $path), 0, $exception);
+            throw new ObjectStorageException('Failed to write object.', previous: $exception, path: $path);
         }
 
         return new StoredObject($path, strlen($contents));
@@ -79,7 +79,7 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         try {
             return $this->filesystem->read($path);
         } catch (FilesystemException $exception) {
-            throw new ObjectStorageException(sprintf('Failed to read object "%s".', $path), 0, $exception);
+            throw new ObjectStorageException('Failed to read object.', previous: $exception, path: $path);
         }
     }
 
@@ -88,7 +88,7 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         try {
             return $this->filesystem->readStream($path);
         } catch (FilesystemException $exception) {
-            throw new ObjectStorageException(sprintf('Failed to read object "%s".', $path), 0, $exception);
+            throw new ObjectStorageException('Failed to read object.', previous: $exception, path: $path);
         }
     }
 
@@ -97,7 +97,7 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         try {
             return $this->filesystem->fileExists($path);
         } catch (FilesystemException $exception) {
-            throw new ObjectStorageException(sprintf('Failed to check object "%s".', $path), 0, $exception);
+            throw new ObjectStorageException('Failed to check object.', previous: $exception, path: $path);
         }
     }
 
@@ -106,7 +106,7 @@ final class FlysystemS3ObjectStorage implements ObjectStorageInterface
         try {
             $this->filesystem->delete($path);
         } catch (FilesystemException $exception) {
-            throw new ObjectStorageException(sprintf('Failed to delete object "%s".', $path), 0, $exception);
+            throw new ObjectStorageException('Failed to delete object.', previous: $exception, path: $path);
         }
     }
 }
