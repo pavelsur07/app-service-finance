@@ -126,6 +126,85 @@ final class SoftDeleteCompanyTransactionsCommandTest extends IntegrationTestCase
         self::assertNull($audit['delete_reason']);
     }
 
+    /**
+     * Откат массового удаления не должен «воскрешать» операции, удалённые вручную
+     * через UI (обычно это дубли импорта): иначе задваиваются ДДС и остатки.
+     */
+    public function testRestoreKeepsManuallyDeletedTransactions(): void
+    {
+        $company = $this->company();
+        $massDeleted = $this->transaction($company, new \DateTimeImmutable('2026-01-15'));
+        $deletedByUser = $this->transaction($company, new \DateTimeImmutable('2026-01-16'));
+        $deletedByUser->markDeleted('user-1', 'дубль');
+        $deletedWithoutActor = $this->transaction($company, new \DateTimeImmutable('2026-01-17'));
+        $deletedWithoutActor->markDeleted(null);
+        $this->em->flush();
+
+        $this->runCommand((string) $company->getId(), ['--execute' => true]);
+        $tester = $this->runCommand((string) $company->getId(), ['--execute' => true, '--restore' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $this->em->clear();
+        self::assertFalse($this->reload($massDeleted)->isDeleted());
+        self::assertTrue($this->reload($deletedByUser)->isDeleted(), 'Удалённая пользователем операция должна остаться удалённой.');
+        self::assertTrue($this->reload($deletedWithoutActor)->isDeleted(), 'Удаление без автора — не массовое, restore его не трогает.');
+        self::assertSame('user-1', $this->em->getConnection()->fetchOne(
+            'SELECT deleted_by FROM cash_transaction WHERE id = :id',
+            ['id' => $deletedByUser->getId()],
+        ));
+    }
+
+    public function testRestoreDryRunCountsOnlyMassDeleted(): void
+    {
+        $company = $this->company();
+        $this->transaction($company, new \DateTimeImmutable('2026-01-15'));
+        $this->transaction($company, new \DateTimeImmutable('2026-01-16'))->markDeleted('user-1');
+        $this->transaction($company, new \DateTimeImmutable('2026-01-17'))->markDeleted('user-1');
+        $this->em->flush();
+        $this->runCommand((string) $company->getId(), ['--execute' => true]);
+
+        $tester = $this->runCommand((string) $company->getId(), ['--restore' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $display = preg_replace('/\s+/u', ' ', $tester->getDisplay());
+        self::assertStringContainsString('Будет восстановлено: 1 транзакций', (string) $display);
+        self::assertStringContainsString('Удалены вручную, restore их не тронет: 2', (string) $display);
+    }
+
+    public function testManuallyDeletedRowInLockedPeriodDoesNotBlockRestore(): void
+    {
+        $company = $this->company();
+        $this->transaction($company, new \DateTimeImmutable('2026-01-15'))->markDeleted('user-1');
+        $massDeleted = $this->transaction($company, new \DateTimeImmutable('2026-03-01'));
+        $company->setFinanceLockBefore(new \DateTimeImmutable('2026-02-01'));
+        $this->em->flush();
+        $this->runCommand((string) $company->getId(), ['--execute' => true]);
+
+        $tester = $this->runCommand((string) $company->getId(), ['--execute' => true, '--restore' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $this->em->clear();
+        self::assertFalse($this->reload($massDeleted)->isDeleted());
+    }
+
+    public function testMassDeletedRowInLockedPeriodStillBlocksRestore(): void
+    {
+        $company = $this->company();
+        $massDeleted = $this->transaction($company, new \DateTimeImmutable('2026-01-15'));
+        $this->em->flush();
+        $this->runCommand((string) $company->getId(), ['--execute' => true]);
+        $company = $this->em->find(Company::class, $company->getId());
+        \assert($company instanceof Company);
+        $company->setFinanceLockBefore(new \DateTimeImmutable('2026-02-01'));
+        $this->em->flush();
+
+        $tester = $this->runCommand((string) $company->getId(), ['--execute' => true, '--restore' => true]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        $this->em->clear();
+        self::assertTrue($this->reload($massDeleted)->isDeleted());
+    }
+
     public function testReasonWithRestoreEmitsWarning(): void
     {
         $company = $this->company();

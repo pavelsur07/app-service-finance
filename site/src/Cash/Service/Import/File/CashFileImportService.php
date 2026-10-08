@@ -29,8 +29,13 @@ use Ramsey\Uuid\Uuid;
 
 final class CashFileImportService
 {
+    private const IMPORT_SOURCE = 'file';
+
     /** @var array<string, Counterparty> */
     private array $counterpartyCache = [];
+
+    /** @var list<CashTransaction> */
+    private array $batchTransactions = [];
 
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
@@ -85,6 +90,11 @@ final class CashFileImportService
             ProjectDirection::class,
             $responsibilityPair->projectDirectionId
         );
+
+        // Сервис живёт в воркере между сообщениями: хвост упавшего импорта не
+        // должен попасть в пачку следующего.
+        $this->batchTransactions = [];
+        $this->counterpartyCache = [];
 
         $created = 0;
         $createdMinDate = null;
@@ -181,7 +191,7 @@ final class CashFileImportService
                             $occurredAt,
                         );
                         $transaction->setDedupeHash($dedupeHash);
-                        $transaction->setImportSource('file');
+                        $transaction->setImportSource(self::IMPORT_SOURCE);
                         $transaction->setDocNumber($docNumber);
                         $transaction->setDescription($description);
                         $transaction->setProjectDirection($systemProject);
@@ -192,13 +202,9 @@ final class CashFileImportService
                             'mapping' => $mapping,
                         ]);
                         $transaction->setUpdatedAt(new \DateTimeImmutable());
-
-                        if (is_string($docNumber)) {
-                            $trimmedDocNumber = trim($docNumber);
-                            if ('' !== $trimmedDocNumber) {
-                                $transaction->setExternalId($trimmedDocNumber);
-                            }
-                        }
+                        // Номер документа не идёт в external_id: он повторяется между годами
+                        // и счетами, а uniq_cashflow_import валил на нём весь импорт.
+                        // Дубли файла ловит dedupeHash, номер хранится в doc_number.
 
                         if (null !== $counterpartyName) {
                             $counterparty = $this->getOrCreateCounterparty($companyId, $counterpartyName, $company);
@@ -208,6 +214,7 @@ final class CashFileImportService
                         }
 
                         $this->entityManager->persist($transaction);
+                        $this->batchTransactions[] = $transaction;
 
                         ++$created;
                         if ($importLog) {
@@ -247,10 +254,45 @@ final class CashFileImportService
                 $this->accountBalanceService->recalculateDailyRange($company, $moneyAccount, $createdMinDate, $toDate);
             }
         } finally {
-            if ($importLog) {
+            // На закрытом EM finish() бросил бы и подменил исходное исключение;
+            // журнал тогда закрывает CashFileImportHandler после resetManager().
+            if ($importLog && $this->entityManager->isOpen()) {
                 $this->importLogger->finish($importLog);
             }
         }
+    }
+
+    /**
+     * Пересчёт остатков по строкам, которые упавший импорт успел зафиксировать:
+     * пачки коммитятся по отдельности, а штатный пересчёт стоит после цикла.
+     * Повторная загрузка того же файла пропустит эти строки как дубли и диапазон
+     * не пересчитает.
+     */
+    public function recalculateCommittedRows(CashFileImportJob $job): void
+    {
+        $startedAt = $job->getStartedAt();
+        if (null === $startedAt) {
+            return;
+        }
+
+        $company = $job->getCompany();
+        $account = $job->getMoneyAccount();
+        $range = $this->cashTransactionRepository->findOccurredRangeByCompanyAccountSourceCreatedSince(
+            (string) $company->getId(),
+            (string) $account->getId(),
+            self::IMPORT_SOURCE,
+            $startedAt,
+        );
+        if (null === $range) {
+            return;
+        }
+
+        [$from, $to] = $range;
+        $today = new \DateTimeImmutable('today');
+        if ($from <= $today) {
+            $to = $today;
+        }
+        $this->accountBalanceService->recalculateDailyRange($company, $account, $from, $to);
     }
 
     /**
@@ -396,11 +438,21 @@ final class CashFileImportService
         return $this->counterpartyCache[$cacheKey] = $counterparty;
     }
 
+    /**
+     * Отсоединяет только сущности пачки. clear() в ORM 3 не принимает класс и
+     * очищает весь UnitOfWork: компания, счёт, журнал и job отсоединялись, и
+     * импорт падал после первой пачки или на закрытии журнала.
+     */
     private function flushBatch(): void
     {
         $this->entityManager->flush();
-        $this->entityManager->clear(CashTransaction::class);
-        $this->entityManager->clear(Counterparty::class);
+        foreach ($this->batchTransactions as $transaction) {
+            $this->entityManager->detach($transaction);
+        }
+        foreach ($this->counterpartyCache as $counterparty) {
+            $this->entityManager->detach($counterparty);
+        }
+        $this->batchTransactions = [];
         $this->counterpartyCache = [];
     }
 

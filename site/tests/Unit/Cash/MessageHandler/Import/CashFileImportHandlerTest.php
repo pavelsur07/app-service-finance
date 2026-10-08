@@ -25,7 +25,11 @@ use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryFileFactory;
 use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
 final class CashFileImportHandlerTest extends TestCase
@@ -52,8 +56,9 @@ final class CashFileImportHandlerTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->method('find')->willReturn($job);
+        $entityManager->method('isOpen')->willReturn(true);
 
-        $handler = new CashFileImportHandler($entityManager, $this->createImportService());
+        $handler = $this->createHandler($entityManager);
         $handler(new CashFileImportMessage((string) $job->getId()));
 
         self::assertSame(CashFileImportJob::STATUS_FAILED, $job->getStatus());
@@ -72,12 +77,79 @@ final class CashFileImportHandlerTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->method('find')->willReturn($job);
+        $entityManager->method('isOpen')->willReturn(true);
 
-        $handler = new CashFileImportHandler($entityManager, $this->createImportService());
+        $handler = $this->createHandler($entityManager);
         $handler(new CashFileImportMessage((string) $job->getId()));
 
         self::assertSame(CashFileImportJob::STATUS_PROCESSING, $job->getStatus());
         self::assertNull($job->getErrorMessage());
+    }
+
+    public function testFailureOnClosedEntityManagerIsRecordedThroughFreshManagerAndLogged(): void
+    {
+        $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
+        $foreignAccount = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString())),
+            MoneyAccountType::BANK,
+            'Foreign account',
+            'RUB',
+        );
+        $jobId = Uuid::uuid4()->toString();
+        $job = new CashFileImportJob($jobId, $company, $foreignAccount, 'file', 'a.csv', 'hash', []);
+        $freshJob = new CashFileImportJob($jobId, $company, $foreignAccount, 'file', 'a.csv', 'hash', []);
+        $freshJob->start();
+
+        $closedManager = $this->createMock(EntityManagerInterface::class);
+        $closedManager->method('find')->willReturn($job);
+        $closedManager->method('isOpen')->willReturn(false);
+
+        $freshManager = $this->createMock(EntityManagerInterface::class);
+        $freshManager->method('find')->willReturn($freshJob);
+        $freshManager->expects(self::once())->method('flush');
+
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->expects(self::once())->method('resetManager');
+        $registry->method('getManager')->willReturn($freshManager);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        // Чужой счёт — ошибка входа (DomainException): warning, не инцидент.
+        $logger->expects(self::once())->method('log')->with(
+            LogLevel::WARNING,
+            'Cash file import failed',
+            self::callback(static fn (array $context): bool => $jobId === $context['jobId']
+                && $company->getId() === $context['companyId']
+                && \DomainException::class === $context['exceptionClass']
+                // Текст исключения не логируется: только класс и место.
+                && ['jobId', 'companyId', 'exceptionClass', 'exceptionAt'] === array_keys($context)),
+        );
+
+        $handler = new CashFileImportHandler(
+            $closedManager,
+            $this->createImportService(),
+            $registry,
+            new ImportLogger($freshManager),
+            $logger,
+        );
+        $handler(new CashFileImportMessage($jobId));
+
+        self::assertSame(CashFileImportJob::STATUS_FAILED, $freshJob->getStatus());
+        self::assertStringContainsString(\DomainException::class, (string) $freshJob->getErrorMessage());
+    }
+
+    private function createHandler(EntityManagerInterface $entityManager): CashFileImportHandler
+    {
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($entityManager);
+
+        return new CashFileImportHandler(
+            $entityManager,
+            $this->createImportService(),
+            $registry,
+            new ImportLogger($entityManager),
+            new NullLogger(),
+        );
     }
 
     private function createImportService(): CashFileImportService

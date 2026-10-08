@@ -107,6 +107,6 @@ final class CashFileImportFacade
 
     public function commitJob(CashFileImportJob $job): void
     {
-        $this->entityManager->flush($job);
+        $this->entityManager->flush();
     }
 }

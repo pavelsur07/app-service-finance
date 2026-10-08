@@ -7,8 +7,12 @@ namespace App\Cash\MessageHandler\Import;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Service\Import\File\CashFileImportService;
+use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
@@ -17,6 +21,9 @@ final class CashFileImportHandler
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CashFileImportService $importService,
+        private readonly ManagerRegistry $managerRegistry,
+        private readonly ImportLogger $importLogger,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -38,6 +45,12 @@ final class CashFileImportHandler
 
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
                 $this->entityManager->commit();
+                // Повторная доставка уже взятой задачи: молчаливый выход здесь
+                // прятал 66 зависших в processing задач на проде.
+                $this->logger->warning('Cash file import skipped: job is not queued', [
+                    'jobId' => $message->getJobId(),
+                    'status' => $job->getStatus(),
+                ]);
 
                 return;
             }
@@ -51,6 +64,10 @@ final class CashFileImportHandler
             throw $exception;
         }
 
+        $companyId = (string) $job->getCompany()->getId();
+        $logContext = ['jobId' => $message->getJobId(), 'companyId' => $companyId];
+        $this->logger->info('Cash file import started', $logContext);
+
         $importException = null;
 
         try {
@@ -59,7 +76,17 @@ final class CashFileImportHandler
             $importException = $exception;
         }
 
-        $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
+        // Ошибка БД внутри импорта закрывает EM: без сброса fail() не сохранить,
+        // сообщение уходило в retry, а retry пропускал задачу в processing навсегда.
+        $entityManager = $this->entityManager;
+        if (!$entityManager->isOpen()) {
+            $this->managerRegistry->resetManager();
+            $resetManager = $this->managerRegistry->getManager();
+            \assert($resetManager instanceof EntityManagerInterface);
+            $entityManager = $resetManager;
+        }
+
+        $freshJob = $entityManager->find(CashFileImportJob::class, $message->getJobId());
         if (!$freshJob instanceof CashFileImportJob) {
             return;
         }
@@ -67,10 +94,21 @@ final class CashFileImportHandler
         if (null === $importException) {
             $freshJob->finishOk();
             $freshJob->setErrorMessage(null);
-            $this->entityManager->flush();
+            $entityManager->flush();
+            $this->logger->info('Cash file import finished', $logContext + ['status' => $freshJob->getStatus()]);
 
             return;
         }
+
+        // Текст исключения в лог не идёт: у DBAL в нём SQL с данными строк выписки.
+        // Невалидный вход (формат файла, чужой счёт) — warning, остальное — инцидент.
+        $level = $importException instanceof \DomainException || $importException instanceof \InvalidArgumentException
+            ? LogLevel::WARNING
+            : LogLevel::ERROR;
+        $this->logger->log($level, 'Cash file import failed', $logContext + [
+            'exceptionClass' => $importException::class,
+            'exceptionAt' => sprintf('%s:%d', $importException->getFile(), $importException->getLine()),
+        ]);
 
         $message = sprintf(
             '[%s] %s at %s:%d',
@@ -82,6 +120,19 @@ final class CashFileImportHandler
         $message = mb_substr($message, 0, 2000);
 
         $freshJob->fail($message);
-        $this->entityManager->flush();
+        $importLog = $freshJob->getImportLog();
+        if (null !== $importLog && null === $importLog->getFinishedAt()) {
+            $this->importLogger->finish($importLog);
+        }
+        $entityManager->flush();
+
+        // После фиксации failed: сбой пересчёта не должен вернуть задачу в processing.
+        try {
+            $this->importService->recalculateCommittedRows($freshJob);
+        } catch (\Throwable $recalcException) {
+            $this->logger->error('Cash file import: balance recalculation after failure failed', $logContext + [
+                'exceptionClass' => $recalcException::class,
+            ]);
+        }
     }
 }
