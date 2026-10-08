@@ -619,6 +619,11 @@
       "id": 124,
       "name": "RfbsBuyerDelivery",
       "description": "Перечисление за доставку от покупателя"
+    },
+    {
+      "id": 126,
+      "name": "AnalyticsPremium",
+      "description": ""
     }
   ]
 }
