@@ -29,7 +29,6 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
@@ -153,11 +152,17 @@ final readonly class RunSyncChunkHandler
 
             $this->syncFacade->markJobCompleted(new MarkJobCompletedCommand($job->getId(), $job->getCompanyId()));
             $this->recordConnectorAuthSuccess($job);
-        } catch (ConnectorAuthException $exception) {
+        } catch (ConnectorAuthException) {
+            // Задание закрыто, повтор ключ не вылечит, поэтому сообщение
+            // завершается штатно. Исключение наружу не бросается: Messenger
+            // отдал бы его в GlitchTip на КАЖДЫЙ 401, включая разовые отказы
+            // во время сбоев API (#335). Сигнал об инциденте — один `error`
+            // при переходе подключения в FAILED (3 отказа подряд), отдельные
+            // отказы — `warning`; см. recordConnectorAuthFailure().
             $this->markJobFailed($job->getId(), $job->getCompanyId(), 'auth');
             $this->recordConnectorAuthFailure($job);
 
-            throw new UnrecoverableMessageHandlingException('Ingestion connector authentication failed.', 0, $exception);
+            return;
         } catch (ConnectorRateLimitedException $exception) {
             if ($job->getAttempts() >= self::MAX_RATE_LIMIT_ATTEMPTS) {
                 $reason = sprintf('rate_limit_exhausted_after_%d_attempts', $job->getAttempts());
@@ -252,13 +257,11 @@ final readonly class RunSyncChunkHandler
      * отказы остаются `warning` и несут контекст (компания, подключение,
      * ресурс), которого нет в системных записях.
      *
-     * Важно не обманываться насчёт тишины: сам факт отказа всё равно доедет до
-     * GlitchTip помимо этих строк. Обработчик бросает
-     * `UnrecoverableMessageHandlingException`, а Messenger на неретраящемся
-     * сбое пишет `critical` (`SendFailedMessageForRetryListener`), и Sentry при
-     * `capture_soft_fails: false` ловит именно такие, «жёсткие», сбои. Шум
-     * убирает не уровень записи, а остановка планировщика: после перехода крон
-     * перестаёт ставить задания, и поток сообщений прекращается.
+     * Отказ не пробрасывается в Messenger исключением: на неретраящемся сбое
+     * тот пишет `critical`, а Sentry ловит такие сбои, и каждый 401 становился
+     * отдельным событием GlitchTip (#335: разовый отказ WB во время его сбоя
+     * будил человека наравне с мёртвым ключом). Поэтому здесь — единственный
+     * канал сигнала. После перехода в FAILED крон перестаёт ставить задания.
      */
     private function recordConnectorAuthFailure(SyncJob $job): void
     {

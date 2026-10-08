@@ -22,7 +22,6 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * Отказ аутентификации доезжает от обработчика до подключения.
@@ -57,24 +56,75 @@ final class RunSyncChunkHandlerAuthStateTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия #335: каждый 401 бросал исключение в Messenger, и GlitchTip
+     * получал событие на любой разовый отказ (06.10.2026 — один отказ WB во
+     * время его сбоя). Одиночный отказ — `warning`, задание закрыто с причиной
+     * `auth`, сообщение завершается штатно.
+     */
+    public function testSingleAuthFailureClosesTheJobWithoutErrorOrException(): void
+    {
+        $companyId = '11111111-1111-1111-1111-0c0000000003';
+        $connectionId = $this->seedConnection($companyId, 'handler-single@example.test');
+        $job = $this->persistJob($companyId, $connectionId);
+
+        $this->fakeConnector()->failNextPullWith(new ConnectorAuthException('Fake connector rejected the key.'));
+
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
+        ($this->handler())(new RunSyncChunkMessage($companyId, $job->getId()));
+
+        self::assertFalse($logHandler->hasRecords(Level::Error), 'Одиночный 401 не инцидент');
+        self::assertTrue($logHandler->hasWarningThatContains('Ingestion connector rejected the API key.'));
+
+        $this->em->clear();
+        $stored = $this->em->find(SyncJob::class, $job->getId());
+        self::assertInstanceOf(SyncJob::class, $stored);
+        self::assertSame('auth', $stored->getLastError());
+        self::assertSame(1, $this->connection($connectionId)->getAuthFailureCount());
+    }
+
+    /**
+     * Сигнал об инциденте — ровно один `error` при переходе подключения в
+     * FAILED, а не по записи на каждый отказ.
+     */
+    public function testErrorIsLoggedOnceWhenConnectionBreaks(): void
+    {
+        $companyId = '11111111-1111-1111-1111-0c0000000004';
+        $connectionId = $this->seedConnection($companyId, 'handler-once@example.test');
+
+        /** @var TestHandler $logHandler */
+        $logHandler = self::getContainer()->get(TestHandler::class);
+        $logHandler->clear();
+
+        for ($i = 1; $i <= self::THRESHOLD + 1; ++$i) {
+            $this->runJobFailingWithAuthError($companyId, $connectionId);
+        }
+
+        $errors = array_filter($logHandler->getRecords(), static fn ($r): bool => $r->level->value >= Level::Error->value);
+        self::assertCount(1, $errors);
+    }
+
+    /**
      * `connectionRef` контрактом задания гарантирован лишь непустым, и в
      * репозитории есть задания со ссылкой вроде `connection-1`. Для них
-     * состояние обновлять не на чем, и это не ошибка: исходное исключение
-     * обязано дойти до Messenger нетронутым.
+     * состояние обновлять не на чем, и это не ошибка: задание всё равно
+     * закрывается с причиной `auth`.
      */
-    public function testNonUuidConnectionRefDoesNotReplaceTheOriginalFailure(): void
+    public function testNonUuidConnectionRefStillClosesTheJobAsAuthFailure(): void
     {
         $companyId = Uuid::uuid7()->toString();
         $job = $this->persistJob($companyId, 'connection-1');
 
         $this->fakeConnector()->failNextPullWith(new ConnectorAuthException('Fake connector rejected the key.'));
 
-        $handler = $this->handler();
+        ($this->handler())(new RunSyncChunkMessage($companyId, $job->getId()));
 
-        $this->expectException(UnrecoverableMessageHandlingException::class);
-        $this->expectExceptionMessage('Ingestion connector authentication failed.');
-
-        $handler(new RunSyncChunkMessage($companyId, $job->getId()));
+        $this->em->clear();
+        $stored = $this->em->find(SyncJob::class, $job->getId());
+        self::assertInstanceOf(SyncJob::class, $stored);
+        self::assertSame('auth', $stored->getLastError());
     }
 
     /**
@@ -142,12 +192,7 @@ final class RunSyncChunkHandlerAuthStateTest extends IntegrationTestCase
         $job = $this->persistJob($companyId, $connectionId);
         $this->fakeConnector()->failNextPullWith(new ConnectorAuthException('Fake connector rejected the key.'));
 
-        try {
-            ($this->handler())(new RunSyncChunkMessage($companyId, $job->getId()));
-            self::fail('Auth failure must surface as an unrecoverable message handling exception.');
-        } catch (UnrecoverableMessageHandlingException) {
-            // Ожидаемо: ключ мёртв, повтор его не вылечит.
-        }
+        ($this->handler())(new RunSyncChunkMessage($companyId, $job->getId()));
     }
 
     private function handler(): RunSyncChunkHandler
