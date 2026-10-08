@@ -28,6 +28,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
@@ -113,7 +114,9 @@ final class CashFileImportHandlerTest extends TestCase
         $registry->method('getManager')->willReturn($freshManager);
 
         $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects(self::once())->method('error')->with(
+        // Чужой счёт — ошибка входа (DomainException): warning, не инцидент.
+        $logger->expects(self::once())->method('log')->with(
+            LogLevel::WARNING,
             'Cash file import failed',
             self::callback(static fn (array $context): bool => $jobId === $context['jobId']
                 && $company->getId() === $context['companyId']

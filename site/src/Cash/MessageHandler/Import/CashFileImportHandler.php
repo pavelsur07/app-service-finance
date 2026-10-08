@@ -12,6 +12,7 @@ use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
@@ -44,6 +45,12 @@ final class CashFileImportHandler
 
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
                 $this->entityManager->commit();
+                // Повторная доставка уже взятой задачи: молчаливый выход здесь
+                // прятал 66 зависших в processing задач на проде.
+                $this->logger->warning('Cash file import skipped: job is not queued', [
+                    'jobId' => $message->getJobId(),
+                    'status' => $job->getStatus(),
+                ]);
 
                 return;
             }
@@ -94,7 +101,11 @@ final class CashFileImportHandler
         }
 
         // Текст исключения в лог не идёт: у DBAL в нём SQL с данными строк выписки.
-        $this->logger->error('Cash file import failed', $logContext + [
+        // Невалидный вход (формат файла, чужой счёт) — warning, остальное — инцидент.
+        $level = $importException instanceof \DomainException || $importException instanceof \InvalidArgumentException
+            ? LogLevel::WARNING
+            : LogLevel::ERROR;
+        $this->logger->log($level, 'Cash file import failed', $logContext + [
             'exceptionClass' => $importException::class,
             'exceptionAt' => sprintf('%s:%d', $importException->getFile(), $importException->getLine()),
         ]);
@@ -114,5 +125,14 @@ final class CashFileImportHandler
             $this->importLogger->finish($importLog);
         }
         $entityManager->flush();
+
+        // После фиксации failed: сбой пересчёта не должен вернуть задачу в processing.
+        try {
+            $this->importService->recalculateCommittedRows($freshJob);
+        } catch (\Throwable $recalcException) {
+            $this->logger->error('Cash file import: balance recalculation after failure failed', $logContext + [
+                'exceptionClass' => $recalcException::class,
+            ]);
+        }
     }
 }

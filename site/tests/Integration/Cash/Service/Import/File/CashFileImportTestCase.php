@@ -135,7 +135,7 @@ abstract class CashFileImportTestCase extends IntegrationTestCase
     /**
      * Строки с разными суммами: dedupeHash (дата + сумма + назначение) не совпадает.
      *
-     * @param array<int, array{counterparty?: string, doc_number?: string}> $overrides по 0-based номеру строки
+     * @param array<int, array{amount?: string, counterparty?: string, doc_number?: string}> $overrides по 0-based номеру строки
      *
      * @return list<array{date: string, amount: string, description: string, counterparty?: string, doc_number?: string}>
      */

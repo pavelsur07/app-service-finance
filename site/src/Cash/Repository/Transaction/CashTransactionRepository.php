@@ -267,6 +267,38 @@ class CashTransactionRepository extends ServiceEntityRepository
         return (string) $id;
     }
 
+    /**
+     * Диапазон дат операций счёта из источника импорта, созданных не раньше
+     * $createdSince. Нужен, чтобы пересчитать остатки по пачкам, зафиксированным
+     * до падения импорта.
+     *
+     * @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable}|null
+     */
+    public function findOccurredRangeByCompanyAccountSourceCreatedSince(
+        string $companyId,
+        string $moneyAccountId,
+        string $importSource,
+        \DateTimeImmutable $createdSince,
+    ): ?array {
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'SELECT min(occurred_at) AS min_at, max(occurred_at) AS max_at FROM cash_transaction
+             WHERE company_id = :companyId AND money_account_id = :accountId
+               AND import_source = :importSource AND created_at >= :createdSince AND deleted_at IS NULL',
+            [
+                'companyId' => $companyId,
+                'accountId' => $moneyAccountId,
+                'importSource' => $importSource,
+                'createdSince' => $createdSince->format('Y-m-d H:i:s'),
+            ],
+        );
+
+        if (false === $row || null === $row['min_at'] || null === $row['max_at']) {
+            return null;
+        }
+
+        return [new \DateTimeImmutable((string) $row['min_at']), new \DateTimeImmutable((string) $row['max_at'])];
+    }
+
     public function findAnyIdByCompanyImportSourceExternalIdDbal(string $companyId, string $importSource, string $externalId): ?string
     {
         $id = $this->getEntityManager()->getConnection()->fetchOne(

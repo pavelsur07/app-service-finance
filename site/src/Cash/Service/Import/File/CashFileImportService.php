@@ -29,6 +29,8 @@ use Ramsey\Uuid\Uuid;
 
 final class CashFileImportService
 {
+    private const IMPORT_SOURCE = 'file';
+
     /** @var array<string, Counterparty> */
     private array $counterpartyCache = [];
 
@@ -189,7 +191,7 @@ final class CashFileImportService
                             $occurredAt,
                         );
                         $transaction->setDedupeHash($dedupeHash);
-                        $transaction->setImportSource('file');
+                        $transaction->setImportSource(self::IMPORT_SOURCE);
                         $transaction->setDocNumber($docNumber);
                         $transaction->setDescription($description);
                         $transaction->setProjectDirection($systemProject);
@@ -258,6 +260,39 @@ final class CashFileImportService
                 $this->importLogger->finish($importLog);
             }
         }
+    }
+
+    /**
+     * Пересчёт остатков по строкам, которые упавший импорт успел зафиксировать:
+     * пачки коммитятся по отдельности, а штатный пересчёт стоит после цикла.
+     * Повторная загрузка того же файла пропустит эти строки как дубли и диапазон
+     * не пересчитает.
+     */
+    public function recalculateCommittedRows(CashFileImportJob $job): void
+    {
+        $startedAt = $job->getStartedAt();
+        if (null === $startedAt) {
+            return;
+        }
+
+        $company = $job->getCompany();
+        $account = $job->getMoneyAccount();
+        $range = $this->cashTransactionRepository->findOccurredRangeByCompanyAccountSourceCreatedSince(
+            (string) $company->getId(),
+            (string) $account->getId(),
+            self::IMPORT_SOURCE,
+            $startedAt,
+        );
+        if (null === $range) {
+            return;
+        }
+
+        [$from, $to] = $range;
+        $today = new \DateTimeImmutable('today');
+        if ($from <= $today) {
+            $to = $today;
+        }
+        $this->accountBalanceService->recalculateDailyRange($company, $account, $from, $to);
     }
 
     /**

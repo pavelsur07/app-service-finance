@@ -107,8 +107,33 @@ final class CashFileImportHandlerFlowTest extends CashFileImportTestCase
 
         $job = $this->reloadJob($jobId);
         self::assertSame(CashFileImportJob::STATUS_FAILED, $job->getStatus());
-        self::assertStringContainsString('Exception', (string) $job->getErrorMessage());
+        // Причина — исходная ошибка БД, а не вторичное «EntityManager is closed»
+        // от попытки закрыть журнал на закрытом EM.
+        self::assertStringContainsString('[Doctrine\DBAL\Exception\\', (string) $job->getErrorMessage());
+        self::assertStringNotContainsString('EntityManagerClosed', (string) $job->getErrorMessage());
         self::assertNotNull($this->reloadLog($job)->getFinishedAt());
         self::assertSame(0, $this->countActiveTransactions());
+    }
+
+    /**
+     * Пачки фиксируются по отдельности: при падении на второй пачке первые 200 строк
+     * уже в БД. Остатки по ним должны быть пересчитаны, иначе повторная загрузка
+     * (дубли пропускаются) оставит ранние дни с неверными остатками.
+     */
+    public function testRowsCommittedBeforeFailureGetDailyBalanceRecalculated(): void
+    {
+        $rows = $this->distinctRows(250, [229 => ['amount' => '100000000000000000,00']]);
+        $jobId = (string) $this->queueCsvImport($rows)->getId();
+
+        $this->handle($jobId);
+
+        self::assertSame(CashFileImportJob::STATUS_FAILED, $this->reloadJob($jobId)->getStatus());
+        self::assertSame(200, $this->countActiveTransactions());
+        $inflow = $this->em->getConnection()->fetchOne(
+            'SELECT inflow FROM money_account_daily_balance WHERE money_account_id = :accountId AND date = :date',
+            ['accountId' => $this->account->getId(), 'date' => '2026-09-01'],
+        );
+        // Сумма 1001..1200 — только зафиксированная первая пачка.
+        self::assertSame('220100.00', number_format((float) $inflow, 2, '.', ''));
     }
 }
