@@ -2943,6 +2943,9 @@ App\Shared\Service\ActiveCompanyService::getActiveCompany(): Company
 // Структурированное логирование (каналы: import.bank1c, recalc, deprecation)
 App\Shared\Service\AppLogger
 
+// Диагностические замеры этапов (Marketplace M1), no-op при выключенном флаге
+App\Shared\Infrastructure\Performance\PerformanceRecorder
+
 // Шифрование sensitive-полей (токены, ключи API)
 App\Shared\Service\SodiumFieldEncryptionService
 
@@ -3440,6 +3443,19 @@ Message/worker:
 | Messenger | `redis://site-redis:6379/messages` (transport `async`) |
 | Lock | `redis://site-redis:6379?prefix=symfony-locks` |
 
+
+---
+
+## Диагностика производительности Marketplace M1
+
+Подробно — `docs/architecture/marketplace-audit/09-m1-diagnostics.md`. Только замеры: сообщения, routing, raw, нормализация и финансы не меняются.
+
+- **Флаг:** `MARKETPLACE_PERF_DIAGNOSTICS` (параметр `app.performance_diagnostics_enabled`, по умолчанию `0`; prod — `${MARKETPLACE_PERF_DIAGNOSTICS:-1}` в `x-php-env`). Читается при старте процесса — смена требует пересоздания PHP-контейнеров.
+- **`App\Shared\Infrastructure\Performance\PerformanceRecorder`** — область замера на сообщение воркера (`MessengerPerformanceSubscriber`) или запуск `app:marketplace:*` (`ConsolePerformanceSubscriber`); этапы `PerformanceStage` копятся в памяти и пишутся одним событием на этап при закрытии области. API: `start()`, `add()`, `addElapsed()`, `measure()`, `setProvider()`. Вне области и с выключенным флагом — no-op. Ошибка записи не пробрасывается (один `warning` на процесс).
+- **Точки замеров:** `PerformanceObjectStorage` (декоратор `ObjectStorageInterface`), `MarketplaceFlushPerformanceListener` (Doctrine flush: raw → `storage_write/postgres`, строки учёта и Finance → `financial_posting`), Ozon/WB API-клиенты, загрузка raw в pipeline-обработчиках, классификация строк и вызовы процессоров в `ProcessMarketplaceRawDocumentAction`, `extract*` Ozon by-day, `MarketplaceCostCategoryResolver` и `MarketplaceCostPriceResolver` (`financial_mapping`).
+- **Лог:** канал Monolog `performance` → `var/log/performance-<Y-m-d>.jsonl` (rotating_file, 14 файлов, том `site_var_log`), исключён из `main` и `console`.
+- **Отчёт:** `app:marketplace:perf-report [--from --to --format=md|json --max-mb --max-events --skip-queues]` — read-only; период ≤ 31 дня; живой снимок Redis-потоков (`MessengerQueueSnapshotQuery`: XLEN/XPENDING/XRANGE COUNT 1/ZCARD) и `failed` (`FailedTransportQuery`).
+
 ---
 
 ## Конфигурация — где что лежит
@@ -3613,6 +3629,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.98 | 2026-10-08 | Marketplace M1: диагностика производительности — `PerformanceRecorder`, канал `performance`, флаг `MARKETPLACE_PERF_DIAGNOSTICS`, отчёт `app:marketplace:perf-report`, `MessengerQueueSnapshotQuery`; `MessageCompanyId` вынесен из `SentryMessengerScopeSubscriber` |
 | 1.97 | 2026-10-06 | Ingestion: исчерпанный ретрай `ConnectorTransientException` закрывает job `FAILED` и не отправляет сообщение в `failed` (гейт `failed-queue-check` больше не краснеет от ночных 5xx WB) |
 | 1.96 | 2026-10-06 | Stage 1.6 (R-18 / R-23): раздел «Cron-задачи» приведён к `docker/cron/app.cron` (добавлены пропущенные задания, исправлены оркестратор `20 3-23 * * *` и несуществующий `marketplace:daily-sync`); таблица транспортов/воркеров; routing `SyncWbFinancialReportDayMessage` → `async_wb_finance`; удалены закомментированные legacy-строки `auto-rules:enqueue` и `money-account:snapshot` |
 | 1.95 | 2026-10-05 | Marketplace: ORM-метаданные unique-индексов sales/returns/costs/raw приведены к фактической схеме БД (R-12a) — `#[ORM\UniqueConstraint(options: ['where' => …])]` с предикатом в форме `pg_get_expr`; миграций нет; `UniqueIndexOrmParityTest`. `uniq_marketplace_srid` без `company_id` (R-12b) — решение «tenant-scoped», отдельная задача |
