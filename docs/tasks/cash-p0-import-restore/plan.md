@@ -9,7 +9,14 @@
 если по ходу понадобится миграция — это выход из scope, см. «Границы».
 Ветка: `fix/cash-p0-import-restore` от `master` @ `56901219`. Один Draft PR.
 
-Baseline: _заполнить в Phase 0_ — `<команда>` — `<результат>`.
+Baseline: целевой набор Cash-тестов — OK (40 tests, 153 assertions), команда в
+`checkpoint.md`.
+
+**Итог Phase 0 (данные прода — в `checkpoint.md`):** главный дефект шире P0-2.
+С 2026-02-08 *каждый* файловый импорт, создавший хотя бы одну строку, зависает в
+`processing` (66 задач, 3 компании). Строки и остатки записываются, но задача и
+журнал не закрываются. Импорты больше 200 строк обрезаются на 200 (23 задачи).
+P0-1 и P0-3 в данных не наблюдались — латентные дефекты кода.
 
 ## Факты, установленные при планировании (перепроверить, не передоказывать)
 
@@ -132,14 +139,24 @@ Baseline: _заполнить в Phase 0_ — `<команда>` — `<резу�
 4. Записать цифры «до» в `checkpoint.md`: они нужны для запроса §3.3 по
    застрявшим задачам и для пост-деплойной сверки.
 
-## Stage 1: импорт файла длиннее одной пачки работает
+## Stage 1: файловый импорт завершается (`done`) и не обрезается на 200 строках
 
 Risk: HIGH-LOCAL (импорт денежных операций)
 stage_base_commit: _записать перед WI 1.1_
 
 Definition of Done:
+- **Основной прод-сценарий:** импорт CSV на 1 строку через полный путь
+  `CashFileImportHandler` (сообщение → handler) → задача `done`,
+  `ImportLog.finishedAt` проставлен, `createdCount = 1`. Сейчас на проде такая
+  задача остаётся `processing`. Тест обязан быть красным на старом коде;
+  существующий `CashFileImportWorkerStorageTest` этого не ловит, потому что
+  зовёт сервис напрямую и не проверяет `finishedAt`.
 - Импорт CSV на 201 и 401 валидную строку создаёт ровно 201 и 401 операцию.
   `ImportLog.createdCount` совпадает, `finishedAt` проставлен.
+- `ImportLogger::finish()` не полагается на `flush($log)`: в ORM 3 аргумент
+  игнорируется и flush идёт по всему UnitOfWork. Достаточно, чтобы
+  `ImportLog` оставался managed; отдельный `persist()` уже managed-сущности
+  убрать или оставить безвредным.
 - Повторный импорт того же файла создаёт 0 операций и даёт
   `skippedDuplicate = N`.
 - Новые контрагенты не дублируются через границу пачки (одно имя в строках
@@ -148,7 +165,14 @@ Definition of Done:
 - Исключено: изменение `batchSize`, семантики дедупликации, автоправил.
 
 Work items:
-- 1.1 — Тест (красный): `tests/Integration/Cash/Service/Import/File/CashFileImportBatchBoundaryTest.php`.
+- 1.1 — Тесты (красные). Сначала handler-уровень, 1 строка:
+  `tests/Integration/Cash/MessageHandler/Import/CashFileImportHandlerFlowTest.php`.
+  Job со статусом `queued` и `ImportLog` из `ImportLogger::start()`, вызов
+  handler'а из контейнера, проверка статуса задачи и `finishedAt` журнала
+  после `$em->clear()` и перечитывания. Ожидаемая причина на старом коде:
+  `UniqueConstraintViolation` по PK `import_log` или «EntityManager is
+  closed». Записать фактическую. Затем граница пачки:
+  `tests/Integration/Cash/Service/Import/File/CashFileImportBatchBoundaryTest.php`.
   Подготовку взять из `CashFileImportWorkerStorageTest`, вынести в private
   helper. CSV генерировать в тесте: строки с разными суммами или назначениями,
   чтобы `dedupeHash` различался; дата в прошлом. Вызов
@@ -288,14 +312,25 @@ Reviewer focus:
 2. Финальный internal review в **свежей сессии**: только этот plan, diff от
    `56901219`, чеклист `docs/workflow/stage-report.md`.
 3. External review (Large → один раунд на handoff, §7.2):
-   `site/bin/external-review.sh 56901219 --effort medium --context "<что уже исправлено, факты из Phase 0>"`.
+   `site/bin/external-review.sh 56901219 --effort medium --context <путь к файлу>`.
+   `--context` принимает **путь к файлу**, не строку: содержимое (исправленное
+   внутренне, факты Phase 0) положить в `site/var/external-review/context-cash-p0.md`.
+   Скрипт включает untracked-файлы, поэтому находки по чужому
+   `site/bin/capture-wb-inventory.sh` отклонять с записанной причиной.
    Механика — `docs/workflow/external-review.md`.
 4. `handoff.md`. В PR-описании:
    - три дефекта с доказательством «красный → зелёный»;
    - цифры прода из Phase 0;
    - FOLLOW-UP:
-     - починка застрявших `processing`-задач на проде — SQL write, §3.3,
-       отдельный запрос с точным `UPDATE` и числом строк;
+     - починка 66 застрявших `processing`-задач на проде — SQL write, §3.3,
+       отдельный запрос с точным `UPDATE` и числом строк. 43 задачи с
+       записанными строками → `done` + `finished_at`; 23 задачи по 200 строк —
+       частичные: `failed` с сообщением и список файлов/компаний для
+       перезагрузки пользователями (разбивка — в `checkpoint.md`);
+     - 15 задач `queued` с февраля;
+     - GlitchTip issue 414 (`uniq_cts_tx_category` в
+       `CashTransactionAutoRuleController`);
+     - 1 день без строки остатка у счёта `10d8d659…`;
      - all-or-nothing импорт;
      - P1/P2 аудита.
 5. PR Ready → единственный вопрос §3.2. Миграции нет, значит обычный «merge and
