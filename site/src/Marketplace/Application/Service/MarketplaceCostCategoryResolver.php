@@ -74,6 +74,7 @@ final class MarketplaceCostCategoryResolver implements ResetInterface
         // следом INSERT падал на уникальном индексе и ронял весь шаг затрат.
         // Так на проде упала загрузка 09.09: код `ozon_logistics` был удалён
         // 28.03.2026, а Ozon снова начислил по этой услуге.
+        /** @var MarketplaceCostCategory|null $category репозиторий не параметризован типом сущности */
         $category = $this->costCategoryRepository->findOneBy([
             'company' => $company,
             'marketplace' => $marketplace,

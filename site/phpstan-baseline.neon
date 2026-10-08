@@ -4819,15 +4819,9 @@ parameters:
 			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php
 
 		-
-			message: '#^Method App\\Marketplace\\Application\\Service\\MarketplaceCostCategoryResolver\:\:doResolve\(\) should return App\\Marketplace\\Entity\\MarketplaceCostCategory but returns object\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php
-
-		-
 			message: '#^Property App\\Marketplace\\Application\\Service\\MarketplaceCostCategoryResolver\:\:\$cache \(array\<string, App\\Marketplace\\Entity\\MarketplaceCostCategory\>\) does not accept array\<string, object\>\.$#'
 			identifier: assign.propertyType
-			count: 3
+			count: 2
 			path: src/Marketplace/Application/Service/MarketplaceCostCategoryResolver.php
 
 		-
