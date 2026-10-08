@@ -3553,6 +3553,7 @@ config/
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
+| `app:disk:healthcheck` | `34 7 * * *` | Read-only гейт диска хоста (каталог данных Docker через overlay): заполнение по inode и по байтам; ERROR + exit 1 при ≥ 85% |
 | heartbeat GlitchTip (`wget` на `$GLITCHTIP_SCHEDULER_HEARTBEAT_URL`) | `*/30 * * * *` | Сигнал живости scheduler'а; пропускается, если переменная не задана |
 
 The production PHP CLI image used by workers and the scheduler disables only
@@ -3629,6 +3630,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.99 | 2026-10-08 | Shared: гейт `app:disk:healthcheck` — заполнение диска хоста по inode и по байтам (19.09.2026 деплой падал на исчерпанных inode при свободных байтах) |
 | 1.98 | 2026-10-08 | Marketplace M1: диагностика производительности — `PerformanceRecorder`, канал `performance`, флаг `MARKETPLACE_PERF_DIAGNOSTICS`, отчёт `app:marketplace:perf-report`, `MessengerQueueSnapshotQuery`; `MessageCompanyId` вынесен из `SentryMessengerScopeSubscriber` |
 | 1.97 | 2026-10-06 | Ingestion: исчерпанный ретрай `ConnectorTransientException` закрывает job `FAILED` и не отправляет сообщение в `failed` (гейт `failed-queue-check` больше не краснеет от ночных 5xx WB) |
 | 1.96 | 2026-10-06 | Stage 1.6 (R-18 / R-23): раздел «Cron-задачи» приведён к `docker/cron/app.cron` (добавлены пропущенные задания, исправлены оркестратор `20 3-23 * * *` и несуществующий `marketplace:daily-sync`); таблица транспортов/воркеров; routing `SyncWbFinancialReportDayMessage` → `async_wb_finance`; удалены закомментированные legacy-строки `auto-rules:enqueue` и `money-account:snapshot` |

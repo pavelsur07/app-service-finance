@@ -284,6 +284,14 @@
 # Что делать с сообщениями — решение человека: messenger:failed:show|retry|remove (мутации — с разрешения Владельца).
 32 7 * * * cd /app && php bin/console app:messenger:failed-queue-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Раз в сутки в 07:34 (read-only гейт): заполнение диска хоста по inode и по байтам, порог 85%.
+# 19.09.2026 деплой десять часов падал на `docker compose pull`: inode кончились при 6.9G свободных байтов.
+# ERROR (logger->error → GlitchTip + exit 1) — один агрегированный event со стабильным текстом.
+# Корень контейнера — overlay, df видит каталог данных Docker на хосте. Починка — ручная чистка образов и
+# build-кэша (docs/maintenance/production-logging.md, «Host disk»), мутация прода — с разрешения Владельца.
+# Минута 34 — свободный слот рядом с остальными утренними гейтами (:32 занята, :35 — заказы Ozon).
+34 7 * * * cd /app && php bin/console app:disk:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.
