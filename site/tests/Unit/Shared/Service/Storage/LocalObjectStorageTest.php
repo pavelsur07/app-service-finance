@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Service\Storage;
 
 use App\Shared\Service\Storage\LocalObjectStorage;
+use App\Shared\Service\Storage\ObjectStorageException;
 use App\Shared\Service\Storage\StorageService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -79,5 +80,25 @@ final class LocalObjectStorageTest extends TestCase
         (new LocalObjectStorage($storageService))->delete('missing');
 
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * Текст не зависит от пути: GlitchTip группирует события по тексту исключения.
+     */
+    public function testReadFailureKeepsPathOutOfMessage(): void
+    {
+        $missing = sprintf('%s/no-such-%s', sys_get_temp_dir(), bin2hex(random_bytes(6)));
+
+        /** @var StorageService&MockObject $storageService */
+        $storageService = $this->createMock(StorageService::class);
+        $storageService->method('getAbsolutePath')->willReturn($missing);
+
+        try {
+            (new LocalObjectStorage($storageService))->read('company/missing.ndjson.gz');
+            self::fail('Read of a missing object was expected to fail.');
+        } catch (ObjectStorageException $exception) {
+            self::assertSame('Failed to read object.', $exception->getMessage());
+            self::assertSame('company/missing.ndjson.gz', $exception->path);
+        }
     }
 }
