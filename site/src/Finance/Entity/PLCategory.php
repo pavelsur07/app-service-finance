@@ -148,19 +148,6 @@ class PLCategory
         return $this;
     }
 
-    /**
-     * Levels the branch occupies below this category: 0 for a leaf.
-     */
-    public function getSubtreeHeight(): int
-    {
-        $height = 0;
-        foreach ($this->children as $child) {
-            $height = max($height, 1 + $child->getSubtreeHeight());
-        }
-
-        return $height;
-    }
-
     private function refreshDescendantLevels(): void
     {
         foreach ($this->children as $child) {

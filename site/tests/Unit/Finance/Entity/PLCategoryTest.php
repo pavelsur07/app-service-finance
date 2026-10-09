@@ -112,23 +112,6 @@ final class PLCategoryTest extends TestCase
         self::assertSame(4, $leaf->getLevel());
     }
 
-    public function testSubtreeHeightCountsDeepestBranch(): void
-    {
-        [$root, $group] = $this->chain(4);
-        $shortBranch = new PLCategory(Uuid::uuid4()->toString(), $root->getCompany());
-        $shortBranch->setParent($group);
-
-        self::assertSame(3, $root->getSubtreeHeight());
-        self::assertSame(2, $group->getSubtreeHeight());
-    }
-
-    public function testSubtreeHeightOfLeafIsZero(): void
-    {
-        $leaf = $this->chain(2)[1];
-
-        self::assertSame(0, $leaf->getSubtreeHeight());
-    }
-
     /**
      * @return list<PLCategory> цепочка от корня вниз, у элемента N уровень N+1
      */

@@ -43,8 +43,9 @@ final class Version20261009100000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        // Предел рекурсии страхует от цикла в parent_id: на проде циклов нет,
-        // но без предела цикл повесил бы миграцию.
+        // Обход идёт от корней, поэтому строки в цикле parent_id недостижимы и
+        // не меняются (на проде циклов нет). Предел — лишь страховка от
+        // неожиданной глубины.
         $this->addSql(<<<'SQL'
             WITH RECURSIVE depth (id, level) AS (
                 SELECT id, 1 FROM pl_categories WHERE parent_id IS NULL
