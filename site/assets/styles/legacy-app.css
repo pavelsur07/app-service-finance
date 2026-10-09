@@ -18,6 +18,13 @@
     aside.navbar-vertical.navbar-expand-lg {
         overflow-y: auto;
     }
+
+    /* Pin the company footer: the sidebar is exactly viewport-high and only the menu list scrolls. */
+    aside.navbar-vertical.navbar-expand-lg > .container-fluid {
+        height: 100%;
+        min-height: 0;
+        flex-wrap: nowrap;
+    }
 }
 
 /* The gutter keeps the layout from jumping when the scrollbar appears.
