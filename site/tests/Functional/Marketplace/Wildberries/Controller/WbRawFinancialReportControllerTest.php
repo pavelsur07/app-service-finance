@@ -113,6 +113,92 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Финальная ошибка', $body);
     }
 
+    public function testFallbackDoesNotPickDocumentOfAnotherCompany(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(506);
+        [, $otherCompany] = $this->seedCompany(507);
+        $day = new \DateTimeImmutable('2026-09-13');
+        $this->seedDayWithFailedRefresh($company, $day, PipelineStatus::FAILED, []);
+        $this->seedLoadedDay($otherCompany, $day, [[
+            'reportId' => 999999,
+            'rrdId' => 999999,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Чужая операция',
+            'quantity' => 1,
+            'retailPriceWithDisc' => '999999.99',
+            'retailAmount' => '999999.99',
+            'forPay' => '999999.99',
+            'acquiringFee' => '0',
+        ]]);
+        $client->loginUser($user);
+
+        $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-09-13&date_to=2026-09-13',
+        );
+
+        self::assertResponseIsSuccessful();
+        $content = (string) $client->getResponse()->getContent();
+        self::assertStringNotContainsString('999999', $content);
+        self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $content);
+    }
+
+    public function testEmptyDayAfterRefreshDoesNotCountPreviousDocument(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(508);
+        $day = new \DateTimeImmutable('2026-09-13');
+        $rows = [[
+            'reportId' => 9015,
+            'rrdId' => 1015,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 1,
+            'retailPriceWithDisc' => '2099',
+            'retailAmount' => '1584',
+            'forPay' => '1308.04',
+            'acquiringFee' => '77.30',
+        ]];
+        $rawDocumentId = Uuid::uuid7()->toString();
+        $rawDocument = MarketplaceRawDocumentBuilder::aDocument()
+            ->withId($rawDocumentId)
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withProcessingStatus(PipelineStatus::COMPLETED)
+            ->build()
+            ->setRawData($rows)
+            ->setRecordsCount(count($rows));
+        $status = new MarketplaceFinancialReportSyncStatus(
+            Uuid::uuid7()->toString(),
+            (string) $company->getId(),
+            Uuid::uuid7()->toString(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::sales_report',
+            $day,
+        );
+        $status->markRawLoaded($rawDocumentId, count($rows), hash('sha256', serialize($rows)));
+        $status->markSuccess();
+        $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
+        $status->markEmpty();
+        $this->em()->persist($rawDocument);
+        $this->em()->persist($status);
+        $this->em()->flush();
+        $client->loginUser($user);
+
+        $crawler = $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-09-13&date_to=2026-09-13',
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = $crawler->filter('body')->text();
+        self::assertStringNotContainsString('1 308,04 RUB', $body);
+        self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
+    }
+
     public function testRendersDeductionBreakdownFromRawReasons(): void
     {
         $client = static::createClient();

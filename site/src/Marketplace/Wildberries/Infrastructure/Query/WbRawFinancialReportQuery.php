@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Wildberries\Infrastructure\Query;
 
+use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\PipelineStatus;
 use Doctrine\DBAL\Connection;
 
@@ -17,6 +18,7 @@ use Doctrine\DBAL\Connection;
  * A failed refresh clears the status link while the previously loaded
  * document stays active, so a status without a link falls back to the
  * day's active document — only when it is fully processed (`completed`).
+ * An `empty` status is WB's explicit answer for the day and gets no fallback.
  */
 final readonly class WbRawFinancialReportQuery
 {
@@ -61,6 +63,7 @@ final readonly class WbRawFinancialReportQuery
                           AND f.period_from = s.business_date
                           AND f.period_to = s.business_date
                           AND f.processing_status = :completedStatus
+                          AND s.status <> :emptyStatus
                     ))
                     AND d.company_id = s.company_id
                     AND d.marketplace = :marketplace
@@ -75,6 +78,7 @@ final readonly class WbRawFinancialReportQuery
             ->setParameter('marketplace', 'wildberries')
             ->setParameter('reportType', 'sales_report')
             ->setParameter('completedStatus', PipelineStatus::COMPLETED->value)
+            ->setParameter('emptyStatus', FinancialReportSyncStatus::EMPTY->value)
             ->setParameter('dateFrom', $dateFrom->format('Y-m-d'))
             ->setParameter('dateTo', $dateTo->format('Y-m-d'))
             ->orderBy('s.business_date', 'ASC')
