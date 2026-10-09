@@ -159,13 +159,19 @@ final class PlReportCalculator
             $values[$id] = $val;
         }
 
+        // Depth comes from the walked tree, not from the stored level: viewers
+        // mark a row as a group when the next row is deeper, and a stale level
+        // would turn a leaf into a fake group. Parents precede children here.
+        $depthById = [];
         $rows = [];
         foreach ($displayOrder as $c) {
+            $parent = $c->getParent();
+            $depthById[$c->getId()] = null === $parent ? 1 : ($depthById[$parent->getId()] ?? 0) + 1;
             $rows[] = new PlComputedRow(
                 id: $c->getId(),
                 code: $c->getCode(),
                 name: $c->getName(),
-                level: $c->getLevel(),
+                level: $depthById[$c->getId()],
                 type: $c->getType()->value,
                 format: $c->getFormat(),
                 rawValue: (float) ($values[$c->getId()] ?? 0.0),

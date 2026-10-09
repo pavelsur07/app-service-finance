@@ -60,4 +60,44 @@ final class PLCategoryNewControllerTest extends WebTestCaseBase
         self::assertInstanceOf(PLCategory::class, $createdCategory);
         self::assertTrue($createdCategory->isVisible());
     }
+
+    public function testNewDoesNotOfferParentAtMaxDepth(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $chain = [];
+        $parent = null;
+        foreach (['L1', 'L2', 'L3', 'L4', 'L5'] as $name) {
+            $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($name)->withParent($parent)->build();
+            $chain[] = $parent;
+        }
+
+        $em = $this->em();
+        foreach ([$user, $company, ...$chain] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/new');
+        self::assertResponseIsSuccessful();
+
+        $parentSelect = $crawler->filter('select[id$="_parent"]');
+        $offered = $parentSelect->filter('option')->each(static fn ($node) => $node->attr('value'));
+        self::assertContains($chain[3]->getId(), $offered);
+        self::assertNotContains($chain[4]->getId(), $offered);
+
+        // Подделанный выбор 5-го уровня — ошибка формы, а не 500.
+        $form = $crawler->filter('#pl-category-edit-form')->form();
+        $client->request($form->getMethod(), $form->getUri(), array_replace_recursive($form->getPhpValues(), [
+            'pl_category_form' => ['name' => 'Too deep', 'parent' => $chain[4]->getId()],
+        ]));
+
+        self::assertResponseIsSuccessful();
+        self::assertNull($this->em()->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'name' => 'Too deep']));
+    }
 }

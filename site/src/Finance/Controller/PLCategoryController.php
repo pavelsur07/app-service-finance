@@ -279,24 +279,26 @@ class PLCategoryController extends AbstractController
             $category->setSortOrder($nextSortOrder);
         }
 
+        // A level-5 parent would put the new row at level 6: setParent() rejects
+        // that while the form maps data, so it must not be offered at all.
+        $parents = array_values(array_filter(
+            $availableCategories,
+            static fn (PLCategory $candidate): bool => $candidate->getLevel() < 5,
+        ));
         $form = $this->createForm(PLCategoryFormType::class, $category, [
-            'parents' => $availableCategories,
+            'parents' => $parents,
             'expanded_choices' => true,
         ]);
         $form->remove('isVisible');
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($category->getParent() && $category->getParent()->getLevel() >= 5) {
-                $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
-            } else {
-                $nextSortOrder = $this->categoryRepository->getNextSortOrder($company, $category->getParent());
-                $category->setSortOrder($nextSortOrder);
-                $em->persist($category);
-                $em->flush();
+            $nextSortOrder = $this->categoryRepository->getNextSortOrder($company, $category->getParent());
+            $category->setSortOrder($nextSortOrder);
+            $em->persist($category);
+            $em->flush();
 
-                return $this->redirectToRoute('pl_category_index');
-            }
+            return $this->redirectToRoute('pl_category_index');
         }
 
         return $this->render('pl_category/new.html.twig', [
