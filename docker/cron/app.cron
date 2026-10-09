@@ -287,8 +287,8 @@
 # Раз в сутки в 07:34 (read-only гейт): заполнение диска хоста по inode и по байтам, порог 85%.
 # 19.09.2026 деплой десять часов падал на `docker compose pull`: inode кончились при 6.9G свободных байтов.
 # ERROR (logger->error → GlitchTip + exit 1) — один агрегированный event со стабильным текстом.
-# Корень контейнера — overlay, df видит каталог данных Docker на хосте. Починка — ручная чистка образов и
-# build-кэша (docs/maintenance/production-logging.md, «Host disk»), мутация прода — с разрешения Владельца.
+# Корень контейнера — overlay, df видит каталог данных Docker на хосте. Образы держит ночной docker-retention
+# на хосте; починка — его ручной запуск (docs/maintenance/production-logging.md, «Host disk»), с разрешения Владельца.
 # Минута 34 — свободный слот рядом с остальными утренними гейтами (:32 занята, :35 — заказы Ozon).
 34 7 * * * cd /app && php bin/console app:disk:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 

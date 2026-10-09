@@ -1,0 +1,16 @@
+# Референсная копия: /etc/systemd/system/docker-retention.service на проде.
+# Скрипт и обоснование — docs/maintenance/docker-retention.sh.
+[Unit]
+Description=Nightly Docker image retention (last N releases)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# У oneshot нет таймаута по умолчанию: зависший вызов docker держал бы flock, и
+# каждая следующая ночь молча выходила бы с «already running».
+TimeoutStartSec=30min
+Environment=KEEP=10
+ExecStart=/usr/local/sbin/docker-retention
+Nice=19
+IOSchedulingClass=idle

@@ -25,15 +25,9 @@ deploy and a migration cannot run at the same time. The default `none` action is
 non-mutating and runs neither gate.
 
 The deploy keeps its selected `IMAGE_TAG` in the Compose project `.env`. Images
-not used by a container are pruned twice per release: by `schema-ready` before
-its first `docker compose pull` (older than 7 days, `until=168h`, together with
-the whole build cache) and at the end of `deploy` (older than 14 days). Running
-images are retained, and older SHA-tagged images remain available in GHCR when
-a rollback requires pulling them again. The pre-pull prune uses a week because
-the 14-day prune was already running before 2026-09-19 and did not prevent the
-outage: images younger than two weeks filled the inodes, and the manual
-`until=168h` prune is what freed them. Its "Диск … до/после чистки" lines in the
-job log show inode and byte usage of the Docker data directory.
+not used by a container and older than 14 days are removed after a successful
+deploy; running images are retained, and older SHA-tagged images remain
+available in GHCR when a rollback requires pulling them again.
 
 ## Runtime logs
 
@@ -178,29 +172,58 @@ quarantine. Deletion requires its own explicit production approval.
 
 ## Host disk: inodes and Docker images
 
+Inodes run out before bytes. Measured on 2026-10-09: one release adds about
+21 000 inodes and 80 MB — `site-php-cli` and `site-php-fpm` each get three new
+layers of ~3 400 files (`COPY ./ ./`, `cache:clear`, and a `chown -R var` that
+copies the whole cache again); the 114 MB vendor layer and the base layers are
+shared between tags. With 6–9 releases a day, age-based pruning cannot bound
+this: a week held 40 tags of each image. On 2026-09-19 inodes hit 100% with
+6.9G of bytes free, and every deploy failed for ten hours on `docker compose
+pull`.
+
+### Nightly retention (host systemd timer)
+
+Cleanup runs outside the release path, so it never slows a deploy (a pre-pull
+prune in `schema-ready` was tried in #2595 and took 2 min 9 s; reverted).
+`docker-retention.timer` runs `/usr/local/sbin/docker-retention` daily at 01:30
+MSK. It keeps the last `KEEP=10` SHA tags of every `ghcr.io/pavelsur07/*`
+image, removes older tags with `docker rmi` (never `-f`: an image used by any
+container, running or stopped, is kept and reported with the reason), then
+prunes dangling `<none>` layers of any image and the whole build cache. Other
+tagged images, `latest`-style tags, containers and volumes are not touched. Older SHA images stay in GHCR, so a rollback beyond
+ten releases is a plain pull. Reference copies:
+`docs/maintenance/docker-retention.{sh,service,timer}`. Log:
+`journalctl -u docker-retention` (start/done lines carry inode and byte usage).
+
+Install or update (root on the host, owner's approval):
+
+```bash
+scp docs/maintenance/docker-retention.sh vf-prod:/tmp/docker-retention.new
+scp docs/maintenance/docker-retention.service docs/maintenance/docker-retention.timer vf-prod:/tmp/
+ssh vf-prod 'diff -u /usr/local/sbin/docker-retention /tmp/docker-retention.new; \
+  install -o root -g root -m 0755 /tmp/docker-retention.new /usr/local/sbin/docker-retention && \
+  install -o root -g root -m 0644 /tmp/docker-retention.service /tmp/docker-retention.timer /etc/systemd/system/ && \
+  systemctl daemon-reload && systemctl enable --now docker-retention.timer'
+ssh vf-prod 'DRY_RUN=1 /usr/local/sbin/docker-retention'   # what would go
+ssh vf-prod 'systemctl start docker-retention'              # run now, logged to the journal
+```
+
+The end-of-deploy prune (`until=336h`) stays as a second, coarser net.
+
+### Gate and manual remedy
+
 `app:disk:healthcheck` (scheduler, daily 07:34) raises one `error` and exits 1
 when the host filesystem under the Docker data directory is at or above 85%
 by inodes or by bytes (percent as `df` shows it: used / (used + available)).
-Inodes run out first: every merge pulls four image tags. On 2026-09-19 inodes
-hit 100% with 6.9G of bytes free, and every deploy failed for ten hours: the
-only prune ran at the end of a successful deploy, which a failed pull never
-reached. Since then `schema-ready` prunes images older than 7 days and the
-build cache before pulling (see "Production gates"). That reproduces the
-manual remedy of 19.09 on every release, but it frees nothing if a week of
-images alone fills the disk; the gate covers that, growth between releases and
-anything that is not an image.
+With the timer in place it fires only if retention stopped working or the disk
+fills with something other than images.
 
 Check on the host: `docker info -f '{{.DockerRootDir}}'`, then `df -i` and
 `df -h` on that path (the gate measures the filesystem of the Docker data
-directory through the scheduler's overlay root). Remedy, a production mutation
-that needs the owner's approval each time:
-
-```bash
-docker builder prune -af
-docker image prune -af --filter 'until=168h'
-```
-
-The manual prune is deliberately deeper than the automatic one (one week
-instead of two): it runs when the disk is already full. A week of tags stays as
-rollback targets; the running image is protected by its container. On 2026-09-19 this took inodes from 100% to 19% and disk from
-87% to 44%.
+directory through the scheduler's overlay root), and `journalctl -u
+docker-retention -n 20`. Remedy, a production mutation that needs the owner's
+approval each time: `systemctl start docker-retention` (logged like the nightly
+run), or `KEEP=5 /usr/local/sbin/docker-retention` for a deeper cut (prints to
+the terminal, not to the journal). From this machine ssh may need
+`-o IdentityAgent=none`. On 2026-09-19 a manual
+prune took inodes from 100% to 19% and disk from 87% to 44%.

@@ -1,0 +1,12 @@
+# Референсная копия: /etc/systemd/system/docker-retention.timer на проде.
+# 01:30 МСК (зона хоста Europe/Moscow): до ночного окна cron в 02:30–07:40 и вне
+# дневных выкаток. Persistent — пропущенный из-за перезагрузки запуск догоняется.
+[Unit]
+Description=Nightly Docker image retention
+
+[Timer]
+OnCalendar=*-*-* 01:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
