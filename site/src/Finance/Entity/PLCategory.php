@@ -118,6 +118,15 @@ class PLCategory
 
     public function setParent(?self $parent): self
     {
+        // Level is denormalized depth: the P&L report treats a row as a group
+        // when the next row sits deeper, so descendants must move with the
+        // branch. Their depth limit is checked by callers on the final tree
+        // (edit form offers only fitting parents, the tree import validates
+        // its plan): mid-import a branch may move deeper before a deep child
+        // is moved out of it.
+        $level = $parent ? $parent->getLevel() + 1 : 1;
+        Assert::range($level, 1, 5);
+
         // Keep the inverse side (parent.children) in sync so an in-memory tree
         // exposes its children immediately, without waiting for an EntityManager
         // reload. Report rollups iterate getChildren() in memory, so a stale
@@ -133,10 +142,31 @@ class PLCategory
         }
 
         $this->parent = $parent;
-        $this->level = $parent ? $parent->getLevel() + 1 : 1;
-        Assert::range($this->level, 1, 5);
+        $this->level = $level;
+        $this->refreshDescendantLevels();
 
         return $this;
+    }
+
+    /**
+     * Levels the branch occupies below this category: 0 for a leaf.
+     */
+    public function getSubtreeHeight(): int
+    {
+        $height = 0;
+        foreach ($this->children as $child) {
+            $height = max($height, 1 + $child->getSubtreeHeight());
+        }
+
+        return $height;
+    }
+
+    private function refreshDescendantLevels(): void
+    {
+        foreach ($this->children as $child) {
+            $child->level = $this->level + 1;
+            $child->refreshDescendantLevels();
+        }
     }
 
     public function getChildren(): Collection

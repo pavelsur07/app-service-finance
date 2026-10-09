@@ -320,10 +320,12 @@ class PLCategoryController extends AbstractController
         }
 
         $availableCategories = $this->categoryRepository->findTreeByCompany($company);
+        $subtreeHeight = $category->getSubtreeHeight();
         $parents = array_values(array_filter(
             $availableCategories,
             static fn (PLCategory $candidate): bool => $candidate->getId() !== $category->getId()
-                && !$candidate->isDescendantOf($category),
+                && !$candidate->isDescendantOf($category)
+                && $candidate->getLevel() + 1 + $subtreeHeight <= 5,
         ));
         $form = $this->createForm(PLCategoryFormType::class, $category, [
             'parents' => $parents,
