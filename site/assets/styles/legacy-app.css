@@ -13,6 +13,13 @@
     margin: 0;
 }
 
+/* Tabler forces overflow-y: scroll on the fixed sidebar; show the scrollbar only when the menu overflows. */
+@media (min-width: 992px) {
+    aside.navbar-vertical.navbar-expand-lg {
+        overflow-y: auto;
+    }
+}
+
 /* The gutter keeps the layout from jumping when the scrollbar appears.
    Tabler's own fix (:root margin-left: calc(100vw - 100%) on >=992px) then
    always equals the gutter width and shifts the page away from the fixed aside. */
