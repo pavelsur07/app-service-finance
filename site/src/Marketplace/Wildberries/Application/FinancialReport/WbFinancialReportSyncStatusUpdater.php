@@ -158,6 +158,19 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             return;
         }
 
+        // Статус хранит ссылку на прежний документ и во время новой загрузки дня: пока идёт
+        // попытка, статусом владеет она, а не поздний результат обработки старого документа.
+        if (in_array($status->getStatus(), [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::LOADING], true)) {
+            $this->logger->info('WB sync status finalization skipped: a new load attempt owns the day.', [
+                'rawDocumentId' => $rawDocument->getId(),
+                'syncStatusId' => $status->getId(),
+                'status' => $status->getStatus()->value,
+                'pipelineStatus' => $rawDocument->getProcessingStatus()?->value,
+            ]);
+
+            return;
+        }
+
         $before = $status->getStatus()->value;
 
         if (PipelineStatus::COMPLETED === $rawDocument->getProcessingStatus()) {

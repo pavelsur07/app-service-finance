@@ -21,7 +21,7 @@ final class MarketplaceFinancialReportSyncStatusTest extends TestCase
         self::assertSame(0, $status->getRecordsCount());
     }
 
-    public function testMarkLoadingResetsCurrentAttemptResultFields(): void
+    public function testMarkLoadingResetsAttemptCountButKeepsLoadedDocument(): void
     {
         $status = $this->statusEntity();
         $status->markRawLoaded($this->rawId(), 100, 'rows-hash');
@@ -29,6 +29,55 @@ final class MarketplaceFinancialReportSyncStatusTest extends TestCase
         $status->markLoading(FinancialReportSyncMode::DAILY);
 
         self::assertSame(0, $status->getRecordsCount());
+        self::assertSame($this->rawId(), $status->getRawDocumentId());
+        self::assertSame('rows-hash', $status->getRowsHash());
+    }
+
+    public function testFailedRefreshKeepsLinkToPreviouslyLoadedDocument(): void
+    {
+        $status = $this->statusEntity();
+        $status->markRawLoaded($this->rawId(), 100, 'rows-hash');
+        $status->markSuccess();
+
+        $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
+        $status->markFailedFinal('MarketplaceBadRequestException', 'WB API rejected request payload.', 400, null);
+
+        self::assertSame($this->rawId(), $status->getRawDocumentId());
+    }
+
+    public function testStagingTheLinkedDocumentDropsTheLink(): void
+    {
+        $status = $this->statusEntity();
+        $status->markRawLoaded($this->rawId(), 100, 'rows-hash');
+        $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
+
+        $status->scheduleNextRetryAt(new \DateTimeImmutable('2026-05-20T12:00:00Z'), $this->rawId(), 123);
+
+        self::assertNull($status->getRawDocumentId());
+        self::assertNull($status->getRowsHash());
+        self::assertSame($this->rawId(), $status->getStagingRawDocumentId());
+    }
+
+    public function testStagingAnotherDocumentKeepsTheLink(): void
+    {
+        $status = $this->statusEntity();
+        $status->markRawLoaded($this->rawId(), 100, 'rows-hash');
+        $otherRawId = '55555555-5555-4555-8555-555555555555';
+
+        $status->markFailedRetryablePreservingCursor('HttpException', 'temporary', 500, null, null, $otherRawId, 123);
+
+        self::assertSame($this->rawId(), $status->getRawDocumentId());
+        self::assertSame($otherRawId, $status->getStagingRawDocumentId());
+    }
+
+    public function testMarkEmptyDropsLinkToPreviouslyLoadedDocument(): void
+    {
+        $status = $this->statusEntity();
+        $status->markRawLoaded($this->rawId(), 100, 'rows-hash');
+        $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
+
+        $status->markEmpty();
+
         self::assertNull($status->getRawDocumentId());
         self::assertNull($status->getRowsHash());
     }

@@ -202,6 +202,12 @@ final class WbRawFinancialReportBuilder
                 continue;
             }
 
+            // Прежний документ дня сейчас перезаписывается новой загрузкой: строки неполные.
+            if ((bool) ($document['unsettled_raw_document'] ?? false)) {
+                $statusByDate[$businessDate]['fallback_raw_document'] = false;
+                continue;
+            }
+
             $rows = $this->rawRows($document['raw_data'] ?? null);
             if (null === $rows) {
                 ++$quality['invalid_raw_documents'];

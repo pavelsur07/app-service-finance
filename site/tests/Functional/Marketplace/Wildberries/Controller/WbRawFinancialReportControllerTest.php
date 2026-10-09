@@ -84,6 +84,34 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
+    public function testCountsActiveDocumentOfDayWhoseStatusLostTheLink(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(509);
+        $this->seedDayWithFailedRefresh($company, new \DateTimeImmutable('2026-09-13'), PipelineStatus::COMPLETED, [[
+            'reportId' => 9016,
+            'rrdId' => 1016,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 1,
+            'retailPriceWithDisc' => '2099',
+            'retailAmount' => '1584',
+            'forPay' => '1308.04',
+            'acquiringFee' => '77.30',
+        ]], lostLink: true);
+        $client->loginUser($user);
+
+        $crawler = $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-09-13&date_to=2026-09-13',
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = $crawler->filter('body')->text();
+        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
+    }
+
     public function testDoesNotCountUnfinishedDocumentOfFailedDay(): void
     {
         $client = static::createClient();
@@ -119,7 +147,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         [$user, $company] = $this->seedCompany(506);
         [, $otherCompany] = $this->seedCompany(507);
         $day = new \DateTimeImmutable('2026-09-13');
-        $this->seedDayWithFailedRefresh($company, $day, PipelineStatus::FAILED, []);
+        $this->seedDayWithFailedRefresh($company, $day, PipelineStatus::FAILED, [], lostLink: true);
         $this->seedLoadedDay($otherCompany, $day, [[
             'reportId' => 999999,
             'rrdId' => 999999,
@@ -650,7 +678,8 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
     /**
      * Как на проде 16.09.2026: день загружен, затем refresh_14d получил 400 от WB.
-     * markLoading() сбросил ссылку на документ, документ остался активным.
+     * $lostLink воспроизводит статусы, записанные до исправления markLoading(): ссылки
+     * на документ у них нет, хотя документ остался активным.
      *
      * @param list<array<string, mixed>> $rows
      */
@@ -659,6 +688,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         \DateTimeImmutable $day,
         PipelineStatus $documentStatus,
         array $rows,
+        bool $lostLink = false,
     ): void {
         $rawDocumentId = Uuid::uuid7()->toString();
         $rawDocument = MarketplaceRawDocumentBuilder::aDocument()
@@ -680,8 +710,10 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
             'wildberries::sales_report',
             $day,
         );
-        $status->markRawLoaded($rawDocumentId, count($rows), hash('sha256', serialize($rows)));
-        $status->markSuccess();
+        if (!$lostLink) {
+            $status->markRawLoaded($rawDocumentId, count($rows), hash('sha256', serialize($rows)));
+            $status->markSuccess();
+        }
         $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
         $status->markFailedFinal('MarketplaceBadRequestException', 'WB API rejected request payload.', 400, null);
 

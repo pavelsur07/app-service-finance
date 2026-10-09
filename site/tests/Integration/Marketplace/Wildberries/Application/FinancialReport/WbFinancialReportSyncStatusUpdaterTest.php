@@ -200,6 +200,34 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertNotNull($persisted->getLastSuccessAt());
     }
 
+    public function testSyncByRawPipelineResultLeavesDayToTheRunningLoadAttempt(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markSuccess($status);
+        $this->updater->markLoading($status, FinancialReportSyncMode::REFRESH_14D);
+        $this->em->flush();
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        self::assertNotNull($company);
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markFailed();
+
+        $this->updater->syncByRawPipelineResult($raw, new \RuntimeException('late result of the previous document'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::LOADING, $persisted->getStatus());
+        self::assertSame($this->rawId(), $persisted->getRawDocumentId());
+    }
+
     public function testSyncByRawPipelineResultMarksFailedFinalAndSavesError(): void
     {
         $status = $this->startLoadingStatus();

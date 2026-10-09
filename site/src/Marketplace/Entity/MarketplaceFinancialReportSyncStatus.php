@@ -288,21 +288,22 @@ class MarketplaceFinancialReportSyncStatus
     public function scheduleNextRetryAt(\DateTimeImmutable $nextRetryAt, ?string $stagingRawDocumentId = null, ?int $nextRrdId = null): void
     {
         $this->nextRetryAt = $nextRetryAt;
-        $this->stagingRawDocumentId = $stagingRawDocumentId;
+        $this->assignStagingRawDocument($stagingRawDocumentId);
         $this->nextRrdId = $nextRrdId;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Ссылка на ранее загруженный raw-документ сохраняется: до ответа API он остаётся
+     * верными данными дня, а неудачная перепроверка не должна их терять. Ссылку снимает
+     * только перезапись этого документа (staging), пустой ответ WB или новый markRawLoaded().
+     */
     public function markLoading(FinancialReportSyncMode $mode): void
     {
         $now = new \DateTimeImmutable();
         $this->status = FinancialReportSyncStatus::LOADING;
         $this->mode = $mode;
         $this->recordsCount = 0;
-        if (null === $this->stagingRawDocumentId) {
-            $this->rawDocumentId = null;
-            $this->rowsHash = null;
-        }
         ++$this->attempts;
         $this->lastAttemptAt = $now;
         $this->nextRetryAt = null;
@@ -317,6 +318,9 @@ class MarketplaceFinancialReportSyncStatus
         $now = new \DateTimeImmutable();
         $this->status = FinancialReportSyncStatus::EMPTY;
         $this->recordsCount = 0;
+        // WB явно ответил, что за день данных нет: прежний документ этим ответом заменён.
+        $this->rawDocumentId = null;
+        $this->rowsHash = null;
         $this->lastEmptyAt = $now;
         $this->finishedAt = $now;
         $this->stagingRawDocumentId = null;
@@ -395,7 +399,7 @@ class MarketplaceFinancialReportSyncStatus
         ?int $nextRrdId,
     ): void {
         $this->markFailedRetryable($errorClass, $errorMessage, $statusCode, $responseExcerpt, $nextRetryAt);
-        $this->stagingRawDocumentId = $stagingRawDocumentId;
+        $this->assignStagingRawDocument($stagingRawDocumentId);
         $this->nextRrdId = $nextRrdId;
     }
 
@@ -428,6 +432,19 @@ class MarketplaceFinancialReportSyncStatus
         $this->nextRetryAt = null;
         $this->finishedAt = $now;
         $this->updatedAt = $now;
+    }
+
+    /**
+     * Многостраничная перезагрузка пишет страницы в тот же документ, на который указывает
+     * ссылка: с этого момента он неполон, и ссылка на него как на данные дня снимается.
+     */
+    private function assignStagingRawDocument(?string $stagingRawDocumentId): void
+    {
+        $this->stagingRawDocumentId = $stagingRawDocumentId;
+        if (null !== $stagingRawDocumentId && $stagingRawDocumentId === $this->rawDocumentId) {
+            $this->rawDocumentId = null;
+            $this->rowsHash = null;
+        }
     }
 
     private function clearLastError(): void

@@ -3304,6 +3304,7 @@ Payload (только scalar):
 - `MarketplaceFinancialReportSyncStatus` — дневной статус синхронизации по ключу `companyId + connectionId + businessDate + reportType`.
 - `MarketplaceFinancialReportSyncError` — append-only история ошибок по `syncStatusId`.
 - `MarketplaceRawDocument` — raw JSON WB financial report; связь с дневным статусом через `rawDocumentId` в `MarketplaceFinancialReportSyncStatus`.
+- `rawDocumentId` — последний загруженный документ дня, а не результат текущей попытки: `LOADING`, `QUEUED` и ошибки загрузки (`FAILED`, `FAILED_FINAL`, `AUTH_FAILED`, `CONFLICT`) его сохраняют. Ссылку снимают только `EMPTY` (WB ответил, что данных нет) и начало многостраничной перезаписи того же документа (`stagingRawDocumentId` совпал со ссылкой): тогда документ неполон. Результат обработки (`syncByRawPipelineResult`) не трогает статус в `QUEUED`/`LOADING` — днём владеет идущая попытка.
 
 ### Status lifecycle
 
