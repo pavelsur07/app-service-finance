@@ -1,6 +1,6 @@
 ## Current checkpoint
 
-**Phase:** handoff
+**Phase:** handoff — ждёт «run the migration and deploy»
 **Stage base commit:** Stage 1: `7c2b8278`; Stage 2: `17767e5a`
 
 ### Completed
