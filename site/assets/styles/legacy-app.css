@@ -13,8 +13,15 @@
     margin: 0;
 }
 
+/* The gutter keeps the layout from jumping when the scrollbar appears.
+   Tabler's own fix (:root margin-left: calc(100vw - 100%) on >=992px) then
+   always equals the gutter width and shifts the page away from the fixed aside. */
 html {
     scrollbar-gutter: stable;
+}
+
+:root {
+    margin-left: 0;
 }
 
 .modal.modal-blur .modal-content {
@@ -154,8 +161,9 @@ aside.navbar.navbar-vertical .navbar-brand {
     word-break: break-word;
 }
 
+/* Always-on scrollbar for browsers without scrollbar-gutter (Safari < 18.2). */
 body.layout-fluid-vertical {
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 body.layout-fluid-vertical .page,
