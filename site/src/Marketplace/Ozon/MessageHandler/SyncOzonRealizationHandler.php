@@ -131,7 +131,8 @@ final class SyncOzonRealizationHandler
             OzonRealizationReport::apiEndpoint(),
             OzonRealizationReport::businessDate($year, $month),
         );
-        // Хеш и статус прошлой загрузки нужны, чтобы не обрабатывать повторно тот же отчёт: markLoading() их сбрасывает.
+        // Хеш и статус прошлой загрузки нужны, чтобы не обрабатывать повторно тот же отчёт: markLoading() меняет статус,
+        // а хеш и ссылку на документ сохраняет до нового markRawLoaded().
         $previousStatus = $status->getStatus();
         $previousHash = $status->getRowsHash();
         // Пара, уже получившая успех, не «разжалуется» неудачной перепроверкой (ручная загрузка, пустой ответ, сбой Ozon):

@@ -447,11 +447,12 @@ final class WbFinanceDiagnosticsCommand extends Command
                    AND r.marketplace = 'wildberries'
                    AND r.document_type = 'sales_report'
                    AND r.processing_status = 'completed'
-                   AND s.status IN ('failed', 'queued', 'processing')
+                   AND s.status = 'processing'
                  ORDER BY COALESCE(r.processed_at, r.synced_at) DESC
                  LIMIT 50",
             );
-            $io->writeln('Mismatch: raw completed exists, but sync_status failed/queued/processing:');
+            // queued/failed с завершённым документом — норма: статус хранит ссылку на прежнюю загрузку дня.
+            $io->writeln('Mismatch: raw completed exists, but sync_status is still processing:');
             $this->renderRows($io, ['company_id', 'connection_id', 'business_date', 'status', 'raw_document_id', 'processing_status', 'processed_at'], $rows);
         } catch (\Throwable $e) {
             $io->warning('Cannot read raw/status mismatches: '.$e->getMessage());

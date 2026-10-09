@@ -11,6 +11,8 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Exception\MarketplaceBadRequestException;
+use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use Psr\Log\LoggerInterface;
@@ -18,6 +20,25 @@ use Ramsey\Uuid\Uuid;
 
 final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialReportSyncStatusUpdaterInterface
 {
+    private const LOAD_ATTEMPT_STATUSES = [
+        FinancialReportSyncStatus::QUEUED,
+        FinancialReportSyncStatus::LOADING,
+        FinancialReportSyncStatus::FAILED,
+        FinancialReportSyncStatus::AUTH_FAILED,
+    ];
+
+    /**
+     * FAILED_FINAL ставят и загрузка (ответ WB), и pipeline. Загрузочный отличается классом
+     * ошибки, который пишет SyncWbFinancialReportDayHandler. CONFLICT сюда не входит: он
+     * возникает, пока документ дня ещё обрабатывается, и итог этой обработки статус обновляет.
+     */
+    private const LOAD_ERROR_CLASSES = [
+        FinancialReportSyncStatus::FAILED_FINAL->value => [
+            MarketplaceBadRequestException::class,
+            MarketplaceInvalidApiResponseException::class,
+        ],
+    ];
+
     public function __construct(
         private MarketplaceFinancialReportSyncStatusRepository $statusRepository,
         private MarketplaceFinancialReportSyncErrorRepository $errorRepository,
@@ -158,10 +179,11 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             return;
         }
 
-        // Статус хранит ссылку на прежний документ и во время новой загрузки дня: пока идёт
-        // попытка, статусом владеет она, а не поздний результат обработки старого документа.
-        if (in_array($status->getStatus(), [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::LOADING], true)) {
-            $this->logger->info('WB sync status finalization skipped: a new load attempt owns the day.', [
+        // Статус хранит ссылку на прежний документ и во время новой загрузки дня, и после её
+        // ошибки. Идущая попытка и ошибка загрузки — состояние загрузки, а не обработки:
+        // поздний результат обработки их не перезаписывает (до сохранения ссылки он их не находил).
+        if ($this->isOwnedByLoadAttempt($status)) {
+            $this->logger->info('WB sync status finalization skipped: the day is owned by a load attempt.', [
                 'rawDocumentId' => $rawDocument->getId(),
                 'syncStatusId' => $status->getId(),
                 'status' => $status->getStatus()->value,
@@ -198,6 +220,17 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
             'to' => $status->getStatus()->value,
             'pipelineStatus' => $rawDocument->getProcessingStatus()?->value,
         ]);
+    }
+
+    private function isOwnedByLoadAttempt(MarketplaceFinancialReportSyncStatus $status): bool
+    {
+        if (in_array($status->getStatus(), self::LOAD_ATTEMPT_STATUSES, true)) {
+            return true;
+        }
+
+        $loadErrorClasses = self::LOAD_ERROR_CLASSES[$status->getStatus()->value] ?? [];
+
+        return in_array($status->getLastErrorClass(), $loadErrorClasses, true);
     }
 
     /** @param array{sync_status_id?: string|null, company_id?: string|null, connection_id?: string|null, marketplace?: string|null, report_type?: string|null, mode?: string|null, business_date?: string|null, raw_document_id?: string|null}|null $context */
