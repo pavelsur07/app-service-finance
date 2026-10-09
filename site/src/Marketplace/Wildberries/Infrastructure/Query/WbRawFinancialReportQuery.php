@@ -6,6 +6,7 @@ namespace App\Marketplace\Wildberries\Infrastructure\Query;
 
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\PipelineStatus;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -15,13 +16,29 @@ use Doctrine\DBAL\Connection;
  * Staging documents are deliberately excluded, so partial API pages cannot
  * leak into report totals.
  *
- * A failed refresh clears the status link while the previously loaded
- * document stays active, so a status without a link falls back to the
- * day's active document — only when it is fully processed (`completed`).
- * An `empty` status is WB's explicit answer for the day and gets no fallback.
+ * A failed or ongoing reload keeps the status linked to the previously
+ * loaded document. Older statuses lost that link (before the fix in
+ * markLoading), so a status without a link falls back to the day's active
+ * document — only when it is fully processed (`completed`). An `empty`
+ * status is WB's explicit answer for the day and gets no fallback, and a
+ * document loaded before the day's last empty answer stays out even after
+ * a later reload attempt changes the status.
+ *
+ * Outside the current attempt's own states (`raw_loaded`, `processing`,
+ * `success`) the document is flagged as earlier data, and a document that
+ * a multi-page reload is rewriting right now (`loading`) is flagged
+ * unsettled so its partial rows stay out of the totals. `pending` and
+ * `running` documents hold complete rows and are counted.
  */
 final readonly class WbRawFinancialReportQuery
 {
+    private const EARLIER_DATA = <<<'SQL'
+        d.id IS NOT NULL AND (
+            s.raw_document_id IS NULL
+            OR (s.status NOT IN (:attemptStatuses) AND d.processing_status = :completedStatus)
+        )
+        SQL;
+
     public function __construct(
         private Connection $connection,
     ) {
@@ -39,9 +56,10 @@ final readonly class WbRawFinancialReportQuery
             ->select(
                 's.business_date',
                 's.status',
-                'CASE WHEN s.raw_document_id IS NULL AND d.id IS NOT NULL THEN d.records_count ELSE s.records_count END AS records_count',
+                'CASE WHEN '.self::EARLIER_DATA.' THEN d.records_count ELSE s.records_count END AS records_count',
                 'COALESCE(s.raw_document_id, d.id) AS raw_document_id',
-                '(s.raw_document_id IS NULL AND d.id IS NOT NULL) AS fallback_raw_document',
+                '('.self::EARLIER_DATA.') AS fallback_raw_document',
+                '(s.status NOT IN (:attemptStatuses) AND d.processing_status = :rewritingStatus) AS unsettled_raw_document',
                 's.last_error_message',
                 's.updated_at',
                 'd.id AS joined_raw_document_id',
@@ -64,6 +82,7 @@ final readonly class WbRawFinancialReportQuery
                           AND f.period_to = s.business_date
                           AND f.processing_status = :completedStatus
                           AND s.status <> :emptyStatus
+                          AND (s.last_empty_at IS NULL OR f.synced_at > s.last_empty_at)
                     ))
                     AND d.company_id = s.company_id
                     AND d.marketplace = :marketplace
@@ -79,6 +98,12 @@ final readonly class WbRawFinancialReportQuery
             ->setParameter('reportType', 'sales_report')
             ->setParameter('completedStatus', PipelineStatus::COMPLETED->value)
             ->setParameter('emptyStatus', FinancialReportSyncStatus::EMPTY->value)
+            ->setParameter('attemptStatuses', [
+                FinancialReportSyncStatus::RAW_LOADED->value,
+                FinancialReportSyncStatus::PROCESSING->value,
+                FinancialReportSyncStatus::SUCCESS->value,
+            ], ArrayParameterType::STRING)
+            ->setParameter('rewritingStatus', PipelineStatus::LOADING->value)
             ->setParameter('dateFrom', $dateFrom->format('Y-m-d'))
             ->setParameter('dateTo', $dateTo->format('Y-m-d'))
             ->orderBy('s.business_date', 'ASC')

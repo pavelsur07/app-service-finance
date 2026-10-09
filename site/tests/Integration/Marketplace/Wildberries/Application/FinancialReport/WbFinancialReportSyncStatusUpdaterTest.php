@@ -200,6 +200,93 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertNotNull($persisted->getLastSuccessAt());
     }
 
+    /**
+     * @return iterable<string, array{\Closure(WbFinancialReportSyncStatusUpdater, MarketplaceFinancialReportSyncStatus): void, FinancialReportSyncStatus}>
+     */
+    public static function loadAttemptStates(): iterable
+    {
+        yield 'loading' => [
+            static fn (WbFinancialReportSyncStatusUpdater $u, MarketplaceFinancialReportSyncStatus $s) => $u->markLoading($s, FinancialReportSyncMode::REFRESH_14D),
+            FinancialReportSyncStatus::LOADING,
+        ];
+        yield 'queued' => [
+            static fn (WbFinancialReportSyncStatusUpdater $u, MarketplaceFinancialReportSyncStatus $s) => $u->markPageQueued($s, FinancialReportSyncMode::REFRESH_14D, false, new \DateTimeImmutable('+10 minutes')),
+            FinancialReportSyncStatus::QUEUED,
+        ];
+        yield 'failed retryable' => [
+            static fn (WbFinancialReportSyncStatusUpdater $u, MarketplaceFinancialReportSyncStatus $s) => $u->markFailedRetryable($s, 'MarketplaceTemporaryApiException', 'timeout'),
+            FinancialReportSyncStatus::FAILED,
+        ];
+        yield 'auth failed' => [
+            static fn (WbFinancialReportSyncStatusUpdater $u, MarketplaceFinancialReportSyncStatus $s) => $u->markAuthFailed($s, 'MarketplaceAuthException', 'token expired', 401),
+            FinancialReportSyncStatus::AUTH_FAILED,
+        ];
+        yield 'failed final by WB 400' => [
+            static fn (WbFinancialReportSyncStatusUpdater $u, MarketplaceFinancialReportSyncStatus $s) => $u->markFailedFinal($s, \App\Marketplace\Exception\MarketplaceBadRequestException::class, 'WB API rejected request payload.', 400),
+            FinancialReportSyncStatus::FAILED_FINAL,
+        ];
+    }
+
+    /**
+     * @param \Closure(WbFinancialReportSyncStatusUpdater, MarketplaceFinancialReportSyncStatus): void $enterState
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('loadAttemptStates')]
+    public function testSyncByRawPipelineResultLeavesDayToTheLoadAttempt(\Closure $enterState, FinancialReportSyncStatus $expected): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markSuccess($status);
+        $this->updater->markLoading($status, FinancialReportSyncMode::REFRESH_14D);
+        $enterState($this->updater, $status);
+        $this->em->flush();
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        self::assertNotNull($company);
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markCompleted();
+
+        $this->updater->syncByRawPipelineResult($raw);
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame($expected, $persisted->getStatus());
+        self::assertSame($this->rawId(), $persisted->getRawDocumentId());
+    }
+
+    public function testReprocessedDocumentHealsPipelineFailure(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+        $this->updater->markFailedFinal($status, 'PipelineFailedException', 'step failed');
+        $this->em->flush();
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        self::assertNotNull($company);
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markCompleted();
+
+        $this->updater->syncByRawPipelineResult($raw);
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $persisted->getStatus());
+    }
+
     public function testSyncByRawPipelineResultMarksFailedFinalAndSavesError(): void
     {
         $status = $this->startLoadingStatus();

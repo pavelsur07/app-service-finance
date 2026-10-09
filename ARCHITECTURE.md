@@ -3304,6 +3304,7 @@ Payload (только scalar):
 - `MarketplaceFinancialReportSyncStatus` — дневной статус синхронизации по ключу `companyId + connectionId + businessDate + reportType`.
 - `MarketplaceFinancialReportSyncError` — append-only история ошибок по `syncStatusId`.
 - `MarketplaceRawDocument` — raw JSON WB financial report; связь с дневным статусом через `rawDocumentId` в `MarketplaceFinancialReportSyncStatus`.
+- `rawDocumentId` — последний загруженный документ дня, а не результат текущей попытки: `LOADING`, `QUEUED` и ошибки загрузки (`FAILED`, `FAILED_FINAL`, `AUTH_FAILED`, `CONFLICT`) его сохраняют. Ссылку снимают только `EMPTY` (WB ответил, что данных нет) и начало многостраничной перезаписи того же документа (`stagingRawDocumentId` совпал со ссылкой): тогда документ неполон. Результат обработки (`syncByRawPipelineResult`) не трогает статус загрузки — `QUEUED`, `LOADING`, `FAILED`, `AUTH_FAILED` и `FAILED_FINAL` от ответа WB (`MarketplaceBadRequestException`, `MarketplaceInvalidApiResponseException`): днём владеет попытка загрузки. `FAILED_FINAL` от pipeline и `CONFLICT` (документ дня ещё в обработке) финализация обновляет — переобработка лечит день. Запасной документ отчёта для статуса без ссылки не берётся, если он загружен до последнего пустого ответа WB (`last_empty_at`). `markLoading()` общий с Ozon-реализацией: там тоже сохраняются ссылка и `rowsHash`. Отчёт WB не считает строки документа, который перезаписывается страницами (`loading`), если статус вне `raw_loaded`/`processing`/`success`.
 
 ### Status lifecycle
 

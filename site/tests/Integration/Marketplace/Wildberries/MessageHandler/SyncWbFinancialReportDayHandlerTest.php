@@ -487,6 +487,92 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         }
     }
 
+    /**
+     * Прод, 16.09.2026: день загружен, перепроверка получила 400 от WB. Ссылка на прежний
+     * документ терялась в markLoading(), и день выпадал из отчёта при целых данных.
+     */
+    public function testRejectedRefreshKeepsLinkToPreviouslyLoadedDocument(): void
+    {
+        $this->swapBusSpy();
+        $company = $this->createCompany(9220);
+        $connection = $this->createWbSellerConnection($company, 9220);
+        $existing = $this->createRaw($company, new \DateTimeImmutable('2026-05-19'), [['rrdId' => 700]], 1, PipelineStatus::COMPLETED);
+        $this->createLoadedStatus($company, $connection, $existing);
+        $this->swapWbClient([new MockResponse('{"error":"bad request"}', ['http_code' => 400])]);
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        try {
+            $handler($this->message((string) $company->getId(), $connection->getId(), false));
+        } finally {
+            $this->em->clear();
+            $status = $this->findStatus($connection->getId(), (string) $company->getId(), '2026-05-19');
+            self::assertNotNull($status);
+            self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $status->getStatus());
+            self::assertSame($existing->getId(), $status->getRawDocumentId());
+
+            $raw = $this->em->find(MarketplaceRawDocument::class, $existing->getId());
+            self::assertInstanceOf(MarketplaceRawDocument::class, $raw);
+            self::assertSame(PipelineStatus::COMPLETED, $raw->getProcessingStatus());
+            self::assertSame([['rrdId' => 700]], $raw->getRawData());
+        }
+    }
+
+    public function testMultiPageRefreshDropsLinkWhileRewritingTheSameDocument(): void
+    {
+        /** @var object{messages: list<object>} $bus */
+        $bus = $this->swapBusSpy();
+        $company = $this->createCompany(9221);
+        $connection = $this->createWbSellerConnection($company, 9221);
+        $existing = $this->createRaw($company, new \DateTimeImmutable('2026-05-19'), [['rrdId' => 800]], 1, PipelineStatus::COMPLETED);
+        $this->createLoadedStatus($company, $connection, $existing);
+        $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
+        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, \JSON_THROW_ON_ERROR), ['http_code' => 200])]);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message((string) $company->getId(), $connection->getId(), false));
+
+        $continuation = $this->filterSyncMessages($bus->messages)[0] ?? null;
+        self::assertInstanceOf(SyncWbFinancialReportDayMessage::class, $continuation);
+        self::assertSame($existing->getId(), $continuation->rawDocumentId);
+        $status = $this->findStatus($connection->getId(), (string) $company->getId(), '2026-05-19');
+        self::assertNotNull($status);
+        self::assertSame($existing->getId(), $status->getStagingRawDocumentId());
+        self::assertNull($status->getRawDocumentId(), 'Документ неполон, пока идёт перезапись страницами.');
+
+        $this->makeStatusRetryDue((string) $company->getId(), '2026-05-19');
+        $this->swapWbClient([new MockResponse('{"error":"bad request"}', ['http_code' => 400])]);
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+
+        try {
+            $handler($continuation);
+        } finally {
+            $this->em->clear();
+            $status = $this->findStatus($connection->getId(), (string) $company->getId(), '2026-05-19');
+            self::assertNotNull($status);
+            self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $status->getStatus());
+            self::assertNull($status->getRawDocumentId());
+        }
+    }
+
+    public function testEmptyRefreshDropsLinkToPreviouslyLoadedDocument(): void
+    {
+        $this->swapBusSpy();
+        $company = $this->createCompany(9222);
+        $connection = $this->createWbSellerConnection($company, 9222);
+        $existing = $this->createRaw($company, new \DateTimeImmutable('2026-05-19'), [['rrdId' => 900]], 1, PipelineStatus::COMPLETED);
+        $this->createLoadedStatus($company, $connection, $existing);
+        $this->swapWbClient([new MockResponse('', ['http_code' => 204])]);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message((string) $company->getId(), $connection->getId(), false));
+
+        $status = $this->findStatus($connection->getId(), (string) $company->getId(), '2026-05-19');
+        self::assertNotNull($status);
+        self::assertSame(FinancialReportSyncStatus::EMPTY, $status->getStatus());
+        self::assertNull($status->getRawDocumentId());
+    }
+
     public function testHandlerRespectsPersistedFutureNextRetryAtWithoutCallingWbApi(): void
     {
         $bus = $this->swapBusSpy();
@@ -562,6 +648,26 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $this->em->flush();
 
         return $raw;
+    }
+
+    private function createLoadedStatus(Company $company, MarketplaceConnection $connection, MarketplaceRawDocument $raw): MarketplaceFinancialReportSyncStatus
+    {
+        $status = new MarketplaceFinancialReportSyncStatus(
+            sprintf('cccccccc-cccc-4ccc-8ccc-%012d', random_int(1, 999999)),
+            (string) $company->getId(),
+            $connection->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            $raw->getPeriodFrom(),
+        );
+        $status->markLoading(FinancialReportSyncMode::DAILY);
+        $status->markRawLoaded($raw->getId(), $raw->getRecordsCount(), 'rows-hash');
+        $status->markSuccess();
+        $this->em->persist($status);
+        $this->em->flush();
+
+        return $status;
     }
 
     /** @var list<MockResponse> */
