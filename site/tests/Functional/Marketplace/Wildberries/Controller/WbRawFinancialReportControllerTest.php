@@ -10,7 +10,9 @@ use App\Marketplace\Entity\Inventory\MarketplaceInventoryCostPrice;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceListingBarcode;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
@@ -50,6 +52,65 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('#wb-product-costs', 'Не сопоставлен');
         self::assertSelectorTextContains('#wb-product-costs', 'Нет цены');
         self::assertSelectorTextContains('#wb-product-costs', 'Нет полной себестоимости');
+    }
+
+    public function testCountsPreviouslyLoadedDayAfterRefreshFailedFinal(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(504);
+        $this->seedDayWithFailedRefresh($company, new \DateTimeImmutable('2026-09-13'), PipelineStatus::COMPLETED, [[
+            'reportId' => 9013,
+            'rrdId' => 1013,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 1,
+            'retailPriceWithDisc' => '2099',
+            'retailAmount' => '1584',
+            'forPay' => '1308.04',
+            'acquiringFee' => '77.30',
+        ]]);
+        $client->loginUser($user);
+
+        $crawler = $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-09-13&date_to=2026-09-13',
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = $crawler->filter('body')->text();
+        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString('9013', $body);
+        self::assertStringContainsString('Финальная ошибка', $body);
+        self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
+    }
+
+    public function testDoesNotCountUnfinishedDocumentOfFailedDay(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedCompany(505);
+        $this->seedDayWithFailedRefresh($company, new \DateTimeImmutable('2026-09-13'), PipelineStatus::LOADING, [[
+            'reportId' => 9014,
+            'rrdId' => 1014,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
+            'quantity' => 1,
+            'retailPriceWithDisc' => '2099',
+            'retailAmount' => '1584',
+            'forPay' => '1308.04',
+            'acquiringFee' => '77.30',
+        ]]);
+        $client->loginUser($user);
+
+        $crawler = $client->request(
+            'GET',
+            '/marketplace/wb-finance-report?date_from=2026-09-13&date_to=2026-09-13',
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = $crawler->filter('body')->text();
+        self::assertStringNotContainsString('1 308,04 RUB', $body);
+        self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
+        self::assertStringContainsString('Финальная ошибка', $body);
     }
 
     public function testRendersDeductionBreakdownFromRawReasons(): void
@@ -495,6 +556,48 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         );
         $status->markRawLoaded($rawDocumentId, count($rows), hash('sha256', serialize($rows)));
         $status->markSuccess();
+
+        $this->em()->persist($rawDocument);
+        $this->em()->persist($status);
+        $this->em()->flush();
+    }
+
+    /**
+     * Как на проде 16.09.2026: день загружен, затем refresh_14d получил 400 от WB.
+     * markLoading() сбросил ссылку на документ, документ остался активным.
+     *
+     * @param list<array<string, mixed>> $rows
+     */
+    private function seedDayWithFailedRefresh(
+        Company $company,
+        \DateTimeImmutable $day,
+        PipelineStatus $documentStatus,
+        array $rows,
+    ): void {
+        $rawDocumentId = Uuid::uuid7()->toString();
+        $rawDocument = MarketplaceRawDocumentBuilder::aDocument()
+            ->withId($rawDocumentId)
+            ->forCompany($company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withPeriod($day, $day)
+            ->withProcessingStatus($documentStatus)
+            ->build()
+            ->setRawData($rows)
+            ->setRecordsCount(count($rows));
+
+        $status = new MarketplaceFinancialReportSyncStatus(
+            Uuid::uuid7()->toString(),
+            (string) $company->getId(),
+            Uuid::uuid7()->toString(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::sales_report',
+            $day,
+        );
+        $status->markRawLoaded($rawDocumentId, count($rows), hash('sha256', serialize($rows)));
+        $status->markSuccess();
+        $status->markLoading(FinancialReportSyncMode::REFRESH_14D);
+        $status->markFailedFinal('MarketplaceBadRequestException', 'WB API rejected request payload.', 400, null);
 
         $this->em()->persist($rawDocument);
         $this->em()->persist($status);
