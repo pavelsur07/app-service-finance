@@ -187,6 +187,7 @@ final class WbRawFinancialReportBuilder
                 'status' => $document['status'] ?? null,
                 'records_count' => $document['records_count'] ?? 0,
                 'raw_document_id' => $document['raw_document_id'] ?? null,
+                'fallback_raw_document' => (bool) ($document['fallback_raw_document'] ?? false),
                 'last_error_message' => $document['last_error_message'] ?? null,
                 'updated_at' => $document['updated_at'] ?? null,
             ];
@@ -1047,6 +1048,7 @@ final class WbRawFinancialReportBuilder
                 'status_tone' => $this->statusTone($statusValue),
                 'records_count' => (int) ($row['records_count'] ?? 0),
                 'raw_document_id' => $row['raw_document_id'] ?? null,
+                'fallback_raw_document' => (bool) ($row['fallback_raw_document'] ?? false),
                 'last_error_message' => $row['last_error_message'] ?? null,
                 'updated_at' => $row['updated_at'] ?? null,
             ];

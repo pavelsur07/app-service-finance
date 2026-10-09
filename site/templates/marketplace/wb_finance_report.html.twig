@@ -779,6 +779,9 @@
                                 <td class="text-nowrap">{{ day.date|date('d.m.Y') }}</td>
                                 <td>
                                     <span class="badge bg-{{ day.status_tone }}">{{ day.status_label }}</span>
+                                    {% if day.fallback_raw_document %}
+                                        <div class="text-secondary small mt-1">В отчёте учтены ранее загруженные данные дня</div>
+                                    {% endif %}
                                     {% if day.last_error_message %}
                                         <div class="text-danger small mt-1">{{ day.last_error_message|slice(0, 160) }}</div>
                                     {% endif %}
