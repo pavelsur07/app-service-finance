@@ -161,8 +161,9 @@ aside.navbar.navbar-vertical .navbar-brand {
     word-break: break-word;
 }
 
+/* Always-on scrollbar for browsers without scrollbar-gutter (Safari < 18.2). */
 body.layout-fluid-vertical {
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 body.layout-fluid-vertical .page,
