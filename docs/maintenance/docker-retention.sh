@@ -16,6 +16,7 @@
 #   - теги, не похожие на SHA коммита (latest и т. п.), и чужие образы
 #     (traefik, postgres, redis) — скрипт их не перебирает;
 #   - тома и контейнеры.
+# Висячие (<none>) слои любых образов и build-кэш удаляются целиком.
 # Старые SHA-образы остаются в GHCR: откат дальше KEEP релизов — обычный pull.
 #
 # DRY_RUN=1 — только напечатать, что было бы удалено.
@@ -54,10 +55,12 @@ for repo in $(docker images --format '{{.Repository}}' | grep "^${REPO_PREFIX}" 
         | while read -r tag; do
             if [ "$DRY_RUN" = 1 ]; then
                 echo "would remove $repo:$tag"
-            elif docker rmi "$repo:$tag" >/dev/null 2>&1; then
+            elif err="$(docker rmi "$repo:$tag" 2>&1 >/dev/null)"; then
                 echo "removed $repo:$tag"
             else
-                echo "kept $repo:$tag (in use by a container)"
+                # Обычно «image is being used by … container»; иначе — сбой демона,
+                # и первая строка stderr это покажет.
+                echo "kept $repo:$tag: $(printf '%s\n' "$err" | head -n 1)"
             fi
         done
 done

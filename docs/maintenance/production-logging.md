@@ -188,9 +188,9 @@ prune in `schema-ready` was tried in #2595 and took 2 min 9 s; reverted).
 `docker-retention.timer` runs `/usr/local/sbin/docker-retention` daily at 01:30
 MSK. It keeps the last `KEEP=10` SHA tags of every `ghcr.io/pavelsur07/*`
 image, removes older tags with `docker rmi` (never `-f`: an image used by any
-container, running or stopped, is kept and reported), then prunes dangling
-layers and the build cache. Other images, `latest`-style tags, containers and
-volumes are not touched. Older SHA images stay in GHCR, so a rollback beyond
+container, running or stopped, is kept and reported with the reason), then
+prunes dangling `<none>` layers of any image and the whole build cache. Other
+tagged images, `latest`-style tags, containers and volumes are not touched. Older SHA images stay in GHCR, so a rollback beyond
 ten releases is a plain pull. Reference copies:
 `docs/maintenance/docker-retention.{sh,service,timer}`. Log:
 `journalctl -u docker-retention` (start/done lines carry inode and byte usage).
@@ -205,6 +205,7 @@ ssh vf-prod 'diff -u /usr/local/sbin/docker-retention /tmp/docker-retention.new;
   install -o root -g root -m 0644 /tmp/docker-retention.service /tmp/docker-retention.timer /etc/systemd/system/ && \
   systemctl daemon-reload && systemctl enable --now docker-retention.timer'
 ssh vf-prod 'DRY_RUN=1 /usr/local/sbin/docker-retention'   # what would go
+ssh vf-prod 'systemctl start docker-retention'              # run now, logged to the journal
 ```
 
 The end-of-deploy prune (`until=336h`) stays as a second, coarser net.
@@ -221,6 +222,8 @@ Check on the host: `docker info -f '{{.DockerRootDir}}'`, then `df -i` and
 `df -h` on that path (the gate measures the filesystem of the Docker data
 directory through the scheduler's overlay root), and `journalctl -u
 docker-retention -n 20`. Remedy, a production mutation that needs the owner's
-approval each time: run the retention by hand (`KEEP=5
-/usr/local/sbin/docker-retention` for a deeper cut). On 2026-09-19 a manual
+approval each time: `systemctl start docker-retention` (logged like the nightly
+run), or `KEEP=5 /usr/local/sbin/docker-retention` for a deeper cut (prints to
+the terminal, not to the journal). From this machine ssh may need
+`-o IdentityAgent=none`. On 2026-09-19 a manual
 prune took inodes from 100% to 19% and disk from 87% to 44%.
