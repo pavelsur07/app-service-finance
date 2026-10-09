@@ -377,6 +377,43 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         self::assertSame('A', $existingA->getName());
         self::assertSame('B', $existingB->getName());
         self::assertNull($existingB->getParent());
+        self::assertSame(5, $existingA->getLevel());
+        self::assertSame(1, $existingB->getLevel());
+    }
+
+    public function testPreservedDescendantFollowsNodeMovedToRoot(): void
+    {
+        // Потомок, которого нет в источнике, остаётся под перенесённым узлом.
+        // Его уровень обязан пересчитаться: иначе отчёт ОПиУ, читающий
+        // level соседних строк, рисует лишнюю группу.
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        $existingParent = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->build();
+        $existingX = PLCategoryBuilder::aPLCategory()->forCompany($target)
+            ->withName('Общепроизводственные')->withCode('OVERHEAD')->withParent($existingParent)->build();
+        $preserved = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Аренда')->withParent($existingX)->build();
+
+        $sourceX = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Общепроизводственные')->withCode('OVERHEAD')->build();
+
+        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository->method('findBy')->willReturnCallback(
+            static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
+        );
+        $plCategoryRepository->method('findOneBy')->willReturnCallback(
+            static fn (array $criteria): ?PLCategory => 'OVERHEAD' === ($criteria['code'] ?? null) ? $existingX : null,
+        );
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($this->nodes([$sourceX]), (string) $target->getId(), false),
+        );
+
+        self::assertNull($existingX->getParent());
+        self::assertSame(1, $existingX->getLevel());
+        self::assertSame(2, $preserved->getLevel());
     }
 
     public function testDoesNotAssignSameExistingTargetNodeToTwoSourceNodes(): void

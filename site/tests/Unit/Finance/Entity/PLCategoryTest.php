@@ -85,6 +85,51 @@ final class PLCategoryTest extends TestCase
         self::assertFalse($sibling->isDescendantOf($child));
     }
 
+    /**
+     * Прод-сценарий ИП Лазарева: группу вынесли в корень, её статьи остались на
+     * старом уровне, и отчёт ОПиУ показал соседнюю статью как группу.
+     */
+    public function testMovingGroupToRootRecalculatesDescendantLevels(): void
+    {
+        [$root, $group, $leaf, $grandchild] = $this->chain(4);
+
+        $group->setParent(null);
+
+        self::assertSame(1, $root->getLevel());
+        self::assertSame(1, $group->getLevel());
+        self::assertSame(2, $leaf->getLevel());
+        self::assertSame(3, $grandchild->getLevel());
+    }
+
+    public function testMovingGroupDeeperRecalculatesDescendantLevels(): void
+    {
+        [, $group, $leaf] = $this->chain(3);
+        $newParent = $this->chain(2)[1];
+
+        $group->setParent($newParent);
+
+        self::assertSame(3, $group->getLevel());
+        self::assertSame(4, $leaf->getLevel());
+    }
+
+    /**
+     * @return list<PLCategory> цепочка от корня вниз, у элемента N уровень N+1
+     */
+    private function chain(int $length): array
+    {
+        $company = $this->company();
+        $chain = [];
+        $parent = null;
+        for ($i = 0; $i < $length; ++$i) {
+            $category = new PLCategory(Uuid::uuid4()->toString(), $company);
+            $category->setParent($parent);
+            $chain[] = $category;
+            $parent = $category;
+        }
+
+        return $chain;
+    }
+
     private function company(): Company
     {
         $user = new User(Uuid::uuid4()->toString());

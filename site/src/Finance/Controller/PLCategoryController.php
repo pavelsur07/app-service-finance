@@ -320,10 +320,16 @@ class PLCategoryController extends AbstractController
         }
 
         $availableCategories = $this->categoryRepository->findTreeByCompany($company);
+        $subtreeHeight = self::subtreeHeight($category, $availableCategories);
+        $currentParent = $category->getParent();
+        // The current parent always stays offered: otherwise an unrelated edit
+        // would submit the empty option and silently move the branch to root.
         $parents = array_values(array_filter(
             $availableCategories,
-            static fn (PLCategory $candidate): bool => $candidate->getId() !== $category->getId()
-                && !$candidate->isDescendantOf($category),
+            static fn (PLCategory $candidate): bool => $candidate === $currentParent
+                || ($candidate->getId() !== $category->getId()
+                    && !$candidate->isDescendantOf($category)
+                    && $candidate->getLevel() + 1 + $subtreeHeight <= 5),
         ));
         $form = $this->createForm(PLCategoryFormType::class, $category, [
             'parents' => $parents,
@@ -333,13 +339,9 @@ class PLCategoryController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($category->getParent() && $category->getParent()->getLevel() >= 5) {
-                $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
-            } else {
-                $em->flush();
+            $em->flush();
 
-                return $this->redirectToRoute('pl_category_index');
-            }
+            return $this->redirectToRoute('pl_category_index');
         }
 
         return $this->render('pl_category/edit.html.twig', [
@@ -434,5 +436,27 @@ class PLCategoryController extends AbstractController
         $slug = trim($slug, '-');
 
         return '' !== $slug ? mb_substr($slug, 0, 60) : 'company';
+    }
+
+    /**
+     * Branch height from the already loaded company tree: walking parent links
+     * avoids a lazy children query per category.
+     *
+     * @param PLCategory[] $tree
+     */
+    private static function subtreeHeight(PLCategory $category, array $tree): int
+    {
+        $height = 0;
+        foreach ($tree as $candidate) {
+            $distance = 0;
+            for ($node = $candidate; null !== $node && $node !== $category; $node = $node->getParent()) {
+                ++$distance;
+            }
+            if (null !== $node) {
+                $height = max($height, $distance);
+            }
+        }
+
+        return $height;
     }
 }

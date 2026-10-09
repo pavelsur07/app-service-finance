@@ -108,6 +108,85 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertFalse($updatedCategory->isVisible());
     }
 
+    /**
+     * Прод-сценарий ИП Лазарева: группу «Общепроизводственные» вынесли в корень,
+     * её статьи остались на уровне 3, и отчёт ОПиУ показал новую соседнюю статью
+     * уровня 2 как группу.
+     */
+    public function testMovingGroupToRootPersistsRecalculatedChildLevels(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $expenses = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы')->build();
+        $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Общепроизводственные')->withParent($expenses)->build();
+        $rent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Аренда офис-склад')->withParent($group)->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, $expenses, $group, $rent] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+        self::assertSame(3, $rent->getLevel());
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/'.$group->getId().'/edit');
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->filter('#pl-category-edit-form')->form();
+        $parentField = (string) $crawler->filter('select[id$="_parent"]')->attr('name');
+        $form->setValues([$parentField => '']);
+        $client->submit($form);
+
+        self::assertResponseRedirects('/pl-categories/');
+
+        $em->clear();
+        $levels = $em->getConnection()->fetchAllKeyValue(
+            'SELECT name, level FROM pl_categories WHERE company_id = :company_id',
+            ['company_id' => $company->getId()],
+        );
+        self::assertEquals(['Расходы' => 1, 'Общепроизводственные' => 1, 'Аренда офис-склад' => 2], $levels);
+    }
+
+    public function testEditOffersOnlyParentsKeepingSubtreeWithinMaxDepth(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $chain = [];
+        $parent = null;
+        foreach (['L1', 'L2', 'L3', 'L4', 'L5'] as $name) {
+            $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($name)->withParent($parent)->build();
+            $chain[] = $parent;
+        }
+        $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Group')->build();
+        $leaf = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Leaf')->withParent($group)->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, ...$chain, $group, $leaf] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/'.$group->getId().'/edit');
+        self::assertResponseIsSuccessful();
+
+        $offered = $crawler->filter('select[id$="_parent"] option')->each(static fn ($node) => $node->attr('value'));
+
+        // Ветка Group высотой 1: под L3 она встаёт на уровни 4–5, под L4 лист ушёл бы на 6.
+        self::assertContains($chain[2]->getId(), $offered);
+        self::assertNotContains($chain[3]->getId(), $offered);
+        self::assertNotContains($chain[4]->getId(), $offered);
+        self::assertNotContains($leaf->getId(), $offered);
+    }
+
     public function testDeleteMergesDailyTotalsIntoUncategorizedBucket(): void
     {
         $client = static::createClient();
