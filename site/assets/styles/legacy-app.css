@@ -13,10 +13,18 @@
     margin: 0;
 }
 
-/* Tabler forces overflow-y: scroll on the fixed sidebar; show the scrollbar only when the menu overflows. */
+/* Tabler forces overflow-y: scroll on the fixed sidebar. The menu scrolls inside .vf-sidebar-body;
+   auto here is only a fallback, so no empty scrollbar track is shown. */
 @media (min-width: 992px) {
     aside.navbar-vertical.navbar-expand-lg {
         overflow-y: auto;
+    }
+
+    /* Pin the company footer: cap the container at the aside height (Tabler uses min-height: 100%)
+       so only the menu list scrolls. */
+    aside.navbar-vertical.navbar-expand-lg > .container-fluid {
+        height: 100%;
+        min-height: 0;
     }
 }
 
