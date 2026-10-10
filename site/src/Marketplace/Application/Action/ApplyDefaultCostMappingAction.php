@@ -85,7 +85,11 @@ final readonly class ApplyDefaultCostMappingAction
                     }
 
                     // Статьи шаблона у компании нет — пробуем статью по образцу.
-                    $plCategoryId = $siblingTargets[$item->getPlCode()] ?? null;
+                    // Статья есть, но не LEAF_INPUT (компания разбила её на дочерние)
+                    // или дублируется — по образцу не угадываем: выбор подстатьи за человеком.
+                    $plCategoryId = DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $status
+                        ? $siblingTargets[$item->getPlCode()] ?? null
+                        : null;
                     if (null === $plCategoryId || null === $item->getCostCategoryId()) {
                         $blocked[] = $costCode;
 
@@ -103,10 +107,10 @@ final readonly class ApplyDefaultCostMappingAction
                         $skipped[] = $costCode;
                     } elseif (null === $item->getExistingMappingId()) {
                         $created[] = $costCode;
-                        $inferred[] = $costCode;
+                        $inferred[$costCode] = $plCategoryId;
                     } else {
                         $updated[] = $costCode;
-                        $inferred[] = $costCode;
+                        $inferred[$costCode] = $plCategoryId;
                     }
 
                     continue;
@@ -116,7 +120,7 @@ final readonly class ApplyDefaultCostMappingAction
             }
         });
 
-        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked, $inferred);
+        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked, array_keys($inferred));
 
         $this->logger->info('Default marketplace cost mapping has been applied.', [
             'company_id' => $command->companyId,
@@ -130,11 +134,21 @@ final readonly class ApplyDefaultCostMappingAction
             'inferred_count' => \count($inferred),
         ]);
 
+        if ([] !== $inferred) {
+            // Аудит финансового решения: какая затрата в какую статью ушла по образцу.
+            $this->logger->info('Default marketplace cost mapping inferred P&L lines from company samples.', [
+                'company_id' => $command->companyId,
+                'marketplace' => $command->marketplace,
+                'inferred' => $inferred,
+            ]);
+        }
+
         return $result;
     }
 
     /**
-     * Статьи «по образцу компании» для pl_code шаблона, которых у компании нет.
+     * Статьи «по образцу компании» для pl_code шаблона, которых у компании нет
+     * вовсе (MISSING_PL_CATEGORY).
      * Считаются, только если такие правила в превью есть.
      *
      * @param list<DefaultCostMappingPreviewItem> $items
@@ -147,9 +161,7 @@ final readonly class ApplyDefaultCostMappingAction
         $needed = false;
         foreach ($items as $item) {
             $templatePlCodes[$item->getCostCode()] = $item->getPlCode();
-            $needed = $needed
-                || DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $item->getStatus()
-                || DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY === $item->getStatus();
+            $needed = $needed || DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $item->getStatus();
         }
 
         if (!$needed) {

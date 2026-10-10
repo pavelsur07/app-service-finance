@@ -8,7 +8,7 @@ use Doctrine\DBAL\Connection;
 
 /**
  * Куда компания относит свои категории затрат маркетплейса: только включённые
- * правила со статьёй LEAF_INPUT своей же компании. Образцы для
+ * правила неудалённых категорий со статьёй LEAF_INPUT своей же компании. Образцы для
  * DefaultCostMappingSiblingResolver.
  */
 final readonly class CompanyCostPlTargetsQuery
@@ -33,6 +33,7 @@ final readonly class CompanyCostPlTargetsQuery
                AND pl.company_id = m.company_id
             WHERE m.company_id = :companyId
               AND mcc.marketplace = :marketplace
+              AND mcc.deleted_at IS NULL
               AND m.include_in_pl = true
               AND pl.type = 'LEAF_INPUT'
             SQL,

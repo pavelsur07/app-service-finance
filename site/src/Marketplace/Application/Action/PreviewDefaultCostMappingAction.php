@@ -65,7 +65,7 @@ final readonly class PreviewDefaultCostMappingAction
         }
 
         if (count($plCandidates) > 1) {
-            return $this->item($rule, $cost, null, null, DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY, 'Найдено несколько категорий ОПиУ с таким code.');
+            return $this->item($rule, $cost, null, $existingMappings[$cost['id']] ?? null, DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY, 'Найдено несколько категорий ОПиУ с таким code.');
         }
 
         if (null === $pl) {
