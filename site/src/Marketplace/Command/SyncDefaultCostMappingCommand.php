@@ -24,7 +24,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * появившаяся ночью, попадает в отчёт в то же утро.
  *
  * Применение частичное: правило, для которого у компании нет статьи ОПиУ из
- * шаблона, пропускается (blocked), остальные применяются. Ручные и отключённые
+ * шаблона, получает статью по образцу компании (DefaultCostMappingSiblingResolver),
+ * а без единогласного образца пропускается (blocked); остальные применяются. Ручные и отключённые
  * правила не трогаются — это гарантирует ApplyDefaultCostMappingAction. Затраты,
  * которые так и остались вне ОПиУ, показывает гейт
  * app:marketplace:cost-pl-mapping:unmapped-check.
@@ -101,12 +102,13 @@ final class SyncDefaultCostMappingCommand extends Command
 
             if ($result->getCreatedCount() + $result->getUpdatedCount() > 0) {
                 $output->writeln(sprintf(
-                    'company %s %s: создано %d, заполнено %d (%s)',
+                    'company %s %s: создано %d, заполнено %d (%s); по образцу компании: %s',
                     $companyId,
                     $marketplace->value,
                     $result->getCreatedCount(),
                     $result->getUpdatedCount(),
                     implode(', ', [...$result->getCreatedCostCodes(), ...$result->getUpdatedCostCodes()]),
+                    [] === $result->getInferredCostCodes() ? '—' : implode(', ', $result->getInferredCostCodes()),
                 ));
             }
         }

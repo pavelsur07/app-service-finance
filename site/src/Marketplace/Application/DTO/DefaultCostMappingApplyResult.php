@@ -13,6 +13,7 @@ final readonly class DefaultCostMappingApplyResult
      * @param list<string> $updatedCostCodes
      * @param list<string> $skippedCostCodes
      * @param list<string> $blockedCostCodes
+     * @param list<string> $inferredCostCodes созданные/заполненные по образцу компании (подмножество created + updated)
      */
     public function __construct(
         private MarketplaceType $marketplace,
@@ -21,6 +22,7 @@ final readonly class DefaultCostMappingApplyResult
         private array $updatedCostCodes,
         private array $skippedCostCodes,
         private array $blockedCostCodes,
+        private array $inferredCostCodes = [],
     ) {
     }
 
@@ -76,6 +78,12 @@ final readonly class DefaultCostMappingApplyResult
     public function getBlockedCostCodes(): array
     {
         return $this->blockedCostCodes;
+    }
+
+    /** @return list<string> */
+    public function getInferredCostCodes(): array
+    {
+        return $this->inferredCostCodes;
     }
 
     /** @return array<string,int> */

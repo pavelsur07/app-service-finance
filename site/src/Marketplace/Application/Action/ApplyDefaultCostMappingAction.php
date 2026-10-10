@@ -7,7 +7,10 @@ namespace App\Marketplace\Application\Action;
 use App\Marketplace\Application\Command\ApplyDefaultCostMappingCommand;
 use App\Marketplace\Application\Command\PreviewDefaultCostMappingCommand;
 use App\Marketplace\Application\DTO\DefaultCostMappingApplyResult;
+use App\Marketplace\Application\DTO\DefaultCostMappingPreviewItem;
+use App\Marketplace\Application\Service\DefaultCostMappingSiblingResolver;
 use App\Marketplace\Enum\DefaultCostMappingPreviewStatus;
+use App\Marketplace\Infrastructure\Query\CompanyCostPlTargetsQuery;
 use App\Marketplace\Infrastructure\Writer\DefaultCostMappingWriter;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
@@ -17,6 +20,8 @@ final readonly class ApplyDefaultCostMappingAction
     public function __construct(
         private PreviewDefaultCostMappingAction $previewAction,
         private DefaultCostMappingWriter $writer,
+        private CompanyCostPlTargetsQuery $companyTargetsQuery,
+        private DefaultCostMappingSiblingResolver $siblingResolver,
         private Connection $connection,
         private LoggerInterface $logger,
     ) {
@@ -34,8 +39,11 @@ final readonly class ApplyDefaultCostMappingAction
         $updated = [];
         $skipped = [];
         $blocked = [];
+        $inferred = [];
 
-        $this->connection->transactional(function () use ($command, $preview, &$created, &$updated, &$skipped, &$blocked): void {
+        $siblingTargets = $command->partial ? $this->siblingTargets($command, $preview->getItems()) : [];
+
+        $this->connection->transactional(function () use ($command, $preview, $siblingTargets, &$created, &$updated, &$skipped, &$blocked, &$inferred): void {
             foreach ($preview->getItems() as $item) {
                 $status = $item->getStatus();
                 $costCode = $item->getCostCode();
@@ -69,7 +77,37 @@ final readonly class ApplyDefaultCostMappingAction
                 if (DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $status
                     || DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY === $status) {
                     // Сюда доходит только частичный режим: полный бросил выше.
-                    $blocked[] = $costCode;
+                    // Статья у правила уже назначена вручную — решение есть.
+                    if (null !== $item->getExistingPlCategoryId()) {
+                        $skipped[] = $costCode;
+
+                        continue;
+                    }
+
+                    // Статьи шаблона у компании нет — пробуем статью по образцу.
+                    $plCategoryId = $siblingTargets[$item->getPlCode()] ?? null;
+                    if (null === $plCategoryId || null === $item->getCostCategoryId()) {
+                        $blocked[] = $costCode;
+
+                        continue;
+                    }
+
+                    if (null === $item->getExistingMappingId()) {
+                        $affected = $this->writer->createMapping($command->companyId, $item->getCostCategoryId(), $plCategoryId, $item->isIncludeInPl(), $item->isNegative());
+                    } else {
+                        // Ручное или отключённое правило writer не тронет: affected = 0.
+                        $affected = $this->writer->fillEmptyMapping($command->companyId, $item->getExistingMappingId(), $plCategoryId, $item->isIncludeInPl(), $item->isNegative());
+                    }
+
+                    if (0 === $affected) {
+                        $skipped[] = $costCode;
+                    } elseif (null === $item->getExistingMappingId()) {
+                        $created[] = $costCode;
+                        $inferred[] = $costCode;
+                    } else {
+                        $updated[] = $costCode;
+                        $inferred[] = $costCode;
+                    }
 
                     continue;
                 }
@@ -78,7 +116,7 @@ final readonly class ApplyDefaultCostMappingAction
             }
         });
 
-        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked);
+        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked, $inferred);
 
         $this->logger->info('Default marketplace cost mapping has been applied.', [
             'company_id' => $command->companyId,
@@ -89,8 +127,35 @@ final readonly class ApplyDefaultCostMappingAction
             'updated_count' => $result->getUpdatedCount(),
             'skipped_count' => $result->getSkippedCount(),
             'blocked_count' => $result->getBlockedCount(),
+            'inferred_count' => \count($inferred),
         ]);
 
         return $result;
+    }
+
+    /**
+     * Статьи «по образцу компании» для pl_code шаблона, которых у компании нет.
+     * Считаются, только если такие правила в превью есть.
+     *
+     * @param list<DefaultCostMappingPreviewItem> $items
+     *
+     * @return array<string, string> pl_code шаблона => статья ОПиУ компании
+     */
+    private function siblingTargets(ApplyDefaultCostMappingCommand $command, array $items): array
+    {
+        $templatePlCodes = [];
+        $needed = false;
+        foreach ($items as $item) {
+            $templatePlCodes[$item->getCostCode()] = $item->getPlCode();
+            $needed = $needed
+                || DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $item->getStatus()
+                || DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY === $item->getStatus();
+        }
+
+        if (!$needed) {
+            return [];
+        }
+
+        return $this->siblingResolver->resolve($templatePlCodes, $this->companyTargetsQuery->fetch($command->companyId, $command->marketplace));
     }
 }
