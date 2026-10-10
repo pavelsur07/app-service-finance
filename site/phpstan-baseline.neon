@@ -4435,12 +4435,6 @@ parameters:
 			path: src/Loan/Repository/LoanPaymentScheduleRepository.php
 
 		-
-			message: '#^Anonymous function has an unused use \$blocked\.$#'
-			identifier: closure.unusedUse
-			count: 1
-			path: src/Marketplace/Application/Action/ApplyDefaultCostMappingAction.php
-
-		-
 			message: '#^Method App\\Marketplace\\Application\\Action\\PreviewDefaultCostMappingAction\:\:buildItem\(\) has parameter \$costByCode with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
