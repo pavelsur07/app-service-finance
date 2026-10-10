@@ -76,10 +76,11 @@ COPY --from=frontend_builder /app/public/build ./public/build
 
 ENV APP_ENV=prod
 
+# chown в том же RUN, что прогрев: отдельный слой заново записывал бы весь кэш
+# (~3,4 тыс. файлов, 16 МБ) в каждом релизе — docs/maintenance/production-logging.md, «Host disk».
 RUN php bin/console cache:clear \
-    && php bin/console assets:install public --no-debug
-
-RUN chown www-data:www-data ./var -R
+    && php bin/console assets:install public --no-debug \
+    && chown www-data:www-data ./var -R
 
 COPY ./docker/production/entrypoint-init-storage.sh /usr/local/bin/entrypoint-init-storage
 RUN chmod 555 /usr/local/bin/entrypoint-init-storage

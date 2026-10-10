@@ -98,10 +98,13 @@ ENV APP_ENV=prod
 # Замер на локальном образе (bin/console list, APP_ENV=prod): холодный кэш —
 # 8.41 s и 126 строк deprecation-шума, тёплый — 0.90 s и одна строка.
 # См. docs/tasks/scheduler-memory-limit/task.md.
-RUN php bin/console cache:clear
-
-# Права на var/cache и var/log — под app (воркер работает под app)
-RUN mkdir -p var/cache var/log \
+#
+# Права на var/cache и var/log — под app (воркер работает под app). Прогрев и
+# chown/chmod — ОДИН RUN: отдельный слой с chown -R заново записывал бы весь
+# прогретый кэш (~3,4 тыс. файлов, 16 МБ) в каждом релизе — замер 09.10.2026,
+# docs/maintenance/production-logging.md, «Host disk».
+RUN php bin/console cache:clear \
+ && mkdir -p var/cache var/log \
  && chown -R app:www-data var \
  && chmod -R 775 var
 
