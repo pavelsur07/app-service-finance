@@ -17,8 +17,8 @@ final readonly class DefaultCostMappingSiblingResolver
 {
     /**
      * @param array<string, string> $templatePlCodes код затраты => pl_code шаблона
-     * @param array<string, string> $companyMapping  код затраты => статья ОПиУ: включённые правила
-     *                                               компании со статьёй LEAF_INPUT
+     * @param array<string, string> $companyMapping код затраты => статья ОПиУ: включённые правила
+     *                                              компании со статьёй LEAF_INPUT
      *
      * @return array<string, string> pl_code шаблона => статья ОПиУ компании
      */
