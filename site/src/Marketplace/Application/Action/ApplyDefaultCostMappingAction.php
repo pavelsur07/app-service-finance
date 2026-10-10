@@ -26,7 +26,7 @@ final readonly class ApplyDefaultCostMappingAction
     {
         $preview = ($this->previewAction)(new PreviewDefaultCostMappingCommand($command->companyId, $command->marketplace));
 
-        if ($preview->hasBlockingIssues()) {
+        if (!$command->partial && $preview->hasBlockingIssues()) {
             throw new \DomainException('Базовый маппинг не может быть применён: есть отсутствующие или невалидные категории ОПиУ.');
         }
 
@@ -66,6 +66,14 @@ final readonly class ApplyDefaultCostMappingAction
                     continue;
                 }
 
+                if (DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $status
+                    || DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY === $status) {
+                    // Сюда доходит только частичный режим: полный бросил выше.
+                    $blocked[] = $costCode;
+
+                    continue;
+                }
+
                 $skipped[] = $costCode;
             }
         });
@@ -76,6 +84,7 @@ final readonly class ApplyDefaultCostMappingAction
             'company_id' => $command->companyId,
             'marketplace' => $command->marketplace,
             'actor_user_id' => $command->actorUserId,
+            'partial' => $command->partial,
             'created_count' => $result->getCreatedCount(),
             'updated_count' => $result->getUpdatedCount(),
             'skipped_count' => $result->getSkippedCount(),
