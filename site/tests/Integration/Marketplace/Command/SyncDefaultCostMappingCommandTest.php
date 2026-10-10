@@ -39,6 +39,10 @@ final class SyncDefaultCostMappingCommandTest extends IntegrationTestCase
         $crossdocking = $this->costCategory($company, 'ozon_crossdocking');
         $returnFromStock = $this->costCategory($company, 'ozon_return_from_stock');
         $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $company->getId(), $returnFromStock, $manual->getId()));
+        // Осознанно исключено из ОПиУ, статья шаблона у компании есть.
+        $pickup = $this->costCategory($company, 'ozon_logistic_pickup');
+        $disabled = new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $company->getId(), $pickup, null, false);
+        $this->em->persist($disabled);
         $this->em->flush();
 
         $tester = $this->tester();
@@ -48,6 +52,8 @@ final class SyncDefaultCostMappingCommandTest extends IntegrationTestCase
         self::assertSame($delivery->getId(), $this->plCategoryOf($handover));
         self::assertNull($this->plCategoryOf($crossdocking), 'статьи OPEX_WH_RECEIVING у компании нет — правило пропущено');
         self::assertSame($manual->getId(), $this->plCategoryOf($returnFromStock), 'ручное правило не перезаписывается');
+        self::assertNull($this->plCategoryOf($pickup), 'отключённое правило не заполняется');
+        self::assertFalse((bool) $this->em->getConnection()->fetchOne('SELECT include_in_pl FROM marketplace_cost_pl_mappings WHERE id = :id', ['id' => $disabled->getId()]));
         self::assertStringContainsString('ozon_delivery_to_handover_place', $tester->getDisplay());
 
         // Повторный прогон ничего не меняет.

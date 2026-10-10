@@ -57,7 +57,7 @@ final class PreflightCostsQuery
                 COUNT(*) FILTER (
                     WHERE m.id IS NULL OR m.pl_category_id IS NULL
                 )                                                               AS without_pl_mapping,
-                COUNT(*) FILTER (WHERE $withoutPlDecision)                                                               AS without_pl_decision,
+                COUNT(*) FILTER (WHERE $withoutPlDecision)                      AS without_pl_decision,
                 COUNT(*) FILTER (
                     WHERE m.id IS NOT NULL AND m.include_in_pl = false
                 )                                                               AS excluded_from_pl,
