@@ -15,6 +15,9 @@ use Doctrine\DBAL\Connection;
  * осознанное исключение, не пропуск. Для Ozon тот же PreliminaryCostFilter, что
  * у оперативного закрытия: нераспознанные коды маппинг не чинит, их ловит сверка Ozon.
  *
+ * Строки считаются, а не сумма: затрата и её сторно дают ноль, но обе остаются
+ * без решения по ОПиУ, и preflight по ним заблокирует окончательное закрытие.
+ *
  * Запрос сквозной по компаниям намеренно — это системный гейт по активным
  * SELLER-подключениям, как ActiveSellerConnectionsQuery.
  */
@@ -61,7 +64,6 @@ final readonly class UnmappedCostsQuery
               AND %s
               %s
             GROUP BY c.company_id, mcc.code
-            HAVING ABS(SUM(c.amount)) > 0.001
             ORDER BY c.company_id, mcc.code
             SQL, PreflightCostsQuery::WITHOUT_PL_DECISION, self::ACTIVE_CONNECTION, $filter);
 

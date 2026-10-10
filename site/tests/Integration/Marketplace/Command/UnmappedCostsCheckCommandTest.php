@@ -80,6 +80,25 @@ final class UnmappedCostsCheckCommandTest extends IntegrationTestCase
         self::assertStringContainsString('unmapped rows count: 0', $tester->getDisplay());
     }
 
+    /**
+     * Затрата и её сторно в сумме дают ноль, но обе строки без решения по ОПиУ:
+     * preflight по ним заблокирует закрытие, значит и гейт обязан их показать.
+     */
+    public function testOffsettingCostsWithoutMappingStillRed(): void
+    {
+        $company = $this->company(964, true);
+        $category = $this->category($company, 'ozon_crossdocking');
+        $today = new \DateTimeImmutable('today');
+        $this->cost($company, $category, $today->modify('first day of previous month'), '100.00');
+        $this->cost($company, $category, $today, '-100.00');
+        $this->em->flush();
+
+        $tester = $this->tester();
+
+        self::assertSame(Command::FAILURE, $tester->execute([]), $tester->getDisplay());
+        self::assertStringContainsString('«ozon_crossdocking»: 2 строк, 0.00', $tester->getDisplay());
+    }
+
     private function company(int $index, bool $activeConnection): Company
     {
         $owner = UserBuilder::aUser()->withIndex($index)->build();
