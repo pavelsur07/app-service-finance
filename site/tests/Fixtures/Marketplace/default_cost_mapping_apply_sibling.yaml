@@ -1,0 +1,74 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: cost_sample_a
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_sample_b
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_sample_disabled
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_new
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_new_empty
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_conflict_a
+        pl_code: PL_OTHER_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_conflict_b
+        pl_code: PL_OTHER_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_conflict_new
+        pl_code: PL_OTHER_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_manual
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_disabled_empty
+        pl_code: PL_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_group_sample
+        pl_code: PL_GROUP
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_group_new
+        pl_code: PL_GROUP
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_iso_sample
+        pl_code: PL_ISO_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_iso_new
+        pl_code: PL_ISO_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high

@@ -10,10 +10,12 @@ use App\Finance\Enum\PLCategoryType;
 use App\Marketplace\Application\Action\ApplyDefaultCostMappingAction;
 use App\Marketplace\Application\Action\PreviewDefaultCostMappingAction;
 use App\Marketplace\Application\Command\ApplyDefaultCostMappingCommand;
+use App\Marketplace\Application\Service\DefaultCostMappingSiblingResolver;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider;
+use App\Marketplace\Infrastructure\Query\CompanyCostPlTargetsQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostCategoriesByCodeQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostPLMappingsByCostCategoryQuery;
 use App\Marketplace\Infrastructure\Query\PLCategoriesByCodeQuery;
@@ -126,6 +128,78 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
         self::assertArrayNotHasKey((string) $invalid->getId(), $mapped);
     }
 
+    /**
+     * Компания со своим деревом ОПиУ: статьи шаблона PL_MISSING нет, но затраты
+     * этого типа она единогласно относит в «Свою строку» — новая затрата идёт туда же.
+     * Разнобой образцов (PL_OTHER_MISSING) — решения нет, правило остаётся blocked.
+     */
+    public function testPartialApplyInfersLineFromUnanimousCompanySamples(): void
+    {
+        $companyId = '55555555-5555-5555-5555-555555555555';
+        $company = $this->createCompany($companyId);
+        $own = $this->createPl($company, 'OWN_LINE', PLCategoryType::LEAF_INPUT);
+        $other = $this->createPl($company, 'OTHER_LINE', PLCategoryType::LEAF_INPUT);
+
+        foreach (['cost_sample_a' => $own, 'cost_sample_b' => $own, 'cost_conflict_a' => $own, 'cost_conflict_b' => $other] as $code => $line) {
+            $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, $code), (string) $line->getId(), true));
+        }
+        // Отключённое правило — не образец, и разнобоя не создаёт.
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_sample_disabled'), (string) $other->getId(), false));
+
+        $new = $this->createCost($company, 'cost_new');
+        $newEmpty = $this->createCost($company, 'cost_new_empty');
+        $emptyMapping = new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $newEmpty, null, true);
+        $this->em->persist($emptyMapping);
+        $conflictNew = $this->createCost($company, 'cost_conflict_new');
+
+        // Ручная статья и отключённое пустое правило — не трогаются, это skipped.
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_manual'), (string) $own->getId(), true));
+        $disabledEmpty = new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_disabled_empty'), null, false);
+        $this->em->persist($disabledEmpty);
+
+        // Статья шаблона есть, но это группа: компания разбила её — по образцу не угадываем.
+        $this->createPl($company, 'PL_GROUP', PLCategoryType::SUBTOTAL);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_group_sample'), (string) $own->getId(), true));
+        $groupNew = $this->createCost($company, 'cost_group_new');
+
+        // Образцы другой компании и другого маркетплейса не учитываются.
+        $neighbourId = '66666666-6666-6666-6666-666666666666';
+        $neighbour = $this->createCompany($neighbourId);
+        $neighbourLine = $this->createPl($neighbour, 'OWN_LINE', PLCategoryType::LEAF_INPUT);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $neighbourId, $this->createCost($neighbour, 'cost_iso_sample'), (string) $neighbourLine->getId(), true));
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_iso_sample', MarketplaceType::WILDBERRIES), (string) $own->getId(), true));
+        $isoNew = $this->createCost($company, 'cost_iso_new');
+        $this->em->flush();
+
+        $action = $this->buildApplyAction('default_cost_mapping_apply_sibling.yaml');
+        $result = $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, 'cron', partial: true));
+
+        self::assertSame(['cost_new'], $result->getCreatedCostCodes());
+        self::assertSame(['cost_new_empty'], $result->getUpdatedCostCodes());
+        self::assertSame(['cost_new', 'cost_new_empty'], $result->getInferredCostCodes());
+        self::assertSame(['cost_conflict_new', 'cost_group_new', 'cost_iso_new'], $result->getBlockedCostCodes());
+        self::assertContains('cost_manual', $result->getSkippedCostCodes());
+        self::assertContains('cost_disabled_empty', $result->getSkippedCostCodes());
+
+        $plOf = fn (string $costId): mixed => $this->em->getConnection()->fetchOne(
+            'SELECT pl_category_id FROM marketplace_cost_pl_mappings WHERE company_id = :companyId AND cost_category_id = :costId',
+            ['companyId' => $companyId, 'costId' => $costId],
+        );
+        self::assertSame((string) $own->getId(), (string) $plOf((string) $new->getId()));
+        self::assertSame((string) $own->getId(), (string) $plOf((string) $newEmpty->getId()));
+        self::assertFalse($plOf((string) $conflictNew->getId()));
+        self::assertFalse($plOf((string) $groupNew->getId()));
+        self::assertFalse($plOf((string) $isoNew->getId()));
+        self::assertSame(
+            ['pl_category_id' => null, 'include_in_pl' => false],
+            $this->em->getConnection()->fetchAssociative('SELECT pl_category_id, include_in_pl FROM marketplace_cost_pl_mappings WHERE id = :id', ['id' => $disabledEmpty->getId()]),
+        );
+
+        // Полный режим (кнопка UI) по образцу не достраивает — по-прежнему блокируется.
+        $this->expectException(\DomainException::class);
+        $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, 'user'));
+    }
+
     private function buildApplyAction(string $fixture): ApplyDefaultCostMappingAction
     {
         $connection = $this->em->getConnection();
@@ -136,7 +210,14 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
             new MarketplaceCostPLMappingsByCostCategoryQuery($connection),
         );
 
-        return new ApplyDefaultCostMappingAction($previewAction, new DefaultCostMappingWriter($connection), $connection, new NullLogger());
+        return new ApplyDefaultCostMappingAction(
+            $previewAction,
+            new DefaultCostMappingWriter($connection),
+            new CompanyCostPlTargetsQuery($connection),
+            new DefaultCostMappingSiblingResolver(),
+            $connection,
+            new NullLogger(),
+        );
     }
 
     private function createCompany(string $companyId): Company
@@ -158,9 +239,9 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
         return $pl;
     }
 
-    private function createCost(Company $company, string $code): MarketplaceCostCategory
+    private function createCost(Company $company, string $code, MarketplaceType $marketplace = MarketplaceType::OZON): MarketplaceCostCategory
     {
-        $cost = new MarketplaceCostCategory(Uuid::uuid7()->toString(), $company, MarketplaceType::OZON);
+        $cost = new MarketplaceCostCategory(Uuid::uuid7()->toString(), $company, $marketplace);
         $cost->setCode($code);
         $cost->setName($code);
         $this->em->persist($cost);

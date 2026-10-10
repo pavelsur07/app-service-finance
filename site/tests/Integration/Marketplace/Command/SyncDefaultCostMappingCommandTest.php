@@ -62,6 +62,29 @@ final class SyncDefaultCostMappingCommandTest extends IntegrationTestCase
         self::assertStringNotContainsString('ozon_delivery_to_handover_place', $tester->getDisplay());
     }
 
+    /**
+     * Своё дерево ОПиУ без OPEX_WH_RECEIVING: приёмку компания относит в «Хранение» —
+     * туда же уходит кросс-докинг (тот же pl_code в шаблоне).
+     */
+    public function testInfersLineFromCompanySamplesWhenTemplateLineIsMissing(): void
+    {
+        $company = $this->company(953);
+        $this->connection($company, MarketplaceType::OZON, true);
+        $storage = PLCategoryBuilder::aPLCategory()->withId(Uuid::uuid4()->toString())->forCompany($company)->withName('Хранение на складе МП')->withCode('MP_STORAGE')->build();
+        $this->em->persist($storage);
+        $inbound = $this->costCategory($company, 'ozon_logistic_inbound');
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $company->getId(), $inbound, $storage->getId()));
+        $crossdocking = $this->costCategory($company, 'ozon_crossdocking');
+        $this->em->flush();
+
+        $tester = $this->tester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
+        self::assertSame($storage->getId(), $this->plCategoryOf($crossdocking));
+        self::assertSame($storage->getId(), $this->plCategoryOf($inbound));
+        self::assertStringContainsString('по образцу компании: ozon_crossdocking', $tester->getDisplay());
+    }
+
     public function testSkipsCompaniesWithoutActiveSellerConnection(): void
     {
         $company = $this->company(952);
