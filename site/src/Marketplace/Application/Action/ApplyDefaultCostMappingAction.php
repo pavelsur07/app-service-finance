@@ -41,9 +41,11 @@ final readonly class ApplyDefaultCostMappingAction
         $blocked = [];
         $inferred = [];
 
-        $siblingTargets = $command->partial ? $this->siblingTargets($command, $preview->getItems()) : [];
+        $this->connection->transactional(function () use ($command, $preview, &$created, &$updated, &$skipped, &$blocked, &$inferred): void {
+            // Образцы читаются в той же транзакции, что и запись, — окно между
+            // выводом статьи и записью правила минимально.
+            $siblingTargets = $command->partial ? $this->siblingTargets($command, $preview->getItems()) : [];
 
-        $this->connection->transactional(function () use ($command, $preview, $siblingTargets, &$created, &$updated, &$skipped, &$blocked, &$inferred): void {
             foreach ($preview->getItems() as $item) {
                 $status = $item->getStatus();
                 $costCode = $item->getCostCode();
