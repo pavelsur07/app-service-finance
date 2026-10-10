@@ -20,6 +20,14 @@ use Doctrine\DBAL\Connection;
  */
 final class PreflightCostsQuery
 {
+    /**
+     * Затрата без решения по ОПиУ: маппинга нет либо он включён в ОПиУ без
+     * статьи — такая затрата молча не попадёт в ОПиУ. Осознанное исключение
+     * (include_in_pl = false) — решение. Алиас `m` — marketplace_cost_pl_mappings.
+     * Тем же условием гейт UnmappedCostsQuery ищет затраты вне ОПиУ.
+     */
+    public const string WITHOUT_PL_DECISION = '(m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL))';
+
     public function __construct(
         private readonly Connection $connection,
     ) {
@@ -39,6 +47,7 @@ final class PreflightCostsQuery
         bool $preliminary = false,
     ): array {
         [$preliminaryFilter, $preliminaryParams, $preliminaryTypes] = PreliminaryCostFilter::build($marketplace, $preliminary);
+        $withoutPlDecision = self::WITHOUT_PL_DECISION;
 
         return $this->connection->fetchAssociative(
             <<<SQL
@@ -48,12 +57,7 @@ final class PreflightCostsQuery
                 COUNT(*) FILTER (
                     WHERE m.id IS NULL OR m.pl_category_id IS NULL
                 )                                                               AS without_pl_mapping,
-                -- Решения по ОПиУ нет: маппинга нет либо он включён в ОПиУ
-                -- без статьи — такая затрата молча не попадёт в ОПиУ.
-                -- Осознанное исключение (include_in_pl = false) — решение.
-                COUNT(*) FILTER (
-                    WHERE m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL)
-                )                                                               AS without_pl_decision,
+                COUNT(*) FILTER (WHERE $withoutPlDecision)                      AS without_pl_decision,
                 COUNT(*) FILTER (
                     WHERE m.id IS NOT NULL AND m.include_in_pl = false
                 )                                                               AS excluded_from_pl,
@@ -172,8 +176,10 @@ final class PreflightCostsQuery
         string $periodFrom,
         string $periodTo,
     ): array {
+        $withoutPlDecision = self::WITHOUT_PL_DECISION;
+
         return $this->connection->fetchAllAssociative(
-            <<<'SQL'
+            <<<SQL
             SELECT
                 cc.id   AS category_id,
                 cc.name AS category_name,
@@ -188,7 +194,7 @@ final class PreflightCostsQuery
               AND mc.marketplace = :marketplace
               AND mc.cost_date >= :periodFrom
               AND mc.cost_date <= :periodTo
-              AND (m.id IS NULL OR (m.include_in_pl = true AND m.pl_category_id IS NULL))
+              AND $withoutPlDecision
             GROUP BY cc.id, cc.name, cc.code
             ORDER BY COUNT(mc.id) DESC
             SQL,

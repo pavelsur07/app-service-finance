@@ -592,12 +592,13 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 | Writer | `DefaultCostMappingWriter` | `DefaultSaleMappingWriter` |
 | Таблица | `marketplace_cost_pl_mappings` | `marketplace_sale_mappings` |
 | Маршруты | `/marketplace/cost-pl-mapping/default/{preview,apply}` | `/marketplace/pl-mappings/default/{preview,apply}` |
-| Консоль | `app:marketplace:cost-pl-mapping:apply-default` (без `--execute` — предпросмотр) | — |
+| Консоль | `app:marketplace:cost-pl-mapping:apply-default` (без `--execute` — предпросмотр); ночной `app:marketplace:cost-pl-mapping:sync-default` (частичный режим, все активные SELLER-подключения) | — |
+| Гейт | `app:marketplace:cost-pl-mapping:unmapped-check` (`UnmappedCostsQuery`, условие `PreflightCostsQuery::WITHOUT_PL_DECISION`) | — |
 
 Общие правила:
 
 - **Существующее правило не перезаписывается.** Затраты дополняют только пустой `pl_category_id` (`WILL_FILL_EMPTY`), продажи не трогают ничего: активное правило на источник суммы → `SKIPPED_EXISTING`.
-- Отсутствующая или не-`LEAF_INPUT` категория ОПиУ, **найденная на preview**, блокирует apply целиком (`hasBlockingIssues()`), а не пропускает строку. Если категория исчезает, меняет код или тип уже во время записи, вставка этого правила не проходит и строка отчитывается как `skipped`; остальные правила сохраняются.
+- Отсутствующая или не-`LEAF_INPUT` категория ОПиУ, **найденная на preview**, блокирует apply целиком (`hasBlockingIssues()`), а не пропускает строку. Исключение — `ApplyDefaultCostMappingCommand::$partial = true` (только ночной `sync-default`): такие правила уходят в `blocked`, остальные применяются; затраты, оставшиеся вне ОПиУ, показывает гейт `unmapped-check`. Если категория исчезает, меняет код или тип уже во время записи, вставка этого правила не проходит и строка отчитывается как `skipped`; остальные правила сохраняются.
 - Правила продаж пишутся одной инструкцией `INSERT … SELECT` из `pl_categories`: категория перепроверяется по компании, коду и типу внутри самой вставки, а частичный индекс `uniq_active_sale_mapping_source` не даёт появиться второму активному правилу на источник суммы.
 - Правила продаж создаются сразу активными; уникальный ключ `uniq_sale_mapping` включает `pl_category_id`, поэтому отключённое правило с той же целью занимает место — preview показывает это отдельным сообщением.
 - Знак: у всех правил с `operation_type = return` обязателен `is_negative: true` (источники отдают возвраты положительными, а родитель-`SUBTOTAL` суммирует листья напрямую). Инвариант закреплён тестом `tests/Unit/Marketplace/Config/DefaultMappingConfigTest.php`, там же гварды на неизвестные `cost_code` / `pl_code`.
@@ -3519,6 +3520,8 @@ config/
 | `app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1` | `10 3 * * *` | Ежедневное планирование WB financial sync за вчерашний день (date-based команда); задачи — `SyncWbFinancialReportDayMessage` → `async_wb_finance` |
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 3-23 * * *` | Почасовой (с 03:20 до 23:20, 21 прогон в сутки) safe planner: current-month daily/retry/missing/empty recovery, затем rolling refresh последних 14 дней; не больше одной задачи на подключение за прогон |
 | `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
+| `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
+| `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
 | `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений |
 | **Marketplace — Ozon** | | |
 | `app:marketplace:ozon-listing-catalog:sync` | `40 3 * * *` | Синхронизация каталога листингов Ozon (`SyncOzonListingCatalogMessage` → `async_sync`) |
@@ -3636,6 +3639,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.00 | 2026-10-10 | Marketplace: ночной частичный базовый маппинг затрат в ОПиУ (`sync-default`, cron 04:35) и гейт затрат вне ОПиУ (`unmapped-check`, cron 06:50); условие «нет решения по ОПиУ» вынесено в `PreflightCostsQuery::WITHOUT_PL_DECISION` |
 | 1.99 | 2026-10-08 | Shared: гейт `app:disk:healthcheck` — заполнение диска хоста по inode и по байтам (19.09.2026 деплой падал на исчерпанных inode при свободных байтах) |
 | 1.98 | 2026-10-08 | Marketplace M1: диагностика производительности — `PerformanceRecorder`, канал `performance`, флаг `MARKETPLACE_PERF_DIAGNOSTICS`, отчёт `app:marketplace:perf-report`, `MessengerQueueSnapshotQuery`; `MessageCompanyId` вынесен из `SentryMessengerScopeSubscriber` |
 | 1.97 | 2026-10-06 | Ingestion: исчерпанный ретрай `ConnectorTransientException` закрывает job `FAILED` и не отправляет сообщение в `failed` (гейт `failed-queue-check` больше не краснеет от ночных 5xx WB) |

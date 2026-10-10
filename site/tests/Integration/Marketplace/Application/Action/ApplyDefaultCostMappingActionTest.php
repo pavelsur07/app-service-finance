@@ -95,6 +95,37 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
         self::assertSame($beforeCount, $afterCount);
     }
 
+    /**
+     * Ночной прогон: правило без статьи ОПиУ у компании не должно мешать
+     * остальным — иначе одна отсутствующая статья оставляет без маппинга все
+     * новые категории компании.
+     */
+    public function testPartialApplyCreatesAvailableRulesAndBlocksOnlyMissingOnes(): void
+    {
+        $companyId = '44444444-4444-4444-4444-444444444444';
+        $company = $this->createCompany($companyId);
+        $leaf = $this->createPl($company, 'PL_LEAF', PLCategoryType::LEAF_INPUT);
+        $this->createPl($company, 'PL_SUBTOTAL', PLCategoryType::SUBTOTAL);
+        $create = $this->createCost($company, 'cost_create');
+        $missing = $this->createCost($company, 'cost_missing_pl');
+        $invalid = $this->createCost($company, 'cost_invalid_pl');
+        $this->em->flush();
+
+        $action = $this->buildApplyAction('default_cost_mapping_apply_partial.yaml');
+        $result = $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, 'cron', partial: true));
+
+        self::assertSame(['cost_create'], $result->getCreatedCostCodes());
+        self::assertSame(['cost_missing_pl', 'cost_invalid_pl'], $result->getBlockedCostCodes());
+
+        $mapped = $this->em->getConnection()->fetchAllKeyValue(
+            'SELECT cost_category_id, pl_category_id FROM marketplace_cost_pl_mappings WHERE company_id = :companyId',
+            ['companyId' => $companyId],
+        );
+        self::assertSame([(string) $create->getId() => (string) $leaf->getId()], $mapped);
+        self::assertArrayNotHasKey((string) $missing->getId(), $mapped);
+        self::assertArrayNotHasKey((string) $invalid->getId(), $mapped);
+    }
+
     private function buildApplyAction(string $fixture): ApplyDefaultCostMappingAction
     {
         $connection = $this->em->getConnection();
