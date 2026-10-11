@@ -5,7 +5,7 @@
 {% block stylesheets %}
     {{ parent() }}
     <style>
-        .preview-row-error { --tblr-table-bg: rgba(239, 68, 68, 0.08); }
+        .preview-row-error { --tblr-table-bg: var(--vf-danger-bg); }
     </style>
 {% endblock %}
 
@@ -58,7 +58,7 @@
                                 </td>
                                 <td class="text-end">
                                     {% if row.amount %}
-                                        {{ row.amount|number_format(2, ',', ' ') }}
+                                        {{ row.amount|vf_amount }}
                                     {% else %}
                                         —
                                     {% endif %}

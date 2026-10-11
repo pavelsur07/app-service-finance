@@ -30,9 +30,8 @@
 
                         <dt class="col-sm-3">Сумма</dt>
                         <dd class="col-sm-9">
-                            <span class="text-{{ sourceTransaction.direction.value == 'INFLOW' ? 'success' : 'danger' }}">
-                                {{ sourceTransaction.direction.value == 'INFLOW' ? '+' : '−' }}{{ sourceTransaction.amount|number_format(2, ',', ' ') }} {{ sourceTransaction.currency }}
-                            </span>
+                            {% set inflow = sourceTransaction.direction.value == 'INFLOW' %}
+                            {{ sourceTransaction.amount|vf_amount(2, inflow ? 'income' : null, signed: true, currency: sourceTransaction.currency == 'RUB' ? '₽' : sourceTransaction.currency, negate: not inflow) }}
                         </dd>
 
                         <dt class="col-sm-3">Контрагент</dt>

@@ -111,7 +111,8 @@
       <table class="table table-vcenter">
         <thead>
           <tr>
-            <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
+            {% set amounts_in_rub = previewRows|filter(r => r.transaction.currency != 'RUB')|length == 0 %}
+            <th>Дата</th><th>Счет</th><th class="text-end">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
             <th>Статья</th><th>Проект</th><th>ЦФО</th><th>Контрагент</th><th>Описание</th><th>План</th><th>Статус и правила</th><th></th>
           </tr>
         </thead>
@@ -124,7 +125,7 @@
           <tr{% if row.skipReason or not isWinner %} class="text-muted"{% endif %}>
             <td>{{ t.occurredAt|date('d.m.Y') }}</td>
             <td>{{ t.moneyAccount.name }}</td>
-            <td class="text-end">{{ t.amount|number_format(2, ',', ' ') }} {{ t.currency }}</td>
+            <td class="text-end">{{ t.amount|vf_amount(currency: amounts_in_rub or t.currency != 'RUB' ? t.currency : '₽') }}</td>
             <td>{{ t.cashflowCategory ? t.cashflowCategory.name : '' }}</td>
             <td>{{ t.projectDirection ? t.projectDirection.name : '' }}</td>
             <td>{{ t.responsibilityCenterId ? preview.responsibilityCenterLabels[t.responsibilityCenterId]|default(t.responsibilityCenterId) : '' }}</td>

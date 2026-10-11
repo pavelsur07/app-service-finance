@@ -33,7 +33,6 @@
                     </tr>
                 {% else %}
                     {% for fund in funds %}
-                        {% set balanceMinor = balances[fund.id] ?? 0 %}
                         {% set balanceValue = balancesDecimal[fund.id] ?? 0 %}
                         <tr>
                             <td>
@@ -43,8 +42,9 @@
                                 {% endif %}
                             </td>
                             <td>{{ fund.currency }}</td>
-                            <td class="text-end {{ balanceMinor < 0 ? 'text-danger' : '' }}">
-                                {{ balanceValue|format_currency(fund.currency) }}
+                            {# DS-Money: отрицательный остаток — со знаком минус, без красного. #}
+                            <td class="text-end">
+                                {{ balanceValue|vf_amount(currency: fund.currency == 'RUB' ? '₽' : fund.currency) }}
                             </td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-primary" href="{{ path('finance_funds_add_movement', {id: fund.id}) }}">
