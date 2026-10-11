@@ -44,15 +44,15 @@
         <div class="row mt-3">
             <div class="col-md-4">
                 <div class="text-muted">Сумма</div>
-                <div>{{ deal.totalAmount|number_format(2, ',', ' ') }}</div>
+                <div>{{ deal.totalAmount|vf_amount }}</div>
             </div>
             <div class="col-md-4">
                 <div class="text-muted">Прямые расходы</div>
-                <div>{{ deal.totalDirectCost|number_format(2, ',', ' ') }}</div>
+                <div>{{ deal.totalDirectCost|vf_amount }}</div>
             </div>
             <div class="col-md-4">
                 <div class="text-muted">Маржа</div>
-                <div>{{ (deal.totalAmount - deal.totalDirectCost)|number_format(2, ',', ' ') }}</div>
+                <div>{{ (deal.totalAmount - deal.totalDirectCost)|vf_amount }}</div>
             </div>
         </div>
         <div class="mt-3">

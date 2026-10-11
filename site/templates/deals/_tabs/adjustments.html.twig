@@ -12,7 +12,7 @@
             <tr>
                 <td>{{ adjustment.type.value }}</td>
                 <td>{{ adjustment.recognizedAt|date('d.m.Y') }}</td>
-                <td class="text-end">{{ adjustment.amount|number_format(2, ',', ' ') }}</td>
+                <td class="text-end">{{ adjustment.amount|vf_amount }}</td>
             </tr>
         {% else %}
             <tr>

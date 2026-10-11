@@ -17,7 +17,7 @@
             <tr>
                 <td>{{ charge.chargeType.name }}</td>
                 <td>{{ charge.recognizedAt|date('d.m.Y') }}</td>
-                <td class="text-end">{{ charge.amount|number_format(2, ',', ' ') }}</td>
+                <td class="text-end">{{ charge.amount|vf_amount }}</td>
                 <td class="text-end">
                     <form method="post" action="{{ path('deal_charge_remove', {id: deal.id, chargeId: charge.id}) }}">
                         <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_remove' ~ charge.id) }}">
