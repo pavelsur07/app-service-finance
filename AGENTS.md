@@ -6,7 +6,7 @@ linked documents — read the one your task touches, not all of them:
 | Document | Contents | When to read |
 |---|---|---|
 | `CLAUDE.md` | Backend PHP/Symfony rules, quality gates | always (auto-loaded) |
-| `CLAUDE.frontend.md` | React / TypeScript / UI Kit rules | frontend task |
+| `CLAUDE.frontend.md` | React / TypeScript / design-system rules | frontend task |
 | `PATTERNS.md`, `ARCHITECTURE.md` | Code patterns; live Facade, Enum, Entity contracts | only the section the task needs |
 | `docs/workflow/external-review.md` | External review: script, prompt, failure handling | before calling the reviewer |
 | `docs/workflow/release.md` | Migration deploy: dispatch, gates, request templates | PR carries a migration |

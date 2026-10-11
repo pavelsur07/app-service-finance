@@ -1,7 +1,7 @@
 # CLAUDE.frontend.md — Frontend Rules
 
-Правила фронтенда: Symfony + Twig + React + Vite с собственным UI Kit как
-источником правды для визуала.
+Правила фронтенда: Symfony + Twig + React + Vite. Эталон визуала обоих
+интерфейсов — дизайн-система «Ваш Финдир» (`docs/design-system/sheets/`).
 
 **Workflow — `AGENTS.md`, он же для фронта.** Иерархия `Work item → Stage →
 Handoff → merge + deploy`, один вопрос Владельцу за задачу, классификация
@@ -21,8 +21,7 @@ Fast Path / Small / Large, STOP-список §3.4, политика ревью 
 | `assets/react/entrypoints/` | нет; entry указывают прямо на файлы `_legacy/` |
 | `mountIsland`, `AppProviders`, `ErrorBoundary` | не реализованы |
 | `templates/_macros/ui-kit.html.twig` | нет |
-| `ui-kit/icons/` | нет |
-| React-обёртки UI Kit | одна: `assets/react/ui-kit/Button/` |
+| React-обёртки кита | одна: `assets/react/ui-kit/Button/` |
 | `assets/react/shared/` | один файл `lib/cn.ts` |
 
 Не установлены и потому не применяются: TanStack Query, React Hook Form, Zod,
@@ -34,8 +33,6 @@ Fast Path / Small / Large, STOP-список §3.4, политика ревью 
 ```bash
 npm run lint                        # eslint, --max-warnings=0
 npm run build                       # vite build
-npm run check:ui-kit                # классы в коде существуют в ui-kit/
-npm run check:uikit-react-mapping   # двусторонняя связь @uiKit ↔ @react
 npm run api:types:check             # schema.d.ts синхронна с OpenAPI
 ```
 
@@ -43,8 +40,10 @@ npm run api:types:check             # schema.d.ts синхронна с OpenAPI
 Это зафиксированное состояние, а не забытая настройка: типы проверяются только
 тем, что `tsc` делает внутри `vite build`, а автотестов на фронте нет вовсе.
 Не писать в отчётах, что они прогнаны, и не добавлять их в команду закрытия.
-Пока их нет, обязательная проверка фронтового изменения — четыре команды выше
-плюс ручной smoke затронутой страницы.
+Пока их нет, обязательная проверка фронтового изменения — `lint` и `build`
+(плюс `api:types:check`, если менялся контракт API) и ручной smoke затронутой
+страницы. Проверок `check:ui-kit` и `check:uikit-react-mapping` больше нет:
+удалены вместе со старым UI Kit 2026-10-11, замена не ставилась.
 
 `tsconfig.json`: включён `strict`. Флагов `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `noImplicitReturns`,
@@ -54,72 +53,69 @@ Node и npm живут только в контейнере, на хосте и�
 
 ## Источники правды
 
-| Слой | Источник правды для | Где живёт |
+| Что | Источник правды | Где живёт |
 |---|---|---|
-| UI Kit | Визуальный язык: классы, токены, компоненты | `site/ui-kit/` |
-| Behavior layer | Поведение браузера и a11y: `:disabled`, `:read-only`, `:autofill`, focus | `ui-kit/components/states.css`, владелец — код |
+| Визуал обоих интерфейсов | Дизайн-система «Ваш Финдир»: токены, контролы, таблицы, деньги, вкладки, обратная связь | `docs/design-system/sheets/*.dc.html` (читать как исходник: значения — из `<style>` и инлайн-стилей) |
+| Behavior layer | Поведение браузера и a11y: `:disabled`, `:read-only`, `:autofill`, focus | `assets/styles/kit/components/states.css`, владелец — код |
 | Screens | Спецификация страниц от дизайнера | `site/screens/<name>.html` |
 | Код | Реализация | `templates/`, `assets/`, `src/` |
 
-- Код использует класс, которого нет в UI Kit — виноват код, ловит
-  `check:ui-kit`.
-- Screen использует класс, которого нет в UI Kit — вернуть дизайнеру или
-  дополнить UI Kit до реализации.
-- UI Kit противоречит сам себе — решение в `ui-kit/decisions.md` и запись в
-  CHANGELOG.
+Реализация DS в коде — не эталон, а его воплощение:
 
-Код никогда не источник правды. Исключение одно — behavior layer: `states.css`
-принадлежит коду, там живёт поведение браузера, которого в макете дизайнера нет
-и не будет. Новых классов он не вводит, только псевдоклассы на существующих.
+| Интерфейс | Реализация |
+|---|---|
+| Легаси (`_layout/legacy.html.twig`, Tabler) | `assets/styles/design-tokens.css` (токены `--vf-*`, слой `--tblr-*`), `assets/styles/vf-custom-classes.css`, Twig-фильтры `vf_money`/`vf_amount`/`vf_number`/`vf_minor` (`src/Twig/VfMoneyExtension.php`), partials `_pagination`, `_tabs`, `_period_presets` |
+| Новый слой (`_layout/app.html.twig`, React) и админка | CSS кита в `assets/styles/kit/` (подключается через `assets/styles/app.css`) |
 
-## UI Kit
+- Код расходится с листом DS — виноват код.
+- Лист DS не покрывает случай — ближайшее решение по существующему коду и
+  `TODO(ds)` в месте решения, вопрос — в отчёт.
+- Поручение Владельца расходится с листом — решение записать (см.
+  `docs/plan/ds-legacy-tabler-audit.md` §7a как образец).
 
-**Токены.** Raw-токены в `ui-kit/tokens/colors.css`, `typography.css`,
+Behavior layer (`states.css`) принадлежит коду: там поведение браузера, которого
+в макете нет. Новых классов он не вводит, только псевдоклассы на существующих.
+
+## CSS нового слоя (`assets/styles/kit/`)
+
+**Токены.** Raw-токены в `kit/tokens/colors.css`, `typography.css`,
 `spacing.css`, `radius.css`, `shadows.css`; semantic-токены в `semantic.css`.
-В компонентах UI Kit и в feature-стилях использовать только semantic-токены.
+В компонентах кита и в feature-стилях использовать только semantic-токены.
 Raw-токен напрямую в компоненте запрещён, хардкод цвета запрещён везде, кроме
-`tokens/colors.css`. Это позволяет переименовать raw-токен без правки
-компонентов и сделать тёмную тему переопределением одного файла.
+`tokens/colors.css` (в легаси — кроме `design-tokens.css`).
 
-**Классы.** В Twig, React и CSS Modules только классы из `ui-kit/`. Кастомные
-`.my-button`, `.special-card` в модулях запрещены. Мелкий локальный оверрайд —
-CSS Module с классом-обёрткой:
+**Классы.** В Twig, React и CSS Modules нового слоя — классы кита
+(`assets/styles/kit/components`, `patterns`). Кастомные `.my-button`,
+`.special-card` в модулях запрещены. Мелкий локальный оверрайд — CSS Module с
+классом-обёрткой:
 
 ```css
 /* KpiSummaryView.module.css */
 .root { padding-top: var(--space-4); }
 ```
 
-Внутри CSS Module нельзя переопределять `.btn`, `.card` и прочие классы UI Kit,
+Внутри CSS Module нельзя переопределять `.btn`, `.card` и прочие классы кита,
 только обёртки. Понадобился один и тот же оверрайд в двух модулях — нужен новый
-вариант компонента в UI Kit, а не вторая копия CSS.
+вариант компонента в ките, а не вторая копия CSS.
 
 **React-обёртки** живут в `assets/react/ui-kit/<Name>/<Name>.tsx`. Обёртка не
 пишет свой CSS: она типизирует пропсы, нормализует классы, делает мелкую логику
 вроде `disabled` при `loading`. Классы мерджатся хелпером `cn` из
-`@/react/shared/lib/cn` (`clsx` не установлен). Обязателен JSDoc с `@uiKit
-<путь>` и `@version <X.Y>`, а в HTML-файле UI Kit — обратный комментарий
-`<!-- @react <ComponentName> -->`. Двустороннюю связь проверяет
-`check:uikit-react-mapping`. Образец — `assets/react/ui-kit/Button/Button.tsx`.
-
-**Версия UI Kit — только в `ui-kit/CHANGELOG.md`**, в других документах её не
-дублировать. Любое изменение `ui-kit/*` сопровождается записью в CHANGELOG и
-bump `@version` в затронутых обёртках. Semver: patch — косметика, minor — новые
-компоненты, варианты и токены без поломки, major — переименование или удаление
-классов, что требует отдельной задачи на миграцию потребителей и deprecation в
-одном minor до удаления.
+`@/react/shared/lib/cn` (`clsx` не установлен). В JSDoc — ссылка на CSS
+компонента в `assets/styles/kit/` и на лист DS. Образец —
+`assets/react/ui-kit/Button/Button.tsx`.
 
 Изменение токенов, добавление, удаление или переименование класса в
-`ui-kit/components/*` и `ui-kit/patterns/*`, добавление компонента в
+`assets/styles/kit/components/*` и `patterns/*`, добавление компонента в
 `assets/react/ui-kit/` — HIGH-LOCAL: усиленные проверки и внимательный review,
-без остановки. Новый компонент добавлять, когда существующий не подходит,
-обновив в том же Stage `storybook.html`, `decisions.md`, обёртку и CHANGELOG.
+без остановки. Удаление или переименование класса — сначала найти всех
+потребителей (`rg` по `templates/` и `assets/`).
 
 ## React
 
 **Smart / Dumb.** Нетривиальная фича делится минимум на два файла. Widget —
 smart: хук, состояние, обработчики, маппинг данных в пропсы. View — dumb:
-только JSX из компонентов UI Kit и пропсы, без эффектов и запросов,
+только JSX из компонентов кита и пропсы, без эффектов и запросов,
 тестируется одними пропсами.
 
 **TypeScript.** Запрещены `any`, non-null `!` и `@ts-ignore`: сужать через
@@ -137,7 +133,7 @@ Query: ключ строится как `[module, entity, ...params]`, посл�
 **Формы.** Целевая связка — React Hook Form и Zod, схема в
 `<feature>.schema.ts` как единственный источник правды, тип через `z.infer`.
 Пока библиотеки не установлены, формы пишутся на нативных элементах с теми же
-правилами вывода ошибок: класс ошибки поля и сообщение берутся из UI Kit
+правилами вывода ошибок: класс ошибки поля и сообщение берутся из кита
 (`input-error`, `form-error`), серверная 422 раскладывается по полям.
 
 ## Twig-острова
@@ -172,7 +168,7 @@ Twig отдаёт shell, React монтируется точечно. Контр
 ## Границы модулей
 
 ```
-ui-kit         ← не импортирует из react/
+ui-kit         ← не импортирует из react/   (assets/react/ui-kit — обёртки)
 react/shared   ← только ui-kit и api
 react/modules  ← ui-kit, shared, api; не другой модуль
 entrypoints    ← модули и провайдеры
@@ -221,14 +217,14 @@ window.cartCount = 5;
 // ❌ data-* без экранирования
 data-props="{{ data|json_encode }}"
 
-// ❌ хардкод цвета вместо класса UI Kit
+// ❌ хардкод цвета вместо класса кита
 <span style={{ color: '#047857' }}>Active</span>
 <span className="status status--success"><span className="dot" /> Active</span>
 
-// ❌ свой класс вне UI Kit
+// ❌ свой класс вне кита
 <div className="my-custom-card">
 
-// ❌ свой CSS для статусов, кнопок, карточек — всё из ui-kit/
+// ❌ свой CSS для статусов, кнопок, карточек — всё из assets/styles/kit/
 
 // ❌ импорт всех иконок пакетом — ломает tree-shaking
 import * as Icons from '@tabler/icons-react';
@@ -236,7 +232,7 @@ import * as Icons from '@tabler/icons-react';
 
 Ещё запрещено: `console.log` в коммитах (только `console.error` в обработчике
 ошибок), inline-стили со значениями вместо токенов, кастомные спиннеры и
-пустые состояния вместо компонентов UI Kit, управление модалками и дропдаунами
+пустые состояния вместо компонентов кита, управление модалками и дропдаунами
 чужим JS вместо React-состояния.
 
 ## Связанные документы
@@ -244,8 +240,7 @@ import * as Icons from '@tabler/icons-react';
 - `AGENTS.md` — workflow, полномочия, ревью, одно одобрение «merge and deploy».
 - `docs/workflow/stage-report-frontend.md` — фронтовый self-review checklist.
 - `screen-intake.md` в корне репозитория — анализ нового макета от дизайнера.
-- `site/ui-kit/storybook.html` — визуальный референс,
-  `site/ui-kit/decisions.md` — ADR дизайн-системы,
-  `site/ui-kit/CHANGELOG.md` — версия и журнал изменений,
-  `site/ui-kit/README.md` — обзор для дизайнера.
+- `docs/design-system/sheets/` — листы дизайн-системы «Ваш Финдир» (эталон),
+  `docs/design-system/README.md` — как их читать.
+- `docs/plan/ds-legacy-tabler-audit.md` — решения по DS и расхождения с поручением.
 - `site/screens/README.md` — матрица реализации макетов.

@@ -9,7 +9,7 @@
 Прогнать в контейнере, где есть node:
 
 ```bash
-npm run lint && npm run build && npm run check:ui-kit && npm run check:uikit-react-mapping
+npm run lint && npm run build
 ```
 
 Плюс `npm run api:types:check`, если задача трогала контракт API. Скриптов
@@ -34,20 +34,21 @@ npm run lint && npm run build && npm run check:ui-kit && npm run check:uikit-rea
 - [ ] Хук возвращает безопасные дефолты, View не падает на `undefined`
 - [ ] `npm run build` зелёный (единственная проверка типов в проекте)
 
-## UI Kit
+## Дизайн-система
 
-- [ ] Все классы в коде существуют в `ui-kit/`, `check:ui-kit` зелёный
-- [ ] Нет хардкода цветов в JSX, CSS Modules и inline-стилях
+- [ ] Визуал сверен с листами DS `docs/design-system/sheets/`; расхождения с
+      поручением записаны, пробелы листов — `TODO(ds)`
+- [ ] Классы — из кита (`assets/styles/kit/`, новый слой) или Tabler + DS-надстройки
+      (легаси); своих параллельных классов нет
+- [ ] Нет хардкода цветов в JSX, CSS Modules, шаблонах и inline-стилях — только токены
 - [ ] Нет inline-стилей со значениями вместо токенов
-- [ ] Статусы и бейджи — классами UI Kit, не своим CSS
-- [ ] Loading, empty и error — компонентами UI Kit, не кастомными
+- [ ] Деньги в легаси — `vf_money`/`vf_amount`, числа — `vf_number` (DS-Money)
+- [ ] Статусы и бейджи — классами кита или Tabler, не своим CSS
+- [ ] Loading, empty и error — компонентами кита, не кастомными
 - [ ] Модалки и дропдауны управляются React-состоянием
 - [ ] CSS Module только для локального отступа или раскладки, без
-      переопределения классов UI Kit
-- [ ] Затронута обёртка UI Kit: JSDoc `@uiKit` и `@version` на месте,
-      обратный `@react` в HTML, `check:uikit-react-mapping` зелёный
-- [ ] Затронут `ui-kit/*`: запись в `CHANGELOG.md`, обновлены `storybook.html`
-      и `decisions.md`
+      переопределения классов кита
+- [ ] Затронута обёртка в `assets/react/ui-kit/`: JSDoc ссылается на CSS кита и лист DS
 
 ## Данные и контракт
 

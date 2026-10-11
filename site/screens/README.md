@@ -5,7 +5,8 @@
 См. также:
 - `CLAUDE.frontend.md` — общие правила фронтенда.
 - `screen-intake.md` — задача для Claude Code на анализ каждого нового макета.
-- `ui-kit/` — дизайн-система, классы которой используются в макетах.
+- `docs/design-system/sheets/` — дизайн-система «Ваш Финдир» (эталон визуала);
+  `assets/styles/kit/` — CSS кита, классы которого используются в макетах.
 
 ---
 
@@ -41,16 +42,16 @@ designer: <имя или ник>
 ...
 ```
 
-`uiKit` — версия UI Kit, под которую макет нарисован. Если макет рисовался под `1.2`, а в проекте уже `1.3` с переименованным классом, screen-intake task это поймает и потребует решения.
+`uiKit` — историческое поле: версия старого UI Kit, под которую рисовались прежние макеты. С 2026-10-11 версий кита нет (старый `site/ui-kit/` удалён), в новых макетах поле не нужно; эталон — листы DS.
 
-### Подключение стилей UI Kit
+### Подключение стилей кита
 
 Макет должен подключать те же CSS-файлы, что и продакшен:
 
 ```html
-<link rel="stylesheet" href="../ui-kit/tokens/index.css">
-<link rel="stylesheet" href="../ui-kit/components/all.css">
-<link rel="stylesheet" href="../ui-kit/patterns/all.css">
+<link rel="stylesheet" href="../assets/styles/kit/tokens/index.css">
+<link rel="stylesheet" href="../assets/styles/kit/components/all.css">
+<link rel="stylesheet" href="../assets/styles/kit/patterns/all.css">
 ```
 
 Тогда изменение DS автоматически отражается во всех макетах — дрейф между дизайном и продом исключён по построению.
@@ -110,7 +111,7 @@ designer: <имя или ник>
 
 Колонки:
 
-- **UI Kit ver.** — версия UI Kit из frontmatter макета.
+- **UI Kit ver.** — версия старого UI Kit из frontmatter макета (историческая, для новых макетов — «—»).
 - **Analysis** — ссылка на отчёт screen-intake, например `_analysis/reconciliation.md`. Прочерк, если ещё не прогоняли intake.
 - **Twig** — путь к Twig-шаблону, реализующему статичные блоки страницы.
 - **React module** — путь к модулю с React-островами, например `assets/react/modules/reconciliation/`.
@@ -151,5 +152,5 @@ designer: <имя или ник>
 - **Не редактировать макеты.** Они от дизайнера, это спецификация. Если что-то не так — возвращать дизайнеру, не править «по дороге».
 - **Не использовать макеты в продакшене.** `screens/` не подключается к Symfony, не отдаётся пользователям, не индексируется.
 - **Не импортировать из `screens/`** в `assets/` или `templates/`. Это spec, а не код.
-- **Не складывать сюда экспорты Figma в виде PNG/SVG.** Только HTML. Картинки — в `ui-kit/icons/` или в task-папке.
+- **Не складывать сюда экспорты Figma в виде PNG/SVG.** Только HTML. Картинки — в task-папке.
 - **Не запускать screen-intake task на свой страх и риск** для нескольких файлов сразу. Один screen = один запуск intake.
