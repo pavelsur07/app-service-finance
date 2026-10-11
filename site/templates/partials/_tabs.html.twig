@@ -28,7 +28,7 @@
                 {% endif %}>
                 {{ tab.label }}
                 {% if tab.count is defined and tab.count is not null %}
-                    <span class="cnt {{ (tab.warn ?? false) ? 'warn' : '' }}">{{ tab.count|vf_money(0) }}</span>
+                    <span class="cnt {{ (tab.warn ?? false) ? 'warn' : '' }}">{{ tab.count|vf_number }}</span>
                 {% endif %}
             </a>
         </li>

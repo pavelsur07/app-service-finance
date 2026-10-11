@@ -33,6 +33,8 @@ final class VfMoneyExtension extends AbstractExtension
     {
         return [
             new TwigFilter('vf_money', $this->money(...)),
+            new TwigFilter('vf_number', $this->number(...)),
+            new TwigFilter('vf_minor', $this->minor(...)),
             new TwigFilter('vf_money_short', $this->moneyShort(...)),
             new TwigFilter('vf_amount', $this->amount(...), ['is_safe' => ['html']]),
         ];
@@ -46,7 +48,33 @@ final class VfMoneyExtension extends AbstractExtension
 
         $formatted = $this->format($this->round($this->normalize($value), $decimals));
 
-        return null === $currency ? $formatted : $formatted.self::NBSP.$currency;
+        return null === $currency ? $formatted : $formatted.self::NBSP.$this->symbol($currency);
+    }
+
+    /**
+     * Копейки (minor units) → десятичная строка без потери точности на крупных
+     * оборотах; дальше — `vf_money` / `vf_amount`: `{{ x_minor|vf_minor|vf_amount }}`.
+     */
+    public function minor(int|string|null $minor, int $digits = 2): ?string
+    {
+        if (null === $minor) {
+            return null;
+        }
+        $minor = trim((string) $minor);
+        if (!preg_match('/^-?\d+$/D', $minor)) {
+            throw new \InvalidArgumentException(\sprintf('Invalid minor amount "%s".', $minor));
+        }
+
+        return bcdiv($minor, bcpow('10', (string) $digits), $digits);
+    }
+
+    /**
+     * Не денежные числа (количества, проценты, курсы) по тем же правилам записи:
+     * тысячи — U+00A0, запятая, минус — U+2212.
+     */
+    public function number(int|float|string|null $value, int $decimals = 0): string
+    {
+        return $this->money($value, $decimals);
     }
 
     /**
@@ -79,7 +107,7 @@ final class VfMoneyExtension extends AbstractExtension
             $formatted = rtrim(rtrim($formatted, '0'), ',');
         }
 
-        return implode(self::NBSP, array_filter([$formatted, $unit, $currency], static fn (string $part): bool => '' !== $part));
+        return implode(self::NBSP, array_filter([$formatted, $unit, $this->symbol($currency)], static fn (string $part): bool => '' !== $part));
     }
 
     /**
@@ -134,10 +162,18 @@ final class VfMoneyExtension extends AbstractExtension
         }
         $currency = null === $currency ? null : strtoupper(trim($currency));
         if (null !== $currency && '' !== $currency && 'RUB' !== $currency) {
-            $html .= self::NBSP.'<span class="vf-amount__currency">'.htmlspecialchars(self::SYMBOLS[$currency] ?? $currency, \ENT_QUOTES).'</span>';
+            $html .= self::NBSP.'<span class="vf-amount__currency">'.htmlspecialchars($this->symbol($currency), \ENT_QUOTES).'</span>';
         }
 
         return \sprintf('<span class="%s">%s</span>', implode(' ', $classes), $html);
+    }
+
+    /**
+     * Код валюты → символ (DS-Money); готовый символ или незнакомый код — как есть.
+     */
+    private function symbol(string $currency): string
+    {
+        return self::SYMBOLS[strtoupper(trim($currency))] ?? $currency;
     }
 
     private function normalize(int|float|string $value): string

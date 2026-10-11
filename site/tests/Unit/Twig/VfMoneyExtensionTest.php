@@ -21,6 +21,8 @@ final class VfMoneyExtensionTest extends TestCase
         yield 'half rounds away from zero' => ['-0.125', 2, null, "\u{2212}0,13"];
         yield 'negative rounding to zero has no sign' => ['-0.004', 2, null, '0,00'];
         yield 'currency is appended with nbsp' => [100, 2, '₽', "100,00\u{00A0}₽"];
+        yield 'currency code becomes its symbol' => [100, 2, 'usd', "100,00\u{00A0}$"];
+        yield 'code without a usual symbol stays a code' => [100, 2, 'CNY', "100,00\u{00A0}CNY"];
         yield 'large string keeps precision' => ['90071992547409.93', 2, null, "90\u{00A0}071\u{00A0}992\u{00A0}547\u{00A0}409,93"];
         yield 'null renders a dash' => [null, 2, null, '—'];
     }
@@ -29,6 +31,32 @@ final class VfMoneyExtensionTest extends TestCase
     public function testMoney(int|float|string|null $value, int $decimals, ?string $currency, string $expected): void
     {
         self::assertSame($expected, (new VfMoneyExtension())->money($value, $decimals, $currency));
+    }
+
+    public function testMinorUnitsConvertExactly(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame('1308.04', $extension->minor(130804));
+        self::assertSame('-0.05', $extension->minor('-5'));
+        self::assertSame('90071992547409.93', $extension->minor('9007199254740993'));
+        self::assertNull($extension->minor(null));
+        self::assertSame("90\u{00A0}071\u{00A0}992\u{00A0}547\u{00A0}409,93\u{00A0}₽", $extension->money($extension->minor('9007199254740993'), 2, 'RUB'));
+    }
+
+    public function testMinorRejectsNonIntegers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new VfMoneyExtension())->minor('12.5');
+    }
+
+    public function testNumberUsesTheSameNotation(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame("12\u{00A0}345", $extension->number('12345'));
+        self::assertSame("\u{2212}98,6", $extension->number(-98.6, 1));
+        self::assertSame('—', $extension->number(null));
     }
 
     public function testRejectsLocalisedStrings(): void

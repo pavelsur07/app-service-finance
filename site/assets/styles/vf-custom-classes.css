@@ -475,3 +475,9 @@
 .vf-pager-caption {
   font-size: var(--vf-size-sm);
 }
+
+/* Сумма внутри сигнала ошибки (расхождение сверки и т. п.) красная целиком — копейки не глушим. */
+.text-danger .vf-amount__minor,
+.text-danger .vf-amount__currency {
+  color: inherit;
+}
