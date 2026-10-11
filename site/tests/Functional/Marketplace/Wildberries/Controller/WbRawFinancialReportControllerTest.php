@@ -46,7 +46,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h3', 'Контроль финансового отчёта WB');
-        self::assertStringContainsString('1 308,04 RUB', $crawler->filter('body')->text());
+        self::assertStringContainsString("1\u{00A0}308,04\u{00A0}₽", $crawler->filter('body')->text());
         self::assertStringContainsString('9001', $crawler->filter('body')->text());
         self::assertStringContainsString('Транзакции системы не используются', $crawler->filter('body')->text());
         self::assertSelectorTextContains('#wb-product-costs', 'Не сопоставлен');
@@ -78,7 +78,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringContainsString('9013', $body);
         self::assertStringContainsString('Финальная ошибка', $body);
         self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
@@ -108,7 +108,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
@@ -128,7 +128,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
@@ -148,7 +148,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringContainsString('1 308,04 RUB', $body);
+        self::assertStringContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
@@ -171,7 +171,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringNotContainsString('1 308,04 RUB', $body);
+        self::assertStringNotContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
@@ -199,7 +199,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringNotContainsString('1 308,04 RUB', $body);
+        self::assertStringNotContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
         self::assertStringContainsString('Финальная ошибка', $body);
     }
@@ -286,7 +286,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $body = $crawler->filter('body')->text();
-        self::assertStringNotContainsString('1 308,04 RUB', $body);
+        self::assertStringNotContainsString("1\u{00A0}308,04\u{00A0}₽", $body);
         self::assertStringNotContainsString('В отчёте учтены ранее загруженные данные дня', $body);
     }
 
@@ -333,11 +333,11 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('#wb-deduction-breakdown', 'Удержано');
         self::assertSelectorTextContains('#wb-deduction-breakdown', 'Выплачено WB');
         self::assertStringContainsString(
-            '2,50 RUB 7,50 RUB 5,00 RUB',
+            '2,50 7,50 5,00',
             $crawler->filter('#wb-deduction-breakdown tbody tr')->first()->text(null, true),
         );
         self::assertStringContainsString(
-            'Итого 2,50 RUB 10,50 RUB 8,00 RUB',
+            "Итого 2,50\u{00A0}₽ 10,50\u{00A0}₽ 8,00\u{00A0}₽",
             $crawler->filter('#wb-deduction-breakdown tfoot')->text(null, true),
         );
         self::assertSelectorCount(2, '#wb-deduction-breakdown tbody tr');
@@ -509,7 +509,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertSelectorTextContains('#wb-product-costs', 'Товары и себестоимость');
         self::assertSelectorTextContains('#wb-product-costs', 'Это не чистая прибыль');
-        self::assertSelectorTextContains('#wb-product-costs', 'Сверка со статьями: 0,00 RUB');
+        self::assertSelectorTextContains('#wb-product-costs', "Сверка со статьями: 0,00\u{00A0}₽");
         self::assertSelectorCount(1, '#wb-product-costs tbody tr[data-sku-nm-id="555"]');
         $productRow = $crawler->filter('#wb-product-costs tbody tr[data-sku-nm-id="555"]')->text(null, true);
         self::assertStringContainsString('=Опасное имя', $productRow);
@@ -517,16 +517,14 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Продано: 2', $productRow);
         self::assertStringContainsString('Возвращено: 1', $productRow);
         self::assertStringContainsString('Нетто: 1', $productRow);
-        self::assertStringContainsString('200,00 RUB', $productRow);
-        self::assertStringContainsString('100,00 RUB', $productRow);
-        self::assertStringContainsString('25,00 RUB', $productRow);
+        self::assertStringContainsString("200,00\u{00A0}₽", $productRow);
+        self::assertStringContainsString("100,00\u{00A0}₽", $productRow);
+        // DS-Money: отрицательный результат — со знаком U+2212, без красного.
+        self::assertStringContainsString("\u{2212}25,00\u{00A0}₽", $productRow);
         self::assertStringContainsString('Рентабельность к продажам без СПП', $productRow);
-        self::assertStringContainsString('-25,0%', $productRow);
+        self::assertStringContainsString("\u{2212}25,0%", $productRow);
         self::assertStringContainsString('50,0%', $productRow);
-        self::assertSelectorTextContains(
-            '#wb-product-costs tbody tr[data-sku-nm-id="555"] .text-danger',
-            '25,00 RUB',
-        );
+        self::assertSelectorNotExists('#wb-product-costs tbody tr[data-sku-nm-id="555"] .text-danger .vf-amount');
 
         $client->request(
             'GET',
@@ -668,7 +666,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('#wb-product-costs .alert-info', '1 шт.');
-        self::assertSelectorTextContains('#wb-product-costs .alert-secondary', '5,00 RUB');
+        self::assertSelectorTextContains('#wb-product-costs .alert-secondary', "5,00\u{00A0}₽");
         self::assertSelectorTextContains(
             '#wb-product-costs tbody tr[data-sku-nm-id="602"]',
             'Частичное',
@@ -686,7 +684,7 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('#wb-product-costs', 'нет товарных продаж или возвратов');
-        self::assertSelectorTextContains('#wb-product-costs .alert-secondary', '5,00 RUB');
+        self::assertSelectorTextContains('#wb-product-costs .alert-secondary', "5,00\u{00A0}₽");
     }
 
     /**
