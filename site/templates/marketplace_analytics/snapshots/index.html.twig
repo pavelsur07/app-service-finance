@@ -67,14 +67,14 @@
                                 <th>Дата</th>
                                 <th>Товар</th>
                                 <th>SKU</th>
-                                <th class="text-end">Выручка</th>
-                                <th class="text-end">Возвраты</th>
+                                <th class="text-end">Выручка, ₽</th>
+                                <th class="text-end">Возвраты, ₽</th>
                                 <th class="text-end">Продажи</th>
-                                <th class="text-end">Себест. ед.</th>
-                                <th class="text-end">Себест. итого</th>
-                                <th class="text-end">Реклама CPC</th>
-                                <th class="text-end">Логистика</th>
-                                <th class="text-end">Комиссия</th>
+                                <th class="text-end">Себест. ед., ₽</th>
+                                <th class="text-end">Себест. итого, ₽</th>
+                                <th class="text-end">Реклама CPC, ₽</th>
+                                <th class="text-end">Логистика, ₽</th>
+                                <th class="text-end">Комиссия, ₽</th>
                                 <th>Пересчитан</th>
                                 <th class="w-1"></th>
                             </tr>
@@ -90,38 +90,39 @@
                                     <td class="text-muted">{{ row.marketplace_sku }}</td>
 
                                     <td class="text-end">
-                                        {{ row.revenue|number_format(0, '.', ' ') }} ₽
+                                        {{ row.revenue|vf_amount }}
                                     </td>
-                                    <td class="text-end text-red">
-                                        {{ row.refunds|number_format(0, '.', ' ') }} ₽
+                                    {# DS-Money: возврат — без красного, красный только для ошибок. #}
+                                    <td class="text-end">
+                                        {{ row.refunds|vf_amount }}
                                     </td>
                                     <td class="text-end">
-                                        {{ row.sales_quantity }}
+                                        {{ row.sales_quantity|vf_number }}
                                     </td>
 
                                     <td class="text-end">
                                         {% if row.cost_price is not null %}
-                                            {{ row.cost_price|number_format(0, '.', ' ') }} ₽
+                                            {{ row.cost_price|vf_amount }}
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
                                         {% if row.total_cost_price is not null %}
-                                            {{ row.total_cost_price|number_format(0, '.', ' ') }} ₽
+                                            {{ row.total_cost_price|vf_amount }}
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
 
                                     <td class="text-end">
-                                        {{ (row.advertising_cpc ?? 0)|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.advertising_cpc ?? 0)|vf_amount }}
                                     </td>
                                     <td class="text-end">
-                                        {{ (row.logistics_to ?? 0)|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.logistics_to ?? 0)|vf_amount }}
                                     </td>
                                     <td class="text-end">
-                                        {{ (row.commission ?? 0)|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.commission ?? 0)|vf_amount }}
                                     </td>
 
                                     <td class="text-muted" style="white-space: nowrap">
