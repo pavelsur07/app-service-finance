@@ -347,29 +347,6 @@
 {% block scripts %}
     {{ parent() }}
     <script>
-        document.querySelectorAll('[data-period]').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const from = document.querySelector('#filter_date_from');
-                const to = document.querySelector('#filter_date_to');
-                const now = new Date();
-                let start = new Date(now);
-                if (this.dataset.period === 'today') {
-                    start = now;
-                } else if (this.dataset.period === 'yesterday') {
-                    start.setDate(start.getDate() - 1);
-                    now.setDate(now.getDate() - 1);
-                } else if (this.dataset.period === 'week') {
-                    start.setDate(start.getDate() - start.getDay() + 1);
-                } else if (this.dataset.period === 'month') {
-                    start = new Date(now.getFullYear(), now.getMonth(), 1);
-                }
-                const fmt = d => d.toISOString().slice(0,10);
-                from.value = fmt(start);
-                to.value = fmt(now);
-            });
-        });
-    </script>
-    <script>
     (function () {
       const selectAll = document.getElementById('cash-transactions-select-all');
       const rowCheckboxes = Array.from(document.querySelectorAll('.js-cash-transaction-select'));

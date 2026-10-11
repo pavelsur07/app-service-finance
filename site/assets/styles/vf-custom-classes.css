@@ -278,3 +278,22 @@
 .page-link:hover .page-item-title {
   color: var(--vf-primary);
 }
+
+/* Сумма (фильтр vf_amount, DS-Money): табличные цифры, копейки и ноль приглушены,
+   приход — зелёный, расход — основной цвет; красный для сумм не используется.
+   Валюта, кроме рубля, — символом после числа, приглушённо. Выравнивание вправо —
+   классом ячейки text-end. */
+.vf-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vf-amount__minor,
+.vf-amount__currency,
+.vf-amount--zero {
+  color: var(--vf-text-muted);
+}
+
+.vf-amount--income {
+  color: var(--vf-ok-text);
+}
