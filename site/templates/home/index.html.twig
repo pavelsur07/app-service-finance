@@ -8,15 +8,15 @@
     data-comparison-state="{{ data.state }}"
     data-comparison-variant="{{ data.variant }}"
   >
-    <div>{{ previous_label }}: {{ data.previous|number_format(0, '.', ' ') }} {{ currency }}</div>
+    <div>{{ previous_label }}: <span title="{{ data.previous|vf_money(2, currency) }}">{{ data.previous|vf_money_short(currency) }}</span></div>
     <div class="kpi-trend {{ trend_class }}">
       {% if data.state == 'percent' %}
-        {% set formatted_percent = data.percent|abs|number_format(1, ',', ' ') %}
+        {% set formatted_percent = data.percent|abs|vf_money(1) %}
         Изменение:
         {% if data.percent > 0 %}
           <span class="visually-hidden">рост на {{ formatted_percent }}%</span><span aria-hidden="true">+{{ formatted_percent }}%</span>
         {% elseif data.percent < 0 %}
-          <span class="visually-hidden">снижение на {{ formatted_percent }}%</span><span aria-hidden="true">-{{ formatted_percent }}%</span>
+          <span class="visually-hidden">снижение на {{ formatted_percent }}%</span><span aria-hidden="true">−{{ formatted_percent }}%</span>
         {% else %}
           {{ formatted_percent }}%
         {% endif %}
@@ -45,7 +45,7 @@
     .card-title {
       font-weight: 600;
       font-size: 0.875rem;
-      color: #626976;
+      color: var(--vf-text-muted);
       text-transform: uppercase;
     }
 
@@ -137,13 +137,14 @@
   </div>
 </div>
 
+{% set kpi_currency = cashCurrency.value == 'RUB' ? '₽' : cashCurrency.value %}
 <div class="row row-deck row-cards mb-4 ">
   <div class="col-sm-6 col-lg-3">
     <div class="card">
       <div class="card-body">
         <div class="subheader">Остаток на сегодня</div>
-        <div class="h1 mb-0" data-dashboard-kpi="todayBalance">{{ kpi.todayBalance|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
-        {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, cashCurrency.value, kpiPeriodLabels.balanceComparison) }}
+        <div class="h1 mb-0" data-dashboard-kpi="todayBalance" title="{{ kpi.todayBalance|vf_money(2, kpi_currency) }}">{{ kpi.todayBalance|vf_money_short(kpi_currency) }}</div>
+        {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, kpi_currency, kpiPeriodLabels.balanceComparison) }}
       </div>
     </div>
   </div>
@@ -151,9 +152,9 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Приход ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="inflow30">{{ kpi.inflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="inflow30" title="{{ kpi.inflow30|vf_money(2, kpi_currency) }}">{{ kpi.inflow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="inflow30">Сверить в ДДС</a>
-        {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
+        {{ _self.comparison('inflow30', kpiComparisons.inflow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>
@@ -161,9 +162,9 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Расход ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="outflow30">{{ kpi.outflow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="outflow30" title="{{ kpi.outflow30|vf_money(2, kpi_currency) }}">{{ kpi.outflow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="outflow30">Сверить в ДДС</a>
-        {{ _self.comparison('outflow30', kpiComparisons.outflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
+        {{ _self.comparison('outflow30', kpiComparisons.outflow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>
@@ -171,9 +172,9 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Чистый поток ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="netFlow30">{{ kpi.netFlow30|number_format(0, '.', ' ') }} {{ cashCurrency.value }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="netFlow30" title="{{ kpi.netFlow30|vf_money(2, kpi_currency) }}">{{ kpi.netFlow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="netFlow30">Сверить в ДДС</a>
-        {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, cashCurrency.value, kpiPeriodLabels.previous) }}
+        {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>
     </div>
   </div>
@@ -185,286 +186,11 @@
   data-currency="{{ cashCurrency.value|e('html_attr') }}"
 ></div>
 
-{#<div class="row g-3 mb-4">
-  <div class="card mt-3">
-    <div class="card-body">
-      <form method="post" action="{{ path('dashboard_notify') }}" style="display:inline;">
-        <input type="hidden" name="_token" value="{{ csrf_token('dashboard_notify') }}">
-        <button type="submit" class="btn btn-primary me-2">
-          Отправить уведомление
-        </button>
-      </form>
-      <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
-      <a href="{{ path('report_cashflow_index') }}" class="btn btn-outline-primary me-2">Отчёт ДДС</a>
-      <a href="{{ path('payment_calendar_index') }}" class="btn btn-outline-primary">Платёжный календарь</a>
-    </div>
-  </div>
 
-    #}{# ... твои виджеты/карточки ... #}{#
-    {% include 'dashboard/_money_balance_chart.html.twig' %}
-    #}{# ... другие блоки ... #}{#
-    {% include 'dashboard/_demo_chart.html.twig' %}
-</div>#}
 
-{#<div class="page-header d-print-none mt-4">
-  <div class="container-xl">
-    <div class="row g-2 align-items-center">
-      <div class="col">
-        <h2 class="page-title">Финансовый мониторинг SMB</h2>
-      </div>
-    </div>
-  </div>
-</div>#}
-
-{#<div class="page-body">
-  <div class="container-xl">
-    <div class="row row-cards mb-3">
-      <div class="col-sm-6 col-lg-3">
-        <div class="card">
-          <div class="card-body card-body">
-            <div class="px-3">
-              <div class="subheader">Остаток на счетах (Cash)</div>
-              <div class="h1 mb-0">4 850 000 ₽</div>
-              <div class="kpi-trend text-success">
-                <span>+4%</span>
-                <i class="ti ti-trending-up" aria-hidden="true"></i>
-                <span>Прирост за период</span>
-              </div>
-            </div>
-            <div id="chart-cash-sparkline" class="chart-sparkline"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="card">
-          <div class="card-body card-body-p-0">
-            <div class="px-3">
-              <div class="subheader">Чистая прибыль (LTM)</div>
-              <div class="h1 mb-0">1 240 000 ₽</div>
-              <div class="kpi-trend text-danger">
-                <span>-1%</span>
-                <i class="ti ti-trending-down" aria-hidden="true"></i>
-                <span>Снижение за период</span>
-              </div>
-            </div>
-            <div id="chart-profit-sparkline" class="chart-sparkline"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="card">
-          <div class="card-body">
-            <div class="subheader">Дебиторка (Просроч.)</div>
-            <div class="h1 mb-3 text-danger">320 000 ₽</div>
-            <div class="progress progress-sm">
-              <div class="progress-bar bg-danger" style="width: 15%"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="card">
-          <div class="card-body">
-            <div class="subheader">Точка безубыточности</div>
-            <div class="h1 mb-3">2 100 000 ₽</div>
-            <div class="text-blue small fw-bold">Пройдена 18 числа</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row row-cards mb-3">
-      <div class="col-sm-4">
-        <div class="card">
-          <div class="card-body card-body-p-0">
-            <div class="px-3">
-              <div class="subheader text-success">Приход (30 дней)</div>
-              <div class="h2 mb-0">3 120 000 ₽</div>
-            </div>
-            <div id="chart-inflow-sparkline" class="chart-sparkline"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-4">
-        <div class="card">
-          <div class="card-body card-body-p-0">
-            <div class="px-3">
-              <div class="subheader text-danger">Расход (30 дней)</div>
-              <div class="h2 mb-0">2 450 000 ₽</div>
-            </div>
-            <div id="chart-outflow-sparkline" class="chart-sparkline"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-4">
-        <div class="card">
-          <div class="card-body card-body-p-0">
-            <div class="px-3">
-              <div class="subheader text-primary">Чистый поток (30 дней)</div>
-              <div class="h2 mb-0">+ 670 000 ₽</div>
-            </div>
-            <div id="chart-netflow-sparkline" class="chart-sparkline"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row row-cards mb-3">
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-body">
-            <h3 class="card-title">Выполнение плана по выручке</h3>
-            <div class="d-flex align-items-end mb-2">
-              <div class="h2 mb-0 me-2">8.2 млн / 10 млн</div>
-              <div class="ms-auto text-muted small">82%</div>
-            </div>
-            <div class="progress progress-sm">
-              <div class="progress-bar bg-primary" style="width: 82%"></div>
-            </div>
-            <div class="mt-3 small text-success fw-bold">Прогноз: 10.5 млн ₽</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-body">
-            <h3 class="card-title">Выполнение плана по марже</h3>
-            <div class="d-flex align-items-end mb-2">
-              <div class="h2 mb-0 me-2">35% / 40%</div>
-              <div class="ms-auto text-muted small">87%</div>
-            </div>
-            <div class="progress progress-sm">
-              <div class="progress-bar bg-yellow" style="width: 87%"></div>
-            </div>
-            <div class="mt-3 small text-danger fw-bold">Прогноз: 38%</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row row-cards mb-3">
-      <div class="col-lg-6">
-        <div class="card">
-          <div class="card-body">
-            <h3 class="card-title">Структура доходов</h3>
-            <div id="chart-income-pie"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-lg-6">
-        <div class="card">
-          <div class="card-body">
-            <h3 class="card-title">Структура затрат</h3>
-            <div id="chart-expense-pie"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row mb-3">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Движение денег (Cash Flow)</h3>
-          </div>
-          <div class="card-body">
-            <div id="chart-cashflow"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Динамика валовой прибыли</h3>
-          </div>
-          <div class="card-body">
-            <div id="chart-gross-profit"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>#}
 
 {% endblock %}
 
 {% block javascripts %}
   {{ parent() }}
-{#  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const sparkBase = {
-        chart: { type: 'bar', height: 40, sparkline: { enabled: true }, animations: { enabled: false } },
-        plotOptions: { bar: { columnWidth: '85%' } },
-        tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => '' } } }
-      };
-
-      new ApexCharts(
-        document.querySelector("#chart-cash-sparkline"),
-        { ...sparkBase, series: [{ data: [30, 40, 35, 50, 49, 60, 70, 91, 125,40, 35, 50, 49,50, 49, 60, 70, 91, 125] }], colors: ['#206bc4'] }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-profit-sparkline"),
-        { ...sparkBase, series: [{ data: [10, 20, 15, 30, 25, 45, 50, 60, 75] }], colors: ['#2fb344'] }
-      ).render();
-
-      new ApexCharts(
-        document.querySelector("#chart-inflow-sparkline"),
-        { ...sparkBase, series: [{ data: [50, 60, 70, 40, 30, 80, 90, 100, 110] }], colors: ['#2fb344'] }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-outflow-sparkline"),
-        { ...sparkBase, series: [{ data: [40, 30, 50, 60, 55, 40, 30, 50, 45] }], colors: ['#d63939'] }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-netflow-sparkline"),
-        { ...sparkBase, series: [{ data: [10, 30, 20, -10, 25, 40, 60, 50, 65] }], colors: ['#206bc4'] }
-      ).render();
-
-      new ApexCharts(
-        document.querySelector("#chart-income-pie"),
-        {
-          chart: { type: 'donut', height: 280 },
-          series: [60, 30, 10],
-          labels: ['Товары', 'Услуги', 'Прочее'],
-          colors: ['#206bc4', '#4299e1', '#bfe399'],
-          legend: { position: 'bottom' }
-        }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-expense-pie"),
-        {
-          chart: { type: 'donut', height: 280 },
-          series: [45, 25, 15, 15],
-          labels: ['ФОТ', 'Маркетинг', 'Аренда', 'Налоги'],
-          colors: ['#d63939', '#f76707', '#fab005', '#ae3ec9'],
-          legend: { position: 'bottom' }
-        }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-cashflow"),
-        {
-          chart: { type: 'bar', height: 320, toolbar: { show: false } },
-          series: [
-            { name: 'Приход', data: [40, 50, 41, 50, 48, 60, 70] },
-            { name: 'Расход', data: [30, 35, 32, 38, 40, 45, 50] }
-          ],
-          colors: ['#2fb344', '#d63939'],
-          xaxis: { categories: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] }
-        }
-      ).render();
-      new ApexCharts(
-        document.querySelector("#chart-gross-profit"),
-        {
-          chart: { type: 'area', height: 300, toolbar: { show: false } },
-          series: [{ name: 'Маржа', data: [30, 45, 35, 55, 40, 80, 95] }],
-          colors: ['#206bc4'],
-          xaxis: { categories: ['Нед 1', 'Нед 2', 'Нед 3', 'Нед 4', 'Нед 5', 'Нед 6', 'Нед 7'] }
-        }
-      ).render();
-    });
-  </script>#}
 {% endblock %}

@@ -112,7 +112,9 @@
                             <th>Дата</th>
                             <th>Счет</th>
                             <th class="text-center text-nowrap">ОПиУ</th>
-                            <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
+                            {# DS-Money: «₽» в заголовке — только когда вся колонка в рублях; суммы не пересчитываются. #}
+                            {% set amounts_in_rub = transactions|filter(t => t.currency != 'RUB')|length == 0 %}
+                            <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
                             <th>Статья / Проект</th>
                             <th>Контрагент</th>
                             <th></th>
@@ -150,7 +152,9 @@
                                     &nbsp;
                                 {% endif %}
                             </td>
-                            <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
+                            {# DS-Money: ₽ — в заголовке, если вся колонка в рублях; иначе валюта в каждой строке, включая ₽. Приход — зелёный с плюсом, расход — основной цвет с минусом. #}
+                            {% set inflow = tx.direction.value == 'INFLOW' %}
+                            <td class="text-end text-nowrap" style="min-width: 12rem;">{{ tx.amount|vf_amount(2, inflow ? 'income' : null, signed: true, currency: amounts_in_rub or tx.currency != 'RUB' ? tx.currency : '₽', negate: not inflow) }}</td>
                             <td>
                                 {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                                 {% if transfer %}

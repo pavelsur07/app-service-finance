@@ -116,7 +116,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
 
                 self::assertResponseIsSuccessful();
                 $this->assertActivityState($crawler, $activity);
-                $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity]);
+                $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity], $uiMode);
                 $this->assertKpiComparisons($crawler, $uiMode, $activity);
                 $this->assertReconciliationLinks($crawler, $uiMode, $activity);
             }
@@ -124,13 +124,13 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             $defaultCrawler = $client->request('GET', '/finance?currency=RUB');
             self::assertResponseIsSuccessful();
             $this->assertActivityState($defaultCrawler, 'all');
-            $this->assertKpis($defaultCrawler, self::EXPECTED_BY_ACTIVITY['all']);
+            $this->assertKpis($defaultCrawler, self::EXPECTED_BY_ACTIVITY['all'], $uiMode);
             $this->assertTabsComposition($defaultCrawler, $uiMode);
 
             $invalidCrawler = $client->request('GET', '/finance?currency=RUB&activity=unknown');
             self::assertResponseIsSuccessful();
             $this->assertActivityState($invalidCrawler, 'all');
-            $this->assertKpis($invalidCrawler, self::EXPECTED_BY_ACTIVITY['all']);
+            $this->assertKpis($invalidCrawler, self::EXPECTED_BY_ACTIVITY['all'], $uiMode);
         }
     }
 
@@ -253,12 +253,25 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
     /**
      * @param array{inflow30: string, outflow30: string, netFlow30: string} $expected
      */
-    private function assertKpis(Crawler $crawler, array $expected): void
+    private function assertKpis(Crawler $crawler, array $expected, string $uiMode): void
     {
-        self::assertSame('1000RUB', $this->normalizedKpi($crawler, 'todayBalance'));
+        self::assertSame($this->expectedKpi('1000RUB', $uiMode), $this->normalizedKpi($crawler, 'todayBalance'));
         foreach ($expected as $name => $value) {
-            self::assertSame($value, $this->normalizedKpi($crawler, $name));
+            self::assertSame($this->expectedKpi($value, $uiMode), $this->normalizedKpi($crawler, $name));
         }
+    }
+
+    /**
+     * Legacy KPI follow the Vash Findir design system: abbreviated amount with the ₽ sign
+     * («1 тыс. ₽»); the app layer keeps the full amount with the currency code.
+     */
+    private function expectedKpi(string $appValue, string $uiMode): string
+    {
+        if (UiModeResolver::LEGACY !== $uiMode) {
+            return $appValue;
+        }
+
+        return '1000RUB' === $appValue ? '1тыс.₽' : str_replace('RUB', '₽', $appValue);
     }
 
     private function assertActivityState(Crawler $crawler, string $activity, int $periodDays = 30): void
@@ -364,7 +377,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             self::assertCount(0, $balance->filter('.visually-hidden'));
         }
         self::assertStringContainsString(
-            str_replace(' ', '', $balanceComparisonLabel).':1000RUB',
+            str_replace(' ', '', $balanceComparisonLabel).':'.$this->expectedKpi('1000RUB', $uiMode),
             $this->normalizedText($balance),
         );
 
@@ -414,7 +427,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 self::assertCount(1, $comparison->filter('.delta [aria-hidden="true"]'));
             }
             self::assertStringContainsString(
-                $previousPeriodLabel.':'.$expected['previous'],
+                $previousPeriodLabel.':'.$this->expectedKpi($expected['previous'], $uiMode),
                 $this->normalizedText($comparison),
             );
         }
@@ -439,9 +452,9 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $previousTo = $today->modify(sprintf('-%d days', $periodDays));
         $previousFrom = $today->modify(sprintf('-%d days', 2 * $periodDays - 1));
 
-        self::assertSame($current, $this->normalizedKpi($crawler, 'inflow30'));
+        self::assertSame($this->expectedKpi($current, $uiMode), $this->normalizedKpi($crawler, 'inflow30'));
         self::assertStringContainsString(
-            $this->dateRangeLabel($previousFrom, $previousTo).':'.$previous,
+            $this->dateRangeLabel($previousFrom, $previousTo).':'.$this->expectedKpi($previous, $uiMode),
             $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="inflow30"]')),
         );
         $periodNodes = $crawler->filter('[data-dashboard-kpi-period="current"]');
@@ -456,7 +469,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             $previousTo->format('Y') === $today->format('Y') ? 'd.m' : 'd.m.Y',
         );
         self::assertStringContainsString(
-            str_replace(' ', '', $balanceComparisonDate).':1000RUB',
+            str_replace(' ', '', $balanceComparisonDate).':'.$this->expectedKpi('1000RUB', $uiMode),
             $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="todayBalance"]')),
         );
 
