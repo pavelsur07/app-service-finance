@@ -40,7 +40,7 @@ final class EnqueueAutoRulesForRangeHandler
             ->where('t.company = :company')
             ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('t.occurredAt', 'ASC');
+            ->orderBy('t.occurredAt', \SortDirection::Ascending);
 
         $lockBefore = $company->getFinanceLockBefore();
         if (null !== $lockBefore) {

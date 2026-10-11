@@ -25,7 +25,7 @@ class PaymentRecurrenceRuleRepository extends ServiceEntityRepository
             ->where('rule.company = :company')
             ->andWhere('rule.active = true')
             ->setParameter('company', $company)
-            ->orderBy('rule.id', 'ASC')
+            ->orderBy('rule.id', \SortDirection::Ascending)
             ->getQuery();
 
         /** @var list<PaymentRecurrenceRule> $result */

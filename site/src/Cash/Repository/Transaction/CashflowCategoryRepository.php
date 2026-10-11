@@ -29,7 +29,7 @@ class CashflowCategoryRepository extends ServiceEntityRepository
             ->andWhere('c.company = :company')
             ->andWhere('c.parent IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('c.sort', 'ASC')
+            ->orderBy('c.sort', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

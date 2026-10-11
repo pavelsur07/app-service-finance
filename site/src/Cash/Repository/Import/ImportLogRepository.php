@@ -29,7 +29,7 @@ class ImportLogRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('l')
             ->andWhere('l.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('l.startedAt', 'DESC');
+            ->orderBy('l.startedAt', \SortDirection::Descending);
 
         if (!empty($filters['source'])) {
             $qb->andWhere('l.source = :source')->setParameter('source', $filters['source']);

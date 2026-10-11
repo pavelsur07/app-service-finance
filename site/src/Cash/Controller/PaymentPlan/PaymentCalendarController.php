@@ -383,8 +383,8 @@ final class PaymentCalendarController extends AbstractController
             ->setParameter('company', $company)
             ->setParameter('from', $from, Types::DATE_IMMUTABLE)
             ->setParameter('to', $to, Types::DATE_IMMUTABLE)
-            ->orderBy('plan.plannedAt', 'ASC')
-            ->addOrderBy('plan.createdAt', 'ASC');
+            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.createdAt', \SortDirection::Ascending);
 
         if (!empty($filters['account_id'])) {
             $qb->andWhere('plan.moneyAccount = :accountId')

@@ -45,7 +45,7 @@ final class PaymentPlanType extends AbstractType
                 'choice_label' => static fn (CashflowCategory $category): string => (string) $category->getName(),
                 'query_builder' => static function (EntityRepository $repository) use ($company) {
                     $qb = $repository->createQueryBuilder('category')
-                        ->orderBy('category.name', 'ASC');
+                        ->orderBy('category.name', \SortDirection::Ascending);
 
                     if ($company) {
                         $qb->andWhere('category.company = :company')
@@ -63,7 +63,7 @@ final class PaymentPlanType extends AbstractType
                 'choice_label' => static fn (MoneyAccount $account): string => (string) $account->getName(),
                 'query_builder' => static function (EntityRepository $repository) use ($company) {
                     $qb = $repository->createQueryBuilder('account')
-                        ->orderBy('account.name', 'ASC');
+                        ->orderBy('account.name', \SortDirection::Ascending);
 
                     if ($company) {
                         $qb->andWhere('account.company = :company')

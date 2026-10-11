@@ -27,7 +27,7 @@ class MoneyFundRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('f')
             ->andWhere('f.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('f.name', 'ASC')
+            ->orderBy('f.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

@@ -62,7 +62,7 @@ class CashflowCategory
     private ?self $parent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
-    #[ORM\OrderBy(['sort' => 'ASC'])]
+    #[ORM\OrderBy(['sort' => \SortDirection::Ascending])]
     private Collection $children;
 
     #[ORM\ManyToOne(targetEntity: Company::class)]

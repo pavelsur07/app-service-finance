@@ -32,7 +32,7 @@ class FundBalanceService
             ->groupBy('f.id')
             ->addGroupBy('f.name')
             ->addGroupBy('f.currency')
-            ->orderBy('f.name', 'ASC')
+            ->orderBy('f.name', \SortDirection::Ascending)
             ->getQuery()
             ->getArrayResult();
 
