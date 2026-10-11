@@ -15,5 +15,12 @@
 - `screen-intake.md`, `site/screens/README.md`: эталон — листы DS, классы — CSS кита в
   `assets/styles/kit/`, без версий кита.
 - `docs/design-system/README.md`: эталон для обоих интерфейсов.
+- `site/screens/screen-intake.md` (второй регламент — макет → Twig + CSS; найден
+  внутренним ревью): preflight требовал удалённый `check-ui-kit-classes.mjs` и вставал
+  на каждом запуске — теперь проверяет CSS кита; сверка классов — `rg` по
+  `assets/styles/kit/{components,patterns}`; шаблон PR и self-review без старого гейта.
+- Оговорка (внутреннее ревью): новый слой пока на палитре кита, перевод на DS —
+  отдельная задача; в других задачах токены кита под листы не подгонять (`CLAUDE.frontend.md`,
+  README DS). Правило денег легаси — в `CLAUDE.frontend.md`.
 
 Исторические `docs/tasks/*`, `docs/migration/*`, `docs/plan/*` не правились — это история.

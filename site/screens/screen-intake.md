@@ -1,7 +1,7 @@
 # Screen Intake — разбор HTML-макетов из screens/ в Twig + CSS
 
 > **Постоянная задача.** Запускается каждый раз, когда в `site/screens/` появляется новый `.html`-макет от дизайнера.
-> Превращает статичный макет на UI Kit классах в Twig-шаблон + page-specific CSS + Vite entry.
+> Превращает статичный макет на классах кита в Twig-шаблон + page-specific CSS + Vite entry.
 > Генерирует **только верстку**. Symfony-биндинги (csrf, роуты, ошибки) — ручная доводка разработчиком.
 
 ---
@@ -19,7 +19,7 @@
 
 - Читает макет `screens/<name>.html`.
 - Разбирает на `<style>`, `<body>`, `<script>`.
-- Валидирует все CSS-классы: UI Kit / page-specific / STOP при чужом.
+- Валидирует все CSS-классы: кит / page-specific / STOP при чужом.
 - Выносит `<style>` в `assets/styles/pages/<name>.css`.
 - Регистрирует Vite entry `<name>`.
 - Генерирует Twig-шаблон из `<body>`.
@@ -90,9 +90,9 @@
    echo "Page prefix: $PREFIX-"
    ```
 
-6. Проверить наличие линтера классов:
+6. Проверить, что CSS кита на месте (линтера классов нет — удалён 2026-10-11 вместе со старым UI Kit):
    ```bash
-   test -f site/tools/check-ui-kit-classes.mjs || { echo "🛑 STOP: нет check-ui-kit-classes.mjs"; exit 1; }
+   test -f site/assets/styles/kit/components/all.css || { echo "🛑 STOP: нет CSS кита"; exit 1; }
    ```
 
 ---
@@ -105,7 +105,7 @@
 2. **`<body>...</body>`** — разметка. Сохранить как `BODY_HTML`.
 3. **`<script>...</script>`** — если есть, сохранить как `PAGE_JS` (обычно нет; если есть — в отчёт как «требует ручного переноса в Stimulus»).
 
-Также извлечь `<link>` шрифтов из `<head>` — не переносить (шрифты уже в UI Kit), зафиксировать в отчёте.
+Также извлечь `<link>` шрифтов из `<head>` — не переносить (шрифты уже в ките), зафиксировать в отчёте.
 
 ---
 
@@ -125,33 +125,35 @@ grep -oE 'class="[^"]+"' /tmp/body.html \
 
 | Категория | Признак | Действие |
 |---|---|---|
-| **UI Kit** | Найден в `ui-kit/components/*.css` или `ui-kit/patterns/*.css` | OK |
+| **Кит** | Найден в `assets/styles/kit/components/*.css` или `assets/styles/kit/patterns/*.css` | OK |
 | **Page-specific** | Начинается с `<PREFIX>-` (например `login-brand`) | OK |
 | **Utility** | Начинается с `u-` | OK |
 | **State mock** | `is-hover`, `is-active`, `is-focus`, `is-on`, `is-error`, `is-selected`, `is-checked` | OK |
 | **Чужой** | Ни одна из категорий выше | 🛑 STOP |
 
-Проверка через существующий линтер:
+Проверка — сверка с CSS кита (отдельного линтера нет):
 
 ```bash
 cd site
-node tools/check-ui-kit-classes.mjs --file ../screens/$SCREEN.html --prefix $PREFIX 2>&1 | tee /tmp/validate.log
+while read -r cls; do
+  rg -q -- "\.${cls}\b" assets/styles/kit/components assets/styles/kit/patterns || echo "$cls"
+done < /tmp/used-classes.txt | grep -vE "^(${PREFIX}-|u-|is-)" | tee /tmp/validate.log
 ```
 
-Если линтер не поддерживает флаги — сверить `/tmp/used-classes.txt` со списком UI Kit классов вручную, отфильтровать page-prefix, utility и state-mocks; оставшиеся — кандидаты на STOP.
+Оставшиеся в `/tmp/validate.log` — кандидаты на STOP.
 
 **При обнаружении чужого класса:**
 
 ```
 🛑 STOP. Класс "<class>" не найден:
-- не в UI Kit (ui-kit/components, ui-kit/patterns)
+- не в ките (assets/styles/kit/components, assets/styles/kit/patterns)
 - не с page-префиксом "<PREFIX>-"
 - не utility (u-*), не state-mock (is-*)
 
 Варианты:
 1. Опечатка → исправить в макете.
 2. Забыт префикс → переименовать в <PREFIX>-<class>.
-3. Новый UI Kit компонент → добавить в UI Kit сначала (задача дизайнеру).
+3. Новый компонент кита → добавить в кит сначала (задача дизайнеру).
 
 Не генерирую битый Twig. Жду решения.
 ```
@@ -172,14 +174,14 @@ mkdir -p site/assets/styles/pages
 /*
  * Page-specific styles: <name>
  * Generated from screens/<name>.html by screen-intake.
- * Only <PREFIX>-* classes. UI Kit classes live in ui-kit/.
+ * Only <PREFIX>-* classes. Kit classes live in assets/styles/kit/.
  */
 
 <PAGE_CSS содержимое>
 ```
 
 **Валидация CSS:**
-- Селекторы — только `.<PREFIX>-*`, `@media`, page-scoped. Если `<style>` переопределяет UI Kit класс (`.btn { ... }`) — 🛑 STOP, «page CSS переопределяет UI Kit класс, запрещено».
+- Селекторы — только `.<PREFIX>-*`, `@media`, page-scoped. Если `<style>` переопределяет класс кита (`.btn { ... }`) — 🛑 STOP, «page CSS переопределяет класс кита, запрещено».
 - Hex допустим только как page-specific токены в начале (`--brand-*`). Точечный hex в правилах — предупреждение в отчёт, не STOP.
 
 ---
@@ -267,10 +269,7 @@ npm run build
 - Entry `<name>` в `public/build/manifest.json`.
 - `app-*.css` не сломан.
 
-```bash
-node tools/check-ui-kit-classes.mjs
-# page CSS не добавляет нарушений
-```
+Page CSS не вводит классов вне `.<PREFIX>-*` (сверка тем же циклом, что в Phase 2).
 
 ---
 
@@ -305,7 +304,7 @@ Generated from screens/<name>.html:
 - vite entry '<name>'
 - <TWIG_PATH>[.new] (verstka only, Symfony bindings = TODO)
 
-All classes validated against UI Kit v2.3.
+All classes validated against the kit CSS (assets/styles/kit).
 Symfony bindings (csrf, routes, error, last_username) — manual follow-up."
 
 git push -u origin chore/screen-intake-<name>
@@ -324,9 +323,9 @@ gh pr create --draft \
 - Stimulus password-toggle (если есть)
 
 ## Verified
-- [x] Все классы валидны против UI Kit v2.3
+- [x] Все классы валидны против CSS кита
 - [x] npm run build clean, entry в manifest
-- [x] check-ui-kit-classes 0 нарушений"
+- [x] Сверка классов с китом — чужих нет"
 ```
 
 ---
@@ -334,16 +333,16 @@ gh pr create --draft \
 ## Self-review
 
 - [ ] `@twig` путь извлечён из макета
-- [ ] Все классы валидны (UI Kit / page-prefix / utility / state-mock), чужих нет
+- [ ] Все классы валидны (кит / page-prefix / utility / state-mock), чужих нет
 - [ ] `assets/styles/pages/<name>.css` создан, только `<PREFIX>-*` селекторы
-- [ ] Page CSS не переопределяет UI Kit классы
+- [ ] Page CSS не переопределяет классы кита
 - [ ] Vite entry `<name>` добавлен, формат не сломан
 - [ ] Twig сгенерирован, `<style>` внутри нет
 - [ ] Symfony-биндинги = `{# TODO #}`, не выдуманы
 - [ ] Интерактив = TODO, Stimulus не выдуман
 - [ ] Существующий Twig → `.new`, не перезаписан
 - [ ] `npm run build` green, entry в manifest
-- [ ] `check-ui-kit-classes` 0 нарушений
+- [ ] Сверка классов с китом — чужих нет
 - [ ] Матрица в `screens/README.md` обновлена
 - [ ] Draft PR открыт
 
@@ -354,7 +353,7 @@ gh pr create --draft \
 ```
 выдумывать csrf/path/error биндинги               — только TODO
 писать Stimulus-контроллер                        — только TODO
-переопределять UI Kit класс в page CSS            — STOP
+переопределять класс кита в page CSS          — STOP
 генерить Twig при чужом классе                    — STOP
 перезаписывать существующий Twig                  — генерить .new
 править security/base.html.twig                   — ручная задача

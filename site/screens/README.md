@@ -32,7 +32,6 @@ screens/
 
 ```html
 <!--
-uiKit: 1.2.0
 designedAt: 2026-06-25
 source: <ссылка на Figma или чат с дизайнером, если есть>
 designer: <имя или ник>
