@@ -6,10 +6,14 @@ namespace App\Tests\Functional\Marketplace\Controller;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 
 final class MarketplaceCostsControllerTest extends WebTestCaseBase
 {
@@ -63,6 +67,37 @@ final class MarketplaceCostsControllerTest extends WebTestCaseBase
             $client->request('GET', $url);
             self::assertResponseIsSuccessful();
         }
+    }
+
+    /**
+     * Сторно хранится положительным и в учёте уменьшает затраты: в списке — плюсом,
+     * в итоге «На странице» — со знаком плюс, а не ещё одной затратой.
+     */
+    public function testStornoIsShownAsCostReversal(): void
+    {
+        $client = static::createClient();
+
+        [$owner, $company] = $this->seedCompany();
+        $date = new \DateTimeImmutable('first day of this month');
+        $cost = (new MarketplaceCost('44444444-4444-4444-8444-000000000301', $company, MarketplaceType::OZON))
+            ->setAmount('100.00')
+            ->setCostDate($date);
+        $storno = (new MarketplaceCost('44444444-4444-4444-8444-000000000302', $company, MarketplaceType::OZON))
+            ->setAmount('30.00')
+            ->setCostDate($date)
+            ->setOperationType(MarketplaceCostOperationType::STORNO);
+        $this->em()->persist($cost);
+        $this->em()->persist($storno);
+        $this->em()->flush();
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/costs?mapped=all');
+
+        self::assertResponseIsSuccessful();
+        $amounts = $crawler->filter('table tbody td.text-end .vf-amount')->each(static fn (Crawler $n): string => $n->text());
+        sort($amounts);
+        self::assertSame(['+30,00', "\u{2212}100,00"], $amounts);
+        self::assertStringContainsString("\u{2212}70,00\u{00A0}₽", $crawler->filter('table tfoot')->text());
     }
 
     /** @return array{0: User,1: Company} */
