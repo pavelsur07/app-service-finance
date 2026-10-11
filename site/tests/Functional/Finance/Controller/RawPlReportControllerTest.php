@@ -19,6 +19,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class RawPlReportControllerTest extends WebTestCaseBase
@@ -50,10 +51,10 @@ final class RawPlReportControllerTest extends WebTestCaseBase
         $content = $client->getResponse()->getContent() ?: '';
         self::assertStringContainsString('№DOC-KRD', $content);
         self::assertStringContainsString('Краснодар', $content);
-        self::assertStringContainsString('100.00', $content);
+        self::assertStringContainsString('100,00', $this->pageText($content));
         self::assertStringNotContainsString('№DOC-RND', $content);
-        self::assertStringNotContainsString('200.00', $content);
-        self::assertStringNotContainsString('300.00', $content);
+        self::assertStringNotContainsString('200,00', $this->pageText($content));
+        self::assertStringNotContainsString('300,00', $this->pageText($content));
         self::assertStringNotContainsString('mixed-rostov-op', $content);
 
         $client->request('GET', '/finance/reports/pl-raw?from=2026-07-01&to=2026-07-31&responsibilityCenterId=not-a-uuid');
@@ -62,9 +63,9 @@ final class RawPlReportControllerTest extends WebTestCaseBase
         $content = $client->getResponse()->getContent() ?: '';
         self::assertStringContainsString('№DOC-KRD', $content);
         self::assertStringContainsString('№DOC-RND', $content);
-        self::assertStringContainsString('100.00', $content);
-        self::assertStringContainsString('200.00', $content);
-        self::assertStringContainsString('300.00', $content);
+        self::assertStringContainsString('100,00', $this->pageText($content));
+        self::assertStringContainsString('200,00', $this->pageText($content));
+        self::assertStringContainsString('300,00', $this->pageText($content));
         self::assertStringContainsString('mixed-rostov-op', $content);
     }
 
@@ -184,5 +185,14 @@ final class RawPlReportControllerTest extends WebTestCaseBase
             ->setResponsibilityCenterId($responsibilityCenterId);
 
         $em->persist($total);
+    }
+
+    /**
+     * Суммы на странице выводятся по DS-Money («200,00» с приглушёнными копейками в
+     * отдельном span), поэтому ищем их в тексте страницы, а не в HTML.
+     */
+    private function pageText(string $content): string
+    {
+        return (string) preg_replace('/\s+/u', ' ', (new Crawler($content))->filter('body')->text());
     }
 }

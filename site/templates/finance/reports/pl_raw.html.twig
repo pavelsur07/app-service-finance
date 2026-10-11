@@ -68,7 +68,7 @@
                     <td>{{ row.project }}</td>
                     <td>{{ row.responsibility_center }}</td>
                     <td class="text-end">{{ row.amount_raw }}</td>
-                    <td class="text-end">{{ row.amount_signed|number_format(2, '.', ' ') }}</td>
+                    <td class="text-end">{{ row.amount_signed|vf_amount }}</td>
                     <td>{{ row.counterparty }}</td>
                     <td>{{ row.comment }}</td>
                 </tr>
@@ -98,9 +98,9 @@
                     <td>{{ t.category }}</td>
                     <td>{{ t.project }}</td>
                     <td>{{ t.responsibility_center }}</td>
-                    <td class="text-end text-success">{{ t.income|number_format(2, '.', ' ') }}</td>
-                    <td class="text-end text-danger">{{ t.expense|number_format(2, '.', ' ') }}</td>
-                    <td class="text-end fw-bold">{{ t.net|number_format(2, '.', ' ') }}</td>
+                    <td class="text-end">{{ t.income|vf_amount(2, 'income') }}</td>
+                    <td class="text-end">{{ t.expense|vf_amount }}</td>
+                    <td class="text-end fw-bold">{{ t.net|vf_amount }}</td>
                 </tr>
             {% endfor %}
             </tbody>

@@ -3,9 +3,9 @@
 
 {% block body %}
 <style>
-  .muted { color: #888; }
-  .warn  { background: #fff8e1; }
-  .ok    { background: #f2fff2; }
+  .muted { color: var(--vf-text-muted); }
+  .warn  { background: var(--vf-warn-bg); }
+  .ok    { background: var(--vf-ok-bg); }
   .mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 </style>
 
@@ -52,7 +52,7 @@
                 {% if r.value is same as(null) %}
                   <span class="muted">n/a</span>
                 {% else %}
-                  {{ r.value|number_format(2, '.', ' ') }}
+                  {{ r.value|vf_amount }}
                 {% endif %}
               </td>
 
