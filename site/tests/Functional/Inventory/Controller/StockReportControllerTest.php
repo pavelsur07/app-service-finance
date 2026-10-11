@@ -73,7 +73,7 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Нет остатков на выбранную дату', $html);
         self::assertStringNotContainsString('SKU-OLD', $html);
         self::assertStringNotContainsString('SKU-LATEST', $html);
-        // Пустой отчёт не показывает футер со счётчиком «Показано 0–0 из 0».
+        // Пустой отчёт не показывает футер со счётчиком «Показано с 0 по 0 из 0».
         self::assertCount(0, $crawler->filter('.card-footer'));
     }
 
@@ -333,7 +333,7 @@ final class StockReportControllerTest extends WebTestCaseBase
         // Четыре записи снимка, но страниц и позиций считается по двум SKU.
         self::assertCount(2, $crawler->filter('table tbody tr'));
         self::assertSame(
-            'Показано 1–2 из 2',
+            'Показано с 1 по 2 из 2',
             preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
         );
         // Одна страница: счётчик есть, навигации нет.
@@ -370,7 +370,7 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertCount(InventoryStockReportQuery::PER_PAGE, $crawler->filter('table tbody tr'));
         self::assertSame(
-            sprintf('Показано 1–%d из %d', InventoryStockReportQuery::PER_PAGE, InventoryStockReportQuery::PER_PAGE + 1),
+            sprintf('Показано с 1 по %d из %d', InventoryStockReportQuery::PER_PAGE, InventoryStockReportQuery::PER_PAGE + 1),
             preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
         );
 

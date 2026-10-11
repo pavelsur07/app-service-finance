@@ -58,14 +58,7 @@
     <div class="mt-3">
         <div class="card">
             <div class="card-header card-head d-flex align-items-center gap-3 flex-wrap">
-                <ul class="nav nav-tabs card-header-tabs">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{{ path('document_index') }}">Операции ОПиУ</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ path('document_deleted_index') }}">Удалённые</a>
-                    </li>
-                </ul>
+                {% include 'document/_tabs.html.twig' with {active: 'index'} only %}
                 <button type="button"
                         class="btn ms-auto"
                         data-bs-toggle="offcanvas"
@@ -191,7 +184,7 @@
                     {% endfor %}
                 </form>
                 <div class="ms-md-auto w-100 w-md-auto">
-                    {% include 'partials/_pagerfanta.html.twig' with { pager: pager, route: 'document_index', params: app.request.query.all|merge({'limit': limit}) } %}
+                    {% include 'partials/_pagination.html.twig' with { pager: pager, route: 'document_index', params: app.request.query.all|merge({'limit': limit}) } %}
                 </div>
             </div>
         </div>

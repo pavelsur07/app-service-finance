@@ -87,20 +87,7 @@
         <div class="card cashflow-ops"
              data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
             <div class="card-header card-head d-flex align-items-center gap-3 flex-wrap">
-                <ul class="nav nav-tabs card-header-tabs">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{{ path('cash_transaction_index') }}">Все</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ path('cash_transaction_audit_index') }}">История</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ path('cash_transaction_deleted_index') }}">Удалённые</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ path('cash_transaction_auto_rule_apply_page') }}">Авто-правило прим.</a>
-                    </li>
-                </ul>
+                {% include 'transaction/_tabs.html.twig' with {active: 'all'} only %}
                 <button type="button"
                         class="btn btn-danger ms-auto"
                         id="bulk-delete-button"
@@ -260,7 +247,7 @@
                 </table>
             </div>
             <div class="card-footer d-flex align-items-center">
-                {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
+                {% include 'partials/_pagination.html.twig' with {pager: pager} %}
             </div>
         </div>
     </div>

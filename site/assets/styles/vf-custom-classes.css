@@ -102,3 +102,79 @@
 .vf-amount--loss {
   color: var(--vf-danger-text);
 }
+
+/* Tabs (DS-Tabs): без «коробки» Tabler, активная — подчёркивание 2px Action blue.
+   Разметка — partials/_tabs.html.twig; классы .nav-tabs/.nav-link.active сохранены. */
+.nav-tabs {
+  gap: var(--vf-space-1);
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.nav-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vf-text-muted);
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus-visible {
+  color: var(--vf-text);
+  border-bottom-color: var(--vf-border-strong);
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  color: var(--vf-primary);
+  border-bottom-color: var(--vf-primary);
+  background: transparent;
+}
+
+/* Размер как у Tabler .icon, которым были свёрстаны SVG-иконки вкладок. */
+.nav-tabs .nav-link > .ti {
+  font-size: 1.25rem;
+}
+
+/* Счётчик-пилюля. TODO(ds): имя warn-модификатора на листе DS-Tabs не указано. */
+.nav-tabs .cnt {
+  padding: 0 var(--vf-space-2);
+  border-radius: var(--vf-radius-pill);
+  background: var(--vf-bg);
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.nav-tabs .nav-link.active .cnt {
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+.nav-tabs .cnt--warn,
+.nav-tabs .nav-link.active .cnt--warn {
+  background: var(--vf-warn-bg);
+  color: var(--vf-warn-text);
+}
+
+/* Таблицы (DS-Table). TODO(ds): плотность строк и цвет hover — по листу DS-Table. */
+.table td.text-end,
+.table th.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+.table-hover > tbody > tr:hover > *,
+.card-table > tbody > tr:hover > * {
+  --tblr-table-bg-state: var(--vf-bg);
+}
+
+/* Строка итогов. */
+.table > tfoot > tr > * {
+  border-top: 1px solid var(--vf-border-strong);
+  font-weight: var(--vf-weight-semibold);
+}

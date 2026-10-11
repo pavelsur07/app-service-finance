@@ -1,0 +1,31 @@
+{#
+  Tabs легаси-слоя (DS «Ваш Финдир»): подчёркивание 2px Action blue у активной,
+  счётчик-пилюля .cnt. По DS: 2–6 вкладок, «Все» — первой, warn-счётчик — не
+  больше одного на экран.
+
+  {% include 'partials/_tabs.html.twig' with {tabs: [
+      {label: 'Все', href: path('x'), active: true, count: 12},
+      {label: 'Ошибки', href: path('y'), count: 3, warn: true, icon: 'ti-alert-triangle'},
+  ]} %}
+  Клиентские вкладки Bootstrap: pane: 'id-панели' вместо href.
+  Необязательно: class — доп. классы <ul> (например, card-header-tabs).
+#}
+<ul class="nav nav-tabs {{ class ?? '' }}"{% if tabs|filter(t => t.pane is defined)|length > 0 %} role="tablist"{% endif %}>
+    {% for tab in tabs %}
+        {% set active = tab.active ?? false %}
+        <li class="nav-item"{% if tab.pane is defined %} role="presentation"{% endif %}>
+            <a class="nav-link {{ active ? 'active' : '' }}"
+                {% if tab.pane is defined %}
+                    href="#{{ tab.pane }}" data-bs-toggle="tab" role="tab" aria-controls="{{ tab.pane }}" aria-selected="{{ active ? 'true' : 'false' }}"
+                {% else %}
+                    href="{{ tab.href }}"{% if active %} aria-current="page"{% endif %}
+                {% endif %}>
+                {% if tab.icon is defined %}<i class="ti {{ tab.icon }} me-1" aria-hidden="true"></i>{% endif %}
+                {{ tab.label }}
+                {% if tab.count is defined and tab.count is not null %}
+                    <span class="cnt {{ (tab.warn ?? false) ? 'cnt--warn' : '' }}">{{ tab.count|vf_money(0) }}</span>
+                {% endif %}
+            </a>
+        </li>
+    {% endfor %}
+</ul>

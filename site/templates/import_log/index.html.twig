@@ -59,17 +59,9 @@
         </table>
       </div>
 
-      {% set pages = (total / limit)|round(0, 'ceil') %}
-      {% if pages > 1 %}
-        <div class="card-footer d-flex align-items-center">
-          <p class="m-0 text-secondary">Всего: <strong>{{ total }}</strong></p>
-          <ul class="pagination m-0 ms-auto">
-            {% for p in 1..pages %}
-              <li class="page-item {{ p == page ? 'active' : '' }}">
-                <a class="page-link" href="{{ path('import_logs_index', app.request.query.all|merge({'page': p})) }}">{{ p }}</a>
-              </li>
-            {% endfor %}
-          </ul>
+      {% if total > 0 %}
+        <div class="card-footer">
+          {% include 'partials/_pagination.html.twig' with {page: page, total: total, perPage: limit} only %}
         </div>
       {% endif %}
     </div>

@@ -125,7 +125,7 @@
 
     {% if pager.haveToPaginate %}
         <div class="card-footer d-flex align-items-center">
-            {% include 'partials/_pagerfanta.html.twig' with {
+            {% include 'partials/_pagination.html.twig' with {
                 'pager': pager,
                 'route': 'marketplace_sales_index',
                 'params': {

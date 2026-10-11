@@ -111,6 +111,7 @@ class Bank1CImportController extends AbstractController
             'previewRows' => $previewRows,
             'pager' => $pager,
             'totalRows' => $totalRows,
+            'perPage' => $perPage,
         ]);
     }
 
