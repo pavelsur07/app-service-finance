@@ -14,16 +14,7 @@ doctrine:
         server_version: '15'
 
         profiling_collect_backtrace: '%kernel.debug%'
-        use_savepoints: true
     orm:
-        # Нативные lazy objects PHP 8.4 вместо сгенерированных ghost-прокси (C3
-        # перехода на DBAL 4 / DoctrineBundle 3, где они обязательны). Генерация
-        # прокси, auto_generate_proxy_classes и proxy_dir при этом не используются.
-        enable_native_lazy_objects: true
-        # Только DoctrineBundle 2: false с ORM 3 бросает LogicException, а при
-        # native-объектах опция ничего не делает. Уходит вместе с bundle 3.
-        enable_lazy_ghost_objects: true
-        report_fields_where_declared: true
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
         identity_generation_preferences:
@@ -150,8 +141,6 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MoySklad/Entity'
                 prefix: 'App\MoySklad\Entity'
                 alias: MoySklad
-        controller_resolver:
-            auto_mapping: false
         filters:
             company:
                 class: App\Ingestion\Infrastructure\Doctrine\CompanyFilter
