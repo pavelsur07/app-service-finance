@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Inventory\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Query\QueryBuilder;
 
 /**
@@ -138,7 +139,7 @@ final readonly class InventoryCostListingQuery
                 'listingId' => $listingId,
                 'limit' => $limit,
             ],
-            ['limit' => \PDO::PARAM_INT],
+            ['limit' => ParameterType::INTEGER],
         );
     }
 
