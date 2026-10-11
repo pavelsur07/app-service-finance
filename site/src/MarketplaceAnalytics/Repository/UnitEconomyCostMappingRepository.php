@@ -79,8 +79,8 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
             ->getSingleScalarResult();
 
         $items = $qb
-            ->orderBy('m.marketplace', 'ASC')
-            ->addOrderBy('m.costCategoryName', 'ASC')
+            ->orderBy('m.marketplace', \SortDirection::Ascending)
+            ->addOrderBy('m.costCategoryName', \SortDirection::Ascending)
             ->setMaxResults($perPage)
             ->setFirstResult(($page - 1) * $perPage)
             ->getQuery()

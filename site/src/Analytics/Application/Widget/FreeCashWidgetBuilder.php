@@ -27,7 +27,7 @@ final readonly class FreeCashWidgetBuilder
 
     public function build(Company $company, Period $period, FiatCurrency $cashCurrency): FreeCashWidgetResponse
     {
-        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => 'ASC']);
+        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => \SortDirection::Ascending]);
         $accountIds = array_map(static fn (MoneyAccount $account): string => (string) $account->getId(), $accounts);
 
         $balancesAtEnd = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $period->getTo(), $accountIds);

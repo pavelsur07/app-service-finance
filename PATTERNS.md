@@ -213,6 +213,11 @@ App\Catalog\Domain\ProductSkuUniquenessChecker:
 Для сложных read-моделей — DBAL QueryBuilder, минуя ORM hydration.
 **Query-класс возвращает `QueryBuilder`, не массив** — обязательно для Pagerfanta.
 
+Направление сортировки: у **DBAL** `QueryBuilder` — строка `'ASC'`/`'DESC'`
+(тип `?string`), у **ORM** `QueryBuilder` и в `#[ORM\OrderBy]` — `\SortDirection::Ascending`/
+`Descending` (строка там — депрекейшен, гейт тестов падает). Перепутать в другую
+сторону — `TypeError` в рантайме.
+
 ```php
 final class ProductQuery
 {

@@ -47,8 +47,8 @@ class DealRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('deal')
             ->andWhere('deal.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('deal.recognizedAt', 'DESC')
-            ->addOrderBy('deal.createdAt', 'DESC');
+            ->orderBy('deal.recognizedAt', \SortDirection::Descending)
+            ->addOrderBy('deal.createdAt', \SortDirection::Descending);
 
         if ($filter->dateFrom) {
             $qb->andWhere('deal.recognizedAt >= :dateFrom')

@@ -36,7 +36,7 @@ final class AiSuggestionRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('suggestion')
             ->andWhere('suggestion.company = :company')
-            ->orderBy('suggestion.createdAt', 'DESC')
+            ->orderBy('suggestion.createdAt', \SortDirection::Descending)
             ->setParameter('company', $company)
             ->setMaxResults($limit)
             ->getQuery()

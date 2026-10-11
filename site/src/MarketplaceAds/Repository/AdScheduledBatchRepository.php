@@ -147,7 +147,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
             ->andWhere('b.companyId = :companyId')
             ->setParameter('jobId', $jobId)
             ->setParameter('companyId', $companyId)
-            ->orderBy('b.batchIndex', 'ASC')
+            ->orderBy('b.batchIndex', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -235,7 +235,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository implement
             ->andWhere('b.storagePath IS NOT NULL')
             ->setParameter('jobId', $jobId)
             ->setParameter('companyId', $companyId)
-            ->orderBy('b.batchIndex', 'ASC')
+            ->orderBy('b.batchIndex', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

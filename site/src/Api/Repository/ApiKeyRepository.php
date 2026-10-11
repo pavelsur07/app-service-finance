@@ -44,6 +44,6 @@ final class ApiKeyRepository extends ServiceEntityRepository
 
     public function createListQueryBuilder(string $companyId): QueryBuilder
     {
-        return $this->createQueryBuilder('k')->andWhere('k.companyId = :companyId')->setParameter('companyId', $companyId)->orderBy('k.createdAt', 'DESC')->addOrderBy('k.id', 'DESC');
+        return $this->createQueryBuilder('k')->andWhere('k.companyId = :companyId')->setParameter('companyId', $companyId)->orderBy('k.createdAt', \SortDirection::Descending)->addOrderBy('k.id', \SortDirection::Descending);
     }
 }

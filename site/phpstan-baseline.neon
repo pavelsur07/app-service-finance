@@ -1296,11 +1296,6 @@ parameters:
 			count: 1
 			path: src/Cash/Repository/Accounts/MoneyAccountRepository.php
 
-		-
-			message: '#^Method App\\Cash\\Repository\\Accounts\\MoneyAccountRepository\:\:findByFilters\(\) has parameter \$sort with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Repository/Accounts/MoneyAccountRepository.php
 
 		-
 			message: '#^Parameter \#2 \$normalized of method App\\Cash\\Repository\\Accounts\\MoneyAccountRepository\:\:findOneByNormalizedAccountNumber\(\) expects string, string\|null given\.$#'
@@ -2712,11 +2707,6 @@ parameters:
 			count: 1
 			path: src/Company/Repository/CompanyMemberRepository.php
 
-		-
-			message: '#^Method App\\Company\\Repository\\CounterpartyRepository\:\:findByFilters\(\) has parameter \$sort with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Company/Repository/CounterpartyRepository.php
 
 		-
 			message: '#^Метод\-запрос App\\Company\\Repository\\CounterpartyRepository\:\:findAllForBackfill\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'

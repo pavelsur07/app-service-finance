@@ -48,7 +48,7 @@ final class MoySkladConnectionWriteRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.id', 'ASC')
+            ->orderBy('c.id', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(100, $limit)));
         if (null !== $afterId) {
             $qb->andWhere('c.id > :afterId')->setParameter('afterId', $afterId);

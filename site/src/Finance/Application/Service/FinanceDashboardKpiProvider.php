@@ -59,7 +59,7 @@ final readonly class FinanceDashboardKpiProvider
             [$cashCurrency->value],
             true,
             null,
-            ['name' => 'ASC'],
+            ['name' => \SortDirection::Ascending],
         );
 
         $todayBalance = $this->cashBalanceAtDate($company, $accounts, $today, $scale);

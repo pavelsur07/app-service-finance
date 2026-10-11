@@ -36,7 +36,7 @@ class CounterpartyController extends AbstractController
         $showArchived = $request->query->getBoolean('show_archived', false);
         $typeEnum = $type ? CounterpartyTypeEnum::tryFrom($type) : null;
 
-        $items = $repo->findByFilters($company, $typeEnum, $q, $showArchived, ['name' => 'ASC']);
+        $items = $repo->findByFilters($company, $typeEnum, $q, $showArchived, ['name' => \SortDirection::Ascending]);
 
         return $this->render('counterparty/index.html.twig', [
             'items' => $items,

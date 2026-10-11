@@ -36,7 +36,7 @@ final class CashTransferType extends AbstractType
                 FiatCurrency::values(),
                 true,
                 null,
-                ['name' => 'ASC'],
+                ['name' => \SortDirection::Ascending],
             ),
             static fn (MoneyAccount $account): bool => MoneyAccountType::CRYPTO_WALLET !== $account->getType(),
         ));

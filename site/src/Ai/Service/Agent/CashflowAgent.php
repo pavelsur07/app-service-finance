@@ -109,7 +109,7 @@ final class CashflowAgent implements AiAgentInterface
             ->setParameter('from', $from)
             ->setParameter('to', $to)
             ->groupBy('category')
-            ->orderBy('category', 'ASC');
+            ->orderBy('category', \SortDirection::Ascending);
 
         $results = $qb->getQuery()->getArrayResult();
         $totals = [];
@@ -139,7 +139,7 @@ final class CashflowAgent implements AiAgentInterface
             ->andWhere('transaction.company = :company')
             ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
             ->groupBy('day')
-            ->orderBy('day', 'ASC')
+            ->orderBy('day', \SortDirection::Ascending)
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to);

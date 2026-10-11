@@ -44,6 +44,7 @@
         "symfony/mime": "7.4.*",
         "symfony/monolog-bundle": "^3.11.2",
         "symfony/notifier": "7.4.*",
+        "symfony/polyfill-php86": "^1.43",
         "symfony/process": "7.4.*",
         "symfony/property-access": "7.4.*",
         "symfony/property-info": "7.4.*",

@@ -24,7 +24,7 @@ final readonly class InflowWidgetBuilder
 
     public function build(Company $company, Period $period, FiatCurrency $cashCurrency): InflowWidgetResponse
     {
-        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => 'ASC']);
+        $accounts = $this->moneyAccountRepository->findByFilters($company, null, [$cashCurrency->value], true, null, ['name' => \SortDirection::Ascending]);
         $accountIds = array_map(static fn (MoneyAccount $account): string => (string) $account->getId(), $accounts);
 
         if ([] === $accountIds) {

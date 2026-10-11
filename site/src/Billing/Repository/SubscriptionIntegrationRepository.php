@@ -27,8 +27,8 @@ final class SubscriptionIntegrationRepository extends ServiceEntityRepository
             ->andWhere('subscriptionIntegration.status = :status')
             ->setParameter('subscription', $subscription)
             ->setParameter('status', SubscriptionIntegrationStatus::ACTIVE)
-            ->orderBy('subscriptionIntegration.startedAt', 'ASC')
-            ->addOrderBy('subscriptionIntegration.id', 'ASC')
+            ->orderBy('subscriptionIntegration.startedAt', \SortDirection::Ascending)
+            ->addOrderBy('subscriptionIntegration.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

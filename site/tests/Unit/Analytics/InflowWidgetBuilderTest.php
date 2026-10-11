@@ -27,7 +27,7 @@ final class InflowWidgetBuilderTest extends TestCase
         $accountRepository = $this->createMock(MoneyAccountRepository::class);
         $accountRepository->expects(self::once())
             ->method('findByFilters')
-            ->with($company, null, ['USD'], true, null, ['name' => 'ASC'])
+            ->with($company, null, ['USD'], true, null, ['name' => \SortDirection::Ascending])
             ->willReturn([$account]);
 
         $transactionRepository = $this->createMock(CashTransactionRepository::class);

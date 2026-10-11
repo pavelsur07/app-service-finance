@@ -179,7 +179,7 @@ final class CashflowReportBuilder
                 [$params->dashboardCurrency?->value],
                 null,
                 null,
-                ['name' => 'ASC'],
+                ['name' => \SortDirection::Ascending],
             )
             : $this->accountRepository->findBy(['company' => $company]);
         $openingByCurrency = [];

@@ -21,7 +21,7 @@ final readonly class MoySkladConnectionsQuery
             ->from(MoySkladConnection::class, 'connection')
             ->where('connection.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('connection.createdAt', 'DESC')
-            ->addOrderBy('connection.id', 'DESC');
+            ->orderBy('connection.createdAt', \SortDirection::Descending)
+            ->addOrderBy('connection.id', \SortDirection::Descending);
     }
 }

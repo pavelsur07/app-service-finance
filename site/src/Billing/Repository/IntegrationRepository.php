@@ -28,8 +28,8 @@ final class IntegrationRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('integration')
             ->andWhere('integration.isActive = :active')
             ->setParameter('active', true)
-            ->orderBy('integration.name', 'ASC')
-            ->addOrderBy('integration.code', 'ASC')
+            ->orderBy('integration.name', \SortDirection::Ascending)
+            ->addOrderBy('integration.code', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

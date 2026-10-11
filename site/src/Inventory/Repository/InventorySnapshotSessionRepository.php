@@ -40,8 +40,8 @@ final class InventorySnapshotSessionRepository extends ServiceEntityRepository
                 SnapshotSessionStatus::Pending,
                 SnapshotSessionStatus::InProgress,
             ])
-            ->orderBy('session.startedAt', 'DESC')
-            ->addOrderBy('session.id', 'DESC')
+            ->orderBy('session.startedAt', \SortDirection::Descending)
+            ->addOrderBy('session.id', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

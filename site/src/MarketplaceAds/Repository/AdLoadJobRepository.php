@@ -53,7 +53,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
             ->andWhere('j.marketplace = :marketplace')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
-            ->orderBy('j.createdAt', 'DESC')
+            ->orderBy('j.createdAt', \SortDirection::Descending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -70,7 +70,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('activeStatuses', [AdLoadJobStatus::PENDING, AdLoadJobStatus::RUNNING])
-            ->orderBy('j.createdAt', 'DESC')
+            ->orderBy('j.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -91,7 +91,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
             ->setParameter('marketplace', $marketplace)
             ->setParameter('activeStatuses', [AdLoadJobStatus::PENDING, AdLoadJobStatus::RUNNING])
             ->setParameter('date', $date->format('Y-m-d'))
-            ->orderBy('j.createdAt', 'DESC')
+            ->orderBy('j.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -225,7 +225,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         $result = $this->createQueryBuilder('j')
             ->where('j.status = :status')
             ->setParameter('status', AdLoadJobStatus::RUNNING)
-            ->orderBy('j.createdAt', 'ASC')
+            ->orderBy('j.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -267,7 +267,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('date', $date->setTime(0, 0), 'date_immutable')
-            ->orderBy('j.createdAt', 'DESC')
+            ->orderBy('j.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -288,7 +288,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
             ->setParameter('marketplace', $marketplace)
             ->setParameter('status', AdLoadJobStatus::COMPLETED)
             ->setParameter('date', $date->setTime(0, 0), 'date_immutable')
-            ->orderBy('j.createdAt', 'DESC')
+            ->orderBy('j.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

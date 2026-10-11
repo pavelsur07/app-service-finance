@@ -78,7 +78,7 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
             ->setParameter('marketplace', $marketplace)
             ->setParameter('from', $from->format('Y-m-d'))
             ->setParameter('to', $to->format('Y-m-d'))
-            ->orderBy('r.reportDate', 'DESC')
+            ->orderBy('r.reportDate', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
@@ -98,7 +98,7 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
             ->setParameter('marketplace', $marketplace)
             ->setParameter('from', $from->format('Y-m-d'))
             ->setParameter('to', $to->format('Y-m-d'))
-            ->orderBy('r.createdAt', 'DESC')
+            ->orderBy('r.createdAt', \SortDirection::Descending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -201,7 +201,7 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
             ->andWhere('r.status = :status')
             ->setParameter('companyId', $companyId)
             ->setParameter('status', AdRawDocumentStatus::DRAFT)
-            ->orderBy('r.reportDate', 'DESC')
+            ->orderBy('r.reportDate', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
@@ -226,7 +226,7 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
         ?string $marketplace = null,
         ?\DateTimeImmutable $reportDate = null,
     ): iterable {
-        $qb = $this->createQueryBuilder('r')->orderBy('r.reportDate', 'DESC');
+        $qb = $this->createQueryBuilder('r')->orderBy('r.reportDate', \SortDirection::Descending);
 
         if (null !== $companyId) {
             $qb->andWhere('r.companyId = :companyId')->setParameter('companyId', $companyId);

@@ -37,7 +37,7 @@ final class SubscriptionRepository extends ServiceEntityRepository
                 .'WHEN subscription.status = :grace THEN 3 '
                 .'ELSE 4 END'
             )
-            ->addOrderBy('subscription.currentPeriodEnd', 'DESC')
+            ->addOrderBy('subscription.currentPeriodEnd', \SortDirection::Descending)
             ->setParameter('active', SubscriptionStatus::ACTIVE)
             ->setParameter('trial', SubscriptionStatus::TRIAL)
             ->setParameter('grace', SubscriptionStatus::GRACE)

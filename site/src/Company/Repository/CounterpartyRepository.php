@@ -122,9 +122,11 @@ class CounterpartyRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array<string, \SortDirection> $sort
+     *
      * @return Counterparty[]
      */
-    public function findByFilters(Company $company, ?CounterpartyType $type, ?string $q, bool $showArchived, array $sort = ['name' => 'ASC']): array
+    public function findByFilters(Company $company, ?CounterpartyType $type, ?string $q, bool $showArchived, array $sort = ['name' => \SortDirection::Ascending]): array
     {
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.company = :company')
@@ -144,11 +146,7 @@ class CounterpartyRepository extends ServiceEntityRepository
         }
 
         foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('c.'.$field, match (strtoupper($direction)) {
-                'ASC' => \SortDirection::Ascending,
-                'DESC' => \SortDirection::Descending,
-                default => throw new \InvalidArgumentException(sprintf('Invalid sort direction "%s".', $direction)),
-            });
+            $qb->addOrderBy('c.'.$field, $direction);
         }
 
         return $qb->getQuery()->getResult();
