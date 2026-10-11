@@ -16,7 +16,10 @@ doctrine:
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
     orm:
-        auto_generate_proxy_classes: true
+        # Нативные lazy objects PHP 8.4 вместо сгенерированных ghost-прокси (C3
+        # перехода на DBAL 4 / DoctrineBundle 3, где они обязательны). Генерация
+        # прокси, auto_generate_proxy_classes и proxy_dir при этом не используются.
+        enable_native_lazy_objects: true
         enable_lazy_ghost_objects: true
         report_fields_where_declared: true
         validate_xml_mapping: true
@@ -172,8 +175,6 @@ when@prod:
             logging: false           # ← ДОБАВИТЬ ЭТО
             profiling: false         # ← И ЭТО
         orm:
-            auto_generate_proxy_classes: false
-            proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'
             query_cache_driver:
                 type: pool
                 pool: doctrine.system_cache_pool
