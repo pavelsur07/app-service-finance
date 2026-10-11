@@ -85,7 +85,7 @@ final class IngestOrderItemRepository extends ServiceEntityRepository
             ->andWhere('i.companyId = :companyId')
             ->andWhere('i.listingId IS NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('i.createdAt', 'DESC')
+            ->orderBy('i.createdAt', \SortDirection::Descending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();

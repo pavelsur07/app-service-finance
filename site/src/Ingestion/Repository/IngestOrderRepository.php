@@ -81,7 +81,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('source', $source->value)
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('externalIds', $externalIds)
-            ->orderBy('o.id', 'ASC')
+            ->orderBy('o.id', \SortDirection::Ascending)
             ->getQuery();
 
         if ($forUpdate) {
@@ -159,13 +159,13 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedAfter', $orderedAfter)
-            ->orderBy('attemptRank', 'ASC')
-            ->addOrderBy('o.statusRefreshAttemptedAt', 'ASC')
+            ->orderBy('attemptRank', \SortDirection::Ascending)
+            ->addOrderBy('o.statusRefreshAttemptedAt', \SortDirection::Ascending)
             // Устойчивый третий ключ: без него заказы с одинаковым временем
             // попытки (а у ни разу не опрошенных оно одинаково всегда — NULL)
             // возвращались бы в произвольном порядке, и при исчерпании лимита
             // часть из них не опрашивалась бы никогда.
-            ->addOrderBy('o.id', 'ASC')
+            ->addOrderBy('o.id', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
@@ -191,7 +191,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('statuses', $nonTerminal)
             ->setParameter('orderedBefore', $orderedBefore)
-            ->orderBy('o.orderedAt', 'ASC')
+            ->orderBy('o.orderedAt', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
@@ -231,7 +231,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.id IN (:orderIds)')
             ->setParameter('companyId', $companyId)
             ->setParameter('orderIds', array_values(array_unique($orderIds)))
-            ->orderBy('o.id', 'ASC')
+            ->orderBy('o.id', \SortDirection::Ascending)
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setHint(Query::HINT_REFRESH, true);
@@ -267,8 +267,8 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->andWhere('o.refreshStoppedAt IS NULL')
             ->setParameter('statuses', self::nonTerminalStatuses())
             ->setParameter('orderedBefore', $orderedBefore)
-            ->orderBy('o.orderedAt', 'ASC')
-            ->addOrderBy('o.id', 'ASC')
+            ->orderBy('o.orderedAt', \SortDirection::Ascending)
+            ->addOrderBy('o.id', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
@@ -395,7 +395,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
             ->setParameter('externalOrderIds', array_values(array_unique($externalOrderIds)))
             ->groupBy('o.externalOrderId')
             ->having('COUNT(o.id) > 1')
-            ->orderBy('o.externalOrderId', 'ASC')
+            ->orderBy('o.externalOrderId', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -426,7 +426,7 @@ final class IngestOrderRepository extends ServiceEntityRepository
         $orders = $this->createQueryBuilder('o')
             ->andWhere('o.id IN (:orderIds)')
             ->setParameter('orderIds', array_values(array_unique($orderIds)))
-            ->orderBy('o.id', 'ASC')
+            ->orderBy('o.id', \SortDirection::Ascending)
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setHint(Query::HINT_REFRESH, true)

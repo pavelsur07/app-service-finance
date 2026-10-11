@@ -52,7 +52,7 @@ final class IngestCursorRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('connectionRef', $connectionRef)
             ->setParameter('resourceType', $resourceType)
-            ->orderBy('cursor.shopRef', 'ASC')
+            ->orderBy('cursor.shopRef', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

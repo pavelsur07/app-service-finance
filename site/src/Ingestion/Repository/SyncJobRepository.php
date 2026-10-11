@@ -42,8 +42,8 @@ final class SyncJobRepository extends ServiceEntityRepository
             ->setParameter('parentJobId', $parentJobId)
             ->setParameter('companyId', $companyId)
             ->setParameter('statuses', [SyncJobStatus::OPEN->value, SyncJobStatus::RUNNING->value])
-            ->orderBy('job.windowFrom', 'ASC')
-            ->addOrderBy('job.createdAt', 'ASC')
+            ->orderBy('job.windowFrom', \SortDirection::Ascending)
+            ->addOrderBy('job.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -86,7 +86,7 @@ final class SyncJobRepository extends ServiceEntityRepository
             ->andWhere('job.updatedAt < :olderThan')
             ->setParameter('statuses', [SyncJobStatus::OPEN->value, SyncJobStatus::RUNNING->value])
             ->setParameter('olderThan', $olderThan)
-            ->orderBy('job.updatedAt', 'ASC')
+            ->orderBy('job.updatedAt', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(500, $limit)))
             ->getQuery()
             ->getResult();
@@ -118,8 +118,8 @@ final class SyncJobRepository extends ServiceEntityRepository
             ->setParameter('resourceType', $resourceType)
             ->setParameter('shopRef', $shopRef)
             ->setParameter('statuses', [SyncJobStatus::COMPLETED->value, SyncJobStatus::FAILED->value])
-            ->orderBy('job.createdAt', 'DESC')
-            ->addOrderBy('job.id', 'DESC')
+            ->orderBy('job.createdAt', \SortDirection::Descending)
+            ->addOrderBy('job.id', \SortDirection::Descending)
             ->setMaxResults(max(1, min(50, $limit)))
             ->getQuery()
             ->getResult();
@@ -144,7 +144,7 @@ final class SyncJobRepository extends ServiceEntityRepository
             ->setParameter('resourceType', $resourceType)
             ->setParameter('shopRef', $shopRef)
             ->setParameter('statuses', [SyncJobStatus::OPEN->value, SyncJobStatus::RUNNING->value])
-            ->orderBy('job.createdAt', 'DESC')
+            ->orderBy('job.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

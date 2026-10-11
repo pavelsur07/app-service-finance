@@ -29,8 +29,8 @@ final class NormalizationIssueRepository extends ServiceEntityRepository
             ->andWhere('issue.resolvedAt IS NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('rawRecordId', $rawRecordId)
-            ->orderBy('issue.createdAt', 'ASC')
-            ->addOrderBy('issue.id', 'ASC')
+            ->orderBy('issue.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('issue.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

@@ -29,8 +29,8 @@ final class IngestionTenantProbeRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('probe')
             ->andWhere('probe.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('probe.createdAt', 'ASC')
-            ->addOrderBy('probe.id', 'ASC')
+            ->orderBy('probe.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('probe.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
