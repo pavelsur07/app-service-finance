@@ -37,6 +37,8 @@ class MoneyAccountRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array<string, \SortDirection> $sort
+     *
      * @return MoneyAccount[]
      */
     public function findByFilters(Company $company, ?MoneyAccountType $type, ?array $currencies, ?bool $active, ?string $q, array $sort): array
@@ -63,11 +65,7 @@ class MoneyAccountRepository extends ServiceEntityRepository
         }
 
         foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('m.'.$field, match (strtoupper($direction)) {
-                'ASC' => \SortDirection::Ascending,
-                'DESC' => \SortDirection::Descending,
-                default => throw new \InvalidArgumentException(sprintf('Invalid sort direction "%s".', $direction)),
-            });
+            $qb->addOrderBy('m.'.$field, $direction);
         }
 
         return $qb->getQuery()->getResult();
