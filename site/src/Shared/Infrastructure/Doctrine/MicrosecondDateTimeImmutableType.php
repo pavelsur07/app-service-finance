@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Doctrine;
 
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Types\ConversionException;
+use Doctrine\DBAL\Types\Exception\InvalidFormat;
+use Doctrine\DBAL\Types\Exception\InvalidType;
 use Doctrine\DBAL\Types\Type;
 
 /**
@@ -27,6 +28,11 @@ use Doctrine\DBAL\Types\Type;
  * Применяется точечно, к отметкам наблюдения, а не ко всем 55 колонкам
  * времени в проекте: смена типа у остальных — отдельное решение с отдельной
  * проверкой обратной совместимости.
+ *
+ * DBAL 4 не хранит тип в DC2Type-комментарии и не видит точность TIMESTAMP
+ * при интроспекции, поэтому `doctrine:migrations:diff` / `schema:update` выдают
+ * по колонкам этого типа и наследника фантомный `ALTER … TYPE TIMESTAMP(3|6)`.
+ * В БД точность уже верная — в миграции такие строки не переносить.
  */
 class MicrosecondDateTimeImmutableType extends Type
 {
@@ -63,7 +69,7 @@ class MicrosecondDateTimeImmutableType extends Type
             return $value->setTimezone($this->storageTimezone())->format(self::FORMAT);
         }
 
-        throw ConversionException::conversionFailedInvalidType($value, $this->getName(), ['null', \DateTimeImmutable::class]);
+        throw InvalidType::new($value, $this->getName(), ['null', \DateTimeImmutable::class]);
     }
 
     public function convertToPHPValue(mixed $value, AbstractPlatform $platform): ?\DateTimeImmutable
@@ -73,7 +79,7 @@ class MicrosecondDateTimeImmutableType extends Type
         }
 
         if (!is_string($value)) {
-            throw ConversionException::conversionFailedInvalidType($value, $this->getName(), ['null', 'string', \DateTimeImmutable::class]);
+            throw InvalidType::new($value, $this->getName(), ['null', 'string', \DateTimeImmutable::class]);
         }
 
         // Прочитанное без дробной части — нормальное состояние: строки,
@@ -85,15 +91,10 @@ class MicrosecondDateTimeImmutableType extends Type
             ?: \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $value, $timezone);
 
         if (false === $converted) {
-            throw ConversionException::conversionFailedFormat($value, $this->getName(), self::FORMAT);
+            throw InvalidFormat::new($value, $this->getName(), self::FORMAT);
         }
 
         return $converted;
-    }
-
-    public function requiresSQLCommentHint(AbstractPlatform $platform): bool
-    {
-        return true;
     }
 
     protected function storageTimezone(): \DateTimeZone

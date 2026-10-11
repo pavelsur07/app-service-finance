@@ -19,6 +19,7 @@ use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Psr\Clock\ClockInterface;
 use Psr\Log\AbstractLogger;
@@ -535,7 +536,7 @@ final class PruneRawRecordsActionTest extends PostgresResetTestCase
         $this->connection->executeStatement(
             'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id IN (:ids)',
             ['ids' => [$stubborn['id'], $next['id']]],
-            ['ids' => Connection::PARAM_STR_ARRAY],
+            ['ids' => ArrayParameterType::STRING],
         );
         $this->em->clear();
 
@@ -945,7 +946,7 @@ final class PruneRawRecordsActionTest extends PostgresResetTestCase
         $this->connection->executeStatement(
             'UPDATE ingest_raw_records SET payload_pruned_at = now() WHERE id IN (:ids)',
             ['ids' => [$held['id'], $neighbour['id']]],
-            ['ids' => Connection::PARAM_STR_ARRAY],
+            ['ids' => ArrayParameterType::STRING],
         );
 
         // Проблема появилась ПОСЛЕ решения: именно она заставляет спросить

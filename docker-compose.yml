@@ -4,6 +4,10 @@
 x-tz-env: &tz-env
     TZ: Europe/Moscow
 
+# container_name не задаётся: compose называет контейнеры <проект>-<сервис>-N
+# (app-service-finance-site-postgres-1), и на машине с другими стеками они не
+# путаются. Сервисы находят друг друга по имени сервиса (site-postgres,
+# site-redis) внутри сети проекта. Прод — docker-compose.prod.yml, там свои имена.
 services:
     traefik:
         image: traefik:3.3
@@ -64,7 +68,6 @@ services:
         build:
             context: site/docker
             dockerfile: development/php-fpm/Dockerfile
-        container_name: symfony-php-fpm
         environment:
             <<: *tz-env
         depends_on:
@@ -78,7 +81,6 @@ services:
         build:
             context: site/docker
             dockerfile: development/php-cli/Dockerfile
-        container_name: symfony-cli
         working_dir: /app
         environment:
             <<: *tz-env
@@ -87,7 +89,6 @@ services:
         command: php bin/console
     site-frontend:
         image: node:24-alpine
-        container_name: symfony-frontend
         working_dir: /app
         environment:
             <<: *tz-env
@@ -165,7 +166,6 @@ services:
         command: php bin/console messenger:consume async_ads --time-limit=3600 --memory-limit=160M -vv
     site-postgres:
         image: postgres:15-alpine
-        container_name: symfony-postgres
         restart: always
         # ponytail: fsync/synchronous_commit/full_page_writes выключены — это
         # локальный dev/test-инстанс в docker volume, не прод (см. docker-compose.prod.yml).
@@ -187,7 +187,6 @@ services:
             start_period: 5s
     site-redis:
         image: redis:7-alpine
-        container_name: site-redis
         restart: unless-stopped
         environment:
             <<: *tz-env
