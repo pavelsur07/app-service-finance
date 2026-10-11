@@ -6,7 +6,6 @@
         "build": "vite build",
         "api:types": "openapi-typescript var/openapi.json -o assets/api/schema.d.ts",
         "api:types:check": "openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts",
-        "check:all": "npm run build",
         "lint": "eslint 'assets/**/*.{ts,tsx,js,jsx}' --max-warnings=0"
     },
     "devDependencies": {

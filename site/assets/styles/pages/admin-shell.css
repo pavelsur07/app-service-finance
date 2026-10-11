@@ -20,8 +20,8 @@
 }
 .wz-title {
   margin: 0;
-  /* 28px — размер page title из storybook; токены --font-* заканчиваются на 14,
-     крупные размеры UI Kit задаёт в px (см. kpi-value--hero: 28px). */
+  /* 28px — размер page title нового слоя; токены --font-* заканчиваются на 14,
+     крупные размеры кит задаёт в px (см. kpi-value--hero: 28px). */
   font-size: 28px; font-weight: 700; line-height: 1.2;
   color: var(--text-strong);
 }
