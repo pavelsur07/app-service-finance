@@ -45,11 +45,11 @@
                                 <tr>
                                     <td>{{ loan.name }}</td>
                                     <td>{{ loan.lenderName ?? '-' }}</td>
-                                    <td class="text-end">{{ loan.principalAmount|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ loan.remainingPrincipal|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ loan.principalAmount|vf_amount }}</td>
+                                    <td class="text-end">{{ loan.remainingPrincipal|vf_amount }}</td>
                                     <td class="text-end">
                                         {% if loan.interestRate is not null %}
-                                            {{ loan.interestRate|number_format(2, '.', ' ') }}%
+                                            {{ loan.interestRate|vf_number(2) }}%
                                         {% else %}
                                             -
                                         {% endif %}

@@ -37,23 +37,23 @@
                             {% for loan in loansReport %}
                                 <tr>
                                     <td>{{ loan.name }}</td>
-                                    <td class="text-end">{{ loan.remainingPrincipal|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ loan.principalAmount|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ loan.remainingPrincipal|vf_amount }}</td>
+                                    <td class="text-end">{{ loan.principalAmount|vf_amount }}</td>
                                     <td class="text-end">
                                         {% if loan.interestRate is not null %}
-                                            {{ loan.interestRate|number_format(2, '.', ' ') }}%
+                                            {{ loan.interestRate|vf_number(2) }}%
                                         {% else %}
                                             -
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
                                         {% if loan.nextPaymentDate is not null and loan.nextPaymentAmount is not null %}
-                                            {{ loan.nextPaymentDate|date('d.m.Y') }} — {{ loan.nextPaymentAmount|number_format(2, '.', ' ') }}
+                                            {{ loan.nextPaymentDate|date('d.m.Y') }} — {{ loan.nextPaymentAmount|vf_amount }}
                                         {% else %}
                                             —
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">{{ loan.totalInterestYear|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ loan.totalInterestYear|vf_amount }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
