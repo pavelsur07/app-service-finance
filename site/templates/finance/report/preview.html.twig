@@ -1,4 +1,24 @@
 {% extends 'base.html.twig' %}
+
+{#
+  Ячейка суммы ОПиУ. Значения приходят из PHP строкой «-1 234.50» (её же отдаёт JSON),
+  поэтому разбираем строку здесь. DS-Money: U+00A0, запятая, копейки приглушены;
+  отрицательные — в скобках: бухгалтерский формат допустим в отчётах.
+  title совпадает с видимым текстом.
+#}
+{% macro cell(raw, class) %}
+    {%- if raw is null or raw == '—' -%}
+        <td class="{{ class }}" title="—">—</td>
+    {%- else -%}
+        {%- set n = raw|replace({' ': ''}) -%}
+        {%- set negative = n starts with '-' -%}
+        {%- set abs = negative ? n|slice(1) : n -%}
+        {%- set plain = abs|vf_number(2) -%}
+        <td class="{{ class }}" title="{{ negative ? '(' ~ plain ~ ')' : plain }}">{% if negative %}({{ abs|vf_amount }}){% else %}{{ abs|vf_amount }}{% endif %}</td>
+    {%- endif -%}
+{% endmacro %}
+{% import _self as pl_ui %}
+
 {% block title %}Отчёт о прибылях и убытках{% endblock %}
 
 {% block stylesheets %}
@@ -498,18 +518,12 @@
                             {% endif %}
                             {% if layout == 'projects' %}
                                 {% for p in compareProjects %}
-                                    {% set cell_value = r.values[p.id] ?? '—' %}
-                                    {% set cell_value = cell_value starts with '-' ? '(' ~ cell_value|slice(1) ~ ')' : cell_value %}
-                                    <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
+                                    {{ pl_ui.cell(r.values[p.id] ?? null, 'text-end') }}
                                 {% endfor %}
-                                {% set total_value = r.values['_total'] ?? '—' %}
-                                {% set total_value = total_value starts with '-' ? '(' ~ total_value|slice(1) ~ ')' : total_value %}
-                                <td class="text-end fw-bold pl-cell-total" title="{{ total_value }}">{{ total_value }}</td>
+                                {{ pl_ui.cell(r.values['_total'] ?? null, 'text-end fw-bold pl-cell-total') }}
                             {% else %}
                                 {% for period in periods %}
-                                    {% set cell_value = r.values[period.id] ?? '—' %}
-                                    {% set cell_value = cell_value starts with '-' ? '(' ~ cell_value|slice(1) ~ ')' : cell_value %}
-                                    <td class="text-end" title="{{ cell_value }}">{{ cell_value }}</td>
+                                    {{ pl_ui.cell(r.values[period.id] ?? null, 'text-end') }}
                                 {% endfor %}
                             {% endif %}
                         </tr>

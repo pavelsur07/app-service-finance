@@ -165,9 +165,10 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
 
             self::assertResponseIsSuccessful($url);
             foreach ([
-                (string) $negativeCategory->getId() => '(1 234.50)',
-                (string) $positiveCategory->getId() => '1 234.50',
-                (string) $zeroCategory->getId() => '0.00',
+                // DS-Money: U+00A0 и запятая; скобки — бухгалтерский формат отчёта.
+                (string) $negativeCategory->getId() => "(1\u{00A0}234,50)",
+                (string) $positiveCategory->getId() => "1\u{00A0}234,50",
+                (string) $zeroCategory->getId() => '0,00',
             ] as $rowId => $expected) {
                 $cells = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"] td.text-end', $rowId));
                 self::assertCount($expectedCellCount, $cells, $url);

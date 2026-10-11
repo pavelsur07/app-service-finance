@@ -33,7 +33,7 @@
                         <tr>
                             <th>Категория</th>
                             <th>Природа</th>
-                            <th>Сумма</th>
+                            <th class="text-end">Сумма, ₽</th>
                             <th>Контрагент</th>
                             <th>Комментарий</th>
                         </tr>
@@ -61,7 +61,7 @@
                                         <span class="badge bg-secondary">—</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ op.amount }}</td>
+                                <td class="text-end">{{ op.amount|vf_amount }}</td>
                                 <td>{{ op.counterparty ? op.counterparty.name : '' }}</td>
                                 <td>{{ op.comment }}</td>
                             </tr>
