@@ -7,9 +7,10 @@ doctrine:
             datetime_immutable_us: App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType
             datetime_immutable_utc_ms: App\Shared\Infrastructure\Doctrine\UtcMillisecondDateTimeImmutableType
 
-        # IMPORTANT: You MUST configure your server version,
-        # either here or in the DATABASE_URL env var (see .env file)
-        #server_version: '16'
+        # Прод и CI — postgres:15 (docker-compose.prod.yml, deploy.yml). Без версии
+        # DBAL спрашивает её у сервера при каждом подключении; serverVersion в
+        # DATABASE_URL (.env.test, CI) имеет приоритет над этим значением.
+        server_version: '15'
 
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
