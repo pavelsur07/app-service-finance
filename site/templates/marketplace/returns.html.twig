@@ -38,8 +38,8 @@
                 <th>Артикул (SKU)</th>
                 <th>Товар</th>
                 <th class="text-end">Кол-во</th>
-                <th class="text-end">Возврат</th>
-                <th class="text-end">Себес.</th>
+                <th class="text-end">Возврат, ₽</th>
+                <th class="text-end">Себес., ₽</th>
                 <th style="max-width: 180px">Причина</th>
                 <th>ID</th>
             </tr>
@@ -68,13 +68,14 @@
                         <td><span class="badge bg-blue-lt">{{ return.marketplace|upper }}</span></td>
                         <td><span class="badge bg-azure-lt">{{ return.marketplace_sku }}</span></td>
                         <td><strong>{{ return.listing_name }}</strong></td>
-                        <td class="text-end">{{ return.quantity }}</td>
-                        <td class="text-end text-danger">
-                            <strong>-{{ return.refund_amount|number_format(2, '.', ' ') }} ₽</strong>
+                        <td class="text-end">{{ return.quantity|vf_number }}</td>
+                        {# DS-Money: возврат — расход: основной цвет с U+2212, не красный. #}
+                        <td class="text-end">
+                            <strong>{{ return.refund_amount|vf_amount(negate: true) }}</strong>
                         </td>
                         <td class="text-end">
                             {% if return.cost_price is not null and return.cost_price > 0 %}
-                                {{ return.cost_price|number_format(2, '.', ' ') }} ₽
+                                {{ return.cost_price|vf_amount }}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
@@ -106,12 +107,12 @@
                 <tfoot>
                 <tr>
                     <th colspan="4">На странице:</th>
-                    <th class="text-end">{{ pager.currentPageResults|reduce((carry, r) => carry + r.quantity, 0) }}</th>
-                    <th class="text-end text-danger">
-                        <strong>-{{ pager.currentPageResults|reduce((carry, r) => carry + r.refund_amount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                    <th class="text-end">{{ pager.currentPageResults|reduce((carry, r) => carry + r.quantity, 0)|vf_number }}</th>
+                    <th class="text-end">
+                        <strong>{{ (-1 * pager.currentPageResults|reduce((carry, r) => carry + r.refund_amount, 0))|vf_money(2, '₽') }}</strong>
                     </th>
                     <th class="text-end">
-                        <strong>{{ pager.currentPageResults|reduce((carry, r) => carry + (r.cost_price ?? 0), 0)|number_format(2, '.', ' ') }} ₽</strong>
+                        <strong>{{ pager.currentPageResults|reduce((carry, r) => carry + (r.cost_price ?? 0), 0)|vf_money(2, '₽') }}</strong>
                     </th>
                     <th colspan="2"></th>
                 </tr>

@@ -222,7 +222,7 @@
                             <td class="text-end">
                                 {% if row.cost_price is not null %}
                                     <span class="fw-medium">
-                                        {{ row.cost_price|number_format(2, '.', ' ') }} {{ row.cost_currency }}
+                                        {{ row.cost_price|vf_amount(currency: row.cost_currency == 'RUB' ? '₽' : row.cost_currency) }}
                                     </span>
                                 {% else %}
                                     <span class="text-danger small">Не задана</span>

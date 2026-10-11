@@ -45,7 +45,7 @@
                             <th>Marketplace SKU</th>
                             <th>Supplier SKU</th>
                             <th>Размер</th>
-                            <th>Цена</th>
+                            <th class="text-end">Цена, ₽</th>
                             <th>Создан</th>
                             <th class="w-1">Действия</th>
                         </tr>
@@ -67,7 +67,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ listing.size }}</td>
-                                <td>{{ listing.price }} ₽</td>
+                                <td class="text-end">{{ listing.price|vf_amount }}</td>
                                 <td>
                                     <span class="text-muted">{{ listing.created_at|date('d.m.Y H:i') }}</span>
                                 </td>

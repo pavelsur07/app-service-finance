@@ -71,9 +71,9 @@
                 <th>Артикул (SKU)</th>
                 <th>Товар</th>
                 <th class="text-end">Кол-во</th>
-                <th class="text-end">Цена</th>
-                <th class="text-end">Выручка</th>
-                <th class="text-end">Себес.</th>
+                <th class="text-end">Цена, ₽</th>
+                <th class="text-end">Выручка, ₽</th>
+                <th class="text-end">Себес., ₽</th>
                 <th>ID заказа</th>
             </tr>
             </thead>
@@ -89,12 +89,12 @@
                         <td><span class="badge bg-blue-lt">{{ sale.marketplace|upper }}</span></td>
                         <td><span class="badge bg-azure-lt">{{ sale.marketplace_sku }}</span></td>
                         <td>{{ sale.listing_name }}</td>
-                        <td class="text-end">{{ sale.quantity }}</td>
-                        <td class="text-end">{{ sale.price_per_unit|number_format(2, '.', ' ') }} ₽</td>
-                        <td class="text-end"><strong>{{ sale.total_revenue|number_format(2, '.', ' ') }} ₽</strong></td>
+                        <td class="text-end">{{ sale.quantity|vf_number }}</td>
+                        <td class="text-end">{{ sale.price_per_unit|vf_amount }}</td>
+                        <td class="text-end"><strong>{{ sale.total_revenue|vf_amount }}</strong></td>
                         <td class="text-end">
                             {% if sale.cost_price is not null and sale.cost_price > 0 %}
-                                {{ sale.cost_price|number_format(2, '.', ' ') }} ₽
+                                {{ sale.cost_price|vf_amount }}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
@@ -108,13 +108,13 @@
                 <tfoot>
                 <tr>
                     <th colspan="4">На странице:</th>
-                    <th class="text-end">{{ pager.currentPageResults|reduce((carry, s) => carry + s.quantity, 0) }}</th>
+                    <th class="text-end">{{ pager.currentPageResults|reduce((carry, s) => carry + s.quantity, 0)|vf_number }}</th>
                     <th></th>
                     <th class="text-end">
-                        <strong>{{ pager.currentPageResults|reduce((carry, s) => carry + s.total_revenue, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                        <strong>{{ pager.currentPageResults|reduce((carry, s) => carry + s.total_revenue, 0)|vf_money(2, '₽') }}</strong>
                     </th>
                     <th class="text-end">
-                        <strong>{{ pager.currentPageResults|reduce((carry, s) => carry + (s.cost_price ?? 0), 0)|number_format(2, '.', ' ') }} ₽</strong>
+                        <strong>{{ pager.currentPageResults|reduce((carry, s) => carry + (s.cost_price ?? 0), 0)|vf_money(2, '₽') }}</strong>
                     </th>
                     <th></th>
                 </tr>

@@ -68,7 +68,7 @@
                             </td>
                             <td class="text-end">
                             <span class="fw-medium">
-                                {{ row.price_amount|number_format(2, '.', ' ') }} {{ row.price_currency }}
+                                {{ row.price_amount|vf_amount(currency: row.price_currency == 'RUB' ? '₽' : row.price_currency) }}
                             </span>
                             </td>
                             <td><span class="text-muted small">{{ row.note ?? '—' }}</span></td>
