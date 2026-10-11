@@ -31,7 +31,7 @@ class CounterpartyRepository extends ServiceEntityRepository
     public function findAllForBackfill(): iterable
     {
         return $this->createQueryBuilder('c')
-            ->orderBy('c.id', 'ASC')
+            ->orderBy('c.id', \SortDirection::Ascending)
             ->getQuery()
             ->toIterable();
     }
@@ -48,7 +48,7 @@ class CounterpartyRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.company = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.name', 'ASC');
+            ->orderBy('c.name', \SortDirection::Ascending);
 
         if (null === $keepId) {
             $qb->andWhere('c.isArchived = false');
@@ -78,7 +78,7 @@ class CounterpartyRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->andWhere('c.nameCore = :nameCore')
             ->setParameter('nameCore', $nameCore)
-            ->orderBy('c.createdAt', 'ASC')
+            ->orderBy('c.createdAt', \SortDirection::Ascending)
             ->setMaxResults(1);
 
         if (null === $legalFormHint) {
@@ -144,7 +144,11 @@ class CounterpartyRepository extends ServiceEntityRepository
         }
 
         foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('c.'.$field, $direction);
+            $qb->addOrderBy('c.'.$field, match (strtoupper($direction)) {
+                'ASC' => \SortDirection::Ascending,
+                'DESC' => \SortDirection::Descending,
+                default => throw new \InvalidArgumentException(sprintf('Invalid sort direction "%s".', $direction)),
+            });
         }
 
         return $qb->getQuery()->getResult();

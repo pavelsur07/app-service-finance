@@ -92,8 +92,8 @@ class ProjectDirectionRepository extends ServiceEntityRepository
             ->andWhere('d.company = :company')
             ->andWhere('d.parent IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('d.sort', 'ASC')
-            ->addOrderBy('d.name', 'ASC')
+            ->orderBy('d.sort', \SortDirection::Ascending)
+            ->addOrderBy('d.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

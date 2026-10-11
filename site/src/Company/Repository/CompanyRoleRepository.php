@@ -28,7 +28,7 @@ class CompanyRoleRepository extends ServiceEntityRepository
             ->andWhere('r.id != :ownerId')
             ->setParameter('company', $company)
             ->setParameter('ownerId', SystemCompanyRoles::OWNER_ID)
-            ->orderBy('r.name', 'ASC');
+            ->orderBy('r.name', \SortDirection::Ascending);
     }
 
     /**

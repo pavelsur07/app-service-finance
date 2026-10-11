@@ -39,7 +39,7 @@ class ProjectDirection
     private ?self $parent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
-    #[ORM\OrderBy(['sort' => 'ASC'])]
+    #[ORM\OrderBy(['sort' => \SortDirection::Ascending])]
     private Collection $children;
 
     public function __construct(string $id, Company $company, string $name, ?string $systemCode = null)
