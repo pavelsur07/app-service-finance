@@ -95,7 +95,7 @@
                                     <div class="col-auto">
                                         <div class="btn-list">
                                             {% if has_auth_error %}
-                                                <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-danger">Обновить ключ</a>
+                                                <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-primary">Обновить ключ</a>
                                             {% endif %}
                                             <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
                                             <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" style="display:inline">

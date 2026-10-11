@@ -112,7 +112,13 @@ html {
     padding-left: 10px;
 }
 
-.nav-item.active > a {
+/* DS: активное состояние — Action blue; у Tabler фон активного пункта меню серый. */
+.navbar-vertical {
+    --tblr-navbar-active-bg: var(--vf-primary-lt);
+}
+
+.nav-item.active > a,
+.navbar-vertical .dropdown-item.active {
     background: var(--vf-primary-lt);
     color: var(--vf-primary);
     border-left: 2px solid var(--vf-primary);

@@ -1,60 +1,280 @@
-/* Clean VF custom classes (normalized, no mojibake, no undefined vars). */
+/*
+ * Надстройки DS «Ваш Финдир» над компонентами Tabler 1.2.0 (легаси-слой).
+ * Эталон — docs/design-system/sheets/ (DS-Controls, DS-Feedback). Палитра —
+ * в design-tokens.css; здесь только места, где Tabler расходится с листами.
+ * Своих компонентов не вводим: разметка остаётся на классах Tabler.
+ */
 
-.vf-scope {
-  font-family: var(--vf-font-sans);
-  font-size: var(--vf-size-base);
-  line-height: var(--vf-leading-normal);
-  color: var(--vf-text-dashboard);
-  background: var(--vf-bg);
-  font-feature-settings: var(--vf-feature-settings);
+/* ===== Кнопки (DS-Controls): md 36px · 0 14px, sm 30px · 0 10px · 13px, радиус 4. */
+.btn {
+  --tblr-btn-padding-x: 14px;
+  --tblr-btn-border-radius: var(--vf-radius-sm);
+  --tblr-btn-disabled-opacity: 0.5;
 }
 
-.vf-h1 { font-size: var(--vf-size-h1); font-weight: var(--vf-weight-bold); line-height: var(--vf-leading-tight); }
-.vf-h2 { font-size: var(--vf-size-h2); font-weight: var(--vf-weight-bold); line-height: var(--vf-leading-snug); }
-.vf-h3 { font-size: var(--vf-size-h3); font-weight: var(--vf-weight-semibold); line-height: var(--vf-leading-snug); }
-.vf-p { font-size: var(--vf-size-base); color: var(--vf-text-muted); }
-.vf-small { font-size: var(--vf-size-sm); color: var(--vf-text-secondary); }
-.vf-uppercase, .vf-label-uppercase { text-transform: uppercase; letter-spacing: var(--vf-tracking-wide); }
-.vf-num, .vf-numeric { font-family: var(--vf-font-numeric); font-variant-numeric: tabular-nums; }
-
-.vf-text-positive { color: var(--vf-green); }
-.vf-text-negative { color: var(--vf-red); }
-.vf-text-warning { color: var(--vf-yellow); }
-.vf-text-info { color: var(--vf-primary); }
-.vf-text-ai { color: var(--vf-ai-indigo); }
-.vf-ai-badge { background: var(--vf-ai-gradient); color: #fff; border-radius: var(--vf-radius-sm); padding: 2px 7px; font-size: 10px; font-weight: var(--vf-weight-bold); }
-
-.vf-pnl-wrap { background: var(--vf-bg); min-height: 100vh; }
-.vf-pnl-sticky { position: sticky; top: 0; z-index: 20; background: var(--vf-bg); }
-.vf-pnl-toolbar { display: flex; flex-wrap: wrap; gap: var(--vf-space-2); padding: 12px 16px; background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: var(--vf-radius-md) var(--vf-radius-md) 0 0; }
-.vf-pnl-search { display: flex; align-items: center; gap: 6px; background: var(--vf-surface-alt); border: 1px solid var(--vf-border); border-radius: var(--vf-radius); padding: 5px 10px; }
-
-.vf-fchip, .vf-chip, .vf-filter-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: var(--vf-radius);
-  padding: 5px 10px; font-size: var(--vf-size-sm); color: var(--vf-text-dashboard);
-}
-.vf-fchip.active, .vf-filter-btn.has-active { border-color: var(--vf-primary); background: var(--vf-primary-lt); color: var(--vf-primary); }
-
-.vf-ops { background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: 0 0 var(--vf-radius-md) var(--vf-radius-md); }
-.vf-ops-table-wrap { max-width: 100%; }
-.vf-ops-foot { background: var(--vf-surface-alt); border-top: 1px solid var(--vf-border); padding: 10px 16px; }
-
-.vf-src { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--vf-radius-pill); font-size: .7rem; border: 1px solid var(--vf-border); }
-.vf-st, .vf-flag { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--vf-radius-sm); font-size: .7rem; padding: 2px 8px; }
-
-.vf-filter-backdrop, .vf-op-drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.28); }
-.vf-filter-panel, .vf-op-drawer {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  background: var(--vf-surface); box-shadow: var(--vf-shadow-lg);
+.btn-sm,
+.btn-group-sm > .btn {
+  --tblr-btn-padding-y: 5px;
+  --tblr-btn-padding-x: 10px;
+  --tblr-btn-font-size: 0.8125rem;
+  --tblr-btn-line-height: 18px;
 }
 
-/* Keep class names available for migration (no-op shims). */
-.vf-brand-mark, .vf-cal, .vf-card-dividends, .vf-chev, .vf-cs, .vf-cs-add, .vf-cs-badge, .vf-cs-caret,
-.vf-cs-item, .vf-cs-lbl, .vf-cs-list, .vf-cs-pop, .vf-cs-pop-foot, .vf-cs-pop-head, .vf-cs-trigger,
-.vf-delta-down, .vf-delta-up, .vf-filter-chips, .vf-kpi, .vf-hero, .vf-op-drawer, .vf-pnl-kpi,
-.vf-sb, .vf-sb-brand, .vf-sb-child, .vf-sb-co-lbl, .vf-sb-co-nm, .vf-sb-co-sw, .vf-sb-foot,
-.vf-sb-group, .vf-sb-kids, .vf-sb-link, .vf-sb-nav, .vf-section-title, .vf-spark, .vf-tx-cat,
-.vf-tx-table, .vf-active-filters, .vf-amount-in, .vf-amount-out {
-  /* intentionally left as migration hooks */
+.btn:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* Secondary: белая, граница Navy 300, hover #eef1f8. Кнопка без цветового варианта — тоже Secondary;
+   исключены все варианты палитры Tabler и свои (accent), JS-хуки вида btn-reprocess вариантом не считаются. */
+.btn-outline-secondary,
+.btn:where(:not([class*="btn-primary"], [class*="btn-secondary"], [class*="btn-success"], [class*="btn-info"], [class*="btn-warning"], [class*="btn-danger"], [class*="btn-light"], [class*="btn-dark"], [class*="btn-link"], [class*="btn-ghost"], [class*="btn-outline"], [class*="btn-action"], [class*="btn-accent"], [class*="btn-blue"], [class*="btn-azure"], [class*="btn-indigo"], [class*="btn-purple"], [class*="btn-pink"], [class*="btn-red"], [class*="btn-orange"], [class*="btn-yellow"], [class*="btn-lime"], [class*="btn-green"], [class*="btn-teal"], [class*="btn-cyan"], [class*="btn-white"], [class*="btn-facebook"], [class*="btn-twitter"], [class*="btn-google"], [class*="btn-github"])) {
+  --tblr-btn-color: var(--vf-text);
+  --tblr-btn-bg: var(--vf-surface);
+  --tblr-btn-border-color: var(--vf-border-strong);
+  --tblr-btn-hover-color: var(--vf-text);
+  --tblr-btn-hover-bg: var(--vf-hover-bg);
+  --tblr-btn-hover-border-color: var(--vf-border-strong);
+  --tblr-btn-active-color: var(--vf-text);
+  --tblr-btn-active-bg: var(--vf-hover-bg);
+  --tblr-btn-active-border-color: var(--vf-border-strong);
+  --tblr-btn-disabled-color: var(--vf-text);
+  --tblr-btn-disabled-bg: var(--vf-surface);
+  --tblr-btn-disabled-border-color: var(--vf-border-strong);
+}
+
+/* Ghost: прозрачная, hover — Navy 7%. */
+.btn-ghost-secondary {
+  --tblr-btn-color: var(--vf-text);
+  --tblr-btn-hover-color: var(--vf-text);
+  --tblr-btn-hover-bg: var(--vf-ghost-hover-bg);
+  --tblr-btn-active-bg: var(--vf-ghost-hover-bg);
+}
+
+/* Danger outline («В архив», отключение): текст danger, граница и hover — светлые. */
+.btn-outline-danger {
+  --tblr-btn-color: var(--vf-danger-text);
+  --tblr-btn-border-color: var(--vf-danger-border);
+  --tblr-btn-hover-color: var(--vf-danger-text);
+  --tblr-btn-hover-bg: var(--vf-danger-bg);
+  --tblr-btn-hover-border-color: var(--vf-danger-border);
+  --tblr-btn-active-color: var(--vf-danger-text);
+  --tblr-btn-active-bg: var(--vf-danger-bg);
+  --tblr-btn-active-border-color: var(--vf-danger-border);
+  --tblr-btn-disabled-color: var(--vf-danger-text);
+  --tblr-btn-disabled-border-color: var(--vf-danger-border);
+}
+
+.btn-link:hover {
+  color: var(--tblr-link-hover-color);
+}
+
+/* ===== Поля (DS-Controls): граница Navy 300, плейсхолдер Navy 500, фокус — кольцо 3px 20%. */
+.form-control,
+.form-select {
+  border-color: var(--vf-border-strong);
+}
+
+.form-control::placeholder {
+  color: var(--vf-navy-500);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--vf-bg);
+  color: var(--vf-text-muted);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.input-group-flat:focus-within .form-control,
+.input-group-flat:focus-within .input-group-text {
+  border-color: var(--vf-primary) !important;
+  box-shadow: var(--vf-shadow-focus);
+}
+
+.form-label {
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.form-hint {
+  font-size: var(--vf-size-xs);
+  line-height: 1rem;
+  color: var(--vf-text-muted);
+}
+
+.form-label.required::after,
+.col-form-label.required::after,
+.form-check-label.required::after {
+  color: var(--vf-danger-text);
+}
+
+/* ===== Текст. Красный бренда (--tblr-danger) — только бренд и деструктивные кнопки;
+   текст ошибок и danger-статусы — danger-текст. */
+.text-danger {
+  color: var(--vf-danger-text) !important;
+}
+
+/* ===== Бейджи (DS-Feedback): 2px 8px · 12/16 · 600 · радиус 4, только светлые.
+   Один смысл — один цвет: сплошные варианты Tabler сводятся к светлым парам листа. */
+.badge {
+  --tblr-badge-padding-x: 8px;
+  --tblr-badge-padding-y: 2px;
+  --tblr-badge-font-size: 0.75rem;
+  --tblr-badge-font-weight: var(--vf-weight-semibold);
+  --tblr-badge-border-radius: var(--vf-radius-sm);
+  line-height: 1rem;
+}
+
+.badge:is(.bg-success, .bg-success-lt, .bg-green, .bg-green-lt) {
+  background-color: var(--vf-ok-bg) !important;
+  color: var(--vf-ok-text) !important;
+}
+
+.badge:is(.bg-warning, .bg-warning-lt, .bg-yellow, .bg-yellow-lt, .bg-orange, .bg-orange-lt) {
+  background-color: var(--vf-warn-bg) !important;
+  color: var(--vf-warn-text) !important;
+}
+
+.badge:is(.bg-danger, .bg-danger-lt, .bg-red, .bg-red-lt) {
+  background-color: var(--vf-danger-bg) !important;
+  color: var(--vf-danger-text) !important;
+}
+
+.badge:is(.bg-info, .bg-info-lt, .bg-blue, .bg-blue-lt, .bg-primary, .bg-primary-lt) {
+  background-color: var(--vf-info-bg) !important;
+  color: var(--vf-info-text) !important;
+}
+
+/* Нейтральный («В архиве») — Navy 100 и #46525f с листа. */
+.badge:is(.bg-secondary, .bg-secondary-lt, .bg-dark, .bg-light) {
+  background-color: var(--vf-navy-100) !important;
+  color: var(--vf-neutral-text) !important;
+}
+
+/* Статус-точки Tabler задают цвет литералами. */
+.status-success,
+.status-green {
+  --tblr-status-color: var(--vf-ok-text);
+  --tblr-status-color-rgb: var(--tblr-success-rgb);
+}
+
+.status-warning,
+.status-yellow {
+  --tblr-status-color: var(--vf-warn-text);
+  --tblr-status-color-rgb: var(--tblr-warning-rgb);
+}
+
+.status-danger,
+.status-red {
+  --tblr-status-color: var(--vf-danger-text);
+  --tblr-status-color-rgb: var(--tblr-red-rgb);
+}
+
+.status-primary,
+.status-blue,
+.status-info {
+  --tblr-status-color: var(--vf-info-text);
+  --tblr-status-color-rgb: var(--tblr-info-rgb);
+}
+
+/* ===== Баннеры (DS-Feedback): 12px 16px · радиус 4 · рамка; текст в цвет смысла. */
+.alert {
+  --tblr-alert-padding-x: 16px;
+  --tblr-alert-padding-y: 12px;
+  --tblr-alert-border-radius: var(--vf-radius-sm);
+}
+
+.alert-info {
+  --tblr-alert-color: var(--vf-info-text);
+  --tblr-alert-bg: var(--vf-info-bg);
+  --tblr-alert-border-color: var(--vf-info-border);
+  color: var(--vf-info-text);
+}
+
+.alert-success {
+  --tblr-alert-color: var(--vf-ok-text);
+  --tblr-alert-bg: var(--vf-ok-bg);
+  --tblr-alert-border-color: var(--vf-ok-border);
+  color: var(--vf-ok-text);
+}
+
+.alert-warning {
+  --tblr-alert-color: var(--vf-warn-text);
+  --tblr-alert-bg: var(--vf-warn-bg);
+  --tblr-alert-border-color: var(--vf-warn-border);
+  color: var(--vf-warn-text);
+}
+
+.alert-danger {
+  --tblr-alert-color: var(--vf-danger-text);
+  --tblr-alert-bg: var(--vf-danger-bg);
+  --tblr-alert-border-color: var(--vf-danger-border);
+  color: var(--vf-danger-text);
+}
+
+/* ===== Карточки (DS-Tokens): радиус 4, граница Navy 200, тень sm. Модалки — 8, тень lg. */
+.card {
+  --tblr-card-border-radius: var(--vf-radius-sm);
+  --tblr-card-inner-border-radius: calc(var(--vf-radius-sm) - 1px);
+  --tblr-card-border-color: var(--vf-border);
+}
+
+.modal-content {
+  --tblr-modal-border-radius: var(--vf-radius-lg);
+  --tblr-modal-box-shadow: var(--vf-shadow-lg);
+}
+
+/* ===== Меню действий и крошки (DS-Feedback). */
+.dropdown-menu {
+  --tblr-dropdown-link-hover-bg: var(--vf-hover-bg);
+  --tblr-dropdown-box-shadow: var(--vf-shadow-md);
+}
+
+.breadcrumb {
+  --tblr-breadcrumb-link-color: var(--vf-text-muted);
+  --tblr-breadcrumb-item-active-color: var(--vf-text);
+  --tblr-breadcrumb-item-active-font-weight: var(--vf-weight-medium);
+  font-size: var(--vf-size-sm);
+}
+
+/* ===== Пустое состояние (DS-Feedback): иконка в круге Blue 50, заголовок 16/24 · 600. */
+.empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+.empty-icon svg,
+.empty-icon .ti {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.empty-title {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.empty-subtitle {
+  color: var(--vf-text-muted);
+}
+
+.list-group-item.active {
+  border-left-color: var(--vf-primary);
+}
+
+.loader,
+.page-link:hover .page-item-title {
+  color: var(--vf-primary);
 }
