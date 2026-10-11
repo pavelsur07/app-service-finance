@@ -1,21 +1,22 @@
 :root {
-  --vf-ai-gradient: linear-gradient(45deg, #6366F1 0%, #A855F7 100%);
-  --vf-ai-indigo: #6366F1;
-  --vf-ai-purple: #A855F7;
-  --vf-bg: #F5F7FB;
-  --vf-border: #E5E7EB;
-  --vf-border-strong: #D1D5DB;
-  --vf-brand-navy: #0A1548;
-  --vf-brand-navy-900: #050B2B;
-  --vf-brand-red: #FF1F1F;
-  --vf-brand-red-soft: rgba(255, 31, 31, 0.08);
+  --vf-ai-gradient: linear-gradient(45deg, #6366F1 0%, #A855F7 100%); /* deprecated: вне DS, потребителей нет */
+  --vf-ai-indigo: #6366F1; /* deprecated: вне DS, потребителей нет */
+  --vf-ai-purple: #A855F7; /* deprecated: вне DS, потребителей нет */
+  --vf-bg: #f7f8fc; /* DS: фон страницы */
+  --vf-border: #dde1ec; /* DS: border */
+  --vf-border-strong: #c3c8d6; /* DS: border strong */
+  --vf-brand-navy: #0b1020; /* DS: Navy 900. TODO(ds): отдельного brand navy в DS нет */
+  --vf-brand-navy-900: var(--vf-navy-900); /* deprecated: алиас Navy 900 */
+  --vf-brand-red: #b00020; /* DS: красный бренда — только бренд и деструктивные действия */
+  --vf-brand-red-soft: color-mix(in srgb, var(--vf-brand-red) 8%, transparent); /* TODO(ds): фона danger в DS нет */
+  /* TODO(ds): палитры графиков в DS нет — значения прежние. */
   --vf-chart-1: #206BC4;
   --vf-chart-2: #D63939;
   --vf-chart-3: #2FB344;
   --vf-chart-4: #F59F00;
   --vf-chart-5: #AE3EC9;
   --vf-chart-6: #17A2B8;
-  --vf-cyan: #17A2B8;
+  --vf-cyan: #17A2B8; /* deprecated: вне DS, потребителей нет */
   --vf-duration: 180ms;
   --vf-duration-fast: 120ms;
   --vf-duration-slow: 320ms;
@@ -25,28 +26,28 @@
   --vf-font-numeric: 'Inter', ui-monospace, monospace;
   --vf-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'San Francisco',
     'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  --vf-green: #2FB344;
-  --vf-green-bg: #F0FDF4;
-  --vf-green-border: #BBF7D0;
-  --vf-green-lt: #EAF7EC;
-  --vf-indigo: #6366F1;
+  --vf-green: #1d7a30; /* DS: OK-текст */
+  --vf-green-bg: var(--vf-green-lt); /* deprecated: алиас --vf-green-lt */
+  --vf-green-border: color-mix(in srgb, var(--vf-green) 25%, var(--vf-green-lt)); /* TODO(ds) */
+  --vf-green-lt: #e4f5e7; /* DS: OK-фон */
+  --vf-indigo: #6366F1; /* deprecated: вне DS, потребителей нет */
   --vf-leading-normal: 1.5;
   --vf-leading-snug: 1.35;
   --vf-leading-tight: 1.2;
-  --vf-navy: #0A1548;
-  --vf-navy-900: #050B2B;
-  --vf-primary: #206BC4;
-  --vf-primary-lt: #E9F0F9;
-  --vf-purple: #AE3EC9;
+  --vf-navy: var(--vf-brand-navy); /* deprecated: алиас --vf-brand-navy */
+  --vf-navy-900: #0b1020; /* DS: Navy 900 — заголовки и основной текст */
+  --vf-primary: #1d4ed8; /* DS: Action blue — основные действия, ссылки, активное состояние */
+  --vf-primary-lt: color-mix(in srgb, var(--vf-primary) 10%, #ffffff); /* TODO(ds) */
+  --vf-purple: #AE3EC9; /* deprecated: вне DS, потребителей нет */
   --vf-radius: 6px;
   --vf-radius-lg: 16px;
   --vf-radius-md: 8px;
   --vf-radius-pill: 999px;
   --vf-radius-sm: 4px;
-  --vf-red: #D63939;
-  --vf-red-lt: #F9E7E7;
+  --vf-red: var(--vf-danger-text); /* deprecated: алиас --vf-danger-text */
+  --vf-red-lt: var(--vf-brand-red-soft); /* deprecated, TODO(ds): фона danger в DS нет */
   --vf-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-  --vf-shadow-focus: 0 0 0 0.25rem rgba(32, 107, 196, 0.25);
+  --vf-shadow-focus: 0 0 0 0.25rem color-mix(in srgb, var(--vf-primary) 25%, transparent); /* TODO(ds): фокус-кольцо */
   --vf-shadow-lg: 0 12px 30px rgba(15, 23, 42, 0.05);
   --vf-shadow-md: 0 8px 24px rgba(10, 21, 72, 0.06);
   --vf-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -69,12 +70,12 @@
   --vf-space-7: 3rem;
   --vf-space-8: 4rem;
   --vf-surface: #FFFFFF;
-  --vf-surface-alt: #F9FAFB;
-  --vf-text: #121212;
-  --vf-text-dashboard: #1E293B;
-  --vf-text-disabled: #9CA3AF;
-  --vf-text-muted: #4B5563;
-  --vf-text-secondary: #6B7280;
+  --vf-surface-alt: var(--vf-bg); /* TODO(ds): второго фона поверхности в DS нет */
+  --vf-text: var(--vf-navy-900); /* DS: основной текст */
+  --vf-text-dashboard: var(--vf-text); /* deprecated: алиас --vf-text */
+  --vf-text-disabled: #9CA3AF; /* TODO(ds): disabled-текста в DS нет */
+  --vf-text-muted: #525b78; /* DS: Muted — вторичный текст */
+  --vf-text-secondary: var(--vf-text-muted); /* deprecated: алиас --vf-text-muted */
   --vf-tracking-wide: 0.04em;
   --vf-tracking-wider: 0.08em;
   --vf-weight-bold: 700;
@@ -82,6 +83,63 @@
   --vf-weight-medium: 500;
   --vf-weight-regular: 400;
   --vf-weight-semibold: 600;
-  --vf-yellow: #F59F00;
-  --vf-yellow-lt: #FDF4E3;
+  --vf-yellow: #9a4a00; /* DS: Warn-текст */
+  --vf-yellow-lt: #fff4e5; /* DS: Warn-фон */
+
+  /* DS «Ваш Финдир»: семантические имена. Новый код берёт их, а не --vf-red/green/yellow. */
+  --vf-danger-text: #9a001b;
+  --vf-ok-text: var(--vf-green);
+  --vf-ok-bg: var(--vf-green-lt);
+  --vf-warn-text: var(--vf-yellow);
+  --vf-warn-bg: var(--vf-yellow-lt);
+  --vf-brand: var(--vf-brand-navy);
+  --vf-brand-05: color-mix(in srgb, var(--vf-brand) 5%, transparent);
+}
+
+/*
+ * Слой DS поверх Tabler 1.2.0 (CDN). Файл подключается после tabler.min.css,
+ * селектор совпадает с Tabler: [data-bs-theme=light] стоит на сайдбаре и иначе
+ * вернул бы там палитру Tabler. Производные -lt/-darken Tabler считает через
+ * color-mix от базового цвета сам; -lt для OK/Warn заданы явно из DS.
+ */
+:root,
+[data-bs-theme=light] {
+  --tblr-font-sans-serif: var(--vf-font-sans);
+
+  --tblr-body-color: var(--vf-text);
+  --tblr-body-color-rgb: 11, 16, 32;
+  --tblr-emphasis-color: var(--vf-text);
+  --tblr-emphasis-color-rgb: 11, 16, 32;
+  --tblr-body-bg: var(--vf-bg);
+  --tblr-body-bg-rgb: 247, 248, 252;
+  --tblr-border-color: var(--vf-border);
+  --tblr-border-active-color: var(--vf-border-strong);
+
+  --tblr-muted: var(--vf-text-muted);
+  --tblr-muted-rgb: 82, 91, 120;
+  --tblr-secondary: var(--vf-text-muted);
+  --tblr-secondary-rgb: 82, 91, 120;
+  --tblr-secondary-color: var(--vf-text-muted);
+  --tblr-secondary-color-rgb: 82, 91, 120;
+
+  --tblr-primary: var(--vf-primary);
+  --tblr-primary-rgb: 29, 78, 216;
+  --tblr-link-color: var(--vf-primary);
+  --tblr-link-color-rgb: 29, 78, 216;
+  /* TODO(ds): hover ссылок в DS нет — затемнение Action blue. */
+  --tblr-link-hover-color: color-mix(in srgb, var(--vf-primary) 80%, #000000);
+  --tblr-link-hover-color-rgb: 23, 62, 173;
+
+  --tblr-danger: var(--vf-brand-red);
+  --tblr-danger-rgb: 176, 0, 32;
+
+  --tblr-success: var(--vf-ok-text);
+  --tblr-success-rgb: 29, 122, 48;
+  --tblr-success-lt: var(--vf-ok-bg);
+  --tblr-success-lt-rgb: 228, 245, 231;
+
+  --tblr-warning: var(--vf-warn-text);
+  --tblr-warning-rgb: 154, 74, 0;
+  --tblr-warning-lt: var(--vf-warn-bg);
+  --tblr-warning-lt-rgb: 255, 244, 229;
 }
