@@ -142,4 +142,26 @@
   --tblr-warning-rgb: 154, 74, 0;
   --tblr-warning-lt: var(--vf-warn-bg);
   --tblr-warning-lt-rgb: 255, 244, 229;
+
+  /* Именованная палитра Tabler, которой свёрстаны статусы (bg-green-lt, text-red …),
+     сводится к семантикам DS: green → OK, red → danger-текст, yellow/orange → Warn,
+     blue → Action blue. TODO(ds): info-статуса в DS нет — azure/cyan прежние. */
+  --tblr-blue: var(--vf-primary);
+  --tblr-blue-rgb: 29, 78, 216;
+  --tblr-green: var(--vf-ok-text);
+  --tblr-green-rgb: 29, 122, 48;
+  --tblr-green-lt: var(--vf-ok-bg);
+  --tblr-red: var(--vf-danger-text);
+  --tblr-red-rgb: 154, 0, 27;
+  --tblr-yellow: var(--vf-warn-text);
+  --tblr-yellow-rgb: 154, 74, 0;
+  --tblr-yellow-lt: var(--vf-warn-bg);
+  --tblr-orange: var(--vf-warn-text);
+  --tblr-orange-rgb: 154, 74, 0;
+  --tblr-orange-lt: var(--vf-warn-bg);
+
+  --tblr-form-invalid-color: var(--vf-danger-text);
+  --tblr-form-invalid-border-color: var(--vf-danger-text);
+  --tblr-form-valid-color: var(--vf-ok-text);
+  --tblr-form-valid-border-color: var(--vf-ok-text);
 }
