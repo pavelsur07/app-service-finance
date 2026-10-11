@@ -5,11 +5,11 @@
   --vf-bg: #f7f8fc; /* DS: фон страницы */
   --vf-border: #dde1ec; /* DS: border */
   --vf-border-strong: #c3c8d6; /* DS: border strong */
-  --vf-brand-navy: #0b1020; /* DS: Navy 900. TODO(ds): отдельного brand navy в DS нет */
+  --vf-brand-navy: var(--vf-navy-900); /* DS-Tokens: бренд-цвет структуры — Navy 900 */
   --vf-brand-navy-900: var(--vf-navy-900); /* deprecated: алиас Navy 900 */
   --vf-brand-red: #b00020; /* DS: красный бренда — только бренд и деструктивные действия */
-  --vf-brand-red-soft: color-mix(in srgb, var(--vf-brand-red) 8%, transparent); /* TODO(ds): фона danger в DS нет */
-  /* TODO(ds): палитры графиков в DS нет — значения прежние. */
+  --vf-brand-red-soft: var(--vf-danger-bg); /* deprecated: алиас --vf-danger-bg */
+  /* TODO(ds): палитры графиков нет и на листах DS — значения прежние. */
   --vf-chart-1: #206BC4;
   --vf-chart-2: #D63939;
   --vf-chart-3: #2FB344;
@@ -28,7 +28,7 @@
     'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --vf-green: #1d7a30; /* DS: OK-текст */
   --vf-green-bg: var(--vf-green-lt); /* deprecated: алиас --vf-green-lt */
-  --vf-green-border: color-mix(in srgb, var(--vf-green) 25%, var(--vf-green-lt)); /* TODO(ds) */
+  --vf-green-border: #b4e0bc; /* DS-Feedback: граница success-алерта */
   --vf-green-lt: #e4f5e7; /* DS: OK-фон */
   --vf-indigo: #6366F1; /* deprecated: вне DS, потребителей нет */
   --vf-leading-normal: 1.5;
@@ -37,26 +37,26 @@
   --vf-navy: var(--vf-brand-navy); /* deprecated: алиас --vf-brand-navy */
   --vf-navy-900: #0b1020; /* DS: Navy 900 — заголовки и основной текст */
   --vf-primary: #1d4ed8; /* DS: Action blue — основные действия, ссылки, активное состояние */
-  --vf-primary-lt: color-mix(in srgb, var(--vf-primary) 10%, #ffffff); /* TODO(ds) */
+  --vf-primary-lt: #e8effd; /* DS: Blue 50 — выбранное, активный сегмент */
   --vf-purple: #AE3EC9; /* deprecated: вне DS, потребителей нет */
-  --vf-radius: 6px;
-  --vf-radius-lg: 16px;
-  --vf-radius-md: 8px;
+  --vf-radius: 4px; /* DS: --r-sm — кнопки, поля, карточки */
+  --vf-radius-lg: 8px; /* DS: --r-lg — модальные окна */
+  --vf-radius-md: 6px; /* DS: --r-md — аватар организации */
   --vf-radius-pill: 999px;
   --vf-radius-sm: 4px;
   --vf-red: var(--vf-danger-text); /* deprecated: алиас --vf-danger-text */
-  --vf-red-lt: var(--vf-brand-red-soft); /* deprecated, TODO(ds): фона danger в DS нет */
-  --vf-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-  --vf-shadow-focus: 0 0 0 0.25rem color-mix(in srgb, var(--vf-primary) 25%, transparent); /* TODO(ds): фокус-кольцо */
-  --vf-shadow-lg: 0 12px 30px rgba(15, 23, 42, 0.05);
-  --vf-shadow-md: 0 8px 24px rgba(10, 21, 72, 0.06);
-  --vf-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --vf-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --vf-red-lt: var(--vf-danger-bg); /* deprecated: алиас --vf-danger-bg */
+  --vf-shadow: var(--vf-shadow-sm); /* deprecated: алиас --vf-shadow-sm */
+  --vf-shadow-focus: 0 0 0 3px rgba(29, 78, 216, 0.2); /* DS-Controls: фокус поля — кольцо 3px, 20% */
+  --vf-shadow-lg: 0 12px 32px rgba(11, 16, 32, 0.18); /* DS: модальные окна, панели */
+  --vf-shadow-md: 0 4px 12px rgba(11, 16, 32, 0.12); /* DS: выпадающие меню */
+  --vf-shadow-sm: 0 1px 2px rgba(11, 16, 32, 0.04); /* DS: карточки */
+  --vf-shadow-xs: var(--vf-shadow-sm); /* deprecated: алиас --vf-shadow-sm */
   --vf-size-base: 0.875rem;
   --vf-size-display: 2.4rem;
-  --vf-size-h1: 2rem;
-  --vf-size-h2: 1.5rem;
-  --vf-size-h3: 1.25rem;
+  --vf-size-h1: 1.5rem; /* DS: H1 24/32 */
+  --vf-size-h2: 1.125rem; /* DS: H2 18/24 */
+  --vf-size-h3: 1rem; /* DS: H3 16/24 */
   --vf-size-lg: 1.125rem;
   --vf-size-md: 1rem;
   --vf-size-sm: 0.8125rem;
@@ -70,10 +70,10 @@
   --vf-space-7: 3rem;
   --vf-space-8: 4rem;
   --vf-surface: #FFFFFF;
-  --vf-surface-alt: var(--vf-bg); /* TODO(ds): второго фона поверхности в DS нет */
+  --vf-surface-alt: var(--vf-navy-50); /* DS: Navy 50 — шапка таблицы, hover */
   --vf-text: var(--vf-navy-900); /* DS: основной текст */
   --vf-text-dashboard: var(--vf-text); /* deprecated: алиас --vf-text */
-  --vf-text-disabled: #9CA3AF; /* TODO(ds): disabled-текста в DS нет */
+  --vf-text-disabled: var(--vf-text-muted); /* DS-Controls: недоступное поле — приглушённый текст */
   --vf-text-muted: #525b78; /* DS: Muted — вторичный текст */
   --vf-text-secondary: var(--vf-text-muted); /* deprecated: алиас --vf-text-muted */
   --vf-tracking-wide: 0.04em;
@@ -88,6 +88,24 @@
 
   /* DS «Ваш Финдир»: семантические имена. Новый код берёт их, а не --vf-red/green/yellow. */
   --vf-danger-text: #9a001b;
+  --vf-danger-bg: #fdecee;
+  --vf-danger-border: #f0c2c9;
+  --vf-ok-border: var(--vf-green-border);
+  --vf-warn-border: #f5d3a8;
+  --vf-info-text: #164f94;
+  --vf-info-bg: #e3eefb;
+  --vf-info-border: #b9d3f2;
+  --vf-primary-hover: #1a40b0; /* DS: Blue 700 — hover, нажатие */
+  --vf-brand-red-hover: #8f0019; /* DS: Red 700 — hover опасной кнопки */
+
+  /* Нейтральная шкала Navy (DS-Tokens). */
+  --vf-navy-700: #2b3350; /* вторичный тёмный */
+  --vf-navy-500: #6a738f; /* плейсхолдер */
+  --vf-navy-100: #e8ecf7; /* чипы, выбранная строка, счётчик */
+  --vf-navy-50: #f4f6fb; /* шапка таблицы, hover */
+  --vf-hover-bg: #eef1f8; /* DS-Controls: hover вторичной кнопки и пункта меню */
+  --vf-ghost-hover-bg: rgba(11, 16, 32, 0.07); /* DS-Controls: hover Ghost-кнопки */
+  --vf-neutral-text: #46525f; /* DS-Feedback: нейтральный бейдж «В архиве» */
   --vf-ok-text: var(--vf-green);
   --vf-ok-bg: var(--vf-green-lt);
   --vf-warn-text: var(--vf-yellow);
@@ -114,6 +132,23 @@
   --tblr-body-bg-rgb: 247, 248, 252;
   --tblr-border-color: var(--vf-border);
   --tblr-border-active-color: var(--vf-border-strong);
+  --tblr-border-color-translucent: var(--vf-border);
+
+  /* DS-Tokens: радиусы 4 / 6 / 8, тени sm / md / lg, заголовки H1–H3. */
+  --tblr-border-radius-sm: var(--vf-radius-sm);
+  --tblr-border-radius: var(--vf-radius);
+  --tblr-border-radius-md: var(--vf-radius);
+  --tblr-border-radius-lg: var(--vf-radius-lg);
+  --tblr-shadow-card: var(--vf-shadow-sm);
+  --tblr-box-shadow-card: var(--vf-shadow-sm);
+  --tblr-shadow-dropdown: var(--vf-shadow-md);
+  --tblr-box-shadow-dropdown: var(--vf-shadow-md);
+  --tblr-font-size-h1: var(--vf-size-h1);
+  --tblr-line-height-h1: 2rem;
+  --tblr-font-size-h2: var(--vf-size-h2);
+  --tblr-line-height-h2: 1.5rem;
+  --tblr-font-size-h3: var(--vf-size-h3);
+  --tblr-line-height-h3: 1.5rem;
 
   --tblr-muted: var(--vf-text-muted);
   --tblr-muted-rgb: 82, 91, 120;
@@ -126,12 +161,16 @@
   --tblr-primary-rgb: 29, 78, 216;
   --tblr-link-color: var(--vf-primary);
   --tblr-link-color-rgb: 29, 78, 216;
-  /* TODO(ds): hover ссылок в DS нет — затемнение Action blue. */
-  --tblr-link-hover-color: color-mix(in srgb, var(--vf-primary) 80%, #000000);
-  --tblr-link-hover-color-rgb: 23, 62, 173;
+  --tblr-link-hover-color: var(--vf-primary-hover);
+  --tblr-link-hover-color-rgb: 26, 64, 176;
+  --tblr-primary-darken: var(--vf-primary-hover);
+  --tblr-primary-fg: var(--vf-surface);
+  --tblr-danger-fg: var(--vf-surface);
 
   --tblr-danger: var(--vf-brand-red);
   --tblr-danger-rgb: 176, 0, 32;
+  --tblr-danger-darken: var(--vf-brand-red-hover);
+  --tblr-danger-lt: var(--vf-danger-bg);
 
   --tblr-success: var(--vf-ok-text);
   --tblr-success-rgb: 29, 122, 48;
@@ -143,25 +182,41 @@
   --tblr-warning-lt: var(--vf-warn-bg);
   --tblr-warning-lt-rgb: 255, 244, 229;
 
-  /* Именованная палитра Tabler, которой свёрстаны статусы (bg-green-lt, text-red …),
-     сводится к семантикам DS: green → OK, red → danger-текст, yellow/orange → Warn,
-     blue → Action blue. TODO(ds): info-статуса в DS нет — azure/cyan прежние. */
-  --tblr-blue: var(--vf-primary);
-  --tblr-blue-rgb: 29, 78, 216;
+  /* Именованная палитра Tabler, которой свёрстаны статусы и категории (bg-green-lt,
+     text-red …), сводится к DS-Tokens / DS-Feedback: green → OK, red → danger,
+     yellow/orange → Warn, info и blue → Info, azure/teal/purple — категориальные. */
   --tblr-green: var(--vf-ok-text);
   --tblr-green-rgb: 29, 122, 48;
   --tblr-green-lt: var(--vf-ok-bg);
   --tblr-red: var(--vf-danger-text);
   --tblr-red-rgb: 154, 0, 27;
+  --tblr-red-lt: var(--vf-danger-bg);
   --tblr-yellow: var(--vf-warn-text);
   --tblr-yellow-rgb: 154, 74, 0;
   --tblr-yellow-lt: var(--vf-warn-bg);
   --tblr-orange: var(--vf-warn-text);
   --tblr-orange-rgb: 154, 74, 0;
   --tblr-orange-lt: var(--vf-warn-bg);
+  --tblr-info: var(--vf-info-text);
+  --tblr-info-rgb: 22, 79, 148;
+  --tblr-info-lt: var(--vf-info-bg);
+  --tblr-blue: var(--vf-info-text);
+  --tblr-blue-rgb: 22, 79, 148;
+  --tblr-blue-lt: var(--vf-info-bg);
+  --tblr-azure: #0b5d85;
+  --tblr-azure-rgb: 11, 93, 133;
+  --tblr-azure-lt: #e0f2fb;
+  --tblr-teal: #0a6650;
+  --tblr-teal-rgb: 10, 102, 80;
+  --tblr-teal-lt: #dff5ef;
+  --tblr-purple: #7a2a93;
+  --tblr-purple-rgb: 122, 42, 147;
+  --tblr-purple-lt: #f4e9f8;
+  --tblr-secondary-lt: var(--vf-navy-100);
 
+  /* DS-Controls: граница поля с ошибкой — Red 600, текст ошибки — danger-текст. */
   --tblr-form-invalid-color: var(--vf-danger-text);
-  --tblr-form-invalid-border-color: var(--vf-danger-text);
+  --tblr-form-invalid-border-color: var(--vf-brand-red);
   --tblr-form-valid-color: var(--vf-ok-text);
   --tblr-form-valid-border-color: var(--vf-ok-text);
 }

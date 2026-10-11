@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Кнопки и поля</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:#0b1020}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:16px;color:#525b78}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec h2{margin:0;font-size:18px;line-height:24px;font-weight:600}
+.sec p{margin:0;color:#525b78}
+.grp{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#525b78}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid #c3c8d6;background:#fff;cursor:pointer;font-weight:500;white-space:nowrap;line-height:20px}
+.btn.sm{height:30px;padding:0 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.f{outline:2px solid #1d4ed8;outline-offset:2px}
+.btn:hover:not(:disabled),.btn.h{background:#eef1f8}
+.btn-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.btn-primary:hover:not(:disabled),.btn-primary.h{background:#1a40b0}
+.btn-ghost{background:transparent;border-color:transparent}
+.btn-ghost:hover:not(:disabled),.btn-ghost.h{background:rgba(11,16,32,.07)}
+.btn-danger{background:#b00020;border-color:#b00020;color:#fff}
+.btn-danger:hover:not(:disabled),.btn-danger.h{background:#8f0019}
+.btn-danger-o{color:#9a001b;border-color:#f0c2c9}
+.btn-danger-o:hover:not(:disabled),.btn-danger-o.h{background:#fdecee}
+.spin{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.field{width:100%;height:36px;padding:0 12px;border:1px solid #c3c8d6;border-radius:4px;background:#fff}
+.field::placeholder{color:#6a738f}
+.field:disabled{background:#f7f8fc;color:#525b78;cursor:not-allowed}
+.field.focus{border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78,216,.2)}
+.field.err{border-color:#b00020}
+.lbl{font-size:13px;font-weight:600}
+.hint{font-size:12px;line-height:16px;color:#525b78}
+.cell{display:flex;align-items:center;justify-content:flex-start}
+</style>
+</helmet>
+
+<div style="width:1240px;height:1700px;padding:56px 64px;display:flex;flex-direction:column;gap:56px;background:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:#0b1020">
+
+  <header style="display:flex;flex-direction:column;gap:8px;padding-bottom:32px;border-bottom:1px solid #dde1ec">
+    <div class="grp">Ваш Финдир · Design System · v0.1</div>
+    <h1 style="margin:0;font-size:32px;line-height:40px;font-weight:600">Кнопки и поля</h1>
+    <p style="margin:0;color:#525b78;max-width:720px">Все интерактивные элементы — настоящие <span class="mono" style="font-size:13px">button</span>, <span class="mono" style="font-size:13px">input</span>, <span class="mono" style="font-size:13px">select</span>. Высота 36 px (md) и 30 px (sm); фокус всегда виден.</p>
+  </header>
+
+  <!-- BUTTONS -->
+  <section class="sec">
+    <div><h2>Кнопки</h2><p>Одно главное действие на экран (Primary). Остальные — Secondary или Ghost. Опасные действия — отдельным вариантом и только после подтверждения.</p></div>
+
+    <div style="display:grid;grid-template-columns:160px repeat(5,minmax(0,1fr));gap:16px 12px;align-items:center">
+      <div class="grp">Вариант</div><div class="grp">Default</div><div class="grp">Hover</div><div class="grp">Focus</div><div class="grp">Disabled</div><div class="grp">Loading</div>
+
+      <div><b style="font-weight:600">Primary</b><div class="mono">главное действие</div></div>
+      <div class="cell"><button class="btn btn-primary" type="button">Сохранить</button></div>
+      <div class="cell"><button class="btn btn-primary h" type="button">Сохранить</button></div>
+      <div class="cell"><button class="btn btn-primary f" type="button">Сохранить</button></div>
+      <div class="cell"><button class="btn btn-primary" type="button" disabled>Сохранить</button></div>
+      <div class="cell"><button class="btn btn-primary" type="button" aria-busy="true"><svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 019 9"/></svg>Сохранение</button></div>
+
+      <div><b style="font-weight:600">Secondary</b><div class="mono">второстепенное</div></div>
+      <div class="cell"><button class="btn" type="button">Экспорт</button></div>
+      <div class="cell"><button class="btn h" type="button">Экспорт</button></div>
+      <div class="cell"><button class="btn f" type="button">Экспорт</button></div>
+      <div class="cell"><button class="btn" type="button" disabled>Экспорт</button></div>
+      <div class="cell"><button class="btn" type="button" aria-busy="true"><svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 019 9"/></svg>Экспорт</button></div>
+
+      <div><b style="font-weight:600">Ghost</b><div class="mono">третичное, в тулбарах</div></div>
+      <div class="cell"><button class="btn btn-ghost" type="button">Отмена</button></div>
+      <div class="cell"><button class="btn btn-ghost h" type="button">Отмена</button></div>
+      <div class="cell"><button class="btn btn-ghost f" type="button">Отмена</button></div>
+      <div class="cell"><button class="btn btn-ghost" type="button" disabled>Отмена</button></div>
+      <div class="cell"></div>
+
+      <div><b style="font-weight:600">Danger</b><div class="mono">необратимое</div></div>
+      <div class="cell"><button class="btn btn-danger" type="button">Удалить</button></div>
+      <div class="cell"><button class="btn btn-danger h" type="button">Удалить</button></div>
+      <div class="cell"><button class="btn btn-danger f" type="button">Удалить</button></div>
+      <div class="cell"><button class="btn btn-danger" type="button" disabled>Удалить</button></div>
+      <div class="cell"></div>
+
+      <div><b style="font-weight:600">Danger outline</b><div class="mono">архив, отключение</div></div>
+      <div class="cell"><button class="btn btn-danger-o" type="button">В архив</button></div>
+      <div class="cell"><button class="btn btn-danger-o h" type="button">В архив</button></div>
+      <div class="cell"><button class="btn btn-danger-o f" type="button">В архив</button></div>
+      <div class="cell"><button class="btn btn-danger-o" type="button" disabled>В архив</button></div>
+      <div class="cell"></div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start;padding-top:8px">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Размеры</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-primary" type="button">Md · 36</button>
+          <button class="btn btn-primary sm" type="button">Sm · 30</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">С иконкой</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-primary" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить</button>
+          <button class="btn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 9l5-5 5 5M12 4v12"/></svg>Импорт</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Только иконка</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button class="btn btn-ghost" type="button" aria-label="Редактировать" style="width:32px;height:32px;padding:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button>
+          <button class="btn btn-ghost" type="button" aria-label="Ещё" style="width:32px;height:32px;padding:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Текстовая ссылка-действие</div>
+        <button type="button" style="background:none;border:0;padding:0;color:#1d4ed8;font-weight:500;font-size:13px;cursor:pointer;text-align:left">Применить</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Сегментный переключатель</div>
+        <div role="group" aria-label="Пример группировки" style="display:flex;border:1px solid #c3c8d6;border-radius:4px;overflow:hidden">
+          <button type="button" aria-pressed="true" style="height:34px;padding:0 12px;border:0;background:#e8effd;color:#1d4ed8;font-weight:600;cursor:pointer">Тип</button>
+          <button type="button" aria-pressed="false" style="height:34px;padding:0 12px;border:0;border-left:1px solid #c3c8d6;background:#fff;font-weight:500;cursor:pointer">Категория</button>
+          <button type="button" aria-pressed="false" style="height:34px;padding:0 12px;border:0;border-left:1px solid #c3c8d6;background:#fff;font-weight:500;cursor:pointer">Без групп</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INPUTS -->
+  <section class="sec">
+    <div><h2>Поля ввода</h2><p>Подпись всегда над полем и связана с ним. Подсказка — под полем. Ошибка заменяет подсказку, показывается после ухода из поля, а не во время ввода.</p></div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 32px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f1">Наименование</label>
+        <input id="f1" class="field" type="text" placeholder="Название организации или ФИО">
+        <div class="hint">Default · без реквизитов в названии</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f2">Наименование</label>
+        <input id="f2" class="field focus" type="text" value="АО «АЛЬФА-БАНК»">
+        <div class="hint">Focus · кольцо 3 px, 20%</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f3">ИНН <span style="color:#9a001b">*</span></label>
+        <input id="f3" class="field err" type="text" inputmode="numeric" value="77281689" aria-invalid="true" aria-describedby="f3e">
+        <div id="f3e" class="hint" style="color:#9a001b">Error · ИНН содержит 10 или 12 цифр</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f4">КПП</label>
+        <input id="f4" class="field" type="text" value="772801001" disabled>
+        <div class="hint">Disabled · заполняется автоматически</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f5">Поиск</label>
+        <div style="position:relative">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#525b78" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:12px;top:10px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="f5" class="field" type="search" placeholder="Название или ИНН" style="padding-left:36px">
+        </div>
+        <div class="hint">С иконкой · поиск применяется сразу</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f6">Сумма</label>
+        <div style="position:relative">
+          <input id="f6" class="field" type="text" inputmode="decimal" value="12 480,00" style="text-align:right;padding-right:36px;font-variant-numeric:tabular-nums">
+          <span aria-hidden="true" style="position:absolute;right:12px;top:8px;color:#525b78">₽</span>
+        </div>
+        <div class="hint">Сумма · по правому краю, разряды пробелом</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f7">Категория</label>
+        <select id="f7" class="field">
+          <option>Банк</option>
+          <option>Лизинг</option>
+          <option>Страхование</option>
+        </select>
+        <div class="hint">Select · до 7 значений, иначе поиск в списке</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f8">Период</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input id="f8" class="field" type="text" value="01.10.2026" aria-label="Период с">
+          <span aria-hidden="true" style="color:#525b78">—</span>
+          <input class="field" type="text" value="31.10.2026" aria-label="Период по">
+        </div>
+        <div class="hint">Период · формат ДД.ММ.ГГГГ</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="lbl" for="f9">Комментарий</label>
+        <textarea id="f9" rows="3" placeholder="Заметка для команды" style="width:100%;padding:8px 12px;border:1px solid #c3c8d6;border-radius:4px;resize:vertical"></textarea>
+        <div class="hint">Textarea · от 3 строк</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHOICE -->
+  <section class="sec">
+    <div><h2>Выбор и переключатели</h2><p>Чекбокс — выбор нескольких, радио — один из списка, переключатель — действие вступает в силу сразу.</p></div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="grp">Чекбокс</div>
+        <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" style="width:16px;height:16px;accent-color:#1d4ed8;margin:0">Не выбран</label>
+        <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" checked style="width:16px;height:16px;accent-color:#1d4ed8;margin:0">Выбран</label>
+        <div style="display:flex;align-items:center;gap:10px"><span aria-hidden="true" style="width:16px;height:16px;border-radius:2px;background:#1d4ed8;display:inline-flex;align-items:center;justify-content:center"><span style="width:8px;height:2px;background:#fff"></span></span>Частично выбраны (в заголовке таблицы)</div>
+        <label style="display:flex;align-items:center;gap:10px;color:#525b78"><input type="checkbox" disabled style="width:16px;height:16px;margin:0">Недоступен</label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="grp">Радио</div>
+        <label style="display:flex;align-items:center;gap:10px"><input type="radio" name="r" checked style="width:16px;height:16px;accent-color:#1d4ed8;margin:0">Юр. лицо</label>
+        <label style="display:flex;align-items:center;gap:10px"><input type="radio" name="r" style="width:16px;height:16px;accent-color:#1d4ed8;margin:0">ИП</label>
+        <label style="display:flex;align-items:center;gap:10px;color:#525b78"><input type="radio" name="r" disabled style="width:16px;height:16px;margin:0">Физ. лицо (недоступно)</label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="grp">Переключатель</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button type="button" role="switch" aria-checked="true" aria-label="Показывать архив" style="width:36px;height:20px;padding:2px;border:0;border-radius:10px;background:#1d4ed8;display:flex;justify-content:flex-end;cursor:pointer"><span style="width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+          <span>Включён</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button type="button" role="switch" aria-checked="false" aria-label="Автоприменение названий" style="width:36px;height:20px;padding:2px;border:0;border-radius:10px;background:#c4cad1;display:flex;justify-content:flex-start;cursor:pointer"><span style="width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+          <span>Выключен</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":1700}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

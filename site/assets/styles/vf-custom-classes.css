@@ -1,33 +1,108 @@
 /*
  * Надстройки DS «Ваш Финдир» над компонентами Tabler 1.2.0 (легаси-слой).
- * Палитра — в design-tokens.css; здесь только места, где Tabler хардкодит
- * свою палитру или где правило DS расходится с семантикой Tabler-класса.
+ * Эталон — docs/design-system/sheets/ (DS-Controls, DS-Feedback). Палитра —
+ * в design-tokens.css; здесь только места, где Tabler расходится с листами.
  * Своих компонентов не вводим: разметка остаётся на классах Tabler.
  */
 
-/* Красный бренда (--tblr-danger) — только бренд и деструктивные кнопки.
-   Текст ошибок, отрицательные суммы, danger-статусы и алерты — danger-текст DS. */
-.text-danger {
-  color: var(--vf-danger-text) !important;
+/* ===== Кнопки (DS-Controls): md 36px · 0 14px, sm 30px · 0 10px · 13px, радиус 4. */
+.btn {
+  --tblr-btn-padding-x: 14px;
+  --tblr-btn-border-radius: var(--vf-radius-sm);
+  --tblr-btn-disabled-opacity: 0.5;
 }
 
-.alert-danger {
-  --tblr-alert-color: var(--vf-danger-text);
+.btn-sm,
+.btn-group-sm > .btn {
+  --tblr-btn-padding-y: 5px;
+  --tblr-btn-padding-x: 10px;
+  --tblr-btn-font-size: 0.8125rem;
+  --tblr-btn-line-height: 18px;
 }
 
-.bg-danger-lt {
-  color: var(--vf-danger-text) !important;
+.btn:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
-/* TODO(ds): сплошного danger-бейджа в DS нет — берём danger-текст как фон. */
-.badge.bg-danger {
-  background-color: var(--vf-danger-text) !important;
+/* Secondary: белая, граница Navy 300, hover #eef1f8. Кнопка без варианта — тоже Secondary. */
+.btn-outline-secondary,
+.btn:where(:not([class*="btn-primary"], [class*="btn-secondary"], [class*="btn-success"], [class*="btn-danger"], [class*="btn-warning"], [class*="btn-info"], [class*="btn-dark"], [class*="btn-light"], [class*="btn-ghost"], [class*="btn-link"], [class*="btn-outline"], [class*="btn-action"], [class*="btn-teal"], [class*="btn-azure"], [class*="btn-red"], [class*="btn-green"], [class*="btn-blue"])) {
+  --tblr-btn-color: var(--vf-text);
+  --tblr-btn-bg: var(--vf-surface);
+  --tblr-btn-border-color: var(--vf-border-strong);
+  --tblr-btn-hover-color: var(--vf-text);
+  --tblr-btn-hover-bg: var(--vf-hover-bg);
+  --tblr-btn-hover-border-color: var(--vf-border-strong);
+  --tblr-btn-active-color: var(--vf-text);
+  --tblr-btn-active-bg: var(--vf-hover-bg);
+  --tblr-btn-active-border-color: var(--vf-border-strong);
+  --tblr-btn-disabled-color: var(--vf-text);
+  --tblr-btn-disabled-bg: var(--vf-surface);
+  --tblr-btn-disabled-border-color: var(--vf-border-strong);
 }
 
-/* У Tabler текст бейджа — --tblr-secondary, на сплошном фоне это ~1,3:1.
-   Белый на этих фонах ≥ 5,4:1. TODO(ds): bg-info (azure) не входит в DS. */
-.badge:is(.bg-primary, .bg-secondary, .bg-success, .bg-danger, .bg-warning, .bg-dark) {
-  color: var(--vf-surface);
+/* Ghost: прозрачная, hover — Navy 7%. */
+.btn-ghost-secondary {
+  --tblr-btn-color: var(--vf-text);
+  --tblr-btn-hover-color: var(--vf-text);
+  --tblr-btn-hover-bg: var(--vf-ghost-hover-bg);
+  --tblr-btn-active-bg: var(--vf-ghost-hover-bg);
+}
+
+/* Danger outline («В архив», отключение): текст danger, граница и hover — светлые. */
+.btn-outline-danger {
+  --tblr-btn-color: var(--vf-danger-text);
+  --tblr-btn-border-color: var(--vf-danger-border);
+  --tblr-btn-hover-color: var(--vf-danger-text);
+  --tblr-btn-hover-bg: var(--vf-danger-bg);
+  --tblr-btn-hover-border-color: var(--vf-danger-border);
+  --tblr-btn-active-color: var(--vf-danger-text);
+  --tblr-btn-active-bg: var(--vf-danger-bg);
+  --tblr-btn-active-border-color: var(--vf-danger-border);
+  --tblr-btn-disabled-color: var(--vf-danger-text);
+  --tblr-btn-disabled-border-color: var(--vf-danger-border);
+}
+
+.btn-link:hover {
+  color: var(--tblr-link-hover-color);
+}
+
+/* ===== Поля (DS-Controls): граница Navy 300, плейсхолдер Navy 500, фокус — кольцо 3px 20%. */
+.form-control,
+.form-select {
+  border-color: var(--vf-border-strong);
+}
+
+.form-control::placeholder {
+  color: var(--vf-navy-500);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--vf-bg);
+  color: var(--vf-text-muted);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.input-group-flat:focus-within .form-control,
+.input-group-flat:focus-within .input-group-text {
+  border-color: var(--vf-primary) !important;
+  box-shadow: var(--vf-shadow-focus);
+}
+
+.form-label {
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.form-hint {
+  font-size: var(--vf-size-xs);
+  line-height: 1rem;
+  color: var(--vf-text-muted);
 }
 
 .form-label.required::after,
@@ -36,13 +111,50 @@
   color: var(--vf-danger-text);
 }
 
-/* Статус-точки Tabler задают цвет литералами. */
-.status-primary,
-.status-blue {
-  --tblr-status-color: var(--vf-primary);
-  --tblr-status-color-rgb: var(--tblr-primary-rgb);
+/* ===== Текст. Красный бренда (--tblr-danger) — только бренд и деструктивные кнопки;
+   текст ошибок и danger-статусы — danger-текст. */
+.text-danger {
+  color: var(--vf-danger-text) !important;
 }
 
+/* ===== Бейджи (DS-Feedback): 2px 8px · 12/16 · 600 · радиус 4, только светлые.
+   Один смысл — один цвет: сплошные варианты Tabler сводятся к светлым парам листа. */
+.badge {
+  --tblr-badge-padding-x: 8px;
+  --tblr-badge-padding-y: 2px;
+  --tblr-badge-font-size: 0.75rem;
+  --tblr-badge-font-weight: var(--vf-weight-semibold);
+  --tblr-badge-border-radius: var(--vf-radius-sm);
+  line-height: 1rem;
+}
+
+.badge:is(.bg-success, .bg-success-lt, .bg-green, .bg-green-lt) {
+  background-color: var(--vf-ok-bg) !important;
+  color: var(--vf-ok-text) !important;
+}
+
+.badge:is(.bg-warning, .bg-warning-lt, .bg-yellow, .bg-yellow-lt, .bg-orange, .bg-orange-lt) {
+  background-color: var(--vf-warn-bg) !important;
+  color: var(--vf-warn-text) !important;
+}
+
+.badge:is(.bg-danger, .bg-danger-lt, .bg-red, .bg-red-lt) {
+  background-color: var(--vf-danger-bg) !important;
+  color: var(--vf-danger-text) !important;
+}
+
+.badge:is(.bg-info, .bg-info-lt, .bg-blue, .bg-blue-lt, .bg-primary, .bg-primary-lt) {
+  background-color: var(--vf-info-bg) !important;
+  color: var(--vf-info-text) !important;
+}
+
+/* Нейтральный («В архиве») — Navy 100 и #46525f с листа. */
+.badge:is(.bg-secondary, .bg-secondary-lt, .bg-dark, .bg-light) {
+  background-color: var(--vf-navy-100) !important;
+  color: var(--vf-neutral-text) !important;
+}
+
+/* Статус-точки Tabler задают цвет литералами. */
 .status-success,
 .status-green {
   --tblr-status-color: var(--vf-ok-text);
@@ -61,18 +173,100 @@
   --tblr-status-color-rgb: var(--tblr-red-rgb);
 }
 
-/* Фокус полей: у Tabler граница литералом старого синего.
-   TODO(ds): цвет фокус-кольца в DS не задан — граница Action blue. */
-.form-control:focus,
-.form-select:focus,
-.form-check-input:focus,
-.input-group-flat:focus-within .form-control,
-.input-group-flat:focus-within .input-group-text {
-  border-color: var(--vf-primary) !important;
+.status-primary,
+.status-blue,
+.status-info {
+  --tblr-status-color: var(--vf-info-text);
+  --tblr-status-color-rgb: var(--tblr-info-rgb);
 }
 
-.btn-link:hover {
-  color: var(--tblr-link-hover-color);
+/* ===== Баннеры (DS-Feedback): 12px 16px · радиус 4 · рамка; текст в цвет смысла. */
+.alert {
+  --tblr-alert-padding-x: 16px;
+  --tblr-alert-padding-y: 12px;
+  --tblr-alert-border-radius: var(--vf-radius-sm);
+}
+
+.alert-info {
+  --tblr-alert-color: var(--vf-info-text);
+  --tblr-alert-bg: var(--vf-info-bg);
+  --tblr-alert-border-color: var(--vf-info-border);
+  color: var(--vf-info-text);
+}
+
+.alert-success {
+  --tblr-alert-color: var(--vf-ok-text);
+  --tblr-alert-bg: var(--vf-ok-bg);
+  --tblr-alert-border-color: var(--vf-ok-border);
+  color: var(--vf-ok-text);
+}
+
+.alert-warning {
+  --tblr-alert-color: var(--vf-warn-text);
+  --tblr-alert-bg: var(--vf-warn-bg);
+  --tblr-alert-border-color: var(--vf-warn-border);
+  color: var(--vf-warn-text);
+}
+
+.alert-danger {
+  --tblr-alert-color: var(--vf-danger-text);
+  --tblr-alert-bg: var(--vf-danger-bg);
+  --tblr-alert-border-color: var(--vf-danger-border);
+  color: var(--vf-danger-text);
+}
+
+/* ===== Карточки (DS-Tokens): радиус 4, граница Navy 200, тень sm. Модалки — 8, тень lg. */
+.card {
+  --tblr-card-border-radius: var(--vf-radius-sm);
+  --tblr-card-inner-border-radius: calc(var(--vf-radius-sm) - 1px);
+  --tblr-card-border-color: var(--vf-border);
+}
+
+.modal-content {
+  --tblr-modal-border-radius: var(--vf-radius-lg);
+  --tblr-modal-box-shadow: var(--vf-shadow-lg);
+}
+
+/* ===== Меню действий и крошки (DS-Feedback). */
+.dropdown-menu {
+  --tblr-dropdown-link-hover-bg: var(--vf-hover-bg);
+  --tblr-dropdown-box-shadow: var(--vf-shadow-md);
+}
+
+.breadcrumb {
+  --tblr-breadcrumb-link-color: var(--vf-text-muted);
+  --tblr-breadcrumb-item-active-color: var(--vf-text);
+  --tblr-breadcrumb-item-active-font-weight: var(--vf-weight-medium);
+  font-size: var(--vf-size-sm);
+}
+
+/* ===== Пустое состояние (DS-Feedback): иконка в круге Blue 50, заголовок 16/24 · 600. */
+.empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+.empty-icon svg,
+.empty-icon .ti {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.empty-title {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.empty-subtitle {
+  color: var(--vf-text-muted);
 }
 
 .list-group-item.active {
@@ -84,14 +278,18 @@
   color: var(--vf-primary);
 }
 
-/* Сумма (фильтр vf_amount): табличные цифры, копейки приглушены, цвет по смыслу.
-   Выравнивание вправо — классом ячейки text-end. */
+/* Сумма (фильтр vf_amount, DS-Money): табличные цифры, копейки и ноль приглушены,
+   приход — зелёный, расход — основной цвет; красный для сумм не используется.
+   Валюта, кроме рубля, — символом после числа, приглушённо. Выравнивание вправо —
+   классом ячейки text-end. */
 .vf-amount {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.vf-amount__minor {
+.vf-amount__minor,
+.vf-amount__currency,
+.vf-amount--zero {
   color: var(--vf-text-muted);
 }
 
@@ -99,11 +297,9 @@
   color: var(--vf-ok-text);
 }
 
-.vf-amount--loss {
-  color: var(--vf-danger-text);
-}
-
-/* Tabs (DS-Tabs): без «коробки» Tabler, активная — подчёркивание 2px Action blue.
+/* ===== Вкладки (DS-Tabs): без «коробки» Tabler; 14/12/12px, между вкладками 4px;
+   текст 14/20 · 500 — обычная Navy 600, hover Navy 900 + линия Navy 300, активная —
+   Action blue + линия 2px; фокус — outline внутри; недоступная — opacity .45.
    Разметка — partials/_tabs.html.twig; классы .nav-tabs/.nav-link.active сохранены. */
 .nav-tabs {
   gap: var(--vf-space-1);
@@ -114,18 +310,26 @@
   display: inline-flex;
   align-items: center;
   gap: var(--vf-space-2);
+  padding: 14px 12px 12px;
   margin-bottom: -1px;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
   color: var(--vf-text-muted);
+  font-weight: var(--vf-weight-medium);
+  white-space: nowrap;
 }
 
-.nav-tabs .nav-link:hover,
-.nav-tabs .nav-link:focus-visible {
+.nav-tabs .nav-link:hover {
   color: var(--vf-text);
   border-bottom-color: var(--vf-border-strong);
+}
+
+.nav-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+  box-shadow: none;
 }
 
 .nav-tabs .nav-link.active,
@@ -135,20 +339,22 @@
   background: transparent;
 }
 
-/* Размер как у Tabler .icon, которым были свёрстаны SVG-иконки вкладок. */
-.nav-tabs .nav-link > .ti {
-  font-size: 1.25rem;
+.nav-tabs .nav-link.disabled,
+.nav-tabs .nav-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-/* Счётчик-пилюля. TODO(ds): имя warn-модификатора на листе DS-Tabs не указано. */
+/* Счётчик: h 20 · радиус 10 · 12/600; Navy 100, в активной — Blue 50, .warn — Warn. */
 .nav-tabs .cnt {
-  padding: 0 var(--vf-space-2);
-  border-radius: var(--vf-radius-pill);
-  background: var(--vf-bg);
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--vf-navy-100);
   color: var(--vf-text-muted);
   font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.5;
+  line-height: 20px;
 }
 
 .nav-tabs .nav-link.active .cnt {
@@ -156,25 +362,105 @@
   color: var(--vf-primary);
 }
 
-.nav-tabs .cnt--warn,
-.nav-tabs .nav-link.active .cnt--warn {
+.nav-tabs .cnt.warn {
   background: var(--vf-warn-bg);
   color: var(--vf-warn-text);
 }
 
-/* Таблицы (DS-Table). TODO(ds): плотность строк и цвет hover — по листу DS-Table. */
+/* ===== Таблицы (DS-Table): шапка Navy 50 · 11/16 · 700 · +5% · Navy 600; строка 14px
+   по вертикали, компактная (.table-sm) 8px; hover Navy 50, выбранная Blue 50. */
+.table > thead > tr > th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background: var(--vf-navy-50);
+  color: var(--vf-text-muted);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.table > tbody > tr > td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.table-sm > tbody > tr > td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .table td.text-end,
 .table th.text-end {
   font-variant-numeric: tabular-nums;
 }
 
-.table-hover > tbody > tr:hover > *,
-.card-table > tbody > tr:hover > * {
-  --tblr-table-bg-state: var(--vf-bg);
+.table {
+  --tblr-table-hover-bg: var(--vf-navy-50);
 }
 
-/* Строка итогов. */
+.card-table > tbody > tr:hover > * {
+  --tblr-table-bg-state: var(--vf-navy-50);
+}
+
+.table > tbody > tr.table-active > * {
+  --tblr-table-bg-state: var(--vf-primary-lt);
+}
+
+/* Итоги (DS-Money): крупнее и жирнее строк; символ валюты в итогах указывается всегда. */
 .table > tfoot > tr > * {
   border-top: 1px solid var(--vf-border-strong);
+  font-size: var(--vf-size-md);
   font-weight: var(--vf-weight-semibold);
+}
+
+/* ===== Пагинация (DS-Feedback): кнопки sm 30px, граница Navy 300, радиус 4;
+   текущая — Primary; недоступная — opacity .5. Подпись — 13px, Navy 600. */
+.pagination {
+  --tblr-pagination-gap: var(--vf-space-1);
+  --tblr-pagination-padding-x: 0;
+  --tblr-pagination-padding-y: 0;
+  --tblr-pagination-font-size: var(--vf-size-sm);
+  --tblr-pagination-color: var(--vf-text);
+  --tblr-pagination-bg: var(--vf-surface);
+  --tblr-pagination-border-width: 1px;
+  --tblr-pagination-border-color: var(--vf-border-strong);
+  --tblr-pagination-border-radius: var(--vf-radius-sm);
+  --tblr-pagination-hover-color: var(--vf-text);
+  --tblr-pagination-hover-bg: var(--vf-hover-bg);
+  --tblr-pagination-hover-border-color: var(--vf-border-strong);
+  --tblr-pagination-focus-color: var(--vf-text);
+  --tblr-pagination-focus-bg: var(--vf-hover-bg);
+  --tblr-pagination-active-color: var(--vf-surface);
+  --tblr-pagination-active-bg: var(--vf-primary);
+  --tblr-pagination-active-border-color: var(--vf-primary);
+  --tblr-pagination-disabled-color: var(--vf-text);
+  --tblr-pagination-disabled-bg: var(--vf-surface);
+  --tblr-pagination-disabled-border-color: var(--vf-border-strong);
+}
+
+.pagination .page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--vf-radius-sm);
+  font-weight: var(--vf-weight-medium);
+}
+
+.pagination .page-link:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.pagination .page-item.disabled .page-link {
+  opacity: 0.5;
+}
+
+.vf-pager-caption {
+  font-size: var(--vf-size-sm);
 }

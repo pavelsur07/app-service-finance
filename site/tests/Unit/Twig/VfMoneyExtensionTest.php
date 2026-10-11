@@ -42,10 +42,10 @@ final class VfMoneyExtensionTest extends TestCase
      */
     public static function shortCases(): iterable
     {
-        yield 'millions as in the design system' => ['6480000', "6,48\u{00A0}млн\u{00A0}₽"];
-        yield 'trailing zeros dropped' => [6500000, "6,5\u{00A0}млн\u{00A0}₽"];
-        yield 'whole unit drops comma' => [2000000000, "2\u{00A0}млрд\u{00A0}₽"];
-        yield 'thousands' => ['-15250', "\u{2212}15,25\u{00A0}тыс.\u{00A0}₽"];
+        yield 'thousands as in DS-Money' => ['196114.44', "196,1\u{00A0}тыс.\u{00A0}₽"];
+        yield 'millions as in DS-Money' => [1200000, "1,2\u{00A0}млн\u{00A0}₽"];
+        yield 'one decimal, half away from zero' => ['-15250', "\u{2212}15,3\u{00A0}тыс.\u{00A0}₽"];
+        yield 'trailing zero dropped' => [2000000000, "2\u{00A0}млрд\u{00A0}₽"];
         yield 'below a thousand stays whole' => [950.4, "950\u{00A0}₽"];
     }
 
@@ -63,20 +63,38 @@ final class VfMoneyExtensionTest extends TestCase
         );
     }
 
-    public function testAmountTones(): void
+    public function testIncomeIsGreenAndSignedOnlyWhenAsked(): void
     {
         $extension = new VfMoneyExtension();
 
-        self::assertStringContainsString('vf-amount--income', $extension->amount(10, 0, 'income'));
-        self::assertStringContainsString('vf-amount--loss', $extension->amount(-10, 0, 'profit'));
-        self::assertStringNotContainsString('vf-amount--', $extension->amount(10, 0, 'profit'));
-        self::assertStringNotContainsString('vf-amount--', $extension->amount(-10, 0));
-        self::assertSame("<span class=\"vf-amount\">1\u{00A0}000</span>", $extension->amount(1000, 0));
+        self::assertSame(
+            "<span class=\"vf-amount vf-amount--income\">+91\u{00A0}079<span class=\"vf-amount__minor\">,35</span></span>",
+            $extension->amount('91079.35', 2, 'income', true),
+        );
+        self::assertStringNotContainsString('+', $extension->amount('91079.35', 2, 'income'));
+        self::assertStringNotContainsString('+', $extension->amount('-11.90', 2, null, true));
+    }
+
+    public function testZeroIsMutedWithoutSignOrIncomeColour(): void
+    {
+        self::assertSame(
+            '<span class="vf-amount vf-amount--zero">0<span class="vf-amount__minor">,00</span></span>',
+            (new VfMoneyExtension())->amount('-0.004', 2, 'income', true),
+        );
+    }
+
+    public function testForeignCurrencyIsAMutedSymbolAfterTheNumber(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertStringEndsWith("\u{00A0}<span class=\"vf-amount__currency\">$</span></span>", $extension->amount(1250, 2, null, false, 'usd'));
+        self::assertStringEndsWith("\u{00A0}<span class=\"vf-amount__currency\">CNY</span></span>", $extension->amount(5000, 2, null, false, 'CNY'));
+        self::assertStringNotContainsString('vf-amount__currency', $extension->amount(5000, 2, null, false, 'RUB'));
     }
 
     public function testAmountRejectsUnknownTone(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new VfMoneyExtension())->amount(1, 2, 'expense');
+        (new VfMoneyExtension())->amount(1, 2, 'profit');
     }
 }

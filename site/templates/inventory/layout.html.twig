@@ -33,10 +33,10 @@
             <div class="card">
                 <div class="card-header">
                     {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
-                        {label: 'Листинг', href: path('marketplace_listings_index'), icon: 'ti-layout-grid', active: active_tab == 'listings'},
-                        {label: 'Остатки', href: path('inventory_stocks_index'), icon: 'ti-building-warehouse', active: active_tab == 'stocks'},
-                        {label: 'Себестоимость', href: path('marketplace_inventory_index'), icon: 'ti-box', active: active_tab == 'inventory'},
-                        {label: 'Теги', href: path('marketplace_listing_tags_manage'), icon: 'ti-tags', active: active_tab == 'listings_tags'},
+                        {label: 'Листинг', href: path('marketplace_listings_index'), active: active_tab == 'listings'},
+                        {label: 'Остатки', href: path('inventory_stocks_index'), active: active_tab == 'stocks'},
+                        {label: 'Себестоимость', href: path('marketplace_inventory_index'), active: active_tab == 'inventory'},
+                        {label: 'Теги', href: path('marketplace_listing_tags_manage'), active: active_tab == 'listings_tags'},
                     ]} only %}
                 </div>
 
