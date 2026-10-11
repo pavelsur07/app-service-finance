@@ -8,13 +8,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
-#[ORM\Table(
-    name: 'product_imports',
-    indexes: [
-        new ORM\Index(name: 'idx_product_imports_company', columns: ['company_id']),
-        new ORM\Index(name: 'idx_product_imports_status', columns: ['status']),
-    ],
-)]
+#[ORM\Table(name: 'product_imports')]
+#[ORM\Index(name: 'idx_product_imports_company', columns: ['company_id'])]
+#[ORM\Index(name: 'idx_product_imports_status', columns: ['status'])]
 class ProductImport
 {
     public const STATUS_PENDING = 'pending';

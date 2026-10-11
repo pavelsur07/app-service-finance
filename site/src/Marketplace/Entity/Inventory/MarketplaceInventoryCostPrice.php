@@ -10,19 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceInventoryCostPriceRepository::class)]
-#[ORM\Table(
-    name: 'marketplace_inventory_cost_prices',
-    indexes: [
-        new ORM\Index(
-            name: 'idx_inv_cost_company_listing_from',
-            columns: ['company_id', 'listing_id', 'effective_from'],
-        ),
-        new ORM\Index(
-            name: 'idx_inv_cost_company_listing_to',
-            columns: ['company_id', 'listing_id', 'effective_to'],
-        ),
-    ],
-)]
+#[ORM\Table(name: 'marketplace_inventory_cost_prices')]
+#[ORM\Index(name: 'idx_inv_cost_company_listing_from', columns: ['company_id', 'listing_id', 'effective_from'])]
+#[ORM\Index(name: 'idx_inv_cost_company_listing_to', columns: ['company_id', 'listing_id', 'effective_to'])]
 #[ORM\UniqueConstraint(
     name: 'uniq_inv_cost_listing_from',
     columns: ['listing_id', 'effective_from'],

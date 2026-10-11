@@ -12,13 +12,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
-#[ORM\Table(
-    name: '`products`',
-    uniqueConstraints: [
-        new ORM\UniqueConstraint(name: 'uniq_company_sku', columns: ['company_id', 'sku']),
-        new ORM\UniqueConstraint(name: 'uniq_company_internal_article', columns: ['company_id', 'internal_article']),
-    ],
-)]
+#[ORM\Table(name: '`products`')]
+#[ORM\UniqueConstraint(name: 'uniq_company_sku', columns: ['company_id', 'sku'])]
+#[ORM\UniqueConstraint(name: 'uniq_company_internal_article', columns: ['company_id', 'internal_article'])]
 class Product
 {
     #[ORM\Id]

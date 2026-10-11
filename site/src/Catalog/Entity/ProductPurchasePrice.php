@@ -8,13 +8,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
-#[ORM\Table(
-    name: 'product_purchase_prices',
-    indexes: [
-        new ORM\Index(name: 'idx_purchase_price_company_product_from', columns: ['company_id', 'product_id', 'effective_from']),
-        new ORM\Index(name: 'idx_purchase_price_company_product_to', columns: ['company_id', 'product_id', 'effective_to']),
-    ],
-)]
+#[ORM\Table(name: 'product_purchase_prices')]
+#[ORM\Index(name: 'idx_purchase_price_company_product_from', columns: ['company_id', 'product_id', 'effective_from'])]
+#[ORM\Index(name: 'idx_purchase_price_company_product_to', columns: ['company_id', 'product_id', 'effective_to'])]
 class ProductPurchasePrice
 {
     #[ORM\Id]

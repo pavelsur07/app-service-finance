@@ -123,7 +123,7 @@ final class InventoryStockReportQuery
                     'COALESCE(SUM(s.quantity - s.reserved_quantity) FILTER (WHERE %s = :%s), 0.000) AS %s',
                     $breakdownExpression,
                     $parameter,
-                    $this->connection->quoteIdentifier($alias),
+                    $this->connection->quoteSingleIdentifier($alias),
                 ))
                 ->setParameter($parameter, $column['value']);
         }

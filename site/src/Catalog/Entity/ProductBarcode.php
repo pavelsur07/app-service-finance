@@ -8,15 +8,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
-#[ORM\Table(
-    name: 'product_barcodes',
-    indexes: [
-        new ORM\Index(name: 'idx_product_barcodes_product', columns: ['product_id']),
-    ],
-    uniqueConstraints: [
-        new ORM\UniqueConstraint(name: 'uniq_product_barcode_company', columns: ['company_id', 'barcode']),
-    ],
-)]
+#[ORM\Table(name: 'product_barcodes')]
+#[ORM\Index(name: 'idx_product_barcodes_product', columns: ['product_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_product_barcode_company', columns: ['company_id', 'barcode'])]
 class ProductBarcode
 {
     public const TYPE_EAN13 = 'EAN13';

@@ -37,7 +37,7 @@ final class DbReset
         // снимаем их перед повторным квотированием, иначе получится ""user"".
         $quotedTables = array_map(
             static fn (string $tableName): string => implode('.', array_map(
-                static fn (string $part): string => $connection->quoteIdentifier(trim($part, '"')),
+                static fn (string $part): string => $connection->quoteSingleIdentifier(trim($part, '"')),
                 explode('.', $tableName),
             )),
             $tableNames,

@@ -43,7 +43,7 @@ final class PaymentPlanMatcher
         $to = $txDate->add(new \DateInterval('P1D'));
 
         $qb = $this->paymentPlanRepository->createQueryBuilder('plan')
-            ->leftJoin(PaymentPlanMatch::class, 'match', 'WITH', 'match.plan = plan')
+            ->leftJoin(PaymentPlanMatch::class, 'match', 'ON', 'match.plan = plan')
             ->where('plan.company = :company')
             ->andWhere('plan.plannedAt BETWEEN :from AND :to')
             ->andWhere('match.id IS NULL')

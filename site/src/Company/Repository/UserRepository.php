@@ -89,13 +89,13 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin(
                 Company::class,
                 'ownedCompany',
-                'WITH',
+                'ON',
                 'ownedCompany.user = user AND ownedCompany.id = :companyId',
             )
             ->leftJoin(
                 CompanyMember::class,
                 'membership',
-                'WITH',
+                'ON',
                 'membership.user = user AND IDENTITY(membership.company) = :companyId AND membership.status = :activeStatus',
             )
             ->andWhere('user.id = :userId')
