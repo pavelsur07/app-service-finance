@@ -65,7 +65,7 @@ final class OzonReconciliationRunRepository extends ServiceEntityRepository
         $runs = $this->createQueryBuilder('r')
             ->where('r.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('r.periodFrom', 'DESC')
+            ->orderBy('r.periodFrom', \SortDirection::Descending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();

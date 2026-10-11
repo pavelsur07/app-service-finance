@@ -28,7 +28,7 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->andWhere('c.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('active', true)
-            ->orderBy('c.name', 'ASC')
+            ->orderBy('c.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

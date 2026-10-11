@@ -62,7 +62,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('listingIds', array_values(array_unique($listingIds)))
-            ->orderBy('l.id', 'ASC')
+            ->orderBy('l.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -105,8 +105,8 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('skus', array_values(array_unique($skus)))
-            ->orderBy('l.marketplaceSku', 'ASC')
-            ->addOrderBy('l.id', 'ASC')
+            ->orderBy('l.marketplaceSku', \SortDirection::Ascending)
+            ->addOrderBy('l.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -156,8 +156,8 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('supplierSkus', array_values(array_unique($supplierSkus)))
-            ->orderBy('l.supplierSku', 'ASC')
-            ->addOrderBy('l.id', 'ASC')
+            ->orderBy('l.supplierSku', \SortDirection::Ascending)
+            ->addOrderBy('l.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -180,7 +180,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('supplierSku', $supplierSku)
-            ->orderBy('l.id', 'ASC')
+            ->orderBy('l.id', \SortDirection::Ascending)
             ->setMaxResults(2)
             ->getQuery()
             ->getResult();
@@ -251,7 +251,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('sku', $marketplaceSku)
-            ->orderBy('l.id', 'ASC')
+            ->orderBy('l.id', \SortDirection::Ascending)
             ->setMaxResults(2)
             ->getQuery()
             ->getResult();
@@ -296,7 +296,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('marketplaceVariantIds', array_values(array_unique($marketplaceVariantIds)))
-            ->orderBy('l.marketplaceVariantId', 'ASC')
+            ->orderBy('l.marketplaceVariantId', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -371,7 +371,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->andWhere('l.isActive = :active')
             ->setParameter('company', $company)
             ->setParameter('active', true)
-            ->orderBy('l.product', 'ASC')
+            ->orderBy('l.product', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

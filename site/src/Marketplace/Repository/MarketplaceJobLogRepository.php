@@ -34,7 +34,7 @@ class MarketplaceJobLogRepository extends ServiceEntityRepository
             ->andWhere('j.jobType IN (:jobTypes)')
             ->setParameter('companyId', $companyId)
             ->setParameter('jobTypes', $jobTypes)
-            ->orderBy('j.startedAt', 'DESC')
+            ->orderBy('j.startedAt', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
 

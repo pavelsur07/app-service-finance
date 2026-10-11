@@ -51,7 +51,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('s')
             ->where('s.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('s.saleDate', 'DESC');
+            ->orderBy('s.saleDate', \SortDirection::Descending);
     }
 
     public function findByMarketplaceOrder(

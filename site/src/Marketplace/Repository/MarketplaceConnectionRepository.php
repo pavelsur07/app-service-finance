@@ -27,7 +27,7 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('c.marketplace', 'ASC')
+            ->orderBy('c.marketplace', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

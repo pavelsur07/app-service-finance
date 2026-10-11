@@ -32,7 +32,7 @@ final class MarketplaceListingsQuery
             ->from(MarketplaceListing::class, 'l')
             ->leftJoin('l.product', 'p')
             ->where('IDENTITY(l.company) = :companyId')
-            ->orderBy('l.createdAt', 'DESC')
+            ->orderBy('l.createdAt', \SortDirection::Descending)
             ->setParameter('companyId', $companyId);
 
         if (true === $mapped) {

@@ -21,11 +21,11 @@ final readonly class RawDocumentsListQuery
         $queryBuilder = $this->rawDocumentRepository->createQueryBuilder('d')
             ->where('d.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('d.periodTo', 'DESC')
-            ->addOrderBy('d.periodFrom', 'DESC')
-            ->addOrderBy('d.marketplace', 'ASC')
-            ->addOrderBy('d.documentType', 'ASC')
-            ->addOrderBy('d.syncedAt', 'DESC');
+            ->orderBy('d.periodTo', \SortDirection::Descending)
+            ->addOrderBy('d.periodFrom', \SortDirection::Descending)
+            ->addOrderBy('d.marketplace', \SortDirection::Ascending)
+            ->addOrderBy('d.documentType', \SortDirection::Ascending)
+            ->addOrderBy('d.syncedAt', \SortDirection::Descending);
 
         if (null !== $marketplace) {
             $queryBuilder

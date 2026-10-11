@@ -51,9 +51,9 @@ final class MarketplaceSaleMappingRepository extends ServiceEntityRepository
         }
 
         return $qb
-            ->orderBy('m.isActive', 'DESC')
-            ->addOrderBy('m.marketplace', 'ASC')
-            ->addOrderBy('m.amountSource', 'ASC')
+            ->orderBy('m.isActive', \SortDirection::Descending)
+            ->addOrderBy('m.marketplace', \SortDirection::Ascending)
+            ->addOrderBy('m.amountSource', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

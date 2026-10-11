@@ -35,8 +35,8 @@ final class OzonTransactionTotalsCheckRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('periodFrom', $periodFrom)
             ->setParameter('periodTo', $periodTo)
-            ->orderBy('c.checkedAt', 'DESC')
-            ->addOrderBy('c.createdAt', 'DESC')
+            ->orderBy('c.checkedAt', \SortDirection::Descending)
+            ->addOrderBy('c.createdAt', \SortDirection::Descending)
             ->getQuery()
             ->setMaxResults(1)
             ->getOneOrNullResult();
