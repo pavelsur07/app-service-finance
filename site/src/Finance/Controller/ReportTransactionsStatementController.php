@@ -278,7 +278,7 @@ class ReportTransactionsStatementController extends AbstractController
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('b.date', 'ASC');
+            ->orderBy('b.date', \SortDirection::Ascending);
 
         if (!empty($accountIds)) {
             $qb->andWhere('a.id IN (:accountIds)')
@@ -327,8 +327,8 @@ class ReportTransactionsStatementController extends AbstractController
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
-            ->orderBy('t.occurredAt', 'ASC')
-            ->addOrderBy('t.id', 'ASC');
+            ->orderBy('t.occurredAt', \SortDirection::Ascending)
+            ->addOrderBy('t.id', \SortDirection::Ascending);
 
         if ($accountId) {
             $qb->andWhere('IDENTITY(t.moneyAccount) = :accountId')

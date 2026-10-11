@@ -41,10 +41,10 @@ class DocumentRepository extends ServiceEntityRepository
             ->andWhere('d.company = :company')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('company', $dto->company)
-            ->orderBy('d.date', 'DESC')
+            ->orderBy('d.date', \SortDirection::Descending)
             // Одной даты мало: при равных датах порядок не определён, и один документ
             // может попасть на две страницы, а другой — ни на одну.
-            ->addOrderBy('d.id', 'ASC');
+            ->addOrderBy('d.id', \SortDirection::Ascending);
 
         if (null !== $dto->dateFrom) {
             $queryBuilder->andWhere('d.date >= :dateFrom')
@@ -117,8 +117,8 @@ class DocumentRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NOT NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('d.deletedAt', 'DESC')
-            ->addOrderBy('d.id', 'ASC');
+            ->orderBy('d.deletedAt', \SortDirection::Descending)
+            ->addOrderBy('d.id', \SortDirection::Ascending);
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($perPage);
