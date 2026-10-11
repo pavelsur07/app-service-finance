@@ -21,7 +21,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  *   это лишний UPDATE на каждом flush, для `int`-свойства на DBAL 3 — TypeError.
  *   Тип выбирается явно: `bigint_string` или `money_amount_minor`.
  *
- * Проверяются метаданные всех сущностей и embeddable — БД не нужна.
+ * Проверяются метаданные всех сущностей, включая поля встроенных embeddable
+ * (у владельца, через точку) — БД не нужна.
  */
 final class DoctrineMappingTypesTest extends KernelTestCase
 {
@@ -52,23 +53,45 @@ final class DoctrineMappingTypesTest extends KernelTestCase
 
     public function testBigintStringFieldsAreStringProperties(): void
     {
+        [$checked, $violations] = $this->propertiesOfTypeNotDeclaredAs(StringBigIntType::NAME, 'string');
+
+        self::assertGreaterThan(0, $checked, 'Ни одного поля bigint_string — гейт ничего не проверил.');
+        self::assertSame([], $violations, 'bigint_string гидрирует строку: свойство обязано быть string|?string.');
+    }
+
+    public function testMoneyAmountMinorFieldsAreIntProperties(): void
+    {
+        [$checked, $violations] = $this->propertiesOfTypeNotDeclaredAs(MoneyAmountType::NAME, 'int');
+
+        self::assertGreaterThan(0, $checked, 'Ни одного поля money_amount_minor — гейт ничего не проверил.');
+        self::assertSame([], $violations, 'money_amount_minor гидрирует int: свойство обязано быть int|?int.');
+    }
+
+    /**
+     * Поля embeddable приходят у владельца с именем через точку; свойство ищется в
+     * исходном классе (originalClass/originalField), иначе Money и подобные выпали бы.
+     *
+     * @return array{int, list<string>}
+     */
+    private function propertiesOfTypeNotDeclaredAs(string $doctrineType, string $phpType): array
+    {
         $checked = 0;
         $violations = [];
         foreach ($this->allMetadata() as $metadata) {
             foreach ($metadata->fieldMappings as $field => $mapping) {
-                if (StringBigIntType::NAME !== $mapping->type || str_contains($field, '.')) {
+                if ($doctrineType !== $mapping->type) {
                     continue;
                 }
                 ++$checked;
-                $type = $metadata->getReflectionProperty($field)?->getType();
-                if (!$type instanceof \ReflectionNamedType || 'string' !== $type->getName()) {
+                $property = new \ReflectionProperty($mapping->originalClass ?? $metadata->getName(), $mapping->originalField ?? $field);
+                $type = $property->getType();
+                if (!$type instanceof \ReflectionNamedType || $phpType !== $type->getName()) {
                     $violations[] = sprintf('%s::$%s (%s)', $metadata->getName(), $field, (string) $type);
                 }
             }
         }
 
-        self::assertGreaterThan(0, $checked, 'Ни одного поля bigint_string — гейт ничего не проверил.');
-        self::assertSame([], $violations, 'bigint_string гидрирует строку: свойство обязано быть string|?string.');
+        return [$checked, $violations];
     }
 
     /**
