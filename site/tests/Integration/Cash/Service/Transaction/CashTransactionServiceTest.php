@@ -175,6 +175,43 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->assertSame([], $tx->getRawData());
     }
 
+    /**
+     * Сервис не полагается на валидацию формы: без суммы вызов в обход формы
+     * (фасад, импорт) получает понятную ошибку, а не неинициализированное свойство.
+     */
+    public function testAddWithoutAmountIsRejectedWithoutPersisting(): void
+    {
+        $user = UserBuilder::aUser()->withEmail('no-amount@example.com')->withPasswordHash('pass')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->withName('No amount')->build();
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'RUB');
+        $account->setOpeningBalance('0');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $this->persistSystemPair($company);
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        foreach ([null, ''] as $amount) {
+            $dto = new CashTransactionDTO();
+            $dto->companyId = (string) $company->getId();
+            $dto->moneyAccountId = (string) $account->getId();
+            $dto->direction = CashDirection::OUTFLOW;
+            $dto->amount = $amount;
+            $dto->currency = 'RUB';
+            $dto->occurredAt = new \DateTimeImmutable('2024-01-11');
+
+            try {
+                $this->txService->add($dto);
+                self::fail('Transaction without amount must be rejected.');
+            } catch (\DomainException $exception) {
+                self::assertSame('Укажите сумму.', $exception->getMessage());
+            }
+        }
+
+        self::assertCount(0, $this->em->getRepository(\App\Cash\Entity\Transaction\CashTransaction::class)->findBy(['company' => $company]));
+    }
+
     public function testAddPersistsExplicitAllowedResponsibilityPair(): void
     {
         $user = UserBuilder::aUser()
