@@ -75,8 +75,8 @@ final class IngestionCompanyFilterTest extends IntegrationTestCase
         return $this->em->createQueryBuilder()
             ->select('probe.id')
             ->from(IngestionTenantProbe::class, 'probe')
-            ->orderBy('probe.createdAt', 'ASC')
-            ->addOrderBy('probe.id', 'ASC')
+            ->orderBy('probe.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('probe.id', \SortDirection::Ascending)
             ->getQuery()
             ->getSingleColumnResult();
     }

@@ -350,7 +350,7 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('jobId', $jobId)
             ->setParameter('inFlightStates', OzonAdPendingReportState::IN_FLIGHT_STATES)
-            ->orderBy('r.requestedAt', 'ASC')
+            ->orderBy('r.requestedAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -380,7 +380,7 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
             ->andWhere('r.companyId = :companyId')
             ->andWhere('r.finalizedAt IS NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('r.requestedAt', 'ASC')
+            ->orderBy('r.requestedAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

@@ -27,7 +27,7 @@ class AuditLogRepository extends ServiceEntityRepository
             ->andWhere('al.entityClass = :entityClass')
             ->setParameter('companyId', $companyId)
             ->setParameter('entityClass', $entityClass)
-            ->orderBy('al.createdAt', 'DESC');
+            ->orderBy('al.createdAt', \SortDirection::Descending);
 
         $pager = new Pagerfanta(new QueryAdapter($qb));
         $pager->setMaxPerPage($perPage);

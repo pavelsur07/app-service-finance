@@ -42,7 +42,7 @@ class BalanceCategory
 
     /** @var Collection<int, self> */
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
-    #[ORM\OrderBy(['sortOrder' => 'ASC'])]
+    #[ORM\OrderBy(['sortOrder' => \SortDirection::Ascending])]
     private Collection $children;
 
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]

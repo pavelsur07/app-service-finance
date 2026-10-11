@@ -31,7 +31,7 @@ final class DealChargeType extends AbstractType
                 'choice_label' => static fn (ChargeType $type): string => (string) $type->getName(),
                 'query_builder' => static function (EntityRepository $repository) use ($company) {
                     $qb = $repository->createQueryBuilder('chargeType')
-                        ->orderBy('chargeType.name', 'ASC')
+                        ->orderBy('chargeType.name', \SortDirection::Ascending)
                         ->andWhere('chargeType.isActive = true');
 
                     if ($company) {

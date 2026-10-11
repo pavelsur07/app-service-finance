@@ -31,7 +31,7 @@ final class BalanceCategoryRepository extends ServiceEntityRepository implements
             ->andWhere('c.companyId = :companyId')
             ->andWhere('c.parent IS NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.sortOrder', 'ASC')
+            ->orderBy('c.sortOrder', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -44,8 +44,8 @@ final class BalanceCategoryRepository extends ServiceEntityRepository implements
         return $this->createQueryBuilder('c')
             ->andWhere('c.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.level', 'ASC')
-            ->addOrderBy('c.sortOrder', 'ASC')
+            ->orderBy('c.level', \SortDirection::Ascending)
+            ->addOrderBy('c.sortOrder', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -78,7 +78,7 @@ final class BalanceCategoryRepository extends ServiceEntityRepository implements
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.sortOrder', 'ASC');
+            ->orderBy('c.sortOrder', \SortDirection::Ascending);
 
         if (null !== $parent) {
             $qb->andWhere('c.parent = :parent')

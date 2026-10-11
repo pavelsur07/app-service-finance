@@ -11,7 +11,4 @@ declare(strict_types=1);
  * пояснением и задачей на исправление.
  */
 return [
-    // ORM 4: направление сортировки — SortDirection, а не строка. ~280 вызовов
-    // orderBy()/addOrderBy() с 'ASC'/'DESC' в src/.
-    'https://github.com/doctrine/orm/issues/11313' => 'QueryBuilder::orderBy(…, string) → SortDirection',
 ];

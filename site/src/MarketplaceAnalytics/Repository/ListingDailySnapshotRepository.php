@@ -99,7 +99,7 @@ final class ListingDailySnapshotRepository extends ServiceEntityRepository imple
             ->getSingleScalarResult();
 
         $items = $qb
-            ->orderBy('s.snapshotDate', 'DESC')
+            ->orderBy('s.snapshotDate', \SortDirection::Descending)
             ->setMaxResults($perPage)
             ->setFirstResult(($page - 1) * $perPage)
             ->getQuery()

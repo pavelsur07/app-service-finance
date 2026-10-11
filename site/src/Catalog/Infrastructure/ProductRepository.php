@@ -44,7 +44,7 @@ final class ProductRepository
                 ->setParameter('status', $filter->status);
         }
 
-        $qb->orderBy('p.updatedAt', 'DESC');
+        $qb->orderBy('p.updatedAt', \SortDirection::Descending);
 
         $pager = new Pagerfanta(new QueryAdapter($qb));
         $pager->setCurrentPage(max(1, $page));
@@ -148,7 +148,7 @@ final class ProductRepository
             ->from(Product::class, 'p')
             ->andWhere('IDENTITY(p.company) = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('p.name', 'ASC')
+            ->orderBy('p.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -179,7 +179,7 @@ final class ProductRepository
             ->andWhere('p.status = :status')
             ->setParameter('companyId', $companyId)
             ->setParameter('status', ProductStatus::ACTIVE)
-            ->orderBy('p.name', 'ASC')
+            ->orderBy('p.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

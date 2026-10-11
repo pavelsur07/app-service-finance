@@ -25,7 +25,7 @@ final class ProductPurchasePriceRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('productId', $productId)
             ->setParameter('at', $at->format('Y-m-d'))
-            ->orderBy('pp.effectiveFrom', 'DESC')
+            ->orderBy('pp.effectiveFrom', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

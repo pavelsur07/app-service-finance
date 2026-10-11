@@ -37,7 +37,7 @@ final class AiRunRepository extends ServiceEntityRepository
             ->andWhere('run.status = :status')
             ->setParameter('company', $company)
             ->setParameter('status', AiRunStatus::SUCCESS)
-            ->orderBy('run.startedAt', 'DESC')
+            ->orderBy('run.startedAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -47,7 +47,7 @@ final class AiRunRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('run')
             ->andWhere('run.agent = :agent')
-            ->orderBy('run.startedAt', 'DESC')
+            ->orderBy('run.startedAt', \SortDirection::Descending)
             ->setParameter('agent', $agent)
             ->setMaxResults(1)
             ->getQuery()
@@ -59,7 +59,7 @@ final class AiRunRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('run')
             ->andWhere('run.agent = :agent')
             ->andWhere('run.status = :status')
-            ->orderBy('run.startedAt', 'DESC')
+            ->orderBy('run.startedAt', \SortDirection::Descending)
             ->setParameter('agent', $agent)
             ->setParameter('status', AiRunStatus::PENDING)
             ->setMaxResults(1)

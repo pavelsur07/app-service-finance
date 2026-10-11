@@ -21,7 +21,7 @@ class TelegramBotRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('bot')
             ->andWhere('bot.isActive = :active')
             ->setParameter('active', true)
-            ->orderBy('bot.createdAt', 'DESC')
+            ->orderBy('bot.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

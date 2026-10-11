@@ -29,7 +29,7 @@ class ChargeTypeRepository extends ServiceEntityRepository
         $queryBuilder = $this->createQueryBuilder('type')
             ->andWhere('type.company = :company')
             ->andWhere('type.isActive = true')
-            ->orderBy('type.name', 'ASC')
+            ->orderBy('type.name', \SortDirection::Ascending)
             ->setParameter('company', $company);
 
         return new Pagerfanta(new QueryAdapter($queryBuilder));
@@ -70,7 +70,7 @@ class ChargeTypeRepository extends ServiceEntityRepository
     {
         $queryBuilder = $this->createQueryBuilder('type')
             ->andWhere('type.company = :company')
-            ->orderBy('type.name', 'ASC')
+            ->orderBy('type.name', \SortDirection::Ascending)
             ->setParameter('company', $company);
 
         if (null !== $isActive) {

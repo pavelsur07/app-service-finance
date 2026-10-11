@@ -29,9 +29,9 @@ final class InventoryRawSnapshotRepository extends ServiceEntityRepository
             ->andWhere('r.companyId = :companyId')
             ->setParameter('snapshotSessionId', $snapshotSessionId)
             ->setParameter('companyId', $companyId)
-            ->addOrderBy('r.pageNumber', 'ASC')
-            ->addOrderBy('r.fetchedAt', 'ASC')
-            ->addOrderBy('r.id', 'ASC')
+            ->addOrderBy('r.pageNumber', \SortDirection::Ascending)
+            ->addOrderBy('r.fetchedAt', \SortDirection::Ascending)
+            ->addOrderBy('r.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

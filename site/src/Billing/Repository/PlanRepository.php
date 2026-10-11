@@ -25,8 +25,8 @@ final class PlanRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('plan')
             ->andWhere('plan.isActive = :active')
             ->setParameter('active', true)
-            ->orderBy('plan.priceAmount', 'ASC')
-            ->addOrderBy('plan.code', 'ASC')
+            ->orderBy('plan.priceAmount', \SortDirection::Ascending)
+            ->addOrderBy('plan.code', \SortDirection::Ascending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -40,8 +40,8 @@ final class PlanRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('plan')
             ->andWhere('plan.isActive = :active')
             ->setParameter('active', true)
-            ->orderBy('plan.priceAmount', 'ASC')
-            ->addOrderBy('plan.code', 'ASC')
+            ->orderBy('plan.priceAmount', \SortDirection::Ascending)
+            ->addOrderBy('plan.code', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

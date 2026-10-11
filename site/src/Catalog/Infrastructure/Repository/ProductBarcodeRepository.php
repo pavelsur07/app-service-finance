@@ -47,8 +47,8 @@ final class ProductBarcodeRepository
             ->from(ProductBarcode::class, 'pb')
             ->andWhere('IDENTITY(pb.product) = :productId')
             ->setParameter('productId', $productId)
-            ->orderBy('pb.isPrimary', 'DESC')
-            ->addOrderBy('pb.createdAt', 'ASC')
+            ->orderBy('pb.isPrimary', \SortDirection::Descending)
+            ->addOrderBy('pb.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

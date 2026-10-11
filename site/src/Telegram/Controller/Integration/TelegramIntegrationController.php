@@ -43,8 +43,8 @@ class TelegramIntegrationController extends AbstractController
             ->andWhere('bl.company = :company')
             ->andWhere('bl.usedAt IS NOT NULL')
             ->setParameter('company', $company)
-            ->orderBy('bl.usedAt', 'DESC')
-            ->addOrderBy('bl.createdAt', 'DESC')
+            ->orderBy('bl.usedAt', \SortDirection::Descending)
+            ->addOrderBy('bl.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -111,8 +111,8 @@ class TelegramIntegrationController extends AbstractController
             ->andWhere('bl.company = :company')
             ->andWhere('bl.usedAt IS NOT NULL')
             ->setParameter('company', $company)
-            ->orderBy('bl.usedAt', 'DESC')
-            ->addOrderBy('bl.createdAt', 'DESC')
+            ->orderBy('bl.usedAt', \SortDirection::Descending)
+            ->addOrderBy('bl.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
