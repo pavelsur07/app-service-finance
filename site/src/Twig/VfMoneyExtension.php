@@ -33,6 +33,7 @@ final class VfMoneyExtension extends AbstractExtension
     {
         return [
             new TwigFilter('vf_money', $this->money(...)),
+            new TwigFilter('vf_number', $this->number(...)),
             new TwigFilter('vf_money_short', $this->moneyShort(...)),
             new TwigFilter('vf_amount', $this->amount(...), ['is_safe' => ['html']]),
         ];
@@ -47,6 +48,15 @@ final class VfMoneyExtension extends AbstractExtension
         $formatted = $this->format($this->round($this->normalize($value), $decimals));
 
         return null === $currency ? $formatted : $formatted.self::NBSP.$currency;
+    }
+
+    /**
+     * Не денежные числа (количества, проценты, курсы) по тем же правилам записи:
+     * тысячи — U+00A0, запятая, минус — U+2212.
+     */
+    public function number(int|float|string|null $value, int $decimals = 0): string
+    {
+        return $this->money($value, $decimals);
     }
 
     /**

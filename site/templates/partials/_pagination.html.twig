@@ -39,9 +39,9 @@
 
     <div class="d-flex flex-wrap align-items-center gap-2 w-100">
         <p class="m-0 text-secondary vf-pager-caption">
-            Показано с {{ ((currentPage - 1) * itemsPerPage + 1)|vf_money(0) }}
-            по {{ min(currentPage * itemsPerPage, totalItems)|vf_money(0) }}
-            из {{ totalItems|vf_money(0) }}
+            Показано с {{ ((currentPage - 1) * itemsPerPage + 1)|vf_number }}
+            по {{ min(currentPage * itemsPerPage, totalItems)|vf_number }}
+            из {{ totalItems|vf_number }}
         </p>
 
         {% if totalPages > 1 %}

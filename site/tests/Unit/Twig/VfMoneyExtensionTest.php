@@ -31,6 +31,15 @@ final class VfMoneyExtensionTest extends TestCase
         self::assertSame($expected, (new VfMoneyExtension())->money($value, $decimals, $currency));
     }
 
+    public function testNumberUsesTheSameNotation(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame("12\u{00A0}345", $extension->number('12345'));
+        self::assertSame("\u{2212}98,6", $extension->number(-98.6, 1));
+        self::assertSame('—', $extension->number(null));
+    }
+
     public function testRejectsLocalisedStrings(): void
     {
         $this->expectException(\InvalidArgumentException::class);
