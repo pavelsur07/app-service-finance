@@ -35,3 +35,15 @@ window.addEventListener('pageshow', () => {
     }
   }
 });
+
+// Period presets (partials/_period_presets.html.twig): dates come from the server.
+document.addEventListener('click', (event) => {
+  const button = event.target instanceof Element ? event.target.closest('[data-period-from]') : null;
+  const group = button?.closest('[data-period-presets]');
+  if (!button || !(group instanceof HTMLElement)) return;
+  const from = document.querySelector(group.dataset.periodFromInput ?? '');
+  const to = document.querySelector(group.dataset.periodToInput ?? '');
+  if (!(from instanceof HTMLInputElement) || !(to instanceof HTMLInputElement)) return;
+  from.value = button.dataset.periodFrom ?? '';
+  to.value = button.dataset.periodTo ?? '';
+});

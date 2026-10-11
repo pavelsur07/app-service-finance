@@ -83,3 +83,22 @@
 .page-link:hover .page-item-title {
   color: var(--vf-primary);
 }
+
+/* Сумма (фильтр vf_amount): табличные цифры, копейки приглушены, цвет по смыслу.
+   Выравнивание вправо — классом ячейки text-end. */
+.vf-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vf-amount__minor {
+  color: var(--vf-text-muted);
+}
+
+.vf-amount--income {
+  color: var(--vf-ok-text);
+}
+
+.vf-amount--loss {
+  color: var(--vf-danger-text);
+}

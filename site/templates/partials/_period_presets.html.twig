@@ -1,0 +1,21 @@
+{#
+  Пресеты периода DS «Ваш Финдир» для подённых фильтров.
+  Использование: {% include 'partials/_period_presets.html.twig' with {from: '#filter_date_from', to: '#filter_date_to'} only %}
+  Даты считает сервер (часовой пояс приложения); клик заполняет поля — assets/legacy-app.js.
+  «Этот …» и «Квартал» — от начала периода по сегодня.
+#}
+{% set today = date('today') %}
+{% set quarter_month = ((today|date('n') - 1) // 3) * 3 + 1 %}
+{% set presets = [
+    {label: 'Вчера', from: date('yesterday'), to: date('yesterday')},
+    {label: 'Эта неделя', from: date('monday this week'), to: today},
+    {label: 'Прошлая неделя', from: date('monday last week'), to: date('sunday last week')},
+    {label: 'Этот месяц', from: date('first day of this month'), to: today},
+    {label: 'Прошлый месяц', from: date('first day of last month'), to: date('last day of last month')},
+    {label: 'Квартал', from: date(today|date('Y') ~ '-' ~ '%02d'|format(quarter_month) ~ '-01'), to: today},
+] %}
+<div class="d-flex flex-wrap gap-2" data-period-presets data-period-from-input="{{ from }}" data-period-to-input="{{ to }}">
+    {% for preset in presets %}
+        <button type="button" class="btn btn-outline-secondary" data-period-from="{{ preset.from|date('Y-m-d') }}" data-period-to="{{ preset.to|date('Y-m-d') }}">{{ preset.label }}</button>
+    {% endfor %}
+</div>
