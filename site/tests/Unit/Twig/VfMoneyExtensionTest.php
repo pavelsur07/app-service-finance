@@ -47,6 +47,9 @@ final class VfMoneyExtensionTest extends TestCase
         yield 'one decimal, half away from zero' => ['-15250', "\u{2212}15,3\u{00A0}тыс.\u{00A0}₽"];
         yield 'trailing zero dropped' => [2000000000, "2\u{00A0}млрд\u{00A0}₽"];
         yield 'below a thousand stays whole' => [950.4, "950\u{00A0}₽"];
+        yield 'rounding up promotes to thousands' => ['999.6', "1\u{00A0}тыс.\u{00A0}₽"];
+        yield 'rounding up promotes to millions' => ['999999.99', "1\u{00A0}млн\u{00A0}₽"];
+        yield 'largest unit is not promoted further' => ['999999999999.99', "1\u{00A0}000\u{00A0}млрд\u{00A0}₽"];
     }
 
     #[DataProvider('shortCases')]
@@ -90,6 +93,15 @@ final class VfMoneyExtensionTest extends TestCase
         self::assertStringEndsWith("\u{00A0}<span class=\"vf-amount__currency\">$</span></span>", $extension->amount(1250, 2, null, false, 'usd'));
         self::assertStringEndsWith("\u{00A0}<span class=\"vf-amount__currency\">CNY</span></span>", $extension->amount(5000, 2, null, false, 'CNY'));
         self::assertStringNotContainsString('vf-amount__currency', $extension->amount(5000, 2, null, false, 'RUB'));
+    }
+
+    public function testNegateFlipsTheStoredSign(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertStringStartsWith("<span class=\"vf-amount\">\u{2212}50\u{00A0}000", $extension->amount('50000.00', 2, null, true, null, true));
+        self::assertStringStartsWith('<span class="vf-amount vf-amount--income">+12', $extension->amount('-12.00', 2, 'income', true, null, true));
+        self::assertStringStartsWith('<span class="vf-amount vf-amount--zero">0', $extension->amount('0.00', 2, null, true, null, true));
     }
 
     public function testAmountRejectsUnknownTone(): void

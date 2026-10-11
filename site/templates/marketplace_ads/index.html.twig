@@ -69,7 +69,7 @@
                                endpoint `marketplace_ads_ozon_initial_load` доступен через
                                прямой API — реактивируем UI одновременно с multi-chunk. #}
                             {% if is_granted('ROLE_COMPANY_OWNER') %}
-                                <button type="button" class="btn btn-indigo"
+                                <button type="button" class="btn btn-primary"
                                         data-bs-toggle="modal" data-bs-target="#modal-ozon-ad-load-range">
                                     Загрузить за период
                                 </button>
@@ -234,7 +234,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="button" class="btn btn-indigo" id="btn-ozon-ad-load-range">Загрузить</button>
+                        <button type="button" class="btn btn-primary" id="btn-ozon-ad-load-range">Загрузить</button>
                     </div>
                 </div>
             </div>
