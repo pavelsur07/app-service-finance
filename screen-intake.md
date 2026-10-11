@@ -22,16 +22,16 @@
 **Делает:**
 
 - Парсит HTML-макет.
-- Сверяет используемые классы с актуальным состоянием `ui-kit/`.
+- Сверяет используемые классы с актуальным состоянием `assets/styles/kit/`.
 - Размечает страницу на статичные блоки (Twig) и интерактивные острова (React).
-- Формирует список новых компонентов, которые нужно добавить в `ui-kit/` или в модуль.
+- Формирует список новых компонентов, которые нужно добавить в `assets/styles/kit/` или в модуль.
 - Пишет структурированный отчёт в `screens/_analysis/<name>.md`.
 
 **НЕ делает:**
 
 - Не пишет React-компоненты.
 - Не правит Twig-шаблоны.
-- Не добавляет ничего в `ui-kit/` (только пишет «надо добавить вот это»).
+- Не добавляет ничего в `assets/styles/kit/` (только пишет «надо добавить вот это»).
 - Не меняет `assets/`, `templates/`, `src/`, `vite.config.ts`, `package.json`.
 - Не создаёт Vite entrypoints.
 - Не запускает `npm install`.
@@ -45,10 +45,10 @@
 | Что | Где |
 |---|---|
 | Макет страницы | `screens/<name>.html` (обязательно) |
-| Текущий UI Kit | `ui-kit/components/*.html`, `ui-kit/components/*.css`, `ui-kit/storybook.html` |
-| Токены DS | `ui-kit/tokens/*.css` |
-| Журнал изменений UI Kit | `ui-kit/CHANGELOG.md` |
-| Решения дизайна | `ui-kit/decisions.md` |
+| Эталон визуала (DS «Ваш Финдир») | `docs/design-system/sheets/*.dc.html` |
+| CSS кита (реализация нового слоя) | `assets/styles/kit/components/*.css`, `assets/styles/kit/patterns/*.css` |
+| Токены | `assets/styles/kit/tokens/*.css` (новый слой), `assets/styles/design-tokens.css` (легаси) |
+| Решения дизайна | `docs/plan/ds-legacy-tabler-audit.md` §7, §7a |
 | Существующие React-обёртки | `assets/react/ui-kit/**` |
 | Существующие модули | `assets/react/modules/**` |
 | Существующие shared-инпуты | `assets/react/shared/**` |
@@ -64,10 +64,9 @@
 
 Дополнительные побочные эффекты:
 
-- Если в `screens/<name>.html` нет frontmatter с версией UI Kit — Claude Code предлагает (в отчёте, не правит сам!) добавить:
+- Если в `screens/<name>.html` нет frontmatter — Claude Code предлагает (в отчёте, не правит сам!) добавить:
   ```
   ---
-  uiKit: <текущая версия из ui-kit/CHANGELOG.md>
   designedAt: <YYYY-MM-DD>
   source: <ссылка на Figma/чат с дизайнером, если известно>
   ---
@@ -83,10 +82,10 @@
 2. Открыть HTML, убедиться что он парсится (валидный DOM, не битый).
 3. Проверить, что нет `<script>`-блоков с реальным JS (макет дизайнера = только разметка + стили). Если есть — отметить в отчёте «требует прояснения, что именно дизайнер хотел показать скриптом».
 4. Проверить, что нет `<link>` или `<img>` с битыми ссылками. Битые — в отчёт в раздел «Вопросы дизайнеру».
-5. Прочитать `ui-kit/CHANGELOG.md`, зафиксировать текущую версию UI Kit (например, `1.2.0`).
-6. Прочитать `ui-kit/decisions.md`, зафиксировать в памяти последние решения (они могут влиять на трактовку макета).
+5. Прочитать листы DS `docs/design-system/sheets/` (эталон визуала) и решения
+   `docs/plan/ds-legacy-tabler-audit.md` §7 (они могут влиять на трактовку макета).
 
-**STOP-условие:** если HTML не парсится, нет UI Kit, нет ключевых файлов — 🛑 STOP, описать ситуацию.
+**STOP-условие:** если HTML не парсится, нет листов DS или CSS кита, нет ключевых файлов — 🛑 STOP, описать ситуацию.
 
 ---
 
@@ -148,9 +147,9 @@
 
 | Статус | Условие | Что делать |
 |---|---|---|
-| ✅ **В UI Kit** | Класс определён в `ui-kit/components/*.css` или `ui-kit/storybook.html` | Использовать как есть |
+| ✅ **В UI Kit** | Класс определён в `assets/styles/kit/components/*.css` или `patterns/*.css` | Использовать как есть |
 | ⚠️ **В UI Kit, но новый вариант** | Базовый класс есть (`.btn`), но модификатор новый (`.btn--xxl`) | В отчёт: «обсудить с дизайнером — это новый вариант или ошибка» |
-| ❌ **НЕ в UI Kit** | Класса нет нигде в `ui-kit/` | В отчёт: «новый класс, требует решения» |
+| ❌ **НЕ в UI Kit** | Класса нет нигде в `assets/styles/kit/` | В отчёт: «новый класс, требует решения» |
 | 🔄 **Похож на существующий** | Класса нет, но визуально совпадает с уже существующим (например, `.financial-status` похож на `.status`) | В отчёт: «переименовать в существующий класс» |
 
 Для каждого ❌ и 🔄 — предложить один из трёх вариантов:
@@ -198,7 +197,7 @@
 
 На основе фаз 1–3 составить **четыре списка**, каждый со ссылкой на файлы/классы:
 
-**4.1. Новые компоненты в UI Kit (`ui-kit/components/`).**
+**4.1. Новые компоненты в UI Kit (`assets/styles/kit/components/`).**
 
 Примитивы, которые надо добавить в DS. Для каждого:
 - Имя класса (`.toolbar`).
@@ -206,7 +205,7 @@
 - Список вариантов и состояний.
 - Обоснование: почему примитив, а не паттерн.
 
-**4.2. Новые паттерны в UI Kit (`ui-kit/patterns/`).**
+**4.2. Новые паттерны в UI Kit (`assets/styles/kit/patterns/`).**
 
 Композиты (KpiRow, FilterBar, EmptyState). Для каждого:
 - Имя паттерна.
@@ -218,7 +217,7 @@
 Для каждого нового класса/компонента из UI Kit — нужна ли React-обёртка. Указать:
 - Имя компонента (`Toolbar`).
 - Сигнатура пропсов (черновик).
-- Ссылка на HTML-референс в `ui-kit/components/<name>.html`.
+- Ссылка на CSS в `assets/styles/kit/components/<name>.css` и на лист DS.
 
 **4.4. Новые feature-компоненты в модуле.**
 
@@ -235,7 +234,7 @@
 
 В конце отчёта — раздел «Открытые вопросы»: всё, что осталось неясным и требует ответа от владельца или дизайнера. Без этих ответов — следующая задача (реализация) **не стартует**.
 
-🛑 **STOP. Ждать ревью владельца.** Никакого кода, никаких изменений в `ui-kit/`, `assets/`, `templates/`.
+🛑 **STOP. Ждать ревью владельца.** Никакого кода, никаких изменений в `assets/styles/kit/`, `assets/`, `templates/`.
 
 ---
 
@@ -245,7 +244,6 @@
 # Screen analysis: <name>
 
 **Source:** `screens/<name>.html`
-**UI Kit version:** <X.Y.Z из ui-kit/CHANGELOG.md>
 **Analysed at:** <YYYY-MM-DD>
 **Analyst:** Claude Code (autonomous, screen-intake task)
 
@@ -288,11 +286,11 @@
 
 ## 4. Component extraction plan
 
-### 4.1. New UI Kit primitives (to add to `ui-kit/components/`)
+### 4.1. New UI Kit primitives (to add to `assets/styles/kit/components/`)
 - **Toolbar** — `.toolbar`, variants: `default`. Reference HTML draft attached.
 - **Dropzone** — `.dropzone`, states: `idle | dragover | error`.
 
-### 4.2. New UI Kit patterns (to add to `ui-kit/patterns/`)
+### 4.2. New UI Kit patterns (to add to `assets/styles/kit/patterns/`)
 - **KpiRow** — composition of 2–6 `.kpi` cards with responsive collapse.
 - **FilterBar** — composition of `.chip--filter` + dropdowns + search.
 
@@ -323,7 +321,7 @@
 
 ## 7. Risks and unknowns
 
-- New UI Kit components: 2 (Toolbar, Dropzone) → требует апрува дизайнером и bump UI Kit (minor).
+- New UI Kit components: 2 (Toolbar, Dropzone) → требует апрува дизайнером и листа DS.
 - New API endpoints: 2 → требует подтверждения бэкенд-разработчика.
 - `.btn--xxl`: непонятно, это намеренный новый размер или ошибка дизайнера → вопрос дизайнеру.
 
@@ -332,12 +330,12 @@
 1. **[Дизайнер]** `.btn--xxl` — это новый размер кнопки или опечатка?
 2. **[Дизайнер]** `.financial-status` — переименовать в `.status` или это отдельный компонент?
 3. **[Бэкенд]** Подтвердить контракт `/api/reconciliation/kpi` и `/api/reconciliation/transactions`.
-4. **[Владелец]** Утвердить добавление `Toolbar` и `Dropzone` в UI Kit (требует bump 1.2 → 1.3).
+4. **[Владелец]** Утвердить добавление `Toolbar` и `Dropzone` в кит и в листы DS.
 
 ## 9. Next steps (предлагаются, не выполняются)
 
 1. Получить ответы на «Open questions».
-2. Обновить `ui-kit/`: добавить Toolbar, Dropzone (отдельная задача, по правилам CLAUDE.frontend.md).
+2. Обновить `assets/styles/kit/`: добавить Toolbar, Dropzone (отдельная задача, по правилам CLAUDE.frontend.md).
 3. После обновления UI Kit — создать задачу на реализацию модуля reconciliation (отдельная задача, по правилам CLAUDE.frontend.md).
 
 ---
@@ -357,7 +355,7 @@
 - [ ] Все динамические данные сопоставлены с API-эндпоинтами (даже если эндпоинт ещё не существует)
 - [ ] В разделе «Open questions» есть конкретные вопросы с адресатом ([Дизайнер] / [Бэкенд] / [Владелец])
 - [ ] Файл `screens/_analysis/<name>.md` создан
-- [ ] Никакие другие файлы не изменены (никаких правок в `ui-kit/`, `assets/`, `templates/`, `src/`)
+- [ ] Никакие другие файлы не изменены (никаких правок в `assets/styles/kit/`, `assets/`, `templates/`, `src/`)
 - [ ] Никаких `npm install`, никаких изменений `package.json` / `vite.config.ts`
 
 Если хоть один пункт не выполнен — анализ **не завершён**, доработать или 🛑 STOP с объяснением.
@@ -368,7 +366,7 @@
 
 ```
 писать React-компоненты                           — это другая задача
-править ui-kit/                                   — это другая задача
+править assets/styles/kit/                        — это другая задача
 править Twig-шаблоны                              — это другая задача
 менять vite.config.ts / package.json              — это другая задача
 запускать npm install                             — это другая задача
@@ -388,7 +386,7 @@
 4. 🛑 **STOP. Ждать решений по «Open questions» от владельца.**
 
 После апрува владельца появятся **отдельные** задачи:
-- Обновление `ui-kit/` (если есть новые компоненты).
+- Обновление `assets/styles/kit/` (если есть новые компоненты).
 - Реализация модуля (Twig + React-острова) — по правилам `CLAUDE.frontend.md`.
 
 Эти задачи **не входят** в screen-intake. Они стартуют как новые автономные задачи со своими планами и этапами.

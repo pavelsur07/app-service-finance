@@ -10,7 +10,7 @@
 Ключевое: один вопрос Владельцу за задачу — «merge and deploy #N» на handoff
 (§3.2); всё до handoff pre-authorized (§3.1); STOP только по списку §3.4.
 `CLAUDE.md` ниже `AGENTS.md` и не может вводить ручной STOP, которого там нет.
-Задача по React / TypeScript / Vite / UI Kit → прочитать `CLAUDE.frontend.md`;
+Задача по React / TypeScript / Vite / вёрстке → прочитать `CLAUDE.frontend.md`;
 правила ниже к фронту не применяются, workflow — тот же.
 
 ## Перед кодом
@@ -203,6 +203,7 @@ INFO/DEBUG.
 
 ## Design System
 
-Весь визуал через собственный UI Kit: правила и Money-форматы —
-`CLAUDE.frontend.md`, референс — `site/ui-kit/storybook.html`, решения —
-`site/ui-kit/decisions.md`.
+Эталон визуала обоих интерфейсов — дизайн-система «Ваш Финдир»:
+листы `docs/design-system/sheets/`, решения и расхождения —
+`docs/plan/ds-legacy-tabler-audit.md`. Реализация и правила (в т. ч. деньги:
+`vf_money`/`vf_amount`) — `CLAUDE.frontend.md`.
