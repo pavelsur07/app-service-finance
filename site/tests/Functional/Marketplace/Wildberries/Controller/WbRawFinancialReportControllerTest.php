@@ -524,7 +524,8 @@ final class WbRawFinancialReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Рентабельность к продажам без СПП', $productRow);
         self::assertStringContainsString("\u{2212}25,0%", $productRow);
         self::assertStringContainsString('50,0%', $productRow);
-        self::assertSelectorNotExists('#wb-product-costs tbody tr[data-sku-nm-id="555"] .text-danger .vf-amount');
+        self::assertSelectorExists('#wb-product-costs tbody tr[data-sku-nm-id="555"] div.fw-semibold');
+        self::assertSelectorNotExists('#wb-product-costs tbody tr[data-sku-nm-id="555"] div.fw-semibold.text-danger');
 
         $client->request(
             'GET',
