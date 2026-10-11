@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Entity;
 
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -24,7 +25,7 @@ class BalanceAccountState
     #[ORM\Column(type: Types::GUID)]
     private string $accountId;
 
-    #[ORM\Column(type: Types::BIGINT)]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     private string $balance = '0';
 
     #[ORM\Column(type: Types::INTEGER)]

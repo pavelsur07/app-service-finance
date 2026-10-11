@@ -6,6 +6,7 @@ namespace App\Marketplace\Entity;
 
 use App\Marketplace\Enum\OzonReconciliationStatus;
 use App\Marketplace\Repository\OzonReconciliationRunRepository;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -48,7 +49,7 @@ class OzonReconciliationRun
     private bool $realizationPresent = false;
 
     /** Затраты периода вне сверки: их документ — не by-day (легаси v3). Информационно. */
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     /** bigint гидратируется строкой; наружу отдаётся int. */
     private string $outsideRawCostsMinor = '0';
 

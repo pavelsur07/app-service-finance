@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceDirection;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -32,7 +33,7 @@ class BalanceOperationLine
     #[ORM\Column(length: 10, enumType: BalanceDirection::class)]
     private BalanceDirection $direction;
 
-    #[ORM\Column(type: Types::BIGINT)]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     private string $amount;
 
     public function __construct(string $companyId, string $operationId, string $accountId, BalanceDirection $direction, string $amount)
