@@ -1,0 +1,61 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: oz_sample
+        pl_code: PL_SHARED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: oz_split_sample
+        pl_code: PL_SPLIT_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: oz_disabled_sample
+        pl_code: PL_DISABLED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: oz_excluded_sample
+        pl_code: PL_EXCLUDED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+  wildberries:
+    cost_mappings:
+      - cost_code: wb_new
+        pl_code: PL_SHARED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_split_a
+        pl_code: PL_SPLIT_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_split_b
+        pl_code: PL_SPLIT_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_split_new
+        pl_code: PL_SPLIT_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_disabled_new
+        pl_code: PL_DISABLED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_excluded
+        pl_code: PL_EXCLUDED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: wb_excluded_new
+        pl_code: PL_EXCLUDED_MISSING
+        include_in_pl: true
+        is_negative: true
+        confidence: high

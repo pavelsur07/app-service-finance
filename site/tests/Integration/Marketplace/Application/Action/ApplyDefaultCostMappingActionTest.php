@@ -162,7 +162,8 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
         $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, 'cost_group_sample'), (string) $own->getId(), true));
         $groupNew = $this->createCost($company, 'cost_group_new');
 
-        // Образцы другой компании и другого маркетплейса не учитываются.
+        // Образцы другой компании не учитываются; правило другого маркетплейса —
+        // образец, только если его код есть в шаблоне того маркетплейса (здесь нет).
         $neighbourId = '66666666-6666-6666-6666-666666666666';
         $neighbour = $this->createCompany($neighbourId);
         $neighbourLine = $this->createPl($neighbour, 'OWN_LINE', PLCategoryType::LEAF_INPUT);
@@ -200,11 +201,63 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
         $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, 'user'));
     }
 
+    /**
+     * Своего образца у WB нет — статья берётся из правил Ozon той же компании с тем же
+     * pl_code шаблона. Разнобой внутри WB и исключённое из ОПиУ правило WB чужим образцом
+     * не перекрываются; отключённое правило Ozon — не образец.
+     */
+    public function testPartialApplyInfersLineFromOtherMarketplaceWhenOwnHasNoSamples(): void
+    {
+        $companyId = '77777777-7777-7777-7777-777777777777';
+        $company = $this->createCompany($companyId);
+        $returns = $this->createPl($company, 'OWN_RETURNS', PLCategoryType::LEAF_INPUT);
+        $other = $this->createPl($company, 'OWN_OTHER', PLCategoryType::LEAF_INPUT);
+
+        $samples = [
+            ['oz_sample', MarketplaceType::OZON, $returns, true],
+            ['oz_split_sample', MarketplaceType::OZON, $returns, true],
+            ['oz_disabled_sample', MarketplaceType::OZON, $returns, false],
+            ['wb_split_a', MarketplaceType::WILDBERRIES, $returns, true],
+            ['wb_split_b', MarketplaceType::WILDBERRIES, $other, true],
+            ['oz_excluded_sample', MarketplaceType::OZON, $returns, true],
+            ['wb_excluded', MarketplaceType::WILDBERRIES, null, false],
+        ];
+        foreach ($samples as [$code, $marketplace, $line, $include]) {
+            $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $this->createCost($company, $code, $marketplace), null === $line ? null : (string) $line->getId(), $include));
+        }
+        $wbNew = $this->createCost($company, 'wb_new', MarketplaceType::WILDBERRIES);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid7()->toString(), $companyId, $wbNew, null, true));
+        $splitNew = $this->createCost($company, 'wb_split_new', MarketplaceType::WILDBERRIES);
+        $disabledNew = $this->createCost($company, 'wb_disabled_new', MarketplaceType::WILDBERRIES);
+        $excludedNew = $this->createCost($company, 'wb_excluded_new', MarketplaceType::WILDBERRIES);
+        $this->em->flush();
+
+        $action = $this->buildApplyAction('default_cost_mapping_apply_cross.yaml');
+        $result = $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::WILDBERRIES->value, 'cron', partial: true));
+
+        self::assertSame(['wb_new'], $result->getUpdatedCostCodes());
+        self::assertSame([], $result->getCreatedCostCodes());
+        self::assertSame(['wb_new'], $result->getInferredCostCodes());
+        self::assertSame(['wb_new'], $result->getCrossMarketplaceCostCodes());
+        // wb_excluded (отключённое правило без статьи шаблона) тоже попадает в blocked — так было до этой задачи.
+        self::assertSame(['wb_split_new', 'wb_disabled_new', 'wb_excluded', 'wb_excluded_new'], $result->getBlockedCostCodes());
+
+        $plOf = fn (string $costId): mixed => $this->em->getConnection()->fetchOne(
+            'SELECT pl_category_id FROM marketplace_cost_pl_mappings WHERE company_id = :companyId AND cost_category_id = :costId',
+            ['companyId' => $companyId, 'costId' => $costId],
+        );
+        self::assertSame((string) $returns->getId(), (string) $plOf((string) $wbNew->getId()));
+        self::assertFalse($plOf((string) $splitNew->getId()));
+        self::assertFalse($plOf((string) $disabledNew->getId()));
+        self::assertFalse($plOf((string) $excludedNew->getId()));
+    }
+
     private function buildApplyAction(string $fixture): ApplyDefaultCostMappingAction
     {
         $connection = $this->em->getConnection();
+        $templateProvider = new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/'.$fixture);
         $previewAction = new PreviewDefaultCostMappingAction(
-            new DefaultCostMappingYamlProvider(__DIR__.'/../../../../Fixtures/Marketplace/'.$fixture),
+            $templateProvider,
             new MarketplaceCostCategoriesByCodeQuery($connection),
             new PLCategoriesByCodeQuery($connection),
             new MarketplaceCostPLMappingsByCostCategoryQuery($connection),
@@ -215,6 +268,7 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
             new DefaultCostMappingWriter($connection),
             new CompanyCostPlTargetsQuery($connection),
             new DefaultCostMappingSiblingResolver(),
+            $templateProvider,
             $connection,
             new NullLogger(),
         );

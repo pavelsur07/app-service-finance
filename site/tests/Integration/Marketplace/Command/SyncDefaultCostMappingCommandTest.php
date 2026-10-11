@@ -85,6 +85,28 @@ final class SyncDefaultCostMappingCommandTest extends IntegrationTestCase
         self::assertStringContainsString('по образцу компании: ozon_crossdocking', $tester->getDisplay());
     }
 
+    /**
+     * WB-правил с COGS_RETURNS_DELIVERY у компании нет, а возвраты Ozon она относит в
+     * свою «Логистику возвратов» — туда же уходят возвраты WB.
+     */
+    public function testInfersLineFromOtherMarketplaceWhenOwnHasNoSamples(): void
+    {
+        $company = $this->company(954);
+        $this->connection($company, MarketplaceType::WILDBERRIES, true);
+        $returns = PLCategoryBuilder::aPLCategory()->withId(Uuid::uuid4()->toString())->forCompany($company)->withName('Логистика возвратов')->build();
+        $this->em->persist($returns);
+        $ozonReturn = $this->costCategory($company, 'ozon_logistic_return');
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $company->getId(), $ozonReturn, $returns->getId()));
+        $wbReturn = $this->costCategory($company, 'logistics_return', MarketplaceType::WILDBERRIES);
+        $this->em->flush();
+
+        $tester = $this->tester();
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
+        self::assertSame($returns->getId(), $this->plCategoryOf($wbReturn));
+        self::assertStringContainsString('из них по другому маркетплейсу: logistics_return', $tester->getDisplay());
+    }
+
     public function testSkipsCompaniesWithoutActiveSellerConnection(): void
     {
         $company = $this->company(952);
@@ -117,9 +139,9 @@ final class SyncDefaultCostMappingCommandTest extends IntegrationTestCase
         $this->em->persist($connection);
     }
 
-    private function costCategory(Company $company, string $code): MarketplaceCostCategory
+    private function costCategory(Company $company, string $code, MarketplaceType $marketplace = MarketplaceType::OZON): MarketplaceCostCategory
     {
-        $category = (new MarketplaceCostCategory(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON))
+        $category = (new MarketplaceCostCategory(Uuid::uuid4()->toString(), $company, $marketplace))
             ->setCode($code)
             ->setName($code);
         $this->em->persist($category);
