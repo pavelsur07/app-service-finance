@@ -19,7 +19,7 @@
             <thead>
                 <tr>
                     <th>Период</th>
-                    <th>Цена</th>
+                    <th class="text-end">Цена</th>
                     <th>Комментарий</th>
                 </tr>
             </thead>
@@ -35,7 +35,7 @@
                                 по н.в.
                             {% endif %}
                         </td>
-                        <td>{{ item.priceAmount }} {{ item.priceCurrency }}</td>
+                        <td class="text-end">{{ item.priceAmount|vf_amount(currency: item.priceCurrency == 'RUB' ? '₽' : item.priceCurrency) }}</td>
                         <td>{{ item.note ?: '—' }}</td>
                     </tr>
                 {% else %}
