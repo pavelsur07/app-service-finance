@@ -71,9 +71,9 @@
                     <td>{{ deal.recognizedAt ? deal.recognizedAt|date('d.m.Y') : '—' }}</td>
                     <td>{{ deal.channel.value }}</td>
                     <td>{{ deal.status.value }}</td>
-                    <td class="text-end">{{ deal.totalAmount|number_format(2, ',', ' ') }}</td>
-                    <td class="text-end">{{ deal.totalDirectCost|number_format(2, ',', ' ') }}</td>
-                    <td class="text-end">{{ (deal.totalAmount - deal.totalDirectCost)|number_format(2, ',', ' ') }}</td>
+                    <td class="text-end">{{ deal.totalAmount|vf_amount }}</td>
+                    <td class="text-end">{{ deal.totalDirectCost|vf_amount }}</td>
+                    <td class="text-end">{{ (deal.totalAmount - deal.totalDirectCost)|vf_amount }}</td>
                 </tr>
             {% else %}
                 <tr>
