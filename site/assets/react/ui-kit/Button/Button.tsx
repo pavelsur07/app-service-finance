@@ -15,11 +15,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 /**
  * Button — типизированная обёртка над UI Kit `.btn` классами.
  *
- * Не пишет свой CSS. Все стили из ui-kit/components/button.css,
- * подключённого через assets/styles/app.css.
- *
- * @uiKit ui-kit/components/button.html
- * @version 1.4
+ * Не пишет свой CSS. Все стили из assets/styles/kit/components/button.css,
+ * подключённого через assets/styles/app.css. Эталон визуала — лист DS-Controls
+ * (docs/design-system/sheets/).
  *
  * @example
  *   <Button variant="primary" size="md" onClick={save}>Сохранить</Button>

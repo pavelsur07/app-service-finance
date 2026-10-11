@@ -123,9 +123,8 @@ consult only the sections the diff touches.
 
 Skip everything the machine gates already enforce: code style and formatting,
 declare(strict_types=1), module boundaries, missing companyId parameters in
-Repository signatures, debug calls, and CSS classes that do not exist in the UI
-Kit. Those are caught by PHP CS Fixer, PHPStan, the architecture tests and
-npm run check:ui-kit; reporting them wastes the round.
+Repository signatures and debug calls. Those are caught by PHP CS Fixer,
+PHPStan and the architecture tests; reporting them wastes the round.
 
 Check, only where relevant to this diff:
 - scope compliance against the task;
