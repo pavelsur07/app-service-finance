@@ -109,6 +109,7 @@ final class PlReportPreviewController extends AbstractController
                     'layout' => $layout,
                     'periods' => [],
                     'rows' => $compare['rows'],
+                    'formats' => $compare['formats'],
                     'warnings' => $compare['warnings'],
                     'compareProjects' => $compare['projects'],
                 ]);
@@ -173,6 +174,7 @@ final class PlReportPreviewController extends AbstractController
                 $grid['periods']
             ),
             'rows' => $grid['rows'],
+            'formats' => $grid['formats'],
             'warnings' => $grid['warnings'],
         ]);
     }

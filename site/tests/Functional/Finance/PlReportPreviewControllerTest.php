@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Finance;
 
+use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\PLCategory;
@@ -165,9 +166,10 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
 
             self::assertResponseIsSuccessful($url);
             foreach ([
-                (string) $negativeCategory->getId() => '(1 234.50)',
-                (string) $positiveCategory->getId() => '1 234.50',
-                (string) $zeroCategory->getId() => '0.00',
+                // DS-Money: U+00A0 и запятая; скобки — бухгалтерский формат отчёта.
+                (string) $negativeCategory->getId() => "(1\u{00A0}234,50)",
+                (string) $positiveCategory->getId() => "1\u{00A0}234,50",
+                (string) $zeroCategory->getId() => '0,00',
             ] as $rowId => $expected) {
                 $cells = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"] td.text-end', $rowId));
                 self::assertCount($expectedCellCount, $cells, $url);
@@ -939,6 +941,58 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
                 $spreadsheet->disconnectWorksheets();
             }
             unlink($path);
+        }
+    }
+
+    /**
+     * Строки «%», «Коэф.» и «Кол-во» приходят из ValueFormatter не деньгами («12.5 %»,
+     * 4 знака): ячейка не должна падать и не должна выдавать их за суммы.
+     */
+    public function testNonMoneyRowsKeepTheirFormat(): void
+    {
+        $client = static::createClient();
+        $company = $this->loginWithCompany($client, 'pl-report-preview-non-money@example.test');
+        self::assertInstanceOf(Company::class, $company);
+        $project = new ProjectDirection('33333333-3333-3333-3333-000000000981', $company, 'Project');
+        $entities = [$project];
+        $expected = [];
+        foreach ([
+            ['33333333-3333-3333-3333-000000000982', PLValueFormat::PERCENT, '0.25', '25,0 %'],
+            ['33333333-3333-3333-3333-000000000983', PLValueFormat::RATIO, '1.50', '1,5000'],
+            ['33333333-3333-3333-3333-000000000984', PLValueFormat::QTY, '3', '3,00'],
+        ] as $i => [$id, $format, $amount, $text]) {
+            $category = (new PLCategory($id, $company))
+                ->setName('Row '.$format->value)
+                ->setCode('ROW_'.$format->value)
+                ->setFlow(PLFlow::INCOME)
+                ->setFormat($format);
+            $entities[] = $category;
+            $entities[] = (new PLDailyTotal(
+                sprintf('33333333-3333-3333-3333-00000000099%d', $i),
+                $company,
+                $project,
+                new \DateTimeImmutable('2026-08-10'),
+                $category,
+            ))->setAmountIncome($amount);
+            $expected[$id] = $text;
+        }
+        foreach ($entities as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        foreach ([
+            '/finance/report/preview?grouping=month&from=2026-08-01&to=2026-08-31',
+            '/finance/report/preview?layout=projects&grouping=month&from=2026-08-01&to=2026-08-31',
+        ] as $url) {
+            $crawler = $client->request('GET', $url);
+            self::assertResponseIsSuccessful($url);
+            foreach ($expected as $rowId => $text) {
+                $cell = $crawler->filter(sprintf('tr.pl-row[data-row-id="%s"] td.text-end', $rowId))->first();
+                self::assertSame($text, str_replace("\u{00A0}", ' ', trim($cell->text())), $url);
+                self::assertSame(trim($cell->text()), $cell->attr('title'), $url);
+                self::assertCount(0, $cell->filter('.vf-amount'), $url);
+            }
         }
     }
 
