@@ -128,7 +128,7 @@
                             <th>Наименование</th>
                             <th>Артикул</th>
                             <th>Размер</th>
-                            <th>Цена</th>
+                            <th class="text-end">Цена, ₽</th>
                             <th>Товар</th>
                             <th>Теги</th>
                             <th class="w-1"></th>
@@ -159,7 +159,7 @@
                                     {% endif %}
                                 </td>
                                 <td>{% include 'marketplace/listings/_listing_size.html.twig' with {size: listing.size} only %}</td>
-                                <td>{{ listing.price }} ₽</td>
+                                <td class="text-end">{{ listing.price|vf_amount }}</td>
                                 <td>
                                     {% if listing.product %}
                                         <div class="d-flex align-items-center gap-2">
