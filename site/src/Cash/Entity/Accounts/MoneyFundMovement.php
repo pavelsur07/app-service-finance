@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Entity\Accounts;
 
 use App\Company\Entity\Company;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -29,7 +30,7 @@ class MoneyFundMovement
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $occurredAt;
 
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     private string $amountMinor = '0';
 
     #[ORM\Column(type: 'text', nullable: true)]

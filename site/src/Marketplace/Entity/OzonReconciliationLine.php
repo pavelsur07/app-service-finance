@@ -8,6 +8,7 @@ use App\Marketplace\Enum\OzonReconciliationBlock;
 use App\Marketplace\Enum\OzonReconciliationCheck;
 use App\Marketplace\Enum\OzonReconciliationStatus;
 use App\Marketplace\Repository\OzonReconciliationLineRepository;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -41,14 +42,14 @@ class OzonReconciliationLine
     #[ORM\Column(type: 'string', length: 64, options: ['default' => ''])]
     private string $categoryCode;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
-    /** bigint гидратируется строкой; наружу отдаётся int. */
+    #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
+    /** bigint_string гидрирует строку (StringBigIntType); наружу отдаётся int. */
     private ?string $sourceMinor;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
     private ?string $targetMinor;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
     private ?string $deltaMinor;
 
     #[ORM\Column(type: 'integer', nullable: true)]
