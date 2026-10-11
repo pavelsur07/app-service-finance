@@ -30,19 +30,19 @@
                         <div class="col-md-4">
                             <div class="text-muted">Сумма транзакции ДДС</div>
                             <span class="badge bg-primary-lt text-primary mt-1">
-                                {{ transactionAllocation.transactionAmount|number_format(2, '.', ' ') }} ₽
+                                {{ transactionAllocation.transactionAmount|vf_money(2, '₽') }}
                             </span>
                         </div>
                         <div class="col-md-4">
                             <div class="text-muted">Уже распределено на документы ОПиУ</div>
                             <span class="badge bg-yellow-lt text-yellow mt-1">
-                                {{ transactionAllocation.allocatedAmount|number_format(2, '.', ' ') }} ₽
+                                {{ transactionAllocation.allocatedAmount|vf_money(2, '₽') }}
                             </span>
                         </div>
                         <div class="col-md-4">
                             <div class="text-muted">Остаток</div>
                             <span class="badge bg-green-lt text-green mt-1">
-                                {{ transactionAllocation.remainingAmount|number_format(2, '.', ' ') }} ₽
+                                {{ transactionAllocation.remainingAmount|vf_money(2, '₽') }}
                             </span>
                         </div>
                     </div>
