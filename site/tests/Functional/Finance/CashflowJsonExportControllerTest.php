@@ -290,7 +290,8 @@ final class CashflowJsonExportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Проект → ЦФО', $content);
         self::assertStringContainsString('Сервисные услуги', $content);
         self::assertStringContainsString('Ростов', $content);
-        self::assertStringContainsString('+250,00', $content);
+        // DS-Money: в отчёте знак только у отрицательных, приход — зелёный (vf-amount--income).
+        self::assertStringContainsString('<span class="vf-amount vf-amount--income">250<span class="vf-amount__minor">,00</span></span>', $content);
         self::assertSame(
             $center->getId(),
             $crawler->filter('input[data-pl-filter-name="responsibilityCenterIds[]"][checked]')->attr('value'),

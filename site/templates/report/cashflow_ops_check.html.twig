@@ -329,7 +329,7 @@
                                 <tr class="{{ has_err ? 'table-warning' : '' }}">
                                     <td>{{ r.date|date('d.m.Y') }}</td>
                                     <td>{{ r.account_name }}</td>
-                                    <td class="text-end">{{ r.amount_signed|number_format(2, '.', ' ') }} {{ r.currency }}</td>
+                                    <td class="text-end">{{ r.amount_signed|vf_amount(currency: r.currency == 'RUB' ? '₽' : r.currency) }}</td>
                                     <td>{{ r.direction }}</td>
                                     <td>{{ r.category_name ?? '—' }}</td>
                                     <td>{{ r.import_source ?? '—' }}</td>
@@ -383,20 +383,20 @@
                                 <tr class="{{ bad ? 'table-danger' : '' }}">
                                     <td>{{ r.date|date('d.m.Y') }}</td>
                                     <td>{{ r.account_name }}</td>
-                                    <td class="text-end">{{ r.opening|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.inflow_bal|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.outflow_bal|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.closing|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.inflow_trx|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.outflow_trx|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ r.closing_by_trx|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.opening|vf_amount }}</td>
+                                    <td class="text-end">{{ r.inflow_bal|vf_amount }}</td>
+                                    <td class="text-end">{{ r.outflow_bal|vf_amount }}</td>
+                                    <td class="text-end">{{ r.closing|vf_amount }}</td>
+                                    <td class="text-end">{{ r.inflow_trx|vf_amount }}</td>
+                                    <td class="text-end">{{ r.outflow_trx|vf_amount }}</td>
+                                    <td class="text-end">{{ r.closing_by_trx|vf_amount }}</td>
                                     <td class="text-end fw-bold">
                                         {% if bad %}
                                             <span class="text-danger">
-                                              <i class="ti ti-alert-octagon me-1"></i>{{ r.diff_closing|number_format(2, '.', ' ') }}
+                                              <i class="ti ti-alert-octagon me-1"></i>{{ r.diff_closing|vf_number(2) }}
                                             </span>
                                         {% else %}
-                                            <span class="text-muted">0.00</span>
+                                            <span class="text-muted">0,00</span>
                                         {% endif %}
                                     </td>
                                 </tr>

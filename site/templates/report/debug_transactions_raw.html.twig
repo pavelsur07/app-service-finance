@@ -47,7 +47,6 @@
                     <tr><td colspan="7" class="text-center text-muted py-5">Нет данных</td></tr>
                 {% else %}
                     {% for t in txs %}
-                        {% set sign = t.amount > 0 ? '+' : (t.amount < 0 ? '−' : '') %}
                         <tr>
                             <td>{{ t.date|date('d.m.Y H:i') }}</td>
                             <td>{{ t.account }}</td>
@@ -55,8 +54,8 @@
                             <td>{{ t.category|default('') }}</td>
                             <td><small class="text-muted">{{ t.document|default('') }}</small></td>
                             <td>{{ t.description|default('') }}</td>
-                            <td class="text-end {{ t.amount < 0 ? 'text-danger' : 'text-success' }}">
-                                {{ sign }}{{ (t.amount|abs)|number_format(2, '.', ' ') }}
+                            <td class="text-end">
+                                {{ t.amount|vf_amount(2, t.amount > 0 ? 'income' : null, signed: true) }}
                             </td>
                         </tr>
                     {% endfor %}

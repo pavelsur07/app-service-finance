@@ -397,7 +397,7 @@
             <div class="card">
                 <div class="card-body">
                     <div class="text-secondary">Приход</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="inflow" data-value="{{ dashboard_reconciliation.inflow }}">{{ dashboard_reconciliation.inflow|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="inflow" data-value="{{ dashboard_reconciliation.inflow }}">{{ dashboard_reconciliation.inflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
                 </div>
             </div>
         </div>
@@ -405,7 +405,7 @@
             <div class="card">
                 <div class="card-body">
                     <div class="text-secondary">Расход</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="outflow" data-value="{{ dashboard_reconciliation.outflow }}">{{ dashboard_reconciliation.outflow|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="outflow" data-value="{{ dashboard_reconciliation.outflow }}">{{ dashboard_reconciliation.outflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
                 </div>
             </div>
         </div>
@@ -413,7 +413,7 @@
             <div class="card">
                 <div class="card-body">
                     <div class="text-secondary">Чистый поток</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="net" data-value="{{ dashboard_reconciliation.net }}">{{ dashboard_reconciliation.net|number_format(2, ',', ' ') }} {{ dashboard_reconciliation.currency }}</div>
+                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="net" data-value="{{ dashboard_reconciliation.net }}">{{ dashboard_reconciliation.net|vf_money(2, dashboard_reconciliation.currency) }}</div>
                 </div>
             </div>
         </div>
@@ -429,10 +429,9 @@
 {% set periodCount = periods|length %}
 {% import _self as macros %}
 
+{# DS-Money: приход — зелёный, расход и отрицательное сальдо — основной цвет с U+2212, ноль приглушён. #}
 {% macro format_amount(value) %}
-    {% set class = value < 0 ? 'text-danger' : (value > 0 ? 'text-success' : '') %}
-    {% set sign = value > 0 ? '+' : (value < 0 ? '-' : '') %}
-    <span class="{{ class }}">{{ sign }}{{ value|abs|number_format(2, ',', ' ') }}</span>
+    {{ value|vf_amount(2, value > 0 ? 'income' : null) }}
 {% endmacro %}
 
 {% macro render_category(cat, totals, currency, periodCount, parentId) %}
