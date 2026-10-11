@@ -1,7 +1,13 @@
 {% extends 'marketplace/layout.html.twig' %}
 
+{# DS-Money: копейки → точная десятичная строка; KPI, итоги и подписи — с «₽». #}
 {% macro money(minor) %}
-    {{ minor|format_minor_currency('RUB') }}
+    {{ minor|vf_minor|vf_money(2, 'RUB') }}
+{% endmacro %}
+
+{# Сумма в денежной колонке таблицы: «₽» — в заголовке колонки. #}
+{% macro amount(minor) %}
+    {{ minor|vf_minor|vf_amount }}
 {% endmacro %}
 
 {% macro percent(value) %}
@@ -10,7 +16,7 @@
     {% elseif value == '0.0' %}
         0,0%
     {% else %}
-        {{ value|replace({'.': ','}) }}%
+        {{ value|vf_number(1) }}%
     {% endif %}
 {% endmacro %}
 
@@ -120,9 +126,9 @@
                     <div class="card h-100">
                         <div class="card-body">
                             <div class="text-secondary mb-1">Строк raw</div>
-                            <div class="h2 mb-0">{{ report.summary.row_count|number_format(0, ',', ' ') }}</div>
+                            <div class="h2 mb-0">{{ report.summary.row_count|vf_number }}</div>
                             <div class="text-secondary small">
-                                Загружено: {{ report.coverage.loaded_rows|number_format(0, ',', ' ') }},
+                                Загружено: {{ report.coverage.loaded_rows|vf_number }},
                                 reportId: {{ report.summary.report_count }}
                             </div>
                         </div>
@@ -150,7 +156,7 @@
                     <div class="card h-100 border-primary">
                         <div class="card-body">
                             <div class="text-secondary mb-1">Расчётное перечисление</div>
-                            <div class="h2 mb-0 {{ report.summary.payout_minor < 0 ? 'text-danger' : 'text-primary' }}">
+                            <div class="h2 mb-0">
                                 {{ report_ui.money(report.summary.payout_minor) }}
                             </div>
                             <div class="text-secondary small">forPay + прочие начисления/удержания</div>
@@ -188,9 +194,9 @@
                         <tr>
                             <th>Статья</th>
                             <th>Источник / формула</th>
-                            <th class="text-end">Начислено</th>
-                            <th class="text-end">Возврат / сторно</th>
-                            <th class="text-end">Влияние</th>
+                            <th class="text-end">Начислено, ₽</th>
+                            <th class="text-end">Возврат / сторно, ₽</th>
+                            <th class="text-end">Влияние, ₽</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -211,10 +217,10 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-secondary"><code>{{ article.source }}</code></td>
-                                <td class="text-end text-nowrap">{{ report_ui.money(article.accrual_minor) }}</td>
-                                <td class="text-end text-nowrap">{{ report_ui.money(article.reversal_minor) }}</td>
-                                <td class="text-end text-nowrap fw-semibold {{ article.net_minor < 0 ? 'text-danger' : (article.net_minor > 0 ? 'text-success' : '') }}">
-                                    {{ report_ui.money(article.net_minor) }}
+                                <td class="text-end text-nowrap">{{ report_ui.amount(article.accrual_minor) }}</td>
+                                <td class="text-end text-nowrap">{{ report_ui.amount(article.reversal_minor) }}</td>
+                                <td class="text-end text-nowrap fw-semibold {{ article.net_minor > 0 ? 'text-success' : '' }}">
+                                    {{ report_ui.amount(article.net_minor) }}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -226,13 +232,13 @@
                         </tr>
                         <tr>
                             <th colspan="4" class="text-end">Прочие начисления и удержания</th>
-                            <th class="text-end text-nowrap {{ report.summary.post_product_minor < 0 ? 'text-danger' : 'text-success' }}">
+                            <th class="text-end text-nowrap {{ report.summary.post_product_minor > 0 ? 'text-success' : '' }}">
                                 {{ report_ui.money(report.summary.post_product_minor) }}
                             </th>
                         </tr>
                         <tr>
                             <th colspan="4" class="text-end">Расчётное перечисление</th>
-                            <th class="text-end text-nowrap fs-3 {{ report.summary.payout_minor < 0 ? 'text-danger' : 'text-primary' }}">
+                            <th class="text-end text-nowrap fs-3">
                                 {{ report_ui.money(report.summary.payout_minor) }}
                             </th>
                         </tr>
@@ -264,9 +270,9 @@
                                 <th>Период</th>
                                 <th class="text-end">Строк</th>
                                 <th class="text-end">reportId с номером</th>
-                                <th class="text-end">Удержано</th>
-                                <th class="text-end">Выплачено WB</th>
-                                <th class="text-end">Влияние</th>
+                                <th class="text-end">Удержано, ₽</th>
+                                <th class="text-end">Выплачено WB, ₽</th>
+                                <th class="text-end">Влияние, ₽</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -280,12 +286,12 @@
                                             {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
-                                    <td class="text-end">{{ row.report_count|number_format(0, ',', ' ') }}</td>
-                                    <td class="text-end text-nowrap">{{ report_ui.money(row.withheld_minor) }}</td>
-                                    <td class="text-end text-nowrap">{{ report_ui.money(row.paid_minor) }}</td>
-                                    <td class="text-end text-nowrap fw-semibold {{ row.impact_minor < 0 ? 'text-danger' : (row.impact_minor > 0 ? 'text-success' : '') }}">
-                                        {{ report_ui.money(row.impact_minor) }}
+                                    <td class="text-end">{{ row.row_count|vf_number }}</td>
+                                    <td class="text-end">{{ row.report_count|vf_number }}</td>
+                                    <td class="text-end text-nowrap">{{ report_ui.amount(row.withheld_minor) }}</td>
+                                    <td class="text-end text-nowrap">{{ report_ui.amount(row.paid_minor) }}</td>
+                                    <td class="text-end text-nowrap fw-semibold {{ row.impact_minor > 0 ? 'text-success' : '' }}">
+                                        {{ report_ui.amount(row.impact_minor) }}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -295,7 +301,7 @@
                                 <th colspan="4" class="text-end">Итого</th>
                                 <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_withheld_minor) }}</th>
                                 <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_paid_minor) }}</th>
-                                <th class="text-end text-nowrap {{ report.summary.deduction_impact_minor < 0 ? 'text-danger' : (report.summary.deduction_impact_minor > 0 ? 'text-success' : '') }}">
+                                <th class="text-end text-nowrap {{ report.summary.deduction_impact_minor > 0 ? 'text-success' : '' }}">
                                     {{ report_ui.money(report.summary.deduction_impact_minor) }}
                                 </th>
                             </tr>
@@ -328,14 +334,14 @@
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <div class="text-secondary mb-1">Варианты SKU</div>
-                                        <div class="h2 mb-0">{{ report.product_summary.sku_count|number_format(0, ',', ' ') }}</div>
+                                        <div class="h2 mb-0">{{ report.product_summary.sku_count|vf_number }}</div>
                                         <div class="text-secondary small">
                                             Сопоставлено:
-                                            {{ report.product_summary.mapped_sku_count|number_format(0, ',', ' ') }},
+                                            {{ report.product_summary.mapped_sku_count|vf_number }},
                                             без пары:
-                                            {{ report.product_summary.unmapped_sku_count|number_format(0, ',', ' ') }},
+                                            {{ report.product_summary.unmapped_sku_count|vf_number }},
                                             конфликтов:
-                                            {{ report.product_summary.conflict_sku_count|number_format(0, ',', ' ') }}
+                                            {{ report.product_summary.conflict_sku_count|vf_number }}
                                         </div>
                                     </div>
                                 </div>
@@ -344,10 +350,10 @@
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <div class="text-secondary mb-1">Товары, шт.</div>
-                                        <div class="h2 mb-0">{{ report.product_summary.net_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div class="h2 mb-0">{{ report.product_summary.net_quantity|vf_number }}</div>
                                         <div class="text-secondary small">
-                                            Продано: {{ report.product_summary.sold_quantity|number_format(0, ',', ' ') }},
-                                            возвращено: {{ report.product_summary.returned_quantity|number_format(0, ',', ' ') }}
+                                            Продано: {{ report.product_summary.sold_quantity|vf_number }},
+                                            возвращено: {{ report.product_summary.returned_quantity|vf_number }}
                                         </div>
                                     </div>
                                 </div>
@@ -390,7 +396,7 @@
                                             Покрытие:
                                             {{ report_ui.percent(report.product_summary.cost_coverage_percent) }};
                                             без цены:
-                                            {{ report.product_summary.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                            {{ report.product_summary.missing_cost_quantity|vf_number }} шт.
                                         </div>
                                     </div>
                                 </div>
@@ -400,7 +406,7 @@
                                     <div class="card-body">
                                         <div class="text-secondary mb-1">Результат до общих расходов WB</div>
                                         {% if report.product_summary.result_minor is not null %}
-                                            <div class="h2 mb-0 {{ report.product_summary.result_minor < 0 ? 'text-danger' : (report.product_summary.result_minor > 0 ? 'text-primary' : '') }}">
+                                            <div class="h2 mb-0">
                                                 {{ report_ui.money(report.product_summary.result_minor) }}
                                             </div>
                                             <div class="text-secondary small">
@@ -411,8 +417,8 @@
                                             <div class="h2 mb-0 text-warning">—</div>
                                             <div class="text-secondary small">
                                                 Рассчитано SKU:
-                                                {{ report.product_summary.complete_cost_sku_count|number_format(0, ',', ' ') }}
-                                                из {{ report.product_summary.sku_count|number_format(0, ',', ' ') }};
+                                                {{ report.product_summary.complete_cost_sku_count|vf_number }}
+                                                из {{ report.product_summary.sku_count|vf_number }};
                                                 известная часть:
                                                 {{ report_ui.money(report.product_summary.known_result_minor) }}
                                             </div>
@@ -437,14 +443,14 @@
                             or report.product_summary.conflict_sku_count > 0 %}
                             <div class="alert alert-warning mb-0" role="status">
                                 Общий результат недостоверен, пока не заполнена себестоимость для
-                                {{ report.product_summary.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                {{ report.product_summary.missing_cost_quantity|vf_number }} шт.
                                 {% if report.product_summary.unmapped_sku_count > 0 %}
                                     Не сопоставлено SKU:
-                                    {{ report.product_summary.unmapped_sku_count|number_format(0, ',', ' ') }}.
+                                    {{ report.product_summary.unmapped_sku_count|vf_number }}.
                                 {% endif %}
                                 {% if report.product_summary.conflict_sku_count > 0 %}
                                     Конфликтов идентификаторов:
-                                    {{ report.product_summary.conflict_sku_count|number_format(0, ',', ' ') }}.
+                                    {{ report.product_summary.conflict_sku_count|vf_number }}.
                                 {% endif %}
                             </div>
                         {% endif %}
@@ -452,7 +458,7 @@
                         {% if report.product_summary.fallback_cost_quantity > 0 %}
                             <div class="alert alert-info mb-0" role="status">
                                 Для
-                                {{ report.product_summary.fallback_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                {{ report.product_summary.fallback_cost_quantity|vf_number }} шт.
                                 использована самая ранняя
                                 доступная себестоимость по правилу fallback.
                             </div>
@@ -524,9 +530,9 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-nowrap">
-                                        <div>Продано: {{ product.sold_quantity|number_format(0, ',', ' ') }}</div>
-                                        <div>Возвращено: {{ product.returned_quantity|number_format(0, ',', ' ') }}</div>
-                                        <div class="fw-semibold">Нетто: {{ product.net_quantity|number_format(0, ',', ' ') }}</div>
+                                        <div>Продано: {{ product.sold_quantity|vf_number }}</div>
+                                        <div>Возвращено: {{ product.returned_quantity|vf_number }}</div>
+                                        <div class="fw-semibold">Нетто: {{ product.net_quantity|vf_number }}</div>
                                         <div class="text-secondary small">
                                             Возвраты / продажи периода:
                                             {{ report_ui.percent(product.return_rate_percent) }}
@@ -572,25 +578,25 @@
                                         {% endif %}
                                         <div class="mt-1">
                                             {{ report_ui.percent(product.cost_coverage_percent) }}
-                                            ({{ product.covered_cost_quantity|number_format(0, ',', ' ') }} из
-                                            {{ (product.sold_quantity + product.returned_quantity)|number_format(0, ',', ' ') }} шт.)
+                                            ({{ product.covered_cost_quantity|vf_number }} из
+                                            {{ (product.sold_quantity + product.returned_quantity)|vf_number }} шт.)
                                         </div>
                                         {% if product.missing_cost_quantity > 0 %}
                                             <div class="text-danger small">
                                                 Без цены:
-                                                {{ product.missing_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                                {{ product.missing_cost_quantity|vf_number }} шт.
                                             </div>
                                         {% endif %}
                                         {% if product.fallback_cost_quantity > 0 %}
                                             <div class="text-warning small">
                                                 Ранняя цена:
-                                                {{ product.fallback_cost_quantity|number_format(0, ',', ' ') }} шт.
+                                                {{ product.fallback_cost_quantity|vf_number }} шт.
                                             </div>
                                         {% endif %}
                                     </td>
                                     <td class="text-end text-nowrap">
                                         {% if product.result_minor is not null %}
-                                            <div class="fw-semibold {{ product.result_minor < 0 ? 'text-danger' : (product.result_minor > 0 ? 'text-success' : '') }}">
+                                            <div class="fw-semibold {{ product.result_minor > 0 ? 'text-success' : '' }}">
                                                 {{ report_ui.money(product.result_minor) }}
                                             </div>
                                             <div class="text-secondary small">
@@ -609,9 +615,9 @@
                             <tr class="fw-semibold">
                                 <th>Итого</th>
                                 <th>
-                                    {{ report.product_summary.sold_quantity|number_format(0, ',', ' ') }} продано /
-                                    {{ report.product_summary.returned_quantity|number_format(0, ',', ' ') }} возвращено /
-                                    {{ report.product_summary.net_quantity|number_format(0, ',', ' ') }} нетто
+                                    {{ report.product_summary.sold_quantity|vf_number }} продано /
+                                    {{ report.product_summary.returned_quantity|vf_number }} возвращено /
+                                    {{ report.product_summary.net_quantity|vf_number }} нетто
                                 </th>
                                 <th class="text-end text-nowrap">
                                     <div>Без СПП: {{ report_ui.money(report.product_summary.net_sales_without_spp_minor) }}</div>
@@ -680,8 +686,8 @@
                                             <td class="text-secondary text-nowrap">
                                                 {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
                                             </td>
-                                            <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
-                                            <td class="text-end text-nowrap fw-semibold {{ row.payout_minor < 0 ? 'text-danger' : '' }}">
+                                            <td class="text-end">{{ row.row_count|vf_number }}</td>
+                                            <td class="text-end text-nowrap fw-semibold">
                                                 {{ report_ui.money(row.payout_minor) }}
                                             </td>
                                         </tr>
@@ -740,9 +746,9 @@
                             <tr>
                                 <td>{{ row.operation_name }}</td>
                                 <td class="text-secondary">{{ row.doc_type }}</td>
-                                <td class="text-end">{{ row.row_count|number_format(0, ',', ' ') }}</td>
+                                <td class="text-end">{{ row.row_count|vf_number }}</td>
                                 <td class="text-end">{{ row.report_count }}</td>
-                                <td class="text-end text-nowrap {{ row.payout_minor < 0 ? 'text-danger' : '' }}">
+                                <td class="text-end text-nowrap">
                                     {{ report_ui.money(row.payout_minor) }}
                                 </td>
                             </tr>
@@ -786,7 +792,7 @@
                                         <div class="text-danger small mt-1">{{ day.last_error_message|slice(0, 160) }}</div>
                                     {% endif %}
                                 </td>
-                                <td class="text-end">{{ day.records_count|number_format(0, ',', ' ') }}</td>
+                                <td class="text-end">{{ day.records_count|vf_number }}</td>
                                 <td class="text-secondary text-nowrap">
                                     {{ day.updated_at ? day.updated_at|date('d.m.Y H:i', 'Europe/Moscow') : '—' }}
                                 </td>

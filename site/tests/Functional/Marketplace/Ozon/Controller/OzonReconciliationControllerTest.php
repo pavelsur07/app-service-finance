@@ -111,8 +111,9 @@ final class OzonReconciliationControllerTest extends WebTestCaseBase
 
         $logistics = $crawler->filter('[data-testid="ozon-reconciliation-check-raw_vs_ledger"] [data-testid="ozon-reconciliation-block"][data-block="logistics"]');
         self::assertCount(1, $logistics);
-        self::assertStringContainsString('118.00', $logistics->text());
-        self::assertStringContainsString('-18.00', $logistics->text());
+        // DS-Money: десятичная запятая, минус U+2212.
+        self::assertStringContainsString('118,00', $logistics->text());
+        self::assertStringContainsString("\u{2212}18,00", $logistics->text());
         self::assertStringContainsString('Расхождение', $logistics->text());
         // Блок с расхождением раскрыт, категория видна и ведёт в drill-down.
         $category = $crawler->filter('[data-testid="ozon-reconciliation-category"]');
