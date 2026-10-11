@@ -10,6 +10,7 @@ use App\Marketplace\Application\DTO\DefaultCostMappingApplyResult;
 use App\Marketplace\Application\DTO\DefaultCostMappingPreviewItem;
 use App\Marketplace\Application\Service\DefaultCostMappingSiblingResolver;
 use App\Marketplace\Enum\DefaultCostMappingPreviewStatus;
+use App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider;
 use App\Marketplace\Infrastructure\Query\CompanyCostPlTargetsQuery;
 use App\Marketplace\Infrastructure\Writer\DefaultCostMappingWriter;
 use Doctrine\DBAL\Connection;
@@ -22,6 +23,7 @@ final readonly class ApplyDefaultCostMappingAction
         private DefaultCostMappingWriter $writer,
         private CompanyCostPlTargetsQuery $companyTargetsQuery,
         private DefaultCostMappingSiblingResolver $siblingResolver,
+        private DefaultCostMappingYamlProvider $templateProvider,
         private Connection $connection,
         private LoggerInterface $logger,
     ) {
@@ -40,8 +42,9 @@ final readonly class ApplyDefaultCostMappingAction
         $skipped = [];
         $blocked = [];
         $inferred = [];
+        $crossMarketplace = [];
 
-        $this->connection->transactional(function () use ($command, $preview, &$created, &$updated, &$skipped, &$blocked, &$inferred): void {
+        $this->connection->transactional(function () use ($command, $preview, &$created, &$updated, &$skipped, &$blocked, &$inferred, &$crossMarketplace): void {
             // Образцы читаются в той же транзакции, что и запись, — окно между
             // выводом статьи и записью правила минимально.
             $siblingTargets = $command->partial ? $this->siblingTargets($command, $preview->getItems()) : [];
@@ -89,9 +92,10 @@ final readonly class ApplyDefaultCostMappingAction
                     // Статьи шаблона у компании нет — пробуем статью по образцу.
                     // Статья есть, но не LEAF_INPUT (компания разбила её на дочерние)
                     // или дублируется — по образцу не угадываем: выбор подстатьи за человеком.
-                    $plCategoryId = DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $status
+                    $target = DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $status
                         ? $siblingTargets[$item->getPlCode()] ?? null
                         : null;
+                    $plCategoryId = $target['pl_category_id'] ?? null;
                     if (null === $plCategoryId || null === $item->getCostCategoryId()) {
                         $blocked[] = $costCode;
 
@@ -107,12 +111,16 @@ final readonly class ApplyDefaultCostMappingAction
 
                     if (0 === $affected) {
                         $skipped[] = $costCode;
-                    } elseif (null === $item->getExistingMappingId()) {
-                        $created[] = $costCode;
-                        $inferred[$costCode] = $plCategoryId;
                     } else {
-                        $updated[] = $costCode;
+                        if (null === $item->getExistingMappingId()) {
+                            $created[] = $costCode;
+                        } else {
+                            $updated[] = $costCode;
+                        }
                         $inferred[$costCode] = $plCategoryId;
+                        if (true === ($target['cross_marketplace'] ?? false)) {
+                            $crossMarketplace[] = $costCode;
+                        }
                     }
 
                     continue;
@@ -122,7 +130,7 @@ final readonly class ApplyDefaultCostMappingAction
             }
         });
 
-        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked, array_keys($inferred));
+        $result = new DefaultCostMappingApplyResult($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked, array_keys($inferred), $crossMarketplace);
 
         $this->logger->info('Default marketplace cost mapping has been applied.', [
             'company_id' => $command->companyId,
@@ -142,6 +150,7 @@ final readonly class ApplyDefaultCostMappingAction
                 'company_id' => $command->companyId,
                 'marketplace' => $command->marketplace,
                 'inferred' => $inferred,
+                'cross_marketplace' => $crossMarketplace,
             ]);
         }
 
@@ -150,19 +159,18 @@ final readonly class ApplyDefaultCostMappingAction
 
     /**
      * Статьи «по образцу компании» для pl_code шаблона, которых у компании нет
-     * вовсе (MISSING_PL_CATEGORY).
+     * вовсе (MISSING_PL_CATEGORY): сначала по своему маркетплейсу, при отсутствии
+     * образцов — по другим маркетплейсам компании.
      * Считаются, только если такие правила в превью есть.
      *
      * @param list<DefaultCostMappingPreviewItem> $items
      *
-     * @return array<string, string> pl_code шаблона => статья ОПиУ компании
+     * @return array<string, array{pl_category_id: string, cross_marketplace: bool}> pl_code шаблона => статья ОПиУ компании
      */
     private function siblingTargets(ApplyDefaultCostMappingCommand $command, array $items): array
     {
-        $templatePlCodes = [];
         $needed = false;
         foreach ($items as $item) {
-            $templatePlCodes[$item->getCostCode()] = $item->getPlCode();
             $needed = $needed || DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY === $item->getStatus();
         }
 
@@ -170,6 +178,13 @@ final readonly class ApplyDefaultCostMappingAction
             return [];
         }
 
-        return $this->siblingResolver->resolve($templatePlCodes, $this->companyTargetsQuery->fetch($command->companyId, $command->marketplace));
+        $templatePlCodes = [];
+        foreach ($this->templateProvider->getAll() as $marketplace => $ruleSet) {
+            foreach ($ruleSet->getRules() as $rule) {
+                $templatePlCodes[$marketplace][$rule->getCostCode()] = $rule->getPlCode();
+            }
+        }
+
+        return $this->siblingResolver->resolve($command->marketplace, $templatePlCodes, $this->companyTargetsQuery->fetch($command->companyId));
     }
 }
