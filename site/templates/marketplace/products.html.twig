@@ -10,7 +10,7 @@
                 <th>Маркетплейс</th>
                 <th>Артикул (SKU)</th>
                 <th>Название товара</th>
-                <th class="text-end">Цена продажи</th>
+                <th class="text-end">Цена продажи, ₽</th>
                 <th>Статус</th>
                 <th>Создан</th>
             </tr>
@@ -39,7 +39,7 @@
                         </td>
                         <td class="text-end">
                             {% if listing.price %}
-                                {{ listing.price|number_format(2, '.', ' ') }} ₽
+                                {{ listing.price|vf_amount }}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
