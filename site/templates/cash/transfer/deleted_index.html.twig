@@ -25,8 +25,8 @@
                     <td>
                         <div>{{ transfer.sourceTransaction.moneyAccount.name }} → {{ transfer.targetTransaction.moneyAccount.name }}</div>
                         <div class="text-muted small">
-                            {{ transfer.sourceTransaction.amount|number_format(2, ',', ' ') }} {{ transfer.sourceTransaction.currency }}
-                            → {{ transfer.targetTransaction.amount|number_format(2, ',', ' ') }} {{ transfer.targetTransaction.currency }}
+                            {{ transfer.sourceTransaction.amount|vf_money(2, transfer.sourceTransaction.currency) }}
+                            → {{ transfer.targetTransaction.amount|vf_money(2, transfer.targetTransaction.currency) }}
                         </div>
                     </td>
                     <td class="text-end">

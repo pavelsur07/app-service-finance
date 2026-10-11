@@ -5,9 +5,9 @@
 {% block stylesheets %}
     {{ parent() }}
     <style>
-        .preview-row-inflow { --tblr-table-bg: rgba(34, 197, 94, 0.08); }
-        .preview-row-outflow { --tblr-table-bg: rgba(239, 68, 68, 0.08); }
-        .preview-row-self-transfer { --tblr-table-bg: rgba(168, 85, 247, 0.12); }
+        /* DS-Money: приход — OK, расход — без подсветки (не красный), перевод между своими — категориальный Purple. */
+        .preview-row-inflow { --tblr-table-bg: var(--vf-ok-bg); }
+        .preview-row-self-transfer { --tblr-table-bg: var(--tblr-purple-lt); }
     </style>
 {% endblock %}
 
@@ -87,7 +87,6 @@
                             {% set counterpartyAccountDisplay = counterpartyAccount %}
                         {% endif %}
 
-                        {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : (isSelfTransfer ? 'text-purple' : '')) %}
                         {% set rowClass = direction ? 'preview-row-' ~ direction : '' %}
 
                         <tr class="{{ rowClass }}">
@@ -106,10 +105,7 @@
                             <td>{{ row.purpose ?? '—' }}</td>
                             <td class="text-end">
                                 {% if row.amount is not null %}
-                                    <span class="{{ amountClass }}">
-                                            {% if isInflow %}+{% elseif isOutflow %}-{% endif %}
-                                        {{ row.amount|number_format(2, ',', ' ') }}
-                                        </span>
+                                    {{ row.amount|vf_amount(2, isInflow ? 'income' : null, signed: isInflow, negate: isOutflow) }}
                                 {% else %}
                                     —
                                 {% endif %}

@@ -7,7 +7,9 @@
             <th class="nowrap" style="width: 120px;">Дата</th>
             <th>Категория ДДС</th>
             <th class="text-truncate">Контрагент</th>
-            <th class="text-end nowrap" style="width: 140px;">Сумма</th>
+            {# DS-Money: «₽» в заголовке — только если все платежи по рублёвым счетам; иначе валюта в строке. #}
+            {% set amounts_in_rub = payments|filter(p => p.moneyAccount and p.moneyAccount.currency != 'RUB')|length == 0 %}
+            <th class="text-end nowrap" style="width: 140px;">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
             <th class="text-truncate" style="width: 160px;">Счёт</th>
             <th style="width: 140px;">Статус</th>
             <th class="d-none d-lg-table-cell text-truncate">Комментарий</th>
@@ -28,17 +30,12 @@
             {% if paymentType == 'INFLOW' %}
                 {% set totalInflow = totalInflow + amountValue %}
                 {% set badgeClass = 'bg-green-lt text-green' %}
-                {% set amountClass = 'text-green' %}
-                {% set amountPrefix = '+ ' %}
             {% elseif paymentType == 'OUTFLOW' %}
                 {% set totalOutflow = totalOutflow + amountValue %}
-                {% set badgeClass = 'bg-red-lt text-red' %}
-                {% set amountClass = 'text-red' %}
-                {% set amountPrefix = '− ' %}
+                {# DS-Money: расход — не красный. #}
+                {% set badgeClass = 'bg-secondary-lt' %}
             {% else %}
                 {% set badgeClass = 'bg-gray-lt text-body' %}
-                {% set amountClass = '' %}
-                {% set amountPrefix = '' %}
             {% endif %}
             {% set status = payment.status.value %}
             {% set allowApprove = status == 'PLANNED' %}
@@ -49,7 +46,8 @@
                 <td class="nowrap">{{ payment.plannedAt|date('d.m.Y') }}</td>
                 <td><span class="badge {{ badgeClass }}">{{ payment.cashflowCategory.name }}</span></td>
                 <td class="text-truncate">{{ payment.counterparty ? payment.counterparty.name : '—' }}</td>
-                <td class="text-end {{ amountClass }} nowrap">{{ amountPrefix }}{{ amountValue|number_format(2, '.', ' ') }}</td>
+                {% set rowCurrency = payment.moneyAccount ? payment.moneyAccount.currency : 'RUB' %}
+                <td class="text-end nowrap">{{ amountValue|vf_amount(2, paymentType == 'INFLOW' ? 'income' : null, signed: paymentType in ['INFLOW', 'OUTFLOW'], currency: amounts_in_rub or rowCurrency != 'RUB' ? rowCurrency : '₽', negate: paymentType == 'OUTFLOW') }}</td>
                 <td class="text-truncate">{{ payment.moneyAccount ? payment.moneyAccount.name : '—' }}</td>
                 <td>
                     {% set statusClass = statusClasses[status] ?? 'bg-secondary text-white' %}
@@ -126,12 +124,10 @@
         </tbody>
         <tfoot>
         {% set netTotal = totalInflow - totalOutflow %}
-        {% set netClass = netTotal > 0 ? 'text-green' : (netTotal < 0 ? 'text-red' : '') %}
         <tr>
             <td colspan="3" class="text-end fw-bold">Итого за период:</td>
-            <td class="text-end fw-bold {{ netClass }}">
-                {% if netTotal > 0 %}+ {% elseif netTotal < 0 %}− {% endif %}{{ netTotal|abs|number_format(2, '.', ' ') }}
-            </td>
+            {# DS-Money: в итогах символ валюты указан всегда, знак — только у отрицательных. #}
+            <td class="text-end fw-bold nowrap">{{ amounts_in_rub ? netTotal|vf_money(2, '₽') : netTotal|vf_number(2) }}</td>
             <td colspan="4"></td>
         </tr>
         </tfoot>
