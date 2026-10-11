@@ -47,7 +47,7 @@ final class VfMoneyExtension extends AbstractExtension
 
         $formatted = $this->format($this->round($this->normalize($value), $decimals));
 
-        return null === $currency ? $formatted : $formatted.self::NBSP.$currency;
+        return null === $currency ? $formatted : $formatted.self::NBSP.$this->symbol($currency);
     }
 
     /**
@@ -89,7 +89,7 @@ final class VfMoneyExtension extends AbstractExtension
             $formatted = rtrim(rtrim($formatted, '0'), ',');
         }
 
-        return implode(self::NBSP, array_filter([$formatted, $unit, $currency], static fn (string $part): bool => '' !== $part));
+        return implode(self::NBSP, array_filter([$formatted, $unit, $this->symbol($currency)], static fn (string $part): bool => '' !== $part));
     }
 
     /**
@@ -144,10 +144,18 @@ final class VfMoneyExtension extends AbstractExtension
         }
         $currency = null === $currency ? null : strtoupper(trim($currency));
         if (null !== $currency && '' !== $currency && 'RUB' !== $currency) {
-            $html .= self::NBSP.'<span class="vf-amount__currency">'.htmlspecialchars(self::SYMBOLS[$currency] ?? $currency, \ENT_QUOTES).'</span>';
+            $html .= self::NBSP.'<span class="vf-amount__currency">'.htmlspecialchars($this->symbol($currency), \ENT_QUOTES).'</span>';
         }
 
         return \sprintf('<span class="%s">%s</span>', implode(' ', $classes), $html);
+    }
+
+    /**
+     * Код валюты → символ (DS-Money); готовый символ или незнакомый код — как есть.
+     */
+    private function symbol(string $currency): string
+    {
+        return self::SYMBOLS[strtoupper(trim($currency))] ?? $currency;
     }
 
     private function normalize(int|float|string $value): string

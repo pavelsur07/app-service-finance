@@ -69,7 +69,7 @@ final class HomeCashCurrencyTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSame(
-            ["50\u{00A0}USD", "5\u{00A0}USD", "0\u{00A0}USD", "5\u{00A0}USD"],
+            ["50\u{00A0}$", "5\u{00A0}$", "0\u{00A0}$", "5\u{00A0}$"],
             $crawler->filter('.row-deck .h1')->each(static fn ($node): string => trim($node->text())),
         );
         self::assertCount(1, $crawler->filter('#finance-balance-dynamics-root[data-currency="USD"]'));

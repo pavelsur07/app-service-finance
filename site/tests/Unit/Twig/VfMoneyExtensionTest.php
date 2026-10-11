@@ -21,6 +21,8 @@ final class VfMoneyExtensionTest extends TestCase
         yield 'half rounds away from zero' => ['-0.125', 2, null, "\u{2212}0,13"];
         yield 'negative rounding to zero has no sign' => ['-0.004', 2, null, '0,00'];
         yield 'currency is appended with nbsp' => [100, 2, '₽', "100,00\u{00A0}₽"];
+        yield 'currency code becomes its symbol' => [100, 2, 'usd', "100,00\u{00A0}$"];
+        yield 'code without a usual symbol stays a code' => [100, 2, 'CNY', "100,00\u{00A0}CNY"];
         yield 'large string keeps precision' => ['90071992547409.93', 2, null, "90\u{00A0}071\u{00A0}992\u{00A0}547\u{00A0}409,93"];
         yield 'null renders a dash' => [null, 2, null, '—'];
     }
