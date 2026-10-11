@@ -47,9 +47,9 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->setParameter('day', $day)
             ->setParameter('failed', PipelineStatus::FAILED)
             ->setParameter('completed', PipelineStatus::COMPLETED)
-            ->orderBy('completed_rank', 'ASC')
-            ->addOrderBy('canonical_at', 'DESC')
-            ->addOrderBy('d.id', 'DESC')
+            ->orderBy('completed_rank', \SortDirection::Ascending)
+            ->addOrderBy('canonical_at', \SortDirection::Descending)
+            ->addOrderBy('d.id', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
@@ -96,7 +96,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('d.syncedAt', 'DESC')
+            ->orderBy('d.syncedAt', \SortDirection::Descending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -131,7 +131,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->setParameter('marketplace', $marketplace)
             ->setParameter('periodFrom', $periodFrom)
             ->setParameter('periodTo', $periodTo)
-            ->orderBy('d.syncedAt', 'ASC');
+            ->orderBy('d.syncedAt', \SortDirection::Ascending);
 
         if (null !== $documentType) {
             $qb->andWhere('d.documentType = :documentType')
@@ -232,7 +232,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->setParameter('firstDay', $firstDay)
             ->setParameter('lastDay', $lastDay)
             ->setParameter('loading', PipelineStatus::LOADING)
-            ->orderBy('d.periodFrom', 'ASC')
+            ->orderBy('d.periodFrom', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

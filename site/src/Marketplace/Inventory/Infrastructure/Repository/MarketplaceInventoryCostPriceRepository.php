@@ -36,7 +36,7 @@ class MarketplaceInventoryCostPriceRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('listingId', $listingId)
             ->setParameter('at', $at)
-            ->orderBy('p.effectiveFrom', 'DESC')
+            ->orderBy('p.effectiveFrom', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -56,7 +56,7 @@ class MarketplaceInventoryCostPriceRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(p.listing) = :listingId')
             ->setParameter('companyId', $companyId)
             ->setParameter('listingId', $listingId)
-            ->orderBy('p.effectiveFrom', 'ASC')
+            ->orderBy('p.effectiveFrom', \SortDirection::Ascending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

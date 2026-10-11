@@ -25,8 +25,8 @@ class MarketplaceCostPLMappingRepository extends ServiceEntityRepository
             ->addSelect('cc')
             ->where('m.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('m.sortOrder', 'ASC')
-            ->addOrderBy('cc.name', 'ASC')
+            ->orderBy('m.sortOrder', \SortDirection::Ascending)
+            ->addOrderBy('cc.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

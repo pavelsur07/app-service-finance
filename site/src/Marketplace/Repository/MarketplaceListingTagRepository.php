@@ -51,7 +51,7 @@ final class MarketplaceListingTagRepository
             ->select('t.id', 't.name')
             ->from(MarketplaceListingTag::class, 't')
             ->where('t.companyId = :companyId')
-            ->orderBy('t.name', 'ASC')
+            ->orderBy('t.name', \SortDirection::Ascending)
             ->setParameter('companyId', $companyId)
             ->getQuery()
             ->getArrayResult();

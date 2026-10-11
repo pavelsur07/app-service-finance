@@ -98,7 +98,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->setParameter('reportType', $reportType)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('s.businessDate', 'ASC')
+            ->orderBy('s.businessDate', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -151,7 +151,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->setParameter('processingStuckBefore', $now->sub(new \DateInterval(self::PROCESSING_STUCK_RECLAIM_INTERVAL)))
             ->setParameter('rateLimitStatusCode', 429)
             ->setParameter('rateLimitErrorClass', MarketplaceRateLimitException::class)
-            ->orderBy('s.businessDate', 'ASC')
+            ->orderBy('s.businessDate', \SortDirection::Ascending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getArrayResult();
@@ -439,7 +439,7 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->andWhere('s.rawDocumentId = :rawDocumentId')
             ->setParameter('companyId', $companyId)
             ->setParameter('rawDocumentId', $rawDocumentId)
-            ->orderBy('s.updatedAt', 'DESC')
+            ->orderBy('s.updatedAt', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }

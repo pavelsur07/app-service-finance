@@ -23,7 +23,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('r')
             ->where('r.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('r.returnDate', 'DESC');
+            ->orderBy('r.returnDate', \SortDirection::Descending);
     }
 
     /**
@@ -41,7 +41,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->setParameter('company', $company)
             ->setParameter('from', $fromDate)
             ->setParameter('to', $toDate)
-            ->orderBy('r.returnDate', 'DESC')
+            ->orderBy('r.returnDate', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }

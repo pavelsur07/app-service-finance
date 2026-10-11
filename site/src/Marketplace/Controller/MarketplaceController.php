@@ -740,7 +740,7 @@ class MarketplaceController extends AbstractController
             ->leftJoin('l.product', 'p')
             ->where('l.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('l.createdAt', 'DESC');
+            ->orderBy('l.createdAt', \SortDirection::Descending);
 
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
             new QueryAdapter($qb),

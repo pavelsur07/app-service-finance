@@ -38,9 +38,9 @@ final class OzonReconciliationLineRepository extends ServiceEntityRepository
             ->andWhere('l.runId = :runId')
             ->setParameter('companyId', $companyId)
             ->setParameter('runId', $runId)
-            ->orderBy('l.checkType', 'ASC')
-            ->addOrderBy('l.block', 'ASC')
-            ->addOrderBy('l.categoryCode', 'ASC')
+            ->orderBy('l.checkType', \SortDirection::Ascending)
+            ->addOrderBy('l.block', \SortDirection::Ascending)
+            ->addOrderBy('l.categoryCode', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

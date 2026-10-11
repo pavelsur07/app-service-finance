@@ -45,7 +45,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
                 ->setParameter('dateTo', $dateTo);
         }
 
-        return $qb->orderBy('c.costDate', 'DESC');
+        return $qb->orderBy('c.costDate', \SortDirection::Descending);
     }
 
     /**

@@ -45,8 +45,8 @@ class MarketplaceMonthCloseRepository extends ServiceEntityRepository
             ->andWhere('mc.marketplace = :marketplace')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
-            ->orderBy('mc.year', 'DESC')
-            ->addOrderBy('mc.month', 'DESC')
+            ->orderBy('mc.year', \SortDirection::Descending)
+            ->addOrderBy('mc.month', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
