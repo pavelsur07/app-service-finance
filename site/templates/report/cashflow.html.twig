@@ -28,6 +28,8 @@
             /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
             box-shadow: inset -1px 0 0 var(--tblr-border-color);
         }
+        /* DS-Table: шапка — Navy 50, включая залипшую ячейку. */
+        .table.cf-table thead th:first-child { background: var(--vf-navy-50); }
         .table.cf-table .cf-toggle,
         .table.cf-table .cf-toggle-spacer {
             flex: none;

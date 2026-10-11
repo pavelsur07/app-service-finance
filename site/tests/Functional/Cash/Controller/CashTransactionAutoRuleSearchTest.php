@@ -67,7 +67,7 @@ final class CashTransactionAutoRuleSearchTest extends WebTestCaseBase
 
         // Счётчик берётся из COUNT пагинации: join размножил бы строки в подсчёте,
         // даже если гидратация схлопнула бы их в одну сущность.
-        self::assertSame('Найдено правил: 1', trim($crawler->filter('.card-footer .text-muted')->text()));
+        self::assertSame('Показано с 1 по 1 из 1', preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer .vf-pager-caption')->text())));
     }
 
     public function testUnderscoreInQueryIsNotASingleCharacterWildcard(): void

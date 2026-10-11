@@ -346,6 +346,16 @@
   cursor: not-allowed;
 }
 
+/* В шапке карточки линию даёт сама шапка — без второй линии под вкладками. */
+.card-header-tabs {
+  border-bottom: 0;
+}
+
+.nav-tabs.nav-fill .nav-link {
+  display: flex;
+  justify-content: center;
+}
+
 /* Счётчик: h 20 · радиус 10 · 12/600; Navy 100, в активной — Blue 50, .warn — Warn. */
 .nav-tabs .cnt {
   padding: 0 7px;
