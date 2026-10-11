@@ -6,7 +6,7 @@
   {{ parent() }}
   <style>
     body {
-      background-color: #f6f8fb;
+      background-color: var(--vf-bg);
     }
 
     /* Выравнивание высоты карточек */
@@ -25,7 +25,7 @@
       display: flex;
       flex-direction: column;
       transition: transform 0.2s;
-      border: 1px solid #e6e8eb;
+      border: 1px solid var(--vf-border);
     }
 
     .card-integration .card-body {
@@ -40,12 +40,12 @@
 
     .card-integration:hover {
       transform: translateY(-4px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+      box-shadow: var(--vf-shadow-md);
     }
 
     .badge-free {
-      background-color: #e6f7ee;
-      color: #2fb344;
+      background-color: var(--vf-ok-bg);
+      color: var(--vf-ok-text);
       border: none;
       font-weight: 500;
     }
