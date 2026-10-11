@@ -8,7 +8,7 @@
     data-comparison-state="{{ data.state }}"
     data-comparison-variant="{{ data.variant }}"
   >
-    <div>{{ previous_label }}: {{ data.previous|vf_money_short(currency) }}</div>
+    <div>{{ previous_label }}: <span title="{{ data.previous|vf_money(2, currency) }}">{{ data.previous|vf_money_short(currency) }}</span></div>
     <div class="kpi-trend {{ trend_class }}">
       {% if data.state == 'percent' %}
         {% set formatted_percent = data.percent|abs|vf_money(1) %}
@@ -143,7 +143,7 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader">Остаток на сегодня</div>
-        <div class="h1 mb-0" data-dashboard-kpi="todayBalance">{{ kpi.todayBalance|vf_money_short(kpi_currency) }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="todayBalance" title="{{ kpi.todayBalance|vf_money(2, kpi_currency) }}">{{ kpi.todayBalance|vf_money_short(kpi_currency) }}</div>
         {{ _self.comparison('todayBalance', kpiComparisons.todayBalance, kpi_currency, kpiPeriodLabels.balanceComparison) }}
       </div>
     </div>
@@ -152,7 +152,7 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Приход ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="inflow30">{{ kpi.inflow30|vf_money_short(kpi_currency) }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="inflow30" title="{{ kpi.inflow30|vf_money(2, kpi_currency) }}">{{ kpi.inflow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="inflow30">Сверить в ДДС</a>
         {{ _self.comparison('inflow30', kpiComparisons.inflow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>
@@ -162,7 +162,7 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Расход ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="outflow30">{{ kpi.outflow30|vf_money_short(kpi_currency) }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="outflow30" title="{{ kpi.outflow30|vf_money(2, kpi_currency) }}">{{ kpi.outflow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="outflow30">Сверить в ДДС</a>
         {{ _self.comparison('outflow30', kpiComparisons.outflow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>
@@ -172,7 +172,7 @@
     <div class="card">
       <div class="card-body">
         <div class="subheader" data-dashboard-kpi-period="current">Чистый поток ({{ kpiPeriodLabels.current }})</div>
-        <div class="h1 mb-0" data-dashboard-kpi="netFlow30">{{ kpi.netFlow30|vf_money_short(kpi_currency) }}</div>
+        <div class="h1 mb-0" data-dashboard-kpi="netFlow30" title="{{ kpi.netFlow30|vf_money(2, kpi_currency) }}">{{ kpi.netFlow30|vf_money_short(kpi_currency) }}</div>
         <a href="{{ path('report_cashflow_index', cashflowReconciliationQuery) }}" data-dashboard-reconcile-link="netFlow30">Сверить в ДДС</a>
         {{ _self.comparison('netFlow30', kpiComparisons.netFlow30, kpi_currency, kpiPeriodLabels.previous) }}
       </div>

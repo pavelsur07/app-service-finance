@@ -150,9 +150,9 @@
                                     &nbsp;
                                 {% endif %}
                             </td>
-                            {# DS: ₽ — в заголовке; другая валюта остаётся в ячейке. Доход — зелёный, расход — обычный цвет с минусом. #}
+                            {# DS-Money: ₽ — в заголовке, другая валюта — символом после числа. Приход — зелёный с плюсом, расход — основной цвет с минусом. #}
                             {% set inflow = tx.direction.value == 'INFLOW' %}
-                            <td class="text-end text-nowrap" style="min-width: 12rem;">{{ (inflow ? tx.amount : '-' ~ tx.amount)|vf_amount(2, inflow ? 'income' : null) }}{% if tx.currency != 'RUB' %} {{ tx.currency }}{% endif %}</td>
+                            <td class="text-end text-nowrap" style="min-width: 12rem;">{{ (inflow ? tx.amount : '-' ~ tx.amount)|vf_amount(2, inflow ? 'income' : null, signed: true, currency: tx.currency) }}</td>
                             <td>
                                 {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                                 {% if transfer %}
