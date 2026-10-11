@@ -63,7 +63,11 @@ class MoneyAccountRepository extends ServiceEntityRepository
         }
 
         foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('m.'.$field, $direction);
+            $qb->addOrderBy('m.'.$field, match (strtoupper($direction)) {
+                'ASC' => \SortDirection::Ascending,
+                'DESC' => \SortDirection::Descending,
+                default => throw new \InvalidArgumentException(sprintf('Invalid sort direction "%s".', $direction)),
+            });
         }
 
         return $qb->getQuery()->getResult();

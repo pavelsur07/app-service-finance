@@ -150,7 +150,7 @@ final class CashTransferRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(transfer.company) = :companyId')
             ->andWhere('transfer.deletedAt IS NOT NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('transfer.deletedAt', 'DESC');
+            ->orderBy('transfer.deletedAt', \SortDirection::Descending);
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($perPage);

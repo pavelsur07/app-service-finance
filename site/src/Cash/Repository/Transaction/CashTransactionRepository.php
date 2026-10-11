@@ -126,7 +126,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->addSelect('cashflowCategory')
             ->leftJoin('t.projectDirection', 'projectDirection')
             ->addSelect('projectDirection')
-            ->orderBy('t.occurredAt', 'DESC')
+            ->orderBy('t.occurredAt', \SortDirection::Descending)
             ->getQuery();
         $query->setHint(Query::HINT_READ_ONLY, true);
 
@@ -170,7 +170,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
             ->groupBy('date')
-            ->orderBy('date', 'ASC');
+            ->orderBy('date', \SortDirection::Ascending);
 
         return $qb->getQuery()->getArrayResult();
     }
@@ -341,7 +341,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(t.company) = :companyId')
             ->andWhere('t.deletedAt IS NOT NULL')
             ->setParameter('companyId', $companyId)
-            ->orderBy('t.deletedAt', 'DESC');
+            ->orderBy('t.deletedAt', \SortDirection::Descending);
 
         $pager = new Pagerfanta(new QueryAdapter($qb));
         $pager->setMaxPerPage($perPage);
@@ -463,7 +463,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.company = :company')
             ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('t.occurredAt', 'DESC');
+            ->orderBy('t.occurredAt', \SortDirection::Descending);
 
         if ($filters['dateFrom'] ?? null) {
             $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
@@ -642,7 +642,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.isTransfer = :isTransfer')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('date')
-            ->orderBy('date', 'ASC')
+            ->orderBy('date', \SortDirection::Ascending)
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
@@ -754,7 +754,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('split.cashflowCategory', 'category.name')
-            ->orderBy('sumAbs', 'DESC')
+            ->orderBy('sumAbs', \SortDirection::Descending)
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
@@ -786,7 +786,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.currency = :currency')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('date')
-            ->orderBy('date', 'ASC')
+            ->orderBy('date', \SortDirection::Ascending)
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
@@ -854,7 +854,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('category.systemCode = :systemCode')
             ->andWhere('t.deletedAt IS NULL')
             ->groupBy('date')
-            ->orderBy('date', 'ASC')
+            ->orderBy('date', \SortDirection::Ascending)
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))

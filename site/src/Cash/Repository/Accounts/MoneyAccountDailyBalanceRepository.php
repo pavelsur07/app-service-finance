@@ -30,7 +30,7 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->setParameter('account', $account)
             ->setParameter('date', $date->setTime(0, 0))
             ->setParameter('openingDate', $account->getOpeningBalanceDate()->setTime(0, 0))
-            ->orderBy('b.date', 'DESC')
+            ->orderBy('b.date', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
     }
@@ -75,7 +75,7 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->setParameter('account', $account)
             ->setParameter('notBefore', $notBefore->setTime(0, 0))
             ->setParameter('date', $date->setTime(0, 0))
-            ->orderBy('b.date', 'DESC')
+            ->orderBy('b.date', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

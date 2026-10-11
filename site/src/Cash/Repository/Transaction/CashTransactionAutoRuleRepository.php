@@ -109,8 +109,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('r')
             ->andWhere('r.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('r.createdAt', 'ASC')
-            ->addOrderBy('r.id', 'ASC');
+            ->orderBy('r.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('r.id', \SortDirection::Ascending);
 
         if ($action) {
             $qb->andWhere('r.action = :action')->setParameter('action', $action);
@@ -169,8 +169,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             ->leftJoin('r.projectDirection', 'projectDirection')
             ->leftJoin('r.counterparty', 'counterparty')
             ->addSelect('conditions', 'conditionCounterparty', 'cashflowCategory', 'projectDirection', 'counterparty')
-            ->orderBy('r.priority', 'DESC')
-            ->addOrderBy('r.id', 'ASC')
+            ->orderBy('r.priority', \SortDirection::Descending)
+            ->addOrderBy('r.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -189,8 +189,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             ->andWhere('rule.responsibilityCenterId IS NULL')
             ->andWhere('project.systemCode = :projectCode')
             ->setParameter('projectCode', ProjectDirection::CODE_GENERAL)
-            ->orderBy('company.id', 'ASC')
-            ->addOrderBy('rule.id', 'ASC')
+            ->orderBy('company.id', \SortDirection::Ascending)
+            ->addOrderBy('rule.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

@@ -29,7 +29,7 @@ class CashFileImportProfileRepository extends ServiceEntityRepository
             ->andWhere('p.type = :type')
             ->setParameter('company', $company)
             ->setParameter('type', $type)
-            ->orderBy('p.name', 'ASC')
+            ->orderBy('p.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

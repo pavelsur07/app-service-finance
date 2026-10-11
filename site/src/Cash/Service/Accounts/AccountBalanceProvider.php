@@ -34,8 +34,8 @@ class AccountBalanceProvider
             ->setParameter('company', $company)
             ->setParameter('date', \DateTimeImmutable::createFromInterface($date)->setTime(0, 0))
             ->setParameter('accountIds', $accountIds)
-            ->orderBy('a.id', 'ASC')
-            ->addOrderBy('b.date', 'DESC');
+            ->orderBy('a.id', \SortDirection::Ascending)
+            ->addOrderBy('b.date', \SortDirection::Descending);
 
         $rows = $qb->getQuery()->getResult();
 
@@ -74,8 +74,8 @@ class AccountBalanceProvider
             ->setParameter('company', $company)
             ->setParameter('date', $date)
             ->setParameter('accountIds', $accountIds)
-            ->orderBy('a.id', 'ASC')
-            ->addOrderBy('b.date', 'DESC');
+            ->orderBy('a.id', \SortDirection::Ascending)
+            ->addOrderBy('b.date', \SortDirection::Descending);
 
         $rows = $qb->getQuery()->getResult();
 

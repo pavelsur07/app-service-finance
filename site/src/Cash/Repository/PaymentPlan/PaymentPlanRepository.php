@@ -45,8 +45,8 @@ class PaymentPlanRepository extends ServiceEntityRepository
                 array_map(static fn (PaymentPlanStatus $status): string => $status->value, $plannedStatuses),
                 ArrayParameterType::STRING
             )
-            ->orderBy('plan.plannedAt', 'ASC')
-            ->addOrderBy('plan.createdAt', 'ASC')
+            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.createdAt', \SortDirection::Ascending)
             ->getQuery();
 
         /** @var list<PaymentPlan> $result */
@@ -78,7 +78,7 @@ class PaymentPlanRepository extends ServiceEntityRepository
             ->andWhere('plan.plannedAt BETWEEN :from AND :to')
             ->andWhere('plan.status IN (:statuses)')
             ->groupBy('plannedDate')
-            ->orderBy('plannedDate', 'ASC')
+            ->orderBy('plannedDate', \SortDirection::Ascending)
             ->setParameter('company', $company)
             ->setParameter('from', \DateTimeImmutable::createFromInterface($from), Types::DATE_IMMUTABLE)
             ->setParameter('to', \DateTimeImmutable::createFromInterface($to), Types::DATE_IMMUTABLE)
@@ -122,7 +122,7 @@ class PaymentPlanRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('plan')
             ->where('plan.recurrenceRule = :rule')
-            ->orderBy('plan.plannedAt', 'ASC')
+            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
             ->setMaxResults(1)
             ->setParameter('rule', $rule)
             ->getQuery()

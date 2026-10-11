@@ -68,7 +68,7 @@ final class AccountBalanceService
             ->setParameter('a', $account)
             ->setParameter('f', $from)
             ->setParameter('t', $to)
-            ->orderBy('b.date', 'ASC')
+            ->orderBy('b.date', \SortDirection::Ascending)
             ->getQuery()->getResult();
         $balances = [];
         foreach ($snapshots as $s) {
