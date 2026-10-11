@@ -109,6 +109,7 @@ final class PlReportPreviewController extends AbstractController
                     'layout' => $layout,
                     'periods' => [],
                     'rows' => $compare['rows'],
+                    'formats' => $compare['formats'],
                     'warnings' => $compare['warnings'],
                     'compareProjects' => $compare['projects'],
                 ]);
@@ -173,6 +174,7 @@ final class PlReportPreviewController extends AbstractController
                 $grid['periods']
             ),
             'rows' => $grid['rows'],
+            'formats' => $grid['formats'],
             'warnings' => $grid['warnings'],
         ]);
     }
@@ -557,7 +559,7 @@ final class PlReportPreviewController extends AbstractController
 
     /**
      * @param list<ProjectDirection> $projectDirections
-     * @param list<object> $responsibilityCenters
+     * @param list<object>           $responsibilityCenters
      *
      * @return array{
      *     plural: bool,
@@ -658,7 +660,7 @@ final class PlReportPreviewController extends AbstractController
     }
 
     /**
-     * @param list<mixed> $requestedIds
+     * @param list<mixed>  $requestedIds
      * @param list<string> $availableIds
      *
      * @return list<string>|null null means no restriction (all choices)
