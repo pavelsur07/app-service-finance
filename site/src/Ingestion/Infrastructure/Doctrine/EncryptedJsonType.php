@@ -7,7 +7,9 @@ namespace App\Ingestion\Infrastructure\Doctrine;
 use App\Ingestion\Domain\Contract\SecretCodec;
 use App\Ingestion\Infrastructure\Security\PlaintextSecretCodec;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Types\ConversionException;
+use Doctrine\DBAL\Types\Exception\InvalidType;
+use Doctrine\DBAL\Types\Exception\SerializationFailed;
+use Doctrine\DBAL\Types\Exception\ValueNotConvertible;
 use Doctrine\DBAL\Types\Type;
 
 final class EncryptedJsonType extends Type
@@ -33,13 +35,13 @@ final class EncryptedJsonType extends Type
         }
 
         if (!is_array($value)) {
-            throw ConversionException::conversionFailedInvalidType($value, self::NAME, ['array', 'null']);
+            throw InvalidType::new($value, self::NAME, ['array', 'null']);
         }
 
         try {
             return self::codec()->encode($value);
         } catch (\Throwable $exception) {
-            throw ConversionException::conversionFailedSerialization($value, self::NAME, $exception->getMessage(), $exception);
+            throw SerializationFailed::new($value, self::NAME, $exception->getMessage(), $exception);
         }
     }
 
@@ -54,19 +56,14 @@ final class EncryptedJsonType extends Type
         }
 
         if (!is_string($value)) {
-            throw ConversionException::conversionFailedInvalidType($value, self::NAME, ['string', 'null']);
+            throw InvalidType::new($value, self::NAME, ['string', 'null']);
         }
 
         try {
             return self::codec()->decode($value, PlaintextSecretCodec::KEY_VERSION);
         } catch (\Throwable $exception) {
-            throw ConversionException::conversionFailed($value, self::NAME, $exception);
+            throw ValueNotConvertible::new($value, self::NAME, previous: $exception);
         }
-    }
-
-    public function getName(): string
-    {
-        return self::NAME;
     }
 
     private static function codec(): SecretCodec

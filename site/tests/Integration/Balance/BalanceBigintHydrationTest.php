@@ -61,6 +61,29 @@ final class BalanceBigintHydrationTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия перехода на DBAL 4: штатный bigint отдавал `int`, UnitOfWork
+     * запоминал его исходным значением, а в свойстве лежала строка — changeset
+     * `[15000, '15000']` у только что загруженной сущности, лишний UPDATE на
+     * каждом flush. StringBigIntType гидрирует строку сразу.
+     */
+    #[DataProvider('balances')]
+    public function testLoadedEntitiesHaveNoChangeSet(string $balance): void
+    {
+        [$companyId, $stateId] = $this->seedLedger($balance, '9007199254740993', '9223372036854775807');
+
+        $state = $this->em->find(BalanceAccountState::class, $stateId);
+        $book = $this->em->getRepository(BalanceBook::class)->findOneBy(['companyId' => $companyId]);
+        self::assertInstanceOf(BalanceAccountState::class, $state);
+        self::assertInstanceOf(BalanceBook::class, $book);
+
+        $unitOfWork = $this->em->getUnitOfWork();
+        $unitOfWork->computeChangeSets();
+
+        self::assertSame([], $unitOfWork->getEntityChangeSet($state));
+        self::assertSame([], $unitOfWork->getEntityChangeSet($book));
+    }
+
+    /**
      * @return array{string, string}
      */
     private function seedLedger(string $balance, string $nextDocumentNumber, string $nextPostingSequence): array

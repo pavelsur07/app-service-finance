@@ -27,9 +27,4 @@ final class MoneyAmountType extends BigIntType
 
         return (int) $value;
     }
-
-    public function getName(): string
-    {
-        return self::NAME;
-    }
 }

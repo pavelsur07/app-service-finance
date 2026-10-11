@@ -11,6 +11,7 @@ use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Exception\StaleTransactionUpdateException;
 use App\Ingestion\Repository\FinancialTransactionRepository;
 use App\Shared\Domain\ValueObject\Money;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -58,7 +59,7 @@ class FinancialTransaction implements TenantOwnedInterface
     #[ORM\Column(type: Types::STRING, length: 8, enumType: TransactionDirection::class)]
     private TransactionDirection $direction;
 
-    #[ORM\Column(type: Types::BIGINT)]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     private string $amountMinor;
 
     #[ORM\Column(type: Types::STRING, length: 3)]
@@ -270,7 +271,7 @@ class FinancialTransaction implements TenantOwnedInterface
 
     /**
      * @param array<string, mixed> $sourceData
-     * @param list<string> $keys
+     * @param list<string>         $keys
      */
     public function replaceSourceDataFields(array $sourceData, array $keys, ?string $description = null): bool
     {
