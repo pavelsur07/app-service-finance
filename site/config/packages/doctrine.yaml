@@ -20,6 +20,8 @@ doctrine:
         # перехода на DBAL 4 / DoctrineBundle 3, где они обязательны). Генерация
         # прокси, auto_generate_proxy_classes и proxy_dir при этом не используются.
         enable_native_lazy_objects: true
+        # Только DoctrineBundle 2: false с ORM 3 бросает LogicException, а при
+        # native-объектах опция ничего не делает. Уходит вместе с bundle 3.
         enable_lazy_ghost_objects: true
         report_fields_where_declared: true
         validate_xml_mapping: true
