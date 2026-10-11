@@ -27,7 +27,7 @@ class CompanyInviteRepository extends ServiceEntityRepository
             ->andWhere('invite.email = :email')
             ->setParameter('company', $company)
             ->setParameter('email', mb_strtolower($email))
-            ->orderBy('invite.createdAt', 'DESC')
+            ->orderBy('invite.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -100,7 +100,7 @@ class CompanyInviteRepository extends ServiceEntityRepository
         return $this->createPendingInviteQueryBuilder($now)
             ->andWhere('invite.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('invite.createdAt', 'DESC')
+            ->orderBy('invite.createdAt', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }

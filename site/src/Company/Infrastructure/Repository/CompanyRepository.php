@@ -52,7 +52,7 @@ class CompanyRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->andWhere('c.user = :user')
             ->setParameter('user', $user)
-            ->orderBy('c.name', 'ASC')
+            ->orderBy('c.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -62,7 +62,7 @@ class CompanyRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->andWhere('c.user = :userId')
             ->setParameter('userId', $userId)
-            ->orderBy('c.name', 'ASC')
+            ->orderBy('c.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -99,7 +99,7 @@ class CompanyRepository extends ServiceEntityRepository
             ->select('c.id AS id')
             ->where('LOWER(c.name) = LOWER(:name)')
             ->setParameter('name', $name)
-            ->orderBy('c.id', 'ASC')
+            ->orderBy('c.id', \SortDirection::Ascending)
             ->setMaxResults(2)
             ->getQuery()
             ->getArrayResult();
@@ -139,7 +139,7 @@ class CompanyRepository extends ServiceEntityRepository
             ->select('c.id AS id', 'c.name AS name')
             ->where('c.id IN (:ids)')
             ->setParameter('ids', array_values($companyIds))
-            ->orderBy('c.name', 'ASC')
+            ->orderBy('c.name', \SortDirection::Ascending)
             ->getQuery()
             ->getArrayResult();
 

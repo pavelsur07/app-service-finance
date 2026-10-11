@@ -63,7 +63,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->andWhere('cm.status = :status')
             ->setParameter('company', $companyId)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
-            ->orderBy('user.email', 'ASC')
+            ->orderBy('user.email', \SortDirection::Ascending)
             ->getQuery()->getArrayResult();
 
         return $rows;
@@ -80,7 +80,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->andWhere('companyMember.status = :status')
             ->setParameter('company', $company)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
-            ->orderBy('companyMember.createdAt', 'ASC')
+            ->orderBy('companyMember.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -96,7 +96,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
         $result = $this->createQueryBuilder('companyMember')
             ->andWhere('companyMember.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('companyMember.createdAt', 'ASC')
+            ->orderBy('companyMember.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -166,7 +166,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->andWhere('companyMember.status = :status')
             ->setParameter('userId', $userId)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
-            ->orderBy('company.name', 'ASC')
+            ->orderBy('company.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -182,7 +182,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->andWhere('companyMember.status = :status')
             ->setParameter('user', $user)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
-            ->orderBy('companyMember.createdAt', 'ASC')
+            ->orderBy('companyMember.createdAt', \SortDirection::Ascending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

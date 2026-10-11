@@ -30,8 +30,8 @@ final class FinancialResponsibilityCenterRepository extends ServiceEntityReposit
             ->andWhere('center.status = :status')
             ->setParameter('companyId', $companyId)
             ->setParameter('status', FinancialResponsibilityCenterStatus::ACTIVE)
-            ->orderBy('center.sort', 'ASC')
-            ->addOrderBy('center.name', 'ASC')
+            ->orderBy('center.sort', \SortDirection::Ascending)
+            ->addOrderBy('center.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -68,8 +68,8 @@ final class FinancialResponsibilityCenterRepository extends ServiceEntityReposit
         $queryBuilder = $this->createQueryBuilder('center')
             ->andWhere('center.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('center.sort', 'ASC')
-            ->addOrderBy('center.name', 'ASC');
+            ->orderBy('center.sort', \SortDirection::Ascending)
+            ->addOrderBy('center.name', \SortDirection::Ascending);
 
         if (!$includeArchived) {
             $queryBuilder
