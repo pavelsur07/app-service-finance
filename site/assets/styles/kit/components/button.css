@@ -85,7 +85,7 @@
 /* Storybook shell · layout utilities.
    Bail-out classes for tiny one-off adjustments in demos and drawer/modal
    heads — flex-grow spacer, right-align on a th. Prefer proper flex/grid
-   layout in production; utilities exist to keep storybook HTML clean of
+   layout in production; utilities exist to keep reference markup clean of
    `class="u-flex-1"` / `style="text-align:right"` inline noise. */
 .u-flex-1     { flex: 1 !important; min-width: 0; }
 .u-text-right { text-align: right !important; }
