@@ -87,8 +87,6 @@
                         {% else %}
                             {% for t in transactions %}
                                 {% set amount = t.amount %}
-                                {% set sign = amount > 0 ? '+' : (amount < 0 ? '−' : '') %}
-                                {% set amountClass = amount < 0 ? 'text-danger' : (amount > 0 ? 'text-success' : '') %}
                                 <tr>
                                     <td>{{ t.date|date('d.m.Y H:i') }}</td>
                                     <td>{{ t.account_name }}</td>
@@ -96,7 +94,7 @@
                                     <td>{{ t.category_name|default('') }}</td>
                                     <td>{{ t.document|default('') }}</td>
                                     <td>{{ t.description|default('') }}</td>
-                                    <td class="text-end {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ amount|vf_amount(2, amount > 0 ? 'income' : null, signed: true) }}</td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
@@ -132,8 +130,8 @@
                                 <tr>
                                     <td>{{ b.date|date('d.m.Y') }}</td>
                                     <td>{{ b.account_name }}</td>
-                                    <td class="text-end">{{ b.opening|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ b.closing|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ b.opening|vf_amount }}</td>
+                                    <td class="text-end">{{ b.closing|vf_amount }}</td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
