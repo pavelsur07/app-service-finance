@@ -60,7 +60,7 @@ final class RecordConnectionAuthResultActionTest extends TestCase
     public function testDatabaseFailureIsSwallowedAndLogged(): void
     {
         $repository = $this->createMock(MarketplaceConnectionRepository::class);
-        $repository->method('registerAuthFailure')->willThrowException(new DbalException('connection lost'));
+        $repository->method('registerAuthFailure')->willThrowException(new class('connection lost') extends \RuntimeException implements DbalException {});
 
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('error');

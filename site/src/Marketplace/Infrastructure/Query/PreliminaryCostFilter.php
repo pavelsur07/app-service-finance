@@ -29,7 +29,7 @@ final readonly class PreliminaryCostFilter
     /**
      * Возвращает SQL-фрагмент, его параметры и типы параметров.
      *
-     * @return array{0: string, 1: array<string, list<string>>, 2: array<string, int>}
+     * @return array{0: string, 1: array<string, list<string>>, 2: array<string, ArrayParameterType>}
      */
     public static function build(string $marketplace, bool $preliminary): array
     {

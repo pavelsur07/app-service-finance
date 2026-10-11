@@ -16,6 +16,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -251,8 +252,11 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
 
     private function assertNoBotTokenInLog(TestHandler $logHandler): void
     {
+        // Сериализует так же, как реальный конвейер логов: голый json_encode падает
+        // на enum в контексте (DBAL 4 пишет типы параметров SQL как ParameterType).
+        $formatter = new JsonFormatter();
         foreach ($logHandler->getRecords() as $record) {
-            $serialized = json_encode($record->toArray(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+            $serialized = $formatter->format($record);
             self::assertStringNotContainsString(
                 'TEST-TOKEN',
                 $serialized,
