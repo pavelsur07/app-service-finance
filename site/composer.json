@@ -137,6 +137,7 @@
     "require-dev": {
         "dama/doctrine-test-bundle": "^8.6",
         "dg/bypass-finals": ">=1.9",
+        "doctrine/deprecations": "^1.1.6",
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "friendsofphp/php-cs-fixer": "^3.95.1",
         "friendsoftwig/twigcs": "^6.6.1",

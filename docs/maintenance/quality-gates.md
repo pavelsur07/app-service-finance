@@ -62,6 +62,32 @@ CI передаёт guard'у карту `git diff -M --name-status --diff-filter
 diff, а это не форматирование — для скалярных вызовов включается строгая
 проверка вместо приведения.
 
+## Депрекейшены Doctrine
+
+PHPUnit-расширение `site/tests/Support/DoctrineDeprecations/` (подключено в
+`site/phpunit.xml`): deprecation из `doctrine/deprecations` с ссылкой, которой
+нет в `baseline.php`, в конце прогона даёт PHPUnit warning раннера, и прогон
+падает (`failOnPhpunitWarning` по умолчанию). Работает в любом наборе — unit,
+integration, каждом functional-шарде; шард, не дошедший до кода, просто молчит.
+
+Обычный `failOnDeprecation` их не видит: Doctrine вызывает `@trigger_error`,
+а PHPUnit подавленные депрекейшены отбрасывает. Расширение до загрузки ядра
+переключает Doctrine на PSR-логгер без `trigger_error`; `DOCTRINE_DEPRECATIONS`
+от FrameworkBundle после этого ничего не меняет.
+
+Отчёт по каждой новой ссылке: пакет, текст, `вызов` — первая строка кода
+проекта в стеке, `в vendor` — где сработал trigger, `тест` — где впервые
+(для `setUpBeforeClass` — `suite …`). Doctrine дедуплицирует по ссылке, поэтому
+показано только первое срабатывание.
+
+Гранулярность — ссылка: гейт ловит новые **виды** депрекейшенов, а не новые
+вызовы известных; пока ссылка в baseline, новый `orderBy(…, 'ASC')` пройдёт.
+Baseline только сокращается: исправили все вызовы — удалите строку. Новая
+ссылка от `composer update` (vendor→vendor) — в baseline с пояснением.
+Тесты с `#[RunInSeparateProcess]` гейт не видит. Падение идёт через
+`@internal` `Event\Facade::emitter()` PHPUnit 11.5: после обновления PHPUnit
+перепроверить внедрённым `Deprecation::trigger()` в пробном тесте (exit 1).
+
 ## Branch protection на `master`
 
 Обязательные проверки заданы в защите ветки, а не в коде: `🔬 Static analysis`,
