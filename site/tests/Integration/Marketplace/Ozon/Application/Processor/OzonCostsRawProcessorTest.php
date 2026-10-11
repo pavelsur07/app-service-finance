@@ -292,9 +292,9 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $costRawDocumentIds = [...$rawDocumentIds, self::LEGACY_RAW_DOC_ID];
 
         $platform = $this->connection->getDatabasePlatform();
-        $companyTable = $platform->quoteIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
-        $userTable = $platform->quoteIdentifier($this->em->getClassMetadata(User::class)->getTableName());
-        $documentTable = $platform->quoteIdentifier($this->em->getClassMetadata(Document::class)->getTableName());
+        $companyTable = $platform->quoteSingleIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
+        $userTable = $platform->quoteSingleIdentifier($this->em->getClassMetadata(User::class)->getTableName());
+        $documentTable = $platform->quoteSingleIdentifier($this->em->getClassMetadata(Document::class)->getTableName());
 
         $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id IN (:companyIds) OR raw_document_id IN (:costRawDocumentIds)', [
             'companyIds' => $companyIds,

@@ -115,7 +115,7 @@ final class UserDeletionService
         foreach ($tables as $table) {
             $sql = sprintf(
                 'DELETE FROM %s WHERE company_id IN (:company_ids)',
-                $platform->quoteIdentifier($table),
+                $platform->quoteSingleIdentifier($table),
             );
 
             $this->connection->executeStatement(

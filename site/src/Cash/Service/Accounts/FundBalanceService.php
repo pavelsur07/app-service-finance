@@ -26,7 +26,7 @@ class FundBalanceService
         $qb = $this->em->createQueryBuilder();
         $rows = $qb->select('f.id AS fundId', 'f.name AS name', 'f.currency AS currency', 'COALESCE(SUM(m.amountMinor), 0) AS balanceMinor')
             ->from(MoneyFund::class, 'f')
-            ->leftJoin(MoneyFundMovement::class, 'm', 'WITH', 'm.fund = f')
+            ->leftJoin(MoneyFundMovement::class, 'm', 'ON', 'm.fund = f')
             ->where('f.company = :company')
             ->setParameter('company', $company)
             ->groupBy('f.id')
