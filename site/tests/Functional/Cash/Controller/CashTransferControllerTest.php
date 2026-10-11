@@ -54,8 +54,9 @@ final class CashTransferControllerTest extends WebTestCaseBase
 
         $crawler = $client->followRedirect();
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('9 500,25 RUB', $crawler->filter('.card-body')->text());
-        self::assertStringContainsString('100,00 USD', $crawler->filter('.card-body')->text());
+        // DS-Money: разряды — U+00A0, валюта — символом после числа.
+        self::assertStringContainsString("9\u{00A0}500,25\u{00A0}₽", $crawler->filter('.card-body')->text());
+        self::assertStringContainsString("100,00\u{00A0}$", $crawler->filter('.card-body')->text());
         self::assertStringContainsString('1 RUB = 0.010526', $crawler->filter('.card-body')->text());
 
         $transferId = basename($location);

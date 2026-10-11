@@ -27,12 +27,12 @@
             <dt class="col-md-3">Списание</dt>
             <dd class="col-md-9">
                 <a href="{{ path('cash_transaction_show', {id: source.id}) }}">{{ source.moneyAccount.name }}</a>
-                — {{ source.amount|number_format(2, ',', ' ') }} {{ source.currency }}
+                — {{ source.amount|vf_money(2, source.currency) }}
             </dd>
             <dt class="col-md-3">Поступление</dt>
             <dd class="col-md-9">
                 <a href="{{ path('cash_transaction_show', {id: target.id}) }}">{{ target.moneyAccount.name }}</a>
-                — {{ target.amount|number_format(2, ',', ' ') }} {{ target.currency }}
+                — {{ target.amount|vf_money(2, target.currency) }}
             </dd>
             <dt class="col-md-3">Технические статьи</dt>
             <dd class="col-md-9">

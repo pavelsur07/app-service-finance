@@ -24,8 +24,10 @@
         <dl class="row">
             <dt class="col-md-3">Дата</dt><dd class="col-md-9">{{ tx.occurredAt|date('d.m.Y') }}</dd>
             <dt class="col-md-3">Счет</dt><dd class="col-md-9">{{ tx.moneyAccount.name }}</dd>
-            <dt class="col-md-3">Направление</dt><dd class="col-md-9"><span class="badge bg-{{ tx.direction == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction == 'INFLOW' ? 'Приток' : 'Отток' }}</span></dd>
-            <dt class="col-md-3">Сумма</dt><dd class="col-md-9 text-end">{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</dd>
+            {# direction — enum CashDirection: сравниваем значение, а не объект. DS-Money: расход — не красный. #}
+            {% set inflow = tx.direction.value == 'INFLOW' %}
+            <dt class="col-md-3">Направление</dt><dd class="col-md-9"><span class="badge bg-{{ inflow ? 'success' : 'secondary' }}">{{ inflow ? 'Приток' : 'Отток' }}</span></dd>
+            <dt class="col-md-3">Сумма</dt><dd class="col-md-9 text-end">{{ tx.amount|vf_amount(2, inflow ? 'income' : null, signed: true, currency: tx.currency == 'RUB' ? '₽' : tx.currency, negate: not inflow) }}</dd>
             <dt class="col-md-3">Статья</dt>
             <dd class="col-md-9">
                 {# Показываем каждую строку разбивки с её суммой: при нескольких статьях
@@ -46,7 +48,7 @@
                         <div>
                             {{ chain|join(' / ') }}
                             {% if tx.splits|length > 1 %}
-                                <span class="text-muted">— {{ split.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span>
+                                <span class="text-muted">— {{ split.amount|vf_money(2, tx.currency) }}</span>
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -97,7 +99,8 @@
                         <tr>
                             <th class="text-nowrap">Номер / дата</th>
                             <th>Описание</th>
-                            <th class="text-end text-nowrap">Сумма</th>
+                            {# Документ ОПиУ копирует сумму операции без пересчёта — валюта та же. #}
+                            <th class="text-end text-nowrap">Сумма{% if tx.currency == 'RUB' %}, ₽{% endif %}</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -112,7 +115,7 @@
                                     <div class="fw-semibold">{{ document.counterparty ? document.counterparty.name : '—' }}</div>
                                     <div class="text-muted">{{ document.description ?: '—' }}</div>
                                 </td>
-                                <td class="text-end fw-semibold">{{ document.totalAmount|number_format(2, ',', ' ') }}</td>
+                                <td class="text-end fw-semibold">{{ document.totalAmount|vf_amount(currency: tx.currency) }}</td>
                                 <td class="text-end">
                                     <a href="{{ path('document_show', {id: document.id}) }}" class="btn btn-link">Открыть</a>
                                 </td>

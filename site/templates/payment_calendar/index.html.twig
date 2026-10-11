@@ -62,7 +62,7 @@
                                 </span>
                                 <div class="text-secondary">Остаток на начало</div>
                             </div>
-                            <div class="h2 mt-2">{{ forecast.openingBalance|number_format(2, '.', ' ') }} ₽</div>
+                            <div class="h2 mt-2">{{ forecast.openingBalance|vf_money(2, '₽') }}</div>
                             {% if period %}
                                 <div class="text-secondary">На {{ period.from|date('d.m.Y') }}</div>
                             {% else %}
@@ -80,7 +80,7 @@
                                 </span>
                                 <div class="text-secondary">Прогноз на конец</div>
                             </div>
-                            <div class="h2 mt-2">{{ forecast.closingForecast|number_format(2, '.', ' ') }} ₽</div>
+                            <div class="h2 mt-2">{{ forecast.closingForecast|vf_money(2, '₽') }}</div>
                             {% if period %}
                                 <div class="text-secondary">На {{ period.to|date('d.m.Y') }}</div>
                             {% else %}
