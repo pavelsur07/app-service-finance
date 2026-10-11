@@ -112,7 +112,7 @@
                             <th>Дата</th>
                             <th>Счет</th>
                             <th class="text-center text-nowrap">ОПиУ</th>
-                            <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
+                            <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма, ₽</th>
                             <th>Статья / Проект</th>
                             <th>Контрагент</th>
                             <th></th>
@@ -150,7 +150,9 @@
                                     &nbsp;
                                 {% endif %}
                             </td>
-                            <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
+                            {# DS: ₽ — в заголовке; другая валюта остаётся в ячейке. Доход — зелёный, расход — обычный цвет с минусом. #}
+                            {% set inflow = tx.direction.value == 'INFLOW' %}
+                            <td class="text-end text-nowrap" style="min-width: 12rem;">{{ (inflow ? tx.amount : '-' ~ tx.amount)|vf_amount(2, inflow ? 'income' : null) }}{% if tx.currency != 'RUB' %} {{ tx.currency }}{% endif %}</td>
                             <td>
                                 {% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
                                 {% if transfer %}
