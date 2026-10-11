@@ -50,7 +50,7 @@ class OzonReconciliationRun
 
     /** Затраты периода вне сверки: их документ — не by-day (легаси v3). Информационно. */
     #[ORM\Column(type: StringBigIntType::NAME)]
-    /** bigint гидратируется строкой; наружу отдаётся int. */
+    /** bigint_string гидрирует строку (StringBigIntType); наружу отдаётся int. */
     private string $outsideRawCostsMinor = '0';
 
     #[ORM\Column(type: 'string', length: 32, enumType: OzonReconciliationStatus::class)]

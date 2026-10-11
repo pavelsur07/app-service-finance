@@ -43,7 +43,7 @@ class OzonReconciliationLine
     private string $categoryCode;
 
     #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
-    /** bigint гидратируется строкой; наружу отдаётся int. */
+    /** bigint_string гидрирует строку (StringBigIntType); наружу отдаётся int. */
     private ?string $sourceMinor;
 
     #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]

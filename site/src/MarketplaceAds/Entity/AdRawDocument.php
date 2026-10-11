@@ -64,7 +64,7 @@ class AdRawDocument
     #[ORM\Column(type: 'string', length: 64, nullable: true)]
     private ?string $fileHash = null;
 
-    // Doctrine hydrates BIGINT as string by default (см. MoneyFundMovement::$amountMinor) —
+    // bigint_string гидрирует BIGINT строкой на любой версии DBAL (StringBigIntType) —
     // на типизированном ?int возникал бы TypeError при загрузке.
     #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
     private ?string $fileSizeBytes = null;
