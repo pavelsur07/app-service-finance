@@ -105,12 +105,13 @@ final class CashTransactionService
         }
 
         // Создаём сущность транзакции
+        $amount = $this->requireAmount($dto);
         $tx = new CashTransaction(
             Uuid::uuid4()->toString(),
             $company,
             $account,
             $dto->direction,
-            $dto->amount,
+            $amount,
             $currency,
             $dto->occurredAt
         );
@@ -135,7 +136,7 @@ final class CashTransactionService
         $tx->setDedupeHash($dto->dedupeHash);
         $tx->setRawData($dto->rawData ?? []);
 
-        $this->applyVat($tx, $company, $dto->direction, $dto->amount);
+        $this->applyVat($tx, $company, $dto->direction, $amount);
 
         $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
 
@@ -177,9 +178,10 @@ final class CashTransactionService
         $currency = $this->resolveCurrencyForAccount($dto->currency, $account);
 
         // Обновляем поля
+        $amount = $this->requireAmount($dto);
         $tx->setMoneyAccount($account)
             ->setDirection($dto->direction)
-            ->setAmount($dto->amount)
+            ->setAmount($amount)
             ->setCurrency($currency)
             ->setOccurredAt($dto->occurredAt)
             ->setDescription($dto->description);
@@ -205,7 +207,7 @@ final class CashTransactionService
             ->setProjectDirection($projectDirection)
             ->setResponsibilityCenterId($responsibilityCenterId);
 
-        $this->applyVat($tx, $company, $dto->direction, $dto->amount);
+        $this->applyVat($tx, $company, $dto->direction, $amount);
 
         $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
 
@@ -230,6 +232,19 @@ final class CashTransactionService
         $this->snapshotCacheInvalidator->invalidateForCompany($company);
 
         return $tx;
+    }
+
+    /**
+     * Форма отсекает пустую сумму валидацией; эта проверка — для вызовов в обход формы
+     * (фасад, импорт). В веб-форме DomainException доходит до пользователя флешем.
+     */
+    private function requireAmount(CashTransactionDTO $dto): string
+    {
+        if (null === $dto->amount || '' === $dto->amount) {
+            throw new \DomainException('Укажите сумму.');
+        }
+
+        return $dto->amount;
     }
 
     private function applyVat(CashTransaction $tx, Company $company, CashDirection $direction, string $amount): void

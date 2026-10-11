@@ -334,15 +334,14 @@ class CashTransactionController extends AbstractController
                     $this->addFlash('danger', $e->getMessage());
                     // остаёмся на форме (без редиректа)
                 }
-            } else {
-                return $this->json($form->getErrors(true));
             }
         }
 
+        // Невалидная форма — та же страница с ошибками у полей и 422, а не сырой JSON.
         return $this->render('transaction/new.html.twig', [
             'form' => $form->createView(),
             'tx' => null,
-        ]);
+        ], new Response(status: $form->isSubmitted() && !$form->isValid() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
     #[Route('/{id}/edit', name: 'cash_transaction_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
@@ -410,7 +409,7 @@ class CashTransactionController extends AbstractController
             'tx' => $tx,
             'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
             'pnlDocuments' => $this->getDocumentsForTransaction($tx),
-        ]);
+        ], new Response(status: $form->isSubmitted() && !$form->isValid() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
     #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]

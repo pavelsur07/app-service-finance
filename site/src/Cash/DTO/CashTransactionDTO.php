@@ -25,8 +25,13 @@ class CashTransactionDTO
     #[Assert\Choice(callback: [CashDirection::class, 'cases'])]
     public CashDirection $direction;
 
+    /**
+     * Nullable, чтобы форма могла записать пустую сумму, а валидация — её отклонить:
+     * Assert\Positive пропускает null, без NotBlank пустая сумма доходила до сервиса.
+     */
+    #[Assert\NotBlank(message: 'Укажите сумму.')]
     #[Assert\Positive]
-    public string $amount;
+    public ?string $amount = null;
 
     #[Assert\Choice(callback: [FiatCurrency::class, 'values'])]
     public string $currency;
