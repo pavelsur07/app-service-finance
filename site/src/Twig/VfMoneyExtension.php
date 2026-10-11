@@ -34,6 +34,7 @@ final class VfMoneyExtension extends AbstractExtension
         return [
             new TwigFilter('vf_money', $this->money(...)),
             new TwigFilter('vf_number', $this->number(...)),
+            new TwigFilter('vf_minor', $this->minor(...)),
             new TwigFilter('vf_money_short', $this->moneyShort(...)),
             new TwigFilter('vf_amount', $this->amount(...), ['is_safe' => ['html']]),
         ];
@@ -48,6 +49,23 @@ final class VfMoneyExtension extends AbstractExtension
         $formatted = $this->format($this->round($this->normalize($value), $decimals));
 
         return null === $currency ? $formatted : $formatted.self::NBSP.$this->symbol($currency);
+    }
+
+    /**
+     * Копейки (minor units) → десятичная строка без потери точности на крупных
+     * оборотах; дальше — `vf_money` / `vf_amount`: `{{ x_minor|vf_minor|vf_amount }}`.
+     */
+    public function minor(int|string|null $minor, int $digits = 2): ?string
+    {
+        if (null === $minor) {
+            return null;
+        }
+        $minor = trim((string) $minor);
+        if (!preg_match('/^-?\d+$/D', $minor)) {
+            throw new \InvalidArgumentException(\sprintf('Invalid minor amount "%s".', $minor));
+        }
+
+        return bcdiv($minor, bcpow('10', (string) $digits), $digits);
     }
 
     /**

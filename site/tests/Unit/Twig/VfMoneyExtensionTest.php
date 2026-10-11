@@ -33,6 +33,23 @@ final class VfMoneyExtensionTest extends TestCase
         self::assertSame($expected, (new VfMoneyExtension())->money($value, $decimals, $currency));
     }
 
+    public function testMinorUnitsConvertExactly(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame('1308.04', $extension->minor(130804));
+        self::assertSame('-0.05', $extension->minor('-5'));
+        self::assertSame('90071992547409.93', $extension->minor('9007199254740993'));
+        self::assertNull($extension->minor(null));
+        self::assertSame("90\u{00A0}071\u{00A0}992\u{00A0}547\u{00A0}409,93\u{00A0}₽", $extension->money($extension->minor('9007199254740993'), 2, 'RUB'));
+    }
+
+    public function testMinorRejectsNonIntegers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new VfMoneyExtension())->minor('12.5');
+    }
+
     public function testNumberUsesTheSameNotation(): void
     {
         $extension = new VfMoneyExtension();
