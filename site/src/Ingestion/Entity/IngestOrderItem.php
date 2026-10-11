@@ -6,6 +6,7 @@ namespace App\Ingestion\Entity;
 
 use App\Ingestion\Domain\TenantOwnedInterface;
 use App\Ingestion\Repository\IngestOrderItemRepository;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -71,7 +72,7 @@ class IngestOrderItem implements TenantOwnedInterface
     private int $quantity;
 
     /** Цена в минорных единицах: копейки у обоих маркетплейсов. */
-    #[ORM\Column(type: Types::BIGINT, nullable: true)]
+    #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
     private ?string $priceMinor = null;
 
     #[ORM\Column(type: Types::STRING, length: 3, nullable: true)]

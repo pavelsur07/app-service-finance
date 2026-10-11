@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final class MarketplaceGeneratedRowsDuplicateAuditQuery
 {
@@ -111,7 +112,7 @@ final class MarketplaceGeneratedRowsDuplicateAuditQuery
         );
 
         // ARRAY_AGG использован осознанно: запрос рассчитан на PostgreSQL, как и миграция unique index для raw documents.
-        return $this->connection->fetchAllAssociative($sql, ['limit' => $limit], ['limit' => \PDO::PARAM_INT]);
+        return $this->connection->fetchAllAssociative($sql, ['limit' => $limit], ['limit' => ParameterType::INTEGER]);
     }
 
     private function resolveKindConfig(string $kind): array

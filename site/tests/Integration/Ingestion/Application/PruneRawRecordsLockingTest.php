@@ -18,6 +18,7 @@ use App\Ingestion\Repository\IngestRawRecordRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\StoredObject;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\DriverManager;
@@ -656,7 +657,7 @@ final class PruneRawRecordsLockingTest extends PostgresResetTestCase
         $holder->executeQuery(
             'SELECT id FROM ingest_raw_records WHERE id IN (:ids) FOR UPDATE',
             ['ids' => [$rawRecordId, $foreignRawRecordId]],
-            ['ids' => Connection::PARAM_STR_ARRAY],
+            ['ids' => ArrayParameterType::STRING],
         );
 
         try {

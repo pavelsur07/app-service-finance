@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -21,7 +22,7 @@ final class Version20250930120000 extends AbstractMigration
         $this->addSql('CREATE INDEX idx_pl_daily_company_date ON pl_daily_totals (company_id, date)');
         $this->addSql('CREATE INDEX idx_pl_daily_company_cat_date ON pl_daily_totals (company_id, pl_category_id, date)');
 
-        if ('postgresql' === $this->connection->getDatabasePlatform()->getName()) {
+        if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
             $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT chk_pl_daily_totals_amounts CHECK (amount_income >= 0 AND amount_expense >= 0)');
         }
     }
