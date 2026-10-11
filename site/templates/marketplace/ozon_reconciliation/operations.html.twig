@@ -22,7 +22,7 @@
                         <th>Дата</th>
                         <th>Идентификатор</th>
                         {% if kind == 'costs' %}<th>Категория</th><th>Тип</th>{% endif %}
-                        <th class="text-end">Сумма</th>
+                        <th class="text-end">Сумма, ₽</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -34,8 +34,9 @@
                                 <td>{{ row.category_name ?? row.category_code ?? 'Без категории' }}</td>
                                 <td>{{ row.operation_type == 'storno' ? 'Возврат (сторно)' : 'Затрата' }}</td>
                             {% endif %}
-                            <td class="text-end {{ kind == 'costs' and row.operation_type == 'storno' ? 'text-success' : '' }}">
-                                {{ kind == 'costs' and row.operation_type == 'storno' ? '−' : '' }}{{ row.amount|number_format(2, '.', ' ') }} ₽
+                            {% set storno = kind == 'costs' and row.operation_type == 'storno' %}
+                            <td class="text-end">
+                                {{ row.amount|vf_amount(2, storno ? 'income' : null, negate: storno) }}
                             </td>
                         </tr>
                     {% else %}

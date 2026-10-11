@@ -91,7 +91,7 @@
                         </li>
                         {% if view.outsideRawCosts != '0.00' %}
                             <li class="text-muted">
-                                Затраты, загруженные прежним способом и не входящие в сверку: {{ view.outsideRawCosts|number_format(2, '.', ' ') }} ₽
+                                Затраты, загруженные прежним способом и не входящие в сверку: {{ view.outsideRawCosts|vf_money(2, '₽') }}
                             </li>
                         {% endif %}
                         <li class="text-muted">Проверено: {{ view.checkedAt|date('d.m.Y H:i') }}</li>
@@ -114,9 +114,9 @@
                             <thead>
                             <tr>
                                 <th>Блок</th>
-                                <th class="text-end">{{ check.sourceLabel }}</th>
-                                <th class="text-end">{{ check.targetLabel }}</th>
-                                <th class="text-end">Разница</th>
+                                <th class="text-end">{{ check.sourceLabel }}, ₽</th>
+                                <th class="text-end">{{ check.targetLabel }}, ₽</th>
+                                <th class="text-end">Разница, ₽</th>
                                 <th>Статус</th>
                                 <th></th>
                             </tr>

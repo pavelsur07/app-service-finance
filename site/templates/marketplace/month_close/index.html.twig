@@ -100,9 +100,9 @@
                                                     <div>
                                                         <div class="fw-medium">Сверка с xlsx: совпадает</div>
                                                         <div class="text-muted small">
-                                                            API: {{ reconciliation.xlsx_comparable|number_format(2, '.', ' ') }} руб. ·
-                                                            xlsx: {{ reconciliation.xlsx_total|number_format(2, '.', ' ') }} руб. ·
-                                                            delta: {{ reconciliation.delta|number_format(2, '.', ' ') }}
+                                                            API: {{ reconciliation.xlsx_comparable|vf_money(2, '₽') }} ·
+                                                            xlsx: {{ reconciliation.xlsx_total|vf_money(2, '₽') }} ·
+                                                            delta: {{ reconciliation.delta|vf_money(2, '₽') }}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -114,7 +114,7 @@
                                                     <div>
                                                         <div class="fw-medium">Сверка с xlsx: расхождение</div>
                                                         <div class="text-muted small">
-                                                            Delta: {{ reconciliation.delta|number_format(2, '.', ' ') }} руб.
+                                                            Delta: {{ reconciliation.delta|vf_money(2, '₽') }}
                                                         </div>
                                                     </div>
                                                 </div>
