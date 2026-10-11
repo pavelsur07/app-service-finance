@@ -72,8 +72,8 @@ class ReportAccountBalancesController extends AbstractController
                 ->setParameter('company', $company)
                 ->setParameter('date', $date)
                 ->setParameter('accountIds', $accountIds)
-                ->orderBy('a.id', 'ASC')
-                ->addOrderBy('b.date', 'DESC');
+                ->orderBy('a.id', \SortDirection::Ascending)
+                ->addOrderBy('b.date', \SortDirection::Descending);
 
             $rows = $qb->getQuery()->getResult();
             foreach ($rows as $row) {

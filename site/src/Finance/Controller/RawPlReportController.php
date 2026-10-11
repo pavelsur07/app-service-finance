@@ -56,9 +56,9 @@ class RawPlReportController extends AbstractController
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('d.date', 'ASC')
-            ->addOrderBy('d.id', 'ASC')
-            ->addOrderBy('o.id', 'ASC');
+            ->orderBy('d.date', \SortDirection::Ascending)
+            ->addOrderBy('d.id', \SortDirection::Ascending)
+            ->addOrderBy('o.id', \SortDirection::Ascending);
 
         if (null !== $selectedResponsibilityCenterId) {
             $qb
@@ -126,9 +126,9 @@ class RawPlReportController extends AbstractController
             ->setParameter('company', $company)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('t.date', 'ASC')
-            ->addOrderBy('pd.name', 'ASC')
-            ->addOrderBy('c.name', 'ASC');
+            ->orderBy('t.date', \SortDirection::Ascending)
+            ->addOrderBy('pd.name', \SortDirection::Ascending)
+            ->addOrderBy('c.name', \SortDirection::Ascending);
 
         if (null !== $selectedResponsibilityCenterId) {
             $qb2

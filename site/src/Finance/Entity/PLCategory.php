@@ -38,7 +38,7 @@ class PLCategory
     private ?self $parent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
-    #[ORM\OrderBy(['sortOrder' => 'ASC'])]
+    #[ORM\OrderBy(['sortOrder' => \SortDirection::Ascending])]
     private Collection $children;
 
     #[ORM\Column(type: 'integer')]

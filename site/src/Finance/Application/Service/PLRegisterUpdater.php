@@ -87,7 +87,7 @@ final class PLRegisterUpdater
             ->setParameter('status', DocumentStatus::ACTIVE)
             ->setParameter('from', $fromDay->setTime(0, 0), Types::DATETIME_IMMUTABLE)
             ->setParameter('to', $toDay->setTime(23, 59, 59), Types::DATETIME_IMMUTABLE)
-            ->orderBy('d.date', 'ASC')
+            ->orderBy('d.date', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 

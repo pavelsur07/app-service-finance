@@ -27,7 +27,7 @@ class PLCategoryRepository extends ServiceEntityRepository
             ->andWhere('c.company = :company')
             ->andWhere('c.parent IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('c.sortOrder', 'ASC')
+            ->orderBy('c.sortOrder', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -46,8 +46,8 @@ class PLCategoryRepository extends ServiceEntityRepository
         $categories = $this->createQueryBuilder('c')
             ->andWhere('c.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('c.sortOrder', 'ASC')
-            ->addOrderBy('c.id', 'ASC')
+            ->orderBy('c.sortOrder', \SortDirection::Ascending)
+            ->addOrderBy('c.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
 
@@ -93,7 +93,7 @@ class PLCategoryRepository extends ServiceEntityRepository
             ->andWhere('c.code IS NOT NULL')
             ->andWhere("c.code <> ''")
             ->setParameter('company', $company)
-            ->orderBy('c.code', 'ASC')
+            ->orderBy('c.code', \SortDirection::Ascending)
             ->getQuery()
             ->getArrayResult();
 
