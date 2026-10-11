@@ -46,7 +46,7 @@
             </div>
             {% if pager.haveToPaginate %}
                 <div class="card-footer d-flex align-items-center">
-                    {% include 'partials/_pagerfanta.html.twig' with {
+                    {% include 'partials/_pagination.html.twig' with {
                         'pager': pager,
                         'route': 'marketplace_ozon_reconciliation_operations',
                         'params': {month: month, kind: kind, block: block ? block.value : null, category: category, limit: limit}|filter(v => v is not null),

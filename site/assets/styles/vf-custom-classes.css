@@ -297,3 +297,181 @@
 .vf-amount--income {
   color: var(--vf-ok-text);
 }
+
+/* ===== Вкладки (DS-Tabs): без «коробки» Tabler; 14/12/12px, между вкладками 4px;
+   текст 14/20 · 500 — обычная Navy 600, hover Navy 900 + линия Navy 300, активная —
+   Action blue + линия 2px; фокус — outline внутри; недоступная — opacity .45.
+   Разметка — partials/_tabs.html.twig; классы .nav-tabs/.nav-link.active сохранены. */
+.nav-tabs {
+  gap: var(--vf-space-1);
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.nav-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: 14px 12px 12px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vf-text-muted);
+  font-weight: var(--vf-weight-medium);
+  white-space: nowrap;
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--vf-text);
+  border-bottom-color: var(--vf-border-strong);
+}
+
+.nav-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  color: var(--vf-primary);
+  border-bottom-color: var(--vf-primary);
+  background: transparent;
+}
+
+.nav-tabs .nav-link.disabled,
+.nav-tabs .nav-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* В шапке карточки линию даёт сама шапка — без второй линии под вкладками. */
+.card-header-tabs {
+  border-bottom: 0;
+}
+
+.nav-tabs.nav-fill .nav-link {
+  display: flex;
+  justify-content: center;
+}
+
+/* Счётчик: h 20 · радиус 10 · 12/600; Navy 100, в активной — Blue 50, .warn — Warn. */
+.nav-tabs .cnt {
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--vf-navy-100);
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+.nav-tabs .nav-link.active .cnt {
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+.nav-tabs .cnt.warn {
+  background: var(--vf-warn-bg);
+  color: var(--vf-warn-text);
+}
+
+/* ===== Таблицы (DS-Table): шапка Navy 50 · 11/16 · 700 · +5% · Navy 600; строка 14px
+   по вертикали, компактная (.table-sm) 8px; hover Navy 50, выбранная Blue 50. */
+.table > thead > tr > th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background: var(--vf-navy-50);
+  color: var(--vf-text-muted);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.table > tbody > tr > td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.table-sm > tbody > tr > td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.table td.text-end,
+.table th.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+.table {
+  --tblr-table-hover-bg: var(--vf-navy-50);
+}
+
+.card-table > tbody > tr:hover > * {
+  --tblr-table-bg-state: var(--vf-navy-50);
+}
+
+.table > tbody > tr.table-active > * {
+  --tblr-table-bg-state: var(--vf-primary-lt);
+}
+
+/* Итоги (DS-Money): крупнее и жирнее строк; символ валюты в итогах указывается всегда. */
+.table > tfoot > tr > * {
+  border-top: 1px solid var(--vf-border-strong);
+  font-size: var(--vf-size-md);
+  font-weight: var(--vf-weight-semibold);
+}
+
+/* ===== Пагинация (DS-Feedback): кнопки sm 30px, граница Navy 300, радиус 4;
+   текущая — Primary; недоступная — opacity .5. Подпись — 13px, Navy 600. */
+.pagination {
+  --tblr-pagination-gap: var(--vf-space-1);
+  --tblr-pagination-padding-x: 0;
+  --tblr-pagination-padding-y: 0;
+  --tblr-pagination-font-size: var(--vf-size-sm);
+  --tblr-pagination-color: var(--vf-text);
+  --tblr-pagination-bg: var(--vf-surface);
+  --tblr-pagination-border-width: 1px;
+  --tblr-pagination-border-color: var(--vf-border-strong);
+  --tblr-pagination-border-radius: var(--vf-radius-sm);
+  --tblr-pagination-hover-color: var(--vf-text);
+  --tblr-pagination-hover-bg: var(--vf-hover-bg);
+  --tblr-pagination-hover-border-color: var(--vf-border-strong);
+  --tblr-pagination-focus-color: var(--vf-text);
+  --tblr-pagination-focus-bg: var(--vf-hover-bg);
+  --tblr-pagination-active-color: var(--vf-surface);
+  --tblr-pagination-active-bg: var(--vf-primary);
+  --tblr-pagination-active-border-color: var(--vf-primary);
+  --tblr-pagination-disabled-color: var(--vf-text);
+  --tblr-pagination-disabled-bg: var(--vf-surface);
+  --tblr-pagination-disabled-border-color: var(--vf-border-strong);
+}
+
+.pagination .page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--vf-radius-sm);
+  font-weight: var(--vf-weight-medium);
+}
+
+.pagination .page-link:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.pagination .page-item.disabled .page-link {
+  opacity: 0.5;
+}
+
+.vf-pager-caption {
+  font-size: var(--vf-size-sm);
+}

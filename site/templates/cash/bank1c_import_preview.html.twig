@@ -150,6 +150,10 @@
             </div>
         </div>
 
-        {% include 'partials/_pagination.html.twig' with {pager: pager} %}
+        {% if pager %}
+            <div class="mt-3">
+                {% include 'partials/_pagination.html.twig' with {page: pager.current, total: totalRows, perPage: perPage} only %}
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

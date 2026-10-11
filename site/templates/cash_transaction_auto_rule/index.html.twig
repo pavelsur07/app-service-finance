@@ -190,11 +190,8 @@
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer d-flex align-items-center">
-                <span class="text-muted">Найдено правил: {{ pager.nbResults }}</span>
-                <div class="ms-auto">
-                    {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
-                </div>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager} %}
             </div>
         </div>
     </div>

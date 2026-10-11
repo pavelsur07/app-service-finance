@@ -3,20 +3,12 @@
 {% set active_tab = 'costs' %}
 
 {% block tab_content %}
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link {{ mapped == 'all' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'all'})) }}">Все</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {{ mapped == 'linked' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'linked'})) }}">С листингом</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {{ mapped == 'general' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'general'})) }}">Общие</a>
-        </li>
-    </ul>
+    {% set costs_tab_params = routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo}) %}
+    {% include 'partials/_tabs.html.twig' with {class: 'mb-3', tabs: [
+        {label: 'Все', href: path('marketplace_costs_index', costs_tab_params|merge({'mapped': 'all'})), active: mapped == 'all'},
+        {label: 'С листингом', href: path('marketplace_costs_index', costs_tab_params|merge({'mapped': 'linked'})), active: mapped == 'linked'},
+        {label: 'Общие', href: path('marketplace_costs_index', costs_tab_params|merge({'mapped': 'general'})), active: mapped == 'general'},
+    ]} only %}
 
     <div class="card-header">
         <h3 class="card-title">Фильтр</h3>
@@ -149,7 +141,7 @@
     </div>
     {% if pager.haveToPaginate %}
         <div class="card-footer d-flex align-items-center">
-            {% include 'partials/_pagerfanta.html.twig' with {
+            {% include 'partials/_pagination.html.twig' with {
                 'pager': pager,
                 'route': 'marketplace_costs_index',
                 'params': routeParams|default({

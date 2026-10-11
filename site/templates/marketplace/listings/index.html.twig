@@ -216,19 +216,11 @@
                 </div>
 
                 <div class="card-footer d-flex align-items-center">
-                    <p class="m-0 text-muted">
-                        Показано <strong>{{ pager.currentPageOffsetStart }}–{{ pager.currentPageOffsetEnd }}</strong>
-                        из <strong>{{ pager.nbResults }}</strong>
-                    </p>
-                    {% if pager.nbPages > 1 %}
-                        <div class="ms-auto">
-                            {% include 'partials/_pagerfanta.html.twig' with {
-                                pager: pager,
-                                route: 'marketplace_listings_index',
-                                params: {filter: filter, marketplace: marketplace}
-                            } %}
-                        </div>
-                    {% endif %}
+                    {% include 'partials/_pagination.html.twig' with {
+                        pager: pager,
+                        route: 'marketplace_listings_index',
+                        params: {filter: filter, marketplace: marketplace}
+                    } %}
                 </div>
             {% endif %}
         </div>

@@ -130,22 +130,11 @@
 
                         {# Пагинация #}
                         {% if pages > 1 %}
-                            <div class="card-footer d-flex align-items-center">
-                                <p class="m-0 text-muted">
-                                    Страница {{ page }} из {{ pages }} (всего {{ total }})
-                                </p>
-                                <ul class="pagination m-0 ms-auto">
-                                    <li class="page-item {{ page <= 1 ? 'disabled' }}">
-                                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page - 1})) }}">
-                                            Назад
-                                        </a>
-                                    </li>
-                                    <li class="page-item {{ page >= pages ? 'disabled' }}">
-                                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page + 1})) }}">
-                                            Вперёд
-                                        </a>
-                                    </li>
-                                </ul>
+                            <div class="card-footer">
+                                {% include 'partials/_pagination.html.twig' with {
+                                    page: page, total: total, perPage: perPage,
+                                    route: 'marketplace_analytics_cost_mappings_index', params: filters
+                                } only %}
                             </div>
                         {% endif %}
                     </div>

@@ -84,11 +84,7 @@
 
         {% if pager.nbResults > 0 %}
             <div class="card-footer d-flex align-items-center">
-                {{ include('partials/_pagerfanta.html.twig', {pager: pager}) }}
-                <p class="m-0 ms-auto text-muted">
-                    Показано <strong>{{ pager.currentPageOffsetStart }}–{{ pager.currentPageOffsetEnd }}</strong>
-                    из <strong>{{ pager.nbResults }}</strong>
-                </p>
+                {{ include('partials/_pagination.html.twig', {pager: pager}) }}
             </div>
         {% endif %}
     </div>

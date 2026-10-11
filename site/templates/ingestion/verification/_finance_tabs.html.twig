@@ -16,17 +16,8 @@
 
 <div class="card mb-3">
     <div class="card-body pb-0">
-        <ul class="nav nav-tabs card-header-tabs" role="tablist">
-            {% for tab in tabs %}
-                <li class="nav-item" role="presentation">
-                    <a
-                        class="nav-link {{ current_route == tab.route ? 'active' : '' }}"
-                        href="{{ path(tab.route) }}"
-                    >
-                        {{ tab.label }}
-                    </a>
-                </li>
-            {% endfor %}
-        </ul>
+        {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: tabs|map(tab => {
+            label: tab.label, href: path(tab.route), active: current_route == tab.route,
+        })} only %}
     </div>
 </div>
