@@ -54,7 +54,7 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
             ->setParameter('source', $source->value)
             ->setParameter('resourceType', $resourceType)
             ->setParameter('normalizedKey', $normalizedKey)
-            ->orderBy('category.scope', 'ASC')
+            ->orderBy('category.scope', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -67,8 +67,8 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('category')
             ->andWhere('category.status = :status')
             ->setParameter('status', $status->value)
-            ->orderBy('category.lastSeenAt', 'DESC')
-            ->addOrderBy('category.createdAt', 'DESC')
+            ->orderBy('category.lastSeenAt', \SortDirection::Descending)
+            ->addOrderBy('category.createdAt', \SortDirection::Descending)
             ->setMaxResults(max(1, min(500, $limit)))
             ->getQuery()
             ->getResult();

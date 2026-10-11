@@ -67,12 +67,12 @@ final class IngestOrderStatusEventRepository extends ServiceEntityRepository
             // процессом. `id` тоже: UUID v7 упорядочен по миллисекунде, и два
             // процесса, взявшие блокировку внутри одной миллисекунды, могли
             // дать порядок, обратный порядку применения.
-            ->orderBy('e.observedAt', 'DESC')
-            ->addOrderBy('e.recordedSeq', 'DESC')
+            ->orderBy('e.observedAt', \SortDirection::Descending)
+            ->addOrderBy('e.recordedSeq', \SortDirection::Descending)
             // Последний ключ — на случай исторических строк, у которых номера
             // ещё нет: сортировка обязана быть полной, иначе страница
             // нестабильна.
-            ->addOrderBy('e.id', 'DESC')
+            ->addOrderBy('e.id', \SortDirection::Descending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();

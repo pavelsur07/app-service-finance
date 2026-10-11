@@ -68,8 +68,8 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->setParameter('source', $source)
             ->setParameter('resourceType', $resourceType)
             ->setParameter('externalId', $externalId)
-            ->orderBy('record.fetchedAt', 'DESC')
-            ->addOrderBy('record.createdAt', 'DESC')
+            ->orderBy('record.fetchedAt', \SortDirection::Descending)
+            ->addOrderBy('record.createdAt', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -109,8 +109,8 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->andWhere('record.fetchedAt < :olderThan')
             ->setParameter('status', RawNormalizationStatus::PENDING->value)
             ->setParameter('olderThan', $olderThan)
-            ->orderBy('record.fetchedAt', 'ASC')
-            ->addOrderBy('record.createdAt', 'ASC')
+            ->orderBy('record.fetchedAt', \SortDirection::Ascending)
+            ->addOrderBy('record.createdAt', \SortDirection::Ascending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -142,8 +142,8 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
     {
         /** @var list<IngestRawRecord> $records */
         $records = $this->prunableQueryBuilder($notSeenSince)
-            ->orderBy('record.lastSeenAt', 'ASC')
-            ->addOrderBy('record.id', 'ASC')
+            ->orderBy('record.lastSeenAt', \SortDirection::Ascending)
+            ->addOrderBy('record.id', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
@@ -249,7 +249,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->andWhere('record.id IN (:ids)')
             ->setParameter('notSeenSince', $notSeenSince)
             ->setParameter('ids', array_values(array_unique($ids)))
-            ->orderBy('record.id', 'ASC')
+            ->orderBy('record.id', \SortDirection::Ascending)
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setHint(Query::HINT_REFRESH, true)
@@ -280,9 +280,9 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             // иначе неустранимый объект вечно занимал бы начало очереди, а
             // остальные не обрабатывались бы никогда.
             ->addSelect('CASE WHEN record.payloadDeletionAttemptedAt IS NULL THEN 0 ELSE 1 END AS HIDDEN attemptRank')
-            ->orderBy('attemptRank', 'ASC')
-            ->addOrderBy('record.payloadDeletionAttemptedAt', 'ASC')
-            ->addOrderBy('record.id', 'ASC')
+            ->orderBy('attemptRank', \SortDirection::Ascending)
+            ->addOrderBy('record.payloadDeletionAttemptedAt', \SortDirection::Ascending)
+            ->addOrderBy('record.id', \SortDirection::Ascending)
             ->setMaxResults(max(1, min(1000, $limit)))
             ->getQuery()
             ->getResult();
@@ -315,7 +315,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->andWhere('record.payloadDeletedAt IS NULL')
             ->andWhere('record.id IN (:ids)')
             ->setParameter('ids', array_values(array_unique($ids)))
-            ->orderBy('record.id', 'ASC')
+            ->orderBy('record.id', \SortDirection::Ascending)
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setHint(Query::HINT_REFRESH, true)
@@ -359,7 +359,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->select('record.id AS id')
             ->andWhere('record.id IN (:ids)')
             ->setParameter('ids', array_values(array_unique($ids)))
-            ->orderBy('record.id', 'ASC')
+            ->orderBy('record.id', \SortDirection::Ascending)
             ->getQuery()
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->getResult();
@@ -463,7 +463,7 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
                 )
                 ->andWhere('record.id IN (:ids)')
                 ->setParameter('ids', $chunk)
-                ->orderBy('record.id', 'ASC')
+                ->orderBy('record.id', \SortDirection::Ascending)
                 ->getQuery()
                 ->setLockMode(LockMode::PESSIMISTIC_WRITE)
                 ->getResult();

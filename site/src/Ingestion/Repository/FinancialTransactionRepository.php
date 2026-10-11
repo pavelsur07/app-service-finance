@@ -86,8 +86,8 @@ final class FinancialTransactionRepository extends ServiceEntityRepository imple
             ->andWhere('transaction.operationGroupId = :operationGroupId')
             ->setParameter('companyId', $companyId)
             ->setParameter('operationGroupId', $operationGroupId)
-            ->orderBy('transaction.occurredAt', 'ASC')
-            ->addOrderBy('transaction.id', 'ASC')
+            ->orderBy('transaction.occurredAt', \SortDirection::Ascending)
+            ->addOrderBy('transaction.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -128,8 +128,8 @@ final class FinancialTransactionRepository extends ServiceEntityRepository imple
             ->setParameter('companyId', $companyId)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
-            ->orderBy('transaction.occurredAt', 'ASC')
-            ->addOrderBy('transaction.id', 'ASC');
+            ->orderBy('transaction.occurredAt', \SortDirection::Ascending)
+            ->addOrderBy('transaction.id', \SortDirection::Ascending);
 
         if (null !== $shopRef) {
             $queryBuilder
@@ -150,8 +150,8 @@ final class FinancialTransactionRepository extends ServiceEntityRepository imple
             ->andWhere('transaction.rawRecordId = :rawRecordId')
             ->setParameter('companyId', $companyId)
             ->setParameter('rawRecordId', $rawRecordId)
-            ->orderBy('transaction.occurredAt', 'ASC')
-            ->addOrderBy('transaction.id', 'ASC')
+            ->orderBy('transaction.occurredAt', \SortDirection::Ascending)
+            ->addOrderBy('transaction.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
