@@ -57,8 +57,7 @@
                             <div class="text-muted small mb-1">На сегодня</div>
                             {% if todayPurchasePrice %}
                                 <div class="h2 mb-0">
-                                    {{ todayPurchasePrice.priceAmount|number_format(2, '.', ' ') }}
-                                    <small class="text-muted fs-4">{{ todayPurchasePrice.priceCurrency }}</small>
+                                    {{ todayPurchasePrice.priceAmount|vf_amount(currency: todayPurchasePrice.priceCurrency == 'RUB' ? '₽' : todayPurchasePrice.priceCurrency) }}
                                 </div>
                                 <div class="text-muted small mt-1">
                                     с {{ todayPurchasePrice.effectiveFrom|date('d.m.Y') }}
@@ -79,8 +78,7 @@
                         <div class="text-muted small mb-1">Цена на дату ({{ priceAtDate|date('d.m.Y') }})</div>
                         {% if priceAtPurchasePrice %}
                             <div class="h3 mb-0">
-                                {{ priceAtPurchasePrice.priceAmount|number_format(2, '.', ' ') }}
-                                <small class="text-muted">{{ priceAtPurchasePrice.priceCurrency }}</small>
+                                {{ priceAtPurchasePrice.priceAmount|vf_amount(currency: priceAtPurchasePrice.priceCurrency == 'RUB' ? '₽' : priceAtPurchasePrice.priceCurrency) }}
                             </div>
                         {% else %}
                             <div class="text-muted">Не задано</div>
@@ -146,8 +144,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <strong>{{ price.priceAmount|number_format(2, '.', ' ') }}</strong>
-                                        <span class="text-muted">{{ price.priceCurrency }}</span>
+                                        <strong>{{ price.priceAmount|vf_amount(currency: price.priceCurrency == 'RUB' ? '₽' : price.priceCurrency) }}</strong>
                                     </td>
                                     <td>
                                         {% if price.note %}

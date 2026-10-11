@@ -62,6 +62,7 @@ final class ProductPurchasePriceCreateTest extends WebTestCaseBase
 
         $content = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('Закупочная цена успешно добавлена.', $content);
-        self::assertStringContainsString('123 456.00', $content);
+        // DS-Money: разряды — U+00A0, десятичная запятая, копейки — отдельным приглушённым span.
+        self::assertStringContainsString("123\u{00A0}456<span class=\"vf-amount__minor\">,00</span>", $content);
     }
 }

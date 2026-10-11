@@ -57,6 +57,7 @@ final class ProductShowPurchasePriceBlockTest extends WebTestCaseBase
         self::assertStringContainsString('Закупочная цена', $content);
         self::assertStringContainsString('На сегодня', $content);
         self::assertStringContainsString('Цена на дату (15.02.2024)', $content);
-        self::assertStringContainsString('199 900.00', $content);
+        // DS-Money: разряды — U+00A0, десятичная запятая, копейки — отдельным приглушённым span.
+        self::assertStringContainsString("199\u{00A0}900<span class=\"vf-amount__minor\">,00</span>", $content);
     }
 }
