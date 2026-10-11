@@ -76,8 +76,8 @@
         .debug-pre {
             max-height: 480px;
             overflow: auto;
-            background: #1e1e1e;
-            color: #dcdcdc;
+            background: var(--vf-navy-900);
+            color: var(--vf-navy-100);
             padding: 12px;
             margin: 0;
             font-size: 12px;
@@ -101,7 +101,7 @@
             var renderResult = function (elId, payload, okFlag) {
                 var el = document.getElementById(elId);
                 el.textContent = pretty(payload);
-                el.style.borderLeft = okFlag ? '4px solid #1a7f37' : '4px solid #d1242f';
+                el.style.borderLeft = okFlag ? '4px solid var(--vf-ok-text)' : '4px solid var(--vf-danger-text)';
             };
 
             var companyId = function () { return companySel.value; };
