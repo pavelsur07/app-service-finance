@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final readonly class ProductPurchasePriceQuery
 {
@@ -70,7 +71,7 @@ SQL;
             'productId' => $productId,
             'limit' => max(1, $limit),
         ], [
-            'limit' => \PDO::PARAM_INT,
+            'limit' => ParameterType::INTEGER,
         ]);
 
         return array_map(static fn (array $row): array => [
