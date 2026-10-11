@@ -559,7 +559,7 @@ final class PlReportPreviewController extends AbstractController
 
     /**
      * @param list<ProjectDirection> $projectDirections
-     * @param list<object>           $responsibilityCenters
+     * @param list<object> $responsibilityCenters
      *
      * @return array{
      *     plural: bool,
@@ -660,7 +660,7 @@ final class PlReportPreviewController extends AbstractController
     }
 
     /**
-     * @param list<mixed>  $requestedIds
+     * @param list<mixed> $requestedIds
      * @param list<string> $availableIds
      *
      * @return list<string>|null null means no restriction (all choices)
