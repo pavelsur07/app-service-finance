@@ -41,10 +41,10 @@
                             {% for item in scheduleItems %}
                                 <tr>
                                     <td>{{ item.dueDate|date('d.m.Y') }}</td>
-                                    <td class="text-end">{{ item.totalPaymentAmount|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ item.principalPart|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ item.interestPart|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ item.feePart|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ item.totalPaymentAmount|vf_amount }}</td>
+                                    <td class="text-end">{{ item.principalPart|vf_amount }}</td>
+                                    <td class="text-end">{{ item.interestPart|vf_amount }}</td>
+                                    <td class="text-end">{{ item.feePart|vf_amount }}</td>
                                     <td class="text-center">
                                         {% if item.isPaid %}
                                             <span class="badge bg-success-lt text-success">Оплачен</span>
