@@ -6,6 +6,7 @@ doctrine:
             money_amount_minor: App\Shared\Infrastructure\Doctrine\MoneyAmountType
             datetime_immutable_us: App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType
             datetime_immutable_utc_ms: App\Shared\Infrastructure\Doctrine\UtcMillisecondDateTimeImmutableType
+            bigint_string: App\Shared\Infrastructure\Doctrine\StringBigIntType
 
         # Прод и CI — postgres:15 (docker-compose.prod.yml, deploy.yml). Без версии
         # DBAL спрашивает её у сервера при каждом подключении; serverVersion в

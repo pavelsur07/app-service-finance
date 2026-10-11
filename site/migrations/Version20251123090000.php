@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -16,7 +17,7 @@ final class Version20251123090000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $allowedTypes = "'DEAL_SALE', 'PAYROLL', 'TAXES', 'LOANS', 'OBLIGATIONS', 'ASSETS', 'CASH', 'CASHFLOW_EXPENSE', 'OTHER'";
 
         $this->addSql("ALTER TABLE documents ADD COLUMN IF NOT EXISTS type VARCHAR(255) DEFAULT 'OTHER'");
@@ -38,7 +39,7 @@ final class Version20251123090000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $legacyTypes = "'SALES', 'PAYROLL', 'LIABILITIES', 'TAXES', 'PROPERTY', 'LOANS', 'OTHER'";
 
         $this->addSql("UPDATE documents SET type = 'OTHER' WHERE type NOT IN ($legacyTypes)");

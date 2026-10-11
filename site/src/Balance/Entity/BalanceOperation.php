@@ -6,6 +6,7 @@ namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceOperationKind;
 use App\Balance\Enum\BalanceOperationStatus;
+use App\Shared\Infrastructure\Doctrine\StringBigIntType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -29,7 +30,7 @@ class BalanceOperation
     #[ORM\Column(type: Types::GUID)]
     private string $companyId;
 
-    #[ORM\Column(type: Types::BIGINT)]
+    #[ORM\Column(type: StringBigIntType::NAME)]
     private string $number;
 
     #[ORM\Column(length: 20, enumType: BalanceOperationKind::class)]
@@ -53,7 +54,7 @@ class BalanceOperation
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $postedAt = null;
 
-    #[ORM\Column(type: Types::BIGINT, nullable: true)]
+    #[ORM\Column(type: StringBigIntType::NAME, nullable: true)]
     private ?string $postingSequence = null;
 
     #[ORM\Column(type: Types::GUID, nullable: true)]
