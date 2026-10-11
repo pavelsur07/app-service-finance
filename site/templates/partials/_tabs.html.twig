@@ -11,8 +11,10 @@
   Необязательно: class — доп. классы <ul> (например, card-header-tabs).
 #}
 {% set max_visible = 6 %}
-{% set visible = tabs|length > max_visible ? tabs|slice(0, max_visible - 1) : tabs %}
-{% set overflow = tabs|length > max_visible ? tabs|slice(max_visible - 1) : [] %}
+{# Клиентские вкладки-панели в «Ещё» не уходят: пункт меню — ссылка, а не переключатель панели. #}
+{% set overflows = tabs|length > max_visible and tabs|filter(t => t.pane is defined)|length == 0 %}
+{% set visible = overflows ? tabs|slice(0, max_visible - 1) : tabs %}
+{% set overflow = overflows ? tabs|slice(max_visible - 1) : [] %}
 {% set overflow_active = overflow|filter(t => t.active ?? false)|first %}
 <ul class="nav nav-tabs {{ class ?? '' }}"{% if tabs|filter(t => t.pane is defined)|length > 0 %} role="tablist"{% endif %}>
     {% for tab in visible %}

@@ -51,6 +51,9 @@
             background: var(--tblr-bg-surface);
             box-shadow: inset 1px 0 0 var(--tblr-border-color);
         }
+        /* DS-Table: шапка — Navy 50, включая залипшие ячейки. */
+        .table.pl-table thead th:first-child,
+        .table.pl-table thead th.pl-cell-total { background: var(--vf-navy-50); }
         .table.pl-table .text-end { font-variant-numeric: tabular-nums; }
         .table.pl-table .pl-name {
             display: block;

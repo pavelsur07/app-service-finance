@@ -18,10 +18,12 @@ final class VfMoneyExtension extends AbstractExtension
     private const MINUS = "\u{2212}";
     /** DS-Money: символ после числа; для валют без привычного символа — код. */
     private const SYMBOLS = ['RUB' => '₽', 'USD' => '$', 'EUR' => '€', 'GBP' => '£'];
+    /** От меньшей единицы к большей: [степень десяти, подпись, знаков после запятой]. */
     private const SHORT_UNITS = [
-        [9, 'млрд'],
-        [6, 'млн'],
-        [3, 'тыс.'],
+        [0, '', 0],
+        [3, 'тыс.', 1],
+        [6, 'млн', 1],
+        [9, 'млрд', 1],
     ];
 
     /**
@@ -58,16 +60,21 @@ final class VfMoneyExtension extends AbstractExtension
         }
 
         $decimal = $this->normalize($value);
-        $unit = '';
-        foreach (self::SHORT_UNITS as [$power, $label]) {
+        $index = 0;
+        foreach (self::SHORT_UNITS as $i => [$power]) {
             if (bccomp($this->abs($decimal), bcpow('10', (string) $power), 0) >= 0) {
-                $decimal = bcdiv($decimal, bcpow('10', (string) $power), 10);
-                $unit = $label;
-                break;
+                $index = $i;
             }
         }
+        // Округление может дотянуть до 1000 текущей единицы: 999 999,99 → «1 млн», а не «1 000 тыс.».
+        do {
+            [$power, $unit, $decimals] = self::SHORT_UNITS[$index];
+            $rounded = $this->round(bcdiv($decimal, bcpow('10', (string) $power), 10), $decimals);
+            $promote = isset(self::SHORT_UNITS[$index + 1]) && bccomp($this->abs($rounded), '1000', $decimals) >= 0;
+            ++$index;
+        } while ($promote);
 
-        $formatted = $this->format($this->round($decimal, '' === $unit ? 0 : 1));
+        $formatted = $this->format($rounded);
         if (str_contains($formatted, ',')) {
             $formatted = rtrim(rtrim($formatted, '0'), ',');
         }
@@ -80,7 +87,8 @@ final class VfMoneyExtension extends AbstractExtension
      * tone: 'income' — зелёный (приход); без tone — основной цвет. Красный для сумм
      * не используется. signed: плюс у положительных — только у приходов в списке
      * операций. currency: код валюты строки; рубль не выводится, остальные —
-     * символом после числа, приглушённо.
+     * символом после числа, приглушённо. negate: вывести с обратным знаком —
+     * расход, хранящийся положительной суммой с направлением.
      */
     public function amount(
         int|float|string|null $value,
@@ -88,6 +96,7 @@ final class VfMoneyExtension extends AbstractExtension
         ?string $tone = null,
         bool $signed = false,
         ?string $currency = null,
+        bool $negate = false,
     ): string {
         if (null !== $tone && 'income' !== $tone) {
             throw new \InvalidArgumentException(\sprintf('Unknown amount tone "%s".', $tone));
@@ -96,7 +105,11 @@ final class VfMoneyExtension extends AbstractExtension
             return '<span class="vf-amount">—</span>';
         }
 
-        $rounded = $this->round($this->normalize($value), $decimals);
+        $decimal = $this->normalize($value);
+        if ($negate) {
+            $decimal = str_starts_with($decimal, '-') ? substr($decimal, 1) : '-'.$decimal;
+        }
+        $rounded = $this->round($decimal, $decimals);
         $zero = 0 === bccomp($rounded, '0', $decimals);
         $formatted = $this->format($rounded);
         if ($signed && !$zero && !$this->isNegative($rounded)) {

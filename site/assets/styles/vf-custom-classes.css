@@ -26,9 +26,10 @@
   box-shadow: none;
 }
 
-/* Secondary: белая, граница Navy 300, hover #eef1f8. Кнопка без варианта — тоже Secondary. */
+/* Secondary: белая, граница Navy 300, hover #eef1f8. Кнопка без цветового варианта — тоже Secondary;
+   исключены все варианты палитры Tabler и свои (accent), JS-хуки вида btn-reprocess вариантом не считаются. */
 .btn-outline-secondary,
-.btn:where(:not([class*="btn-primary"], [class*="btn-secondary"], [class*="btn-success"], [class*="btn-danger"], [class*="btn-warning"], [class*="btn-info"], [class*="btn-dark"], [class*="btn-light"], [class*="btn-ghost"], [class*="btn-link"], [class*="btn-outline"], [class*="btn-action"], [class*="btn-teal"], [class*="btn-azure"], [class*="btn-red"], [class*="btn-green"], [class*="btn-blue"])) {
+.btn:where(:not([class*="btn-primary"], [class*="btn-secondary"], [class*="btn-success"], [class*="btn-info"], [class*="btn-warning"], [class*="btn-danger"], [class*="btn-light"], [class*="btn-dark"], [class*="btn-link"], [class*="btn-ghost"], [class*="btn-outline"], [class*="btn-action"], [class*="btn-accent"], [class*="btn-blue"], [class*="btn-azure"], [class*="btn-indigo"], [class*="btn-purple"], [class*="btn-pink"], [class*="btn-red"], [class*="btn-orange"], [class*="btn-yellow"], [class*="btn-lime"], [class*="btn-green"], [class*="btn-teal"], [class*="btn-cyan"], [class*="btn-white"], [class*="btn-facebook"], [class*="btn-twitter"], [class*="btn-google"], [class*="btn-github"])) {
   --tblr-btn-color: var(--vf-text);
   --tblr-btn-bg: var(--vf-surface);
   --tblr-btn-border-color: var(--vf-border-strong);
@@ -343,6 +344,16 @@
 .nav-tabs .nav-link:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* В шапке карточки линию даёт сама шапка — без второй линии под вкладками. */
+.card-header-tabs {
+  border-bottom: 0;
+}
+
+.nav-tabs.nav-fill .nav-link {
+  display: flex;
+  justify-content: center;
 }
 
 /* Счётчик: h 20 · радиус 10 · 12/600; Navy 100, в активной — Blue 50, .warn — Warn. */
