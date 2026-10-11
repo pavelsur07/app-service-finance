@@ -271,7 +271,7 @@ class FinancialTransaction implements TenantOwnedInterface
 
     /**
      * @param array<string, mixed> $sourceData
-     * @param list<string>         $keys
+     * @param list<string> $keys
      */
     public function replaceSourceDataFields(array $sourceData, array $keys, ?string $description = null): bool
     {

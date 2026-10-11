@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -16,9 +17,9 @@ final class Version20260602120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $this->abortIf(
-            $platform !== 'postgresql',
+            'postgresql' !== $platform,
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform),
         );
 
@@ -72,9 +73,9 @@ final class Version20260602120000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $this->abortIf(
-            $platform !== 'postgresql',
+            'postgresql' !== $platform,
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform),
         );
 

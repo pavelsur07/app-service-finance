@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -16,8 +17,8 @@ final class Version20260520143000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
-        $this->abortIf($platform !== 'postgresql', 'Migration can only be executed safely on postgresql.');
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
+        $this->abortIf('postgresql' !== $platform, 'Migration can only be executed safely on postgresql.');
 
         $salesDuplicates = (int) $this->connection->fetchOne(<<<'SQL'
             SELECT COUNT(*)
@@ -91,8 +92,8 @@ final class Version20260520143000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        $platform = $this->connection->getDatabasePlatform()->getName();
-        $this->abortIf($platform !== 'postgresql', 'Migration can only be executed safely on postgresql.');
+        $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
+        $this->abortIf('postgresql' !== $platform, 'Migration can only be executed safely on postgresql.');
 
         $this->addSql('DROP INDEX IF EXISTS uniq_marketplace_sales_company_marketplace_external_order');
         $this->addSql('DROP INDEX IF EXISTS uniq_marketplace_returns_company_marketplace_external_return');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -18,7 +19,7 @@ final class Version20250929120000 extends AbstractMigration
     {
         $this->normalizeTypes();
 
-        if ('postgresql' === $this->connection->getDatabasePlatform()->getName()) {
+        if ('postgresql' === ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()))) {
             $this->addSql(<<<'SQL'
 DO $$
 BEGIN
@@ -45,7 +46,7 @@ SQL);
 
     public function down(Schema $schema): void
     {
-        if ('postgresql' === $this->connection->getDatabasePlatform()->getName()) {
+        if ('postgresql' === ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()))) {
             $this->addSql(<<<'SQL'
 DO $$
 BEGIN
@@ -67,7 +68,7 @@ SQL);
 
         foreach ($rows as $row) {
             $current = $row['type'];
-            $normalized = $current === null || '' === trim((string) $current)
+            $normalized = null === $current || '' === trim((string) $current)
                 ? 'OTHER'
                 : $this->mapLegacyType((string) $current);
 
@@ -76,6 +77,7 @@ SQL);
             }
         }
     }
+
     private function mapLegacyType(string $value): string
     {
         $normalized = strtoupper(trim($value));
