@@ -8,6 +8,7 @@ use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\Security\BalanceAccess;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use Ramsey\Uuid\Uuid;
 
 final class BalancePeriodAction
@@ -45,7 +46,7 @@ final class BalancePeriodAction
             }
             $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
             $id = $this->db->fetchOne('SELECT id FROM balance_periods WHERE company_id=? AND month=?', [$companyId, $month]) ?: Uuid::uuid7()->toString();
-            $this->db->executeStatement('INSERT INTO balance_periods (id,company_id,month,is_closed,changed_by,reason,changed_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (company_id,month) DO UPDATE SET is_closed=EXCLUDED.is_closed,changed_by=EXCLUDED.changed_by,reason=EXCLUDED.reason,changed_at=EXCLUDED.changed_at', [$id, $companyId, $month, $close, $actorId, trim($reason), $now], [\PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_BOOL, \PDO::PARAM_STR, \PDO::PARAM_STR, \PDO::PARAM_STR]);
+            $this->db->executeStatement('INSERT INTO balance_periods (id,company_id,month,is_closed,changed_by,reason,changed_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (company_id,month) DO UPDATE SET is_closed=EXCLUDED.is_closed,changed_by=EXCLUDED.changed_by,reason=EXCLUDED.reason,changed_at=EXCLUDED.changed_at', [$id, $companyId, $month, $close, $actorId, trim($reason), $now], [ParameterType::STRING, ParameterType::STRING, ParameterType::STRING, ParameterType::BOOLEAN, ParameterType::STRING, ParameterType::STRING, ParameterType::STRING]);
             $this->db->executeStatement('UPDATE balance_books SET version=version+1,updated_at=? WHERE company_id=?', [$now, $companyId]);
             $this->db->insert('balance_audit_events', ['id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'object_type' => 'period', 'object_id' => $id, 'action' => $close ? 'closed' : 'reopened', 'author_id' => $actorId, 'changes' => json_encode(['month' => $month, 'reason' => trim($reason)], \JSON_THROW_ON_ERROR), 'created_at' => $now]);
             $drafts = (int) $this->db->fetchOne("SELECT COUNT(*) FROM balance_operations WHERE company_id=? AND status='draft' AND operation_date>=? AND operation_date<?", [$companyId, $month, $date->modify('+1 month')->format('Y-m-d')]);

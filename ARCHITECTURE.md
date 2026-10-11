@@ -2995,6 +2995,11 @@ $money->amountMinor(): int;  $money->currency(): string
 Зарегистрирован в `config/packages/doctrine.yaml > dbal.types`; namespace VO покрыт маппингом
 `SharedValueObject`. SQL-агрегация по сумме (`SUM`/`ORDER BY`) работает на отдельной колонке.
 
+**BIGINT со `string`-свойством** мапится типом `bigint_string`
+(`App\Shared\Infrastructure\Doctrine\StringBigIntType`, extends `BigIntType`) — гидрирует
+строку на любой версии DBAL. Штатный `Types::BIGINT` для `string`-свойства не использовать:
+в DBAL 4 он отдаёт `int`, и UnitOfWork видит изменение у каждой загруженной сущности.
+
 ---
 
 ## Tagged Services — текущие группы

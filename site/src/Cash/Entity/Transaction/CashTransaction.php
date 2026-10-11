@@ -109,8 +109,8 @@ class CashTransaction
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: 'datetime')]
-    private \DateTimeInterface $updatedAt;
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $updatedAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $deletedAt = null;
@@ -658,12 +658,12 @@ class CashTransaction
         return $this->createdAt;
     }
 
-    public function getUpdatedAt(): \DateTimeInterface
+    public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
     }
 
-    public function setUpdatedAt(\DateTimeInterface $u): self
+    public function setUpdatedAt(\DateTimeImmutable $u): self
     {
         $this->updatedAt = $u;
 
