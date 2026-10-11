@@ -29,18 +29,18 @@
 
             <div class="card">
                 <div class="card-header">
-                    {# TODO(ds): 10 вкладок — больше 6 по DS-Tabs; группировка раздела — решение продукта. #}
+                    {# DS-Tabs: больше 6 вкладок — пять видны, остальные в «Ещё» (partials/_tabs). #}
                     {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
-                        {label: 'Покрытие', href: path('marketplace_index'), icon: 'ti-git-fork', active: active_tab == 'marketplace'},
-                        {label: 'Подключения', href: path('marketplace_connections_index'), icon: 'ti-plug', active: active_tab == 'connections'},
-                        {label: 'Продажи', href: path('marketplace_sales_index'), icon: 'ti-activity', active: active_tab == 'sales'},
-                        {label: 'Возвраты', href: path('marketplace_returns_index'), icon: 'ti-arrow-back-up', active: active_tab == 'returns'},
-                        {label: 'Затраты', href: path('marketplace_costs_index'), icon: 'ti-wallet', active: active_tab == 'costs'},
-                        {label: 'Отчёт WB', href: path('marketplace_wb_finance_report'), icon: 'ti-report-analytics', active: active_tab == 'wb_finance_report'},
-                        {label: 'Маппинг ОПиУ', href: path('marketplace_pl_mappings_index'), icon: 'ti-list-details', active: active_tab == 'pl_mappings'},
-                        {label: 'Маппинг затрат', href: path('marketplace_cost_pl_mapping_index'), icon: 'ti-trending-up', active: active_tab == 'cost_pl_mapping'},
-                        {label: 'Закрытие месяца', href: path('marketplace_month_close_index'), icon: 'ti-square-check', active: active_tab == 'month_close'},
-                        {label: 'Сверка Ozon', href: path('marketplace_ozon_reconciliation_index'), icon: 'ti-shield-check', active: active_tab == 'ozon_reconciliation'},
+                        {label: 'Покрытие', href: path('marketplace_index'), active: active_tab == 'marketplace'},
+                        {label: 'Подключения', href: path('marketplace_connections_index'), active: active_tab == 'connections'},
+                        {label: 'Продажи', href: path('marketplace_sales_index'), active: active_tab == 'sales'},
+                        {label: 'Возвраты', href: path('marketplace_returns_index'), active: active_tab == 'returns'},
+                        {label: 'Затраты', href: path('marketplace_costs_index'), active: active_tab == 'costs'},
+                        {label: 'Отчёт WB', href: path('marketplace_wb_finance_report'), active: active_tab == 'wb_finance_report'},
+                        {label: 'Маппинг ОПиУ', href: path('marketplace_pl_mappings_index'), active: active_tab == 'pl_mappings'},
+                        {label: 'Маппинг затрат', href: path('marketplace_cost_pl_mapping_index'), active: active_tab == 'cost_pl_mapping'},
+                        {label: 'Закрытие месяца', href: path('marketplace_month_close_index'), active: active_tab == 'month_close'},
+                        {label: 'Сверка Ozon', href: path('marketplace_ozon_reconciliation_index'), active: active_tab == 'ozon_reconciliation'},
                     ]} only %}
                 </div>
 

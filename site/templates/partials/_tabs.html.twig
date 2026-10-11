@@ -1,17 +1,21 @@
 {#
-  Tabs легаси-слоя (DS «Ваш Финдир»): подчёркивание 2px Action blue у активной,
-  счётчик-пилюля .cnt. По DS: 2–6 вкладок, «Все» — первой, warn-счётчик — не
-  больше одного на экран.
+  Tabs легаси-слоя по листу DS-Tabs: подчёркивание 2px Action blue у активной,
+  счётчик-пилюля .cnt (.cnt.warn — «нужно действие», не больше одного на экран).
+  Названия без иконок; «Все» — первой; больше 6 вкладок — пять видны, остальные в «Ещё».
 
   {% include 'partials/_tabs.html.twig' with {tabs: [
       {label: 'Все', href: path('x'), active: true, count: 12},
-      {label: 'Ошибки', href: path('y'), count: 3, warn: true, icon: 'ti-alert-triangle'},
+      {label: 'Требуют внимания', href: path('y'), count: 3, warn: true},
   ]} %}
   Клиентские вкладки Bootstrap: pane: 'id-панели' вместо href.
   Необязательно: class — доп. классы <ul> (например, card-header-tabs).
 #}
+{% set max_visible = 6 %}
+{% set visible = tabs|length > max_visible ? tabs|slice(0, max_visible - 1) : tabs %}
+{% set overflow = tabs|length > max_visible ? tabs|slice(max_visible - 1) : [] %}
+{% set overflow_active = overflow|filter(t => t.active ?? false)|first %}
 <ul class="nav nav-tabs {{ class ?? '' }}"{% if tabs|filter(t => t.pane is defined)|length > 0 %} role="tablist"{% endif %}>
-    {% for tab in tabs %}
+    {% for tab in visible %}
         {% set active = tab.active ?? false %}
         <li class="nav-item"{% if tab.pane is defined %} role="presentation"{% endif %}>
             <a class="nav-link {{ active ? 'active' : '' }}"
@@ -20,12 +24,24 @@
                 {% else %}
                     href="{{ tab.href }}"{% if active %} aria-current="page"{% endif %}
                 {% endif %}>
-                {% if tab.icon is defined %}<i class="ti {{ tab.icon }} me-1" aria-hidden="true"></i>{% endif %}
                 {{ tab.label }}
                 {% if tab.count is defined and tab.count is not null %}
-                    <span class="cnt {{ (tab.warn ?? false) ? 'cnt--warn' : '' }}">{{ tab.count|vf_money(0) }}</span>
+                    <span class="cnt {{ (tab.warn ?? false) ? 'warn' : '' }}">{{ tab.count|vf_money(0) }}</span>
                 {% endif %}
             </a>
         </li>
     {% endfor %}
+    {% if overflow|length > 0 %}
+        {# Активная вкладка из «Ещё» показывает своё название на переключателе. #}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {{ overflow_active ? 'active' : '' }}" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false">
+                {{ overflow_active ? overflow_active.label : 'Ещё' }}
+            </a>
+            <div class="dropdown-menu">
+                {% for tab in overflow %}
+                    <a class="dropdown-item {{ (tab.active ?? false) ? 'active' : '' }}" href="{{ tab.href }}"{% if tab.active ?? false %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+                {% endfor %}
+            </div>
+        </li>
+    {% endif %}
 </ul>

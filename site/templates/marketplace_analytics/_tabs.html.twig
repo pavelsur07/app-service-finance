@@ -13,9 +13,9 @@
         <div class="row">
             <div class="col">
                 {% include 'partials/_tabs.html.twig' with {tabs: [
-                    {label: 'Unit — Экономика', href: path('marketplace_analytics_unit_extended_index'), icon: 'ti-activity', active: activeTab == 'unit_extended'},
-                    {label: 'Снапшоты', href: path('marketplace_analytics_snapshots_index'), icon: 'ti-table', active: activeTab == 'snapshots'},
-                    {label: 'Настройки', href: path('marketplace_analytics_cost_mappings_index'), icon: 'ti-settings', active: activeTab == 'settings'},
+                    {label: 'Unit — Экономика', href: path('marketplace_analytics_unit_extended_index'), active: activeTab == 'unit_extended'},
+                    {label: 'Снапшоты', href: path('marketplace_analytics_snapshots_index'), active: activeTab == 'snapshots'},
+                    {label: 'Настройки', href: path('marketplace_analytics_cost_mappings_index'), active: activeTab == 'settings'},
                 ]} only %}
             </div>
         </div>

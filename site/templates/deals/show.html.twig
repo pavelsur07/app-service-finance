@@ -65,9 +65,9 @@
 <div class="card">
     <div class="card-header">
         {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
-            {label: 'Позиции', pane: 'deal-tab-items', icon: 'ti-list', count: deal.items|length, active: activeTab == 'items'},
-            {label: 'Прямые расходы', pane: 'deal-tab-charges', icon: 'ti-receipt', count: deal.charges|length, active: activeTab == 'charges'},
-            {label: 'Корректировки', pane: 'deal-tab-adjustments', icon: 'ti-adjustments', count: deal.adjustments|length, active: activeTab == 'adjustments'},
+            {label: 'Позиции', pane: 'deal-tab-items', count: deal.items|length, active: activeTab == 'items'},
+            {label: 'Прямые расходы', pane: 'deal-tab-charges', count: deal.charges|length, active: activeTab == 'charges'},
+            {label: 'Корректировки', pane: 'deal-tab-adjustments', count: deal.adjustments|length, active: activeTab == 'adjustments'},
         ]} only %}
     </div>
     <div class="card-body">

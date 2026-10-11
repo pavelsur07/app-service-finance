@@ -1,6 +1,7 @@
 {#
-  Пагинация легаси-слоя (DS «Ваш Финдир»): .pagination Tabler, активная страница
-  — Action blue, подпись «Показано с X по Y из N», «Назад» / «Вперёд».
+  Пагинация легаси-слоя (DS-Feedback, DS-Table): .pagination Tabler, кнопки 30px,
+  активная страница — Action blue, «Назад» / «Вперёд» — стрелки с aria-label,
+  подпись «Показано с X по Y из N» 13px.
 
   Pagerfanta:  {% include 'partials/_pagination.html.twig' with {pager: pager} %}
   Без Pagerfanta: {% include 'partials/_pagination.html.twig' with {page: page, total: total, perPage: limit} %}
@@ -37,7 +38,7 @@
     {% endif %}
 
     <div class="d-flex flex-wrap align-items-center gap-2 w-100">
-        <p class="m-0 text-secondary">
+        <p class="m-0 text-secondary vf-pager-caption">
             Показано с {{ ((currentPage - 1) * itemsPerPage + 1)|vf_money(0) }}
             по {{ min(currentPage * itemsPerPage, totalItems)|vf_money(0) }}
             из {{ totalItems|vf_money(0) }}
@@ -48,9 +49,9 @@
                 <ul class="pagination m-0 flex-wrap">
                     <li class="page-item {{ currentPage > 1 ? '' : 'disabled' }}">
                         {% if currentPage > 1 %}
-                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage - 1})) }}">Назад</a>
+                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage - 1})) }}" aria-label="Назад"><i class="ti ti-chevron-left" aria-hidden="true"></i></a>
                         {% else %}
-                            <span class="page-link" aria-disabled="true">Назад</span>
+                            <span class="page-link" aria-disabled="true" aria-label="Назад"><i class="ti ti-chevron-left" aria-hidden="true"></i></span>
                         {% endif %}
                     </li>
 
@@ -66,9 +67,9 @@
 
                     <li class="page-item {{ currentPage < totalPages ? '' : 'disabled' }}">
                         {% if currentPage < totalPages %}
-                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage + 1})) }}">Вперёд</a>
+                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage + 1})) }}" aria-label="Вперёд"><i class="ti ti-chevron-right" aria-hidden="true"></i></a>
                         {% else %}
-                            <span class="page-link" aria-disabled="true">Вперёд</span>
+                            <span class="page-link" aria-disabled="true" aria-label="Вперёд"><i class="ti ti-chevron-right" aria-hidden="true"></i></span>
                         {% endif %}
                     </li>
                 </ul>
