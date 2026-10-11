@@ -8,10 +8,12 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\BigIntType;
 
 /**
- * BIGINT-колонка, гидрируемая в PHP `int` (а не `string`, как штатный BigIntType).
+ * BIGINT-колонка, гидрируемая всегда в PHP `int`.
  *
- * Нужен для маппинга `Money::$amountMinor` (readonly int) в Embeddable: штатный
- * bigint отдаёт строку, что несовместимо с типизированным int-свойством.
+ * Нужен для маппинга `Money::$amountMinor` (readonly int) в Embeddable. Штатный
+ * bigint в DBAL 4 отдаёт `string` для значений вне PHP int, а в DBAL 3 отдавал
+ * строку всегда — тип фиксирует `int` явно. Пара для string-свойств —
+ * StringBigIntType.
  *
  * Диапазон: PHP int 64-бит = ±9.2·10^18 копеек ≈ ±9.2·10^16 ₽ — покрывает decimal(18,2).
  */
@@ -26,10 +28,5 @@ final class MoneyAmountType extends BigIntType
         }
 
         return (int) $value;
-    }
-
-    public function getName(): string
-    {
-        return self::NAME;
     }
 }

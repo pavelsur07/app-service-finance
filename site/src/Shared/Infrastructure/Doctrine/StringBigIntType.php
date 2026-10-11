@@ -18,24 +18,10 @@ use Doctrine\DBAL\Types\BigIntType;
  * исходное значение совпадает со значением свойства.
  *
  * SQL-объявление то же, что у штатного bigint: схема БД и миграции не меняются.
- * На DBAL 3 тип ведёт себя как штатный bigint — вводится заранее, чтобы
- * переход на DBAL 4 не менял гидрацию.
- *
- * Временно, до DBAL 4: компаратор схемы DBAL 3 сравнивает и экземпляр типа,
- * а интроспекция без DC2Type-комментария видит штатный bigint — поэтому
- * `doctrine:migrations:diff` / `schema:update --dump-sql` выдают по этим
- * колонкам фантомный `ALTER … TYPE BIGINT`. В миграции его не переносить:
- * БД уже такая, а DBAL 4 сравнивает только SQL, и строки исчезнут сами.
  */
 final class StringBigIntType extends BigIntType
 {
     public const NAME = 'bigint_string';
-
-    // DBAL 3: имя обязано совпадать с ключом регистрации; в DBAL 4 метода нет.
-    public function getName(): string
-    {
-        return self::NAME;
-    }
 
     public function convertToPHPValue(mixed $value, AbstractPlatform $platform): ?string
     {
