@@ -69,9 +69,9 @@
                                 <td class="text-nowrap">{{ item.number ?: '—' }}</td>
                                 <td>{{ item.projectDirection ? item.projectDirection.name : '—' }}</td>
                                 <td>{{ item.counterparty ? item.counterparty.name : '—' }}</td>
-                                <td class="text-end text-success text-nowrap">{{ income ? income|number_format(0, ',', ' ') : '—' }}</td>
-                                <td class="text-end text-danger text-nowrap">{{ expense ? expense|number_format(0, ',', ' ') : '—' }}</td>
-                                <td class="text-end fw-semibold text-nowrap">{{ total ? total|number_format(0, ',', ' ') : '—' }}</td>
+                                <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
+                                <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
+                                <td class="text-end fw-semibold text-nowrap">{{ total ? total|vf_amount : '—' }}</td>
                                 <td class="text-end">
                                     <form method="post" action="{{ path('document_restore', {'id': item.id}) }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('document_restore' ~ item.id) }}">
