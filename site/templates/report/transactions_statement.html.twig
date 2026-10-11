@@ -111,25 +111,25 @@
         <div class="col-sm-6 col-lg-3">
             <div class="card"><div class="card-body">
                     <div>Сальдо на начало</div>
-                    <div class="h2 mb-0 fw-semibold">{{ summary.opening|default(0)|number_format(2, '.', ' ') }}</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.opening|default(0)|vf_amount }}</div>
                 </div></div>
         </div>
         <div class="col-sm-6 col-lg-3">
             <div class="card"><div class="card-body">
                     <div>Приход</div>
-                    <div class="h2 mb-0 fw-semibold text-success">+{{ summary.income|default(0)|number_format(2, '.', ' ') }}</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.income|default(0)|vf_amount(2, 'income', signed: true) }}</div>
                 </div></div>
         </div>
         <div class="col-sm-6 col-lg-3">
             <div class="card"><div class="card-body">
                     <div>Расход</div>
-                    <div class="h2 mb-0 fw-semibold text-danger">−{{ summary.expense|default(0)|number_format(2, '.', ' ') }}</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.expense|default(0)|vf_amount(negate: true) }}</div>
                 </div></div>
         </div>
         <div class="col-sm-6 col-lg-3">
             <div class="card"><div class="card-body">
                     <div>Сальдо на конец</div>
-                    <div class="h2 mb-0 fw-semibold">{{ summary.closing|default(0)|number_format(2, '.', ' ') }}</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.closing|default(0)|vf_amount }}</div>
                 </div></div>
         </div>
     </div>
@@ -156,14 +156,12 @@
                         <tr class="fw-bold">
                             <td>{{ bucket.label }} — Сальдо на начало</td>
                             <td></td><td></td><td></td>
-                            <td class="text-end text-nowrap fw-semibold">{{ bucket.opening|number_format(2, '.', ' ') }}</td>
+                            <td class="text-end text-nowrap fw-semibold">{{ bucket.opening|vf_amount }}</td>
                         </tr>
 
                         {% if filters.expand_transactions and bucket.transactions is not empty %}
                             {% for trx in bucket.transactions %}
                                 {% set amount = trx.amount %}
-                                {% set sign = amount > 0 ? '+' : (amount < 0 ? '−' : '') %}
-                                {% set amountClass = amount < 0 ? 'text-danger' : (amount > 0 ? 'text-success' : '') %}
                                 <tr>
                                     <td>
                                         {% if filters.group == 'day' %}
@@ -174,8 +172,8 @@
                                     </td>
                                     <td>{{ trx.counterparty|default('') }}</td>
                                     <td>{{ trx.description|default('') }}</td>
-                                    <td class="text-end text-nowrap fw-semibold {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end text-nowrap fw-semibold">{{ trx.balance_after|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end text-nowrap fw-semibold">{{ amount|vf_amount(2, amount > 0 ? 'income' : null, signed: true) }}</td>
+                                    <td class="text-end text-nowrap fw-semibold">{{ trx.balance_after|vf_amount }}</td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
@@ -184,13 +182,13 @@
                             <td>{{ bucket.label }} — Сальдо на конец</td>
                             <td></td><td></td><td></td>
                             <td class="text-end text-nowrap fw-semibold">
-                                {{ bucket.closing_calc|number_format(2, '.', ' ') }}
+                                {{ bucket.closing_calc|vf_amount }}
                                 {# Информер сверки — без цветной подложки #}
                                 {% if bucket.closing_fact is not null %}
                                     {% if bucket.check_ok %}
                                         <span class="ms-2 text-success" title="Расчёт совпадает с фактом">✓</span>
                                     {% else %}
-                                        <span class="ms-2 text-danger" title="Расхождение с фактическим остатком">Δ {{ bucket.check_diff|number_format(2, '.', ' ') }}</span>
+                                        <span class="ms-2 text-danger" title="Расхождение с фактическим остатком">Δ {{ bucket.check_diff|vf_number(2) }}</span>
                                     {% endif %}
                                 {% else %}
                                     <span class="ms-2 text-muted">нет факта</span>

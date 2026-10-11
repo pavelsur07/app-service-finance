@@ -47,8 +47,8 @@
                         <tr>
                             <td>{{ r.date|date('d.m.Y') }}</td>
                             <td>{{ r.account }}</td>
-                            <td class="text-end">{{ r.opening|number_format(2, '.', ' ') }}</td>
-                            <td class="text-end">{{ r.closing|number_format(2, '.', ' ') }}</td>
+                            <td class="text-end">{{ r.opening|vf_amount }}</td>
+                            <td class="text-end">{{ r.closing|vf_amount }}</td>
                         </tr>
                     {% endfor %}
                 {% endif %}

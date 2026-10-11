@@ -101,30 +101,30 @@
                                     {% endif %}
                                     <td>{{ account.name }}</td>
                                     {% set bal = balancesByAccountId[account.id]|default('0') %}
-                                    <td class="text-end">{{ bal|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ bal|vf_amount }}</td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
                     {% endfor %}
                     <tr>
                         <td colspan="2" class="text-end">Подытог Банк</td>
-                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.bank|number_format(2, '.', ' ') }}</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.bank|vf_amount }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="text-end">Подытог Касса</td>
-                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.cash|number_format(2, '.', ' ') }}</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.cash|vf_amount }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="text-end">Подытог Кошелёк</td>
-                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|number_format(2, '.', ' ') }}</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|vf_amount }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="text-end">Подытог Крипто-кошелёк</td>
-                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.crypto_wallet|number_format(2, '.', ' ') }}</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.crypto_wallet|vf_amount }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="text-end fw-bold">Итог по компании ({{ currency }})</td>
-                        <td class="text-end fw-bold">{{ totalsByCurrency[currency].totalCompany|number_format(2, '.', ' ') }}</td>
+                        <td class="text-end fw-bold">{{ totalsByCurrency[currency].totalCompany|vf_amount }}</td>
                     </tr>
                     </tbody>
                 </table>

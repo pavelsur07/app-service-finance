@@ -59,12 +59,14 @@ final class AccountBalancesOpeningBalanceTest extends WebTestCaseBase
         $client->request('GET', '/finance/reports/account-balances', ['date' => '2026-01-01']);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('table', '209 594.87');
-        self::assertSelectorTextNotContains('table', '208 604.87');
+        // DS-Money: разряды — U+00A0, десятичная запятая.
+        $tableText = $client->getCrawler()->filter('table')->text();
+        self::assertMatchesRegularExpression('/209[\x{00A0} ]594,87/u', $tableText);
+        self::assertDoesNotMatchRegularExpression('/208[\x{00A0} ]604,87/u', $tableText);
 
         $client->request('GET', '/finance/reports/account-balances', ['date' => '2026-01-02']);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('table', '208 604.87');
+        self::assertMatchesRegularExpression('/208[\x{00A0} ]604,87/u', $client->getCrawler()->filter('table')->text());
     }
 }

@@ -127,10 +127,10 @@
                                 <td></td>
                                 <td>Всего</td>
                                 <td>{{ currency }}</td>
-                                <td class="text-end">{{ rows.total.opening|number_format(2, '.', ' ') }}</td>
-                                <td class="text-end">{{ rows.total.inflow|number_format(2, '.', ' ') }}</td>
-                                <td class="text-end">{{ rows.total.outflow|number_format(2, '.', ' ') }}</td>
-                                <td class="text-end">{{ rows.total.closing|number_format(2, '.', ' ') }}</td>
+                                <td class="text-end">{{ rows.total.opening|vf_amount }}</td>
+                                <td class="text-end">{{ rows.total.inflow|vf_amount }}</td>
+                                <td class="text-end">{{ rows.total.outflow|vf_amount }}</td>
+                                <td class="text-end">{{ rows.total.closing|vf_amount }}</td>
                                 <td></td>
                             </tr>
                             {% set rowIndex = 1 %}
@@ -139,10 +139,10 @@
                                     <td class="text-center">{{ rowIndex }}</td>
                                     <td>{{ row.name }}</td>
                                     <td>{{ row.currency }}</td>
-                                    <td class="text-end">{{ row.opening|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ row.inflow|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ row.outflow|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ row.closing|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ row.opening|vf_amount }}</td>
+                                    <td class="text-end">{{ row.inflow|vf_amount }}</td>
+                                    <td class="text-end">{{ row.outflow|vf_amount }}</td>
+                                    <td class="text-end">{{ row.closing|vf_amount }}</td>
                                     <td>{{ row.type ?? '' }}</td>
                                 </tr>
                                 {% set rowIndex = rowIndex + 1 %}

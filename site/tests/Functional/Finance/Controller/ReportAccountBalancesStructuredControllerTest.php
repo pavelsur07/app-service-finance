@@ -77,7 +77,8 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         self::assertSelectorExists('#recalcModal input[name="to"][value="2026-01-01"]');
 
         $rowText = $this->tableRowText($crawler, 'ПАО СБЕРБАНК');
-        self::assertMatchesRegularExpression('/ПАО СБЕРБАНК RUB 209 594\\.87 0\\.00 990\\.00 208 604\\.87/', $rowText);
+        // DS-Money: разряды — U+00A0, десятичная запятая.
+        self::assertMatchesRegularExpression('/ПАО СБЕРБАНК RUB 209\x{00A0}594,87 0,00 990,00 208\x{00A0}604,87/u', $rowText);
 
         $client->request('POST', '/finance/reports/account-balances/recalc', [
             '_token' => 'invalid',
@@ -233,10 +234,10 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         self::assertSelectorExists('#recalcModal input[name="to"][value="2024-01-05"]');
 
         $mainRubRowText = $this->tableRowText($crawler, 'Main RUB');
-        self::assertMatchesRegularExpression('/Main RUB RUB 0\\.00 60\\.00 10\\.00 150\\.00/', $mainRubRowText);
+        self::assertMatchesRegularExpression('/Main RUB RUB 0,00 60,00 10,00 150,00/u', $mainRubRowText);
 
         $cashUsdRowText = $this->tableRowText($crawler, 'Cash USD');
-        self::assertMatchesRegularExpression('/Cash USD USD 0\\.00 20\\.00 5\\.00 90\\.00/', $cashUsdRowText);
+        self::assertMatchesRegularExpression('/Cash USD USD 0,00 20,00 5,00 90,00/u', $cashUsdRowText);
 
         $form = $crawler->selectButton('Пересчитать')->form();
         $client->submit($form);
@@ -316,7 +317,7 @@ final class ReportAccountBalancesStructuredControllerTest extends WebTestCaseBas
         self::assertStringContainsString('Filtered RUB', $content);
         self::assertStringContainsString('Visible USD', $content);
         self::assertStringContainsString('Zero RUB', $content);
-        self::assertStringContainsString('60.00', $content);
+        self::assertStringContainsString('60,00', (new \Symfony\Component\DomCrawler\Crawler($content))->filter('body')->text());
         self::assertSelectorExists('#recalcModal input[name="from"][value="2024-01-01"]');
         self::assertSelectorExists('#recalcModal input[name="to"][value="2024-01-05"]');
     }
