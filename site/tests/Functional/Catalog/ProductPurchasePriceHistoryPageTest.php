@@ -73,11 +73,11 @@ final class ProductPurchasePriceHistoryPageTest extends WebTestCaseBase
         $secondRow = trim((string) $rows->eq(1)->text());
 
         self::assertStringContainsString('01.03.2024', $firstRow);
-        self::assertStringContainsString('12000.00 RUB', $firstRow);
+        self::assertStringContainsString("12\u{00A0}000,00\u{00A0}₽", $firstRow);
         self::assertStringContainsString('Новая цена', $firstRow);
 
         self::assertStringContainsString('01.01.2024', $secondRow);
-        self::assertStringContainsString('10000.00 RUB', $secondRow);
+        self::assertStringContainsString("10\u{00A0}000,00\u{00A0}₽", $secondRow);
         self::assertStringContainsString('Старая цена', $secondRow);
     }
 }
