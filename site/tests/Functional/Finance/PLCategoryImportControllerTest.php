@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Finance;
 
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -693,7 +694,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
         // Своя статья компании с кодом шаблона: шаблон её не переименовывает и не переносит,
         // а вешает под неё недостающие статьи своей ветки.
-        $ownStorage = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Склад и удержания (своё)')->withCode('OPEX_WH_TOTAL')->build();
+        $ownStorage = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Склад и удержания (своё)')->withCode('OPEX_WH_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
         $ownStorageId = (string) $ownStorage->getId();
 
         $em = $this->em();
@@ -726,6 +727,8 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $kept = $repository->find($ownStorageId);
         self::assertInstanceOf(PLCategory::class, $kept);
         self::assertSame('Склад и удержания (своё)', $kept->getName());
+        self::assertSame(PLCategoryType::SUBTOTAL, $kept->getType());
+        self::assertNull($kept->getParent());
 
         $storage = $repository->findOneBy(['company' => $target, 'code' => 'OPEX_WH_STORAGE']);
         self::assertInstanceOf(PLCategory::class, $storage);
@@ -739,5 +742,39 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertResponseRedirects('/pl-categories/');
         $this->em()->clear();
         self::assertCount(70, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testDefaultTemplateRefusesToHangLinesUnderACompanyInputLine(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        // У компании «склад» — строка ввода: отчёт не суммирует её потомков, и статьи шаблона
+        // под ней молча выпали бы из CM3.
+        $inputLine = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Склад')->withCode('OPEX_WH_TOTAL')->build();
+
+        $em = $this->em();
+        foreach ([$user, $target, $inputLine] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $client->request('GET', '/pl-categories/import?source=template');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.toast.text-bg-danger', 'строка ввода, а в шаблоне это группа');
+        self::assertSelectorNotExists('input[name="mode"][value="template"]');
+
+        $client->request('POST', '/pl-categories/import/apply', [
+            'mode' => 'template',
+            '_token' => $this->csrfToken($client, 'pl-category-import'.(string) $target->getId()),
+        ]);
+        self::assertResponseRedirects('/pl-categories/import');
+
+        $this->em()->clear();
+        self::assertCount(1, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 }

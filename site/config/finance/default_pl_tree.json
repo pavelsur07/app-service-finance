@@ -469,7 +469,7 @@
       "isVisible": true,
       "formula": "CM3 / REV_NOT_SPP_TOTAL",
       "calcOrder": null,
-      "sortOrder": 47,
+      "sortOrder": 46,
       "children": []
     },
     {
@@ -964,7 +964,7 @@
       "expenseType": "other",
       "weightInParent": "1.0000",
       "isVisible": true,
-      "formula": "EBITDA+BELOW_EBITDA_TOTAL",
+      "formula": "EBITDA + BELOW_EBITDA_TOTAL + BELOW_EBITDA_INCOME_TOTAL",
       "calcOrder": null,
       "sortOrder": 70,
       "children": []

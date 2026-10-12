@@ -46,6 +46,13 @@ final class ApplyDefaultPLTreeCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Целевая компания не найдена.', $tester->getDisplay());
     }
 
+    public function testNonUuidCompanyIsRejectedBeforeAnyQuery(): void
+    {
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:apply-default'));
+
+        self::assertSame(Command::INVALID, $tester->execute(['companyId' => '78f0cc9f']));
+    }
+
     private function categories(string $companyId): int
     {
         return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [$companyId]);

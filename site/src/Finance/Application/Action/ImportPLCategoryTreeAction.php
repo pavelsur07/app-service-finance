@@ -11,6 +11,7 @@ use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\ImportPLCategoryTreeRow;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -312,6 +313,20 @@ final class ImportPLCategoryTreeAction
     }
 
     /**
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     */
+    private function hasChildren(array $plan, PLCategoryTreeNode $node): bool
+    {
+        foreach ($plan as $item) {
+            if ($item['sourceNode']->parent === $node) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Фаза 2 — валидация глубины и diff, без мутаций.
      *
      * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> &$plan
@@ -342,6 +357,11 @@ final class ImportPLCategoryTreeAction
             // Только создание: совпавшая категория остаётся на своём месте и
             // уровне — от него и считается глубина новых потомков.
             if ($onlyCreate && null !== $existing) {
+                // Строка ввода считает значение из своих фактов и потомков не
+                // суммирует: новые статьи под ней молча выпали бы из итогов отчёта.
+                if (PLCategoryType::LEAF_INPUT === $existing->getType() && $this->hasChildren($plan, $sourceNode)) {
+                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании — строка ввода, а в шаблоне это группа. Сделайте её подытогом или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
+                }
                 $targetLevelBySourceKey[$sourceNode->key] = $existing->getLevel();
                 ++$unchangedCount;
 

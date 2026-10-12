@@ -8,6 +8,7 @@ use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -45,6 +46,11 @@ final class ApplyDefaultPLTreeCommand extends Command
     {
         $companyId = (string) $input->getArgument('companyId');
         $execute = (bool) $input->getOption('execute');
+        if (!Uuid::isValid($companyId)) {
+            $output->writeln(\sprintf('<error>Не UUID: %s</error>', $companyId));
+
+            return Command::INVALID;
+        }
 
         try {
             $result = ($this->importAction)(new ImportPLCategoryTreeCommand(
@@ -54,6 +60,7 @@ final class ApplyDefaultPLTreeCommand extends Command
                 true,
             ));
         } catch (\DomainException $e) {
+            $this->logger->warning('Default P&L tree not applied', ['companyId' => $companyId, 'reason' => $e->getMessage()]);
             $output->writeln(\sprintf('<error>%s</error>', $e->getMessage()));
 
             return Command::FAILURE;

@@ -17,11 +17,11 @@ use App\Finance\Exception\DefaultPLTreeTemplateNotFoundException;
  * Файл — в формате выгрузки «Выгрузить в файл» и читается тем же
  * PLCategoryTreeFileReader, что и импорт из файла.
  */
-final class DefaultPLCategoryTreeProvider
+final readonly class DefaultPLCategoryTreeProvider
 {
     public function __construct(
-        private readonly string $configPath,
-        private readonly PLCategoryTreeFileReader $reader,
+        private string $configPath,
+        private PLCategoryTreeFileReader $reader,
     ) {
     }
 

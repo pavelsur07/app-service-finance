@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Finance\Infrastructure\Provider;
 
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Exception\DefaultPLTreeTemplateNotFoundException;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use PHPUnit\Framework\TestCase;
@@ -24,7 +25,7 @@ final class DefaultPLCategoryTreeProviderTest extends TestCase
         $codes = [];
         foreach ($this->provider()->nodes() as $node) {
             self::assertNotNull($node->code, \sprintf('Template category "%s" has no code: re-applying could not match it.', $node->name));
-            $codes[$node->code] = true;
+            $codes[$node->code] = $node->type;
         }
 
         $mappingCodes = [];
@@ -43,6 +44,10 @@ final class DefaultPLCategoryTreeProviderTest extends TestCase
 
         self::assertNotEmpty($mappingCodes);
         self::assertSame([], array_keys(array_diff_key($mappingCodes, $codes)));
+        // Маппинг пишет факты в строку ввода: подытог или KPI их не показали бы.
+        foreach (array_keys($mappingCodes) as $code) {
+            self::assertSame(PLCategoryType::LEAF_INPUT, $codes[$code], $code);
+        }
     }
 
     public function testMissingTemplateFileFailsLoudly(): void
