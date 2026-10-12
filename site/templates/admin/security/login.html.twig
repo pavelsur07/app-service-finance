@@ -5,13 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Admin Login</title>
   <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css"/>
+  {# Слой DS «Ваш Финдир» поверх Tabler — как у легаси-страниц (security/base.html.twig). #}
+  {{ vite_entry_link_tags('design_tokens') }}
+  {{ vite_entry_link_tags('vf_custom_classes') }}
 </head>
 <body class="d-flex flex-column">
   <div class="page page-center">
     <div class="container-tight py-4">
       <div class="text-center mb-4">
-        <a href="#" class="navbar-brand navbar-brand-autodark">Fin-Plan · Admin</a>
+        <a href="#" class="navbar-brand navbar-brand-autodark">Ваш Финдир · Админка</a>
       </div>
       <form class="card card-md" method="post" action="{{ path('admin_auth_login') }}">
         <div class="card-body">

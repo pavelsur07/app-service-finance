@@ -20,9 +20,8 @@
 }
 .wz-title {
   margin: 0;
-  /* 28px — размер page title нового слоя; токены --font-* заканчиваются на 14,
-     крупные размеры кит задаёт в px (см. kpi-value--hero: 28px). */
-  font-size: 28px; font-weight: 700; line-height: 1.2;
+  /* DS-Tokens: H1 24/32 · 600 (как patterns/page-scaffold.css). */
+  font-size: 24px; font-weight: 600; line-height: 32px;
   color: var(--text-strong);
 }
 .wz-kpi-row {
@@ -66,3 +65,13 @@
   margin-top: var(--s-4);
 }
 
+
+/* Список ссылок раздела (Billing). */
+.admin-link-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--s-2); }
+
+/* Danger Zone: рамка и заголовок danger (DS-Feedback), карточки действий — обычные. */
+.admin-danger-zone { margin-top: var(--s-5); border-color: var(--danger-border); }
+.admin-danger-zone > h2 { color: var(--danger-text); }
+.admin-danger-zone__title { margin: 0 0 var(--s-1); font-size: 16px; line-height: 24px; font-weight: 600; }
+.admin-danger-zone__text { margin: 0 0 var(--s-3); color: var(--text-tertiary); }
+.admin-delete-field { margin: var(--s-4) 0; max-width: 420px; }

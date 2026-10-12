@@ -120,7 +120,7 @@
               <th>Компания</th>
               <th>Маркетплейс</th>
               <th>Service name</th>
-              <th class="t-cell--right">Сумма</th>
+              <th class="t-cell--right">Сумма, ₽</th>
               <th class="t-cell--right">Строк</th>
               <th>Обнаружено</th>
               <th>Статус</th>
@@ -144,11 +144,9 @@
                 </td>
                 <td><code>{{ error.service_name }}</code></td>
                 <td class="t-cell--right">
-                  <span class="money money--14 money--strong">
-                    {% if amount < 0 %}−{{ amount|abs|number_format(2, ',', ' ') }}{% else %}{{ amount|number_format(2, ',', ' ') }}{% endif %}&nbsp;₽
-                  </span>
+                  {{ amount|vf_amount }}
                 </td>
-                <td class="t-cell--right">{{ error.rows_count }}</td>
+                <td class="t-cell--right">{{ error.rows_count|vf_number }}</td>
                 <td><time datetime="{{ error.detected_at|date('c') }}">{{ error.detected_at|date('d.m.Y H:i') }}</time></td>
                 <td>
                   {% if error.resolved_at %}

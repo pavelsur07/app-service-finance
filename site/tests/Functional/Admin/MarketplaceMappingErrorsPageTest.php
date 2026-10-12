@@ -80,7 +80,7 @@ final class MarketplaceMappingErrorsPageTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter('h1.wz-title'));
         self::assertCount(1, $crawler->filter('table.t-table'));
         self::assertSame(
-            ['Компания', 'Маркетплейс', 'Service name', 'Сумма', 'Строк', 'Обнаружено', 'Статус', 'Действия'],
+            ['Компания', 'Маркетплейс', 'Service name', 'Сумма, ₽', 'Строк', 'Обнаружено', 'Статус', 'Действия'],
             $crawler->filter('table.t-table thead th')->each(static fn ($cell): string => $cell->text()),
         );
         self::assertCount(8, $crawler->filter('table.t-table colgroup col'));
@@ -94,12 +94,12 @@ final class MarketplaceMappingErrorsPageTest extends WebTestCaseBase
         self::assertCount(8, $ozonRow->filter('td'));
         self::assertSame('ООО Ромашка', $ozonRow->filter('td')->eq(0)->text());
         self::assertCount(0, $crawler->filter('a[href^="mailto:"]'));
-        self::assertStringContainsString("12\u{2009}345,67", $ozonRow->filter('.money')->text());
+        self::assertSame("12\u{00A0}345,67", $ozonRow->filter('.vf-amount')->text());
 
         $fallbackRow = $crawler->filterXPath('//tr[td/code[text()="MarketplaceServiceFallback"]]');
         self::assertCount(1, $fallbackRow);
         self::assertSame('OTHER', $fallbackRow->filter('.mp-chip')->text());
-        self::assertStringContainsString("−12\u{2009}345,67", $fallbackRow->filter('.money')->text());
+        self::assertSame("\u{2212}12\u{00A0}345,67", $fallbackRow->filter('.vf-amount')->text());
 
         $dialogId = 'sample-'.str_replace('-', '', $error->getId());
         self::assertCount(1, $crawler->filter(sprintf('[data-admin-dialog-open="%s"]', $dialogId)));

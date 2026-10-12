@@ -3,9 +3,8 @@
 {% set app_breadcrumb = 'Финансовый обзор' %}
 {% set app_nav_active = 'home' %}
 
-{% macro money(value, currency) %}
-    {% if value < 0 %}−{% endif %}{{ value|abs|number_format(0, ',', ' ') }} {{ currency }}
-{% endmacro %}
+{# KPI (DS-Money): сокращённо до одного знака, полная сумма — в подсказке. #}
+{% macro money(value, currency) %}<span title="{{ value|vf_money(2, currency) }}">{{ value|vf_money_short(currency) }}</span>{% endmacro %}
 
 {% macro comparison(name, data, currency, previousLabel) %}
     <div
@@ -16,7 +15,7 @@
     >
         <span class="delta delta--{{ data.variant }}">
             {% if data.state == 'percent' %}
-                {% set formattedPercent = data.percent|abs|number_format(1, ',', ' ') %}
+                {% set formattedPercent = data.percent|abs|vf_number(1) %}
                 {% if data.percent > 0 %}<span class="sr-only">Рост на {{ formattedPercent }}%</span><span aria-hidden="true">+{{ formattedPercent }}%</span>{% elseif data.percent < 0 %}<span class="sr-only">Снижение на {{ formattedPercent }}%</span><span aria-hidden="true">−{{ formattedPercent }}%</span>{% else %}{{ formattedPercent }}%{% endif %}
             {% elseif data.state == 'cross_up' %}
                 Из минуса в плюс
@@ -90,7 +89,8 @@
                 {{ _self.comparison('inflow30', kpiComparisons.inflow30, cashCurrency.value, kpiPeriodLabels.previous) }}
             </article>
 
-            <article class="kpi kpi--accent-danger">
+            {# DS-Money: расход — основным цветом, красный только для сигналов ошибки. #}
+            <article class="kpi kpi--accent-neutral">
                 <div class="kpi-label">Расход</div>
                 <div class="kpi-value money" data-dashboard-kpi="outflow30">{{ _self.money(kpi.outflow30, cashCurrency.value) }}</div>
                 <div class="kpi-meta" data-dashboard-kpi-period="current">{{ kpiPeriodLabels.current }}</div>

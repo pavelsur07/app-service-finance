@@ -15,10 +15,10 @@
 | Периоды | `balance/periods` | ✓ | ✓ | ✓ |
 | Карточка счёта / статьи | `balance/card` | ✓ | ✓ | ✓ |
 | Настройка, права, история | `balance/setup`, `access`, `audit` | ✓ | ✓ | ✓ |
-| Главная нового слоя | `app/home/index` | ✓ | ✓ | этап 4 |
-| Настройки API | `api/settings/*` (6) | ✓ | ✓ | этап 4 |
-| Админка | `admin/dashboard`, `users/*` (3), `billing`, `ingestion/external_categories`, `marketplace/admin/mapping_error_list` | ✓ | ✓ | этап 4 |
-| Telegram-боты | `telegram/admin/bot/*` (3) | ✓ | ✓ | этап 4 |
-| Вход в приложение | `security/login` | ✓ | ✓ | этап 4 |
-| Вход в админку | `admin/security/login` (отдельная страница) | — | — | этап 4 |
+| Главная нового слоя | `app/home/index` | ✓ | ✓ | ✓ |
+| Настройки API | `api/settings/*` (6) | ✓ | ✓ | ✓ |
+| Админка | `admin/dashboard`, `users/*` (3), `billing`, `ingestion/external_categories`, `marketplace/admin/mapping_error_list` | ✓ | ✓ | ✓ |
+| Telegram-боты | `telegram/admin/bot/*` (3) | ✓ | ✓ | ✓ |
+| Вход в приложение | `security/login` | ✓ | ✓ | ✓ |
+| Вход в админку | `admin/security/login` (отдельная страница, слой DS легаси поверх Tabler) | ✓ | ✓ | ✓ |
 | «Покрытие» маркетплейсов (легаси, CSS кита) | `marketplace/index` | ✓ | ✓ | — |
