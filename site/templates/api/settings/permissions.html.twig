@@ -1,7 +1,7 @@
 {% extends 'api/settings/layout.html.twig' %}
 {% form_theme form 'api/settings/_form_theme.html.twig' %}
 {% block content %}
-<div class="wz-row"><h1 class="wz-title">Права API-ключа<span class="wz-sub">Подготовьте доступ отдельно для каждого подключения</span></h1><div class="wz-head-actions"><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">К списку ключей</a></div></div>
+<div class="wz-head"><h1 class="wz-title">Права API-ключа<span class="wz-sub">Подготовьте доступ отдельно для каждого подключения</span></h1><div class="wz-head-actions"><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">К списку ключей</a></div></div>
 <div class="wz-row"><section class="card">
     <div class="form-field"><label class="form-label" for="api-key-current-name">Ключ</label><input id="api-key-current-name" class="input" readonly value="{{ key.name }}"></div>
     {% for message in app.flashes('api_permissions_success') %}<div class="alert alert--success" role="status"><div class="a-body"><p class="a-text">{{ message }}</p></div></div>{% endfor %}
@@ -14,7 +14,7 @@
 {% set scope_fields = {} %}{% for field in form.selectedScopes %}{% set scope_fields = scope_fields|merge({(field.vars.value): field}) %}{% endfor %}
 {% set enable_fields = {} %}{% for field in form.enabledResources %}{% set enable_fields = enable_fields|merge({(field.vars.value): field}) %}{% endfor %}
 {% set action_labels = {read: 'Чтение', create: 'Создание', update: 'Изменение', soft_delete: 'Мягкое удаление'} %}
-<div class="wz-row">
+<div class="wz-actions">
     <button class="btn btn-md btn-secondary" type="button" data-api-preset="{{ presets.read_only|json_encode|e('html_attr') }}">Только чтение</button>
     <button class="btn btn-md btn-secondary" type="button" data-api-preset="{{ presets.all_scopes|json_encode|e('html_attr') }}">Все действия</button>
 </div>
@@ -38,6 +38,6 @@
     </div>
 </section></div>
 {{ form_widget(form.version) }}{{ form_widget(form._token) }}
-<div class="wz-row"><button class="btn btn-md btn-primary" type="submit">Сохранить права</button><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">Отмена</a></div>
+<div class="wz-actions"><button class="btn btn-md btn-primary" type="submit">Сохранить права</button><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">Отмена</a></div>
 {{ form_end(form, {render_rest: false}) }}
 {% endblock %}

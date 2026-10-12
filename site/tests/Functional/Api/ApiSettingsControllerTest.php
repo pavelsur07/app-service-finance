@@ -195,14 +195,14 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         $this->client->request('GET', '/settings/api?limit=2');
         self::assertResponseIsSuccessful();
         self::assertSelectorCount(2, '.t-table tbody tr');
-        self::assertSelectorExists('a[href="/settings/api?page=2&limit=2"]');
+        self::assertSelectorExists('a[href="/settings/api?limit=2&page=2"][aria-label="Вперёд"]');
         $this->client->request('GET', '/settings/api?page=2&limit=2');
         self::assertResponseIsSuccessful();
         self::assertSelectorCount(1, '.t-table tbody tr');
         $this->client->request('GET', '/settings/api');
         self::assertSelectorTextContains('.status--success', 'Действует');
         self::assertSelectorTextContains('.status--warning', 'Истёк');
-        self::assertSelectorTextContains('.status--danger', 'Отозван');
+        self::assertSelectorTextContains('.status--neutral', 'Отозван');
         $html = (string) $this->client->getResponse()->getContent();
         self::assertStringNotContainsString($token, $html);
         self::assertStringNotContainsString($active->getPublicIdentifier(), $html);

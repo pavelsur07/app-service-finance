@@ -262,16 +262,12 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
     }
 
     /**
-     * Legacy KPI follow the Vash Findir design system: abbreviated amount with the ₽ sign
-     * («1 тыс. ₽»); the app layer keeps the full amount with the currency code.
+     * KPI of both layers follow the Vash Findir design system: abbreviated amount with
+     * the ₽ sign («1 тыс. ₽»). Expectations are written in the old «1000RUB» notation.
      */
-    private function expectedKpi(string $appValue, string $uiMode): string
+    private function expectedKpi(string $value, string $uiMode): string
     {
-        if (UiModeResolver::LEGACY !== $uiMode) {
-            return $appValue;
-        }
-
-        return '1000RUB' === $appValue ? '1тыс.₽' : str_replace('RUB', '₽', $appValue);
+        return '1000RUB' === $value ? '1тыс.₽' : str_replace('RUB', '₽', $value);
     }
 
     private function assertActivityState(Crawler $crawler, string $activity, int $periodDays = 30): void

@@ -21,7 +21,8 @@
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field-label { font-size: var(--font-11_5); color: var(--form-label-text); font-weight: 600; }
 .field-label .req { color: var(--form-required-mark); margin-left: 2px; }
-.field-helper { font-size: var(--font-11); color: var(--form-helper-text); }
+/* DS-Controls: подсказка 12/16, Navy 600. */
+.field-helper { margin: 0; font-size: var(--font-12); line-height: 16px; color: var(--form-helper-text); }
 .field-helper.error { color: var(--form-error-text); }
 
 textarea.input { height: auto; min-height: 64px; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.5; }

@@ -25,7 +25,8 @@
 .kpi--accent-success,
 .kpi--accent-danger,
 .kpi--accent-warning,
-.kpi--accent-primary {
+.kpi--accent-primary,
+.kpi--accent-neutral {
   border-left-width: 3px;
   padding-left: 18px;
 }
@@ -33,6 +34,7 @@
 .kpi--accent-danger  { border-left-color: var(--danger-dot); }
 .kpi--accent-warning { border-left-color: var(--warning-dot); }
 .kpi--accent-primary { border-left-color: var(--color-primary); }
+.kpi--accent-neutral { border-left-color: var(--border-strong); }
 
 /* Units / count sub-value (e.g. «500 ед.») — sits between .kpi-value and .kpi-meta.
    Bold number + muted unit. tabular-nums for digit alignment in card rows. */
