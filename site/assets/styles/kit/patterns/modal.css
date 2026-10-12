@@ -3,7 +3,7 @@
   width: 100%; max-width: min(var(--modal-width-standard), calc(100vw - var(--s-8)));
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--r-4);
+  border-radius: var(--r-5);
   box-shadow: var(--shadow-modal);
 }
 .mdl--compact { max-width: min(var(--modal-width-compact), calc(100vw - var(--s-8))); }  /* S · 440 */
@@ -24,7 +24,7 @@
   overflow: visible;
 }
 .dlg::backdrop {
-  background: rgba(11, 18, 32, var(--backdrop-opacity));
+  background: rgba(11, 16, 32, var(--backdrop-opacity));
   backdrop-filter: blur(var(--backdrop-blur));
   -webkit-backdrop-filter: blur(var(--backdrop-blur));
 }

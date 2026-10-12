@@ -1,48 +1,50 @@
 :root {
+  /* Значения — DS «Ваш Финдир» (docs/design-system/sheets/DS-Tokens.dc.html);
+     имена токенов кита сохранены, компоненты не меняются. */
   /* ===== Brand ===== */
-  --color-primary: #1A56DB;
-  --color-primary-hover: #1E40AF;
-  --color-primary-tint: #EEF3FE;
-  --color-primary-border: #C7D7FB;
-  --color-primary-selection: #DBE6FF;
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1a40b0;
+  --color-primary-tint: #e8effd;
+  --color-primary-border: #b9cbf5;
+  --color-primary-selection: #d6e2fb;
 
   /* ===== Text ===== */
-  --text-strong: #0B1220;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
-  --text-muted: #8B95A7;
-  --text-disabled: #94A3B8;
-  --text-faint: #CBD5E1;
+  --text-strong: #0b1020;
+  --text-secondary: #2b3350;
+  --text-tertiary: #525b78;
+  --text-muted: #6a738f;
+  --text-disabled: #6a738f;
+  --text-faint: #c3c8d6;
   --text-inverse: #FFFFFF;
 
   /* ===== Borders ===== */
-  --border: #E8ECF3;
-  --border-soft: #F1F4F9;
+  --border: #dde1ec;
+  --border-soft: #e8ecf7;
 
   /* ===== Backgrounds ===== */
-  --bg-page: #F4F6FA;
+  --bg-page: #f7f8fc;
   --bg-card: #FFFFFF;
-  --bg-subtle: #F7F9FC;
-  --bg-row-hover: #FAFBFD;
-  --bg-row-selected: #F4F8FF;
-  --bg-dark: #0B1220;
+  --bg-subtle: #f4f6fb;
+  --bg-row-hover: #f4f6fb;
+  --bg-row-selected: #e8ecf7;
+  --bg-dark: #0b1020;
 
   /* ===== State colors (audit v1.4) ===== */
-  --color-primary-active: #1A3E9C;
-  --border-hover:         #D8DEE8;
-  --bg-subtle-hover:      #F0F3F8;
-  --danger-text-hover:    #991B1B;
-  --warning-text-hover:   #78350F;
+  --color-primary-active: #1a40b0;
+  --border-hover:         #c3c8d6;
+  --bg-subtle-hover:      #eef1f8;
+  --danger-text-hover:    #8f0019;
+  --warning-text-hover:   #7a3a00;
   --border-dark:          #1F2937;
   --report-head-meta:     #6E89C6;
 
   /* ===== Focus / glow (alpha brand colors) ===== */
-  --focus-ring-primary:  rgba(26, 86, 219, 0.25);
-  --focus-ring-input:    rgba(26, 86, 219, 0.12);
-  --focus-ring-danger:   rgba(239, 68, 68, 0.12);
-  --shadow-primary-glow: rgba(26, 86, 219, 0.25);
-  --shadow-danger-glow:  rgba(185, 28, 28, 0.22);
-  --shadow-warning-glow: rgba(146, 64, 14, 0.22);
+  --focus-ring-primary:  rgba(29, 78, 216, 0.2);
+  --focus-ring-input:    rgba(29, 78, 216, 0.2);
+  --focus-ring-danger:   rgba(176, 0, 32, 0.15);
+  --shadow-primary-glow: rgba(29, 78, 216, 0.25);
+  --shadow-danger-glow:  rgba(176, 0, 32, 0.22);
+  --shadow-warning-glow: rgba(154, 74, 0, 0.22);
 
   /* ===== Categories (tints + lines) ===== */
   --cat-revenue: #10B981;
