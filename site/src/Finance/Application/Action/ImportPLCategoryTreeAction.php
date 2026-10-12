@@ -47,7 +47,7 @@ final class ImportPLCategoryTreeAction
         }
 
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
-        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan);
+        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $command->onlyCreate);
 
         // Строго до мутаций: метод сравнивает старый code совпавшего узла с
         // новым, а после applyFields() старого уже не существует.
@@ -318,7 +318,7 @@ final class ImportPLCategoryTreeAction
      *
      * @return array{0: ImportPLCategoryTreeRow[], 1: ImportPLCategoryTreeRow[], 2: int}
      */
-    private function validateAndDiff(array &$plan): array
+    private function validateAndDiff(array &$plan, bool $onlyCreate = false): array
     {
         /** @var array<string, true> $matchedTargetIds id существующих target-узлов, которыми управляет источник */
         $matchedTargetIds = [];
@@ -337,10 +337,20 @@ final class ImportPLCategoryTreeAction
         foreach ($plan as $i => $item) {
             $sourceNode = $item['sourceNode'];
             $sourceParent = $sourceNode->parent;
+            $existing = $item['existing'];
+
+            // Только создание: совпавшая категория остаётся на своём месте и
+            // уровне — от него и считается глубина новых потомков.
+            if ($onlyCreate && null !== $existing) {
+                $targetLevelBySourceKey[$sourceNode->key] = $existing->getLevel();
+                ++$unchangedCount;
+
+                continue;
+            }
+
             $targetLevel = null !== $sourceParent ? $targetLevelBySourceKey[$sourceParent->key] + 1 : 1;
             $targetLevelBySourceKey[$sourceNode->key] = $targetLevel;
 
-            $existing = $item['existing'];
             // Существующие потомки target, отсутствующие в источнике, не
             // трогаются и не удаляются — но переносятся вместе с этим узлом,
             // если он переносится глубже, и не должны провалиться за предел.

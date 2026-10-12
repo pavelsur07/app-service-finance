@@ -19,6 +19,22 @@
     <div class="container-xl mt-3">
         <div class="card mb-3">
             <div class="card-body">
+                <h3 class="card-title">Базовый шаблон ОПиУ</h3>
+                <p class="text-secondary">
+                    Стандартное дерево статей: выручка, прямые расходы, маржинальность CM1–CM3, склад и
+                    удержания МП, косвенные расходы, EBITDA и чистая прибыль. Коды статей совпадают с
+                    шаблоном маппинга затрат маркетплейсов — после переноса затраты разносятся по статьям
+                    автоматически ночью. Добавляются только недостающие статьи, существующие не меняются.
+                </p>
+                <form method="get" action="{{ path('pl_category_import') }}">
+                    <input type="hidden" name="source" value="template">
+                    <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
                 {% if sources is empty %}
                     <div class="alert alert-info mb-0">
                         Нет других компаний, к которым у вас есть доступ.
@@ -68,6 +84,7 @@
                     <h3 class="card-title">
                         Предпросмотр
                         {% if previewMode == 'file' %}— файл {{ uploadedFileName }}{% endif %}
+                        {% if previewMode == 'template' %}— базовый шаблон{% endif %}
                     </h3>
 
                     {% if preview.unresolvedFormulaCodes is not empty %}
@@ -133,6 +150,8 @@
                         {% if previewMode == 'file' %}
                             <input type="hidden" name="mode" value="file">
                             <input type="hidden" name="payload" value="{{ uploadedPayload }}">
+                        {% elseif previewMode == 'template' %}
+                            <input type="hidden" name="mode" value="template">
                         {% else %}
                             <input type="hidden" name="sourceCompanyId" value="{{ selectedSourceCompanyId }}">
                         {% endif %}

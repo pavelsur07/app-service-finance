@@ -504,6 +504,10 @@ services:
         arguments:
             $configPath: "%kernel.project_dir%/config/marketplace/default_sale_mapping.yaml"
 
+    App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider:
+        arguments:
+            $configPath: "%kernel.project_dir%/config/finance/default_pl_tree.json"
+
     # Dedicated untraceable transport: credentials must not enter the HTTP profiler.
     moysklad.http_client:
         class: Symfony\Contracts\HttpClient\HttpClientInterface

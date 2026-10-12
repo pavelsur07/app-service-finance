@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Finance\Command;
+
+use App\Finance\Application\Action\ImportPLCategoryTreeAction;
+use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+/**
+ * Добавляет компании недостающие статьи базового шаблона ОПиУ — тот же перенос,
+ * что кнопка «Базовый шаблон ОПиУ» на экране импорта категорий. Существующие
+ * статьи не меняются. Без --execute — только план.
+ */
+#[AsCommand(
+    name: 'app:finance:pl-tree:apply-default',
+    description: 'Добавляет компании недостающие статьи базового шаблона ОПиУ (без --execute — только план).',
+)]
+final class ApplyDefaultPLTreeCommand extends Command
+{
+    public function __construct(
+        private readonly DefaultPLCategoryTreeProvider $defaultTree,
+        private readonly ImportPLCategoryTreeAction $importAction,
+        private readonly LoggerInterface $logger,
+    ) {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this
+            ->addArgument('companyId', InputArgument::REQUIRED, 'UUID компании')
+            ->addOption('execute', null, InputOption::VALUE_NONE, 'Применить; без опции — только план');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $companyId = (string) $input->getArgument('companyId');
+        $execute = (bool) $input->getOption('execute');
+
+        try {
+            $result = ($this->importAction)(new ImportPLCategoryTreeCommand(
+                $this->defaultTree->nodes(),
+                $companyId,
+                !$execute,
+                true,
+            ));
+        } catch (\DomainException $e) {
+            $output->writeln(\sprintf('<error>%s</error>', $e->getMessage()));
+
+            return Command::FAILURE;
+        }
+
+        foreach ($result->created as $row) {
+            $output->writeln(\sprintf('create  %-40s %s', $row->code ?? '', $row->path));
+        }
+        $output->writeln(\sprintf(
+            '%s: create %d, keep existing %d',
+            $execute ? 'applied' : 'plan (dry run)',
+            \count($result->created),
+            $result->unchangedCount,
+        ));
+        if ([] !== $result->unresolvedFormulaCodes) {
+            $output->writeln(\sprintf('<comment>formula codes without a category: %s</comment>', implode(', ', $result->unresolvedFormulaCodes)));
+        }
+
+        if ($execute) {
+            $this->logger->info('Default P&L tree applied to company', [
+                'companyId' => $companyId,
+                'created' => \count($result->created),
+                'kept' => $result->unchangedCount,
+            ]);
+        }
+
+        return Command::SUCCESS;
+    }
+}
