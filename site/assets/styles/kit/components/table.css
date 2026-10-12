@@ -32,7 +32,7 @@
   font-weight: 700;
   font-size: 13.5px;
 }
-.t-table tbody tr:hover > td { background: var(--bg-row-hover); }
+.t-table tbody tr:not([class*="t-row--"]):hover > td { background: var(--bg-row-hover); }
 .t-cell--right { text-align: right; font-variant-numeric: tabular-nums; }
 .t-table thead th.t-cell--right { text-align: right; }
 /* Вторая строка ячейки (код, статья) — 12px, Navy 600. */

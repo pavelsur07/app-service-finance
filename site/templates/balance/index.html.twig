@@ -26,26 +26,29 @@
             {% endif %}
         </section>
     {% else %}
-        {# KPI (DS-Money): сокращённо до одного знака, полная сумма — в подсказке. #}
+        {# Баланс — учётный отчёт: итоги до копейки, без сокращения (решение Владельца 2026-10-12). #}
         {% set digits = vf_currency_digits(currency) %}
-        {% set symbol = vf_currency_symbol(currency) %}
+        {% set difference = report.differenceMinor|vf_minor(digits) %}
         {% set mismatch = report.differenceMinor != 0 %}
         <div class="wz-row">
-            {% for kpi in [
-                {label: 'Актив', minor: report.assetMinor},
-                {label: 'Пассив', minor: report.passiveMinor},
-                {label: 'Расхождение', minor: report.differenceMinor, error: mismatch},
-            ] %}
-                {% set value = kpi.minor|vf_minor(digits) %}
-                <section class="kpi{{ kpi.error|default(false) ? ' kpi--accent-danger' : '' }}">
+            {% for kpi in [{label: 'Актив', minor: report.assetMinor}, {label: 'Пассив', minor: report.passiveMinor}] %}
+                <section class="kpi">
                     <div class="kpi-label">{{ kpi.label }}</div>
-                    <div class="kpi-value{{ kpi.error|default(false) ? ' money--error' : '' }}" title="{{ value|vf_money(digits, currency) }}">{{ value|vf_money_short(symbol) }}</div>
-                    {% if kpi.error is defined %}
-                        {# Ненулевое расхождение — сигнал ошибки учёта (решение Владельца №4), а не сумма-расход. #}
-                        <div class="kpi-meta">{{ kpi.error ? 'Актив и пассив не равны' : 'Актив и пассив равны' }}</div>
-                    {% endif %}
+                    <div class="kpi-value">{{ kpi.minor|vf_minor(digits)|vf_money(digits, currency) }}</div>
                 </section>
             {% endfor %}
+            {# Ненулевое расхождение — сигнал ошибки учёта (решение Владельца №4): красным, до копейки и с пояснением. #}
+            <section class="kpi{{ mismatch ? ' kpi--accent-danger' : '' }}" data-balance-mismatch="{{ mismatch ? 'true' : 'false' }}">
+                <div class="kpi-label">Расхождение</div>
+                <div class="kpi-value{{ mismatch ? ' money--error' : '' }}">{{ difference|vf_money(digits, currency) }}</div>
+                {% if not mismatch %}
+                    <div class="kpi-meta">Актив и пассив равны</div>
+                {% else %}
+                    <div class="kpi-meta money--error">
+                        {{ difference starts with '-' ? 'Пассив больше актива' : 'Актив больше пассива' }} на {{ difference|vf_money(digits, currency)|replace({'−': ''}) }}. Проверьте проведённые документы за период.
+                    </div>
+                {% endif %}
+            </section>
         </div>
         <div class="wz-row">
             {% for side,label in {'asset':'Актив','passive':'Пассив'} %}

@@ -26,7 +26,8 @@
             {% set value = kpi.minor|vf_minor(digits) %}
             <section class="kpi">
                 <div class="kpi-label">{{ kpi.label }}</div>
-                <div class="kpi-value" title="{{ value|vf_money(digits, currency) }}">{{ value|vf_money_short(vf_currency_symbol(currency)) }}</div>
+                {# Баланс — до копейки, без сокращения. #}
+                <div class="kpi-value">{{ value|vf_money(digits, currency) }}</div>
             </section>
         {% endfor %}
     </div>
