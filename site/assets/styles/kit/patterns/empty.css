@@ -6,12 +6,13 @@
   border-radius: var(--r-4);
   text-align: center;
 }
+/* DS-Feedback: иконка в круге Blue 50, заголовок 16/24 · 600, текст Navy 600. */
 .empty-icon {
-  width: 48px; height: 48px;
-  background: var(--bg-page); border-radius: var(--r-circle);
+  width: 44px; height: 44px;
+  background: var(--color-primary-tint); border-radius: var(--r-circle);
   margin: 0 auto 12px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-disabled);
+  color: var(--color-primary);
 }
-.empty-title { font-size: 14px; font-weight: 700; color: var(--text-strong); margin-bottom: 4px; }
-.empty-text { font-size: 12.5px; color: var(--text-muted); max-width: 40ch; margin: 0 auto 16px; }
+.empty-title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-strong); margin: 0 0 4px; }
+.empty-text { font-size: 14px; color: var(--text-tertiary); max-width: 48ch; margin: 0 auto 16px; }

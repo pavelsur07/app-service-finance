@@ -1,0 +1,75 @@
+/* ============ PAGE TABS ============ (DS-Tabs)
+   Вкладки разделов страницы: подчёркивание 2px Action blue, без «коробки»;
+   14/20 · 500, отступы 14/12/12, между вкладками 4px. Обычная — Navy 600,
+   hover — Navy 900 и линия Navy 300; фокус — outline внутри; недоступная — opacity .45.
+   Счётчик .cnt: h 20 · радиус 10 · 12/600; Navy 100, в активной — Blue 50, .warn — Warn.
+   Больше шести вкладок — лишние в «Ещё» (<details>, без JS). Одна строка:
+   на узком экране вкладки прокручиваются по горизонтали.
+   Разметка — templates/app/_ui/_tabs.html.twig. */
+.page-tabs {
+  display: flex; align-items: flex-end; gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.page-tabs-scroll {
+  display: flex; align-items: flex-end; gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.page-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 12px 12px;
+  margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent;
+  background: transparent;
+  font-family: inherit; font-size: var(--font-14); line-height: 20px; font-weight: 500;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-tab:hover { color: var(--text-strong); border-bottom-color: var(--border-strong); }
+.page-tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.page-tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.page-tab.is-disabled { opacity: 0.45; cursor: not-allowed; }
+
+.page-tab .cnt {
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--bg-neutral-tint);
+  color: var(--text-tertiary);
+  font-size: var(--font-12); font-weight: 600; line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.page-tab.is-active .cnt { background: var(--color-primary-tint); color: var(--color-primary); }
+.page-tab .cnt.warn { background: var(--warning-bg); color: var(--warning-text); }
+
+/* «Ещё»: выпадающий список скрытых вкладок. <details> стоит вне прокручиваемой
+   части строки, поэтому меню не обрезается. */
+.page-tabs-more { position: relative; margin-bottom: -1px; }
+.page-tabs-more > summary { list-style: none; }
+.page-tabs-more > summary::-webkit-details-marker { display: none; }
+.page-tabs-more > summary::after {
+  content: ''; width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.page-tabs-menu {
+  position: absolute; z-index: 40; top: 100%; left: 0;
+  min-width: 200px; padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-menu);
+  display: flex; flex-direction: column;
+}
+.page-tabs-menu a {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-1);
+  color: var(--text-strong);
+  font-size: var(--font-14);
+  text-decoration: none;
+}
+.page-tabs-menu a:hover { background: var(--bg-subtle-hover); }
+.page-tabs-menu a[aria-current="page"] { color: var(--color-primary); font-weight: 600; }

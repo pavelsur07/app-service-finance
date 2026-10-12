@@ -1,10 +1,11 @@
-/* ============ STATUS-PILL ============ */
+/* ============ STATUS-PILL ============ (DS-Feedback: бейдж с точкой — 2px 8px · 12/16 · 600 · радиус 4) */
 .status {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px 3px 8px;
-  border-radius: var(--r-pill);
-  font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: var(--r-1);
+  font-size: var(--font-12); font-weight: 600; line-height: 16px; white-space: nowrap;
 }
+.status--info { background: var(--info-bg); color: var(--info-text); } .status--info .dot { background: var(--info-dot); }
 .status .dot { width: 6px; height: 6px; border-radius: 50%; }
 .status--success { background: var(--status-success-bg); color: var(--status-success-text); } .status--success .dot { background: var(--status-success-dot); }
 .status--danger  { background: var(--status-danger-bg);  color: var(--status-danger-text); }  .status--danger .dot  { background: var(--status-danger-dot); }

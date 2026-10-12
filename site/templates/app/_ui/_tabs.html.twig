@@ -1,0 +1,44 @@
+{#
+  Вкладки разделов нового интерфейса по листу DS-Tabs: подчёркивание 2px Action blue
+  у активной, счётчик .cnt (.cnt.warn — «нужно действие»), названия без иконок.
+  Больше 6 вкладок — первые 6 видны, остальные в «Ещё» (решение Владельца, docs/plan/ds-new-layer.md §5).
+  Стили — assets/styles/kit/components/page-tabs.css.
+
+  {% include 'app/_ui/_tabs.html.twig' with {label: 'Разделы баланса', tabs: [
+      {label: 'Баланс', href: path('x'), active: true},
+      {label: 'Документы', href: path('y'), count: 3, warn: true},
+  ]} only %}
+#}
+{% set max_visible = 6 %}
+{% set visible = tabs|length > max_visible ? tabs|slice(0, max_visible) : tabs %}
+{% set overflow = tabs|length > max_visible ? tabs|slice(max_visible) : [] %}
+{% set overflow_active = overflow|filter(t => t.active ?? false)|first %}
+<nav class="page-tabs" aria-label="{{ label ?? 'Разделы' }}">
+    <div class="page-tabs-scroll">
+        {% for tab in visible %}
+            {% set active = tab.active ?? false %}
+            <a class="page-tab{{ active ? ' is-active' : '' }}" href="{{ tab.href }}"{% if active %} aria-current="page"{% endif %}>
+                {{- tab.label -}}
+                {% if tab.count is defined and tab.count is not null %}
+                    <span class="cnt{{ (tab.warn ?? false) ? ' warn' : '' }}">{{ tab.count|vf_number }}</span>
+                {% endif %}
+            </a>
+        {% endfor %}
+    </div>
+    {% if overflow|length > 0 %}
+        {# Активная вкладка из «Ещё» показывает своё название на переключателе. #}
+        <details class="page-tabs-more">
+            <summary class="page-tab{{ overflow_active ? ' is-active' : '' }}">{{ overflow_active ? overflow_active.label : 'Ещё' }}</summary>
+            <div class="page-tabs-menu">
+                {% for tab in overflow %}
+                    <a href="{{ tab.href }}"{% if tab.active ?? false %} aria-current="page"{% endif %}>
+                        {{- tab.label -}}
+                        {% if tab.count is defined and tab.count is not null %}
+                            <span class="cnt{{ (tab.warn ?? false) ? ' warn' : '' }}">{{ tab.count|vf_number }}</span>
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </details>
+    {% endif %}
+</nav>

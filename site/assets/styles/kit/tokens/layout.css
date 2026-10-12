@@ -53,17 +53,17 @@
   --button-primary-text:         var(--text-inverse);
 
   --button-secondary-bg:         var(--bg-card);
-  --button-secondary-bg-hover:   var(--bg-page);
-  --button-secondary-border:     var(--border);
-  --button-secondary-border-hover: var(--border-hover);
+  --button-secondary-bg-hover:   var(--bg-subtle-hover);
+  --button-secondary-border:     var(--border-strong);
+  --button-secondary-border-hover: var(--border-strong);
   --button-secondary-text:       var(--text-strong);
 
   --button-ghost-text:           var(--text-secondary);
-  --button-ghost-bg-hover:       var(--bg-page);
+  --button-ghost-bg-hover:       var(--bg-ghost-hover);
 
   /* Inputs */
   --input-bg:           var(--bg-card);
-  --input-border:       var(--border);
+  --input-border:       var(--border-strong);
   --input-border-focus: var(--color-primary);
   --input-border-error: var(--danger-dot);
   --input-text:         var(--text-strong);
@@ -78,8 +78,8 @@
 
   /* Form messages */
   --form-error-text:    var(--danger-text);
-  --form-helper-text:   var(--text-muted);
-  --form-label-text:    var(--text-tertiary);
+  --form-helper-text:   var(--text-tertiary);
+  --form-label-text:    var(--text-strong);
   --form-required-mark: var(--danger-dot);
 
   /* Status pills */
@@ -92,7 +92,7 @@
   --status-warning-bg:   var(--warning-bg);
   --status-warning-text: var(--warning-text);
   --status-warning-dot:  var(--warning-dot);
-  --status-neutral-bg:   var(--bg-page);
+  --status-neutral-bg:   var(--bg-neutral-tint);
   --status-neutral-text: var(--neutral-tint-text);
   --status-neutral-dot:  var(--text-disabled);
 }

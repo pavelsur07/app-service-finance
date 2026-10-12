@@ -17,8 +17,9 @@
 .demo > .form-field + .form-field {
   margin-top: 0;
 }
+/* DS-Controls: подпись 13px · 600 · Navy 900. */
 .form-label {
-  font-size: var(--font-11_5);
+  font-size: var(--font-13);
   color: var(--form-label-text);
   font-weight: 600;
   line-height: 1.4;

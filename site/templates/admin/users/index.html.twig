@@ -56,7 +56,7 @@
         </tbody>
       </table>
       {# route явно: при 422 re-render из CreateAccountController текущий _route — POST-only #}
-      {% include 'admin/partials/_pagination.html.twig' with { pager: pager, route: 'admin_user_index' } %}
+      {% include 'app/_ui/_pagination.html.twig' with { pager: pager, route: 'admin_user_index', params: app.request.query.all } %}
     </div>
   {% else %}
     <div class="empty">

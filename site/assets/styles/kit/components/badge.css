@@ -1,11 +1,11 @@
-/* ============ BADGE ============ */
+/* ============ BADGE ============ (DS-Feedback: 2px 8px · 12/16 · 600 · радиус 4) */
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: var(--r-1);
   font-size: var(--font-12);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 16px;
   white-space: nowrap;
 }
 .chip--filter { background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
