@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Twig;
 
+use Symfony\Component\Intl\Currencies;
+use Symfony\Component\Intl\Exception\MissingResourceException;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 /**
  * Деньги по листу DS-Money («Ваш Финдир», docs/design-system/sheets) для
@@ -38,6 +41,39 @@ final class VfMoneyExtension extends AbstractExtension
             new TwigFilter('vf_money_short', $this->moneyShort(...)),
             new TwigFilter('vf_amount', $this->amount(...), ['is_safe' => ['html']]),
         ];
+    }
+
+    /**
+     * @return TwigFunction[]
+     */
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('vf_currency_symbol', $this->currencySymbol(...)),
+            new TwigFunction('vf_currency_digits', $this->currencyDigits(...)),
+        ];
+    }
+
+    /**
+     * Символ валюты для заголовка колонки (DS-Money: «Сумма, ₽»); код без
+     * привычного символа — как есть.
+     */
+    public function currencySymbol(string $currency): string
+    {
+        return $this->symbol($currency);
+    }
+
+    /**
+     * Знаков после запятой у валюты (ISO 4217): RUB — 2, JPY — 0. Для перевода
+     * копеек учёта в десятичную сумму: `minor|vf_minor(vf_currency_digits(cur))`.
+     */
+    public function currencyDigits(string $currency): int
+    {
+        try {
+            return Currencies::getFractionDigits(strtoupper(trim($currency)));
+        } catch (MissingResourceException) {
+            return 2;
+        }
     }
 
     public function money(int|float|string|null $value, int $decimals = 2, ?string $currency = null): string

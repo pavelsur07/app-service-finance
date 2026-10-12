@@ -1,4 +1,5 @@
 {% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
 {% form_theme form 'balance/_form_theme.html.twig' %}
 {% block balance_content %}
     <div class="wz-head">
@@ -6,7 +7,7 @@
         </h1>
     </div>
     <section class="card">
-        <p>Текущий остаток: {{ account.balance|format_minor_currency(currency) }}. Разница на выбранную дату станет строкой корректировки. Укажите остальные изменения самостоятельно.</p>{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.date) }}{{ form_row(form.target) }}{{ form_row(form.reason) }}
+        <p>Текущий остаток: {{ account.balance|vf_minor(vf_currency_digits(currency))|vf_money(vf_currency_digits(currency), currency) }}. Разница на выбранную дату станет строкой корректировки. Укажите остальные изменения самостоятельно.</p>{{ form_start(form) }}{{ form_errors(form) }}{{ form_row(form.date) }}{{ form_row(form.target) }}{{ form_row(form.reason) }}
         <h2>Остальные строки корректировки</h2>
         <p>Предварительные итоги ниже относятся только к введенным строкам. Изменение выбранного счета будет рассчитано при сохранении.</p>
         {% include 'balance/_document_lines.html.twig' %}

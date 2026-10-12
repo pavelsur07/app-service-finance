@@ -55,7 +55,7 @@
   transform: translateY(-2px) rotate(45deg);
 }
 .page-tabs-menu {
-  position: absolute; z-index: 40; top: 100%; left: 0;
+  position: absolute; z-index: 40; top: 100%; right: 0; /* «Ещё» стоит в конце строки — меню не уходит за край экрана */
   min-width: 200px; padding: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);

@@ -120,7 +120,7 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         foreach (['/balance/accounts/'.$asset.'/card', '/balance/statement'] as $path) {
             $client->request('GET', $path.'?from=2026-07-01&to=2026-08-31');
             self::assertResponseIsSuccessful();
-            self::assertSelectorTextContains('main', 'Фактическое начало периода учета: 2026-08-01');
+            self::assertSelectorTextContains('main', 'Фактическое начало периода учета: 01.08.2026');
             $client->request('GET', $path.'?from=2026-07-01&to=2026-07-31');
             self::assertResponseIsSuccessful();
             self::assertSelectorTextContains('main', 'Учет не начат в выбранном периоде');
@@ -131,7 +131,7 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $client->request('GET', '/balance/?date=2026-08-01');
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('a[href="/balance/articles/'.$articleId.'/card"]');
-        self::assertSelectorTextContains('main', '100 000,00');
+        self::assertSelectorTextContains('main', "100\u{00A0}000,00");
     }
 
     public function testCategoryFormRejectsInvalidCsrf(): void
@@ -321,6 +321,86 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $client->request('GET', '/balance/accounts/'.$account.'/edit');
         self::assertResponseStatusCodeSame(404);
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id=?', [$companyId]));
+    }
+
+    public function testScreensFollowDesignSystem(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100000.00'], [$passive, 'increase', '100000.00']]);
+        $this->postDocument($client, 'operation', '2026-08-10', [[$asset, 'decrease', '1500.00'], [$passive, 'decrease', '1500.00']]);
+
+        $crawler = $client->request('GET', '/balance/journal');
+        self::assertResponseIsSuccessful();
+        self::assertSame('10.08.2026', trim($crawler->filter('tbody tr')->first()->filter('td')->eq(1)->text()));
+        self::assertSelectorTextSame('tbody .status.status--success', 'Проведен');
+        self::assertSelectorTextSame('.page-tab.is-active', 'Документы');
+
+        $crawler = $client->request('GET', '/balance/accounts');
+        self::assertSelectorTextSame('thead th.t-cell--right', 'Остаток, ₽');
+        self::assertSelectorTextSame('.page-tab.is-active', 'Счета');
+        // Девять разделов владельца: шесть вкладок видны, остальные — в «Ещё».
+        self::assertCount(6, $crawler->filter('.page-tabs-scroll .page-tab'));
+        self::assertSame(['Периоды', 'Настройка', 'Права'], $crawler->filter('.page-tabs-menu a')->each(static fn ($a): string => trim($a->text())));
+
+        $client->request('GET', '/balance/accounts/'.$asset.'/card?from=2026-08-01&to=2026-08-31');
+        self::assertSelectorTextSame('.page-tab.is-active', 'Счета');
+        // Список движений: знак у изменения — U+2212 у уменьшения, плюс у увеличения.
+        self::assertSelectorTextSame('tbody td.t-cell--right', "\u{2212}1\u{00A0}500,00");
+
+        $client->request('GET', '/balance/periods');
+        self::assertSelectorTextSame('.page-tabs-more summary.is-active', 'Периоды');
+
+        // Баланс — до копейки, без сокращения.
+        $crawler = $client->request('GET', '/balance/?date=2026-08-31');
+        self::assertSame("98\u{00A0}500,00\u{00A0}₽", trim($crawler->filter('.kpi-value')->first()->text()));
+        self::assertSelectorNotExists('.money--error');
+        self::assertSelectorTextSame('.kpi-meta', 'Актив и пассив равны');
+    }
+
+    public function testMismatchIsRedToTheKopeckWithExplanation(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100000.00'], [$passive, 'increase', '100000.00']]);
+        // Проведённые строки неизменяемы через UI: расхождение в 40 копеек создаём в БД.
+        $this->em()->getConnection()->executeStatement(
+            'UPDATE balance_operation_lines SET amount = amount + 40 WHERE company_id = ? AND account_id = ?',
+            [$companyId, $asset],
+        );
+
+        $crawler = $client->request('GET', '/balance/?date=2026-08-31');
+        self::assertResponseIsSuccessful();
+        $kpi = $crawler->filter('[data-balance-mismatch="true"]');
+        self::assertCount(1, $kpi);
+        self::assertStringContainsString('kpi--accent-danger', (string) $kpi->attr('class'));
+        self::assertSame("0,40\u{00A0}₽", trim($kpi->filter('.kpi-value.money--error')->text()));
+        self::assertStringContainsString("Актив больше пассива на 0,40\u{00A0}₽", $kpi->filter('.kpi-meta.money--error')->text());
+    }
+
+    /**
+     * @param list<array{string, string, string}> $lines [счёт, направление, сумма]
+     */
+    private function postDocument(KernelBrowser $client, string $kind, string $date, array $lines): void
+    {
+        $client->request('GET', '/balance/documents/new');
+        $values = $client->getCrawler()->selectButton('Сохранить черновик')->form()->getPhpValues();
+        $values['balance_document']['kind'] = $kind;
+        $values['balance_document']['date'] = $date;
+        $values['balance_document']['reason'] = 'Документ '.$kind;
+        $values['balance_document']['lines'] = array_map(
+            static fn (array $line): array => ['accountId' => $line[0], 'direction' => $line[1], 'amount' => $line[2]],
+            $lines,
+        );
+        $client->request('POST', '/balance/documents/new', $values);
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        $client->submitForm('Провести сохраненный документ');
+        self::assertResponseRedirects();
     }
 
     /** @return array{string,string} */

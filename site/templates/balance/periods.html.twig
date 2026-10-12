@@ -26,22 +26,21 @@
                 {% for item in items %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_audit',{type:'period',id:item.id}) }}">{{ item.month|date('m.Y') }}
-                            </a>
+                            <a href="{{ path('balance_audit',{type:'period',id:item.id}) }}">{{ item.month|date('m.Y') }}</a>
                         </td>
-                        <td>{{ item.is_closed ? 'Закрыт':'Открыт' }}
+                        <td>
+                            {% if item.is_closed %}<span class="status status--neutral">Закрыт</span>{% else %}<span class="status status--success">Открыт</span>{% endif %}
                         </td>
-                        <td>{{ item.reason }}
-                        </td>
-                        <td>{{ item.changed_at }}
-                        </td>
+                        <td>{{ item.reason }}</td>
+                        <td>{{ ui.datetime(item.changed_at) }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="4">Закрытых периодов пока нет.</td>
+                        <td class="t-empty" colspan="4">Закрытых периодов пока нет.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </section>{{ ui.pager(pager) }}
+        {{ ui.pager(pager) }}
+    </section>
 {% endblock %}

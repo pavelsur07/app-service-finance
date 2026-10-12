@@ -5,12 +5,12 @@
         <h1 class="wz-title">Баланс<span class="wz-sub">Состояние на конец выбранной даты</span>
         </h1>
     </div>
-    <form method="get" class="wz-row">
+    <form method="get" class="wz-row wz-filters">
         <div class="form-field">
             <label class="form-label" for="balance-date">Дата</label>
             <input class="input" id="balance-date" type="date" name="date" required value="{{ date }}">
         </div>
-        <div>
+        <div class="wz-row-actions">
             <button class="btn btn-md btn-primary">Показать</button>
         </div>
     </form>
@@ -26,33 +26,39 @@
             {% endif %}
         </section>
     {% else %}
+        {# Баланс — учётный отчёт: итоги до копейки, без сокращения (решение Владельца 2026-10-12). #}
+        {% set digits = vf_currency_digits(currency) %}
+        {% set difference = report.differenceMinor|vf_minor(digits) %}
+        {% set mismatch = report.differenceMinor != 0 %}
         <div class="wz-row">
-            <section class="card">
-                <h2>Актив</h2>
-                <p>{{ report.assetMinor|format_minor_currency(currency) }}
-                </p>
-            </section>
-            <section class="card">
-                <h2>Пассив</h2>
-                <p>{{ report.passiveMinor|format_minor_currency(currency) }}
-                </p>
-            </section>
-            <section class="card">
-                <h2>Расхождение</h2>
-                <p>{{ report.differenceMinor|format_minor_currency(currency) }}
-                </p>
+            {% for kpi in [{label: 'Актив', minor: report.assetMinor}, {label: 'Пассив', minor: report.passiveMinor}] %}
+                <section class="kpi">
+                    <div class="kpi-label">{{ kpi.label }}</div>
+                    <div class="kpi-value">{{ kpi.minor|vf_minor(digits)|vf_money(digits, currency) }}</div>
+                </section>
+            {% endfor %}
+            {# Ненулевое расхождение — сигнал ошибки учёта (решение Владельца №4): красным, до копейки и с пояснением. #}
+            <section class="kpi{{ mismatch ? ' kpi--accent-danger' : '' }}" data-balance-mismatch="{{ mismatch ? 'true' : 'false' }}">
+                <div class="kpi-label">Расхождение</div>
+                <div class="kpi-value{{ mismatch ? ' money--error' : '' }}">{{ difference|vf_money(digits, currency) }}</div>
+                {% if not mismatch %}
+                    <div class="kpi-meta">Актив и пассив равны</div>
+                {% else %}
+                    <div class="kpi-meta money--error">
+                        {{ difference starts with '-' ? 'Пассив больше актива' : 'Актив больше пассива' }} на {{ difference|vf_money(digits, currency)|replace({'−': ''}) }}. Проверьте проведённые документы за период.
+                    </div>
+                {% endif %}
             </section>
         </div>
         <div class="wz-row">
             {% for side,label in {'asset':'Актив','passive':'Пассив'} %}
                 <section class="card report-scroll">
-                    <h2>{{ label }}
-                    </h2>
+                    <h2>{{ label }}</h2>
                     <table class="t-table">
                         <thead>
                             <tr>
                                 <th>Статья</th>
-                                <th class="t-cell--right">Остаток</th>
+                                <th class="t-cell--right">{{ ui.col('Остаток', currency) }}</th>
                             </tr>
                         </thead>
                         <tbody>

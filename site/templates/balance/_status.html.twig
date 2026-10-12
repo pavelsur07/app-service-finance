@@ -1,0 +1,9 @@
+{# Статус документа баланса (DS-Feedback): черновик — нейтральный, проведён — OK, сторнирован — Warn. #}
+{% if status == 'draft' %}
+    <span class="status status--neutral">Черновик</span>
+{% else %}
+    <span class="status status--success">Проведен</span>
+{% endif %}
+{% if reversed|default(false) %}
+    <span class="status status--warning">Сторнирован</span>
+{% endif %}

@@ -9,3 +9,5 @@
   padding: var(--card-padding);
   box-shadow: var(--card-shadow);
 }
+/* DS-Tokens: заголовок секции в карточке — H2 18/24 · 600. */
+.card > h2:not([class]) { margin: 0 0 var(--s-3); font-size: 18px; line-height: 24px; font-weight: 600; }

@@ -1,5 +1,18 @@
+{#
+  Деньги Баланса (DS-Money): учёт хранит копейки валюты книги; одна валюта на книгу,
+  поэтому символ — в заголовке колонки (col), а в ячейке только число.
+  signed — плюс у увеличения в списке движений; negate — уменьшение, хранящееся положительной суммой.
+#}
+{% macro amount(minor, currency, signed = false, negate = false) %}
+    {%- set digits = vf_currency_digits(currency) -%}
+    {{- minor|vf_minor(digits)|vf_amount(digits, null, signed, null, negate) -}}
+{% endmacro %}
+{% macro col(label, currency) %}{{ label }}, {{ vf_currency_symbol(currency) }}{% endmacro %}
+{# Учётные даты приходят строкой из БД (Y-m-d, время — МСК без зоны): зону не пересчитываем. #}
+{% macro date(value) %}{{ value ? value|date('d.m.Y', false) : '—' }}{% endmacro %}
+{% macro datetime(value) %}{{ value ? value|date('d.m.Y H:i', false) : '—' }}{% endmacro %}
 {% macro period(from, to) %}
-    <form method="get" class="wz-row">
+    <form method="get" class="wz-row wz-filters">
         <div class="form-field">
             <label class="form-label" for="balance-from">С даты</label>
             <input class="input" id="balance-from" type="date" name="from" required value="{{ from }}">
@@ -8,23 +21,13 @@
             <label class="form-label" for="balance-to">По дату</label>
             <input class="input" id="balance-to" type="date" name="to" required value="{{ to }}">
         </div>
-        <div>
+        <div class="wz-row-actions">
             <button class="btn btn-md btn-primary">Показать</button>
         </div>
     </form>
 {% endmacro %}
 {% macro pager(pager) %}
-    {% if pager.haveToPaginate %}
-        <nav class="wz-row" aria-label="Страницы">
-            <div>
-                {% if pager.hasPreviousPage %}
-                    <a class="btn btn-md btn-secondary" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|merge(app.request.query.all)|merge({page:pager.previousPage})) }}">Назад</a>
-                {% endif %} Страница {{ pager.currentPage }} из {{ pager.nbPages }} {% if pager.hasNextPage %}
-                    <a class="btn btn-md btn-secondary" href="{{ path(app.request.attributes.get('_route'), app.request.attributes.get('_route_params')|merge(app.request.query.all)|merge({page:pager.nextPage})) }}">Вперед</a>
-                {% endif %}
-            </div>
-        </nav>
-    {% endif %}
+    {% include 'app/_ui/_pagination.html.twig' with {pager: pager} only %}
 {% endmacro %}
 {% macro line(line) %}
     <fieldset class="card" data-balance-lines-target="row">
@@ -38,15 +41,10 @@
     {% for item in items %}
         {% if item.isVisible %}
             <tr>
-                <td>
-                    {% for n in 1..item.level %}
-                        {% if n > 1 %}— {% endif %}
-                    {% endfor %}
-                    <a href="{{ path('balance_article_card',{id:item.id}) }}">{{ item.name }}
-                    </a>
+                <td class="t-tree{{ item.level == 1 ? ' t-tree--root' : '' }}" style="--lvl: {{ item.level - 1 }}">
+                    <a href="{{ path('balance_article_card',{id:item.id}) }}">{{ item.name }}</a>
                 </td>
-                <td class="t-cell--right">{{ item.amountMinor|format_minor_currency(currency) }}
-                </td>
+                <td class="t-cell--right">{{ _self.amount(item.amountMinor, currency) }}</td>
             </tr>
         {% endif %}
         {{ _self.tree(item.children, currency) }}

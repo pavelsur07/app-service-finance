@@ -4,23 +4,36 @@
 {% set currency = book.currency|default('RUB') %}
 {% block title %}Управленческий баланс{% endblock %}
 {% block content %}
-    <nav class="wz-row" aria-label="Разделы баланса">
-        {% for route, label in {'balance_index':'Баланс','balance_structure_index':'Статьи','balance_accounts':'Счета','balance_journal':'Документы','balance_statement':'Движения','balance_compare':'Сравнение','balance_periods':'Периоды'} %}
-            <a class="btn btn-md btn-secondary" href="{{ path(route) }}" {% if app.request.attributes.get('_route') == route %}aria-current="page"{% endif %}>{{ label }}
-            </a>
-        {% endfor %}
-        {% if permissions.manage %}
-            <a class="btn btn-md btn-secondary" href="{{ path('balance_setup') }}">Настройка</a>
-            <a class="btn btn-md btn-secondary" href="{{ path('balance_access') }}">Права</a>
-        {% endif %}
-    </nav>
+    {# Вкладки разделов (DS-Tabs): вложенные страницы подсвечивают свой раздел. #}
+    {% set route = app.request.attributes.get('_route') %}
+    {% set section = {
+        balance_index: 'balance_index',
+        balance_structure_index: 'balance_structure_index', balance_structure_new: 'balance_structure_index', balance_structure_edit: 'balance_structure_index', balance_article_card: 'balance_structure_index',
+        balance_accounts: 'balance_accounts', balance_account_new: 'balance_accounts', balance_account_edit: 'balance_accounts', balance_account_card: 'balance_accounts', balance_account_target: 'balance_accounts',
+        balance_journal: 'balance_journal', balance_document: 'balance_journal', balance_document_new: 'balance_journal', balance_document_reverse: 'balance_journal',
+        balance_statement: 'balance_statement',
+        balance_compare: 'balance_compare',
+        balance_periods: 'balance_periods',
+        balance_setup: 'balance_setup',
+        balance_access: 'balance_access',
+    }[route]|default(null) %}
+    {% set sections = {'balance_index':'Баланс','balance_structure_index':'Статьи','balance_accounts':'Счета','balance_journal':'Документы','balance_statement':'Движения','balance_compare':'Сравнение','balance_periods':'Периоды'} %}
+    {% if permissions.manage %}
+        {% set sections = sections|merge({'balance_setup':'Настройка','balance_access':'Права'}) %}
+    {% endif %}
+    {% set tabs = [] %}
+    {% for tab_route, label in sections %}
+        {% set tabs = tabs|merge([{label: label, href: path(tab_route), active: tab_route == section}]) %}
+    {% endfor %}
+    <div class="wz-row">
+        {% include 'app/_ui/_tabs.html.twig' with {tabs: tabs, label: 'Разделы баланса'} only %}
+    </div>
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="wz-row">
                 <div class="alert alert--{{ label == 'success' ? 'success' : 'warning' }}" role="status">
                     <div class="a-body">
-                        <p class="a-text">{{ message }}
-                        </p>
+                        <p class="a-text">{{ message }}</p>
                     </div>
                 </div>
             </div>
