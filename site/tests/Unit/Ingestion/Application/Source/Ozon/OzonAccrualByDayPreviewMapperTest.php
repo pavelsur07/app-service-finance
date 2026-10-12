@@ -395,6 +395,20 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::fail(sprintf('Preview row with component "%s" was not found.', $component));
     }
 
+    public function testPreviewEachYieldsSameTransactionsAsPreview(): void
+    {
+        $fixture = json_decode((string) file_get_contents(__DIR__.'/../../../../../Fixtures/Marketplace/Ozon/accrual_by_day_cases.json'), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($fixture);
+        $rows = $fixture['accruals'];
+        self::assertIsArray($rows);
+        $companyId = '19621cff-b028-45d9-9193-11f47ad9a8b2';
+
+        $expected = $this->mapper()->preview($companyId, $rows, includeSaleRefund: true);
+
+        self::assertNotEmpty($expected);
+        self::assertEquals($expected, iterator_to_array($this->mapper()->previewEach($companyId, $rows, includeSaleRefund: true), false));
+    }
+
     private function mapper(): OzonAccrualByDayPreviewMapper
     {
         return new OzonAccrualByDayPreviewMapper(new OzonMoneyParser(), new SourceDataHasher());

@@ -655,7 +655,7 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     private function expectedSourceKeys(string $companyId, string $rawRecordId): array
     {
         $sourceKeys = [];
-        foreach ($this->previewMapper->preview($companyId, $this->rawStorageFacade->read($rawRecordId, $companyId), includeSaleRefund: true) as $row) {
+        foreach ($this->previewMapper->previewEach($companyId, $this->rawStorageFacade->read($rawRecordId, $companyId), includeSaleRefund: true) as $row) {
             $sourceKeys[$row->sourceKey] = true;
         }
 
