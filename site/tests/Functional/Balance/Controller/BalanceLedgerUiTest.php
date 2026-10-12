@@ -353,11 +353,33 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $client->request('GET', '/balance/periods');
         self::assertSelectorTextSame('.page-tabs-more summary.is-active', 'Периоды');
 
+        // Баланс — до копейки, без сокращения.
         $crawler = $client->request('GET', '/balance/?date=2026-08-31');
-        self::assertSame("98,5\u{00A0}тыс.\u{00A0}₽", trim($crawler->filter('.kpi-value')->first()->text()));
-        self::assertSame("98\u{00A0}500,00\u{00A0}₽", $crawler->filter('.kpi-value')->first()->attr('title'));
+        self::assertSame("98\u{00A0}500,00\u{00A0}₽", trim($crawler->filter('.kpi-value')->first()->text()));
         self::assertSelectorNotExists('.money--error');
         self::assertSelectorTextSame('.kpi-meta', 'Актив и пассив равны');
+    }
+
+    public function testMismatchIsRedToTheKopeckWithExplanation(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100000.00'], [$passive, 'increase', '100000.00']]);
+        // Проведённые строки неизменяемы через UI: расхождение в 40 копеек создаём в БД.
+        $this->em()->getConnection()->executeStatement(
+            'UPDATE balance_operation_lines SET amount = amount + 40 WHERE company_id = ? AND account_id = ?',
+            [$companyId, $asset],
+        );
+
+        $crawler = $client->request('GET', '/balance/?date=2026-08-31');
+        self::assertResponseIsSuccessful();
+        $kpi = $crawler->filter('[data-balance-mismatch="true"]');
+        self::assertCount(1, $kpi);
+        self::assertStringContainsString('kpi--accent-danger', (string) $kpi->attr('class'));
+        self::assertSame("0,40\u{00A0}₽", trim($kpi->filter('.kpi-value.money--error')->text()));
+        self::assertStringContainsString("Актив больше пассива на 0,40\u{00A0}₽", $kpi->filter('.kpi-meta.money--error')->text());
     }
 
     /**
