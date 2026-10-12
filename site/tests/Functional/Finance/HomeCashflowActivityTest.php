@@ -255,9 +255,9 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
      */
     private function assertKpis(Crawler $crawler, array $expected, string $uiMode): void
     {
-        self::assertSame($this->expectedKpi('1000RUB', $uiMode), $this->normalizedKpi($crawler, 'todayBalance'));
+        self::assertSame($this->expectedKpi('1000RUB'), $this->normalizedKpi($crawler, 'todayBalance'));
         foreach ($expected as $name => $value) {
-            self::assertSame($this->expectedKpi($value, $uiMode), $this->normalizedKpi($crawler, $name));
+            self::assertSame($this->expectedKpi($value), $this->normalizedKpi($crawler, $name));
         }
     }
 
@@ -265,7 +265,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
      * KPI of both layers follow the Vash Findir design system: abbreviated amount with
      * the ₽ sign («1 тыс. ₽»). Expectations are written in the old «1000RUB» notation.
      */
-    private function expectedKpi(string $value, string $uiMode): string
+    private function expectedKpi(string $value): string
     {
         return '1000RUB' === $value ? '1тыс.₽' : str_replace('RUB', '₽', $value);
     }
@@ -373,7 +373,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             self::assertCount(0, $balance->filter('.visually-hidden'));
         }
         self::assertStringContainsString(
-            str_replace(' ', '', $balanceComparisonLabel).':'.$this->expectedKpi('1000RUB', $uiMode),
+            str_replace(' ', '', $balanceComparisonLabel).':'.$this->expectedKpi('1000RUB'),
             $this->normalizedText($balance),
         );
 
@@ -423,7 +423,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
                 self::assertCount(1, $comparison->filter('.delta [aria-hidden="true"]'));
             }
             self::assertStringContainsString(
-                $previousPeriodLabel.':'.$this->expectedKpi($expected['previous'], $uiMode),
+                $previousPeriodLabel.':'.$this->expectedKpi($expected['previous']),
                 $this->normalizedText($comparison),
             );
         }
@@ -448,9 +448,9 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $previousTo = $today->modify(sprintf('-%d days', $periodDays));
         $previousFrom = $today->modify(sprintf('-%d days', 2 * $periodDays - 1));
 
-        self::assertSame($this->expectedKpi($current, $uiMode), $this->normalizedKpi($crawler, 'inflow30'));
+        self::assertSame($this->expectedKpi($current), $this->normalizedKpi($crawler, 'inflow30'));
         self::assertStringContainsString(
-            $this->dateRangeLabel($previousFrom, $previousTo).':'.$this->expectedKpi($previous, $uiMode),
+            $this->dateRangeLabel($previousFrom, $previousTo).':'.$this->expectedKpi($previous),
             $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="inflow30"]')),
         );
         $periodNodes = $crawler->filter('[data-dashboard-kpi-period="current"]');
@@ -465,7 +465,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
             $previousTo->format('Y') === $today->format('Y') ? 'd.m' : 'd.m.Y',
         );
         self::assertStringContainsString(
-            str_replace(' ', '', $balanceComparisonDate).':'.$this->expectedKpi('1000RUB', $uiMode),
+            str_replace(' ', '', $balanceComparisonDate).':'.$this->expectedKpi('1000RUB'),
             $this->normalizedText($crawler->filter('[data-dashboard-kpi-comparison="todayBalance"]')),
         );
 
