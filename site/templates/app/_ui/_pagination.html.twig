@@ -1,0 +1,72 @@
+{#
+  Пагинация нового интерфейса (DS-Feedback, DS-Table): кнопки 30px, текущая — Action blue,
+  «Назад» / «Вперёд» — стрелки с aria-label, подпись «Показано с X по Y из N» 13px.
+  Разметка — классы кита .t-pagination / .t-pg-btn (assets/styles/kit/components/table.css).
+
+  Pagerfanta:     {% include 'app/_ui/_pagination.html.twig' with {pager: pager} %}
+  Без Pagerfanta: {% include 'app/_ui/_pagination.html.twig' with {page: page, total: total, perPage: limit} %}
+  Необязательно: route (по умолчанию текущий), params (по умолчанию route params + query).
+#}
+{% set route = route ?? app.request.attributes.get('_route') %}
+{% set params = params ?? app.request.attributes.get('_route_params', {})|merge(app.request.query.all) %}
+
+{% if pager is defined and pager %}
+    {% set currentPage = pager.currentPage %}
+    {% set totalPages = pager.nbPages %}
+    {% set totalItems = pager.nbResults %}
+    {% set itemsPerPage = pager.maxPerPage %}
+{% else %}
+    {% set totalItems = total %}
+    {% set itemsPerPage = perPage %}
+    {% set totalPages = max(1, (totalItems / itemsPerPage)|round(0, 'ceil') // 1) %}
+    {% set currentPage = min(max(1, page), totalPages) %}
+{% endif %}
+
+{% if totalItems > 0 %}
+    {% set delta = 2 %}
+    {% set pages = [] %}
+    {% if totalPages <= 9 %}
+        {% set pages = 1..totalPages %}
+    {% else %}
+        {% set startPage = max(2, currentPage - delta) %}
+        {% set endPage = min(totalPages - 1, currentPage + delta) %}
+        {% set pages = [1] %}
+        {% if startPage > 2 %}{% set pages = pages|merge(['…']) %}{% endif %}
+        {% for pageNumber in startPage..endPage %}{% set pages = pages|merge([pageNumber]) %}{% endfor %}
+        {% if endPage < totalPages - 1 %}{% set pages = pages|merge(['…']) %}{% endif %}
+        {% set pages = pages|merge([totalPages]) %}
+    {% endif %}
+    {% set chevron_left %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{% endset %}
+    {% set chevron_right %}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>{% endset %}
+
+    <div class="t-pagination">
+        <p class="t-pagination-info vf-pager-caption">
+            Показано с {{ ((currentPage - 1) * itemsPerPage + 1)|vf_number }}
+            по {{ min(currentPage * itemsPerPage, totalItems)|vf_number }}
+            из {{ totalItems|vf_number }}
+        </p>
+        {% if totalPages > 1 %}
+            <nav class="t-pagination-pages" aria-label="Пагинация">
+                {% if currentPage > 1 %}
+                    <a class="t-pg-btn" href="{{ path(route, params|merge({page: currentPage - 1})) }}" aria-label="Назад">{{ chevron_left }}</a>
+                {% else %}
+                    <span class="t-pg-btn is-disabled" aria-disabled="true" aria-label="Назад">{{ chevron_left }}</span>
+                {% endif %}
+                {% for pageNumber in pages %}
+                    {% if pageNumber == '…' %}
+                        <span class="t-pg-ellipsis">…</span>
+                    {% elseif pageNumber == currentPage %}
+                        <span class="t-pg-btn is-active" aria-current="page">{{ pageNumber }}</span>
+                    {% else %}
+                        <a class="t-pg-btn" href="{{ path(route, params|merge({page: pageNumber})) }}">{{ pageNumber }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if currentPage < totalPages %}
+                    <a class="t-pg-btn" href="{{ path(route, params|merge({page: currentPage + 1})) }}" aria-label="Вперёд">{{ chevron_right }}</a>
+                {% else %}
+                    <span class="t-pg-btn is-disabled" aria-disabled="true" aria-label="Вперёд">{{ chevron_right }}</span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </div>
+{% endif %}

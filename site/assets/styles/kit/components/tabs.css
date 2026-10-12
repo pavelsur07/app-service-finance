@@ -10,14 +10,15 @@
   color: var(--text-tertiary); cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px;
 }
+/* DS-Tokens: активный сегмент — Blue 50 и Action blue. */
 .tab.is-active {
-  background: var(--bg-card);
-  color: var(--text-strong);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-weight: 600;
 }
+.tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .tab .count { font-size: 11px; color: var(--text-muted); font-weight: 600; }
-.tab.is-active .count { color: var(--text-tertiary); }
+.tab.is-active .count { color: var(--color-primary); }
 
 /* Tabs · count with inner dot (status counters) */
 .tab .count--dot {

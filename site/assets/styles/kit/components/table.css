@@ -1,20 +1,22 @@
-/* ============ TABLE ============ */
+/* ============ TABLE ============ (DS-Table: шапка Navy 50 · 11/16 · 700 · +5% · Navy 600;
+   строка 14px по вертикали, текст 14px; hover Navy 50) */
 .t-table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .t-table thead th {
   text-align: left;
-  font-size: 10.5px;
+  font-size: var(--font-11);
+  line-height: 16px;
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 11px 12px;
-  background: var(--bg-row-hover);
+  padding: 10px 12px;
+  background: var(--bg-subtle);
   border-bottom: 1px solid var(--border);
 }
 .t-table tbody td {
-  padding: var(--s-3);
+  padding: 14px 12px;
   border-bottom: 1px solid var(--border-soft);
-  font-size: 12.5px;
+  font-size: var(--font-14);
   color: var(--text-strong);
   vertical-align: top;
 }
@@ -30,7 +32,9 @@
   font-weight: 700;
   font-size: 13.5px;
 }
+.t-table tbody tr:hover > td { background: var(--bg-row-hover); }
 .t-cell--right { text-align: right; font-variant-numeric: tabular-nums; }
+.t-table thead th.t-cell--right { text-align: right; }
 
 /* Table · dot-prefix cell (run-log transport name) */
 .t-cell--dot {
@@ -61,9 +65,10 @@
 /* Table · totals row (Decision 21) */
 .t-table tbody tr.t-row--totals td {
   background: var(--bg-subtle);
-  border-top: 2px solid var(--text-strong);
+  border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border);
-  font-weight: 700;
+  font-size: var(--font-14);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--text-strong);
@@ -81,33 +86,36 @@
 }
 .t-row--totals .t-totals-strong { font-size: var(--font-13_5); font-weight: 800; }
 
-/* Table · pagination */
+/* Table · pagination (DS-Feedback: кнопки 30px, граница Navy 300, радиус 4; текущая — Primary;
+   недоступная — opacity .5; подпись «Показано с X по Y из N» — 13px, Navy 600) */
 .t-pagination {
   display: flex; align-items: center; gap: 14px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-soft);
-  background: var(--bg-row-hover);
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.t-pagination-info { font-size: var(--font-12_5); color: var(--text-secondary); }
+.t-pagination-info { margin: 0; font-size: var(--font-13); color: var(--text-tertiary); }
 .t-pagination-info b { color: var(--text-strong); font-weight: 700; }
 .t-pagination-pages { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .t-pg-btn {
-  min-width: 32px; height: 32px; padding: 0 10px;
-  border-radius: var(--r-2);
+  min-width: 30px; height: 30px; padding: 0 8px;
+  border-radius: var(--r-1);
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  font-family: inherit; font-size: var(--font-12_5); font-weight: 600;
-  color: var(--text-secondary); cursor: pointer;
+  border: 1px solid var(--border-strong);
+  font-family: inherit; font-size: var(--font-13); font-weight: 500;
+  color: var(--text-strong); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.t-pg-btn:hover { background: var(--bg-page); }
+.t-pg-btn:hover { background: var(--bg-subtle-hover); }
+.t-pg-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.t-pg-btn.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.t-pg-btn.is-disabled:hover { background: var(--bg-card); }
 .t-pg-btn.is-active {
   background: var(--color-primary); border-color: var(--color-primary);
-  color: var(--text-inverse); font-weight: 700;
+  color: var(--text-inverse); font-weight: 600;
 }
 .t-pg-ellipsis {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   color: var(--text-muted); font-size: var(--font-12); font-weight: 600;
   display: flex; align-items: center; justify-content: center;
 }

@@ -1,15 +1,18 @@
-/* ============ BUTTON ============ */
+/* ============ BUTTON ============ (DS-Controls: md 36px · 0 14px · 14px, sm 30px · 0 10px · 13px,
+   вес 500, радиус 4; фокус — outline 2px Action blue с отступом 2px) */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font-family: inherit; cursor: pointer;
   border: 1px solid transparent;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   text-decoration: none;
   transition: background .12s, border-color .12s, color .12s;
 }
-.btn-sm { height: 30px; padding: 0 var(--s-3); font-size: var(--font-12_5); border-radius: var(--r-2); }
-.btn-md { height: 36px; padding: 0 14px; font-size: var(--font-13); border-radius: var(--r-3); }
+.btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: var(--font-13); border-radius: var(--r-2); }
+.btn-md { height: 36px; padding: 0 14px; font-size: var(--font-14); border-radius: var(--r-3); }
 .btn-lg { height: 44px; padding: 0 18px; font-size: var(--font-14); border-radius: var(--r-3); }
 
 .btn-primary { background: var(--button-primary-bg); color: var(--button-primary-text); border-color: var(--button-primary-bg); box-shadow: var(--shadow-primary); }
@@ -37,17 +40,16 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Solid danger / warning · destructive confirm CTAs (kept here as button variants) */
+/* Solid danger / warning · destructive confirm CTAs (kept here as button variants).
+   DS: опасная кнопка — красный бренда #b00020, hover #8f0019, без тени. */
 .btn-danger-solid {
-  background: var(--danger-text); border-color: var(--danger-text);
+  background: var(--danger-dot); border-color: var(--danger-dot);
   color: var(--text-inverse);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-danger-glow);
 }
 .btn-danger-solid:hover { background: var(--danger-text-hover); border-color: var(--danger-text-hover); }
 .btn-warning-solid {
   background: var(--warning-text); border-color: var(--warning-text);
   color: var(--text-inverse);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 10px var(--shadow-warning-glow);
 }
 .btn-warning-solid:hover { background: var(--warning-text-hover); border-color: var(--warning-text-hover); }
 

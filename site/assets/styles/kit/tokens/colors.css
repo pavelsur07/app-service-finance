@@ -20,6 +20,7 @@
   /* ===== Borders ===== */
   --border: #dde1ec;
   --border-soft: #e8ecf7;
+  --border-strong: #c3c8d6; /* DS Navy 300 — граница полей и вторичных кнопок */
 
   /* ===== Backgrounds ===== */
   --bg-page: #f7f8fc;
@@ -28,6 +29,8 @@
   --bg-row-hover: #f4f6fb;
   --bg-row-selected: #e8ecf7;
   --bg-dark: #0b1020;
+  --bg-neutral-tint: #e8ecf7; /* DS Navy 100 — нейтральный бейдж, счётчик вкладки */
+  --bg-ghost-hover: rgba(11, 16, 32, 0.07); /* DS-Controls: hover Ghost-кнопки */
 
   /* ===== State colors (audit v1.4) ===== */
   --color-primary-active: #1a40b0;

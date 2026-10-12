@@ -5,7 +5,8 @@
   letter-spacing: -0.01em;
 }
 .money--in   { color: var(--success-text); }
-.money--out  { color: var(--danger-text); }
+/* DS-Money: красный для сумм не используется — расход основным цветом. */
+.money--out  { color: var(--text-strong); }
 .money--strong { color: var(--text-strong); }
 .money--muted  { color: var(--text-faint); }
 .money--14 { font-size: 14px; font-weight: 700; }
@@ -29,3 +30,19 @@
   border-top: 1px solid var(--border-soft);
   line-height: 1.5;
 }
+
+/* Сумма (фильтр vf_amount, DS-Money) — та же разметка, что в легаси-слое:
+   табличные цифры, копейки и ноль приглушены, приход — зелёный, расход — основной цвет.
+   Валюта, кроме рубля, — символом после числа, приглушённо. */
+.vf-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vf-amount__minor,
+.vf-amount__currency,
+.vf-amount--zero { color: var(--text-tertiary); }
+.vf-amount--income { color: var(--success-text); }
+/* Сумма внутри сигнала ошибки (расхождение) красная целиком — копейки не глушим. */
+.money--error,
+.money--error .vf-amount__minor,
+.money--error .vf-amount__currency { color: var(--danger-text); }
