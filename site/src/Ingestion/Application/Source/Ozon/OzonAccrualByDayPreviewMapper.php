@@ -32,9 +32,27 @@ final readonly class OzonAccrualByDayPreviewMapper
         bool $includeSaleRefund = false,
         bool $recordUnknownCategories = false,
     ): array {
-        $this->categoryResolver?->resetPerPreviewState($companyId);
+        return iterator_to_array($this->previewEach($companyId, $rows, $from, $to, $includeSaleRefund, $recordUnknownCategories), false);
+    }
 
-        $transactions = [];
+    /**
+     * Тот же результат, что {@see preview()}, но построчно: вызывающему, которому
+     * нужен не список, а свёртка (ключи источника), не приходится держать в памяти
+     * все транзакции крупного снимка разом (GlitchTip #422).
+     *
+     * @param iterable<array<string, mixed>> $rows
+     *
+     * @return \Generator<int, OzonAccrualPreviewTransaction>
+     */
+    public function previewEach(
+        string $companyId,
+        iterable $rows,
+        ?\DateTimeImmutable $from = null,
+        ?\DateTimeImmutable $to = null,
+        bool $includeSaleRefund = false,
+        bool $recordUnknownCategories = false,
+    ): \Generator {
+        $this->categoryResolver?->resetPerPreviewState($companyId);
 
         foreach ($rows as $row) {
             $date = $this->stringValue($row['date'] ?? 'unknown');
@@ -46,6 +64,7 @@ final readonly class OzonAccrualByDayPreviewMapper
             $accrualId = $this->accrualId($row);
             $operationGroupId = Uuid::uuid5(Uuid::NAMESPACE_URL, sprintf('%s:ozon:accrual-by-day:%s', $companyId, $accrualId))->toString();
             $unitNumber = $this->optionalString($row['unit_number'] ?? null);
+            $transactions = [];
 
             match ($category) {
                 'POSTING' => $this->collectPosting($transactions, $companyId, $row, $operationGroupId, $date, $category, $accrualId, $unitNumber, $includeSaleRefund, $recordUnknownCategories),
@@ -54,9 +73,9 @@ final readonly class OzonAccrualByDayPreviewMapper
                 'CONTAINER' => $this->collectContainerFees($transactions, $companyId, $row['container_fees'] ?? null, $operationGroupId, $date, $category, $accrualId, $unitNumber, recordUnknownCategories: $recordUnknownCategories),
                 default => null,
             };
-        }
 
-        return $transactions;
+            yield from $transactions;
+        }
     }
 
     /**

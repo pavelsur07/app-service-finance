@@ -8,6 +8,8 @@ use App\Ingestion\Exception\RawStorageException;
 
 final class RawNdjsonCodec
 {
+    private const INFLATE_CHUNK_BYTES = 65536;
+
     /**
      * @param iterable<array<string, mixed>> $rows
      */
@@ -34,23 +36,65 @@ final class RawNdjsonCodec
      */
     public function decodeCompressedRows(string $compressedPayload): iterable
     {
-        $payload = gzdecode($compressedPayload);
-        if (false === $payload) {
+        // Распаковка порциями: gzdecode() целиком плюс explode() держали крупный
+        // снимок Ozon by-day в памяти дважды, и сверка падала по memory_limit
+        // (GlitchTip #422). В памяти теперь только порция и недочитанная строка.
+        $context = inflate_init(\ZLIB_ENCODING_GZIP);
+        if (false === $context) {
             throw new RawStorageException('Failed to decode gzip raw payload.');
         }
 
-        foreach (explode("\n", $payload) as $line) {
-            if ('' === $line) {
-                continue;
+        // Ключ — номер строки снимка, как у прежнего explode(): пустые строки
+        // пропускаются, но номер занимают.
+        $lineNumber = 0;
+        $tail = '';
+        $length = \strlen($compressedPayload);
+        $offset = 0;
+        do {
+            $input = substr($compressedPayload, $offset, self::INFLATE_CHUNK_BYTES);
+            $offset += self::INFLATE_CHUNK_BYTES;
+            $finish = $offset >= $length;
+            $chunk = @inflate_add($context, $input, $finish ? \ZLIB_FINISH : \ZLIB_SYNC_FLUSH);
+            if (false === $chunk) {
+                throw new RawStorageException('Failed to decode gzip raw payload.');
             }
 
-            $row = json_decode($line, true, 512, \JSON_THROW_ON_ERROR);
-            if (!is_array($row)) {
-                throw new RawStorageException('Decoded raw payload row is not an object.');
+            $lines = explode("\n", $tail.$chunk);
+            $tail = (string) array_pop($lines);
+            foreach ($lines as $line) {
+                $row = $this->decodeLine($line);
+                if (null !== $row) {
+                    yield $lineNumber => $row;
+                }
+                ++$lineNumber;
             }
+        } while (!$finish);
 
-            yield $row;
+        if (\ZLIB_STREAM_END !== inflate_get_status($context)) {
+            throw new RawStorageException('Failed to decode gzip raw payload.');
         }
+
+        $row = $this->decodeLine($tail);
+        if (null !== $row) {
+            yield $lineNumber => $row;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeLine(string $line): ?array
+    {
+        if ('' === $line) {
+            return null;
+        }
+
+        $row = json_decode($line, true, 512, \JSON_THROW_ON_ERROR);
+        if (!is_array($row)) {
+            throw new RawStorageException('Decoded raw payload row is not an object.');
+        }
+
+        return $row;
     }
 
     private function normalizeValue(mixed $value): mixed
