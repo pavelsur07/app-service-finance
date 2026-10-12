@@ -11,6 +11,7 @@ use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\ImportPLCategoryTreeRow;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -47,7 +48,7 @@ final class ImportPLCategoryTreeAction
         }
 
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
-        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan);
+        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $command->onlyCreate);
 
         // Строго до мутаций: метод сравнивает старый code совпавшего узла с
         // новым, а после applyFields() старого уже не существует.
@@ -311,6 +312,25 @@ final class ImportPLCategoryTreeAction
         return $plan;
     }
 
+    private function sumsChildren(PLCategoryType $type, ?string $formula): bool
+    {
+        return PLCategoryType::SUBTOTAL === $type && '' === trim((string) $formula);
+    }
+
+    /**
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     */
+    private function hasChildren(array $plan, PLCategoryTreeNode $node): bool
+    {
+        foreach ($plan as $item) {
+            if ($item['sourceNode']->parent === $node) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Фаза 2 — валидация глубины и diff, без мутаций.
      *
@@ -318,7 +338,7 @@ final class ImportPLCategoryTreeAction
      *
      * @return array{0: ImportPLCategoryTreeRow[], 1: ImportPLCategoryTreeRow[], 2: int}
      */
-    private function validateAndDiff(array &$plan): array
+    private function validateAndDiff(array &$plan, bool $onlyCreate = false): array
     {
         /** @var array<string, true> $matchedTargetIds id существующих target-узлов, которыми управляет источник */
         $matchedTargetIds = [];
@@ -337,10 +357,30 @@ final class ImportPLCategoryTreeAction
         foreach ($plan as $i => $item) {
             $sourceNode = $item['sourceNode'];
             $sourceParent = $sourceNode->parent;
+            $existing = $item['existing'];
+
+            // Только создание: совпавшая категория остаётся на своём месте и
+            // уровне — от него и считается глубина новых потомков.
+            if ($onlyCreate && null !== $existing) {
+                // Потомков суммирует только подытог без формулы (PlReportCalculator):
+                // строка ввода берёт свои факты, KPI и подытог с формулой — формулу.
+                // Если в шаблоне это сумма потомков, а у компании нет, новые
+                // статьи под ней молча выпали бы из итогов отчёта.
+                if ($this->sumsChildren($sourceNode->type, $sourceNode->formula)
+                    && !$this->sumsChildren($existing->getType(), $existing->getFormula())
+                    && $this->hasChildren($plan, $sourceNode)
+                ) {
+                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании считается не суммой вложенных статей, а в шаблоне это группа. Сделайте её подытогом без формулы или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
+                }
+                $targetLevelBySourceKey[$sourceNode->key] = $existing->getLevel();
+                ++$unchangedCount;
+
+                continue;
+            }
+
             $targetLevel = null !== $sourceParent ? $targetLevelBySourceKey[$sourceParent->key] + 1 : 1;
             $targetLevelBySourceKey[$sourceNode->key] = $targetLevel;
 
-            $existing = $item['existing'];
             // Существующие потомки target, отсутствующие в источнике, не
             // трогаются и не удаляются — но переносятся вместе с этим узлом,
             // если он переносится глубже, и не должны провалиться за предел.

@@ -17,6 +17,7 @@ use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Exception\PLCategoryInUseException;
 use App\Finance\Form\PLCategoryFormType;
+use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,7 @@ class PLCategoryController extends AbstractController
         private readonly PLCategoryTreeExporter $exporter,
         private readonly PLCategoryTreeFileReader $fileReader,
         private readonly CompanyFacade $companyFacade,
+        private readonly DefaultPLCategoryTreeProvider $defaultTree,
     ) {
     }
 
@@ -93,8 +95,24 @@ class PLCategoryController extends AbstractController
 
         $sourceCompanyId = $request->query->get('sourceCompanyId');
         $preview = null;
+        $previewMode = null;
 
-        if (is_string($sourceCompanyId) && '' !== $sourceCompanyId) {
+        if ('template' === $request->query->get('source')) {
+            // Базовый шаблон только добавляет недостающие статьи: настройки
+            // компании (имена, места, типы совпавших по коду статей) не трогаются.
+            $sourceCompanyId = null;
+            try {
+                $preview = $importAction(new ImportPLCategoryTreeCommand(
+                    $this->defaultTree->nodes(),
+                    (string) $targetCompany->getId(),
+                    true,
+                    true,
+                ));
+                $previewMode = 'template';
+            } catch (\DomainException $e) {
+                $this->addFlash('danger', $e->getMessage());
+            }
+        } elseif (is_string($sourceCompanyId) && '' !== $sourceCompanyId) {
             if (!$this->companyFacade->userHasAccess($sourceCompanyId, (string) $user->getId())) {
                 throw new AccessDeniedException();
             }
@@ -105,6 +123,7 @@ class PLCategoryController extends AbstractController
                     (string) $targetCompany->getId(),
                     true,
                 ));
+                $previewMode = 'company';
             } catch (\DomainException $e) {
                 $this->addFlash('danger', $e->getMessage());
             }
@@ -115,7 +134,7 @@ class PLCategoryController extends AbstractController
             'selectedSourceCompanyId' => $sourceCompanyId,
             'targetCompanyId' => (string) $targetCompany->getId(),
             'preview' => $preview,
-            'previewMode' => null !== $preview ? 'company' : null,
+            'previewMode' => $previewMode,
             'uploadedFileName' => null,
             'uploadedPayload' => null,
         ]);
@@ -216,8 +235,9 @@ class PLCategoryController extends AbstractController
         }
 
         $sourceCompanyId = null;
+        $mode = $request->request->get('mode');
 
-        if ('file' !== $request->request->get('mode')) {
+        if ('file' !== $mode && 'template' !== $mode) {
             $sourceCompanyId = $request->request->get('sourceCompanyId');
             if (!is_string($sourceCompanyId) || '' === $sourceCompanyId) {
                 throw $this->createNotFoundException();
@@ -229,14 +249,17 @@ class PLCategoryController extends AbstractController
         }
 
         try {
-            $sourceNodes = null === $sourceCompanyId
-                ? $this->fileReader->read($this->submittedJson($request))
-                : $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany);
+            $sourceNodes = match (true) {
+                'template' === $mode => $this->defaultTree->nodes(),
+                null === $sourceCompanyId => $this->fileReader->read($this->submittedJson($request)),
+                default => $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
+            };
 
             $result = $importAction(new ImportPLCategoryTreeCommand(
                 $sourceNodes,
                 (string) $targetCompany->getId(),
                 false,
+                'template' === $mode,
             ));
         } catch (\DomainException $e) {
             // Без sourceCompanyId в redirect: GET заново пересчитал бы тот же

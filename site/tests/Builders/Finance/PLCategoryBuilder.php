@@ -6,6 +6,7 @@ namespace App\Tests\Builders\Finance;
 
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -20,6 +21,7 @@ final class PLCategoryBuilder
     private ?string $code = null;
     private ?PLCategory $parent = null;
     private PLExpenseType $expenseType = PLExpenseType::OTHER;
+    private PLCategoryType $type = PLCategoryType::LEAF_INPUT;
 
     private function __construct()
     {
@@ -90,6 +92,14 @@ final class PLCategoryBuilder
         return $clone;
     }
 
+    public function withType(PLCategoryType $type): self
+    {
+        $clone = clone $this;
+        $clone->type = $type;
+
+        return $clone;
+    }
+
     public function build(): PLCategory
     {
         $category = new PLCategory($this->id, $this->company);
@@ -98,6 +108,7 @@ final class PLCategoryBuilder
         $category->setCode($this->code);
         $category->setParent($this->parent);
         $category->setExpenseType($this->expenseType);
+        $category->setType($this->type);
 
         return $category;
     }
