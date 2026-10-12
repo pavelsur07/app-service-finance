@@ -1,7 +1,7 @@
 /* ============ DRAWER ============ */
 .dw {
   background: var(--bg-page);
-  border-radius: var(--r-4);
+  border-radius: var(--r-5);
   overflow: hidden;
   border: 1px solid var(--border);
 }

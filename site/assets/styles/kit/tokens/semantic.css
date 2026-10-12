@@ -1,20 +1,25 @@
 :root {
-  /* ===== Semantic ===== */
-  --success-bg: #ECFDF5;
-  --success-border: #D1FAE5;
-  --success-text: #047857;
-  --success-dot: #10B981;
+  /* ===== Semantic ===== (DS «Ваш Финдир», листы DS-Tokens и DS-Feedback) */
+  --success-bg: #e4f5e7;
+  --success-border: #b4e0bc;
+  --success-text: #1d7a30;
+  --success-dot: #2fb344;
 
-  --danger-bg: #FEF2F2;
-  --danger-border: #FECACA;
-  --danger-text: #B91C1C;
-  --danger-dot: #EF4444;
+  --danger-bg: #fdecee;
+  --danger-border: #f0c2c9;
+  --danger-text: #9a001b;
+  --danger-dot: #b00020;
 
-  --warning-bg: #FFFBEB;
-  --warning-border: #FDE68A;
-  --warning-text: #92400E;
-  --warning-dot: #F59E0B;
+  --warning-bg: #fff4e5;
+  --warning-border: #f5d3a8;
+  --warning-text: #9a4a00;
+  --warning-dot: #f76707;
 
-  --neutral-tint-text: #475569;
+  --info-bg: #e3eefb;
+  --info-border: #b9d3f2;
+  --info-text: #164f94;
+  --info-dot: #1d4ed8;
+
+  --neutral-tint-text: #46525f;
 
 }

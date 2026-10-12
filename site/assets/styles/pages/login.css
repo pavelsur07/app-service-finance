@@ -6,7 +6,7 @@
 
 /* === page-specific tokens (для dark brand-панели) === */
 :root {
-  --brand-overlay-primary: rgba(26, 86, 219, 0.35);   /* radial glow — primary */
+  --brand-overlay-primary: rgba(29, 78, 216, 0.35);   /* radial glow — primary */
   --brand-overlay-success: rgba(16, 185, 129, 0.18);  /* radial glow — success */
   --brand-surface:         rgba(255, 255, 255, 0.04); /* soft panel bg */
   --brand-divider:         rgba(255, 255, 255, 0.08); /* dividers on dark */

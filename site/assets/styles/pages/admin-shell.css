@@ -2,7 +2,7 @@
  * Page-specific styles: admin-shell
  * App-shell scaffold (.app, .app-body, .app-sidebar, .app-workzone) lives in
  * UI Kit since v2.4 (patterns/app-shell.css) — not duplicated here anymore.
- * Body baseline (margin:0, Manrope, bg) comes from .uikit-base on <body>.
+ * Body baseline (margin:0, Inter, bg) comes from .uikit-base on <body>.
  * Only what UI Kit doesn't cover for the admin base document remains.
  */
 

@@ -1,9 +1,10 @@
 :root {
-  /* ===== Radii ===== */
+  /* ===== Radii ===== (DS «Ваш Финдир», лист DS-Tokens: --r-sm 4px, --r-md 6px, --r-lg 8px) */
   --r-1: 4px;   /* chips, badges */
-  --r-2: 5px;   /* nav items, small buttons */
-  --r-3: 6px;   /* inputs, primary buttons */
-  --r-4: 8px;   /* cards, sections */
+  --r-2: 4px;   /* nav items, small buttons */
+  --r-3: 4px;   /* inputs, primary buttons */
+  --r-4: 4px;   /* cards, sections */
+  --r-5: 8px;   /* modals, drawers, toasts (DS --r-lg) */
   --r-pill: 999px;
   --r-circle: 50%;
 
