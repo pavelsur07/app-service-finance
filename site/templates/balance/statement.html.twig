@@ -5,43 +5,44 @@
         <h1 class="wz-title">Ведомость изменений</h1>
     </div>{{ ui.period(from,to) }}
     {% if not statement.accounting_started %}
-        <section class="card">Учет не начат в выбранном периоде.</section>
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Учет не начат в выбранном периоде.</p></div></div>
+        </div>
     {% elseif statement.effective_from != from %}
-        <section class="card">Фактическое начало периода учета: {{ statement.effective_from }}. Начальные остатки показаны на эту дату.</section>
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Фактическое начало периода учета: {{ ui.date(statement.effective_from) }}. Начальные остатки показаны на эту дату.</p></div></div>
+        </div>
     {% endif %}
     <section class="card report-scroll">
         <table class="t-table">
             <thead>
                 <tr>
                     <th>Счет / статья</th>
-                    <th>На начало</th>
-                    <th>Увеличение</th>
-                    <th>Уменьшение</th>
-                    <th>На конец</th>
+                    <th class="t-cell--right">{{ ui.col('На начало', currency) }}</th>
+                    <th class="t-cell--right">{{ ui.col('Увеличение', currency) }}</th>
+                    <th class="t-cell--right">{{ ui.col('Уменьшение', currency) }}</th>
+                    <th class="t-cell--right">{{ ui.col('На конец', currency) }}</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in statement.accounts %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}
-                            </a>
-                            <p>{{ row.article_name }}
-                                {% if row.is_archived %} · Архив{% endif %}
-                            </p>
+                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}</a>
+                            {% if row.is_archived %} <span class="status status--neutral">В архиве</span>{% endif %}
+                            <p class="t-sub">{{ row.article_name }}</p>
                         </td>
                         {% for key in ['opening','increase','decrease','closing'] %}
-                            <td class="t-cell--right">{{ attribute(row,key)|format_minor_currency(currency) }}
-                            </td>
+                            <td class="t-cell--right">{{ ui.amount(attribute(row,key), currency) }}</td>
                         {% endfor %}
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5">Нет учетных счетов.</td>
+                        <td class="t-empty" colspan="5">Нет учетных счетов.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <p>Начальные остатки не включены в обороты периода.</p>
+        <p class="t-sub">Начальные остатки не включены в обороты периода.</p>
     </section>
 {% endblock %}

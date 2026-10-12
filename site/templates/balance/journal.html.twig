@@ -4,10 +4,12 @@
     <div class="wz-head">
         <h1 class="wz-title">Документы баланса</h1>
         {% if permissions.prepare %}
-            <a class="btn btn-md btn-primary" href="{{ path('balance_document_new') }}">Новый документ</a>
+            <div class="wz-head-actions">
+                <a class="btn btn-md btn-primary" href="{{ path('balance_document_new') }}">Новый документ</a>
+            </div>
         {% endif %}
     </div>
-    <form method="get" class="wz-row">
+    <form method="get" class="wz-row wz-filters">
         <div class="form-field">
             <label class="form-label" for="journal-search">Номер или основание</label>
             <input class="input" id="journal-search" name="search" value="{{ filters.search }}">
@@ -60,11 +62,12 @@
                 {% endfor %}
             </select>
         </div>
-        <div>
+        <div class="wz-row-actions">
             <button class="btn btn-md btn-primary">Найти</button>
             <a class="btn btn-md btn-secondary" href="{{ path('balance_journal') }}">Сбросить</a>
         </div>
     </form>
+    {% set kinds = {'opening':'Начальные остатки','operation':'Операция','correction':'Корректировка','reversal':'Сторно'} %}
     <section class="card report-scroll">
         <table class="t-table">
             <thead>
@@ -81,27 +84,23 @@
                 {% for item in journal.items %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_document',{id:item.id}) }}">{{ item.number }}
-                            </a>
+                            <a href="{{ path('balance_document',{id:item.id}) }}">{{ item.number }}</a>
                         </td>
-                        <td>{{ item.operation_date }}
+                        <td>{{ ui.date(item.operation_date) }}</td>
+                        <td>{{ kinds[item.kind] }}</td>
+                        <td>
+                            {% include 'balance/_status.html.twig' with {status: item.status, reversed: item.is_reversed} only %}
                         </td>
-                        <td>{{ {'opening':'Начальные остатки','operation':'Операция','correction':'Корректировка','reversal':'Сторно'}[item.kind] }}
-                        </td>
-                        <td>{{ item.status == 'draft' ? 'Черновик':'Проведен' }}
-                            {% if item.is_reversed %} · Сторнирован{% endif %}
-                        </td>
-                        <td>{{ item.reason }}
-                        </td>
-                        <td>{{ members[item.author_id]|default('Бывший участник') }}
-                        </td>
+                        <td>{{ item.reason }}</td>
+                        <td>{{ members[item.author_id]|default('Бывший участник') }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="6">Документы не найдены.</td>
+                        <td class="t-empty" colspan="6">Документы не найдены.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </section>{{ ui.pager(journal.pager) }}
+        {{ ui.pager(journal.pager) }}
+    </section>
 {% endblock %}

@@ -7,13 +7,14 @@
   display: flex; align-items: flex-start; gap: var(--s-4);
   margin-bottom: var(--s-5);
 }
+/* DS-Tokens: H1 24/32 · 600. */
 .wz-title {
-  font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -0.01em;
   color: var(--text-strong); margin: 0;
 }
 .wz-title .wz-sub {
   display: block; margin-top: var(--s-1);
-  font-size: var(--font-13); font-weight: 400; letter-spacing: 0;
+  font-size: var(--font-14); line-height: 20px; font-weight: 400; letter-spacing: 0;
   color: var(--text-tertiary);
 }
 .wz-head-actions { margin-left: auto; display: flex; gap: var(--s-2); flex-shrink: 0; }
@@ -24,3 +25,12 @@
 }
 .wz-row > * { flex: 1 1 200px; min-width: 200px; }
 .wz-row:last-child { margin-bottom: 0; }
+/* Поля в ряду стоят рядом — вертикальный интервал стека form-field здесь не нужен. */
+.wz-row > .form-field + .form-field { margin-top: 0; }
+/* Фильтр: поля не растягиваются на всю ширину ряда. */
+.wz-row.wz-filters > .form-field { flex: 0 1 220px; min-width: 160px; }
+@media (max-width: 600px) { .wz-row.wz-filters > .form-field { flex: 1 1 100%; } }
+/* Ряд кнопок действий: по ширине содержимого, с переносом. */
+.wz-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+/* Кнопки фильтра в ряду полей: по ширине содержимого, по нижнему краю полей. */
+.wz-row > .wz-row-actions { flex: 0 0 auto; min-width: 0; align-self: flex-end; display: flex; gap: var(--s-2); }

@@ -11,10 +11,25 @@
 .uikit-base {
   margin: 0;
   font-family: var(--font-family);
-  font-size: var(--font-13);
+  font-size: var(--font-14); /* DS-Tokens: основной текст 14/20 */
   line-height: 1.5;
   background: var(--bg-page);
   color: var(--text-strong);
+}
+
+/* DS: ссылка — Action blue, подчёркивание при наведении. :where() — нулевая
+   специфичность: ссылки с собственным классом (кнопки, меню) не задеваются. */
+:where(.uikit-base a:not([class])) {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+:where(.uikit-base a:not([class]):hover) {
+  text-decoration: underline;
+}
+:where(.uikit-base a:not([class]):focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .sr-only {

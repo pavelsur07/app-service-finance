@@ -47,10 +47,13 @@ export default class extends Controller {
       : 'Заполните строки для предварительного расчета. Итог проверяется при проведении.';
   }
 
+  // DS-Money: тысячи — U+00A0, запятая, минус — U+2212, символ валюты после числа (как vf_money).
   format(value) {
-    const sign = value < 0n ? '−' : '';
+    const sign = value < 0n ? '\u2212' : '';
     const digits = (value < 0n ? -value : value).toString().padStart(this.digits + 1, '0');
-    const decimal = this.digits === 0 ? digits : `${digits.slice(0, -this.digits)},${digits.slice(-this.digits)}`;
-    return `${sign}${decimal} ${this.currencyValue}`;
+    const whole = (this.digits === 0 ? digits : digits.slice(0, -this.digits)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+    const decimal = this.digits === 0 ? whole : `${whole},${digits.slice(-this.digits)}`;
+    const symbol = { RUB: '₽', USD: '$', EUR: '€', GBP: '£' }[this.currencyValue] ?? this.currencyValue;
+    return `${sign}${decimal}\u00A0${symbol}`;
   }
 }

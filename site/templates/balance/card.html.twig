@@ -3,40 +3,54 @@
 {% block balance_content %}
     <div class="wz-head">
         <h1 class="wz-title">{{ item.name }}
-            <span class="wz-sub">{{ article ? 'Карточка статьи':'Карточка счета' }}
-            </span>
+            <span class="wz-sub">{{ article ? 'Карточка статьи':'Карточка счета' }}</span>
         </h1>
+        {% if not article and permissions.prepare and not item.is_archived %}
+            <div class="wz-head-actions">
+                <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
+            </div>
+        {% endif %}
     </div>{{ ui.period(from,to) }}
     {% if not card.accounting_started %}
-        <section class="card">Учет не начат в выбранном периоде.</section>
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Учет не начат в выбранном периоде.</p></div></div>
+        </div>
     {% elseif card.effective_from != from %}
-        <section class="card">Фактическое начало периода учета: {{ card.effective_from }}. Начальные остатки показаны на эту дату.</section>
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Фактическое начало периода учета: {{ ui.date(card.effective_from) }}. Начальные остатки показаны на эту дату.</p></div></div>
+        </div>
     {% endif %}
+    {% set digits = vf_currency_digits(currency) %}
     <div class="wz-row">
-        <section class="card">
-            <h2>На начало</h2>{{ card.opening|format_minor_currency(currency) }}
-        </section>
-        <section class="card">
-            <h2>На конец</h2>{{ card.closing|format_minor_currency(currency) }}
-        </section>
+        {% for kpi in [{label: 'На начало', minor: card.opening}, {label: 'На конец', minor: card.closing}] %}
+            {% set value = kpi.minor|vf_minor(digits) %}
+            <section class="kpi">
+                <div class="kpi-label">{{ kpi.label }}</div>
+                <div class="kpi-value" title="{{ value|vf_money(digits, currency) }}">{{ value|vf_money_short(vf_currency_symbol(currency)) }}</div>
+            </section>
+        {% endfor %}
     </div>
     {% if article %}
         <section class="card report-scroll">
             <h2>Счета статьи</h2>
             <table class="t-table">
+                <thead>
+                    <tr>
+                        <th>Счет</th>
+                        <th class="t-cell--right">{{ ui.col('На конец', currency) }}</th>
+                    </tr>
+                </thead>
                 <tbody>
                     {% for row in card.accounts %}
                         <tr>
                             <td>
-                                <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}
-                                </a>
+                                <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}</a>
                             </td>
-                            <td>{{ row.closing|format_minor_currency(currency) }}
-                            </td>
+                            <td class="t-cell--right">{{ ui.amount(row.closing, currency) }}</td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td>Нет счетов.</td>
+                            <td class="t-empty" colspan="2">Нет счетов.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -51,36 +65,28 @@
                     <th>Дата / документ</th>
                     <th>Счет</th>
                     <th>Основание</th>
-                    <th>Изменение</th>
-                    <th>Остаток</th>
+                    <th class="t-cell--right">{{ ui.col('Изменение', currency) }}</th>
+                    <th class="t-cell--right">{{ ui.col('Остаток', currency) }}</th>
                 </tr>
             </thead>
             <tbody>
                 {% for entry in card.entries %}
                     <tr>
-                        <td>{{ entry.operation_date }} · <a href="{{ path('balance_document',{id:entry.id}) }}">№ {{ entry.number }}
-                            </a>
-                        </td>
-                        <td>{{ entry.account_name }}
-                        </td>
-                        <td>{{ entry.reason }}
-                        </td>
-                        <td>{{ entry.direction == 'increase' ? '+':'−' }}{{ entry.amount|format_minor_currency(currency) }}
-                        </td>
-                        <td>{{ entry.balance|format_minor_currency(currency) }}
-                        </td>
+                        <td>{{ ui.date(entry.operation_date) }} · <a href="{{ path('balance_document',{id:entry.id}) }}">№ {{ entry.number }}</a></td>
+                        <td>{{ entry.account_name }}</td>
+                        <td>{{ entry.reason }}</td>
+                        {# Список движений: плюс у увеличения, минус у уменьшения (DS-Money). #}
+                        <td class="t-cell--right">{{ ui.amount(entry.amount, currency, true, entry.direction != 'increase') }}</td>
+                        <td class="t-cell--right">{{ ui.amount(entry.balance, currency) }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5">За период движений нет.</td>
+                        <td class="t-empty" colspan="5">За период движений нет.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <a href="{{ path('balance_audit',{type:article ? 'article':'account',id:item.id}) }}">История изменений</a>
-        {% if not article and permissions.prepare and not item.is_archived %}
-            <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
-        {% endif %}
+        {{ ui.pager(card.pager) }}
+        <p><a href="{{ path('balance_audit',{type:article ? 'article':'account',id:item.id}) }}">История изменений</a></p>
     </section>
-{{ ui.pager(card.pager) }}
 {% endblock %}

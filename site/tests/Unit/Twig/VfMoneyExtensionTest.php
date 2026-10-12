@@ -137,4 +137,22 @@ final class VfMoneyExtensionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         (new VfMoneyExtension())->amount(1, 2, 'profit');
     }
+
+    public function testCurrencySymbolForColumnHeaders(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame('₽', $extension->currencySymbol('RUB'));
+        self::assertSame('$', $extension->currencySymbol('usd'));
+        self::assertSame('KZT', $extension->currencySymbol('KZT'));
+    }
+
+    public function testCurrencyDigitsFollowIso4217(): void
+    {
+        $extension = new VfMoneyExtension();
+
+        self::assertSame(2, $extension->currencyDigits('RUB'));
+        self::assertSame(0, $extension->currencyDigits('jpy'));
+        self::assertSame(3, $extension->currencyDigits('KWD'));
+    }
 }

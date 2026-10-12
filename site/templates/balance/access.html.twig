@@ -37,10 +37,11 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5">Дополнительные права не назначены.</td>
+                        <td class="t-empty" colspan="5">Дополнительные права не назначены.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </section>{{ ui.pager(pager) }}
+        {{ ui.pager(pager) }}
+    </section>
 {% endblock %}
