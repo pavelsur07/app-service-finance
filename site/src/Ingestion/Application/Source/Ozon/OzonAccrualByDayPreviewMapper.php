@@ -40,6 +40,9 @@ final readonly class OzonAccrualByDayPreviewMapper
      * нужен не список, а свёртка (ключи источника), не приходится держать в памяти
      * все транзакции крупного снимка разом (GlitchTip #422).
      *
+     * Состояние резолвера категорий сбрасывается на первой итерации, поэтому
+     * генератор потребляется сразу и не чередуется с другим превью.
+     *
      * @param iterable<array<string, mixed>> $rows
      *
      * @return \Generator<int, OzonAccrualPreviewTransaction>

@@ -63,6 +63,28 @@ final class RawNdjsonCodecTest extends TestCase
         self::assertSame([['a' => 1], ['b' => 2]], iterator_to_array((new RawNdjsonCodec())->decodeCompressedRows($compressed), false));
     }
 
+    public function testDecodeCompressedRowsIgnoresBytesAfterStreamEndLikeGzdecode(): void
+    {
+        $codec = new RawNdjsonCodec();
+        $rows = [['sku' => 'A-1'], ['sku' => 'B-2']];
+        $compressed = gzencode($codec->encodeRows($rows));
+        self::assertIsString($compressed);
+
+        // Хвост длиннее порции распаковки: конец потока внутри первой порции.
+        $withTrailer = $compressed.str_repeat("\0", 200000);
+
+        self::assertNotFalse(gzdecode($withTrailer));
+        self::assertSame($rows, iterator_to_array($codec->decodeCompressedRows($withTrailer)));
+    }
+
+    public function testDecodeCompressedRowsKeysRowsSequentially(): void
+    {
+        $compressed = gzencode("{\"a\":1}\n\n{\"b\":2}\n");
+        self::assertIsString($compressed);
+
+        self::assertSame([0 => ['a' => 1], 1 => ['b' => 2]], iterator_to_array((new RawNdjsonCodec())->decodeCompressedRows($compressed)));
+    }
+
     public function testDecodeCompressedRowsRejectsCorruptPayload(): void
     {
         $this->expectException(RawStorageException::class);

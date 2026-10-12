@@ -38,15 +38,13 @@ final class RawNdjsonCodec
     {
         // Распаковка порциями: gzdecode() целиком плюс explode() держали крупный
         // снимок Ozon by-day в памяти дважды, и сверка падала по memory_limit
-        // (GlitchTip #422). В памяти теперь только порция и недочитанная строка.
+        // (GlitchTip #422). В памяти теперь порция и недочитанная строка; при
+        // сжатии JSON ~10:1 порция входа 64 КБ даёт около мегабайта.
         $context = inflate_init(\ZLIB_ENCODING_GZIP);
         if (false === $context) {
             throw new RawStorageException('Failed to decode gzip raw payload.');
         }
 
-        // Ключ — номер строки снимка, как у прежнего explode(): пустые строки
-        // пропускаются, но номер занимают.
-        $lineNumber = 0;
         $tail = '';
         $length = \strlen($compressedPayload);
         $offset = 0;
@@ -64,19 +62,22 @@ final class RawNdjsonCodec
             foreach ($lines as $line) {
                 $row = $this->decodeLine($line);
                 if (null !== $row) {
-                    yield $lineNumber => $row;
+                    yield $row;
                 }
-                ++$lineNumber;
             }
-        } while (!$finish);
 
-        if (\ZLIB_STREAM_END !== inflate_get_status($context)) {
+            // Байты после конца потока не читаются, как и у gzdecode(): иначе
+            // хвост за границей порции превращался бы в ошибку распаковки.
+            $streamEnded = \ZLIB_STREAM_END === inflate_get_status($context);
+        } while (!$finish && !$streamEnded);
+
+        if (!$streamEnded) {
             throw new RawStorageException('Failed to decode gzip raw payload.');
         }
 
         $row = $this->decodeLine($tail);
         if (null !== $row) {
-            yield $lineNumber => $row;
+            yield $row;
         }
     }
 
