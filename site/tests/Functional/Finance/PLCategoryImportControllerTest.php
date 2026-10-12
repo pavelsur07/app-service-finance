@@ -744,15 +744,27 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertCount(70, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 
-    public function testDefaultTemplateRefusesToHangLinesUnderACompanyInputLine(): void
+    /**
+     * @return iterable<string, array{PLCategoryType, ?string}>
+     */
+    public static function nonSummingParents(): iterable
+    {
+        yield 'строка ввода' => [PLCategoryType::LEAF_INPUT, null];
+        yield 'KPI' => [PLCategoryType::KPI, '0'];
+        yield 'подытог с формулой' => [PLCategoryType::SUBTOTAL, 'CM2 * 0'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonSummingParents')]
+    public function testDefaultTemplateRefusesToHangLinesUnderANonSummingCompanyLine(PLCategoryType $type, ?string $formula): void
     {
         $client = static::createClient();
 
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
-        // У компании «склад» — строка ввода: отчёт не суммирует её потомков, и статьи шаблона
-        // под ней молча выпали бы из CM3.
-        $inputLine = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Склад')->withCode('OPEX_WH_TOTAL')->build();
+        // У компании «склад» считается не суммой потомков (строка ввода, KPI или подытог
+        // с формулой): статьи шаблона под ней молча выпали бы из CM3.
+        $inputLine = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Склад')->withCode('OPEX_WH_TOTAL')->withType($type)->build();
+        $inputLine->setFormula($formula);
 
         $em = $this->em();
         foreach ([$user, $target, $inputLine] as $entity) {
@@ -765,7 +777,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
 
         $client->request('GET', '/pl-categories/import?source=template');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('.toast.text-bg-danger', 'строка ввода, а в шаблоне это группа');
+        self::assertSelectorTextContains('.toast.text-bg-danger', 'считается не суммой вложенных статей');
         self::assertSelectorNotExists('input[name="mode"][value="template"]');
 
         $client->request('POST', '/pl-categories/import/apply', [

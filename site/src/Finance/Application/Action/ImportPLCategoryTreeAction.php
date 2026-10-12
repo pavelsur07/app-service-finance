@@ -312,6 +312,11 @@ final class ImportPLCategoryTreeAction
         return $plan;
     }
 
+    private function sumsChildren(PLCategoryType $type, ?string $formula): bool
+    {
+        return PLCategoryType::SUBTOTAL === $type && '' === trim((string) $formula);
+    }
+
     /**
      * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
      */
@@ -357,10 +362,15 @@ final class ImportPLCategoryTreeAction
             // Только создание: совпавшая категория остаётся на своём месте и
             // уровне — от него и считается глубина новых потомков.
             if ($onlyCreate && null !== $existing) {
-                // Строка ввода считает значение из своих фактов и потомков не
-                // суммирует: новые статьи под ней молча выпали бы из итогов отчёта.
-                if (PLCategoryType::LEAF_INPUT === $existing->getType() && $this->hasChildren($plan, $sourceNode)) {
-                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании — строка ввода, а в шаблоне это группа. Сделайте её подытогом или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
+                // Потомков суммирует только подытог без формулы (PlReportCalculator):
+                // строка ввода берёт свои факты, KPI и подытог с формулой — формулу.
+                // Если в шаблоне это сумма потомков, а у компании нет, новые
+                // статьи под ней молча выпали бы из итогов отчёта.
+                if ($this->sumsChildren($sourceNode->type, $sourceNode->formula)
+                    && !$this->sumsChildren($existing->getType(), $existing->getFormula())
+                    && $this->hasChildren($plan, $sourceNode)
+                ) {
+                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании считается не суммой вложенных статей, а в шаблоне это группа. Сделайте её подытогом без формулы или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
                 }
                 $targetLevelBySourceKey[$sourceNode->key] = $existing->getLevel();
                 ++$unchangedCount;
