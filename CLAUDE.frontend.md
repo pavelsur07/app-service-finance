@@ -65,15 +65,18 @@ Node и npm живут только в контейнере, на хосте и�
 | Интерфейс | Реализация |
 |---|---|
 | Легаси (`_layout/legacy.html.twig`, Tabler) | `assets/styles/design-tokens.css` (токены `--vf-*`, слой `--tblr-*`), `assets/styles/vf-custom-classes.css`, Twig-фильтры `vf_money`/`vf_amount`/`vf_number`/`vf_minor` (`src/Twig/VfMoneyExtension.php`), partials `_pagination`, `_tabs`, `_period_presets` |
-| Новый слой (`_layout/app.html.twig`, React) и админка | CSS кита в `assets/styles/kit/` (подключается через `assets/styles/app.css`) |
+| Новый слой (`_layout/app.html.twig`, React) и админка | CSS кита в `assets/styles/kit/` (подключается через `assets/styles/app.css`; значения токенов — DS), те же Twig-фильтры денег, функции `vf_currency_symbol`/`vf_currency_digits`, partials `app/_ui/_pagination`, `app/_ui/_tabs` |
 
-- Код расходится с листом DS — виноват код. **Исключение — палитра нового слоя:**
-  кит пока на собственной палитре (`kit/tokens/colors.css`), перевод нового слоя на
-  DS — отдельная задача. В других задачах токены кита под листы не подгонять —
-  расхождение записать `TODO(ds)` в отчёт.
-- Деньги: легаси — только `vf_money` / `vf_amount` / `vf_money_short` (KPI),
-  не деньги — `vf_number` (лист DS-Money: U+00A0, запятая, U+2212, копейки
-  приглушены, «₽» в заголовке колонки, красный для сумм не используется).
+- Код расходится с листом DS — виноват код, в обоих интерфейсах. Новый слой на DS
+  с 2026-10-12 (`docs/plan/ds-new-layer.md`): имена токенов кита прежние, значения —
+  с листов.
+- Деньги в обоих интерфейсах — только `vf_money` / `vf_amount` / `vf_money_short`
+  (KPI), не деньги — `vf_number` (лист DS-Money: U+00A0, запятая, U+2212, копейки
+  приглушены, «₽» в заголовке колонки, красный для сумм не используется). Копейки
+  учёта в валюте с другой точностью — `minor|vf_minor(vf_currency_digits(cur))`,
+  символ для заголовка — `vf_currency_symbol(cur)`.
+- Пагинация и вкладки разделов нового слоя — только `app/_ui/_pagination` и
+  `app/_ui/_tabs` (больше 6 — в «Ещё»).
 - Лист DS не покрывает случай — ближайшее решение по существующему коду и
   `TODO(ds)` в месте решения, вопрос — в отчёт.
 - Поручение Владельца расходится с листом — решение записать (см.
