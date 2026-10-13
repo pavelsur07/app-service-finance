@@ -15,7 +15,8 @@
 
 | Контракт | Версии | Стороны | Статус |
 |---|---|---|---|
-| [source-fact-envelope](source-fact-envelope/v1/) | v1 | producer: `services/*`; consumer: Symfony inbox (`/internal/source-facts`) | **проект**, не утверждённый API |
+| [source-fact-envelope](source-fact-envelope/v1/) | v1 | producer: `services/*`; consumer: Symfony (pull + ack) | **проект**, не утверждённый API |
+| [marketplace-connections](marketplace-connections/v1/) | v1 | producer: Symfony; consumer: `services/*` (поллинг конфигурации) | **проект**, не утверждённый API |
 
 ## Статус «проект»
 

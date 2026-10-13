@@ -37,18 +37,38 @@
 - Consumer обязан принимать все версии, которые заявлены как поддерживаемые;
   producer шлёт ровно одну версию.
 
-## 3. Транспорт: HTTP push + durable inbox (вариант A, утверждён 2026-10-13)
+## 3. Взаимодействие с Symfony: pull-модель (утверждена владельцем, 2026-10-13)
 
-- Producer → `POST /internal/source-facts`, заголовок `Idempotency-Key:
-  <batch_id>` (см. `source-fact-envelope` v1).
-- Symfony отвечает ACK **только после долговечной записи inbox**; повтор того
-  же `batch_id` возвращает прежний результат (idempotent replay).
-- Backpressure: на `429`/`503` producer повторяет с экспоненциальным backoff +
-  jitter; курсор сохраняется локально у producer.
-- Endpoint — только внутри docker-сети / за IP-allowlist. Наружу не
-  публикуется (прецедент allowlist: `tg-gateway/docker-compose.yml`).
-- Замена транспорта (вариант B: Redis Streams) допустима **без смены
-  контракта envelope** — отдельным решением.
+Принцип: сервис **автономен** — сам решает, когда выгружать (своё расписание +
+watermark'и из `checkpoint`). Symfony — владелец кабинетов и ключей; забирает
+готовые результаты, когда они ему нужны. Push фактов в Symfony нет.
+
+- **Конфигурация**: сервис периодически `GET /internal/marketplace-connections`
+  (контракт `marketplace-connections` v1), кэш **только в памяти**; при
+  недоступности Symfony работает на последнем кэше (fail-soft); 401 от Ozon
+  по кабинету → форс-обновление его ключа. Значения ключей никогда не в БД
+  сервиса и не в логах.
+- **Результаты**: Symfony `GET /internal/source-facts` (фильтры
+  `connection_ref`/`resource_type`/`business_period`, только `status=new`,
+  курсор постранично) → импортирует идемпотентно (inbox и natural keys — на
+  его стороне) → `POST /internal/source-facts/ack {batch_ids}`; сервис
+  переводит батчи в `acked` и обнуляет payload (retention, §9). До ack
+  повторные pull'и возвращают те же батчи (re-pull окно для сверок).
+- **Триггер первичной загрузки** (новый кабинет): Symfony `POST
+  /internal/fetch-requests` → 202 Accepted только после долговечной записи;
+  воркер берёт приоритетно (`ORDER BY priority DESC, created_at ASC`).
+  Статус: `GET /internal/fetch-requests/{id}` →
+  `queued|fetching|ready|failed` + прогресс (periods_done/periods_total).
+  Один активный запрос на `(connection_ref, resource_type)`; повторный
+  триггер сливается в существующий (идемпотентно). Lookback первичной
+  загрузки ограничен (по умолчанию 90 дней). Приоритет не обходит rate limit
+  Ozon. Статусы для UI: queued → «В очереди», fetching → «Загружаем: x/y
+  периодов», ready → «Готово», failed → «Ошибка загрузки, повторим».
+- **Внутренняя авторизация** едина для всех `/internal/*`: docker-сеть /
+  IP-allowlist + internal static token (env с обеих сторон). Наружу не
+  публикуется.
+- Гарантии контрактов неизменны: деньги строками, неизвестное → карантин при
+  импорте в Symfony, immutable raw, parity до cutover (аудит 08/10).
 
 ## 4. Структура сервиса
 
@@ -116,6 +136,10 @@ services/<name>/
 - Запрещено: доступ к БД/таблицам Symfony, cross-БД join/FK, секреты в git.
 - Dev: контейнер `services-postgres` (профиль `services`), init-скрипты в
   `services/docker/postgres/init/`.
+- Статусная машина батчей: `new → acked` (доставка pull, §3); миграция 00002 —
+  вместе с кодовым Stage facts API.
+- Очередь триггеров: таблица `fetch_request` (priority, статус, прогресс);
+  миграция 00003 — вместе с кодовым Stage триггера первичной загрузки.
 
 ### S3
 

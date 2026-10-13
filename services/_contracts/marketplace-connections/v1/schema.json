@@ -1,0 +1,99 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://vashfindir.ru/contracts/marketplace-connections/v1/schema.json",
+    "title": "Marketplace Connections Config",
+    "description": "Ответ внутреннего endpoint'а Symfony GET /internal/marketplace-connections: активные кабинеты и credentials для автономной работы сервисов services/. Только внутренняя сеть + internal token.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["schema_version", "generated_at", "connections"],
+    "properties": {
+        "schema_version": {
+            "const": "1"
+        },
+        "generated_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "connections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "connection_ref",
+                    "company_id",
+                    "provider",
+                    "updated_at",
+                    "credentials",
+                    "resource_types"
+                ],
+                "properties": {
+                    "connection_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Безопасная ссылка на подключение (не секрет)"
+                    },
+                    "company_id": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "provider": {
+                        "enum": ["ozon", "wildberries"]
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Время последнего изменения подключения/ключей — для инвалидации кэша и force-refresh"
+                    },
+                    "credentials": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["seller", "performance"],
+                        "properties": {
+                            "seller": {
+                                "type": ["object", "null"],
+                                "additionalProperties": false,
+                                "required": ["client_id", "api_key"],
+                                "properties": {
+                                    "client_id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "api_key": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                },
+                                "description": "null — ключ Seller API не задан"
+                            },
+                            "performance": {
+                                "type": ["object", "null"],
+                                "additionalProperties": false,
+                                "required": ["client_id", "client_secret"],
+                                "properties": {
+                                    "client_id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "client_secret": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                },
+                                "description": "null — ключ Performance API не задан"
+                            }
+                        }
+                    },
+                    "resource_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "Ресурсы, доступные с имеющимися credentials; например ozon.finance.transaction-list при наличии seller"
+                    }
+                }
+            }
+        }
+    }
+}
