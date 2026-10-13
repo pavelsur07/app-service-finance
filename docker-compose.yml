@@ -164,6 +164,53 @@ services:
         volumes:
             - ./site:/app
         command: php bin/console messenger:consume async_ads --time-limit=3600 --memory-limit=160M -vv
+
+    # ───────────────────────────────────────────────────────────────
+    # Сервисы монорепо services/ (Go/Python). Профиль services:
+    # обычный up монолита их не собирает и не запускает.
+    # Правила: services/AGENTS.md
+    # ───────────────────────────────────────────────────────────────
+    services-ozon-fetcher:
+        build:
+            context: services/ozon-fetcher
+            dockerfile: docker/Dockerfile
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+            LISTEN_ADDR: ":8080"
+        ports:
+            - "8180:8080"   # dev-only проброс /health
+        profiles:
+            - services
+        healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+            start_period: 5s
+
+    # Тулчейн-контейнеры сервиса (гейты make ozon-fetcher-test/-vet/-lint);
+    # не публикуются и не деплоятся. См. services/go.md «Гейты».
+    services-ozon-fetcher-dev:
+        image: golang:1.27-alpine
+        working_dir: /src
+        environment:
+            <<: *tz-env
+        volumes:
+            - ./services/ozon-fetcher:/src
+        profiles:
+            - services
+
+    services-ozon-fetcher-lint:
+        image: golangci/golangci-lint:v2.11.4-alpine
+        working_dir: /src
+        environment:
+            <<: *tz-env
+        volumes:
+            - ./services/ozon-fetcher:/src
+        profiles:
+            - services
+
     site-postgres:
         image: postgres:15-alpine
         restart: always

@@ -1,0 +1,174 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://vashfindir.ru/contracts/source-fact-envelope/v1/schema.json",
+    "title": "Source Fact Envelope",
+    "description": "Пакет нормализованных фактов источника от сервиса services/ к Symfony inbox (POST /internal/source-facts, Idempotency-Key: batch_id). Деньги — точные десятичные строки, без float.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "trace_id",
+        "job_id",
+        "company_id",
+        "provider",
+        "connection_ref",
+        "resource_type",
+        "business_period",
+        "timezone",
+        "batch",
+        "facts"
+    ],
+    "properties": {
+        "schema_version": {
+            "const": "1"
+        },
+        "trace_id": {
+            "type": "string",
+            "minLength": 1
+        },
+        "job_id": {
+            "type": "string",
+            "minLength": 1
+        },
+        "company_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "UUID компании в Symfony; producer получает из конфигурации задания, сам не выбирает"
+        },
+        "provider": {
+            "enum": ["ozon", "wildberries"]
+        },
+        "connection_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Безопасная ссылка на настройку подключения кабинета (не секрет, не токен)"
+        },
+        "resource_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Например ozon.finance.transaction-list"
+        },
+        "business_period": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "Бизнес-период фактов, YYYY-MM"
+        },
+        "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA-имя часового пояса бизнес-периода, например Europe/Moscow"
+        },
+        "batch": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["batch_id", "status", "cursor", "page_count"],
+            "properties": {
+                "batch_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Стабильный идентификатор батча; значение заголовка Idempotency-Key"
+                },
+                "status": {
+                    "enum": ["complete", "partial"],
+                    "description": "partial = есть курсор продолжения"
+                },
+                "cursor": {
+                    "type": ["string", "null"],
+                    "description": "Курсор следующей страницы; null при status=complete"
+                },
+                "page_count": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "facts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "source_external_id",
+                    "source_key",
+                    "source_revision",
+                    "payload_hash",
+                    "storage_uri",
+                    "operation_type",
+                    "occurred_at",
+                    "category_code",
+                    "amount",
+                    "currency",
+                    "quantity"
+                ],
+                "properties": {
+                    "source_external_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Идентификатор документа/операции в источнике"
+                    },
+                    "source_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Стабильный бизнес-ключ строки; семантика за провайдером, см. README контракта"
+                    },
+                    "source_revision": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Ревизия строки; коррекция — новое значение, не overwrite"
+                    },
+                    "revised_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time",
+                        "description": "Время изменения строки в источнике, если источник его даёт"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "SHA-256 канонической формы payload строки"
+                    },
+                    "storage_uri": {
+                        "type": ["string", "null"],
+                        "description": "S3 URI raw-ответа источника; null если raw не выгружался"
+                    },
+                    "checksum": {
+                        "type": ["string", "null"],
+                        "description": "Контрольная сумма объекта по storage_uri"
+                    },
+                    "size_bytes": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                    },
+                    "operation_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Код операции источника; семантика — в README контракта. Неизвестный код на приёме → карантин, не skip"
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Дата/время операции в часовом поясе batch.timezone"
+                    },
+                    "category_code": {
+                        "type": ["string", "null"],
+                        "description": "Код категории начисления источника; null если источник не даёт"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$",
+                        "description": "Точная десятичная строка суммы строки; float запрещён"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217"
+                    },
+                    "quantity": {
+                        "type": ["string", "null"],
+                        "pattern": "^-?\\d+(\\.\\d{1,6})?$",
+                        "description": "Количество, если применимо; float запрещён"
+                    }
+                }
+            }
+        }
+    }
+}

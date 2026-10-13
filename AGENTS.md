@@ -18,10 +18,12 @@ linked documents — read the one your task touches, not all of them:
 | `docs/workflow/new-module.md` | New module configuration and directory layout | creating `src/{Module}` |
 | `docs/maintenance/quality-gates.md` | PHPStan baseline, cs-check, branch protection: design and history | red gate, CI trouble |
 | `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists, log/backup paths | before touching production |
+| `services/AGENTS.md` | Go/Python services monorepo: boundaries, contracts, transport A (HTTP push + durable inbox) | task touching `services/` |
 
 Main application: `site/` (Symfony 7.4, Doctrine, PostgreSQL, Redis, Messenger,
-Twig, React/Vite, Docker Compose, Makefile). Verify paths with `ls`/`rg`; do
-not assume.
+Twig, React/Vite, Docker Compose, Makefile). Services monorepo: `services/`
+(Go/Python; правила и контракты — `services/AGENTS.md`, `_contracts/`). Verify
+paths with `ls`/`rg`; do not assume.
 
 ## 1. Role
 

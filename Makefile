@@ -212,3 +212,20 @@ sched-test:
 
 sched-down:
 	$(DOCKER_COMPOSE) stop scheduler
+
+# ===== SERVICES (монорепо services/, правила: services/AGENTS.md) =====
+
+ozon-fetcher-build:
+	$(DOCKER_COMPOSE) build services-ozon-fetcher
+
+ozon-fetcher-up: ozon-fetcher-build
+	$(DOCKER_COMPOSE) --profile services up -d services-ozon-fetcher
+
+ozon-fetcher-test:
+	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-dev go test -race ./...
+
+ozon-fetcher-vet:
+	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-dev go vet ./...
+
+ozon-fetcher-lint:
+	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-lint run ./...
