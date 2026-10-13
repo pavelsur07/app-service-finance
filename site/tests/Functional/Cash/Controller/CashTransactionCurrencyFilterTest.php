@@ -64,7 +64,7 @@ final class CashTransactionCurrencyFilterTest extends WebTestCaseBase
         $firstPage = $client->request('GET', '/finance/cash-transactions/?currency=USD');
         self::assertResponseIsSuccessful();
         self::assertCount(20, $firstPage->filter('.js-cash-transaction-select'));
-        self::assertSame(1, $firstPage->filter('#filter-currency option[value="USD"][selected]')->count());
+        self::assertSame(1, $firstPage->filter('#filter-currency input[value="USD"][checked]')->count());
         self::assertStringContainsString('currency=USD', (string) $firstPage->filter('.pagination a')->last()->attr('href'));
 
         $secondPage = $client->request('GET', '/finance/cash-transactions/?currency=USD&page=2');
