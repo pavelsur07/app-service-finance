@@ -60,14 +60,6 @@
         <p class="vf-ops-head__lead">Все движения денег по счетам и кассам: загружайте выписки, разносите операции по статьям и формируйте ОПиУ.</p>
     </div>
     <div class="btn-list d-print-none">
-        <a href="#"
-           class="btn"
-           data-bs-toggle="offcanvas"
-           data-bs-target="#transaction-filters-offcanvas"
-           aria-controls="transaction-filters-offcanvas">
-            <i class="ti ti-filter me-1" aria-hidden="true"></i>
-            Фильтры
-        </a>
         <a href="{{ path('cash_transaction_export', query) }}"
            class="btn"
            data-testid="btn-export-xls">
@@ -101,6 +93,49 @@
      data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
     <div class="card-header">
         {% include 'transaction/_tabs.html.twig' with {active: 'all'} only %}
+    </div>
+
+    {# Строка фильтров по эталону: поиск, пресеты периода, направление, «Все фильтры». Ссылки и GET-форма — без JS. #}
+    {% set baseQuery = query|filter((v, k) => k != 'page' and v is not iterable and v != '') %}
+    <div class="vf-ops-filterbar d-print-none">
+        <div class="vf-ops-filterbar__row">
+            <form method="get" action="{{ path('cash_transaction_index') }}" class="vf-ops-search" role="search">
+                {% for k, v in baseQuery|filter((v, k) => k != 'q') %}
+                    <input type="hidden" name="{{ k }}" value="{{ v }}">
+                {% endfor %}
+                <button type="submit" class="vf-ops-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
+                <input type="search" name="q" value="{{ filters.q ?? '' }}" class="form-control" placeholder="Описание операции" aria-label="Поиск по описанию">
+            </form>
+
+            {% include 'partials/_period_presets.html.twig' with {
+                route: 'cash_transaction_index',
+                params: baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo']),
+                current_from: filters.dateFrom,
+                current_to: filters.dateTo,
+                class: 'vf-ops-seg',
+            } only %}
+        </div>
+
+        <div class="vf-ops-filterbar__row">
+            <div class="vf-ops-seg" role="group" aria-label="Направление">
+                {% for d in [{value: null, label: 'Все'}, {value: 'INFLOW', label: 'Приток'}, {value: 'OUTFLOW', label: 'Отток'}] %}
+                    <a href="{{ path('cash_transaction_index', baseQuery|filter((v, k) => k != 'direction')|merge(d.value ? {direction: d.value} : {})) }}"
+                       {% if filters.direction == d.value %}class="active" aria-current="true"{% endif %}>{{ d.label }}</a>
+                {% endfor %}
+            </div>
+
+            <button type="button"
+                    class="btn"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#transaction-filters-offcanvas"
+                    aria-controls="transaction-filters-offcanvas">
+                <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>
+                Все фильтры
+                {% if applied is not empty %}
+                    <span class="vf-ops-filterbar__count">{{ applied|length }}<span class="visually-hidden"> применено</span></span>
+                {% endif %}
+            </button>
+        </div>
     </div>
 
     {% if applied is not empty %}
@@ -137,13 +172,13 @@
 
     {% if transactions is empty %}
         {% if hasFilters %}
-            <div class="vf-ops-empty border-top">
+            <div class="vf-ops-empty">
                 <div class="vf-ops-empty__title">Операции не найдены</div>
                 <div class="vf-ops-empty__hint">Измените фильтры или сбросьте их.</div>
                 <a href="{{ path('cash_transaction_index') }}" class="btn btn-sm">Сбросить фильтры</a>
             </div>
         {% else %}
-            <div class="vf-ops-empty border-top">
+            <div class="vf-ops-empty">
                 <div class="vf-ops-empty__title">Пока нет операций</div>
                 <div class="vf-ops-empty__hint">Загрузите выписку в формате 1С или добавьте операцию вручную.</div>
                 <div class="btn-list justify-content-center">

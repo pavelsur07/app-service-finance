@@ -541,10 +541,151 @@
   overflow-y: visible;
 }
 
+/* Слои по эталону: белая карточка на --vf-bg, все зоны белые явно — Tabler красит
+   .card-header-tabs и .card-footer своим #f9fafb, отчего вкладки, итог и шапка таблицы сливались. */
+.cashflow-ops {
+  --tblr-card-bg: var(--vf-surface);
+  background: var(--vf-surface);
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius);
+  box-shadow: var(--vf-shadow-sm);
+}
+
 .cashflow-ops > .card-header {
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0 var(--vf-space-4);
+  background: var(--vf-surface);
   border-bottom: 1px solid var(--vf-border);
+}
+
+/* Отрицательный margin Tabler у .card-header-tabs при нулевом padding шапки уводил вкладки
+   под верхнюю границу карточки и прятал подчёркивание активной. */
+.cashflow-ops > .card-header .card-header-tabs {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.cashflow-ops > .card-footer {
+  background: var(--vf-surface);
+  border-top: 1px solid var(--vf-border);
+}
+
+/* Шапка таблицы: фон страницы, капс 12px muted, нижняя граница — отличается и от полосы итога, и от строк. */
+.cashflow-ops .vf-ops-table > thead > tr > th {
+  background: var(--vf-bg);
+  font-size: var(--vf-size-xs);
+  border-bottom: 1px solid var(--vf-border);
+}
+
+/* Строка фильтров: поиск, сегменты периода и направления, «Все фильтры». */
+/* Два ряда, как в эталоне: поиск + период; направление + «Все фильтры». Шесть пресетов
+   и направление в один ряд не помещаются уже на 1440 — ряды заданы явно, а не переносом. */
+.vf-ops-filterbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-3);
+  padding: var(--vf-space-4);
+  background: var(--vf-surface);
+}
+
+.vf-ops-filterbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-3);
+}
+
+.vf-ops-search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 340px;
+}
+
+.vf-ops-search .form-control {
+  height: 36px;
+  padding-left: 36px;
+}
+
+.vf-ops-search__submit {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--vf-radius);
+  background: transparent;
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-search__submit:hover {
+  color: var(--vf-text);
+}
+
+.vf-ops-search__submit:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 0;
+}
+
+/* Сегментированный контрол (ссылки): общая граница контрола, активный — Blue 50 + Action blue. */
+.vf-ops-seg {
+  display: inline-flex;
+  flex: none;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--vf-border-control);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface);
+}
+
+.vf-ops-seg > a {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  color: var(--vf-text);
+  font-weight: var(--vf-weight-medium);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.vf-ops-seg > a + a {
+  border-left: 1px solid var(--vf-border-control);
+}
+
+.vf-ops-seg > a:hover {
+  background: var(--vf-hover-bg);
+  color: var(--vf-text);
+}
+
+.vf-ops-seg > a.active {
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-weight: var(--vf-weight-semibold);
+}
+
+/* Кольцо внутрь: снаружи его обрезал бы overflow сегмента. */
+.vf-ops-seg > a:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+}
+
+.vf-ops-filterbar__count {
+  min-width: 20px;
+  margin-left: var(--vf-space-2);
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-semibold);
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Применённые фильтры: подпись капсом и чипсы Blue 50. */
@@ -553,8 +694,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--vf-space-2);
-  padding: var(--vf-space-3) var(--vf-space-4);
-  border-bottom: 1px solid var(--vf-border);
+  padding: 0 var(--vf-space-4) var(--vf-space-3);
 }
 
 .vf-ops-label {
@@ -601,8 +741,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--vf-space-3);
-  min-height: 52px;
-  padding: 10px var(--vf-space-4);
+  min-height: 44px;
+  padding: 6px var(--vf-space-4);
+  border-top: 1px solid var(--vf-border);
+  border-bottom: 1px solid var(--vf-border);
   background: var(--vf-navy-50);
   color: var(--vf-text-muted);
   font-size: var(--vf-size-sm);
