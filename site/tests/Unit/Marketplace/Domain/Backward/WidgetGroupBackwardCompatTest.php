@@ -43,6 +43,7 @@ final class WidgetGroupBackwardCompatTest extends TestCase
         'ozon_dropoff_ff' => 'Услуги доставки и FBO',
         'ozon_dropoff_sc' => 'Услуги доставки и FBO',
         'ozon_dropoff_ppz' => 'Услуги доставки и FBO',
+        'ozon_dropoff' => 'Услуги доставки и FBO',
         'ozon_delivery_to_handover_place' => 'Услуги доставки и FBO',
         'ozon_temporary_storage' => 'Услуги доставки и FBO',
         'ozon_delivery' => 'Услуги доставки и FBO',

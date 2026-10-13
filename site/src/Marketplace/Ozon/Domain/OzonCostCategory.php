@@ -167,6 +167,13 @@ final readonly class OzonCostCategory
                 serviceNames: ['MarketplaceServiceItemDropoffPPZ'],
             ),
             new self(
+                code: 'ozon_dropoff',
+                name: 'Обработка отправления Drop-off Ozon',
+                widgetGroup: 'Услуги доставки и FBO',
+                xlsxGroup: 'Услуги доставки',
+                accrualTypeNames: ['Drop-Off'],
+            ),
+            new self(
                 code: 'ozon_delivery_to_handover_place',
                 name: 'Доставка до места передачи Ozon',
                 widgetGroup: 'Услуги доставки и FBO',

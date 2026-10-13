@@ -61,6 +61,11 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "По аналогии с ozon_dropoff_pvz / ozon_dropoff_sc"
+      - cost_code: ozon_dropoff
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        confidence: medium
+        note: "By-day Drop-Off без места обработки; v3 раскладывал её по ozon_dropoff_pvz / ozon_dropoff_sc"
       - cost_code: ozon_delivery
         pl_code: COGS_DELIVERY
         include_in_pl: true
