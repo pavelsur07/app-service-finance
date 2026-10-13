@@ -12,12 +12,15 @@
 {# Дизайн-система по листам DS-*, композиция — «Операции ДДС»; отчёт — docs/plan/ds-counterparties.md.
    GET-параметры прежние: q, type, show_archived (показывает активных И архивных — поэтому переключатель, не вкладки). #}
 {% set route = 'counterparty_index' %}
-{% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null}|filter(v => v is not null) %}
-{% set hasFilters = params is not empty %}
+{# page в params не входит: смена фильтра возвращает на первую страницу; limit — только нестандартный. #}
+{% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null, limit: pager.maxPerPage != defaultLimit ? pager.maxPerPage : null}|filter(v => v is not null) %}
+{% set hasFilters = params|filter((v, k) => k != 'limit') is not empty %}
+{# Состояние списка для возврата после архивации: фильтры и текущая страница. #}
+{% set listState = params|merge(pager.currentPage > 1 ? {page: pager.currentPage} : {}) %}
 {# «Показывать архив» результат расширяет, а не сужает: пустой список при нём — «пока нет», не «ничего не найдено». #}
 {% set narrowed = params.q is defined or params.type is defined %}
-{% set total = items|length %}
-{% set archivedCount = items|filter(i => i.isArchived)|length %}
+{# По всем страницам: pager.nbResults и COUNT архивных из контроллера, а не по видимой странице. #}
+{% set total = pager.nbResults %}
 {% set totalWord = total % 10 == 1 and total % 100 != 11 ? 'контрагент' : (total % 10 in 2..4 and (total % 100 < 10 or total % 100 >= 20) ? 'контрагента' : 'контрагентов') %}
 
 <div class="vf-page-head">
@@ -46,6 +49,7 @@
                применяется сразу (data-autosubmit), без JS — по Enter в поиске. #}
             <form method="get" action="{{ path(route) }}" class="vf-card-bar__row" role="search" data-autosubmit>
                 {% if params.type is defined %}<input type="hidden" name="type" value="{{ params.type }}">{% endif %}
+                {% if params.limit is defined %}<input type="hidden" name="limit" value="{{ params.limit }}">{% endif %}
                 <div class="vf-search">
                     <button type="submit" class="vf-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
                     <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Название или ИНН" aria-label="Поиск по названию или ИНН">
@@ -147,7 +151,7 @@
                                     {% if item.isArchived %}
                                         <button type="button" class="dropdown-item" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
-                                                data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}) }}"
+                                                data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('unarchive' ~ item.id) }}"
                                                 data-confirm-title="Вернуть из архива?"
                                                 data-confirm-body="{{ item.name }} снова появится в списках выбора контрагента."
@@ -157,7 +161,7 @@
                                     {% else %}
                                         <button type="button" class="dropdown-item text-danger" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
-                                                data-confirm-action="{{ path('counterparty_archive', {id: item.id}) }}"
+                                                data-confirm-action="{{ path('counterparty_archive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"
                                                 data-confirm-title="Отправить в архив?"
                                                 data-confirm-body="{{ item.name }} пропадёт из списков выбора, но операции и история сохранятся. Вернуть можно здесь же: включите «Показывать архив»."
@@ -174,6 +178,11 @@
                 </tbody>
             </table>
         </div>
+        {% if pager.haveToPaginate %}
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager, route: route, params: params} only %}
+            </div>
+        {% endif %}
     {% endif %}
 </div>
 

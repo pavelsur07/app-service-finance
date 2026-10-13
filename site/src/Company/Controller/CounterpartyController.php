@@ -15,11 +15,15 @@ use App\Company\Repository\CounterpartyRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -27,6 +31,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/counterparties')]
 class CounterpartyController extends AbstractController
 {
+    private const PER_PAGE = 50;
+    private const MAX_PER_PAGE = 200;
+
     #[Route('/', name: 'counterparty_index', methods: ['GET'])]
     public function index(Request $request, CounterpartyRepository $repo, ActiveCompanyService $companyService): Response
     {
@@ -36,10 +43,30 @@ class CounterpartyController extends AbstractController
         $showArchived = $request->query->getBoolean('show_archived', false);
         $typeEnum = $type ? CounterpartyTypeEnum::tryFrom($type) : null;
 
-        $items = $repo->findByFilters($company, $typeEnum, $q, $showArchived, ['name' => \SortDirection::Ascending]);
+        // query->all(), а не get(): массив (?page[]=1) иначе даёт 400 вместо 422.
+        $parameters = $request->query->all();
+        $page = filter_var($parameters['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $limit = filter_var($parameters['limit'] ?? (string) self::PER_PAGE, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_PER_PAGE]]);
+        if (false === $page || false === $limit) {
+            throw new UnprocessableEntityHttpException('Номер страницы и размер списка должны быть целыми числами: страница от 1, размер от 1 до 200.');
+        }
+
+        try {
+            $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(
+                // Без join'ов: fetchJoinCollection не нужен, лишний запрос id не делаем.
+                new QueryAdapter($repo->createListQueryBuilder($company, $typeEnum, $q, $showArchived), false),
+                $page,
+                $limit,
+            );
+        } catch (OutOfRangeCurrentPageException $exception) {
+            throw new UnprocessableEntityHttpException('Страница не найдена.', $exception);
+        }
 
         return $this->render('counterparty/index.html.twig', [
-            'items' => $items,
+            'pager' => $pager,
+            'items' => iterator_to_array($pager->getCurrentPageResults(), false),
+            'archivedCount' => $showArchived ? $repo->countArchivedInList($company, $typeEnum, $q) : 0,
+            'defaultLimit' => self::PER_PAGE,
             'q' => $q,
             'type' => $type,
             'show_archived' => $showArchived,
@@ -116,7 +143,7 @@ class CounterpartyController extends AbstractController
             $this->addFlash('success', 'Контрагент архивирован');
         }
 
-        return $this->redirectToRoute('counterparty_index');
+        return $this->backToList($request, $repo, $company);
     }
 
     #[Route('/{id}/unarchive', name: 'counterparty_unarchive', methods: ['POST'])]
@@ -132,7 +159,38 @@ class CounterpartyController extends AbstractController
             $this->addFlash('success', 'Контрагент восстановлён');
         }
 
-        return $this->redirectToRoute('counterparty_index');
+        return $this->backToList($request, $repo, $company);
+    }
+
+    /**
+     * Назад к списку с теми же фильтрами и страницей (их несёт адрес формы архивации), чтобы
+     * не терять место в длинном списке. Страница ограничивается последней существующей:
+     * архивация единственной строки последней страницы иначе вела бы на 422.
+     */
+    private function backToList(Request $request, CounterpartyRepository $repo, Company $company): Response
+    {
+        $parameters = $request->query->all();
+        $query = [];
+        foreach (['q', 'type', 'show_archived', 'limit'] as $key) {
+            if (isset($parameters[$key]) && \is_string($parameters[$key]) && '' !== $parameters[$key]) {
+                $query[$key] = $parameters[$key];
+            }
+        }
+
+        $page = filter_var($parameters['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (\is_int($page) && $page > 1) {
+            $limit = filter_var($query['limit'] ?? self::PER_PAGE, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_PER_PAGE]]);
+            $limit = \is_int($limit) ? $limit : self::PER_PAGE;
+            $type = isset($query['type']) ? CounterpartyTypeEnum::tryFrom($query['type']) : null;
+            $showArchived = filter_var($query['show_archived'] ?? false, \FILTER_VALIDATE_BOOL);
+            $total = (new QueryAdapter($repo->createListQueryBuilder($company, $type, $query['q'] ?? null, $showArchived), false))->getNbResults();
+            $page = min($page, max(1, (int) ceil($total / $limit)));
+            if ($page > 1) {
+                $query['page'] = $page;
+            }
+        }
+
+        return $this->redirectToRoute('counterparty_index', $query);
     }
 
     private function findForCompany(CounterpartyRepository $repo, string $id, string $companyId): Counterparty

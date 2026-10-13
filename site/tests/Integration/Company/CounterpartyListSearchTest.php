@@ -55,7 +55,7 @@ final class CounterpartyListSearchTest extends IntegrationTestCase
     public function testNameSearchIgnoresCyrillicCase(string $query): void
     {
         // When
-        $names = $this->names($this->repository->findByFilters($this->company, null, $query, false));
+        $names = $this->names($this->repository->createListQueryBuilder($this->company, null, $query, false)->getQuery()->getResult());
 
         // Then
         self::assertSame(['ООО "Альфа-Снаб"'], $names);
@@ -64,7 +64,7 @@ final class CounterpartyListSearchTest extends IntegrationTestCase
     public function testInnSearchStillMatchesSubstring(): void
     {
         // When
-        $names = $this->names($this->repository->findByFilters($this->company, null, '234567', false));
+        $names = $this->names($this->repository->createListQueryBuilder($this->company, null, '234567', false)->getQuery()->getResult());
 
         // Then
         self::assertSame(['ООО "Бета-Логистик"'], $names);
