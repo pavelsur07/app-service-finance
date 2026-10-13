@@ -1,10 +1,11 @@
 {#
   Строка фильтров операций ДДС — блок «Filter bar» эталона docs/design-system/screens/Operations.dc.html.
   Ряд 1: поиск, пресеты периода, «Выбрать период», направление. Ряд 2: пилюли Счёт · Статья ДДС ·
-  Контрагент · Валюта · Сумма · «Ещё фильтры» (offcanvas _filters.html.twig).
-  Выбор — ссылка или GET-форма на cash_transaction_index с текущими параметрами без page: работает без JS.
+  Контрагент · Валюта · Сумма · «Ещё фильтры» (offcanvas _filters.html.twig). Контрагент — partials/_filter_pill_picker.
+  Выбор — ссылка или GET-форма на cash_transaction_index с текущими параметрами без page.
   Поповеры — dropdown Bootstrap (Esc, клик снаружи, стрелки по .dropdown-item, фокус на кнопку);
-  поиск в списках и фокус при открытии — скрипт [data-ops-pop] в index.html.twig.
+  поиск в списках и фокус при открытии — скрипт [data-ops-pop] в index.html.twig, кроме пилюли
+  «Контрагент»: её окно заполняет assets/picker_pill.js (без JS оно пустое).
   Нужны из контекста: filters, baseQuery, amountLabel, accounts, categories, counterparties, currencies.
 #}
 {% macro pill(label, active, id, autoclose) %}
@@ -142,37 +143,30 @@
             </div>
         </div>
 
-        {# Контрагент: поиск по названию или ИНН, группы по типу. «Недавних» и «Без контрагента» бэкенд не умеет — не рисуем. #}
-        {% set groups = [
-            {title: 'Организации', items: counterparties|filter(c => c.type.value == 'LEGAL_ENTITY')},
-            {title: 'ИП и физические лица', items: counterparties|filter(c => c.type.value != 'LEGAL_ENTITY')},
-        ]|filter(g => g.items is not empty) %}
-        <div class="dropdown">
-            {{ ui.pill(counterparty ? 'Контрагент: ' ~ ui.clip(counterparty.name) : 'Контрагент', counterparty, 'ops-pill-counterparty', 'outside') }}
-            <div class="dropdown-menu vf-ops-pop vf-ops-pop--lg" role="dialog" aria-labelledby="ops-pill-counterparty" data-ops-pop>
-                <div class="vf-ops-pop__search">
-                    <i class="ti ti-search" aria-hidden="true"></i>
-                    <input type="search" class="form-control" placeholder="Название или ИНН" aria-label="Найти контрагента по названию или ИНН" data-ops-pop-search>
-                </div>
-                <div class="vf-ops-pop__list">
-                    <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['counterpartyId'])) }}"{% if not filters.counterpartyId %} aria-current="true"{% endif %}>Все контрагенты</a>
-                    {% for g in groups %}
-                        <div data-ops-pop-group>
-                            {% if groups|length > 1 %}<div class="vf-ops-pop__group">{{ g.title }}</div>{% endif %}
-                            {% for c in g.items %}
-                                <a class="dropdown-item vf-ops-pop__cp"
-                                   href="{{ path(route, baseQuery|filter((v, k) => k not in ['counterpartyId'])|merge({counterpartyId: c.id})) }}"
-                                   data-ops-pop-item="{{ (c.name ~ ' ' ~ (c.inn ?? ''))|lower }}"{% if filters.counterpartyId == c.id %} aria-current="true"{% endif %}>
-                                    <span class="vf-ops-pop__name">{{ c.name }}</span>
-                                    {% if c.inn %}<span class="vf-ops-pop__inn">{{ c.inn }}</span>{% endif %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    {% endfor %}
-                    <div class="vf-ops-pop__empty" data-ops-pop-empty hidden>Никого не нашли. Проверьте название или ИНН.</div>
-                </div>
-            </div>
-        </div>
+        {# Контрагент — окно выбора из справочника (partials/_filter_pill_picker): до ввода — применённый
+           контрагент (даже архивный: поиск их не отдаёт, а снять или увидеть выбор нужно) и первые 20
+           неархивных по алфавиту, без запроса; дальше поиск /api/counterparties/search.
+           «Недавних», «Без контрагента» и мультивыбора бэкенд не умеет — не рисуем. #}
+        {% include 'partials/_filter_pill_picker.html.twig' with {
+            id: 'ops-pill-counterparty',
+            name: 'counterpartyId',
+            label: 'Контрагент',
+            route: route,
+            params: baseQuery,
+            value: filters.counterpartyId ?? '',
+            valueLabel: counterparty ? counterparty.name : '',
+            searchUrl: path('api_counterparty_search'),
+            adapter: 'counterparty',
+            initial: (counterparty ? [counterparty] : [])
+                |merge(counterparties|filter(c => not c.archived and c.id != filters.counterpartyId)|slice(0, 20))
+                |map(c => {id: c.id, name: c.name, inn: c.inn, type: c.type.value}),
+            emptyText: 'Никого не нашли. Проверьте название или ИНН.',
+            allLabel: 'Все контрагенты',
+            placeholder: 'Название или ИНН',
+            searchLabel: 'Найти контрагента по названию или ИНН',
+            dialogLabel: 'Фильтр по контрагенту',
+            hint: 'Начните вводить название или ИНН',
+        } only %}
 
         {# Валюта #}
         <div class="dropdown">
