@@ -41,8 +41,12 @@
 {% if filters.currency %}
     {% set applied = applied|merge([{label: 'Валюта: ' ~ filters.currency, keys: ['currency']}]) %}
 {% endif %}
-{% if filters.amountMin or filters.amountMax %}
-    {% set applied = applied|merge([{label: 'Сумма: ' ~ (filters.amountMin ? 'от ' ~ filters.amountMin : '') ~ (filters.amountMin and filters.amountMax ? ' ' : '') ~ (filters.amountMax ? 'до ' ~ filters.amountMax : ''), keys: ['amountMin', 'amountMax']}]) %}
+{# Сумма — «от 1 000», «до 1 500,50»: копейки только если они есть. Та же подпись у пилюли «Сумма». #}
+{% set amountLabel = (filters.amountMin ? 'от ' ~ filters.amountMin|vf_number(filters.amountMin matches '/\\.\\d*[1-9]/' ? 2 : 0) : '')
+    ~ (filters.amountMin and filters.amountMax ? ' ' : '')
+    ~ (filters.amountMax ? 'до ' ~ filters.amountMax|vf_number(filters.amountMax matches '/\\.\\d*[1-9]/' ? 2 : 0) : '') %}
+{% if amountLabel %}
+    {% set applied = applied|merge([{label: 'Сумма: ' ~ amountLabel, keys: ['amountMin', 'amountMax']}]) %}
 {% endif %}
 {% if filters.q %}
     {% set applied = applied|merge([{label: 'Поиск: «' ~ filters.q ~ '»', keys: ['q']}]) %}
@@ -95,48 +99,8 @@
         {% include 'transaction/_tabs.html.twig' with {active: 'all'} only %}
     </div>
 
-    {# Строка фильтров по эталону: поиск, пресеты периода, направление, «Все фильтры». Ссылки и GET-форма — без JS. #}
     {% set baseQuery = query|filter((v, k) => k != 'page' and v is not iterable and v != '') %}
-    <div class="vf-ops-filterbar d-print-none">
-        <div class="vf-ops-filterbar__row">
-            <form method="get" action="{{ path('cash_transaction_index') }}" class="vf-ops-search" role="search">
-                {% for k, v in baseQuery|filter((v, k) => k != 'q') %}
-                    <input type="hidden" name="{{ k }}" value="{{ v }}">
-                {% endfor %}
-                <button type="submit" class="vf-ops-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
-                <input type="search" name="q" value="{{ filters.q ?? '' }}" class="form-control" placeholder="Описание операции" aria-label="Поиск по описанию">
-            </form>
-
-            {% include 'partials/_period_presets.html.twig' with {
-                route: 'cash_transaction_index',
-                params: baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo']),
-                current_from: filters.dateFrom,
-                current_to: filters.dateTo,
-                class: 'vf-ops-seg',
-            } only %}
-        </div>
-
-        <div class="vf-ops-filterbar__row">
-            <div class="vf-ops-seg" role="group" aria-label="Направление">
-                {% for d in [{value: null, label: 'Все'}, {value: 'INFLOW', label: 'Приток'}, {value: 'OUTFLOW', label: 'Отток'}] %}
-                    <a href="{{ path('cash_transaction_index', baseQuery|filter((v, k) => k != 'direction')|merge(d.value ? {direction: d.value} : {})) }}"
-                       {% if filters.direction == d.value %}class="active" aria-current="true"{% endif %}>{{ d.label }}</a>
-                {% endfor %}
-            </div>
-
-            <button type="button"
-                    class="btn"
-                    data-bs-toggle="offcanvas"
-                    data-bs-target="#transaction-filters-offcanvas"
-                    aria-controls="transaction-filters-offcanvas">
-                <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>
-                Все фильтры
-                {% if applied is not empty %}
-                    <span class="vf-ops-filterbar__count">{{ applied|length }}<span class="visually-hidden"> применено</span></span>
-                {% endif %}
-            </button>
-        </div>
-    </div>
+    {% include 'transaction/_filter_bar.html.twig' %}
 
     {% if applied is not empty %}
         <div class="vf-ops-applied">
@@ -426,6 +390,53 @@
 
 {% block scripts %}
     {{ parent() }}
+    <script>
+    // Поповеры строки фильтров (_filter_bar.html.twig): открытие/закрытие, Esc и стрелки — dropdown Bootstrap.
+    // Здесь только фокус при открытии, поиск по списку и переход из поиска в список стрелкой вниз.
+    (function () {
+      document.querySelectorAll('[data-ops-pop]').forEach(pop => {
+        const toggle = pop.parentElement.querySelector('[data-bs-toggle="dropdown"]');
+        const search = pop.querySelector('[data-ops-pop-search]');
+        const items = Array.from(pop.querySelectorAll('[data-ops-pop-item]'));
+        const empty = pop.querySelector('[data-ops-pop-empty]');
+
+        toggle?.addEventListener('shown.bs.dropdown', () => {
+          const target = search ?? pop.querySelector('input:not([type="hidden"])') ?? pop.querySelector('[aria-current="true"]') ?? pop.querySelector('.dropdown-item');
+          target?.focus();
+        });
+
+        if (!search) {
+          return;
+        }
+
+        search.addEventListener('input', () => {
+          const needle = search.value.trim().toLowerCase();
+          let shown = 0;
+          items.forEach(item => {
+            const match = needle === '' || item.dataset.opsPopItem.includes(needle);
+            item.hidden = !match;
+            shown += match ? 1 : 0;
+          });
+          pop.querySelectorAll('[data-ops-pop-group]').forEach(group => {
+            group.hidden = !group.querySelector('[data-ops-pop-item]:not([hidden])');
+          });
+          if (empty) {
+            empty.hidden = shown > 0;
+          }
+        });
+
+        search.addEventListener('keydown', event => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            const first = search.value.trim() === ''
+              ? pop.querySelector('.dropdown-item')
+              : pop.querySelector('[data-ops-pop-item]:not([hidden])');
+            first?.focus();
+          }
+        });
+      });
+    })();
+    </script>
     <script>
     (function () {
       const selectAll = document.getElementById('cash-transactions-select-all');

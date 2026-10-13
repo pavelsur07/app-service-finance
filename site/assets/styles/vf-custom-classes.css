@@ -592,6 +592,11 @@
   box-shadow: inset 0 -1px 0 var(--vf-border);
 }
 
+/* Шапке достаточно быть над строками: z-index 1020 у .sticky-top перекрывал поповеры фильтров и меню строк (1000). */
+.cashflow-ops .vf-ops-table > thead.sticky-top {
+  z-index: 2;
+}
+
 /* Строка фильтров: поиск, сегменты периода и направления, «Все фильтры». */
 /* Два ряда, как в эталоне: поиск + период; направление + «Все фильтры». Шесть пресетов
    и направление в один ряд не помещаются уже на 1440 — ряды заданы явно, а не переносом. */
@@ -701,6 +706,217 @@
   line-height: 20px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-filterbar__spacer {
+  flex: 1 1 0;
+}
+
+.vf-ops-filterbar__row--pills {
+  gap: var(--vf-space-2);
+}
+
+/* Пилюля фильтра (эталон .pill): 32px, радиус 16, 13/500, шеврон справа; применённая — Blue 50 + Action blue.
+   Граница — --vf-border-control (3,21:1), как у полей и сегментов страницы (§3 отчёта). */
+.vf-ops-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--vf-border-control);
+  border-radius: 16px;
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-medium);
+  white-space: nowrap;
+}
+
+.vf-ops-pill:hover {
+  background: var(--vf-hover-bg);
+}
+
+.vf-ops-pill.active {
+  border-color: var(--vf-primary);
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-pill:focus-visible,
+.vf-ops-range:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+}
+
+.vf-ops-pill__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vf-ops-pill .vf-ops-filterbar__count {
+  margin-left: 0;
+}
+
+/* «Выбрать период»: кнопка с диапазоном; подсвечена, только если период не совпал с пресетом. */
+.vf-ops-range {
+  gap: var(--vf-space-2);
+  border-color: var(--vf-border-control);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-range.active {
+  border-color: var(--vf-primary);
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+/* Поповер пилюли (dropdown Bootstrap в роли диалога), эталон: 8px, тень модального уровня. */
+.vf-ops-pop {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius-lg);
+  box-shadow: var(--vf-shadow-lg);
+  overflow: hidden;
+}
+
+.vf-ops-pop--sm {
+  width: 300px;
+}
+
+.vf-ops-pop--lg {
+  width: 420px;
+}
+
+.vf-ops-pop__search {
+  position: relative;
+  padding: var(--vf-space-3);
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.vf-ops-pop__search .ti {
+  position: absolute;
+  top: 50%;
+  left: 24px;
+  transform: translateY(-50%);
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-pop__search .form-control {
+  padding-left: 36px;
+  border-color: var(--vf-border-control);
+}
+
+.vf-ops-pop__list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: var(--vf-space-1) 0;
+}
+
+.vf-ops-pop__list .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-space-3);
+  padding: var(--vf-space-2) var(--vf-space-4);
+  white-space: normal;
+}
+
+.vf-ops-pop__list .dropdown-item[aria-current="true"] {
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-pop__list .dropdown-item:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+}
+
+/* Дерево статей ДДС: отступ по уровню. */
+.vf-ops-pop__list .vf-ops-lvl-2 { padding-left: 32px; }
+.vf-ops-pop__list .vf-ops-lvl-3 { padding-left: 48px; }
+.vf-ops-pop__list .vf-ops-lvl-4 { padding-left: 64px; }
+.vf-ops-pop__list .vf-ops-lvl-5 { padding-left: 80px; }
+
+.vf-ops-pop__group {
+  padding: 10px var(--vf-space-4) var(--vf-space-1);
+  font-size: 0.6875rem;
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-pop__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-ops-pop__inn {
+  flex: none;
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-pop__empty {
+  padding: var(--vf-space-5) var(--vf-space-4);
+  text-align: center;
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-pop__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-2);
+  padding: var(--vf-space-4);
+}
+
+.vf-ops-pop__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--vf-space-3);
+}
+
+.vf-ops-pop__body .vf-ops-pop__pair {
+  padding: 0;
+}
+
+.vf-ops-pop .form-label {
+  margin-bottom: 6px;
+}
+
+.vf-ops-pop .form-control {
+  border-color: var(--vf-border-control);
+}
+
+.vf-ops-pop .vf-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-pop__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--vf-space-3);
+  padding: 10px var(--vf-space-4);
+  border-top: 1px solid var(--vf-border);
+  background: var(--vf-navy-50);
+}
+
+.vf-ops-pop__footer .btn-link {
+  margin-right: auto;
+  padding: 0;
+  font-weight: var(--vf-weight-medium);
 }
 
 /* Применённые фильтры: подпись капсом и чипсы Blue 50. */
@@ -924,6 +1140,47 @@
 .vf-ops-filters .vf-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-filters__lead {
+  margin: 0;
+  color: var(--vf-text-muted);
+}
+
+/* Выбор валюты в «Ещё фильтрах» — пилюли-радио (Filters.dc.html). */
+.vf-ops-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vf-space-2);
+}
+
+.vf-ops-choice > label {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--vf-border-control);
+  border-radius: 16px;
+  background: var(--vf-surface);
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-medium);
+  cursor: pointer;
+}
+
+.vf-ops-choice > label:hover {
+  background: var(--vf-hover-bg);
+}
+
+.vf-ops-choice > input:checked + label {
+  border-color: var(--vf-primary);
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-choice > input:focus-visible + label {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
 }
 
 .vf-ops-filters__footer {
