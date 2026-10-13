@@ -25,6 +25,11 @@ function initOnePill(root) {
     }
 
     const config = readConfig(root);
+    if (!config.param || !config.searchUrl) {
+        console.error('picker pill: data-picker-param and data-picker-search-url are required', root);
+
+        return;
+    }
     const base = new URL(root.dataset.pickerBaseUrl || window.location.pathname, window.location.origin);
     const hrefFor = (item) => {
         const url = new URL(base);

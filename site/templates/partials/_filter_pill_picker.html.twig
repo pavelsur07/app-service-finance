@@ -7,16 +7,20 @@
     name        имя GET-параметра фильтра (counterpartyId)
     label       подпись пилюли без значения («Контрагент»)
     route       маршрут списка; params — текущие параметры запроса (page и name снимаются здесь)
-    value       текущий id или ''; valueLabel — его название
+    value       текущий id или ''; valueLabel — его название ('' — id не найден: пилюля не подсвечивается)
     searchUrl   URL поиска (GET ?q=), adapter — ключ адаптера в picker_core.js
-    initial     до 20 строк в форме ответа API — список до ввода, без запроса
+    initial     строки в форме ответа API — список до ввода, без запроса (≈20; выбранное — первым)
     emptyText   текст пустого результата; allLabel — пункт сброса («Все контрагенты»)
     placeholder, searchLabel, dialogLabel, hint — подписи поиска и окна
     minQuery    минимум символов для запроса (по умолчанию 2)
 #}
 {% set baseParams = params|filter((v, k) => k != name and k != 'page') %}
-{% set applied = value is not empty %}
-{% set shown = valueLabel ?: value %}
+{% set valueLabel = valueLabel ?? '' %}
+{# Чужой или удалённый id: название неизвестно — пилюля не выдаёт UUID за выбор, как и прежняя. #}
+{% set applied = value is not empty and valueLabel is not empty %}
+{% set shown = valueLabel %}
+{% set emptyText = emptyText ?? 'Ничего не нашли.' %}
+{% set allLabel = allLabel ?? 'Все' %}
 <div class="dropdown"
      data-picker-pill
      data-picker-search-url="{{ searchUrl }}"
@@ -40,12 +44,12 @@
         <span class="vf-pick-pill__label">{{ applied ? label ~ ': ' ~ (shown|length > 22 ? shown|slice(0, 21)|trim ~ '…' : shown) : label }}</span>
         <i class="ti ti-chevron-down" aria-hidden="true"></i>
     </button>
-    <div class="dropdown-menu vf-pick-pop" role="dialog" aria-label="{{ dialogLabel }}">
+    <div class="dropdown-menu vf-pick-pop" role="dialog" aria-label="{{ dialogLabel ?? label }}">
         <div class="vf-pick-pop__search">
             <i class="ti ti-search" aria-hidden="true"></i>
-            <input type="search" class="form-control" placeholder="{{ placeholder }}" aria-label="{{ searchLabel }}" autocomplete="off" aria-expanded="true" data-picker-input>
+            <input type="search" class="form-control" placeholder="{{ placeholder ?? '' }}" aria-label="{{ searchLabel ?? label }}" autocomplete="off" aria-expanded="true" data-picker-input>
         </div>
-        <div class="vf-pick-pop__hint" data-picker-hint>{{ hint }}</div>
+        <div class="vf-pick-pop__hint" data-picker-hint>{{ hint ?? '' }}</div>
         <div class="vf-pick-pop__results" data-picker-results></div>
         {% if applied %}
             <div class="vf-pick-pop__footer">

@@ -161,6 +161,10 @@ export function initPickerField(root, parts, options) {
 
     input.addEventListener('keydown', (event) => {
         if ('Escape' === event.key) {
+            // Открытый список закрывается сам, а не вместе с модалкой формы.
+            if (isOpen()) {
+                event.stopPropagation();
+            }
             search?.cancel();
             hide();
             syncInputFromSelect();

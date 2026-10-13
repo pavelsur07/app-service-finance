@@ -32,7 +32,8 @@ export const adapters = {
     },
 };
 
-const identity = (row) => ({ id: String(row.id), label: row.label, hint: row.hint || '', group: row.group || '', icon: row.icon || '' });
+// Без адаптера иконку не берём: имя иконки задаёт код, а не данные.
+const identity = (row) => ({ id: String(row.id), label: row.label, hint: row.hint || '', group: row.group || '' });
 
 /** Общий атрибутный контракт data-picker-*. */
 export function readConfig(el) {
@@ -44,7 +45,6 @@ export function readConfig(el) {
         minQuery: Number.isNaN(minQuery) ? DEFAULT_MIN_QUERY : Math.max(1, minQuery),
         param: data.pickerParam || '',
         value: data.pickerValue || '',
-        label: data.pickerLabel || '',
         emptyText: data.pickerEmptyText || 'Ничего не нашли.',
         adapter: adapters[data.pickerAdapter] ?? identity,
     };
@@ -116,10 +116,12 @@ export function createSearch({ url, adapter, onLoading, onResults, onError }) {
 
     return {
         // Прежний запрос отменяется сразу, а не в следующем debounce: иначе его ответ
-        // успевает отрисоваться поверх нового ввода.
+        // успевает отрисоваться поверх нового ввода. Состояние загрузки — тоже сразу, чтобы
+        // в паузе debounce нельзя было выбрать пункт из прежнего списка.
         schedule(query) {
             cancel();
             current = query;
+            onLoading(query);
             timer = window.setTimeout(() => run(query), DEBOUNCE_MS);
         },
         run,
@@ -136,7 +138,7 @@ let uid = 0;
  * hrefFor(item) — пункт становится ссылкой (пилюля фильтра); без него — onChoose(item)
  * по mousedown (поле формы: до click список уже закрылся бы).
  */
-export function createListbox(container, input, { onChoose = () => {}, hrefFor = null, grouped = false, icons = false, live = null } = {}) {
+export function createListbox(container, input, { onChoose = () => {}, hrefFor = null, grouped = false, icons = false } = {}) {
     uid += 1;
     const listId = `vf-pick-list-${uid}`;
 
@@ -144,17 +146,16 @@ export function createListbox(container, input, { onChoose = () => {}, hrefFor =
     list.className = 'vf-pick-list';
     list.id = listId;
     list.setAttribute('role', 'listbox');
+    list.setAttribute('aria-label', input.getAttribute('aria-label') || 'Результаты');
 
     const state = document.createElement('div');
     state.className = 'vf-pick-state';
     state.hidden = true;
 
-    const liveRegion = live ?? document.createElement('div');
-    if (!live) {
-        liveRegion.className = 'visually-hidden';
-        container.appendChild(liveRegion);
-    }
+    const liveRegion = document.createElement('div');
+    liveRegion.className = 'visually-hidden';
     liveRegion.setAttribute('aria-live', 'polite');
+    container.appendChild(liveRegion);
 
     container.prepend(list, state);
 
@@ -245,7 +246,12 @@ export function createListbox(container, input, { onChoose = () => {}, hrefFor =
             button.className = 'btn btn-sm btn-outline-secondary vf-pick-state__retry';
             button.textContent = 'Повторить';
             button.addEventListener('mousedown', (event) => event.preventDefault());
-            button.addEventListener('click', retry);
+            // Кнопка исчезнет при перерисовке — фокус заранее возвращается в поиск,
+            // иначе он падает на body и Esc больше не закрывает поповер.
+            button.addEventListener('click', () => {
+                input.focus();
+                retry();
+            });
             state.appendChild(button);
         }
 
@@ -253,9 +259,6 @@ export function createListbox(container, input, { onChoose = () => {}, hrefFor =
     };
 
     return {
-        id: listId,
-        list,
-
         /** before — пункты над результатами без подсветки и групп («Все контрагенты»). */
         render(items, { query = '', selected = '', emptyText = 'Ничего не найдено', before = [] } = {}) {
             list.replaceChildren();
@@ -294,6 +297,7 @@ export function createListbox(container, input, { onChoose = () => {}, hrefFor =
                     group.setAttribute('role', 'group');
                     const header = document.createElement('div');
                     header.className = 'vf-pick-group';
+                    header.setAttribute('role', 'presentation');
                     header.id = `${listId}-g${list.children.length}`;
                     header.textContent = title;
                     group.setAttribute('aria-labelledby', header.id);

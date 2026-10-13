@@ -2,9 +2,10 @@
   Строка фильтров операций ДДС — блок «Filter bar» эталона docs/design-system/screens/Operations.dc.html.
   Ряд 1: поиск, пресеты периода, «Выбрать период», направление. Ряд 2: пилюли Счёт · Статья ДДС ·
   Контрагент · Валюта · Сумма · «Ещё фильтры» (offcanvas _filters.html.twig). Контрагент — partials/_filter_pill_picker.
-  Выбор — ссылка или GET-форма на cash_transaction_index с текущими параметрами без page: работает без JS.
+  Выбор — ссылка или GET-форма на cash_transaction_index с текущими параметрами без page.
   Поповеры — dropdown Bootstrap (Esc, клик снаружи, стрелки по .dropdown-item, фокус на кнопку);
-  поиск в списках и фокус при открытии — скрипт [data-ops-pop] в index.html.twig.
+  поиск в списках и фокус при открытии — скрипт [data-ops-pop] в index.html.twig, кроме пилюли
+  «Контрагент»: её окно заполняет assets/picker_pill.js (без JS оно пустое).
   Нужны из контекста: filters, baseQuery, amountLabel, accounts, categories, counterparties, currencies.
 #}
 {% macro pill(label, active, id, autoclose) %}
@@ -142,8 +143,9 @@
             </div>
         </div>
 
-        {# Контрагент — окно выбора из справочника (partials/_filter_pill_picker): до ввода первые 20 по алфавиту
-           без запроса, дальше поиск /api/counterparties/search (архивных он не отдаёт — и здесь их нет).
+        {# Контрагент — окно выбора из справочника (partials/_filter_pill_picker): до ввода — применённый
+           контрагент (даже архивный: поиск их не отдаёт, а снять или увидеть выбор нужно) и первые 20
+           неархивных по алфавиту, без запроса; дальше поиск /api/counterparties/search.
            «Недавних», «Без контрагента» и мультивыбора бэкенд не умеет — не рисуем. #}
         {% include 'partials/_filter_pill_picker.html.twig' with {
             id: 'ops-pill-counterparty',
@@ -155,7 +157,9 @@
             valueLabel: counterparty ? counterparty.name : '',
             searchUrl: path('api_counterparty_search'),
             adapter: 'counterparty',
-            initial: counterparties|filter(c => not c.archived)|slice(0, 20)|map(c => {id: c.id, name: c.name, inn: c.inn, type: c.type.value}),
+            initial: (counterparty ? [counterparty] : [])
+                |merge(counterparties|filter(c => not c.archived and c.id != filters.counterpartyId)|slice(0, 20))
+                |map(c => {id: c.id, name: c.name, inn: c.inn, type: c.type.value}),
             emptyText: 'Никого не нашли. Проверьте название или ИНН.',
             allLabel: 'Все контрагенты',
             placeholder: 'Название или ИНН',
