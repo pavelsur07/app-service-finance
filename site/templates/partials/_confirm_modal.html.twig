@@ -1,0 +1,29 @@
+{#
+  Диалог подтверждения (DS-Feedback): один на страницу, а не копия на строку.
+  Кнопка-триггер: data-bs-toggle="modal" data-bs-target="#{{ id }}" и
+    data-confirm-action   URL формы (POST)
+    data-confirm-token    CSRF-токен этого действия
+    data-confirm-title    заголовок («Отправить в архив?»)
+    data-confirm-body     пояснение
+    data-confirm-submit   подпись кнопки («В архив»)
+    data-confirm-variant  danger — деструктивное действие (красная кнопка), иначе Action blue
+  Текст подставляет assets/confirm_modal.js через textContent.
+  Параметры: id (обязателен).
+#}
+<div class="modal fade vf-confirm" id="{{ id }}" tabindex="-1" aria-hidden="true" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-body" data-confirm-modal>
+    <div class="modal-dialog modal-dialog-centered vf-confirm__dialog" role="document">
+        <div class="modal-content">
+            <form method="post" action="" data-confirm-form>
+                <input type="hidden" name="_token" value="" data-confirm-token>
+                <div class="vf-confirm__head">
+                    <h2 class="vf-confirm__title" id="{{ id }}-title" data-confirm-title>Подтвердите действие</h2>
+                </div>
+                <p class="vf-confirm__body" id="{{ id }}-body" data-confirm-body></p>
+                <div class="vf-confirm__footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary" data-confirm-submit>Подтвердить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

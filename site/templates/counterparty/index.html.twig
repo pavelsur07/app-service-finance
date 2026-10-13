@@ -9,81 +9,179 @@
 } %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Контрагенты</h2>
+{# Дизайн-система по листам DS-*, композиция — «Операции ДДС»; отчёт — docs/plan/ds-counterparties.md.
+   GET-параметры прежние: q, type, show_archived (показывает активных И архивных — поэтому переключатель, не вкладки). #}
+{% set route = 'counterparty_index' %}
+{% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null}|filter(v => v is not null) %}
+{% set hasFilters = params is not empty %}
+{% set total = items|length %}
+{% set archivedCount = items|filter(i => i.isArchived)|length %}
+{% set totalWord = total % 10 == 1 and total % 100 != 11 ? 'контрагент' : (total % 10 in 2..4 and (total % 100 < 10 or total % 100 >= 20) ? 'контрагента' : 'контрагентов') %}
+
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Справочники</li>
+                <li class="breadcrumb-item active" aria-current="page">Контрагенты</li>
+            </ol>
+        </nav>
+        <h1>Контрагенты</h1>
+        <p class="vf-page-head__lead">Организации, ИП и физические лица, с которыми проводятся операции.</p>
+    </div>
+    <div class="btn-list d-print-none">
+        <a href="{{ path('counterparty_new') }}" class="btn btn-primary">
+            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+            Добавить контрагента
+        </a>
+    </div>
+</div>
+
+<div class="card vf-card mb-4">
+    <div class="vf-card-bar d-print-none">
+        <div class="vf-card-bar__row">
+            {# Поиск и архив — одна GET-форма; тип несёт скрытым полем. Переключатель архива
+               применяется сразу (data-autosubmit), без JS — по Enter в поиске. #}
+            <form method="get" action="{{ path(route) }}" class="vf-card-bar__row" role="search" data-autosubmit>
+                {% if params.type is defined %}<input type="hidden" name="type" value="{{ params.type }}">{% endif %}
+                <div class="vf-search">
+                    <button type="submit" class="vf-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
+                    <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Название или ИНН" aria-label="Поиск по названию или ИНН">
                 </div>
+                <label class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" name="show_archived" value="1" id="show_archived"{% if show_archived %} checked{% endif %}>
+                    <span class="form-check-label">Показывать архив</span>
+                </label>
+            </form>
+
+            <div class="vf-card-bar__spacer"></div>
+
+            <div class="vf-seg" role="group" aria-label="Тип контрагента">
+                {% for key, label in {'': 'Все'}|merge(type_labels) %}
+                    <a href="{{ path(route, params|filter((v, k) => k != 'type')|merge(key ? {type: key} : {})) }}"
+                       {% if (params.type ?? '') == key %}class="active" aria-current="true"{% endif %}>{{ label }}</a>
+                {% endfor %}
             </div>
         </div>
     </div>
-    <div class="container-xl mt-3">
-        <div class="card">
-            <div class="card-body">
-                <form method="get" class="row g-2 mb-3">
-                    <div class="col">
-                        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Поиск...">
-                    </div>
-                    <div class="col">
-                        <select name="type" class="form-select">
-                            <option value="">Все типы</option>
-                            {% for key,label in type_labels %}
-                                <option value="{{ key }}" {% if type == key %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" name="show_archived" value="1" id="show_archived" {% if show_archived %}checked{% endif %}>
-                            <label class="form-check-label" for="show_archived">Показывать архив</label>
-                        </div>
-                    </div>
-                    <div class="col-auto">
-                        <button class="btn btn-primary" type="submit">Фильтр</button>
-                    </div>
-                    <div class="col-auto ms-auto">
-                        <a href="{{ path('counterparty_new') }}" class="btn btn-success">+ Добавить</a>
-                    </div>
-                </form>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Наименование</th>
-                            <th>ИНН</th>
-                            <th>Тип</th>
-                            <th>Статус</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for item in items %}
-                        <tr>
-                            <td>{{ item.name }}</td>
-                            <td>{{ item.inn }}</td>
-                            <td>{{ type_labels[item.type.value] }}</td>
-                            <td>{{ item.isArchived ? 'В архиве' : 'Активен' }}</td>
-                            <td class="text-end">
-                                <a href="{{ path('counterparty_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                {% if item.isArchived %}
-                                    <form method="post" action="{{ path('counterparty_unarchive', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Разархивировать?');">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('unarchive' ~ item.id) }}">
-                                        <button class="btn btn-sm btn-secondary">♻️</button>
-                                    </form>
-                                {% else %}
-                                    <form method="post" action="{{ path('counterparty_archive', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Архивировать?');">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('archive' ~ item.id) }}">
-                                        <button class="btn btn-sm btn-danger">🗄</button>
-                                    </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr><td colspan="5" class="text-center">Нет данных</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+
+    {% if hasFilters %}
+        <div class="vf-applied">
+            <span class="vf-caps-label">Применено</span>
+            {% for chip in [
+                params.q is defined ? {label: 'Поиск: «' ~ params.q ~ '»', key: 'q'} : null,
+                params.type is defined ? {label: 'Тип: ' ~ type_labels[params.type], key: 'type'} : null,
+                params.show_archived is defined ? {label: 'С архивом', key: 'show_archived'} : null,
+            ]|filter(c => c) %}
+                <span class="vf-chip">
+                    {{ chip.label }}
+                    <a href="{{ path(route, params|filter((v, k) => k != chip.key)) }}" aria-label="Снять фильтр «{{ chip.label }}»"><i class="ti ti-x" aria-hidden="true"></i></a>
+                </span>
+            {% endfor %}
+            <a href="{{ path(route) }}" class="small fw-medium">Сбросить всё</a>
         </div>
+    {% endif %}
+
+    <div class="vf-bar" role="status">
+        Найдено {{ total|vf_number }} {{ totalWord }}{% if show_archived and archivedCount %}, из них в архиве {{ archivedCount|vf_number }}{% endif %}
     </div>
+
+    {% if items is empty %}
+        <div class="vf-empty">
+            <span class="empty-icon" aria-hidden="true"><i class="ti {{ hasFilters ? 'ti-search' : 'ti-building' }}"></i></span>
+            {% if hasFilters %}
+                <div class="vf-empty__title">Ничего не найдено</div>
+                <div class="vf-empty__hint">Измените фильтры или сбросьте их.</div>
+                <div class="btn-list">
+                    <a href="{{ path(route) }}" class="btn btn-sm">Сбросить фильтры</a>
+                </div>
+            {% else %}
+                <div class="vf-empty__title">Контрагентов пока нет</div>
+                <div class="vf-empty__hint">Добавьте вручную или загрузите выписку — контрагенты из неё появятся здесь. Архивные скрыты: включите «Показывать архив».</div>
+                <div class="btn-list">
+                    <a href="{{ path('counterparty_new') }}" class="btn btn-primary btn-sm"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить контрагента</a>
+                    <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-sm">Импорт выписки</a>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter vf-table">
+                <thead class="sticky-top">
+                    <tr>
+                        <th>Наименование</th>
+                        <th>ИНН</th>
+                        <th>КПП</th>
+                        <th>Тип</th>
+                        <th>Статус</th>
+                        <th class="vf-actions"><span class="visually-hidden">Действия</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in items %}
+                    {% set editUrl = path('counterparty_edit', {id: item.id}) %}
+                    <tr{% if item.isArchived %} class="vf-row-muted"{% endif %}>
+                        <td><a href="{{ editUrl }}" class="vf-strong">{{ item.name }}</a></td>
+                        <td class="vf-num">{{ item.inn ?: '—' }}</td>
+                        <td class="vf-num">{{ item.kpp ?: '—' }}</td>
+                        <td>{{ type_labels[item.type.value] }}</td>
+                        <td>
+                            {% if item.isArchived %}
+                                <span class="badge bg-secondary-lt vf-status">В архиве</span>
+                            {% else %}
+                                <span class="badge bg-success-lt vf-status">Активен</span>
+                            {% endif %}
+                        </td>
+                        <td class="vf-actions text-end">
+                            <div class="dropdown position-static{{ loop.last and not loop.first ? ' dropup' }}">
+                                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Действия: {{ item.name }}">
+                                    <i class="ti ti-dots" aria-hidden="true"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item" href="{{ editUrl }}"><i class="ti ti-pencil me-2" aria-hidden="true"></i>Редактировать</a>
+                                    <div class="dropdown-divider"></div>
+                                    {% if item.isArchived %}
+                                        <button type="button" class="dropdown-item"
+                                                data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
+                                                data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}) }}"
+                                                data-confirm-token="{{ csrf_token('unarchive' ~ item.id) }}"
+                                                data-confirm-title="Вернуть из архива?"
+                                                data-confirm-body="{{ item.name }} снова появится в списках выбора контрагента."
+                                                data-confirm-submit="Вернуть">
+                                            <i class="ti ti-archive-off me-2" aria-hidden="true"></i>Вернуть из архива
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="dropdown-item text-danger"
+                                                data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
+                                                data-confirm-action="{{ path('counterparty_archive', {id: item.id}) }}"
+                                                data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"
+                                                data-confirm-title="Отправить в архив?"
+                                                data-confirm-body="{{ item.name }} пропадёт из списков выбора, но операции и история сохранятся. Вернуть можно здесь же: включите «Показывать архив»."
+                                                data-confirm-submit="В архив"
+                                                data-confirm-variant="danger">
+                                            <i class="ti ti-archive me-2" aria-hidden="true"></i>В архив
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
+{% include 'partials/_confirm_modal.html.twig' with {id: 'counterparty-confirm'} only %}
+{% endblock %}
+
+{% block scripts %}
+    {{ parent() }}
+    <script>
+    // Переключатель «Показывать архив» применяет фильтр сразу; без JS — по Enter в поиске.
+    document.querySelectorAll('form[data-autosubmit] input[type="checkbox"]').forEach(box => {
+      box.addEventListener('change', () => box.form.requestSubmit());
+    });
+    </script>
 {% endblock %}

@@ -1,0 +1,38 @@
+{#
+  Форма контрагента (DS-Controls): карточка ≈640px, поля колонкой через form_row темы
+  bootstrap_5_layout (label, подсказка help, ошибка под полем), «Отмена» и «Сохранить» в подвале.
+  Имена полей, id и CSRF — из CounterpartyType, разметка полей не копируется.
+  Параметры: form, title, current (крошка), item (только edit).
+#}
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Справочники</li>
+                <li class="breadcrumb-item"><a href="{{ path('counterparty_index') }}">Контрагенты</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ current }}</li>
+            </ol>
+        </nav>
+        <h1>
+            {{ title }}
+            {% if item is defined and item and item.isArchived %}
+                <span class="badge bg-secondary-lt vf-status align-middle ms-2">В архиве</span>
+            {% endif %}
+        </h1>
+    </div>
+</div>
+
+{{ form_start(form, {attr: {class: 'card vf-form mb-4'}}) }}
+    <div class="card-body">
+        {{ form_errors(form) }}
+        {{ form_row(form.name, {attr: {autocomplete: 'off'}}) }}
+        {{ form_row(form.inn, {attr: {inputmode: 'numeric', autocomplete: 'off'}}) }}
+        {{ form_row(form.kpp, {attr: {inputmode: 'numeric', autocomplete: 'off'}}) }}
+        {{ form_row(form.type) }}
+        {{ form_rest(form) }}
+    </div>
+    <div class="card-footer">
+        <a href="{{ path('counterparty_index') }}" class="btn">Отмена</a>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+{{ form_end(form) }}
