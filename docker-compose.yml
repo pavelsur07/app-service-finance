@@ -189,6 +189,28 @@ services:
             retries: 5
             start_period: 5s
 
+    # Тулчейн-контейнеры сервиса (гейты make ozon-fetcher-test/-vet/-lint);
+    # не публикуются и не деплоятся. См. services/go.md «Гейты».
+    services-ozon-fetcher-dev:
+        image: golang:1.27-alpine
+        working_dir: /src
+        environment:
+            <<: *tz-env
+        volumes:
+            - ./services/ozon-fetcher:/src
+        profiles:
+            - services
+
+    services-ozon-fetcher-lint:
+        image: golangci/golangci-lint:v2.11.4-alpine
+        working_dir: /src
+        environment:
+            <<: *tz-env
+        volumes:
+            - ./services/ozon-fetcher:/src
+        profiles:
+            - services
+
     site-postgres:
         image: postgres:15-alpine
         restart: always

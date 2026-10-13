@@ -8,11 +8,12 @@ API и публикация source facts в Symfony (вариант A: HTTP push
 
 ## Стек
 
-- Go (пин в `go.mod`), **stdlib-first**: внешние модули только при доказанной
-  необходимости и с фиксацией версий (§3.3 корневого AGENTS.md — новые
-  зависимости production-дерева).
+- Go 1.27 (пин в `go.mod`); общие правила — `services/go.md` (раскладка,
+  паттерны, зависимости, гейты). stdlib-first — культура, не запрет;
+  проверенный стек — в `go.md` «Зависимости».
 - `cmd/ozon-fetcher/` — только wiring (config, server); вся логика в `internal/`.
-- Форматирование `gofmt`, линтование до коммита.
+- Гейты до коммита: `make ozon-fetcher-lint`, `make ozon-fetcher-vet`,
+  `make ozon-fetcher-test` (см. `go.md` «Гейты»).
 
 ## Границы ответственности
 

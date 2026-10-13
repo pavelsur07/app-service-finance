@@ -22,11 +22,17 @@ curl -s http://localhost:8180/health   # {"status":"ok"}
 проброшен на 8180). Секреты Ozon API (`OZON_CLIENT_ID`, `OZON_API_KEY`) —
 только env, появятся с Stage «Ozon API client».
 
-## Тесты
+## Тесты и гейты
 
 ```bash
-make ozon-fetcher-test
+make ozon-fetcher-test   # go test -race ./...
+make ozon-fetcher-vet    # go vet ./...
+make ozon-fetcher-lint   # golangci-lint v2 (.golangci.yml)
 ```
+
+Правила и состав гейтов — `services/go.md` «Гейты». Тулчейн-контейнеры:
+`services-ozon-fetcher-dev` (golang:1.27), `services-ozon-fetcher-lint`
+(golangci-lint) — compose-профиль `services`.
 
 ## Roadmap (Stages, отдельные задачи)
 

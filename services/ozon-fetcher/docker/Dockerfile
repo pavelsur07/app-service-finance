@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # multi-stage: сборка в golang, рантайм в alpine, non-root.
 # Stdlib-only намеренно: go.mod без внешних зависимостей, go.sum не нужен.
-FROM golang:1.23-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 COPY cmd ./cmd
