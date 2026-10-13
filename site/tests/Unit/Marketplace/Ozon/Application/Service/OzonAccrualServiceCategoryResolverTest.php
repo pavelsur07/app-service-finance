@@ -28,6 +28,7 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'LastMileCourier' => ['29', 'LastMileCourier', 'ozon_logistic_last_mile'];
         yield 'ReturnFlowLogistic' => ['59', 'ReturnFlowLogistic', 'ozon_logistic_return'];
         yield 'PickUpPointReturnAcceptance' => ['45', 'PickUpPointReturnAcceptance', 'ozon_return_pvz'];
+        yield 'Drop-Off' => ['16', 'Drop-Off', 'ozon_dropoff'];
         yield 'Drop-Off Agent' => ['17', 'Drop-Off Agent', 'ozon_dropoff_apvz'];
         yield 'DeliveryToHandoverPlaceByOzon' => ['98', 'DeliveryToHandoverPlaceByOzon', 'ozon_delivery_to_handover_place'];
         yield 'Acquiring' => ['1', 'Acquiring', 'ozon_acquiring'];

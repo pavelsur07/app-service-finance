@@ -74,7 +74,7 @@ final class OzonCostCategoryTest extends TestCase
         // Возвраты и отмены: несколько кандидатов в каталоге, денег у них не было
         'Cancellation', 'ClientReturn', 'PartialReturn', 'PreparingToReturn', 'ReturnStorageInTheWarehouse',
         // Логистика и обработка отправлений: несколько кандидатов или нет денег
-        'Shipment', 'Drop-Off', 'Pick-Up', 'PickUpCourierArrangement', 'PickUpCourierDelivery',
+        'Shipment', 'Pick-Up', 'PickUpCourierArrangement', 'PickUpCourierDelivery',
         'CrossDockPickUpCourierDelivery', 'CourierPickUpByOzon', 'CourierPickUpReinvoice', 'LastMilePickUpPoint',
         'ClickAndCollect', 'QuantProcessingDrop', 'PackageUnitProcessing', 'OversizedExtraHandling',
         'ItemSealing', 'PackmanCisPacking', 'Marking',
@@ -221,6 +221,7 @@ final class OzonCostCategoryTest extends TestCase
         yield 'ReviewsPin' => ['ReviewsPin', 'ozon_pin_review'];
         yield 'VolumeWeightCharacteristicsProcessing' => ['VolumeWeightCharacteristicsProcessing', 'ozon_ovh_processing'];
         yield 'DefectFineComplaint' => ['DefectFineComplaint', 'ozon_fines_customer_complaint'];
+        yield 'Drop-Off' => ['Drop-Off', 'ozon_dropoff'];
     }
 
     #[DataProvider('exactDictionaryMatches')]
