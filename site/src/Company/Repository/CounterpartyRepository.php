@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -122,11 +123,10 @@ class CounterpartyRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array<string, \SortDirection> $sort
-     *
-     * @return Counterparty[]
+     * Список «Справочники → Контрагенты» для Pagerfanta: по названию, при равных — по id,
+     * чтобы строки не переезжали между страницами.
      */
-    public function findByFilters(Company $company, ?CounterpartyType $type, ?string $q, bool $showArchived, array $sort = ['name' => \SortDirection::Ascending]): array
+    public function createListQueryBuilder(Company $company, ?CounterpartyType $type, ?string $q, bool $showArchived): QueryBuilder
     {
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.company = :company')
@@ -147,10 +147,22 @@ class CounterpartyRepository extends ServiceEntityRepository
             $qb->andWhere('c.isArchived = false');
         }
 
-        foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('c.'.$field, $direction);
-        }
+        return $qb
+            ->addOrderBy('c.name', \SortDirection::Ascending)
+            ->addOrderBy('c.id', \SortDirection::Ascending);
+    }
 
-        return $qb->getQuery()->getResult();
+    /**
+     * Сколько архивных среди найденных по тем же фильтрам — для подписи «из них в архиве K»:
+     * на странице видна только её часть.
+     */
+    public function countArchivedInList(Company $company, ?CounterpartyType $type, ?string $q): int
+    {
+        return (int) $this->createListQueryBuilder($company, $type, $q, true)
+            ->select('COUNT(c.id)')
+            ->andWhere('c.isArchived = true')
+            ->resetDQLPart('orderBy')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 }

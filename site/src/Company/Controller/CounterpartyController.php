@@ -15,11 +15,15 @@ use App\Company\Repository\CounterpartyRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -27,6 +31,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/counterparties')]
 class CounterpartyController extends AbstractController
 {
+    private const PER_PAGE = 50;
+    private const MAX_PER_PAGE = 200;
+
     #[Route('/', name: 'counterparty_index', methods: ['GET'])]
     public function index(Request $request, CounterpartyRepository $repo, ActiveCompanyService $companyService): Response
     {
@@ -36,10 +43,26 @@ class CounterpartyController extends AbstractController
         $showArchived = $request->query->getBoolean('show_archived', false);
         $typeEnum = $type ? CounterpartyTypeEnum::tryFrom($type) : null;
 
-        $items = $repo->findByFilters($company, $typeEnum, $q, $showArchived, ['name' => \SortDirection::Ascending]);
+        $page = filter_var($request->query->get('page', '1'), \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $limit = filter_var($request->query->get('limit', (string) self::PER_PAGE), \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_PER_PAGE]]);
+        if (false === $page || false === $limit) {
+            throw new UnprocessableEntityHttpException('Номер страницы и размер списка должны быть целыми числами: страница от 1, размер от 1 до 200.');
+        }
+
+        try {
+            $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(
+                new QueryAdapter($repo->createListQueryBuilder($company, $typeEnum, $q, $showArchived)),
+                $page,
+                $limit,
+            );
+        } catch (OutOfRangeCurrentPageException $exception) {
+            throw new UnprocessableEntityHttpException('Страница не найдена.', $exception);
+        }
 
         return $this->render('counterparty/index.html.twig', [
-            'items' => $items,
+            'pager' => $pager,
+            'items' => iterator_to_array($pager->getCurrentPageResults(), false),
+            'archivedCount' => $showArchived ? $repo->countArchivedInList($company, $typeEnum, $q) : 0,
             'q' => $q,
             'type' => $type,
             'show_archived' => $showArchived,
