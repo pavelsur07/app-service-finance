@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Ещё фильтры</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+button,input,select{font-family:inherit;font-size:14px;color:#0b1020}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid #c3c8d6;background:#fff;cursor:pointer;font-weight:500;white-space:nowrap;line-height:20px}
+.btn:hover{background:#eef1f8}
+.btn-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.btn-primary:hover{background:#1a40b0}
+.field{width:100%;height:36px;padding:0 12px;border:1px solid #c3c8d6;border-radius:4px;background:#fff}
+.field::placeholder{color:#6a738f}
+.lbl{font-size:13px;font-weight:600}
+.ttl{font-size:11px;line-height:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#525b78}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
+</style>
+</helmet>
+
+<div style="width:480px;height:1000px;display:flex;flex-direction:column;background:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:#0b1020;border-left:1px solid #dde1ec">
+
+  <header style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px;border-bottom:1px solid #dde1ec">
+    <h2 style="margin:0;font-size:18px;line-height:24px;font-weight:600">Ещё фильтры</h2>
+    <button type="button" aria-label="Закрыть" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:#525b78;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </header>
+
+  <div style="flex:1;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:28px">
+
+    <div style="padding:10px 12px;border-radius:4px;background:#f4f6fb;color:#525b78;font-size:13px">Период, счёт, статья, контрагент и направление — в панели над таблицей. Здесь только то, что нужно реже.</div>
+
+    <section style="display:flex;flex-direction:column;gap:14px">
+      <div class="ttl">Сумма</div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label class="lbl" for="s1">От</label>
+          <input id="s1" class="field" type="text" inputmode="decimal" placeholder="0,00" style="text-align:right;font-variant-numeric:tabular-nums">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label class="lbl" for="s2">До</label>
+          <input id="s2" class="field" type="text" inputmode="decimal" placeholder="0,00" style="text-align:right;font-variant-numeric:tabular-nums">
+        </div>
+      </div>
+      <div style="font-size:12px;color:#525b78">Сумма по модулю: расходы ищутся без знака минус</div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:14px">
+      <div class="ttl">Валюта операции</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button type="button" aria-pressed="true" style="height:32px;padding:0 14px;border:1px solid #1d4ed8;border-radius:16px;background:#e8effd;color:#1d4ed8;font-weight:600;font-size:13px;cursor:pointer">Все</button>
+        <button type="button" aria-pressed="false" style="height:32px;padding:0 14px;border:1px solid #c3c8d6;border-radius:16px;background:#fff;font-weight:500;font-size:13px;cursor:pointer">₽</button>
+        <button type="button" aria-pressed="false" style="height:32px;padding:0 14px;border:1px solid #c3c8d6;border-radius:16px;background:#fff;font-weight:500;font-size:13px;cursor:pointer">€</button>
+      </div>
+      <div style="font-size:12px;color:#525b78">При выборе одной валюты колонка «Сумма» показывает её, а рубли идут вторым значением</div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:14px">
+      <div class="ttl">Назначение платежа</div>
+      <input class="field" type="search" aria-label="Поиск по назначению платежа" placeholder="Например: возмещение по договору">
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:16px">
+      <div class="ttl">Состояние операции</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div><div style="font-weight:500">Только не распределённые</div><div style="font-size:12px;color:#525b78">Без статьи ДДС</div></div>
+        <button type="button" role="switch" aria-checked="false" aria-label="Только не распределённые" style="flex:none;width:36px;height:20px;padding:2px;border:0;border-radius:10px;background:#c3c8d6;display:flex;justify-content:flex-start;cursor:pointer"><span style="width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div><div style="font-weight:500">Только с автоправилом</div><div style="font-size:12px;color:#525b78">Разнесены автоматически</div></div>
+        <button type="button" role="switch" aria-checked="true" aria-label="Только с автоправилом" style="flex:none;width:36px;height:20px;padding:2px;border:0;border-radius:10px;background:#1d4ed8;display:flex;justify-content:flex-end;cursor:pointer"><span style="width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div><div style="font-weight:500">Разбитые на части</div><div style="font-size:12px;color:#525b78">Несколько статей в одной операции</div></div>
+        <button type="button" role="switch" aria-checked="false" aria-label="Разбитые на части" style="flex:none;width:36px;height:20px;padding:2px;border:0;border-radius:10px;background:#c3c8d6;display:flex;justify-content:flex-start;cursor:pointer"><span style="width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+      </div>
+    </section>
+  </div>
+
+  <footer style="display:flex;align-items:center;gap:8px;padding:14px 24px;border-top:1px solid #dde1ec;background:#f4f6fb">
+    <button class="btn" type="button">Сбросить</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" type="button">Показать 15 операций</button>
+  </footer>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":480,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
