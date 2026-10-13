@@ -74,11 +74,14 @@ final class CounterpartyListPaginationTest extends WebTestCaseBase
         [$owner, $company] = $this->createCompany($client, 934);
         $this->createCounterparties($company, 2, 'Активный');
         $this->createCounterparties($company, 3, 'Архивный', archived: true);
+        $this->createCounterparties($company, 1, 'Прочий', archived: true);
+        [, $foreignCompany] = $this->createCompany($client, 936);
+        $this->createCounterparties($foreignCompany, 2, 'Архивный', archived: true);
         $this->em()->flush();
         $this->login($client, $owner, $company);
 
-        // When
-        $crawler = $client->request('GET', '/counterparties/?show_archived=1&limit=2');
+        // When: поиск отсекает «Прочий», чужая компания не считается
+        $crawler = $client->request('GET', '/counterparties/?q=%D0%BD%D1%8B%D0%B9&show_archived=1&limit=2');
 
         // Then
         self::assertResponseIsSuccessful();
@@ -96,6 +99,8 @@ final class CounterpartyListPaginationTest extends WebTestCaseBase
         yield 'лимит больше 200' => ['limit=201'];
         yield 'лимит 0' => ['limit=0'];
         yield 'страницы нет' => ['page=3'];
+        yield 'страница массивом' => ['page[]=1'];
+        yield 'лимит массивом' => ['limit[]=50'];
     }
 
     #[DataProvider('invalidPagingProvider')]
@@ -113,6 +118,69 @@ final class CounterpartyListPaginationTest extends WebTestCaseBase
 
         // Then
         self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testLinksKeepLimitAndFiltersDropPage(): void
+    {
+        // Given
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 937);
+        $this->createCounterparties($company, 5, 'Поставщик');
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        // When
+        $crawler = $client->request('GET', '/counterparties/?type=LEGAL_ENTITY&limit=2&page=2');
+
+        // Then: страницы несут limit и тип; сегмент и чипс — без page; поиск несёт limit
+        self::assertResponseIsSuccessful();
+        foreach ($crawler->filter('.pagination a')->each(static fn ($a): string => (string) $a->attr('href')) as $href) {
+            self::assertStringContainsString('limit=2', $href);
+            self::assertStringContainsString('type=LEGAL_ENTITY', $href);
+        }
+        foreach ($crawler->filter('.vf-seg a, .vf-chip a')->each(static fn ($a): string => (string) $a->attr('href')) as $href) {
+            self::assertStringNotContainsString('page=', $href);
+        }
+        self::assertSame('2', $crawler->filter('form[role=search] input[name=limit]')->attr('value'));
+    }
+
+    public function testArchiveReturnsToSamePageWithFilters(): void
+    {
+        // Given: 5 строк по 2 — третья страница с одной строкой
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 938);
+        $this->createCounterparties($company, 5, 'Поставщик');
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/counterparties/?q=%D0%BF%D0%BE%D1%81%D1%82&limit=2&page=2');
+        $action = $crawler->filter('[data-confirm-action$="/archive"], [data-confirm-action*="/archive?"]')->first();
+
+        // When
+        $client->request('POST', (string) $action->attr('data-confirm-action'), ['_token' => (string) $action->attr('data-confirm-token')]);
+
+        // Then
+        self::assertResponseRedirects('/counterparties/?q=%D0%BF%D0%BE%D1%81%D1%82&limit=2&page=2');
+    }
+
+    public function testArchivingLastRowOfLastPageFallsBackToPreviousPage(): void
+    {
+        // Given: 5 строк по 2 — на третьей странице одна строка
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 939);
+        $this->createCounterparties($company, 5, 'Поставщик');
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/counterparties/?limit=2&page=3');
+        self::assertCount(1, $crawler->filter('.vf-table tbody tr'));
+        $action = $crawler->filter('[data-confirm-variant="danger"]');
+
+        // When
+        $client->request('POST', (string) $action->attr('data-confirm-action'), ['_token' => (string) $action->attr('data-confirm-token')]);
+
+        // Then: третьей страницы больше нет — вторая, а не 422
+        self::assertResponseRedirects('/counterparties/?limit=2&page=2');
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
     }
 
     private function createCounterparties(Company $company, int $count, string $prefix, bool $archived = false): void

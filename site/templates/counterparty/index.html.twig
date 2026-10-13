@@ -13,8 +13,10 @@
    GET-параметры прежние: q, type, show_archived (показывает активных И архивных — поэтому переключатель, не вкладки). #}
 {% set route = 'counterparty_index' %}
 {# page в params не входит: смена фильтра возвращает на первую страницу; limit — только нестандартный. #}
-{% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null, limit: pager.maxPerPage != 50 ? pager.maxPerPage : null}|filter(v => v is not null) %}
+{% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null, limit: pager.maxPerPage != defaultLimit ? pager.maxPerPage : null}|filter(v => v is not null) %}
 {% set hasFilters = params|filter((v, k) => k != 'limit') is not empty %}
+{# Состояние списка для возврата после архивации: фильтры и текущая страница. #}
+{% set listState = params|merge(pager.currentPage > 1 ? {page: pager.currentPage} : {}) %}
 {# «Показывать архив» результат расширяет, а не сужает: пустой список при нём — «пока нет», не «ничего не найдено». #}
 {% set narrowed = params.q is defined or params.type is defined %}
 {# По всем страницам: pager.nbResults и COUNT архивных из контроллера, а не по видимой странице. #}
@@ -149,7 +151,7 @@
                                     {% if item.isArchived %}
                                         <button type="button" class="dropdown-item" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
-                                                data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}) }}"
+                                                data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('unarchive' ~ item.id) }}"
                                                 data-confirm-title="Вернуть из архива?"
                                                 data-confirm-body="{{ item.name }} снова появится в списках выбора контрагента."
@@ -159,7 +161,7 @@
                                     {% else %}
                                         <button type="button" class="dropdown-item text-danger" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
-                                                data-confirm-action="{{ path('counterparty_archive', {id: item.id}) }}"
+                                                data-confirm-action="{{ path('counterparty_archive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"
                                                 data-confirm-title="Отправить в архив?"
                                                 data-confirm-body="{{ item.name }} пропадёт из списков выбора, но операции и история сохранятся. Вернуть можно здесь же: включите «Показывать архив»."
