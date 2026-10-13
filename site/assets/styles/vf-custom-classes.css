@@ -1431,6 +1431,10 @@
   font-weight: var(--vf-weight-regular);
 }
 
+.vf-table > tbody > tr.vf-row-muted a.vf-strong:hover {
+  color: var(--vf-primary);
+}
+
 .vf-table .vf-num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1444,6 +1448,7 @@
 /* Переключатель в строке фильтров: высота как у поиска и сегментов. */
 .vf-card-bar .form-switch {
   display: inline-flex;
+  padding-left: 0;
   align-items: center;
   gap: var(--vf-space-2);
   min-height: 36px;

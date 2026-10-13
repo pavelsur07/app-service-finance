@@ -14,6 +14,8 @@
 {% set route = 'counterparty_index' %}
 {% set params = {q: q ?: null, type: type_labels[type] is defined ? type : null, show_archived: show_archived ? 1 : null}|filter(v => v is not null) %}
 {% set hasFilters = params is not empty %}
+{# «Показывать архив» результат расширяет, а не сужает: пустой список при нём — «пока нет», не «ничего не найдено». #}
+{% set narrowed = params.q is defined or params.type is defined %}
 {% set total = items|length %}
 {% set archivedCount = items|filter(i => i.isArchived)|length %}
 {% set totalWord = total % 10 == 1 and total % 100 != 11 ? 'контрагент' : (total % 10 in 2..4 and (total % 100 < 10 or total % 100 >= 20) ? 'контрагента' : 'контрагентов') %}
@@ -83,13 +85,15 @@
     {% endif %}
 
     <div class="vf-bar" role="status">
-        Найдено {{ total|vf_number }} {{ totalWord }}{% if show_archived and archivedCount %}, из них в архиве {{ archivedCount|vf_number }}{% endif %}
+        {% if items is not empty or narrowed %}
+            Найдено {{ total|vf_number }} {{ totalWord }}{% if show_archived and archivedCount %}, из них в архиве {{ archivedCount|vf_number }}{% endif %}
+        {% endif %}
     </div>
 
     {% if items is empty %}
         <div class="vf-empty">
-            <span class="empty-icon" aria-hidden="true"><i class="ti {{ hasFilters ? 'ti-search' : 'ti-building' }}"></i></span>
-            {% if hasFilters %}
+            <span class="empty-icon" aria-hidden="true"><i class="ti {{ narrowed ? 'ti-search' : 'ti-building' }}"></i></span>
+            {% if narrowed %}
                 <div class="vf-empty__title">Ничего не найдено</div>
                 <div class="vf-empty__hint">Измените фильтры или сбросьте их.</div>
                 <div class="btn-list">
@@ -97,7 +101,7 @@
                 </div>
             {% else %}
                 <div class="vf-empty__title">Контрагентов пока нет</div>
-                <div class="vf-empty__hint">Добавьте вручную или загрузите выписку — контрагенты из неё появятся здесь. Архивные скрыты: включите «Показывать архив».</div>
+                <div class="vf-empty__hint">Добавьте вручную или загрузите выписку — контрагенты из неё появятся здесь.{% if not show_archived %} Архивные скрыты: включите «Показывать архив».{% endif %}</div>
                 <div class="btn-list">
                     <a href="{{ path('counterparty_new') }}" class="btn btn-primary btn-sm"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить контрагента</a>
                     <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-sm">Импорт выписки</a>
@@ -124,7 +128,7 @@
                         <td><a href="{{ editUrl }}" class="vf-strong">{{ item.name }}</a></td>
                         <td class="vf-num">{{ item.inn ?: '—' }}</td>
                         <td class="vf-num">{{ item.kpp ?: '—' }}</td>
-                        <td>{{ type_labels[item.type.value] }}</td>
+                        <td class="vf-sub">{{ type_labels[item.type.value] }}</td>
                         <td>
                             {% if item.isArchived %}
                                 <span class="badge bg-secondary-lt vf-status">В архиве</span>
@@ -137,11 +141,11 @@
                                 <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Действия: {{ item.name }}">
                                     <i class="ti ti-dots" aria-hidden="true"></i>
                                 </button>
-                                <div class="dropdown-menu dropdown-menu-end">
-                                    <a class="dropdown-item" href="{{ editUrl }}"><i class="ti ti-pencil me-2" aria-hidden="true"></i>Редактировать</a>
-                                    <div class="dropdown-divider"></div>
+                                <div class="dropdown-menu dropdown-menu-end" role="menu">
+                                    <a class="dropdown-item" role="menuitem" href="{{ editUrl }}"><i class="ti ti-pencil me-2" aria-hidden="true"></i>Редактировать</a>
+                                    <div class="dropdown-divider" role="separator"></div>
                                     {% if item.isArchived %}
-                                        <button type="button" class="dropdown-item"
+                                        <button type="button" class="dropdown-item" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
                                                 data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}) }}"
                                                 data-confirm-token="{{ csrf_token('unarchive' ~ item.id) }}"
@@ -151,7 +155,7 @@
                                             <i class="ti ti-archive-off me-2" aria-hidden="true"></i>Вернуть из архива
                                         </button>
                                     {% else %}
-                                        <button type="button" class="dropdown-item text-danger"
+                                        <button type="button" class="dropdown-item text-danger" role="menuitem"
                                                 data-bs-toggle="modal" data-bs-target="#counterparty-confirm"
                                                 data-confirm-action="{{ path('counterparty_archive', {id: item.id}) }}"
                                                 data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"

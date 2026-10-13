@@ -3,11 +3,19 @@
  * При открытии берёт адрес формы, CSRF-токен и тексты из data-confirm-* кнопки-триггера,
  * поэтому разметка не повторяется в каждой строке таблицы. Текст — только textContent.
  */
+const triggers = new WeakMap();
+
 document.addEventListener('show.bs.modal', (event) => {
     const modal = event.target;
     const trigger = event.relatedTarget;
 
-    if (!(modal instanceof HTMLElement) || !modal.matches('[data-confirm-modal]') || !(trigger instanceof HTMLElement)) {
+    if (!(modal instanceof HTMLElement) || !modal.matches('[data-confirm-modal]')) {
+        return;
+    }
+
+    if (!(trigger instanceof HTMLElement)) {
+        event.preventDefault();
+
         return;
     }
 
@@ -29,11 +37,31 @@ document.addEventListener('show.bs.modal', (event) => {
     submit.textContent = data.confirmSubmit || 'Подтвердить';
     submit.classList.toggle('btn-danger', 'danger' === data.confirmVariant);
     submit.classList.toggle('btn-primary', 'danger' !== data.confirmVariant);
+    // Без JS кнопка остаётся disabled: пустая форма не уйдёт на текущую страницу.
+    submit.disabled = false;
+    triggers.set(modal, trigger);
 });
 
 // Фокус на безопасное действие: Enter сразу после открытия не архивирует.
 document.addEventListener('shown.bs.modal', (event) => {
     if (event.target instanceof HTMLElement && event.target.matches('[data-confirm-modal]')) {
         event.target.querySelector('[data-bs-dismiss="modal"]')?.focus();
+    }
+});
+
+// Bootstrap возвращает фокус триггеру, только если тот виден. Пункт закрытого меню скрыт —
+// фокус падал на body; возвращаем его на кнопку «⋯» той же строки.
+document.addEventListener('hidden.bs.modal', (event) => {
+    const modal = event.target;
+    if (!(modal instanceof HTMLElement) || !modal.matches('[data-confirm-modal]')) {
+        return;
+    }
+
+    const trigger = triggers.get(modal);
+    triggers.delete(modal);
+    modal.querySelector('[data-confirm-submit]').disabled = true;
+
+    if (trigger && !trigger.checkVisibility?.()) {
+        trigger.closest('.dropdown')?.querySelector('[data-bs-toggle="dropdown"]')?.focus();
     }
 });
