@@ -137,8 +137,10 @@ class CounterpartyRepository extends ServiceEntityRepository
         }
 
         if ($q) {
+            // mb_strtolower: strtolower с PHP 8.2 понижает только ASCII, а LOWER() в Postgres —
+            // и кириллицу, поэтому «Альфа» не находила «Альфа-Банк».
             $qb->andWhere('LOWER(c.name) LIKE :q OR c.inn LIKE :q')
-               ->setParameter('q', '%'.strtolower($q).'%');
+               ->setParameter('q', '%'.mb_strtolower($q).'%');
         }
 
         if (!$showArchived) {
