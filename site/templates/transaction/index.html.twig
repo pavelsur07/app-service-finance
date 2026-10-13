@@ -417,9 +417,6 @@
             item.hidden = !match;
             shown += match ? 1 : 0;
           });
-          pop.querySelectorAll('[data-ops-pop-group]').forEach(group => {
-            group.hidden = !group.querySelector('[data-ops-pop-item]:not([hidden])');
-          });
           if (empty) {
             empty.hidden = shown > 0;
           }

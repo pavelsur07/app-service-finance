@@ -717,8 +717,10 @@
 }
 
 /* Пилюля фильтра (эталон .pill): 32px, радиус 16, 13/500, шеврон справа; применённая — Blue 50 + Action blue.
-   Граница — --vf-border-control (3,21:1), как у полей и сегментов страницы (§3 отчёта). */
-.vf-ops-pill {
+   Граница — --vf-border-control (3,21:1), как у полей и сегментов страницы (§3 отчёта).
+   .vf-pick-pill — та же пилюля у окна выбора из справочника (docs/design-system/components/entity-picker.md). */
+.vf-ops-pill,
+.vf-pick-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -734,11 +736,13 @@
   white-space: nowrap;
 }
 
-.vf-ops-pill:hover {
+.vf-ops-pill:hover,
+.vf-pick-pill:hover {
   background: var(--vf-hover-bg);
 }
 
-.vf-ops-pill.active {
+.vf-ops-pill.active,
+.vf-pick-pill.active {
   border-color: var(--vf-primary);
   background: var(--vf-primary-lt);
   color: var(--vf-primary);
@@ -746,12 +750,14 @@
 }
 
 .vf-ops-pill:focus-visible,
+.vf-pick-pill:focus-visible,
 .vf-ops-range:focus-visible {
   outline: 2px solid var(--vf-primary);
   outline-offset: 2px;
 }
 
-.vf-ops-pill__label {
+.vf-ops-pill__label,
+.vf-pick-pill__label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -774,7 +780,8 @@
 }
 
 /* Поповер пилюли (dropdown Bootstrap в роли диалога), эталон: 8px, тень модального уровня. */
-.vf-ops-pop {
+.vf-ops-pop,
+.vf-pick-pop {
   width: 360px;
   max-width: calc(100vw - 32px);
   padding: 0;
@@ -788,17 +795,19 @@
   width: 300px;
 }
 
-.vf-ops-pop--lg {
+.vf-pick-pop {
   width: 420px;
 }
 
-.vf-ops-pop__search {
+.vf-ops-pop__search,
+.vf-pick-pop__search {
   position: relative;
   padding: var(--vf-space-3);
   border-bottom: 1px solid var(--vf-border);
 }
 
-.vf-ops-pop__search .ti {
+.vf-ops-pop__search .ti,
+.vf-pick-pop__search .ti {
   position: absolute;
   top: 50%;
   left: 24px;
@@ -806,7 +815,8 @@
   color: var(--vf-text-muted);
 }
 
-.vf-ops-pop__search .form-control {
+.vf-ops-pop__search .form-control,
+.vf-pick-pop__search .form-control {
   padding-left: 36px;
   border-color: var(--vf-border-control);
 }
@@ -841,31 +851,6 @@
 .vf-ops-pop__list .vf-ops-lvl-3 { padding-left: 48px; }
 .vf-ops-pop__list .vf-ops-lvl-4 { padding-left: 64px; }
 .vf-ops-pop__list .vf-ops-lvl-5 { padding-left: 80px; }
-
-.vf-ops-pop__group {
-  padding: 10px var(--vf-space-4) var(--vf-space-1);
-  font-size: 0.6875rem;
-  font-weight: var(--vf-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--vf-text-muted);
-}
-
-.vf-ops-pop__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--vf-weight-medium);
-}
-
-.vf-ops-pop__inn {
-  flex: none;
-  font-size: var(--vf-size-xs);
-  color: var(--vf-text-muted);
-  font-variant-numeric: tabular-nums;
-}
 
 .vf-ops-pop__empty {
   padding: var(--vf-space-5) var(--vf-space-4);
@@ -903,7 +888,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vf-ops-pop__footer {
+.vf-ops-pop__footer,
+.vf-pick-pop__footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -913,10 +899,168 @@
   background: var(--vf-navy-50);
 }
 
-.vf-ops-pop__footer .btn-link {
+.vf-ops-pop__footer .btn-link,
+.vf-pick-pop__footer .btn-link {
   margin-right: auto;
   padding: 0;
   font-weight: var(--vf-weight-medium);
+}
+
+/* Окно выбора из справочника (entity picker): список, пункты, состояния — общие для поля формы
+   (портал) и пилюли фильтра (поповер). Контракт — docs/design-system/components/entity-picker.md. */
+.vf-pick-pop__hint {
+  padding: var(--vf-space-2) var(--vf-space-4) 0;
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+}
+
+.vf-pick-pop .vf-pick-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: var(--vf-space-1) 0;
+}
+
+/* Портал поля формы живёт в body: слой выше модалки Bootstrap (1055) и оффканваса (1045).
+   Точечный z-index на кнопках формы не помогает — внутри модалки дефект возвращается. */
+.vf-pick-portal {
+  position: fixed;
+  z-index: 1080;
+  overflow-y: auto;
+  padding: var(--vf-space-1) 0;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius-lg);
+  background: var(--vf-surface);
+  box-shadow: var(--vf-shadow-md);
+}
+
+.vf-pick-portal[hidden] {
+  display: none;
+}
+
+.vf-pick-group {
+  padding: 10px var(--vf-space-4) var(--vf-space-1);
+  font-size: 0.6875rem;
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vf-text-muted);
+}
+
+.vf-pick-option {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-space-3);
+  padding: var(--vf-space-2) var(--vf-space-4);
+  color: var(--vf-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.vf-pick-option:hover,
+.vf-pick-option.active {
+  background: var(--vf-hover-bg);
+  color: var(--vf-text);
+  text-decoration: none;
+}
+
+/* Активный с клавиатуры: фокус остаётся в поиске (aria-activedescendant), поэтому рамка — здесь. */
+.vf-pick-option.active {
+  box-shadow: inset 2px 0 0 var(--vf-primary);
+}
+
+.vf-pick-option[aria-selected="true"] {
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+/* Нейтральная иконка типа вместо аватара-инициалов эталона: их цвета — не токены DS. */
+.vf-pick-option__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--vf-surface-alt);
+  color: var(--vf-text-muted);
+  font-size: 16px;
+}
+
+.vf-pick-option__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--vf-weight-medium);
+}
+
+/* Портал шириной с поле формы бывает узким (модалка, строка условия): название переносится,
+   ИНН уходит строкой ниже, а не обрезает название до «ООО…». */
+.vf-pick-portal .vf-pick-option {
+  flex-wrap: wrap;
+  column-gap: var(--vf-space-2);
+  row-gap: 0;
+}
+
+.vf-pick-portal .vf-pick-option__label {
+  flex: 1 0 auto;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.vf-pick-option__hint {
+  flex: none;
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-pick-mark {
+  padding: 0;
+  background: var(--vf-primary-lt);
+  color: inherit;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-pick-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: var(--vf-space-5) var(--vf-space-4);
+  text-align: center;
+  color: var(--vf-text-muted);
+}
+
+.vf-pick-state[hidden] {
+  display: none;
+}
+
+.vf-pick-state--busy {
+  flex-direction: row;
+  justify-content: center;
+}
+
+.vf-pick-state--busy::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: vf-pick-spin 0.6s linear infinite;
+}
+
+@keyframes vf-pick-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-pick-state--busy::before {
+    animation-duration: 2s;
+  }
 }
 
 /* Применённые фильтры: подпись капсом и чипсы Blue 50. */
