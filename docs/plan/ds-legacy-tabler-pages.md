@@ -156,7 +156,7 @@
 | telegram | `telegram/integration/index.html.twig` | перенесено (глобальный слой) | — |
 | transaction | `transaction/auto_rule_apply.html.twig` | перенесено (глобальный слой) | — |
 | transaction | `transaction/edit.html.twig` | перенесено (пилот) | — |
-| transaction | `transaction/index.html.twig` | перенесено (пилот) | — |
+| transaction | `transaction/index.html.twig` | перенесено (пилот); эталон экрана — `docs/plan/ds-operations-dds.md` | — |
 | transaction | `transaction/new.html.twig` | перенесено (пилот) | — |
 | transaction | `transaction/show.html.twig` | перенесено (глобальный слой) | — |
 | transaction | `transaction/splits.html.twig` | перенесено (глобальный слой) | — |

@@ -5,6 +5,7 @@
   --vf-bg: #f7f8fc; /* DS: фон страницы */
   --vf-border: #dde1ec; /* DS: border */
   --vf-border-strong: #c3c8d6; /* DS: border strong */
+  --vf-border-control: #8590a8; /* Отклонение от DS-Controls: граница поля 3,2:1 (WCAG 1.4.11); пока только «Операции ДДС», docs/plan/ds-operations-dds.md §3 */
   --vf-brand-navy: var(--vf-navy-900); /* DS-Tokens: бренд-цвет структуры — Navy 900 */
   --vf-brand-navy-900: var(--vf-navy-900); /* deprecated: алиас Navy 900 */
   --vf-brand-red: #b00020; /* DS: красный бренда — только бренд и деструктивные действия */
