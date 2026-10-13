@@ -66,6 +66,10 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "By-day Drop-Off без места обработки; v3 раскладывал её по ozon_dropoff_pvz / ozon_dropoff_sc"
+      - cost_code: ozon_dropoff_apvz
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+        note: "Drop-off у партнёров — та же отправка покупателю, что ozon_dropoff_*, не приёмка поставки (решение Владельца 13.10.2026)"
       - cost_code: ozon_delivery
         pl_code: COGS_DELIVERY
         include_in_pl: true
@@ -172,9 +176,6 @@ marketplaces:
         pl_code: OPEX_WH_RECEIVING
         include_in_pl: true
       - cost_code: ozon_crossdocking
-        pl_code: OPEX_WH_RECEIVING
-        include_in_pl: true
-      - cost_code: ozon_dropoff_apvz
         pl_code: OPEX_WH_RECEIVING
         include_in_pl: true
       - cost_code: ozon_supply_additional
