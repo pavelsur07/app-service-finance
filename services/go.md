@@ -74,6 +74,18 @@ services/<name>/
 - HTTP: stdlib `http.ServeMux` с паттернами (Go 1.22+); middleware — ручные
   замыкания.
 
+## Хранение: БД и S3
+
+Дисциплина и границы — `services/AGENTS.md` §9 (отдельная БД на общем инстансе,
+outbox, immutable raw, dev-контейнер `services-postgres`).
+
+- БД: `pgx/v5` (pgxpool, лимиты 2–5 коннектов, `statement_timeout`,
+  `lock_timeout`), миграции — `pressly/goose` с `embed.FS` (миграции внутри
+  бинарника, команда `-migrate`); `sqlc` — при росте числа запросов.
+- S3: `aws-sdk-go-v2` (S3-совместимые провайдеры; endpoint/region из env);
+  объекты immutable, коррекции — новым ключом; sha256 и size передаются
+  в envelope (`storage_uri`, `checksum`, `size_bytes`).
+
 ## Деньги
 
 - `float` запрещён везде. На границе контракта — точные строки (pattern

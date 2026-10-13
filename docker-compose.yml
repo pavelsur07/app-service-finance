@@ -196,18 +196,45 @@ services:
         working_dir: /src
         environment:
             <<: *tz-env
+            # dev-only DSN на services-postgres; продакшен-значение — только env сервиса.
+            DB_DSN: "postgres://svc_ozon_fetcher:ozon_fetcher_dev@services-postgres:5432/ozon_fetcher?sslmode=disable"
+        depends_on:
+            services-postgres:
+                condition: service_healthy
         volumes:
             - ./services/ozon-fetcher:/src
         profiles:
             - services
 
     services-ozon-fetcher-lint:
-        image: golangci/golangci-lint:v2.11.4-alpine
+        image: golangci/golangci-lint:v2.14.0-alpine
         working_dir: /src
         environment:
             <<: *tz-env
         volumes:
             - ./services/ozon-fetcher:/src
+        profiles:
+            - services
+
+    # Общая dev-БД сервисов монорепо (профиль services). Init-скрипты создают
+    # БД и роли сервисов. Прод: отдельная БД на общем инстансе (services/AGENTS.md §9).
+    services-postgres:
+        image: postgres:15-alpine
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+            POSTGRES_DB: postgres
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: dev-only
+        volumes:
+            - services-postgres-data:/var/lib/postgresql/data
+            - ./services/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+            start_period: 5s
         profiles:
             - services
 
@@ -262,6 +289,7 @@ services:
 volumes:
     postgres_data:
     site-redis-data:
+    services-postgres-data:
 networks:
     traefik-public:
         name: traefik-public

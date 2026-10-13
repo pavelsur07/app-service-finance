@@ -26,6 +26,15 @@ backoff), контрольные суммы и `payload_hash` raw-строк, с
 принимает решения об идемпотентности по состоянию БД, не знает о периодах и
 закрытии месяца.
 
+## Хранение
+
+- Собственная БД `ozon_fetcher` (роль `svc_ozon_fetcher`) — только
+  техническое состояние: `sync_job`, `checkpoint`, `outbox_batch`
+  (миграции `internal/store/migrations`; прогон — `make ozon-fetcher-migrate`).
+  Дисциплина — `services/AGENTS.md` §9.
+- S3: бакет `vashfindir-services-raw` (Timeweb), raw immutable, sha256/size в
+  envelope; ключи — дополнительного пользователя бакета, только env.
+
 ## Специфика Ozon (для агентов)
 
 - Seller API, finance (`/v3/finance/transaction-list` и смежные): курсорная

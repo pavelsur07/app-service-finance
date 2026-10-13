@@ -229,3 +229,6 @@ ozon-fetcher-vet:
 
 ozon-fetcher-lint:
 	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-lint run ./...
+
+ozon-fetcher-migrate:
+	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-dev go run ./cmd/ozon-fetcher -migrate
