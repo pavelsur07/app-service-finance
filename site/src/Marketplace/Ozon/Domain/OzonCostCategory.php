@@ -445,6 +445,13 @@ final readonly class OzonCostCategory
                 accrualTypeNames: ['AnalyticsPremium'],
             ),
             new self(
+                code: 'ozon_analytics_plus',
+                name: 'Подписка Аналитика Плюс Ozon',
+                widgetGroup: 'Продвижение и реклама',
+                xlsxGroup: 'Продвижение и реклама',
+                accrualTypeNames: ['AnalyticsPlus'],
+            ),
+            new self(
                 code: 'ozon_premium_cashback',
                 name: 'Бонусы продавца Premium Ozon',
                 widgetGroup: 'Продвижение и реклама',
@@ -517,6 +524,13 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
                 operationTypes: ['OperationMarketplaceSubscriptionMarketingServicesCost'],
+            ),
+            new self(
+                code: 'ozon_marketing_services',
+                name: 'Рекламные услуги Ozon',
+                widgetGroup: 'Продвижение и реклама',
+                xlsxGroup: 'Продвижение и реклама',
+                accrualTypeNames: ['Marketing'],
             ),
             new self(
                 code: 'ozon_stars_membership',
@@ -773,6 +787,13 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['DefectRateCancellation'],
+            ),
+            new self(
+                code: 'ozon_defect_rate_fine',
+                name: 'Превышение индекса ошибок Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                accrualTypeNames: ['DefectFineErrors'],
             ),
             new self(
                 code: 'ozon_service_fee_rfbs',

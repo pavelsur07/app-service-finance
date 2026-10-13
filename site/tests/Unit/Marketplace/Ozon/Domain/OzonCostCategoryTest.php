@@ -66,7 +66,7 @@ final class OzonCostCategoryTest extends TestCase
      */
     private const AWAITING_CLASSIFICATION = [
         // Продвижение и маркетинг без своей категории
-        'BrandPromotion', 'BrandShelf', 'ExternalPromotion', 'Marketing', 'SocialMediaAdvertising',
+        'BrandPromotion', 'BrandShelf', 'ExternalPromotion', 'SocialMediaAdvertising',
         'LeadGeneration', 'OrdersBooking', 'FirstCustomerReview', 'CustomerChatPoints',
         'PremiumMembership',
         // Контент и сервисы кабинета
@@ -79,7 +79,7 @@ final class OzonCostCategoryTest extends TestCase
         'ClickAndCollect', 'QuantProcessingDrop', 'PackageUnitProcessing', 'OversizedExtraHandling',
         'ItemSealing', 'PackmanCisPacking', 'Marking',
         // Штрафы и индекс ошибок без однозначной категории
-        'DefectRate', 'DefectFineModeration', 'DefectFineCounterfeitGoods', 'DefectFineErrors',
+        'DefectRate', 'DefectFineModeration', 'DefectFineCounterfeitGoods',
         // Взаиморасчёты, претензии, обеспечительные платежи — не услуги
         'SaleCommission', 'ClaimCommission', 'CorrectionCommission', 'SetOff', 'VolumeObligationReward',
         'BrandDeposit', 'KazakhstanBuyerInstallment',
@@ -222,6 +222,8 @@ final class OzonCostCategoryTest extends TestCase
         yield 'VolumeWeightCharacteristicsProcessing' => ['VolumeWeightCharacteristicsProcessing', 'ozon_ovh_processing'];
         yield 'DefectFineComplaint' => ['DefectFineComplaint', 'ozon_fines_customer_complaint'];
         yield 'Drop-Off' => ['Drop-Off', 'ozon_dropoff'];
+        yield 'Marketing' => ['Marketing', 'ozon_marketing_services'];
+        yield 'DefectFineErrors' => ['DefectFineErrors', 'ozon_defect_rate_fine'];
     }
 
     #[DataProvider('exactDictionaryMatches')]

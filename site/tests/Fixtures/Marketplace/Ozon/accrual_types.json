@@ -624,6 +624,11 @@
       "id": 126,
       "name": "AnalyticsPremium",
       "description": ""
+    },
+    {
+      "id": 127,
+      "name": "AnalyticsPlus",
+      "description": ""
     }
   ]
 }
