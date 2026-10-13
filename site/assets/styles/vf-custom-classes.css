@@ -541,6 +541,19 @@
   overflow-y: visible;
 }
 
+/* Sticky-шапка к окну: любой overflow, кроме visible, делает .table-responsive контейнером
+   прокрутки, и thead прилипал к нему, а не к окну. Таблице нужно ~900px — с 1200px
+   она помещается в карточку, прокрутка не нужна. Уже — горизонтальная прокрутка, шапка не липнет. */
+@media (min-width: 1200px) {
+  .cashflow-ops .table-responsive {
+    overflow: visible;
+  }
+
+  .cashflow-ops .vf-ops-table td {
+    overflow-wrap: anywhere;
+  }
+}
+
 /* Слои по эталону: белая карточка на --vf-bg, все зоны белые явно — Tabler красит
    .card-header-tabs и .card-footer своим #f9fafb, отчего вкладки, итог и шапка таблицы сливались. */
 .cashflow-ops {
@@ -575,6 +588,8 @@
   background: var(--vf-bg);
   font-size: var(--vf-size-xs);
   border-bottom: 1px solid var(--vf-border);
+  /* при border-collapse граница не едет с прилипшей шапкой — линию держит тень */
+  box-shadow: inset 0 -1px 0 var(--vf-border);
 }
 
 /* Строка фильтров: поиск, сегменты периода и направления, «Все фильтры». */
