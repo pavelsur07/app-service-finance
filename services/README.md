@@ -33,5 +33,6 @@ make ozon-fetcher-up      # запуск в dev-окружении
 1. Каталог `services/<name>/` со структурой из `services/AGENTS.md` §4
    (`AGENTS.md`, `README.md`, исходники, `docker/Dockerfile`).
 2. Dev-сервис в корневом `docker-compose.yml` с профилем `services`.
-3. Таргеты `make <name>-build` / `make <name>-up` в корневом `Makefile`.
+3. Таргеты `make <name>-build` / `make <name>-up` / `make <name>-test` /
+   `make <name>-migrate` (гейты и миграции — `services/go.md`) в корневом `Makefile`.
 4. Строка в таблице «Сервисы» выше.
