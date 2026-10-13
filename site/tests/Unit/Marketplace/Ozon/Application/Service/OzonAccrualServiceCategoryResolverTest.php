@@ -65,6 +65,9 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         // До 08.10.2026 уходили в ozon_unknown_126 и ozon_unknown_92: подписка
         // 8 500 руб. за 30.09–30.10 у двух компаний и штраф 417,29 руб. по отправлению.
         yield 'AnalyticsPremium' => ['126', 'AnalyticsPremium', 'ozon_analytics_premium'];
+        yield 'AnalyticsPlus' => ['127', 'AnalyticsPlus', 'ozon_analytics_plus'];
+        yield 'Marketing' => ['33', 'Marketing', 'ozon_marketing_services'];
+        yield 'DefectFineErrors' => ['93', 'DefectFineErrors', 'ozon_defect_rate_fine'];
         yield 'DefectFineComplaint' => ['92', 'DefectFineComplaint', 'ozon_fines_customer_complaint'];
         // Compensation разводится по знаку отдельными тестами ниже: направление
         // у неё кодируется категорией, а не только видом операции.

@@ -283,6 +283,11 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "По аналогии с индексами ошибок Ozon"
+      - cost_code: ozon_defect_rate_fine
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "By-day DefectFineErrors без разбивки по причине; по аналогии с индексами ошибок Ozon"
       - cost_code: ozon_original_label
         pl_code: OPEX_WH_MP_DEDUCTIONS
         include_in_pl: true
@@ -319,6 +324,11 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "Подписка площадки, по аналогии с ozon_premium_promotion"
+      - cost_code: ozon_analytics_plus
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+        confidence: medium
+        note: "Подписка площадки, по аналогии с ozon_analytics_premium"
       - cost_code: ozon_premium_cashback
         pl_code: PROMO_INTERNAL
         include_in_pl: true
@@ -331,6 +341,11 @@ marketplaces:
       - cost_code: ozon_site_advertising
         pl_code: PROMO_INTERNAL
         include_in_pl: true
+      - cost_code: ozon_marketing_services
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+        confidence: medium
+        note: "By-day Marketing («Рекламные услуги») — реклама площадки, по аналогии с ozon_cpc"
       - cost_code: ozon_sending_push_notifications
         pl_code: PROMO_INTERNAL
         include_in_pl: true
