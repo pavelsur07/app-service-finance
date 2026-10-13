@@ -64,7 +64,7 @@ Node и npm живут только в контейнере, на хосте и�
 
 | Интерфейс | Реализация |
 |---|---|
-| Легаси (`_layout/legacy.html.twig`, Tabler) | `assets/styles/design-tokens.css` (токены `--vf-*`, слой `--tblr-*`), `assets/styles/vf-custom-classes.css`, Twig-фильтры `vf_money`/`vf_amount`/`vf_number`/`vf_minor` (`src/Twig/VfMoneyExtension.php`), partials `_pagination`, `_tabs`, `_period_presets` |
+| Легаси (`_layout/legacy.html.twig`, Tabler) | `assets/styles/design-tokens.css` (токены `--vf-*`, слой `--tblr-*`), `assets/styles/vf-custom-classes.css`, Twig-фильтры `vf_money`/`vf_amount`/`vf_number`/`vf_minor` (`src/Twig/VfMoneyExtension.php`), partials `_pagination`, `_tabs`, `_period_presets`, `_confirm_modal` (подтверждение вместо `confirm()`, `assets/confirm_modal.js`) |
 | Новый слой (`_layout/app.html.twig`, React) и админка | CSS кита в `assets/styles/kit/` (подключается через `assets/styles/app.css`; значения токенов — DS), те же Twig-фильтры денег, функции `vf_currency_symbol`/`vf_currency_digits`, partials `app/_ui/_pagination`, `app/_ui/_tabs` |
 
 - Код расходится с листом DS — виноват код, в обоих интерфейсах. Новый слой на DS

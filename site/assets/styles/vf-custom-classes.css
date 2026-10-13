@@ -483,8 +483,12 @@
 }
 
 /* ===== Операции ДДС (docs/design-system/screens/Operations.dc.html, Filters.dc.html).
-   Отчёт и отклонения — docs/plan/ds-operations-dds.md. */
-.vf-ops-head {
+   Отчёт и отклонения — docs/plan/ds-operations-dds.md.
+   Нейтральные имена (vf-page-head, vf-card, vf-card-bar, vf-search, vf-seg, vf-applied, vf-chip,
+   vf-bar, vf-empty, vf-table) — те же правила для других страниц легаси
+   (docs/plan/ds-counterparties.md); vf-ops-* остаются алиасами «Операций». */
+.vf-ops-head,
+.vf-page-head {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -493,38 +497,46 @@
   margin-bottom: 20px;
 }
 
-.vf-ops-head__title {
+.vf-ops-head__title,
+.vf-page-head__title {
   flex: 1 1 360px;
   min-width: 0;
 }
 
-.vf-ops-head > .btn-list {
+.vf-ops-head > .btn-list,
+.vf-page-head > .btn-list {
   flex: none;
 }
 
-.vf-ops-head .breadcrumb {
+.vf-ops-head .breadcrumb,
+.vf-page-head .breadcrumb {
   margin: 0 0 var(--vf-space-1);
   font-size: var(--vf-size-xs);
 }
 
 .vf-ops-head .breadcrumb-item,
-.vf-ops-head .breadcrumb-item a {
+.vf-ops-head .breadcrumb-item a,
+.vf-page-head .breadcrumb-item,
+.vf-page-head .breadcrumb-item a {
   color: var(--vf-text-muted);
 }
 
-.vf-ops-head .breadcrumb-item.active {
+.vf-ops-head .breadcrumb-item.active,
+.vf-page-head .breadcrumb-item.active {
   color: var(--vf-text);
   font-weight: var(--vf-weight-medium);
 }
 
-.vf-ops-head h1 {
+.vf-ops-head h1,
+.vf-page-head h1 {
   margin: 0;
   font-size: var(--vf-size-h1);
   line-height: 2rem;
   font-weight: var(--vf-weight-semibold);
 }
 
-.vf-ops-head__lead {
+.vf-ops-head__lead,
+.vf-page-head__lead {
   max-width: 560px;
   margin: var(--vf-space-1) 0 0;
   color: var(--vf-text-muted);
@@ -532,11 +544,14 @@
 
 /* Карточка: выпадающие меню строк не обрезаются, таблица прокручивается по горизонтали. */
 .cashflow-ops,
-.cashflow-ops .card-body {
+.cashflow-ops .card-body,
+.vf-card,
+.vf-card .card-body {
   overflow: visible;
 }
 
-.cashflow-ops .table-responsive {
+.cashflow-ops .table-responsive,
+.vf-card .table-responsive {
   overflow-x: auto;
   overflow-y: visible;
 }
@@ -545,18 +560,21 @@
    прокрутки, и thead прилипал к нему, а не к окну. Таблице нужно ~900px — с 1200px
    она помещается в карточку, прокрутка не нужна. Уже — горизонтальная прокрутка, шапка не липнет. */
 @media (min-width: 1200px) {
-  .cashflow-ops .table-responsive {
+  .cashflow-ops .table-responsive,
+  .vf-card .table-responsive {
     overflow: visible;
   }
 
-  .cashflow-ops .vf-ops-table td {
+  .cashflow-ops .vf-ops-table td,
+  .vf-card .vf-table td {
     overflow-wrap: anywhere;
   }
 }
 
 /* Слои по эталону: белая карточка на --vf-bg, все зоны белые явно — Tabler красит
    .card-header-tabs и .card-footer своим #f9fafb, отчего вкладки, итог и шапка таблицы сливались. */
-.cashflow-ops {
+.cashflow-ops,
+.vf-card {
   --tblr-card-bg: var(--vf-surface);
   background: var(--vf-surface);
   border: 1px solid var(--vf-border);
@@ -564,7 +582,8 @@
   box-shadow: var(--vf-shadow-sm);
 }
 
-.cashflow-ops > .card-header {
+.cashflow-ops > .card-header,
+.vf-card > .card-header {
   padding: 0 var(--vf-space-4);
   background: var(--vf-surface);
   border-bottom: 1px solid var(--vf-border);
@@ -578,13 +597,15 @@
   background: transparent;
 }
 
-.cashflow-ops > .card-footer {
+.cashflow-ops > .card-footer,
+.vf-card > .card-footer {
   background: var(--vf-surface);
   border-top: 1px solid var(--vf-border);
 }
 
 /* Шапка таблицы: фон страницы, капс 12px muted, нижняя граница — отличается и от полосы итога, и от строк. */
-.cashflow-ops .vf-ops-table > thead > tr > th {
+.cashflow-ops .vf-ops-table > thead > tr > th,
+.vf-card .vf-table > thead > tr > th {
   background: var(--vf-bg);
   font-size: var(--vf-size-xs);
   border-bottom: 1px solid var(--vf-border);
@@ -593,14 +614,16 @@
 }
 
 /* Шапке достаточно быть над строками: z-index 1020 у .sticky-top перекрывал поповеры фильтров и меню строк (1000). */
-.cashflow-ops .vf-ops-table > thead.sticky-top {
+.cashflow-ops .vf-ops-table > thead.sticky-top,
+.vf-card .vf-table > thead.sticky-top {
   z-index: 2;
 }
 
 /* Строка фильтров: поиск, сегменты периода и направления, «Все фильтры». */
 /* Два ряда, как в эталоне: поиск + период; направление + «Все фильтры». Шесть пресетов
    и направление в один ряд не помещаются уже на 1440 — ряды заданы явно, а не переносом. */
-.vf-ops-filterbar {
+.vf-ops-filterbar,
+.vf-card-bar {
   display: flex;
   flex-direction: column;
   gap: var(--vf-space-3);
@@ -608,25 +631,29 @@
   background: var(--vf-surface);
 }
 
-.vf-ops-filterbar__row {
+.vf-ops-filterbar__row,
+.vf-card-bar__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--vf-space-3);
 }
 
-.vf-ops-search {
+.vf-ops-search,
+.vf-search {
   position: relative;
   flex: 1 1 260px;
   max-width: 340px;
 }
 
-.vf-ops-search .form-control {
+.vf-ops-search .form-control,
+.vf-search .form-control {
   height: 36px;
   padding-left: 36px;
 }
 
-.vf-ops-search__submit {
+.vf-ops-search__submit,
+.vf-search__submit {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -642,17 +669,20 @@
   color: var(--vf-text-muted);
 }
 
-.vf-ops-search__submit:hover {
+.vf-ops-search__submit:hover,
+.vf-search__submit:hover {
   color: var(--vf-text);
 }
 
-.vf-ops-search__submit:focus-visible {
+.vf-ops-search__submit:focus-visible,
+.vf-search__submit:focus-visible {
   outline: 2px solid var(--vf-primary);
   outline-offset: 0;
 }
 
 /* Сегментированный контрол (ссылки): общая граница контрола, активный — Blue 50 + Action blue. */
-.vf-ops-seg {
+.vf-ops-seg,
+.vf-seg {
   display: inline-flex;
   flex: none;
   max-width: 100%;
@@ -662,7 +692,8 @@
   background: var(--vf-surface);
 }
 
-.vf-ops-seg > a {
+.vf-ops-seg > a,
+.vf-seg > a {
   display: inline-flex;
   align-items: center;
   height: 34px;
@@ -673,23 +704,27 @@
   text-decoration: none;
 }
 
-.vf-ops-seg > a + a {
+.vf-ops-seg > a + a,
+.vf-seg > a + a {
   border-left: 1px solid var(--vf-border-control);
 }
 
-.vf-ops-seg > a:hover {
+.vf-ops-seg > a:hover,
+.vf-seg > a:hover {
   background: var(--vf-hover-bg);
   color: var(--vf-text);
 }
 
-.vf-ops-seg > a.active {
+.vf-ops-seg > a.active,
+.vf-seg > a.active {
   background: var(--vf-primary-lt);
   color: var(--vf-primary);
   font-weight: var(--vf-weight-semibold);
 }
 
 /* Кольцо внутрь: снаружи его обрезал бы overflow сегмента. */
-.vf-ops-seg > a:focus-visible {
+.vf-ops-seg > a:focus-visible,
+.vf-seg > a:focus-visible {
   outline: 2px solid var(--vf-primary);
   outline-offset: -2px;
 }
@@ -708,7 +743,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vf-ops-filterbar__spacer {
+.vf-ops-filterbar__spacer,
+.vf-card-bar__spacer {
   flex: 1 1 0;
 }
 
@@ -1064,7 +1100,8 @@
 }
 
 /* Применённые фильтры: подпись капсом и чипсы Blue 50. */
-.vf-ops-applied {
+.vf-ops-applied,
+.vf-applied {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1072,7 +1109,8 @@
   padding: 0 var(--vf-space-4) var(--vf-space-3);
 }
 
-.vf-ops-label {
+.vf-ops-label,
+.vf-caps-label {
   margin-right: var(--vf-space-1);
   font-size: 0.6875rem;
   line-height: 1rem;
@@ -1082,7 +1120,8 @@
   color: var(--vf-text-muted);
 }
 
-.vf-ops-chip {
+.vf-ops-chip,
+.vf-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1095,7 +1134,8 @@
   font-weight: var(--vf-weight-medium);
 }
 
-.vf-ops-chip a {
+.vf-ops-chip a,
+.vf-chip a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1106,12 +1146,14 @@
   text-decoration: none;
 }
 
-.vf-ops-chip a:hover {
+.vf-ops-chip a:hover,
+.vf-chip a:hover {
   background: color-mix(in srgb, var(--vf-primary) 15%, transparent);
 }
 
 /* Строка итогов и панель выбора (взаимоисключающие, переключает JS выбора). */
-.vf-ops-bar {
+.vf-ops-bar,
+.vf-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1154,7 +1196,8 @@
 }
 
 /* Таблица операций: вторая строка ячейки — 12px muted, длинное — многоточием с title. */
-.vf-ops-table .vf-ops-sub {
+.vf-ops-table .vf-ops-sub,
+.vf-table .vf-sub {
   font-size: var(--vf-size-xs);
   color: var(--vf-text-muted);
 }
@@ -1167,7 +1210,8 @@
   white-space: nowrap;
 }
 
-.vf-ops-table .vf-ops-strong {
+.vf-ops-table .vf-ops-strong,
+.vf-table .vf-strong {
   font-weight: var(--vf-weight-medium);
 }
 
@@ -1207,7 +1251,8 @@
 }
 
 /* Пустое состояние (DS-Feedback). */
-.vf-ops-empty {
+.vf-ops-empty,
+.vf-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1216,17 +1261,25 @@
   text-align: center;
 }
 
-.vf-ops-empty__title {
+.vf-ops-empty__title,
+.vf-empty__title {
   font-size: var(--vf-size-md);
   font-weight: var(--vf-weight-semibold);
   color: var(--vf-text);
 }
 
-.vf-ops-empty__hint {
+.vf-ops-empty__hint,
+.vf-empty__hint {
   color: var(--vf-text-muted);
 }
 
-/* Отклонение от DS-Controls (§3 отчёта): граница полей 3,2:1 вместо 1,67:1. */
+/* Отклонение от DS-Controls (§3 отчёта): граница полей 3,2:1 вместо 1,67:1. Та же граница — на
+   страницах с .vf-card и в формах .vf-form (docs/plan/ds-counterparties.md). */
+.vf-card .form-control,
+.vf-card .form-select,
+.vf-card .form-check-input:not(:checked):not(:indeterminate),
+.vf-form .form-control,
+.vf-form .form-select,
 .vf-ops .form-control,
 .vf-ops .form-select,
 .vf-ops .form-check-input:not(:checked):not(:indeterminate),
@@ -1338,4 +1391,157 @@
 
 .vf-ops-filters__footer .btn-primary {
   margin-left: auto;
+}
+
+/* ===== Общие элементы страниц легаси (справочники и т. п.; docs/plan/ds-counterparties.md). */
+
+/* Бейдж состояния — с точкой (DS-Feedback): цвет пары задаёт bg-*-lt, текст рядом всегда. */
+.badge.vf-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge.vf-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Наименование — основной текст и ссылка на карточку: синий только на hover, не вся колонка. */
+.vf-table a.vf-strong {
+  color: var(--vf-text);
+  text-decoration: none;
+}
+
+.vf-table a.vf-strong:hover {
+  color: var(--vf-primary);
+  text-decoration: underline;
+}
+
+/* Архивная строка приглушена; смысл несёт бейдж «В архиве», не только цвет. */
+.vf-table > tbody > tr.vf-row-muted > td {
+  color: var(--vf-text-muted);
+}
+
+.vf-table > tbody > tr.vf-row-muted .vf-strong {
+  color: var(--vf-text-muted);
+  font-weight: var(--vf-weight-regular);
+}
+
+.vf-table > tbody > tr.vf-row-muted a.vf-strong:hover {
+  color: var(--vf-primary);
+}
+
+.vf-table .vf-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vf-table .vf-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Переключатель в строке фильтров: высота как у поиска и сегментов. */
+.vf-card-bar .form-switch {
+  display: inline-flex;
+  padding-left: 0;
+  align-items: center;
+  gap: var(--vf-space-2);
+  min-height: 36px;
+  margin: 0;
+}
+
+.vf-card-bar .form-switch .form-check-input {
+  margin: 0;
+}
+
+.vf-card-bar .form-check-input:focus-visible,
+.vf-table .vf-strong:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+}
+
+.vf-empty .btn-list {
+  justify-content: center;
+  margin-top: var(--vf-space-2);
+}
+
+/* Форма справочника (DS-Controls): карточка ≈640px, поля колонкой, действия в подвале. */
+.vf-form {
+  max-width: 640px;
+}
+
+.vf-form .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-4);
+  padding: var(--vf-space-5);
+}
+
+.vf-form .card-body > .mb-3 {
+  margin-bottom: 0 !important;
+}
+
+.vf-form .form-text {
+  margin-top: var(--vf-space-1);
+  font-size: var(--vf-size-xs);
+  line-height: 1rem;
+  color: var(--vf-text-muted);
+}
+
+.vf-form .invalid-feedback,
+.vf-form .form-error-message {
+  color: var(--vf-danger-text);
+  font-size: var(--vf-size-xs);
+}
+
+.vf-form .form-control.is-invalid,
+.vf-form .form-select.is-invalid {
+  border-color: var(--vf-danger-text);
+}
+
+.vf-form > .card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--vf-space-2);
+  padding: var(--vf-space-3) var(--vf-space-5);
+  background: var(--vf-navy-50);
+  border-top: 1px solid var(--vf-border);
+}
+
+/* Диалог подтверждения (DS-Feedback): 420px, заголовок 18/24 · 600, пояснение muted,
+   подвал Navy 50 с линией; partials/_confirm_modal.html.twig. */
+.vf-confirm__dialog {
+  max-width: 420px;
+}
+
+.vf-confirm__head {
+  padding: 20px var(--vf-space-5) var(--vf-space-2);
+}
+
+.vf-confirm__title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-confirm__body {
+  margin: 0;
+  padding: 0 var(--vf-space-5) 20px;
+  color: var(--vf-text-muted);
+}
+
+.vf-confirm__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--vf-space-2);
+  padding: 14px var(--vf-space-5);
+  border-top: 1px solid var(--vf-border);
+  background: var(--vf-navy-50);
+  border-radius: 0 0 var(--vf-radius-lg) var(--vf-radius-lg);
 }

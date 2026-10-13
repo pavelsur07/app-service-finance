@@ -3,6 +3,7 @@ import './bootstrap.js';
 import './project_direction_picker.js';
 import './counterparty_picker.js';
 import './picker_pill.js';
+import './confirm_modal.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
 document.addEventListener('submit', (event) => {
