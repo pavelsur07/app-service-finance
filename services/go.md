@@ -86,6 +86,20 @@ outbox, immutable raw, dev-контейнер `services-postgres`).
   объекты immutable, коррекции — новым ключом; sha256 и size передаются
   в envelope (`storage_uri`, `checksum`, `size_bytes`).
 
+## Автономная работа (pull-модель)
+
+Механика взаимодействия — `services/AGENTS.md` §3.
+
+- Расписание: ticker-воркеры в процессе; watermark-догон по `checkpoint`
+  (сначала backlog, потом свежие периоды).
+- Конфиг-кэш: in-memory + поллинг по env-интервалу; 401 от провайдера →
+  force-refresh записи кабинета; нет кэша и нет Symfony — сервис ждёт, не
+  падает.
+- Очередь триггеров: одна таблица, `ORDER BY priority DESC, created_at ASC`;
+  приоритет не отменяет rate limit внешнего API.
+- Facts API отдаёт только `status=new` батчи; ack — единственный переход в
+  `acked`.
+
 ## Деньги
 
 - `float` запрещён везде. На границе контракта — точные строки (pattern

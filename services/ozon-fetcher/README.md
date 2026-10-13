@@ -40,6 +40,24 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 | `S3_REGION` | `ru-1` | Stage raw |
 | `S3_BUCKET` | `vashfindir-services-raw` | Stage raw |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Пара доп. пользователя бакета | Stage raw |
+| `SYMFONY_INTERNAL_BASE_URL` | Базовый URL внутреннего API Symfony (`/internal/marketplace-connections`) | Stage pull-модели |
+| `INTERNAL_AUTH_TOKEN` | Внутренний static token для `/internal/*` (с обеих сторон) | Stage pull-модели |
+| `CONNECTIONS_POLL_INTERVAL` | Интервал поллинга конфигурации, по умолчанию `5m` | Stage pull-модели |
+
+## Внутренний API сервиса (контракты, к кодовым Stage'ам)
+
+Сервис автономен (расписание + watermark'и); Symfony забирает готовое. Семантика
+— `services/AGENTS.md` §3, контракты — `services/_contracts/`.
+
+| Метод | Назначение |
+|---|---|
+| `GET /internal/source-facts` | Выдача батчей `status=new` (фильтры `connection_ref`/`resource_type`/`business_period`, курсор) |
+| `POST /internal/source-facts/ack` | `{batch_ids}` → батчи в `acked`, payload purge (retention) |
+| `POST /internal/fetch-requests` | Триггер первичной загрузки: `{request_id, connection_ref, resource_type, period_from, period_to}` → 202 после записи; повтор сливается в активный запрос |
+| `GET /internal/fetch-requests/{id}` | `{status: queued\|fetching\|ready\|failed, progress: {periods_done, periods_total}, error_class}` |
+
+Мапа статусов для UI Symfony: queued → «В очереди»; fetching → «Загружаем:
+x/y периодов»; ready → «Готово»; failed → «Ошибка загрузки, повторим».
 
 ## Тесты и гейты
 
@@ -57,7 +75,11 @@ make ozon-fetcher-lint   # golangci-lint v2 (.golangci.yml)
 
 1. Ozon API client: auth, rate limit, курсорная пагинация, retry на 429.
 2. Сборка envelope v1 + `payload_hash` (SHA-256 канонической формы).
-3. Publisher: запись в outbox → `POST /internal/source-facts`, backoff/jitter,
-   idempotent replay; выгрузка raw в S3 (`storage_uri` + sha256).
-4. Dual-run против Symfony-пути, паритет сумм до копейки на архивном raw.
-5. Cutover по кабинету — только после данных M1/M2 и решения владельца.
+3. Pull-модель: клиент конфигурации (`marketplace-connections` v1, кэш в
+   памяти), ticker + watermark-догон по `checkpoint`, facts API + ack
+   (`GET/POST /internal/source-facts*`); миграция 00002 (`new → acked`).
+4. Триггер первичной загрузки (`POST/GET /internal/fetch-requests`, очередь
+   с приоритетом); миграция 00003 (`fetch_request`).
+5. Выгрузка raw в S3 (`storage_uri` + sha256).
+6. Dual-run против Symfony-пути, паритет сумм до копейки на архивном raw.
+7. Cutover по кабинету — только после данных M1/M2 и решения владельца.

@@ -3,15 +3,23 @@
 Семантика полей контракта. Schema: [schema.json](schema.json). История решений:
 [CHANGELOG.md](CHANGELOG.md). Статус: **проект** (см. `_contracts/README.md`).
 
-## Доставка
+## Доставка: pull-модель (решение владельца, 2026-10-13)
 
-`POST /internal/source-facts`, заголовок `Idempotency-Key: <batch.batch_id>`.
+Envelope передаётся от сервиса к Symfony **по запросу Symfony** (схема
+envelope не меняется, меняется семантика доставки):
 
-- Symfony отвечает ACK только после долговечной записи inbox; повтор того же
-  `batch_id` возвращает прежний результат.
-- `429`/`503` от Symfony → producer повторяет с экспоненциальным backoff +
-  jitter, сохраняя курсор.
-- Endpoint — только внутри docker-сети / за IP-allowlist.
+1. Сервис копит готовые батчи (outbox, `status=new`).
+2. Symfony: `GET /internal/source-facts?connection_ref=…&resource_type=…&
+   business_period=…&cursor=…` — постранично, только `status=new`.
+3. Symfony импортирует идемпотентно (inbox и natural keys — на его стороне)
+   и подтверждает: `POST /internal/source-facts/ack` с `batch_ids`.
+4. Сервис переводит батчи в `status=acked` и обнуляет payload (retention,
+   `services/AGENTS.md` §9). До ack повторные pull'и возвращают те же батчи
+   (re-pull окно для сверок/паритета).
+
+Endpoint'ы — только внутри docker-сети / за IP-allowlist + internal token
+(`services/AGENTS.md` §3). Push-вариант (`POST` в inbox Symfony) отменён до
+реализации; версия схемы от этого не изменилась.
 
 ## Деньги
 

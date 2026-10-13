@@ -19,7 +19,8 @@ API и публикация source facts в Symfony (вариант A: HTTP push
 
 Делает: HTTP к Ozon API (rate limit, курсорная пагинация, retry на 429 с
 backoff), контрольные суммы и `payload_hash` raw-строк, сборку envelope v1,
-публикацию фактов с идемпотентным replay.
+накопление фактов в outbox и выдачу их Symfony по pull (ack, §3
+`services/AGENTS.md`).
 
 Не делает (§1 `services/AGENTS.md`): не пишет в БД и очереди Symfony, не
 нормализует категории начислений (в v1 публикует коды источника как есть), не
@@ -34,6 +35,15 @@ backoff), контрольные суммы и `payload_hash` raw-строк, с
   Дисциплина — `services/AGENTS.md` §9.
 - S3: бакет `vashfindir-services-raw` (Timeweb), raw immutable, sha256/size в
   envelope; ключи — дополнительного пользователя бакета, только env.
+
+## Внутренний API (контракты, к кодовым Stage'ам)
+
+- `GET /internal/source-facts` — выдача `status=new` батчей (фильтры +
+  курсор); `POST /internal/source-facts/ack` — единственный переход в `acked`.
+- `POST /internal/fetch-requests`, `GET /internal/fetch-requests/{id}` —
+  триггер первичной загрузки; статусы `queued|fetching|ready|failed`.
+- Семантика и мапа статусов для UI — `services/AGENTS.md` §3; endpoint'ы в
+  README сервиса. Внутренняя авторизация: internal token + allowlist.
 
 ## Специфика Ozon (для агентов)
 
