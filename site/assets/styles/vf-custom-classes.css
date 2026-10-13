@@ -481,3 +481,303 @@
 .text-danger .vf-amount__currency {
   color: inherit;
 }
+
+/* ===== Операции ДДС (docs/design-system/screens/Operations.dc.html, Filters.dc.html).
+   Отчёт и отклонения — docs/plan/ds-operations-dds.md. */
+.vf-ops-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--vf-space-4);
+  margin-bottom: 20px;
+}
+
+.vf-ops-head__title {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.vf-ops-head > .btn-list {
+  flex: none;
+}
+
+.vf-ops-head .breadcrumb {
+  margin: 0 0 var(--vf-space-1);
+  font-size: var(--vf-size-xs);
+}
+
+.vf-ops-head .breadcrumb-item,
+.vf-ops-head .breadcrumb-item a {
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-head .breadcrumb-item.active {
+  color: var(--vf-text);
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-ops-head h1 {
+  margin: 0;
+  font-size: var(--vf-size-h1);
+  line-height: 2rem;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-head__lead {
+  max-width: 560px;
+  margin: var(--vf-space-1) 0 0;
+  color: var(--vf-text-muted);
+}
+
+/* Карточка: выпадающие меню строк не обрезаются, таблица прокручивается по горизонтали. */
+.cashflow-ops,
+.cashflow-ops .card-body {
+  overflow: visible;
+}
+
+.cashflow-ops .table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.cashflow-ops > .card-header {
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--vf-border);
+}
+
+/* Применённые фильтры: подпись капсом и чипсы Blue 50. */
+.vf-ops-applied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: var(--vf-space-3) var(--vf-space-4);
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.vf-ops-label {
+  margin-right: var(--vf-space-1);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  border-radius: 14px;
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-ops-chip a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.vf-ops-chip a:hover {
+  background: color-mix(in srgb, var(--vf-primary) 15%, transparent);
+}
+
+/* Строка итогов и панель выбора (взаимоисключающие, переключает JS выбора). */
+.vf-ops-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-3);
+  min-height: 52px;
+  padding: 10px var(--vf-space-4);
+  background: var(--vf-navy-50);
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-sm);
+}
+
+.vf-ops-bar--selection {
+  background: var(--vf-primary-lt);
+  color: var(--vf-text);
+}
+
+.vf-ops-bar__count {
+  font-weight: var(--vf-weight-semibold);
+  color: var(--vf-primary);
+}
+
+.vf-ops-bar .btn-link {
+  margin-left: auto;
+  padding: 0;
+  font-size: var(--vf-size-sm);
+  font-weight: var(--vf-weight-medium);
+}
+
+/* Деструктивное действие в панели — красный текст на белой кнопке, без заливки (DS-Controls). */
+.vf-ops-bar .vf-btn-destructive {
+  background: var(--vf-surface);
+  border-color: var(--vf-border-strong);
+  color: var(--vf-danger-text);
+}
+
+.vf-ops-bar .vf-btn-destructive:hover {
+  background: var(--vf-danger-bg);
+}
+
+/* Таблица операций: вторая строка ячейки — 12px muted, длинное — многоточием с title. */
+.vf-ops-table .vf-ops-sub {
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-table .vf-ops-clip {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-ops-table .vf-ops-strong {
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-ops-table .vf-ops-date {
+  font-weight: var(--vf-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-table .vf-ops-amount {
+  min-width: 12rem;
+  font-weight: var(--vf-weight-semibold);
+  white-space: nowrap;
+}
+
+.vf-ops-table .vf-ops-sub a {
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-ops-badge-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--vf-radius);
+  background: var(--vf-warn-bg);
+  color: var(--vf-warn-text);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-badge-warn::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Пустое состояние (DS-Feedback). */
+.vf-ops-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: 56px var(--vf-space-4);
+  text-align: center;
+}
+
+.vf-ops-empty__title {
+  font-size: var(--vf-size-md);
+  font-weight: var(--vf-weight-semibold);
+  color: var(--vf-text);
+}
+
+.vf-ops-empty__hint {
+  color: var(--vf-text-muted);
+}
+
+/* Отклонение от DS-Controls (§3 отчёта): граница полей 3,2:1 вместо 1,67:1. */
+.vf-ops .form-control,
+.vf-ops .form-select,
+.vf-ops .form-check-input:not(:checked):not(:indeterminate),
+.vf-ops-filters .form-control,
+.vf-ops-filters .form-select {
+  border-color: var(--vf-border-control);
+}
+
+/* «Ещё фильтры» — offcanvas по Filters.dc.html. */
+.vf-ops-filters {
+  --tblr-offcanvas-width: 480px;
+}
+
+.vf-ops-filters .offcanvas-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.vf-ops-filters .offcanvas-title {
+  font-size: var(--vf-size-h2);
+  line-height: 1.5rem;
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-ops-filters .offcanvas-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.vf-ops-filters__scroll {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 20px 24px;
+}
+
+.vf-ops-filters__section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vf-ops-filters__section .form-label {
+  margin-bottom: 6px;
+}
+
+.vf-ops-filters__hint {
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+}
+
+.vf-ops-filters .vf-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-ops-filters__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: 14px 24px;
+  border-top: 1px solid var(--vf-border);
+  background: var(--vf-navy-50);
+}
+
+.vf-ops-filters__footer .btn-primary {
+  margin-left: auto;
+}
