@@ -36,6 +36,17 @@ CI передаёт guard'у карту `git diff -M --name-status --diff-filter
   Finance — от сообщений и событий Ingestion.
 - `site/tests/PHPStan/Rules/RepositoryCompanyScopeRule.php` — методы-запросы
   Repository без параметра компании; исключение `@companyScopeExempt <причина>`.
+- `ControllerUnscopedFindRule`, `ControllerEntityArgumentRule` — в контроллерах
+  `find()`/`findAll()` и аргумент-сущность компании (IDOR).
+- `FlushOutsideTransactionBoundaryRule` — `flush()` только в `*Action`,
+  `*Handler`, `*Command`; фикстуры и тесты вне правила.
+- `ForeignEntityTypeRule` — `EntityType` только с сущностью своего модуля.
+- `MoneyFloatCastRule` — `(float)` от `get*Amount*()` в `App\Cash`.
+- `site/tests/Unit/Config/MessengerRoutingTest.php` — каждое сообщение с
+  handler'ом на ровно одном известном транспорте.
+- `MoneyFloatCastRule` введён на этапе 3 плана Cash (0 нарушений), остальные
+  правила и `MessengerRoutingTest` — на этапе 4 (14.10.2026) с baseline текущих
+  нарушений; записи их идентификаторов дальше только сокращаются.
 - `spaze/phpstan-disallowed-calls` — `dump`, `dd`, `var_dump`, `print_r`,
   `die`, `exit`; записей в baseline нет.
 

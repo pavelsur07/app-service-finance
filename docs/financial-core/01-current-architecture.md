@@ -62,8 +62,11 @@ flowchart LR
 - По одному процессу на транспорт, без реплик; `--time-limit=3600`,
   `--memory-limit`; healthcheck = `ps aux | grep`.
 - Сериализатор — PHP по умолчанию; сообщения содержат скаляры/ID.
-- Нерутированные сообщения исполняются синхронно в диспетчере
-  (`ScoreCompanyCounterpartiesMessage`).
+- Нерутированных сообщений, которые отправляются в шину, нет: с 14.10.2026
+  это проверяет тест `MessengerRoutingTest`. `ScoreCompanyCounterpartiesMessage`
+  удалено вместе с неиспользуемой цепочкой скоринга; у
+  `ProcessMarketplaceRawDocumentCommand` есть handler и нет routing — Action
+  вызывают напрямую, в тесте это явное исключение с причиной.
 - Redis общий для очередей, локов, кэша и сессий.
 
 ## 4. Расписание (supercronic, `docker/cron/app.cron`, MSK)
