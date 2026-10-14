@@ -13,6 +13,7 @@ use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -30,8 +31,8 @@ class CashTransactionToDocumentService
      */
     public function createFromCashTransaction(CashTransaction $transaction): Document
     {
-        $remaining = $transaction->getRemainingAmount();
-        $transaction->assertCanAllocateAmount($remaining);
+        $remaining = $transaction->getRemainingMoney();
+        $transaction->assertCanAllocate($remaining);
 
         return $this->createDocument($transaction, $remaining);
     }
@@ -53,16 +54,6 @@ class CashTransactionToDocumentService
             $this->em->rollback();
             throw $e;
         }
-    }
-
-    /**
-     * Создаёт документ ОПиУ на заданную сумму в пределах остатка транзакции ДДС.
-     */
-    public function createWithCustomAmount(CashTransaction $transaction, float $amount): Document
-    {
-        $transaction->assertCanAllocateAmount($amount);
-
-        return $this->createDocument($transaction, $amount);
     }
 
     /**
@@ -89,7 +80,7 @@ class CashTransactionToDocumentService
         return $category->getPlCategory();
     }
 
-    private function createDocument(CashTransaction $transaction, float $amount): Document
+    private function createDocument(CashTransaction $transaction, Money $amount): Document
     {
         $category = $transaction->getSingleSplitCategory();
         if (!$category instanceof CashflowCategory) {
@@ -118,7 +109,7 @@ class CashTransactionToDocumentService
 
         $operation = new DocumentOperation();
         $operation
-            ->setAmount(number_format($amount, 2, '.', ''))
+            ->setAmount($amount->toDecimalString())
             ->setCounterparty($transaction->getCounterparty())
             ->setCategory($plCategory)
             ->setProjectDirection($projectDirection)

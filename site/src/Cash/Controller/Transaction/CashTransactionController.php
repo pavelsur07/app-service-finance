@@ -255,7 +255,7 @@ class CashTransactionController extends AbstractController
     {
         $category = $transaction->getCashflowCategory();
 
-        return $transaction->getRemainingAmount() > 0
+        return $transaction->getRemainingMoney()->isPositive()
             && $category instanceof CashflowCategory
             && $category->isAllowPlDocument();
     }

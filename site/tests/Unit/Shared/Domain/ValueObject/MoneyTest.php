@@ -245,4 +245,71 @@ final class MoneyTest extends TestCase
         self::assertFalse(Money::fromMinor(100, 'RUB')->equals(Money::fromMinor(101, 'RUB')));
         self::assertFalse(Money::fromMinor(100, 'RUB')->equals(Money::fromMinor(100, 'USD')));
     }
+
+    public function testMultiplyByRatioIsExactForTerminatingResult(): void
+    {
+        // НДС 5% «из суммы» 105.00 — ровно 5.00.
+        self::assertSame(500, Money::fromString('105.00', 'RUB')->multiplyByRatio('5', '105')->amountMinor());
+    }
+
+    public function testMultiplyByRatioRoundsOnceAtTheEnd(): void
+    {
+        // 100.00 × 20/120 = 16.6666… → 16.67.
+        self::assertSame(1667, Money::fromString('100.00', 'RUB')->multiplyByRatio('20', '120')->amountMinor());
+    }
+
+    public function testMultiplyByRatioAppliesRoundingModeAtExactHalf(): void
+    {
+        $oneKopeck = Money::fromMinor(1, 'RUB');
+
+        self::assertSame(1, $oneKopeck->multiplyByRatio('1', '2')->amountMinor());
+        self::assertSame(0, $oneKopeck->multiplyByRatio('1', '2', RoundingMode::HALF_EVEN)->amountMinor());
+        self::assertSame(-1, $oneKopeck->negate()->multiplyByRatio('1', '2')->amountMinor());
+    }
+
+    public function testMultiplyByRatioKeepsPrecisionForLargeAmounts(): void
+    {
+        // 999 999 999.99 × 5/105 = 47 619 047.618… → 47 619 047.62.
+        $vat = Money::fromString('999999999.99', 'RUB')->multiplyByRatio('5', '105');
+
+        self::assertSame('47619047.62', $vat->toDecimalString());
+        self::assertSame('RUB', $vat->currency());
+    }
+
+    public function testMultiplyByRatioRejectsZeroDenominator(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        Money::fromMinor(100, 'RUB')->multiplyByRatio('1', '0');
+    }
+
+    public function testMultiplyByRatioRoundsNegativeHalfToEven(): void
+    {
+        // −3 × 1/2 = −1.5 → −2 (к чётному), −5 × 1/2 = −2.5 → −2.
+        self::assertSame(-2, Money::fromMinor(-3, 'RUB')->multiplyByRatio('1', '2', RoundingMode::HALF_EVEN)->amountMinor());
+        self::assertSame(-2, Money::fromMinor(-5, 'RUB')->multiplyByRatio('1', '2', RoundingMode::HALF_EVEN)->amountMinor());
+        self::assertSame(-3, Money::fromMinor(-5, 'RUB')->multiplyByRatio('1', '2')->amountMinor());
+    }
+
+    public function testMultiplyByRatioUsesCurrencyFractionDigits(): void
+    {
+        // JPY без дробной части: 1000 × 5/105 = 47.6… → 48.
+        self::assertSame('48', Money::fromString('1000', 'JPY')->multiplyByRatio('5', '105')->toDecimalString());
+        // BHD — три знака: 1.050 × 5/105 = 0.050.
+        self::assertSame('0.050', Money::fromString('1.050', 'BHD')->multiplyByRatio('5', '105')->toDecimalString());
+    }
+
+    public function testMultiplyByRatioDetectsOverflow(): void
+    {
+        $this->expectException(MoneyOverflowException::class);
+
+        Money::fromMinor(\PHP_INT_MAX, 'RUB')->multiplyByRatio('2', '1');
+    }
+
+    public function testMultiplyByRatioRejectsArgumentsBeyondTwelveFractionalDigits(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        Money::fromMinor(100, 'RUB')->multiplyByRatio('1', '0.0000000000001');
+    }
 }

@@ -137,3 +137,13 @@ services:
             reflectionProvider: @reflectionProvider
         tags:
             - phpstan.rules.rule
+
+    # Деньги без float (PATTERNS.md §24): (float)/floatval() от get*Amount*().
+    # Пока только Cash: вне модуля 11 приведений — расширение с baseline отдельно.
+    -
+        class: App\Tests\PHPStan\Rules\MoneyFloatCastRule
+        arguments:
+            namespacePrefixes:
+                - 'App\Cash\'
+        tags:
+            - phpstan.rules.rule

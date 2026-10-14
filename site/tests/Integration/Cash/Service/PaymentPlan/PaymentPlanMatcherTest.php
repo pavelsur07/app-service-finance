@@ -20,6 +20,7 @@ use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class PaymentPlanMatcherTest extends IntegrationTestCase
@@ -167,5 +168,48 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         self::assertNull($this->matcher->matchForTransaction($transaction));
         self::assertNull($this->matchRepository->findOneByTransactionAndCompanyId($transaction, (string) $transaction->getCompany()->getId()));
         self::assertSame(PaymentPlanStatusEnum::APPROVED, $plan->getStatus());
+    }
+
+    /**
+     * Допуск — «разница больше 5% от плана — не сопоставлять». Во float
+     * 5.03 / 100.60 давало 0.0500…01 > 0.05, и план ровно на границе
+     * отбрасывался; в минорных единицах граница точная.
+     *
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function tolerance5PercentProvider(): iterable
+    {
+        yield 'ровно 5% — сопоставляется' => ['105.63', true];
+        yield 'на копейку больше 5% — нет' => ['105.64', false];
+        yield 'ровно 5% вниз — сопоставляется' => ['95.57', true];
+        yield 'на копейку меньше −5% — нет' => ['95.56', false];
+    }
+
+    #[DataProvider('tolerance5PercentProvider')]
+    public function testFivePercentToleranceBoundaryIsExact(string $transactionAmount, bool $matches): void
+    {
+        $user = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('payment-plan-tolerance@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($user)->withName('Tolerance company')->build();
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'RUB account', 'RUB');
+        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category->setName('Payments');
+        $occurredAt = new \DateTimeImmutable('2024-08-20');
+        $transaction = new CashTransaction(Uuid::uuid4()->toString(), $company, $account, CashDirection::OUTFLOW, $transactionAmount, 'RUB', $occurredAt);
+        $transaction->setCashflowCategory($category);
+        $plan = new PaymentPlan(Uuid::uuid4()->toString(), $company, $category, $occurredAt, '100.60');
+        $plan->setStatus(PaymentPlanStatusEnum::APPROVED);
+
+        foreach ([$user, $company, $account, $category, $transaction, $plan] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+
+        $result = $this->matcher->matchForTransaction($transaction);
+
+        if ($matches) {
+            self::assertSame($plan->getId(), $result?->getId());
+        } else {
+            self::assertNull($result);
+        }
     }
 }

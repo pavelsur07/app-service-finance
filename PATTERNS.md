@@ -1240,6 +1240,7 @@ $amount = Money::fromString('0.30', 'RUB');
 | Сравнение | `compareTo()` / `equals()` |
 | Умножение | `multiply(string $factor, RoundingMode $mode)` |
 | Процент от суммы | `percentage(string $percent, RoundingMode $mode)` |
+| Умножение на дробь (НДС «из суммы», доля) | `multiplyByRatio(string $numerator, string $denominator, RoundingMode $mode)` |
 
 Множитель и процент всегда передаются decimal-строкой:
 
@@ -1375,8 +1376,8 @@ Codex не должен обходить эти ограничения лока�
 
 1. Неизвестная Intl валюта получает fallback scale `2`.
 2. `add()`, `subtract()` и `negate()` не используют `createSafe()` и требуют отдельной проверки единообразной обработки overflow.
-3. Для `multiply()` и `percentage()` промежуточный scale BCMath зафиксирован на `12`.
-4. Нет операций деления, распределения остатка и конвертации валют.
+3. Для `multiply()`, `percentage()` и `multiplyByRatio()` промежуточный scale BCMath зафиксирован на `12`; у `multiplyByRatio()` аргументы — не более 12 знаков после точки, точность округления гарантирована при |знаменателе| < 10¹².
+4. Деление — только как `multiplyByRatio()` (одно округление в конце); операций распределения остатка и конвертации валют нет.
 5. Не определена модель точности и хранения криптовалют.
 
 ### Антипаттерны
