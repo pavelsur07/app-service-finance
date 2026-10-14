@@ -33,7 +33,7 @@
 {% endif %}
 {% if filters.counterpartyId %}
     {% set counterparty = counterparties|filter(c => c.id == filters.counterpartyId)|first %}
-    {% set applied = applied|merge([{label: 'Контрагент: ' ~ (counterparty ? counterparty.name : filters.counterpartyId), keys: ['counterpartyId']}]) %}
+    {% set applied = applied|merge([{label: 'Контрагент: ' ~ (counterparty ? (counterparty.displayName ?? counterparty.name) : filters.counterpartyId), keys: ['counterpartyId']}]) %}
 {% endif %}
 {% if filters.direction %}
     {% set applied = applied|merge([{label: filters.direction == 'INFLOW' ? 'Приток' : 'Отток', keys: ['direction']}]) %}

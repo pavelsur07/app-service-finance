@@ -26,6 +26,21 @@
     <div class="card-body">
         {{ form_errors(form) }}
         {{ form_row(form.name, {attr: {autocomplete: 'off'}}) }}
+        {# Отображаемое название (docs/plan/counterparty-display-name.md, этап 5): в списках и выборе
+           показывается оно, а не наименование выше. Ручное смена наименования не меняет. #}
+        {% if item is defined and item and item.displayName and item.displayName != item.name %}
+            {% set manual = item.displayNameSource and item.displayNameSource.value == 'manual' %}
+            <div class="alert alert-info mb-0" role="note">
+                В списках и при выборе отображается как <strong>{{ item.displayName }}</strong>
+                ({{ manual ? 'задано вручную' : 'по правилам' }}).
+                {% if manual %}
+                    Изменение наименования его не поменяет — вернуть исходное можно в
+                    <a href="{{ path('counterparty_index') }}">списке контрагентов</a>.
+                {% else %}
+                    После изменения наименования оно сбросится и будет пересчитано при следующей нормализации.
+                {% endif %}
+            </div>
+        {% endif %}
         {{ form_row(form.inn, {attr: {inputmode: 'numeric', autocomplete: 'off'}}) }}
         {{ form_row(form.kpp, {attr: {inputmode: 'numeric', autocomplete: 'off'}}) }}
         {{ form_row(form.type) }}

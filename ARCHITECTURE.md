@@ -981,7 +981,8 @@ PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, на
 ```php
 // Варианты выбора как DTO: Entity чужого модуля в формы не попадает.
 // Архивные не предлагаются, но уже выбранный архивный остаётся (keepId).
-// @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, label()
+// @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, displayName, shownName(), label()
+// label() и data-name пикера — по shownName() = displayName ?? name
 getSelectable(string $companyId, ?string $keepId = null): array
 
 // Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
@@ -1085,7 +1086,9 @@ findAllForBackfill(): iterable
 ```
 
 Публичный endpoint: `GET /api/counterparties/search?q=` — автокомплит,
-companyId только из сессии, ответ `[{id, name, inn, kpp, type}]` без пагинации.
+companyId только из сессии, ответ `[{id, name, displayName, inn, kpp, type}]` без пагинации;
+`name` — сырое, `displayName` — отображаемое или `null` (с 14.10.2026, этап 5
+`docs/plan/counterparty-display-name.md`; показывать `displayName ?? name`).
 `legalFormHint` в ответе намеренно отсутствует.
 
 `name_core` в БД пока nullable: `SET NOT NULL` — contract-миграцией после

@@ -95,7 +95,7 @@ final class CounterpartyPickerType extends AbstractType
                     $choice = $byId[$id] ?? null;
 
                     return [
-                        'data-name' => $choice?->name ?? '',
+                        'data-name' => $choice?->shownName() ?? '',
                         'data-inn' => $choice?->inn ?? '',
                     ];
                 };

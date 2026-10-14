@@ -17,14 +17,15 @@ const MIN_PORTAL_HEIGHT = 160;
 
 /** Адаптеры ответа API → элемент ядра. Ключ — значение data-picker-adapter. */
 export const adapters = {
-    // GET /api/counterparties/search: {id, name, inn, kpp, type}. Типы — App\Company\Enum\CounterpartyType.
+    // GET /api/counterparties/search: {id, name, displayName, inn, kpp, type}. Показ — отображаемое
+    // название, если задано (docs/plan/counterparty-display-name.md). Типы — App\Company\Enum\CounterpartyType.
     counterparty: (row) => {
         const legal = 'LEGAL_ENTITY' === row.type;
         const known = Boolean(row.type);
 
         return {
             id: String(row.id),
-            label: row.name,
+            label: row.displayName || row.name,
             hint: row.inn || '',
             group: known ? (legal ? 'Организации' : 'ИП и физические лица') : '',
             icon: known ? (legal ? 'building' : 'user') : '',

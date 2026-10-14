@@ -212,6 +212,28 @@ final class CounterpartySearchQueryTest extends IntegrationTestCase
         );
     }
 
+    /** Этап 5 docs/plan/counterparty-display-name.md: пикер показывает отображаемое, name — сырое. */
+    public function testReturnsDisplayNameNextToRawName(): void
+    {
+        // Given
+        $this->persistCounterparty(1, 'ООО "Ромашка"', '7707083893');
+        $this->persistCounterparty(2, 'ООО "Ромашка-2"', '7707083894');
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'manual', 'id' => '33333333-3333-3333-3333-000000000001'],
+        );
+
+        // When
+        $items = $this->query->search((string) $this->company->getId(), 'ромашка');
+
+        // Then
+        $byId = array_column($items, null, 'id');
+        self::assertSame('ООО "Ромашка"', $byId['33333333-3333-3333-3333-000000000001']['name']);
+        self::assertSame('ООО «Ромашка»', $byId['33333333-3333-3333-3333-000000000001']['displayName']);
+        self::assertNull($byId['33333333-3333-3333-3333-000000000002']['displayName']);
+    }
+
     private function persistCounterparty(int $index, string $name, ?string $inn): void
     {
         $counterparty = CounterpartyBuilder::aCounterparty()
