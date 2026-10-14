@@ -19,8 +19,14 @@ class PaymentPlanMatchRepository extends ServiceEntityRepository
         parent::__construct($registry, PaymentPlanMatch::class);
     }
 
-    public function findOneByTransaction(CashTransaction $transaction): ?PaymentPlanMatch
+    public function findOneByTransactionAndCompanyId(CashTransaction $transaction, string $companyId): ?PaymentPlanMatch
     {
-        return $this->findOneBy(['transaction' => $transaction]);
+        return $this->createQueryBuilder('planMatch')
+            ->andWhere('planMatch.transaction = :transaction')
+            ->andWhere('IDENTITY(planMatch.company) = :companyId')
+            ->setParameter('transaction', $transaction)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 }

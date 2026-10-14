@@ -12,6 +12,7 @@ use App\Cash\Application\SaveCashTransactionSplitsAction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
@@ -301,16 +302,16 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
 
         $source = $this->transactionRepository->find($created->sourceTransactionId);
         $target = $this->transactionRepository->find($created->targetTransactionId);
-        self::assertNotNull($source);
-        self::assertNotNull($target);
+        self::assertInstanceOf(CashTransaction::class, $source);
+        self::assertInstanceOf(CashTransaction::class, $target);
         self::assertNull($source->getVatRatePercent());
         self::assertNull($source->getVatAmount());
         self::assertNull($target->getVatRatePercent());
         self::assertNull($target->getVatAmount());
         /** @var PaymentPlanMatchRepository $paymentPlanMatchRepository */
         $paymentPlanMatchRepository = self::getContainer()->get(PaymentPlanMatchRepository::class);
-        self::assertNull($paymentPlanMatchRepository->findOneByTransaction($source));
-        self::assertNull($paymentPlanMatchRepository->findOneByTransaction($target));
+        self::assertNull($paymentPlanMatchRepository->findOneByTransactionAndCompanyId($source, (string) $company->getId()));
+        self::assertNull($paymentPlanMatchRepository->findOneByTransactionAndCompanyId($target, (string) $company->getId()));
 
         /** @var MoneyAccountDailyBalanceRepository $balanceRepository */
         $balanceRepository = self::getContainer()->get(MoneyAccountDailyBalanceRepository::class);
@@ -364,7 +365,7 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
             [
                 'companyId' => $companyId,
                 'transferClass' => CashTransfer::class,
-                'transactionClass' => \App\Cash\Entity\Transaction\CashTransaction::class,
+                'transactionClass' => CashTransaction::class,
             ],
         ));
     }
@@ -408,8 +409,8 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
         $this->assertClosingBalance($company, $sourceAccount, $date, '0.00');
         $this->assertClosingBalance($company, $targetAccount, $date, '0.00');
         $this->assertLifecycleAudit($created->transferId, CashTransfer::class, AuditLogAction::SOFT_DELETE, $actorUserId);
-        $this->assertLifecycleAudit($created->sourceTransactionId, \App\Cash\Entity\Transaction\CashTransaction::class, AuditLogAction::SOFT_DELETE, $actorUserId);
-        $this->assertLifecycleAudit($created->targetTransactionId, \App\Cash\Entity\Transaction\CashTransaction::class, AuditLogAction::SOFT_DELETE, $actorUserId);
+        $this->assertLifecycleAudit($created->sourceTransactionId, CashTransaction::class, AuditLogAction::SOFT_DELETE, $actorUserId);
+        $this->assertLifecycleAudit($created->targetTransactionId, CashTransaction::class, AuditLogAction::SOFT_DELETE, $actorUserId);
 
         $this->cashFacade->restoreTransfer((string) $company->getId(), $created->transferId, $actorUserId);
 
@@ -420,8 +421,8 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
         $this->assertClosingBalance($company, $sourceAccount, $date, '-9500.00');
         $this->assertClosingBalance($company, $targetAccount, $date, '100.00');
         $this->assertLifecycleAudit($created->transferId, CashTransfer::class, AuditLogAction::RESTORE, $actorUserId);
-        $this->assertLifecycleAudit($created->sourceTransactionId, \App\Cash\Entity\Transaction\CashTransaction::class, AuditLogAction::RESTORE, $actorUserId);
-        $this->assertLifecycleAudit($created->targetTransactionId, \App\Cash\Entity\Transaction\CashTransaction::class, AuditLogAction::RESTORE, $actorUserId);
+        $this->assertLifecycleAudit($created->sourceTransactionId, CashTransaction::class, AuditLogAction::RESTORE, $actorUserId);
+        $this->assertLifecycleAudit($created->targetTransactionId, CashTransaction::class, AuditLogAction::RESTORE, $actorUserId);
     }
 
     public function testLifecycleRejectsForeignCompanyAndClosedPeriod(): void
@@ -553,7 +554,7 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
             self::assertStringContainsString('Операции перевода нельзя удалить отдельно.', $exception->getMessage());
         }
 
-        $legacy = new \App\Cash\Entity\Transaction\CashTransaction(
+        $legacy = new CashTransaction(
             Uuid::uuid4()->toString(),
             $company,
             $sourceAccount,

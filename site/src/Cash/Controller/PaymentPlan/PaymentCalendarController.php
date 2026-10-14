@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
+use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\DTO\ForecastDTO;
 use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -11,6 +12,7 @@ use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentCalendarFacade;
@@ -26,6 +28,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -40,6 +43,7 @@ final class PaymentCalendarController extends AbstractController
         private PaymentCalendarFacade $paymentCalendarFacade,
         private ForecastBalanceService $forecastBalanceService,
         private RecurrenceMaterializer $recurrenceMaterializer,
+        private MoneyAccountRepository $moneyAccountRepository,
     ) {
     }
 
@@ -84,8 +88,8 @@ final class PaymentCalendarController extends AbstractController
         ], $filters);
     }
 
-    #[Route('/{id}/edit', name: 'payment_calendar_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, PaymentPlan $plan): Response
+    #[Route('/{id}/edit', name: 'payment_calendar_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
+    public function edit(Request $request, string $id): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
@@ -93,9 +97,7 @@ final class PaymentCalendarController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($plan->getCompany()->getId() !== $company->getId()) {
-            throw $this->createAccessDeniedException();
-        }
+        $plan = $this->findPlanOrNotFound($id, $company);
 
         $filters = $this->extractFilters($request);
 
@@ -135,15 +137,12 @@ final class PaymentCalendarController extends AbstractController
         ], $filters);
     }
 
-    #[Route('/{id}/status', name: 'payment_calendar_status', methods: ['POST'])]
+    #[Route('/{id}/status', name: 'payment_calendar_status', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function changeStatus(Request $request, PaymentPlan $plan): Response
+    public function changeStatus(Request $request, string $id): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
-
-        if ($plan->getCompany()->getId() !== $company->getId()) {
-            throw $this->createAccessDeniedException();
-        }
+        $plan = $this->findPlanOrNotFound($id, $company);
 
         if (!$this->isCsrfTokenValid('payment_plan_status_'.$plan->getId(), (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
@@ -190,15 +189,12 @@ final class PaymentCalendarController extends AbstractController
         return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
     }
 
-    #[Route('/{id}/postpone', name: 'payment_calendar_postpone', methods: ['POST'])]
+    #[Route('/{id}/postpone', name: 'payment_calendar_postpone', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function postpone(Request $request, PaymentPlan $plan): Response
+    public function postpone(Request $request, string $id): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
-
-        if ($plan->getCompany()->getId() !== $company->getId()) {
-            throw $this->createAccessDeniedException();
-        }
+        $plan = $this->findPlanOrNotFound($id, $company);
 
         if (!$this->isCsrfTokenValid('payment_plan_postpone_'.$plan->getId(), (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
@@ -259,10 +255,7 @@ final class PaymentCalendarController extends AbstractController
 
             $account = null;
             if (!empty($filters['account_id'])) {
-                $candidate = $this->entityManager->getRepository(MoneyAccount::class)->find($filters['account_id']);
-                if ($candidate instanceof MoneyAccount && $candidate->getCompany()->getId() === $company->getId()) {
-                    $account = $candidate;
-                }
+                $account = $this->moneyAccountRepository->findOneByIdAndCompanyId($filters['account_id'], (string) $company->getId());
             }
 
             $forecast = $this->forecastBalanceService->buildForecast($company, $from, $to, $account);
@@ -285,6 +278,23 @@ final class PaymentCalendarController extends AbstractController
         ];
 
         return $this->render('payment_calendar/index.html.twig', array_merge($context, $extra));
+    }
+
+    /**
+     * Невалидный UUID в фильтре игнорируется: иначе PostgreSQL падает на
+     * приведении к uuid и пользователь получает 500.
+     */
+    private function uuidFilter(Request $request, string $name): string
+    {
+        $value = (string) $request->query->get($name, '');
+
+        return CanonicalUuid::isValid($value) ? $value : '';
+    }
+
+    private function findPlanOrNotFound(string $id, Company $company): PaymentPlan
+    {
+        return $this->paymentPlanRepository->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
     }
 
     /**
@@ -317,10 +327,10 @@ final class PaymentCalendarController extends AbstractController
         return [
             'from' => $from,
             'to' => $to,
-            'account_id' => (string) $request->query->get('account_id', ''),
-            'category_id' => (string) $request->query->get('category_id', ''),
+            'account_id' => $this->uuidFilter($request, 'account_id'),
+            'category_id' => $this->uuidFilter($request, 'category_id'),
             'status' => (string) $request->query->get('status', ''),
-            'counterparty_id' => (string) $request->query->get('counterparty_id', ''),
+            'counterparty_id' => $this->uuidFilter($request, 'counterparty_id'),
         ];
     }
 

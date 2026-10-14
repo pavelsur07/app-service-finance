@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -106,10 +107,10 @@ class CashflowCategoryController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'cashflow_category_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'cashflow_category_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
-        CashflowCategory $article,
+        string $id,
         CashflowCategoryRepository $repo,
         SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
@@ -122,9 +123,8 @@ class CashflowCategoryController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($article->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $article = $repo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         $parents = $article->isSystem()
             ? []
@@ -155,18 +155,18 @@ class CashflowCategoryController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'cashflow_category_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'cashflow_category_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
-        CashflowCategory $article,
+        string $id,
+        CashflowCategoryRepository $repo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
-        if ($article->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $article = $repo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         if ($this->isCsrfTokenValid('delete'.$article->getId(), $request->request->get('_token'))) {
             try {

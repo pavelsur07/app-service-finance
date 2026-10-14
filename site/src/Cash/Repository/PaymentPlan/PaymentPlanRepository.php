@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Repository\PaymentPlan;
 
+use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
@@ -21,6 +22,24 @@ class PaymentPlanRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, PaymentPlan::class);
+    }
+
+    /**
+     * Невалидный UUID — «не найдено», а не ошибка БД: id приходит из URL и формы.
+     */
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?PaymentPlan
+    {
+        if (!CanonicalUuid::isValid($id) || !CanonicalUuid::isValid($companyId)) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('plan')
+            ->andWhere('plan.id = :id')
+            ->andWhere('IDENTITY(plan.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**
@@ -118,10 +137,12 @@ class PaymentPlanRepository extends ServiceEntityRepository
         return $totals;
     }
 
-    public function findTemplateForRecurrenceRule(PaymentRecurrenceRule $rule): ?PaymentPlan
+    public function findTemplateForRecurrenceRuleAndCompanyId(PaymentRecurrenceRule $rule, string $companyId): ?PaymentPlan
     {
         return $this->createQueryBuilder('plan')
             ->where('plan.recurrenceRule = :rule')
+            ->andWhere('IDENTITY(plan.company) = :companyId')
+            ->setParameter('companyId', $companyId)
             ->orderBy('plan.plannedAt', \SortDirection::Ascending)
             ->setMaxResults(1)
             ->setParameter('rule', $rule)

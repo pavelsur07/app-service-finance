@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountMasker;
 use App\Cash\Service\Import\ClientBank1CImportService;
@@ -60,11 +61,11 @@ class Bank1CImportController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $selectedAccount = null;
 
-        if (is_string($state['account_id'])) {
-            $selectedAccount = $accountRepository->find($state['account_id']);
+        if (is_string($state['account_id']) && CanonicalUuid::isValid($state['account_id'])) {
+            $selectedAccount = $accountRepository->findOneByIdAndCompanyId($state['account_id'], (string) $company->getId());
         }
 
-        if (null === $selectedAccount || $selectedAccount->getCompany() !== $company) {
+        if (null === $selectedAccount) {
             $this->addFlash('danger', 'Выбранный счёт недоступен.');
 
             return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
@@ -222,11 +223,11 @@ class Bank1CImportController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
         $account = null;
-        if (is_string($state['account_id'])) {
-            $account = $accountRepository->find($state['account_id']);
+        if (is_string($state['account_id']) && CanonicalUuid::isValid($state['account_id'])) {
+            $account = $accountRepository->findOneByIdAndCompanyId($state['account_id'], (string) $company->getId());
         }
 
-        if (null === $account || $account->getCompany() !== $company) {
+        if (null === $account) {
             $this->addFlash('danger', 'Выбранный счёт недоступен.');
 
             return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);
@@ -329,11 +330,11 @@ class Bank1CImportController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
         $account = null;
-        if (is_string($state['account_id'])) {
-            $account = $accountRepository->find($state['account_id']);
+        if (is_string($state['account_id']) && CanonicalUuid::isValid($state['account_id'])) {
+            $account = $accountRepository->findOneByIdAndCompanyId($state['account_id'], (string) $company->getId());
         }
 
-        if (null === $account || $account->getCompany() !== $company) {
+        if (null === $account) {
             $this->addFlash('danger', 'Выбранный счёт недоступен. Пожалуйста, повторите загрузку файла.');
 
             return $this->redirectToRoute('cash_bank1c_import_upload', [], 303);

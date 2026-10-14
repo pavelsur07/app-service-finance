@@ -18,6 +18,7 @@ use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -94,10 +95,11 @@ class MoneyAccountController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'money_account_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'money_account_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
-        MoneyAccount $account,
+        string $id,
+        MoneyAccountRepository $accountRepository,
         AccountBalanceService $balanceService,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -106,9 +108,8 @@ class MoneyAccountController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($account->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $account = $accountRepository->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         $form = $this->createForm(MoneyAccountFormType::class, $account, [
             'expanded_type' => true,

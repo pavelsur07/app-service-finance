@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -74,7 +75,7 @@ class BankConnectionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'cash_bank_connection_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'cash_bank_connection_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
         string $id,
@@ -86,9 +87,9 @@ class BankConnectionController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        $connection = $repository->find($id);
+        $connection = $repository->findOneByIdAndCompanyId($id, (string) $company->getId());
 
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+        if (null === $connection) {
             throw $this->createNotFoundException();
         }
 
@@ -117,7 +118,7 @@ class BankConnectionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'cash_bank_connection_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'cash_bank_connection_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
@@ -125,9 +126,9 @@ class BankConnectionController extends AbstractController
         BankConnectionRepository $repository,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
-        $connection = $repository->find($id);
+        $connection = $repository->findOneByIdAndCompanyId($id, (string) $company->getId());
 
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+        if (null === $connection) {
             throw $this->createNotFoundException();
         }
 
@@ -138,7 +139,7 @@ class BankConnectionController extends AbstractController
         return $this->redirectToRoute('cash_bank_connection_index');
     }
 
-    #[Route('/{id}/enqueue-import', name: 'cash_bank_connection_enqueue_import', methods: ['POST'])]
+    #[Route('/{id}/enqueue-import', name: 'cash_bank_connection_enqueue_import', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function enqueueImport(
         Request $request,
@@ -146,9 +147,9 @@ class BankConnectionController extends AbstractController
         BankConnectionRepository $repository,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
-        $connection = $repository->find($id);
+        $connection = $repository->findOneByIdAndCompanyId($id, (string) $company->getId());
 
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+        if (null === $connection) {
             throw $this->createNotFoundException();
         }
 

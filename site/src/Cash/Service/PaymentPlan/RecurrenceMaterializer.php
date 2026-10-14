@@ -41,7 +41,7 @@ final class RecurrenceMaterializer
         $created = 0;
 
         foreach ($rules as $rule) {
-            $seed = $this->paymentPlanRepository->findTemplateForRecurrenceRule($rule);
+            $seed = $this->paymentPlanRepository->findTemplateForRecurrenceRuleAndCompanyId($rule, (string) $company->getId());
 
             if (!$seed instanceof PaymentPlan) {
                 continue;

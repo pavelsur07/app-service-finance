@@ -122,7 +122,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         $result = $this->matcher->matchForTransaction($transactionFromDb);
 
         self::assertNull($result);
-        self::assertNull($this->matchRepository->findOneByTransaction($transactionFromDb));
+        self::assertNull($this->matchRepository->findOneByTransactionAndCompanyId($transactionFromDb, (string) $transactionFromDb->getCompany()->getId()));
     }
 
     public function testDoesNotMatchCurrencylessPlanToNonRubTransaction(): void
@@ -165,7 +165,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         $this->em->flush();
 
         self::assertNull($this->matcher->matchForTransaction($transaction));
-        self::assertNull($this->matchRepository->findOneByTransaction($transaction));
+        self::assertNull($this->matchRepository->findOneByTransactionAndCompanyId($transaction, (string) $transaction->getCompany()->getId()));
         self::assertSame(PaymentPlanStatusEnum::APPROVED, $plan->getStatus());
     }
 }

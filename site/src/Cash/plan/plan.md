@@ -234,6 +234,8 @@
   `ARCHITECTURE.md`.
 - Репозитории других модулей, даже если в них то же нарушение.
 - Маршруты и URL: `{id}` в пути остаётся, меняется только способ загрузки.
+  *Пересмотрено при выполнении:* на затронутых маршрутах добавлены
+  `requirements: UUID` — невалидный id давал 500.
 - Глобальный Doctrine SQL Filter по компании — не вводим.
 
 **Правила:**
@@ -246,6 +248,9 @@
 - `PaymentPlanType` без компании — бросать исключение, а не отдавать
   несфильтрованный список.
 - Ответ на чужой ID — 404, как сейчас. Текст и поведение не меняются.
+  *Пересмотрено при выполнении:* план платежа и `create-from` отвечали на
+  чужой id 403 (раскрывали существование) — теперь 404; JSON `create-from`
+  получил текст «Транзакция не найдена.».
 
 **Результат.** Ни одной загрузки сущности компании без `companyId` в
 контроллерах Cash; правило ловит это машинно; формы не показывают чужие
@@ -253,17 +258,52 @@
 
 **Чек-лист:**
 
-- [ ] 11 `find($id)` заменены; на каждый маршрут — тест «чужой ID → 404».
-- [ ] 6 аргументов-Entity заменены на `string $id` + загрузку с компанией;
-      тесты «чужой ID → 404».
-- [ ] 4 записи `repositoryCompanyScope` по Cash удалены из baseline (параметр
+- [x] 11 `find($id)` заменены; на каждый маршрут — тест «чужой ID → 404»
+      (во flash-сценариях — «недоступно»).
+- [x] 6 аргументов-Entity заменены на `string $id` + загрузку с компанией;
+      тесты «чужой ID → 404». Ревью нашло ещё 6, пропущенных аудитом из-за
+      многострочных сигнатур (`CashTransactionController::createPnlDocument/edit`,
+      `MoneyAccountController::edit`, `CashflowCategoryController::edit/delete`,
+      `FundController::addMovement`), — переведены в этом же этапе; всего 12.
+- [x] 4 записи `repositoryCompanyScope` по Cash удалены из baseline (параметр
       или `@companyScopeExempt` с причиной).
-- [ ] `RepositoryCompanyScopeRule` ловит `->find(` на репозиториях сущностей
-      компании в контроллерах; тест правила.
-- [ ] Формы: `EntityType` с чужими сущностями убран; тест на отсутствие чужих
-      значений в выборе.
-- [ ] Baseline Cash уменьшился минимум на 4; «Журнал» обновлён.
-- [ ] Все гейты зелёные.
+- [→] `RepositoryCompanyScopeRule` для `->find(` в контроллерах — **перенесён
+      в этап 4**: правило проектное, вне Cash 41 срабатывание, а рост baseline
+      по общим правилам плана допустим только на этапе 4.
+- [→] Формы: `EntityType` с чужими сущностями — **перенесён в этап 7.5**:
+      утечки нет (`choices` уже из списка своей компании), нужна работа над
+      границей модулей — методы фасадов Company/Finance с DTO и трансформер.
+- [x] Baseline уменьшился на 11 (Cash 8, тесты 3); «Журнал» обновлён.
+- [x] Все гейты зелёные.
+
+### Результат этапа 2 (2026-10-14)
+
+Живого IDOR в контроллерах Cash не было: все 23 места (11 `find()` и 12
+аргументов-Entity) после загрузки сверяли компанию. После этапа в контроллерах
+Cash нет ни одной загрузки сущности компании без компании в самом запросе. Этап перевёл их на загрузку с компанией в самом запросе и закрыл
+дефекты, найденные тестами (на старом коде красные 15 из 33):
+
+- **Невалидный id → 500** в 9 маршрутах (`{id}` без `requirements`, PostgreSQL
+  падал на приведении к `uuid`) и в фильтрах платёжного календаря
+  (`account_id`, `category_id`, `counterparty_id`). Теперь 404 и игнор фильтра.
+- **Раскрытие существования чужой записи:** чужой план платежа давал 403, чужая
+  транзакция в `create-from` — JSON 403 «Доступ запрещён». Теперь 404, чужая и
+  несуществующая запись неразличимы.
+
+| Что | Как |
+|---|---|
+| Репозитории | `findOneByIdAndCompanyId()` в `CashFileImportProfileRepository`, `BankConnectionRepository`, `PaymentPlanRepository`; невалидный UUID → `null` |
+| 4 метода без компании | `findActiveByBankCode`, `findActiveGeneralProjectTargetsWithoutCfo` — `@companyScopeExempt` (cron и разовая миграция по всем компаниям); `findOneByTransaction` → `findOneByTransactionAndCompanyId`, `findTemplateForRecurrenceRule` → `findTemplateForRecurrenceRuleAndCompanyId` |
+| Контроллеры | профили импорта, подключения банка, 1С-импорт, файловый импорт, транзакции (`show`/`delete`/`restore`/`create-from`), платёжный календарь (`edit`/`status`/`postpone`, фильтр счёта); `requirements: UUID` на затронутых маршрутах |
+| `PaymentPlanType` | опция `company` уже была обязательной; мёртвые `if ($company)` убраны |
+| Строгий UUID | `CanonicalUuid::isValid()` (8-4-4-4-12): `Ramsey\Uuid\Uuid::isValid()` и `Assert::uuid()` пропускают `urn:uuid:…`, на котором PostgreSQL падает; применён в новых методах репозиториев, фильтрах календаря и сессии 1С |
+| Данные прода перед деплоем | `payment_plan_match` — 1 строка, расхождений `company_id` с транзакцией 0; `payment_plan` с чужим `recurrence_rule` — 0 (read-only) |
+
+Тесты: `CashCompanyIsolationTest` — чужой id, невалидный id, своя сущность
+(GET открывается, POST без токена не 404), восстановление своей удалённой
+транзакции, 1С preview/commit, профиль импорта с `urn:uuid:`;
+`MoneyFundCompanyScopeTest` (фонды за флагом, маршрут функционально не
+проверить); `CanonicalUuidTest`.
 
 ---
 
@@ -346,7 +386,14 @@ Object», `PATTERNS.md` §4 Value Object).
      `*Action`, `*Handler`, `*Command`.
   3. PHPat-правило: `EntityType` в формах модуля — только с сущностями своего
      модуля.
-- Правило 2 и 3 вводятся **с baseline** текущих нарушений: это единственный
+  4. Call-site правило (перенесено из этапа 2): вызов `find()`/`findAll()` на
+     репозитории сущности компании в `*\Controller\*` — ошибка; аргумент
+     действия контроллера с типом сущности компании (Entity value resolver) —
+     тоже ошибка. Вне Cash на
+     дату этапа 2 — 41 вызов `->find(`/`->findAll()` в контроллерах Company,
+     Loan, Marketplace, MarketplaceAds, Telegram (часть — не по сущностям
+     компании).
+- Правила 2–4 вводятся **с baseline** текущих нарушений: это единственный
   этап, где baseline растёт, PR с меткой `[baseline-grow]` и списком записей.
 - `ScoreCompanyCounterpartiesMessage`: команда `app:cash:dispatch-scoring`
   нигде не вызывается. Варианта два — прописать в `async_pipeline` с логами в
@@ -477,7 +524,7 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 7.2 | Finance: 4 отчётных контроллера, `FinanceFacade`, `FinanceDashboardKpiProvider` | репозитории, `DailyBalanceRecalculator`, `AccountBalanceProvider` |
 | 7.3 | `Report/CashflowReportBuilder`, `Ai/CashflowAgent`, `Telegram/SendTelegramReportsCommand` | репозитории |
 | 7.4 | `Twig` ×2, `Company` ×2, `Shared/AuditLogSubscriber`, `DataFixtures` | сервисы Cash |
-| 7.5 | Cash → Company и Finance | `CounterpartyRepository`, `ProjectDirectionRepository`, `UserRepository`, `CompanyRepository`, `CounterpartyNameNormalizer`, `PLCategoryRepository`, `PLRegisterUpdater` |
+| 7.5 | Cash → Company и Finance | `CounterpartyRepository`, `ProjectDirectionRepository`, `UserRepository`, `CompanyRepository`, `CounterpartyNameNormalizer`, `PLCategoryRepository`, `PLRegisterUpdater`; из этапа 2 — `EntityType` с `ProjectDirection` (`CashTransactionAutoRuleType`) и `PLCategory` (`CashflowCategoryType`) → `ChoiceType` + фасад с DTO |
 
 **Лезем:**
 
@@ -587,7 +634,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | Этап | Дата | Baseline Cash до | Baseline Cash после | Прочие цифры | PR |
 |---|---|---|---|---|---|
 | 0 | 2026-10-14 | 240 записей (276 ошибок) | — | phpat…Cash 39, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3; весь baseline — 2332 записи (3425 ошибок); данные: расхождений `float` 0 по трём проверкам | #2677 |
-| 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | этот PR |
+| 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | #2678 |
+| 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | этот PR |
 
 ## Находки
 
@@ -625,6 +673,19 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
     неустранимый → без ретраев.
   - Неустранимая ветка даёт два события в GlitchTip: `error` handler'а и
     `critical` Messenger «Removing from transport». Решить, понижать ли первый.
+- Ревью этапа 2, вне scope:
+  - Невалидный id всё ещё даёт 500 вне диффа этапа: `CashTransactionSplitsController`
+    (`/{id}/splits`) и `CashTransactionAutoRuleController` (edit, check,
+    disable, enable, delete, `match/{transactionId}`, `apply/{transactionId}`)
+    без `requirements`; `CashTransactionRepository::findOneByIdAndCompanyId` и
+    `CashTransactionAutoRuleRepository::findOneByIdAndCompanyId` не проверяют
+    UUID. Унифицировать: `CanonicalUuid` в репозиториях + `requirements`.
+  - Вне диффа этапа входные id проверяются через `Ramsey\Uuid\Uuid::isValid()`,
+    который пропускает `urn:uuid:…` (пример — `CashTransactionAutoRuleController`,
+    `fromTransactionId`) → 500 на PostgreSQL. Перевести на `CanonicalUuid`
+    вместе с предыдущим пунктом.
+  - JSON-ошибки `create-from` в старом формате `{error: true, message}`, не
+    `{error: {code, message}}` из `CLAUDE.md` — менять вместе с шаблоном.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - `Finance/Entity/Document::getTotalAmount()` суммирует через `float` —

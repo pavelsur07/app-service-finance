@@ -44,15 +44,10 @@ final class PaymentPlanType extends AbstractType
                 'placeholder' => 'Выберите категорию',
                 'choice_label' => static fn (CashflowCategory $category): string => (string) $category->getName(),
                 'query_builder' => static function (EntityRepository $repository) use ($company) {
-                    $qb = $repository->createQueryBuilder('category')
+                    return $repository->createQueryBuilder('category')
+                        ->andWhere('category.company = :company')
+                        ->setParameter('company', $company)
                         ->orderBy('category.name', \SortDirection::Ascending);
-
-                    if ($company) {
-                        $qb->andWhere('category.company = :company')
-                            ->setParameter('company', $company);
-                    }
-
-                    return $qb;
                 },
             ])
             ->add('moneyAccount', EntityType::class, [
@@ -62,15 +57,10 @@ final class PaymentPlanType extends AbstractType
                 'placeholder' => 'Любой счёт',
                 'choice_label' => static fn (MoneyAccount $account): string => (string) $account->getName(),
                 'query_builder' => static function (EntityRepository $repository) use ($company) {
-                    $qb = $repository->createQueryBuilder('account')
+                    return $repository->createQueryBuilder('account')
+                        ->andWhere('account.company = :company')
+                        ->setParameter('company', $company)
                         ->orderBy('account.name', \SortDirection::Ascending);
-
-                    if ($company) {
-                        $qb->andWhere('account.company = :company')
-                            ->setParameter('company', $company);
-                    }
-
-                    return $qb;
                 },
             ])
             ->add('counterparty', CounterpartyPickerType::class, [

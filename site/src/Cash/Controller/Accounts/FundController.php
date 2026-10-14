@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Intl\Currencies;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -82,10 +83,11 @@ class FundController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/movement', name: 'finance_funds_add_movement', methods: ['GET', 'POST'])]
+    #[Route('/{id}/movement', name: 'finance_funds_add_movement', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function addMovement(
-        MoneyFund $fund,
+        string $id,
         Request $request,
+        MoneyFundRepository $fundRepository,
         FundService $fundService,
     ): Response {
         $this->assertFeatureEnabled();
@@ -95,9 +97,8 @@ class FundController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($fund->getCompany()->getId() !== $company->getId()) {
-            throw $this->createNotFoundException();
-        }
+        $fund = $fundRepository->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         $movement = new MoneyFundMovement(
             Uuid::uuid4()->toString(),

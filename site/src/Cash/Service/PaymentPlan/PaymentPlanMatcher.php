@@ -28,7 +28,10 @@ final class PaymentPlanMatcher
 
     public function matchForTransaction(CashTransaction $transaction): ?PaymentPlan
     {
-        $existingMatch = $this->paymentPlanMatchRepository->findOneByTransaction($transaction);
+        $existingMatch = $this->paymentPlanMatchRepository->findOneByTransactionAndCompanyId(
+            $transaction,
+            (string) $transaction->getCompany()->getId(),
+        );
         if (null !== $existingMatch) {
             return $existingMatch->getPlan();
         }

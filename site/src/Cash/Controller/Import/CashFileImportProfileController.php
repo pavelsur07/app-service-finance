@@ -13,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -90,7 +91,7 @@ class CashFileImportProfileController extends AbstractController
         return $this->render('cash/file_import_profiles/new.html.twig', $formData);
     }
 
-    #[Route('/{id}/edit', name: 'cash_file_import_profile_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'cash_file_import_profile_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
         string $id,
@@ -102,9 +103,9 @@ class CashFileImportProfileController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        $profile = $repository->find($id);
+        $profile = $repository->findOneByIdAndCompanyId($id, (string) $company->getId());
 
-        if (!$profile || $profile->getCompany()->getId() !== $company->getId()) {
+        if (null === $profile) {
             throw $this->createNotFoundException();
         }
 
@@ -154,7 +155,7 @@ class CashFileImportProfileController extends AbstractController
         return $this->render('cash/file_import_profiles/edit.html.twig', $formData);
     }
 
-    #[Route('/{id}/delete', name: 'cash_file_import_profile_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'cash_file_import_profile_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function delete(
         Request $request,
@@ -162,9 +163,9 @@ class CashFileImportProfileController extends AbstractController
         CashFileImportProfileRepository $repository,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
-        $profile = $repository->find($id);
+        $profile = $repository->findOneByIdAndCompanyId($id, (string) $company->getId());
 
-        if (!$profile || $profile->getCompany()->getId() !== $company->getId()) {
+        if (null === $profile) {
             throw $this->createNotFoundException();
         }
 

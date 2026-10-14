@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Repository\Accounts;
 
+use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -17,6 +18,24 @@ class MoneyFundRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MoneyFund::class);
+    }
+
+    /**
+     * Невалидный UUID — «не найдено», а не ошибка БД: id приходит из URL.
+     */
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?MoneyFund
+    {
+        if (!CanonicalUuid::isValid($id) || !CanonicalUuid::isValid($companyId)) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('f')
+            ->andWhere('f.id = :id')
+            ->andWhere('IDENTITY(f.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

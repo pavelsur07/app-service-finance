@@ -199,12 +199,11 @@ class CashTransactionController extends AbstractController
     }
 
     #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
-    public function show(CashTransaction $tx, CashTransferRepository $transferRepository): Response
+    public function show(string $id, CashTransactionRepository $txRepo, CashTransferRepository $transferRepository): Response
     {
         $company = $this->companyService->getActiveCompany();
-        if ($tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         $transfer = $transferRepository->findOneByTransactionAndCompanyId($tx, $company->getId());
 
@@ -220,13 +219,13 @@ class CashTransactionController extends AbstractController
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function createPnlDocument(
         Request $request,
-        CashTransaction $tx,
+        string $id,
+        CashTransactionRepository $txRepo,
         CashTransactionToDocumentService $operationFactory,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        if ($tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         if (!$this->isCsrfTokenValid('create_pnl_document'.$tx->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF токен');
@@ -347,7 +346,8 @@ class CashTransactionController extends AbstractController
     #[Route('/{id}/edit', name: 'cash_transaction_edit', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
-        CashTransaction $tx,
+        string $id,
+        CashTransactionRepository $txRepo,
         CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
@@ -356,9 +356,8 @@ class CashTransactionController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
         try {
             $service->assertStandaloneTransaction($tx);
         } catch (\DomainException $exception) {
@@ -421,10 +420,8 @@ class CashTransactionController extends AbstractController
         CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $tx = $txRepo->find($id);
-        if (!$tx || $tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         if (!$this->isCsrfTokenValid('tx_restore'.$tx->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF токен');
@@ -444,12 +441,11 @@ class CashTransactionController extends AbstractController
 
     #[Route('/{id}/delete', name: 'cash_transaction_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function delete(Request $request, CashTransaction $tx, CashTransactionService $service): Response
+    public function delete(Request $request, string $id, CashTransactionRepository $txRepo, CashTransactionService $service): Response
     {
         $company = $this->companyService->getActiveCompany();
-        if ($tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
+        $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
+            ?? throw $this->createNotFoundException();
 
         if ($this->isCsrfTokenValid('tx_delete'.$tx->getId(), $request->request->get('_token'))) {
             try {
