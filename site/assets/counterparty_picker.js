@@ -38,6 +38,8 @@ function initOnePicker(root) {
         adapter: adapters.counterparty,
         rowFromOption: (option) => ({ id: option.value, name: optionName(option), inn: option.dataset.inn || null, type: null }),
         labelFromOption: optionLabel,
+        // Локальный поиск — и по показанному, и по сырому названию.
+        searchTextFromOption: (option) => `${optionLabel(option)} ${option.dataset.rawName || ''}`,
         texts: {
             invalid: 'Выберите контрагента из списка.',
             stale: 'Обновите страницу: контрагент появился после её открытия.',

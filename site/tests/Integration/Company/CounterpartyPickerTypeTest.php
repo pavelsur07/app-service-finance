@@ -318,6 +318,29 @@ final class CounterpartyPickerTypeTest extends IntegrationTestCase
         self::assertSame('/api/counterparties/search', $view->vars['search_url']);
     }
 
+    /** Этап 5: вариант выбора подписан отображаемым названием, если оно задано. */
+    public function testChoiceLabelAndDataNameUseDisplayName(): void
+    {
+        // Given
+        $id = $this->persist($this->company, 1, 'ООО "Ромашка"', '7707083893');
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'manual', 'id' => $id],
+        );
+        $this->em->clear();
+
+        // When
+        $view = $this->forms->create(CounterpartyPickerType::class, null, [
+            'company_id' => $this->company->getId(),
+        ])->createView();
+
+        // Then
+        $choice = $view->vars['choices'][0];
+        self::assertSame('ООО «Ромашка» · 7707083893', $choice->label);
+        self::assertSame('ООО «Ромашка»', $choice->attr['data-name']);
+    }
+
     private function persist(Company $company, int $index, string $name, ?string $inn): string
     {
         $counterparty = CounterpartyBuilder::aCounterparty()

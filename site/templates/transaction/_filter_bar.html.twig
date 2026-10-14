@@ -154,12 +154,12 @@
             route: route,
             params: baseQuery,
             value: filters.counterpartyId ?? '',
-            valueLabel: counterparty ? counterparty.name : '',
+            valueLabel: counterparty ? (counterparty.displayName ?? counterparty.name) : '',
             searchUrl: path('api_counterparty_search'),
             adapter: 'counterparty',
             initial: (counterparty ? [counterparty] : [])
-                |merge(counterparties|filter(c => not c.archived and c.id != filters.counterpartyId)|slice(0, 20))
-                |map(c => {id: c.id, name: c.name, inn: c.inn, type: c.type.value}),
+                |merge(counterparties|filter(c => not c.archived and c.id != filters.counterpartyId)|sort((a, b) => (a.displayName ?? a.name) <=> (b.displayName ?? b.name))|slice(0, 20))
+                |map(c => {id: c.id, name: c.name, displayName: c.displayName, inn: c.inn, type: c.type.value}),
             emptyText: 'Никого не нашли. Проверьте название или ИНН.',
             allLabel: 'Все контрагенты',
             placeholder: 'Название или ИНН',

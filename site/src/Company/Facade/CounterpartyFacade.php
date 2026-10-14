@@ -41,6 +41,7 @@ final class CounterpartyFacade
                 $counterparty->getInn(),
                 $counterparty->getKpp(),
                 $counterparty->isArchived(),
+                $counterparty->getDisplayName(),
             ),
             $this->repository->findSelectableByCompany($companyId, $keepId),
         );

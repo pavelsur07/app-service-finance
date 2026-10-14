@@ -19,6 +19,7 @@ final class CounterpartySearchQuery
 {
     private const SIMILARITY_THRESHOLD = 0.3;
     private const MAX_LIMIT = 20;
+    private const QUOTES = '«»"“”„\'';
 
     public function __construct(
         private readonly Connection $connection,
@@ -27,7 +28,7 @@ final class CounterpartySearchQuery
     }
 
     /**
-     * @return list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}>
+     * @return list<array{id: string, name: string, displayName: ?string, inn: ?string, kpp: ?string, type: string}>
      */
     public function search(string $companyId, string $query, int $limit = self::MAX_LIMIT): array
     {
@@ -44,17 +45,17 @@ final class CounterpartySearchQuery
     }
 
     /**
-     * @return list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}>
+     * @return list<array{id: string, name: string, displayName: ?string, inn: ?string, kpp: ?string, type: string}>
      */
     private function searchByInn(string $companyId, string $query, int $limit): array
     {
         $sql = <<<'SQL'
-            SELECT id, name, inn, kpp, type
+            SELECT id, name, display_name, inn, kpp, type
             FROM "counterparty"
             WHERE company_id = :companyId
               AND is_archived = false
               AND inn LIKE :prefix
-            ORDER BY (inn = :query) DESC, name ASC
+            ORDER BY (inn = :query) DESC, COALESCE(display_name, name) ASC
             LIMIT :limit
             SQL;
 
@@ -73,27 +74,33 @@ final class CounterpartySearchQuery
     }
 
     /**
-     * @return list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}>
+     * @return list<array{id: string, name: string, displayName: ?string, inn: ?string, kpp: ?string, type: string}>
      */
     private function searchByName(string $companyId, string $query, int $limit): array
     {
         $core = $this->normalizer->normalize($query)->core;
+        // Отображаемое название ищется подстрокой без кавычек: в пикере показано оно
+        // («СПАО «Ингосстрах»» на месте банковской строки), и набранное должно его находить.
+        $shown = self::withoutQuotes(mb_strtolower($query, 'UTF-8'));
 
         // Порог задан явным условием, а не оператором `%`: тот зависит от сессионной
         // настройки pg_trgm.similarity_threshold и вёл бы себя по-разному в тестах и проде.
         $sql = <<<'SQL'
-            SELECT id, name, inn, kpp, type,
+            SELECT id, name, display_name, inn, kpp, type,
                    CASE
                        WHEN name_core = :core THEN 3.0
                        WHEN name_core LIKE :prefix THEN 2.0
+                       WHEN display_name IS NOT NULL AND regexp_replace(translate(lower(display_name), :quotes, ''), '\s+', ' ', 'g') LIKE :shownLike THEN 1.5
                        ELSE similarity(name_core, :core)
                    END AS rank
             FROM "counterparty"
             WHERE company_id = :companyId
               AND is_archived = false
               AND name_core IS NOT NULL
-              AND (name_core LIKE :prefix OR similarity(name_core, :core) > :threshold)
-            ORDER BY rank DESC, name ASC
+              AND (name_core LIKE :prefix
+                   OR similarity(name_core, :core) > :threshold
+                   OR (display_name IS NOT NULL AND regexp_replace(translate(lower(display_name), :quotes, ''), '\s+', ' ', 'g') LIKE :shownLike))
+            ORDER BY rank DESC, COALESCE(display_name, name) ASC
             LIMIT :limit
             SQL;
 
@@ -106,6 +113,8 @@ final class CounterpartySearchQuery
                 // с процентом матчит несопоставимо шире, чем ожидает пользователь.
                 'prefix' => addcslashes($core, '%_\\').'%',
                 'threshold' => self::SIMILARITY_THRESHOLD,
+                'quotes' => self::QUOTES,
+                'shownLike' => '%'.addcslashes($shown, '%_\\').'%',
                 'limit' => $limit,
             ],
             ['limit' => ParameterType::INTEGER],
@@ -114,13 +123,20 @@ final class CounterpartySearchQuery
         return $this->toItems($rows);
     }
 
+    private static function withoutQuotes(string $value): string
+    {
+        $value = str_replace(mb_str_split(self::QUOTES), '', $value);
+
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
+    }
+
     /**
      * Оба маршрута возвращают одну и ту же форму строки: драйвер отдаёт всё строками,
      * а `rank` во внешний контракт не попадает.
      *
      * @param list<array<string, mixed>> $rows
      *
-     * @return list<array{id: string, name: string, inn: ?string, kpp: ?string, type: string}>
+     * @return list<array{id: string, name: string, displayName: ?string, inn: ?string, kpp: ?string, type: string}>
      */
     private function toItems(array $rows): array
     {
@@ -128,6 +144,8 @@ final class CounterpartySearchQuery
             static fn (array $row): array => [
                 'id' => (string) $row['id'],
                 'name' => (string) $row['name'],
+                // Отображаемое название (docs/plan/counterparty-display-name.md); null — показывать name.
+                'displayName' => null !== $row['display_name'] ? (string) $row['display_name'] : null,
                 'inn' => null !== $row['inn'] ? (string) $row['inn'] : null,
                 'kpp' => null !== $row['kpp'] ? (string) $row['kpp'] : null,
                 'type' => (string) $row['type'],

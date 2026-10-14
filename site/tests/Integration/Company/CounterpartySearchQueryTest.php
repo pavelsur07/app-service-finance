@@ -212,6 +212,52 @@ final class CounterpartySearchQueryTest extends IntegrationTestCase
         );
     }
 
+    /** Этап 5 docs/plan/counterparty-display-name.md: пикер показывает отображаемое, name — сырое. */
+    public function testReturnsDisplayNameNextToRawName(): void
+    {
+        // Given
+        $this->persistCounterparty(1, 'ООО "Ромашка"', '7707083893');
+        $this->persistCounterparty(2, 'ООО "Ромашка-2"', '7707083894');
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'manual', 'id' => '33333333-3333-3333-3333-000000000001'],
+        );
+
+        // When
+        $items = $this->query->search((string) $this->company->getId(), 'ромашка');
+
+        // Then
+        $byId = array_column($items, null, 'id');
+        self::assertSame('ООО "Ромашка"', $byId['33333333-3333-3333-3333-000000000001']['name']);
+        self::assertSame('ООО «Ромашка»', $byId['33333333-3333-3333-3333-000000000001']['displayName']);
+        self::assertNull($byId['33333333-3333-3333-3333-000000000002']['displayName']);
+    }
+
+    /**
+     * Показанное в пикере должно находиться набором: банковская строка 383-П отображается как
+     * «СПАО «Ингосстрах»», а её name_core — длинная строка банка, по которой «Ингосстрах» не найти.
+     */
+    public function testFindsByDisplayNameIgnoringQuotes(): void
+    {
+        // Given
+        $this->persistCounterparty(1, 'БАНК ГПБ (АО)//40701810992000010090 ИНН7705042179 СПАО "Ингосстрах"', null);
+        $this->persistCounterparty(2, 'ООО "Ромашка"', null);
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'СПАО «Ингосстрах»', 'source' => 'manual', 'id' => '33333333-3333-3333-3333-000000000001'],
+        );
+
+        foreach (['Ингосстрах', 'СПАО Ингосстрах', 'спао «ингосстрах»', 'БАНК ГПБ'] as $query) {
+            // When
+            $ids = array_column($this->query->search((string) $this->company->getId(), $query), 'id');
+
+            // Then
+            self::assertSame(['33333333-3333-3333-3333-000000000001'], $ids, $query);
+        }
+    }
+
     private function persistCounterparty(int $index, string $name, ?string $inn): void
     {
         $counterparty = CounterpartyBuilder::aCounterparty()

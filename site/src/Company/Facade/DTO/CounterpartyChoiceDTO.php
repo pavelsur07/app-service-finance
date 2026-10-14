@@ -16,7 +16,14 @@ final readonly class CounterpartyChoiceDTO
         public ?string $inn,
         public ?string $kpp,
         public bool $isArchived,
+        public ?string $displayName = null,
     ) {
+    }
+
+    /** Название для показа: отображаемое, если задано (docs/plan/counterparty-display-name.md). */
+    public function shownName(): string
+    {
+        return $this->displayName ?? $this->name;
     }
 
     /**
@@ -24,7 +31,7 @@ final readonly class CounterpartyChoiceDTO
      */
     public function label(): string
     {
-        $label = $this->name;
+        $label = $this->shownName();
 
         if (null !== $this->inn) {
             $label .= ' · '.$this->inn;
