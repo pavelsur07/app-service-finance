@@ -49,7 +49,8 @@ class Counterparty
 
     /**
      * Отображаемое название — производное от name (docs/plan/counterparty-display-name.md):
-     * пишет только пересчёт по правилам или ручная правка; null — показывать name.
+     * пишет только пересчёт по правилам (RefreshCounterpartyDisplayNamesAction, условным UPDATE
+     * в обход сущности) или ручная правка; null — показывать name.
      */
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $displayName = null;
@@ -127,11 +128,14 @@ class Counterparty
 
     public function rename(CounterpartyName $name): void
     {
+        // Форма редактирования вызывает rename() при каждом сохранении — сбрасываем авто-название,
+        // только если сырое действительно сменилось.
+        $nameChanged = $name->display !== $this->name;
         $this->applyName($name);
 
         // Сырое название сменилось — авто-название посчитано от старого и уйдёт на пересчёт.
         // Ручное название — решение пользователя, переименование его не отменяет.
-        if (CounterpartyDisplayNameSource::MANUAL !== $this->displayNameSource) {
+        if ($nameChanged && CounterpartyDisplayNameSource::MANUAL !== $this->displayNameSource) {
             $this->displayName = null;
             $this->displayNameSource = null;
             $this->displayRulesVersion = null;
@@ -155,32 +159,11 @@ class Counterparty
         return $this->displayRulesVersion;
     }
 
-    /** Нужен ли пересчёт правилами этой версии: ручное название не пересчитывается никогда. */
-    public function needsAutoDisplayName(int $rulesVersion): bool
-    {
-        return CounterpartyDisplayNameSource::MANUAL !== $this->displayNameSource
-            && $rulesVersion !== $this->displayRulesVersion;
-    }
-
-    /**
-     * Результат правил (null — «не уверен, показывать name»). Не правка пользователя:
-     * updatedAt не меняется; ручное название перезаписать нельзя.
-     */
-    public function applyAutoDisplayName(?string $displayName, int $rulesVersion): void
-    {
-        if (CounterpartyDisplayNameSource::MANUAL === $this->displayNameSource) {
-            throw new \LogicException('Ручное отображаемое название не пересчитывается правилами.');
-        }
-
-        $this->displayName = $displayName;
-        $this->displayNameSource = CounterpartyDisplayNameSource::AUTO;
-        $this->displayRulesVersion = $rulesVersion;
-    }
-
     /** Ручное отображаемое название: главнее правил (этап 5 — правка в форме). */
     public function setManualDisplayName(string $displayName): void
     {
-        WebAssert::stringNotEmpty(trim($displayName));
+        $displayName = trim((string) preg_replace('/\s+/u', ' ', $displayName));
+        WebAssert::stringNotEmpty($displayName);
         WebAssert::maxLength($displayName, 255);
 
         $this->displayName = $displayName;

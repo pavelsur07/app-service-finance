@@ -27,7 +27,7 @@ final class RefreshCounterpartyDisplayNamesCommand extends Command
     {
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Только отчёт «было → станет», без записи в БД')
-            ->addOption('samples', null, InputOption::VALUE_REQUIRED, 'Сколько примеров показать в каждом разделе отчёта', '50');
+            ->addOption('samples', null, InputOption::VALUE_REQUIRED, 'Сколько примеров показать в каждом разделе отчёта (только с --dry-run)', '50');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -43,13 +43,17 @@ final class RefreshCounterpartyDisplayNamesCommand extends Command
 
         $io->title($dryRun ? 'Отображаемые названия контрагентов (dry-run)' : 'Отображаемые названия контрагентов');
 
-        $result = ($this->refresh)($dryRun, $samples);
+        // Примеры (сырые названия, ФИО ИП) — только в dry-run для отчёта: плановый прогон пишет
+        // stdout в docker logs планировщика, там персональным данным не место.
+        $result = ($this->refresh)($dryRun, $dryRun ? $samples : 0);
 
         $io->definitionList(
             ['Обработано' => $result->processed],
             [$dryRun ? 'Изменилось бы' : 'Изменено' => $result->changed],
+            ['  из них стало нераспознанным' => $result->becameUnrecognised],
             ['Без изменений' => $result->unchanged],
             ['Не распознано (показывается сырое название)' => $result->unrecognised],
+            ['Пропущено: изменены во время прогона' => $result->skippedConcurrent],
         );
 
         if ([] !== $result->changedSamples) {

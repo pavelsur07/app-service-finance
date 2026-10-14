@@ -6,16 +6,17 @@ namespace App\Company\Application;
 
 use App\Company\Application\DTO\CounterpartyDisplayNameRefreshResult;
 use App\Company\Domain\Service\CounterpartyDisplayNameFormatter;
-use App\Company\Repository\CounterpartyRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Company\Infrastructure\Persistence\CounterpartyDisplayNameWriter;
+use App\Company\Infrastructure\Query\CounterpartyDisplayNameBacklogQuery;
 use Psr\Log\LoggerInterface;
 
 /**
  * Пересчёт отображаемого названия контрагентов правилами (docs/plan/counterparty-display-name.md).
  *
  * Сырое name и updatedAt не меняются, импорт не участвует. Обрабатываются только строки без
- * авто-названия текущей версии правил; ручные — никогда. Идемпотентно: повторный прогон после
- * записи ничего не находит. Порциями с flush и clear — память не растёт с размером справочника.
+ * авто-названия текущей версии правил; ручные — никогда. Запись — условным UPDATE: параллельная
+ * правка пользователя не перезаписывается. Идемпотентно: повторный прогон ничего не находит.
+ * Скалярные порции по id — память не растёт, EntityManager не задействован.
  */
 final class RefreshCounterpartyDisplayNamesAction
 {
@@ -23,9 +24,9 @@ final class RefreshCounterpartyDisplayNamesAction
     private const MAX_LENGTH = 255;
 
     public function __construct(
-        private readonly CounterpartyRepository $repository,
+        private readonly CounterpartyDisplayNameBacklogQuery $backlog,
+        private readonly CounterpartyDisplayNameWriter $writer,
         private readonly CounterpartyDisplayNameFormatter $formatter,
-        private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -39,46 +40,26 @@ final class RefreshCounterpartyDisplayNamesAction
 
         $afterId = null;
         do {
-            $batch = $this->repository->findDisplayNameBacklog($version, $afterId, self::BATCH_SIZE);
+            $batch = $this->backlog->fetch($version, $afterId, self::BATCH_SIZE);
 
-            foreach ($batch as $counterparty) {
+            foreach ($batch as $row) {
                 ++$result->processed;
-                $afterId = $counterparty->getId();
+                $afterId = $row['id'];
 
-                $after = $this->formatter->format($counterparty->getName());
+                $after = $this->formatter->format($row['name']);
                 // Результат длиннее колонки (ОПФ и «ёлочки» к названию в 255 символов) — не уверены.
                 if (null !== $after && mb_strlen($after) > self::MAX_LENGTH) {
                     $after = null;
                 }
 
-                $before = $counterparty->getDisplayName();
+                if (!$dryRun && !$this->writer->writeAutoIfUnchanged($row['id'], $row['name'], $after, $version)) {
+                    ++$result->skippedConcurrent;
 
-                if (null === $after) {
-                    ++$result->unrecognised;
-                    if (\count($result->unrecognisedSamples) < $sampleLimit) {
-                        $result->unrecognisedSamples[] = ['id' => $counterparty->getId(), 'companyId' => (string) $counterparty->getCompany()->getId(), 'raw' => $counterparty->getName()];
-                    }
+                    continue;
                 }
 
-                if ($after === $before) {
-                    ++$result->unchanged;
-                } else {
-                    ++$result->changed;
-                    if (null !== $after && \count($result->changedSamples) < $sampleLimit) {
-                        $result->changedSamples[] = ['id' => $counterparty->getId(), 'companyId' => (string) $counterparty->getCompany()->getId(), 'raw' => $counterparty->getName(), 'before' => $before, 'after' => $after];
-                    }
-                }
-
-                if (!$dryRun) {
-                    $counterparty->applyAutoDisplayName($after, $version);
-                }
+                $this->count($result, $row, $after, $sampleLimit);
             }
-
-            if (!$dryRun) {
-                $this->em->flush();
-            }
-            // В ORM 3 clear() отцепляет всё — здесь других управляемых сущностей нет.
-            $this->em->clear();
         } while (self::BATCH_SIZE === \count($batch));
 
         $this->logger->info('Counterparty display name refresh finished.', [
@@ -86,10 +67,38 @@ final class RefreshCounterpartyDisplayNamesAction
             'rulesVersion' => $version,
             'processed' => $result->processed,
             'changed' => $result->changed,
+            'becameUnrecognised' => $result->becameUnrecognised,
             'unchanged' => $result->unchanged,
             'unrecognised' => $result->unrecognised,
+            'skippedConcurrent' => $result->skippedConcurrent,
         ]);
 
         return $result;
+    }
+
+    /**
+     * @param array{id: string, company_id: string, name: string, display_name: ?string} $row
+     */
+    private function count(CounterpartyDisplayNameRefreshResult $result, array $row, ?string $after, int $sampleLimit): void
+    {
+        if (null === $after) {
+            ++$result->unrecognised;
+            if (\count($result->unrecognisedSamples) < $sampleLimit) {
+                $result->unrecognisedSamples[] = ['id' => $row['id'], 'companyId' => $row['company_id'], 'raw' => $row['name']];
+            }
+        }
+
+        if ($after === $row['display_name']) {
+            ++$result->unchanged;
+
+            return;
+        }
+
+        ++$result->changed;
+        if (null === $after) {
+            ++$result->becameUnrecognised;
+        } elseif (\count($result->changedSamples) < $sampleLimit) {
+            $result->changedSamples[] = ['id' => $row['id'], 'companyId' => $row['company_id'], 'raw' => $row['name'], 'before' => $row['display_name'], 'after' => $after];
+        }
     }
 }

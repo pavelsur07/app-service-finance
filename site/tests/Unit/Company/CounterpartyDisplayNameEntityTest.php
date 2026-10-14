@@ -5,74 +5,32 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Company;
 
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
+use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyDisplayNameSource;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Отображаемое название — производное поле: правила пишут его без updatedAt, ручное главнее
- * правил, переименование отправляет авто-название на пересчёт.
+ * Отображаемое название в сущности: ручное главнее правил, переименование отправляет
+ * авто-название на пересчёт. Запись авто-названия — условный UPDATE пересчёта
+ * (CounterpartyDisplayNameWriterTest), сущность здесь не участвует.
  */
 final class CounterpartyDisplayNameEntityTest extends TestCase
 {
-    public function testNewCounterpartyNeedsAutoDisplayName(): void
+    public function testNewCounterpartyHasNoDisplayName(): void
     {
         $counterparty = CounterpartyBuilder::aCounterparty()->build();
 
         self::assertNull($counterparty->getDisplayName());
         self::assertNull($counterparty->getDisplayNameSource());
-        self::assertTrue($counterparty->needsAutoDisplayName(1));
-    }
-
-    public function testApplyAutoDisplayNameKeepsUpdatedAtAndRecordsVersion(): void
-    {
-        // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
-        $updatedAt = $counterparty->getUpdatedAt();
-
-        // When
-        $counterparty->applyAutoDisplayName('ООО «Ромашка»', 1);
-
-        // Then
-        self::assertSame('ООО «Ромашка»', $counterparty->getDisplayName());
-        self::assertSame(CounterpartyDisplayNameSource::AUTO, $counterparty->getDisplayNameSource());
-        self::assertSame(1, $counterparty->getDisplayRulesVersion());
-        self::assertSame($updatedAt, $counterparty->getUpdatedAt());
-        self::assertFalse($counterparty->needsAutoDisplayName(1));
-        self::assertTrue($counterparty->needsAutoDisplayName(2));
-    }
-
-    public function testUnrecognisedIsRecordedAsProcessed(): void
-    {
-        // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()->withName('Ozon')->build();
-
-        // When: правила не уверены
-        $counterparty->applyAutoDisplayName(null, 1);
-
-        // Then: показывать name, но повторно этой версией не обрабатывать
-        self::assertNull($counterparty->getDisplayName());
-        self::assertFalse($counterparty->needsAutoDisplayName(1));
-    }
-
-    public function testManualDisplayNameIsNeverRecalculated(): void
-    {
-        // Given
-        $counterparty = CounterpartyBuilder::aCounterparty()->build();
-        $counterparty->setManualDisplayName('ООО «Ромашка и партнёры»');
-
-        // Then
-        self::assertSame(CounterpartyDisplayNameSource::MANUAL, $counterparty->getDisplayNameSource());
-        self::assertFalse($counterparty->needsAutoDisplayName(1));
-        $this->expectException(\LogicException::class);
-        $counterparty->applyAutoDisplayName('ООО «Ромашка»', 1);
+        self::assertNull($counterparty->getDisplayRulesVersion());
     }
 
     public function testRenameSendsAutoDisplayNameToRecalculation(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
-        $counterparty->applyAutoDisplayName('ООО «Ромашка»', 1);
+        self::loadAutoDisplayName($counterparty, 'ООО «Ромашка»');
 
         // When
         $counterparty->rename((new CounterpartyNameNormalizer())->normalize('ООО "Лютик"'));
@@ -80,26 +38,62 @@ final class CounterpartyDisplayNameEntityTest extends TestCase
         // Then: старое авто-название посчитано от другого сырого — сброшено
         self::assertNull($counterparty->getDisplayName());
         self::assertNull($counterparty->getDisplayNameSource());
-        self::assertTrue($counterparty->needsAutoDisplayName(1));
+        self::assertNull($counterparty->getDisplayRulesVersion());
     }
 
-    public function testRenameKeepsManualDisplayName(): void
+    public function testSavingSameNameKeepsAutoDisplayName(): void
+    {
+        // Given: форма сохраняет карточку с тем же названием (правка ИНН или типа)
+        $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
+        self::loadAutoDisplayName($counterparty, 'ООО «Ромашка»');
+
+        // When
+        $counterparty->rename((new CounterpartyNameNormalizer())->normalize('ООО "Ромашка"'));
+
+        // Then
+        self::assertSame('ООО «Ромашка»', $counterparty->getDisplayName());
+        self::assertSame(CounterpartyDisplayNameSource::AUTO, $counterparty->getDisplayNameSource());
+        self::assertSame(1, $counterparty->getDisplayRulesVersion());
+    }
+
+    public function testManualDisplayNameSurvivesRename(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
-        $counterparty->setManualDisplayName('Ромашка (наш поставщик)');
+        $counterparty->setManualDisplayName('  Ромашка   (наш поставщик) ');
 
         // When
         $counterparty->rename((new CounterpartyNameNormalizer())->normalize('ООО "Лютик"'));
 
-        // Then
+        // Then: пробелы схлопнуты, ручное не сброшено
         self::assertSame('Ромашка (наш поставщик)', $counterparty->getDisplayName());
         self::assertSame(CounterpartyDisplayNameSource::MANUAL, $counterparty->getDisplayNameSource());
+        self::assertNull($counterparty->getDisplayRulesVersion());
+    }
+
+    public function testManualDisplayNameTouchesUpdatedAt(): void
+    {
+        $counterparty = CounterpartyBuilder::aCounterparty()->withUpdatedAt(new \DateTimeImmutable('2026-01-01'))->build();
+
+        $counterparty->setManualDisplayName('Ромашка');
+
+        self::assertGreaterThan(new \DateTimeImmutable('2026-01-01'), $counterparty->getUpdatedAt());
     }
 
     public function testManualDisplayNameMustNotBeBlank(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         CounterpartyBuilder::aCounterparty()->build()->setManualDisplayName('   ');
+    }
+
+    /** Состояние после пересчёта: его пишет условный UPDATE, а не метод сущности. */
+    private static function loadAutoDisplayName(Counterparty $counterparty, string $displayName): void
+    {
+        $set = \Closure::bind(static function (Counterparty $c) use ($displayName): void {
+            $c->displayName = $displayName;
+            $c->displayNameSource = CounterpartyDisplayNameSource::AUTO;
+            $c->displayRulesVersion = 1;
+        }, null, Counterparty::class);
+        $set($counterparty);
     }
 }

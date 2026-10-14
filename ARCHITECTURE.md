@@ -1047,14 +1047,15 @@ format(string $rawName): ?string
 
 // Entity Counterparty: displayName / displayNameSource (CounterpartyDisplayNameSource:
 // auto | manual) / displayRulesVersion
-needsAutoDisplayName(int $rulesVersion): bool     // manual — никогда
-applyAutoDisplayName(?string $name, int $version)  // правила; updatedAt не меняется; manual → LogicException
-setManualDisplayName(string $name): void           // правка пользователя, главнее правил; + touch
-// rename() сбрасывает авто-название (пересчитается), ручное сохраняет
+setManualDisplayName(string $name): void  // правка пользователя, главнее правил; + touch
+// rename() сбрасывает авто-название, только если name действительно сменилось; ручное сохраняет
 
 // src/Company/Application/RefreshCounterpartyDisplayNamesAction.php
-// Пересчёт по всем компаниям порциями (keyset по id, flush+clear); идемпотентно.
-// CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50]
+// Пересчёт по всем компаниям: CounterpartyDisplayNameBacklogQuery (скалярные порции по id,
+// кросс-компанийный, только CLI) + CounterpartyDisplayNameWriter::writeAutoIfUnchanged()
+// — условный UPDATE (name не изменился, источник не manual): параллельная правка
+// пользователя не перезаписывается. updatedAt не меняется; идемпотентно.
+// CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50, только с --dry-run]
 __invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
 
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры

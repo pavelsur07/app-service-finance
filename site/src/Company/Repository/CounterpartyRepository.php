@@ -6,7 +6,6 @@ namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
-use App\Company\Enum\CounterpartyDisplayNameSource;
 use App\Company\Enum\CounterpartyType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -36,34 +35,6 @@ class CounterpartyRepository extends ServiceEntityRepository
             ->orderBy('c.id', \SortDirection::Ascending)
             ->getQuery()
             ->toIterable();
-    }
-
-    /**
-     * Порция контрагентов, которым нужен пересчёт отображаемого названия правилами этой версии
-     * (CLI, все компании): ещё не обработаны или посчитаны старой версией; ручные — никогда.
-     * Keyset по id: порции не съезжают, пока пересчёт записывает версию.
-     *
-     * @companyScopeExempt Системный пересчёт производного поля по всем компаниям из CLI; из HTTP не вызывается.
-     *
-     * @return list<Counterparty>
-     */
-    public function findDisplayNameBacklog(int $rulesVersion, ?string $afterId, int $limit): array
-    {
-        $qb = $this->createQueryBuilder('c')
-            ->andWhere('c.displayNameSource IS NULL OR (c.displayNameSource = :auto AND (c.displayRulesVersion IS NULL OR c.displayRulesVersion <> :version))')
-            ->setParameter('auto', CounterpartyDisplayNameSource::AUTO)
-            ->setParameter('version', $rulesVersion)
-            ->orderBy('c.id', \SortDirection::Ascending)
-            ->setMaxResults($limit);
-
-        if (null !== $afterId) {
-            $qb->andWhere('c.id > :afterId')->setParameter('afterId', $afterId);
-        }
-
-        /** @var list<Counterparty> $rows */
-        $rows = $qb->getQuery()->getResult();
-
-        return $rows;
     }
 
     /**

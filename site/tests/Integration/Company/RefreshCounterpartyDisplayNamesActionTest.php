@@ -116,7 +116,6 @@ final class RefreshCounterpartyDisplayNamesActionTest extends IntegrationTestCas
             'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = :version WHERE id = :id',
             ['name' => 'устарело', 'source' => 'auto', 'version' => CounterpartyDisplayNameFormatter::RULES_VERSION - 1, 'id' => $id],
         );
-        $this->em->clear();
 
         // When
         $result = ($this->refresh)(false);
@@ -146,6 +145,43 @@ final class RefreshCounterpartyDisplayNamesActionTest extends IntegrationTestCas
         self::assertSame(206, $result->processed);
         self::assertSame(206, $result->changed);
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM "counterparty" WHERE display_rules_version IS NULL'));
+    }
+
+    public function testDryRunAcrossSeveralBatchesTerminatesAndWritesNothing(): void
+    {
+        // Given: в dry-run строки остаются в очереди — завершение держится только на keyset
+        for ($i = 1; $i <= 205; ++$i) {
+            $this->persist($this->company, sprintf('ООО "Поставщик %03d"', $i));
+        }
+        $this->em->flush();
+
+        // When
+        $result = ($this->refresh)(true, 0);
+
+        // Then
+        self::assertSame(205, $result->processed);
+        self::assertSame(205, $result->changed);
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM "counterparty" WHERE display_rules_version IS NOT NULL'));
+    }
+
+    public function testRecognisedNameThatBecomesUnrecognisedIsCountedSeparately(): void
+    {
+        // Given: прошлая версия правил что-то показывала для «Ozon»
+        $id = $this->persist($this->company, 'Ozon');
+        $this->em->flush();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = :version WHERE id = :id',
+            ['name' => 'Озон', 'source' => 'auto', 'version' => CounterpartyDisplayNameFormatter::RULES_VERSION - 1, 'id' => $id],
+        );
+
+        // When
+        $result = ($this->refresh)(false);
+
+        // Then
+        self::assertSame(1, $result->changed);
+        self::assertSame(1, $result->becameUnrecognised);
+        self::assertSame([], $result->changedSamples);
+        self::assertNull($this->fetchDisplay($id)['display_name']);
     }
 
     private function build(Company $company, string $name): Counterparty

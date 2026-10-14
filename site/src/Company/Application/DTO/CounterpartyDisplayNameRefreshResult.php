@@ -11,7 +11,13 @@ final class CounterpartyDisplayNameRefreshResult
     /** Отображаемое название стало другим (в том числе появилось впервые). */
     public int $changed = 0;
 
+    /** Было отображаемое название, по новой версии правил — нераспознано (входит в changed). */
+    public int $becameUnrecognised = 0;
+
     public int $unchanged = 0;
+
+    /** Строку переименовали или задали ручное название во время прогона — не записана. */
+    public int $skippedConcurrent = 0;
 
     /** Правила не уверены — показывается сырое название (входит в changed/unchanged). */
     public int $unrecognised = 0;
