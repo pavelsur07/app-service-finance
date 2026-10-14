@@ -279,6 +279,20 @@ case "$cmd" in
     # Ненулевой exit code — штатный результат гейта (ERROR), а не ошибка wrapper'а.
     if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
     ;;
+  app:counterparty:refresh-display-names)
+    # Только сухой прогон: отчёт «сырое → отображаемое» по правилам названий контрагентов
+    # (docs/plan/counterparty-display-name.md, этап 3). --dry-run обязателен — без него команда
+    # пишет display_name; запись на проде — отдельное согласие Владельца, через wrapper её нет.
+    # Разрешение Владельца 14.10.2026. Вывод содержит названия и ФИО ИП — только для отчёта.
+    seen_dry_run=0
+    for arg in "$@"; do
+      if   [ "$arg" = "--dry-run" ]; then seen_dry_run=1
+      elif [[ "$arg" =~ ^--samples=[0-9]{1,4}$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_dry_run" -ne 1 ]; then echo "--dry-run is required for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 
