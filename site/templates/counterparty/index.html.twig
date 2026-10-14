@@ -128,8 +128,36 @@
                 <tbody>
                 {% for item in items %}
                     {% set editUrl = path('counterparty_edit', {id: item.id}) %}
+                    {# Показ — отображаемое название, если есть (docs/plan/counterparty-display-name.md);
+                       предложение правил считает контроллер (CounterpartyDisplayNameSuggestion), здесь правил нет. #}
+                    {% set shown = item.displayName ?? item.name %}
+                    {% set suggestion = suggestions[item.id] ?? null %}
                     <tr{% if item.isArchived %} class="vf-row-muted"{% endif %}>
-                        <td><a href="{{ editUrl }}" class="vf-strong">{{ item.name }}</a></td>
+                        <td>
+                            <a href="{{ editUrl }}" class="vf-strong">{{ shown }}</a>
+                            {% if item.displayName and item.displayName != item.name %}
+                                <div class="vf-name-origin">
+                                    <span class="vf-clip" title="{{ item.name }}">Исходное: {{ item.name }}</span>
+                                    {% if not item.isArchived and item.displayNameSource and item.displayNameSource.value == 'manual' %}
+                                        <form method="post" action="{{ path('counterparty_reset_display_name', {id: item.id}|merge(listState)) }}" class="vf-inline-form">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('reset_display_name' ~ item.id) }}">
+                                            <button type="submit" class="vf-link-btn" aria-label="Вернуть исходное название «{{ item.name }}»">Вернуть исходное</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if suggestion %}
+                                <div class="vf-name-suggest">
+                                    <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                                    <span class="vf-clip" title="{{ suggestion }}">Предложено: {{ suggestion }}</span>
+                                    <span aria-hidden="true">·</span>
+                                    <form method="post" action="{{ path('counterparty_apply_display_name', {id: item.id}|merge(listState)) }}" class="vf-inline-form">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('apply_display_name' ~ item.id) }}">
+                                        <button type="submit" class="vf-link-btn" aria-label="Применить предложенное название «{{ suggestion }}» для «{{ shown }}»">Применить</button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </td>
                         <td class="vf-num">{{ item.inn ?: '—' }}</td>
                         <td class="vf-num">{{ item.kpp ?: '—' }}</td>
                         <td class="vf-sub">{{ type_labels[item.type.value] }}</td>
@@ -142,7 +170,7 @@
                         </td>
                         <td class="vf-actions text-end">
                             <div class="dropdown position-static{{ loop.last and not loop.first ? ' dropup' }}">
-                                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Действия: {{ item.name }}">
+                                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Действия: {{ shown }}">
                                     <i class="ti ti-dots" aria-hidden="true"></i>
                                 </button>
                                 <div class="dropdown-menu dropdown-menu-end" role="menu">
@@ -154,7 +182,7 @@
                                                 data-confirm-action="{{ path('counterparty_unarchive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('unarchive' ~ item.id) }}"
                                                 data-confirm-title="Вернуть из архива?"
-                                                data-confirm-body="{{ item.name }} снова появится в списках выбора контрагента."
+                                                data-confirm-body="{{ shown }} снова появится в списках выбора контрагента."
                                                 data-confirm-submit="Вернуть">
                                             <i class="ti ti-archive-off me-2" aria-hidden="true"></i>Вернуть из архива
                                         </button>
@@ -164,7 +192,7 @@
                                                 data-confirm-action="{{ path('counterparty_archive', {id: item.id}|merge(listState)) }}"
                                                 data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"
                                                 data-confirm-title="Отправить в архив?"
-                                                data-confirm-body="{{ item.name }} пропадёт из списков выбора, но операции и история сохранятся. Вернуть можно здесь же: включите «Показывать архив»."
+                                                data-confirm-body="{{ shown }} пропадёт из списков выбора, но операции и история сохранятся. Вернуть можно здесь же: включите «Показывать архив»."
                                                 data-confirm-submit="В архив"
                                                 data-confirm-variant="danger">
                                             <i class="ti ti-archive me-2" aria-hidden="true"></i>В архив

@@ -6,6 +6,8 @@ namespace App\Company\Security;
 
 use App\Company\Controller\Api\CounterpartySearchController;
 use App\Company\Controller\CompanyController;
+use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
+use App\Company\Controller\Counterparty\ResetCounterpartyDisplayNameController;
 use App\Company\Controller\CounterpartyController;
 use App\Company\Controller\FinancialResponsibilityCenterController;
 use App\Company\Controller\ProfileController;
@@ -30,6 +32,8 @@ final class ModuleAccessMap
     private const EXACT = [
         // Контрагенты, ЦФО и направления проектов живут в App\Company, но относятся к финансам.
         CounterpartyController::class => Module::FINANCE,
+        ApplyCounterpartyDisplayNameController::class => Module::FINANCE,
+        ResetCounterpartyDisplayNameController::class => Module::FINANCE,
         FinancialResponsibilityCenterController::class => Module::FINANCE,
         ProjectDirectionController::class => Module::FINANCE,
     ];

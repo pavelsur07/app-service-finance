@@ -26,7 +26,7 @@ final class CounterpartyDisplayNameEntityTest extends TestCase
         self::assertNull($counterparty->getDisplayRulesVersion());
     }
 
-    public function testRenameSendsAutoDisplayNameToRecalculation(): void
+    public function testRenameDoesNotTouchDisplayFieldsInMemory(): void
     {
         // Given
         $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
@@ -35,22 +35,8 @@ final class CounterpartyDisplayNameEntityTest extends TestCase
         // When
         $counterparty->rename((new CounterpartyNameNormalizer())->normalize('ООО "Лютик"'));
 
-        // Then: старое авто-название посчитано от другого сырого — сброшено
-        self::assertNull($counterparty->getDisplayName());
-        self::assertNull($counterparty->getDisplayNameSource());
-        self::assertNull($counterparty->getDisplayRulesVersion());
-    }
-
-    public function testSavingSameNameKeepsAutoDisplayName(): void
-    {
-        // Given: форма сохраняет карточку с тем же названием (правка ИНН или типа)
-        $counterparty = CounterpartyBuilder::aCounterparty()->withName('ООО "Ромашка"')->build();
-        self::loadAutoDisplayName($counterparty, 'ООО «Ромашка»');
-
-        // When
-        $counterparty->rename((new CounterpartyNameNormalizer())->normalize('ООО "Ромашка"'));
-
-        // Then
+        // Then: сброс делает SaveCounterpartyAction условным UPDATE в БД, не сущность —
+        // иначе flush по устаревшему снимку затёр бы параллельно записанное ручное название
         self::assertSame('ООО «Ромашка»', $counterparty->getDisplayName());
         self::assertSame(CounterpartyDisplayNameSource::AUTO, $counterparty->getDisplayNameSource());
         self::assertSame(1, $counterparty->getDisplayRulesVersion());
