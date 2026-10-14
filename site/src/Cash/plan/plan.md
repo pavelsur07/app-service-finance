@@ -169,16 +169,35 @@
 
 **Чек-лист:**
 
-- [ ] `CashFileImportController:123` — ошибка логируется или тип сужен;
-      регрессионный тест.
-- [ ] `BankImportHandler` — три неустранимые ветки бросают `Unrecoverable…`;
+- [x] `CashFileImportController:123` — тип сужен до `\RuntimeException`;
+      функциональные тесты: сбой хранилища → flash, ошибка программы → 500.
+- [x] `BankImportHandler` — три неустранимые ветки бросают `Unrecoverable…`;
       логи старта и финиша; тесты на каждую ветку.
-- [ ] `AlfaApiClient` — доменные исключения, временное отличимо от
-      постоянного; unit-тест на 429/5xx и на битый JSON.
-- [ ] `FundController` — некорректная сумма отдаёт 422; тест.
-- [ ] Новые исключения замаплены в `ExceptionListener`.
-- [ ] Baseline не вырос; изменения записаны в «Журнал».
-- [ ] Все гейты зелёные.
+- [x] `AlfaApiClient` — доменные исключения, временное отличимо от
+      постоянного; unit-тесты на 429/5xx, 4xx, транспорт и битый JSON.
+- [x] `FundController` — исключён: ветка недостижима (см. результат).
+- [x] `ExceptionListener` — не нужен: новые исключения возникают только в
+      воркере, HTTP-ответа у них нет.
+- [x] Baseline сократился на 8; изменения записаны в «Журнал».
+- [x] Все гейты зелёные.
+
+### Результат этапа 1 (2026-10-14)
+
+Перед кодом дефекты проверены по коду и на данных прода (read-only). Ни один
+не подтвердился как действующий; по решению Владельца этап выполнен в
+сокращённом, профилактическом объёме.
+
+| Пункт | Что выяснилось | Что сделано |
+|---|---|---|
+| `CashFileImportController:123` | Сбой хранилища уже пишет `error` декоратор `LoggingObjectStorage` — ошибка не терялась. Локальный драйвер при сбое записи бросает `\RuntimeException`, не `ObjectStorageException` | `catch (\Throwable)` → `catch (\RuntimeException)`: flash для сбоя хранилища сохранён, `\Error`/`\LogicException` дают 500 |
+| `BankImportHandler` | На проде 0 банковских подключений, 0 `import_log` с `bank:*`, 0 `BankImportMessage` в `failed` — код не выполнялся | Неустранимые ветки и отказ банка (4xx) → `error` + `UnrecoverableMessageHandlingException`; временный сбой → `warning` + исходное исключение (ретраи транспорта, затем `failed`); логи старта и финиша с `import_id`, `company_id`, `bank_code`; `CompanyRepository` → `CompanyFacade` |
+| `AlfaApiClient` | То же: не использовался | `final`; `BankApiUnavailableException` (сеть, 408, 429, 5xx, обрыв тела) и `BankApiRequestFailedException` (прочие коды, битый JSON); лог: метод, путь без query, статус, время; тело ответа не логируется; исключения HttpClient не передаются как `previous` — их сообщения несут URL с номером счёта (замечание внутреннего ревью) |
+| `FundController:152` | Поле — `MoneyType`: нечисловой ввод отсекается валидацией формы, ветка недостижима; фонды за флагом `FEATURE_FUNDS_AND_WIDGET` | Не трогали |
+
+`RecoverableMessageHandlingException` сознательно не используется: Symfony
+ретраит `RecoverableExceptionInterface` безусловно, в обход `max_retries`
+(`SendFailedMessageForRetryListener::shouldRetry`); так же сделано в
+`SyncOzonListingCatalogHandler`. Противоречие с `CLAUDE.md` — в «Находках».
 
 ---
 
@@ -567,7 +586,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 | Этап | Дата | Baseline Cash до | Baseline Cash после | Прочие цифры | PR |
 |---|---|---|---|---|---|
-| 0 | 2026-10-14 | 240 записей (276 ошибок) | — | phpat…Cash 39, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3; весь baseline — 2332 записи (3425 ошибок); данные: расхождений `float` 0 по трём проверкам | этот PR |
+| 0 | 2026-10-14 | 240 записей (276 ошибок) | — | phpat…Cash 39, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3; весь baseline — 2332 записи (3425 ошибок); данные: расхождений `float` 0 по трём проверкам | #2677 |
+| 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | этот PR |
 
 ## Находки
 
@@ -585,6 +605,28 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
   Остаток при создании документа считается заново по документам, поэтому
   создание не блокируется; устаревшее значение видно только там, где
   читается колонка. Чинить — отдельной задачей после согласования.
+- **Правило `CLAUDE.md` о Messenger противоречит Symfony.** «`warning` +
+  `RecoverableMessageHandlingException` пока ретраим» ведёт к бесконечным
+  ретраям: `RecoverableExceptionInterface` ретраится в обход `max_retries` и
+  никогда не попадает в `failed`. Практика проекта (`SyncOzonListingCatalogHandler`,
+  этап 1) — обычное исключение и `retry_strategy` транспорта. Правило нужно
+  переписать отдельным PR в правила.
+- Ревью этапа 1, вне scope (банковский импорт на проде не используется, но
+  перед включением это нужно закрыть):
+  - `BankImportService` логирует всю банковскую транзакцию
+    (`'transaction' => $transaction`, т. е. тело ответа банка) и номера счетов
+    в `account_number` — противоречит правилам логирования.
+  - Канал `http_client` Symfony пишет на INFO полный URL с query (номер
+    счёта): исключить канал из основного лога на проде или дать банковскому
+    клиенту свой логгер.
+  - У `AlfaApiClient` нет `timeout`/`max_duration`: воркер `async_sync` может
+    висеть до таймаута сокета.
+  - Нет интеграционного теста Messenger: временный сбой → 3 ретрая → `failed`;
+    неустранимый → без ретраев.
+  - Неустранимая ветка даёт два события в GlitchTip: `error` handler'а и
+    `critical` Messenger «Removing from transport». Решить, понижать ли первый.
+- `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
+  недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - `Finance/Entity/Document::getTotalAmount()` суммирует через `float` —
   расхождений на данных нет (этап 0), перевод на `Money` — задача модуля
   Finance.
