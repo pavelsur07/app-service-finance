@@ -26,7 +26,7 @@ final readonly class CounterpartyDisplayNameFormatter
      * Версия правил: поднимать при любом изменении результата format() — пересчёт
      * (app:counterparty:refresh-display-names) обработает все авто-названия заново.
      */
-    public const RULES_VERSION = 1;
+    public const RULES_VERSION = 2;
 
     /**
      * Вариант написания => [каноническая ОПФ, только префиксом]. Порядок — от длинных к коротким:
@@ -70,6 +70,22 @@ final readonly class CounterpartyDisplayNameFormatter
         'УПРАВЛЕНИЕ', 'ОТДЕЛЕНИЕ', 'ФИЛИАЛ', 'Ф-Л', 'ФИЛ', 'ОП', 'ОСП', 'ОБОСОБЛЕННОЕ', 'ПОДРАЗДЕЛЕНИЕ', 'ГЛАВА',
     ];
 
+    /**
+     * Подпись счёта: длинные варианты раньше коротких («р/сч» раньше «р/с», «расч. счёт» раньше
+     * «счёт»), иначе от подписи остался бы хвост «р», «расч.».
+     */
+    private const ACCOUNT_LABEL = '(?:расч(?:\.|[её]тный)?\s*сч[её]т|кор\.?\s*сч(?:[её]т)?\.?|р\s*\/\s*сч\.?|р\.\s*сч\.|р\s*\/\s*с|р\.\s*с\.|л\s*\/\s*с|л\.\s*с\.|с\s*\/\s*ч|сч(?:[её]т)?\.?)';
+
+    /**
+     * Слова, с которых не начинается ФИО: назначение платежа и вывески («ПЕРЕВОД И.И.»,
+     * «ТОРГОВЫЙ ДОМ ИВАНОВИЧ», «БАР ДЯДЯ ПЕТРОВИЧ»). Любое из них в строке — это не человек.
+     */
+    private const NOT_PERSON_WORDS = [
+        'ПЕРЕВОД', 'ВОЗВРАТ', 'ОПЛАТА', 'КОМИССИЯ', 'ПОПОЛНЕНИЕ', 'СПИСАНИЕ', 'ЗАЧИСЛЕНИЕ', 'ВЫДАЧА',
+        'ТОРГОВЫЙ', 'ТОРГОВАЯ', 'ТОРГОВОЕ', 'ДОМ', 'МАГАЗИН', 'САЛОН', 'КАФЕ', 'БАР', 'РЕСТОРАН',
+        'КОМПАНИЯ', 'ГРУППА', 'ЦЕНТР', 'СТУДИЯ', 'КЛУБ', 'АТЕЛЬЕ', 'АПТЕКА', 'ДЯДЯ', 'ТЕТЯ', 'ТЁТЯ',
+    ];
+
     /** Отчества-частицы пишутся строчными: «Алиев Рустам Али оглы». */
     private const PATRONYMIC_PARTICLES = ['оглы', 'кызы', 'улы', 'гызы'];
 
@@ -80,9 +96,10 @@ final readonly class CounterpartyDisplayNameFormatter
         // Удвоенные кавычки CSV: «ООО ""Ромашка""».
         $name = str_replace('""', '"', self::collapse($rawName));
         $fromBankString = str_contains($name, '//');
-        // Голый 20-значный счёт вырезается только в банковской строке: в обычной вместе с ним
-        // осталась бы подпись («сч», «р.с.») — пусть длинное число отклонит такое название.
-        $party = $fromBankString ? $this->pickBankStringParty($name) : $this->stripIds($name, false);
+        // Голый 20-значный счёт вырезается только в банковской строке. В обычной — только счёт с
+        // подписью целиком в конце или в начале строки (stripLabelledAccount); иначе длинное число
+        // отклонит название.
+        $party = $fromBankString ? $this->pickBankStringParty($name) : $this->stripIds($this->stripLabelledAccount($name), false);
 
         if (null === $party || '' === $party || $this->containsNeverTouch($party) || $this->countLegalForms($party) > 1) {
             return null;
@@ -91,14 +108,19 @@ final readonly class CounterpartyDisplayNameFormatter
         $split = $this->splitLegalForm($party);
 
         if (null === $split) {
-            // ОПФ нет. В банковской строке это может быть человек — но только узнаваемое ФИО
-            // (с отчеством или инициалами), а не «ВНУТРЕННИЙ ПЕРЕВОД» или «МОСКВА».
-            return $fromBankString && 0 === $this->countLegalForms($party) && $this->looksLikeFullPersonName($party)
-                ? $this->formatPersonName($party)
-                : null;
+            return $this->formatPersonWithoutLegalForm($party, $fromBankString);
         }
 
         [$form, $body] = $split;
+
+        // v2: вложенные кавычки «ООО "КОМПАНИЯ "ТЕНЗОР"» → «ООО «КОМПАНИЯ «ТЕНЗОР»»».
+        if ('ИП' !== $form) {
+            $nested = $this->formatNestedQuotes($body);
+            if (null !== $nested) {
+                return $form.' '.$nested;
+            }
+        }
+
         $body = $this->stripOuterQuotes($body);
 
         if ('ИП' === $form) {
@@ -108,6 +130,69 @@ final readonly class CounterpartyDisplayNameFormatter
         }
 
         return $this->isCleanOrganizationName($body) ? $form.' «'.$body.'»' : null;
+    }
+
+    /**
+     * Человек без ОПФ — только узнаваемое ФИО (с отчеством или инициалами), а не «ВНУТРЕННИЙ
+     * ПЕРЕВОД» или «МОСКВА». В банковской строке — всегда к виду «Фамилия Имя Отчество».
+     * v2: вне банковской строки — только ФИО целиком заглавными или строчными; записанное как
+     * следует («Иванов Иван Иванович») — null, приводить нечего.
+     */
+    private function formatPersonWithoutLegalForm(string $party, bool $fromBankString): ?string
+    {
+        if (0 !== $this->countLegalForms($party) || !$this->looksLikeFullPersonName($party)) {
+            return null;
+        }
+
+        if (!$fromBankString && $party !== mb_strtoupper($party, 'UTF-8') && $party !== mb_strtolower($party, 'UTF-8')) {
+            return null;
+        }
+
+        return $this->formatPersonName($party);
+    }
+
+    /**
+     * Вложенные кавычки 1С и выписок: `"КОМПАНИЯ "ТЕНЗОР"`, `"ПФ "СКБ Контур""`, `«ТД «Ромашка»»`.
+     * Обе части — чистые названия; регистр не меняется. Иначе null — пусть решает общая ветка.
+     */
+    private function formatNestedQuotes(string $body): ?string
+    {
+        if (1 !== preg_match('/^["«“„]([^"«»“”„]+?)\s+["«“„]([^"«»“”„]+?)["»”]{1,2}$/u', $body, $m)) {
+            return null;
+        }
+
+        $outer = trim($m[1]);
+        $inner = trim($m[2]);
+
+        return $this->isCleanOrganizationName($outer) && $this->isCleanOrganizationName($inner)
+            && $this->isCleanOrganizationName($outer.' '.$inner)
+            ? '«'.$outer.' «'.$inner.'»»'
+            : null;
+    }
+
+    /**
+     * v2: счёт с подписью — только целиком в конце или в начале строки, не в середине: «… Р/С
+     * 40702… в Сбербанке» склеило бы банк с названием. В конце — только после закрывающей кавычки
+     * или после узнаваемого ФИО: «ООО Ромашка на сч 40702…» иначе дало бы «Ромашка на».
+     */
+    private function stripLabelledAccount(string $name): string
+    {
+        $label = self::ACCOUNT_LABEL;
+        $quote = preg_quote(self::QUOTES, '/');
+
+        if (1 === preg_match('/^(.*['.$quote.'])\s*,?\s*'.$label.'\s*:?\s*\d{20}\s*[.,;]?$/iu', $name, $m)) {
+            return trim($m[1]);
+        }
+
+        if (1 === preg_match('/^(.+?)[\s,;]+'.$label.'\s*:?\s*\d{20}\s*[.,;]?$/iu', $name, $m) && $this->looksLikeFullPersonName(trim($m[1]))) {
+            return trim($m[1]);
+        }
+
+        if (1 === preg_match('/^'.$label.'\s*:?\s*\d{20}[\s,;]+(.+)$/iu', $name, $m)) {
+            return trim($m[1]);
+        }
+
+        return $name;
     }
 
     /**
@@ -237,6 +322,16 @@ final readonly class CounterpartyDisplayNameFormatter
                 return [$form, trim($m[1])];
             }
 
+            // v2: суффикс после запятой — так ОПФ пишет 1С («Интернет Решения, ООО»). Не для АО /
+            // ЗАО / САО — это ещё и округа («Москва, ЗАО», «Ненецкий, АО»), и не для названий-
+            // прилагательных и регионов («Тюменская область, ПАО», «Московский, ПАО»).
+            if (!\in_array($variant, ['АО', 'ЗАО', 'САО'], true)
+                && 1 === preg_match('/^(.+?),\s*('.$token.')$/iu', $name, $m)
+                && self::isFormToken($m[2], $variant)
+                && !$this->looksLikeRegion(trim($m[1]))) {
+                return [$form, trim($m[1])];
+            }
+
             // Голый суффикс — только после названия в кавычках: «"Ромашка" ООО». Без кавычек
             // это округ («Префектура ЗАО», «Ненецкого АО»), а не ОПФ.
             if (1 === preg_match('/^(['.$quote.'].+['.$quote.'])\s+('.$token.')$/iu', $name, $m) && self::isFormToken($m[2], $variant)) {
@@ -244,7 +339,33 @@ final readonly class CounterpartyDisplayNameFormatter
             }
         }
 
-        return null;
+        return $this->splitEntrepreneurSuffix($name);
+    }
+
+    /**
+     * v2: ИП после ФИО — «ФАМИЛИЯ ИМЯ ОТЧЕСТВО (ИП)», «Фамилия И.О. ИП». И в скобках, и без —
+     * только после узнаваемого ФИО (отчество или инициалы): «Магазин у дома (ИП)» — не ФИО, а
+     * слитное «Иванов И.П.» — инициалы, а не ОПФ.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function splitEntrepreneurSuffix(string $name): ?array
+    {
+        if (1 !== preg_match('/^(.+?)(?:\s*\(\s*(ИП)\s*\)|(?:\s*,\s*|\s+)(ИП))$/iu', $name, $m)) {
+            return null;
+        }
+
+        $token = '' !== ($m[2] ?? '') ? $m[2] : ($m[3] ?? '');
+        $person = trim($m[1]);
+
+        return self::isFormToken($token, 'ИП') && $this->looksLikeFullPersonName($person) ? ['ИП', $person] : null;
+    }
+
+    /** Регион или название-прилагательное: «Московский», «Тюменская область», «… округ - Югра». */
+    private function looksLikeRegion(string $body): bool
+    {
+        return 1 === preg_match('/(?:ский|цкий|ской|цкой|ный|ной|ская|цкая|ное)$/iu', $body)
+            || 1 === preg_match('/(?<![\p{L}])(?:область|округ|край|республика|москва|санкт-петербург)(?![\p{L}])/iu', $body);
     }
 
     /**
@@ -330,6 +451,17 @@ final readonly class CounterpartyDisplayNameFormatter
      */
     private function looksLikeFullPersonName(string $value): bool
     {
+        $words = explode(' ', mb_strtoupper($value, 'UTF-8'));
+        if ([] !== array_intersect($words, self::NOT_PERSON_WORDS)) {
+            return false;
+        }
+
+        // Порядок «Фамилия Имя Отчество»: второе слово — не отчество («ВОЗВРАТ ИВАНОВ ИВАНОВИЧ»
+        // ловит стоп-слово, «ИВАН ИВАНОВИЧ ПЕТРОВ» — эта проверка).
+        if (isset($words[1]) && 1 === preg_match('/(?:вич|вна|ична)$/iu', $words[1])) {
+            return false;
+        }
+
         return 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}*(?:вич|вна|ична|инична)(?:\s+(?:оглы|кызы|улы|гызы))?$/iu', $value)
             || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}\.\s*\p{Cyrillic}\.$/u', $value)
             || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}+\s+(?:оглы|кызы|улы|гызы)$/iu', $value);
