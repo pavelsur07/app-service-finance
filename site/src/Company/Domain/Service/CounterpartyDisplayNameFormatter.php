@@ -61,7 +61,7 @@ final readonly class CounterpartyDisplayNameFormatter
         'ФГБУ', 'ФГУП', 'ФГАУ', 'ФГБОУ', 'ФКУ', 'ГБУ', 'ГКУ', 'ГАУ', 'ГУП', 'ГБОУ', 'ОГБУ', 'ОГКУ', 'КГБУ',
         'МБУ', 'МКУ', 'МАУ', 'МУП', 'МБОУ', 'МАОУ', 'УФК', 'ИФНС', 'ОМВД', 'КФХ',
         'КАЗНАЧЕЙСТВО', 'ПРЕФЕКТУРА', 'УПРАВА', 'АДМИНИСТРАЦИЯ', 'ДЕПАРТАМЕНТ', 'МИНИСТЕРСТВО',
-        'УПРАВЛЕНИЕ', 'ОТДЕЛЕНИЕ', 'ФИЛИАЛ', 'Ф-Л', 'ГЛАВА',
+        'УПРАВЛЕНИЕ', 'ОТДЕЛЕНИЕ', 'ФИЛИАЛ', 'Ф-Л', 'ФИЛ', 'ОП', 'ОСП', 'ОБОСОБЛЕННОЕ', 'ПОДРАЗДЕЛЕНИЕ', 'ГЛАВА',
     ];
 
     /** Отчества-частицы пишутся строчными: «Алиев Рустам Али оглы». */
@@ -71,9 +71,12 @@ final readonly class CounterpartyDisplayNameFormatter
 
     public function format(string $rawName): ?string
     {
-        $name = self::collapse($rawName);
+        // Удвоенные кавычки CSV: «ООО ""Ромашка""».
+        $name = str_replace('""', '"', self::collapse($rawName));
         $fromBankString = str_contains($name, '//');
-        $party = $fromBankString ? $this->pickBankStringParty($name) : $this->stripIds($name);
+        // Голый 20-значный счёт вырезается только в банковской строке: в обычной вместе с ним
+        // осталась бы подпись («сч», «р.с.») — пусть длинное число отклонит такое название.
+        $party = $fromBankString ? $this->pickBankStringParty($name) : $this->stripIds($name, false);
 
         if (null === $party || '' === $party || $this->containsNeverTouch($party) || $this->countLegalForms($party) > 1) {
             return null;
@@ -82,8 +85,11 @@ final readonly class CounterpartyDisplayNameFormatter
         $split = $this->splitLegalForm($party);
 
         if (null === $split) {
-            // ОПФ нет. Банковская строка — сторона операции без ОПФ (человек): только чистый текст.
-            return $fromBankString && 1 === preg_match('/^\p{L}[\p{L}.\- ]*$/u', $party) ? $party : null;
+            // ОПФ нет. В банковской строке это может быть человек — но только узнаваемое ФИО
+            // (с отчеством или инициалами), а не «ВНУТРЕННИЙ ПЕРЕВОД» или «МОСКВА».
+            return $fromBankString && 0 === $this->countLegalForms($party) && $this->looksLikeFullPersonName($party)
+                ? $this->formatPersonName($party)
+                : null;
         }
 
         [$form, $body] = $split;
@@ -101,8 +107,8 @@ final readonly class CounterpartyDisplayNameFormatter
     /**
      * Строка 383-П: «БАНК ГПБ (АО)//40701810992000010090 ИНН7705042179 СПАО "Ингосстрах"»,
      * «ИВАНОВ ИВАН ИВАНОВИЧ//123456, г. Москва, ул. Ленина, д. 1//», «ПАО СБЕРБАНК//ФИО//адрес//».
-     * Отбрасываются адреса и счета, первый сегмент-банк; остаётся ровно один кандидат или
-     * ровно один с ОПФ — иначе null.
+     * Отбрасываются адреса и счета, первый сегмент-банк; должен остаться ровно один кандидат,
+     * иначе null.
      */
     private function pickBankStringParty(string $name): ?string
     {
@@ -111,7 +117,7 @@ final readonly class CounterpartyDisplayNameFormatter
             if ($this->looksLikeAddressOrAccount($segment)) {
                 continue;
             }
-            $segment = $this->stripIds($segment);
+            $segment = $this->stripIds($segment, true);
             if (1 === preg_match('/\p{L}/u', $segment)) {
                 $segments[] = $segment;
             }
@@ -121,15 +127,14 @@ final readonly class CounterpartyDisplayNameFormatter
             array_shift($segments);
         }
 
-        if (1 === \count($segments)) {
-            return $segments[0];
-        }
-
-        $withForm = array_values(array_filter($segments, fn (string $segment): bool => $this->countLegalForms($segment) > 0));
-
-        return 1 === \count($withForm) ? $withForm[0] : null;
+        // Ровно один кандидат — иначе не угадываем: «ФИО//ПАО СБЕРБАНК//» — это ФИО и его банк.
+        return 1 === \count($segments) ? $segments[0] : null;
     }
 
+    /**
+     * Строгая проверка сегмента банковской строки: адресные сокращения только строчными —
+     * иначе инициалы «ИВАНОВ Г.П.» приняли бы за «г.» и выбросили бы сегмент с ФИО.
+     */
     private function looksLikeAddressOrAccount(string $segment): bool
     {
         return 1 === preg_match(
@@ -138,20 +143,32 @@ final readonly class CounterpartyDisplayNameFormatter
         );
     }
 
-    /** ИНН, КПП, ОГРН(ИП), 20-значный счёт и пустые скобки после них; хвостовая пунктуация. */
-    private function stripIds(string $value): string
+    /**
+     * Широкая проверка названия организации: адрес в любом регистре («Г. МОСКВА», «ул Ленина»,
+     * «с. Ивановка», «мкр. 5»). Здесь null дёшев, поэтому ловим с запасом.
+     */
+    private function looksLikeAddress(string $body): bool
     {
-        $value = (string) preg_replace(
-            [
-                '/(?<![\p{L}\d])ИНН\s*:?\s*\d{10}(?:\d{2})?(?!\d)/iu',
-                '/(?<![\p{L}\d])КПП\s*:?\s*\d{9}(?!\d)/iu',
-                '/(?<![\p{L}\d])ОГРН(?:ИП)?\s*:?\s*\d{13}(?:\d{2})?(?!\d)/iu',
-                '/(?<![\p{L}\d])\d{20}(?!\d)/u',
-                '/\(\s*\)/u',
-            ],
-            ' ',
-            $value,
-        );
+        return 1 === preg_match(
+            '/(?<![\p{L}\d])(?:г|ул|пер|наб|корп|кв|обл|пос|с|п|пгт|ст|мкр|стр|ш|пр|д|х|респ|р-н|пр-т|просп)(?:\.\s*|\s+)(?=[\p{L}\d])/iu',
+            $body,
+        ) || $this->looksLikeAddressOrAccount($body);
+    }
+
+    /** ИНН, КПП, ОГРН(ИП), 20-значный счёт (если $accounts) и пустые скобки; хвостовая пунктуация. */
+    private function stripIds(string $value, bool $accounts): string
+    {
+        $patterns = [
+            '/(?<![\p{L}\d])ИНН\s*:?\s*\d{10}(?:\d{2})?(?!\d)/iu',
+            '/(?<![\p{L}\d])КПП\s*:?\s*\d{9}(?!\d)/iu',
+            '/(?<![\p{L}\d])ОГРН(?:ИП)?\s*:?\s*\d{13}(?:\d{2})?(?!\d)/iu',
+        ];
+        if ($accounts) {
+            $patterns[] = '/(?<![\p{L}\d])\d{20}(?!\d)/u';
+        }
+        $patterns[] = '/\(\s*\)/u';
+
+        $value = (string) preg_replace($patterns, ' ', $value);
 
         return trim(self::collapse($value), " ,;:/\t");
     }
@@ -264,17 +281,20 @@ final readonly class CounterpartyDisplayNameFormatter
         return 1 !== preg_match('/['.$quote.'(),;\/]/u', $body)
             && 1 !== preg_match('/(?<![\p{L}\d])(?:ИНН|КПП|ОГРН|ОГРНИП)(?![\p{L}])/iu', $body)
             && 1 !== preg_match('/\d{5,}|\d{4}\s+\d{4}/u', $body)
-            && !$this->looksLikeAddressOrAccount($body);
+            && 1 !== preg_match('/(?<![\p{L}])(?:НДС|в\s+лице|тел|ОКПО|ОКВЭД|БИК)(?![\p{L}])/iu', $body)
+            && !$this->looksLikeAddress($body);
     }
 
     /**
-     * ФИО: 2–4 слова, каждое — кириллица (двойные через дефис) или инициалы «И.» / «И.И.».
+     * ФИО: 2–3 слова (четвёртое — только частица «оглы / кызы»), каждое — кириллица (двойные
+     * через дефис) или инициалы «И.» / «И.И.».
      * Смешанный регистр — как ввели («ДеКарт»); целиком заглавные или строчные — «Фамилия Имя».
      */
     private function formatPersonName(string $body): ?string
     {
         $words = explode(' ', $body);
-        if (\count($words) < 2 || \count($words) > 4) {
+        $hasParticle = \in_array(mb_strtolower((string) end($words), 'UTF-8'), self::PATRONYMIC_PARTICLES, true);
+        if (\count($words) < 2 || \count($words) > ($hasParticle ? 4 : 3)) {
             return null;
         }
 
@@ -295,6 +315,18 @@ final readonly class CounterpartyDisplayNameFormatter
                 : self::capitalizeLetterRuns($word),
             $words,
         ));
+    }
+
+    /**
+     * Человек без ОПФ в банковской строке: «Фамилия Имя Отчество» с отчеством на -вич / -вна /
+     * -ична или частицей, либо «Фамилия И.И.» / «Фамилия И. И.». «Иванов Иван» без отчества,
+     * «ВНУТРЕННИЙ ПЕРЕВОД», «Москва Ленина» — не человек.
+     */
+    private function looksLikeFullPersonName(string $value): bool
+    {
+        return 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}*(?:вич|вна|ична|инична)(?:\s+(?:оглы|кызы|улы|гызы))?$/iu', $value)
+            || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}\.\s*\p{Cyrillic}\.$/u', $value)
+            || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}+\s+(?:оглы|кызы|улы|гызы)$/iu', $value);
     }
 
     /**
