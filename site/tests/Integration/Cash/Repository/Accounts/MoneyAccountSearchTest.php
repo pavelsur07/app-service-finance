@@ -15,8 +15,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Поиск счетов: регистр запроса не важен, в том числе для кириллицы. strtolower с PHP 8.2
- * понижает только ASCII, а LOWER() в Postgres — всё, поэтому «Сбер» не находил «Сбербанк»
- * (тот же дефект, что был у контрагентов, #2665).
+ * понижает только ASCII, а LOWER() в Postgres — всё (тот же дефект, что был у контрагентов,
+ * #2665). На 14.10.2026 вызовов с поиском нет — тест держит репозиторий для будущего поиска
+ * и изоляцию по компании: подходящий счёт другой компании не попадает в выдачу.
  */
 final class MoneyAccountSearchTest extends IntegrationTestCase
 {
@@ -42,6 +43,14 @@ final class MoneyAccountSearchTest extends IntegrationTestCase
         $alfa->setBankName('АО «Альфа-Банк»');
         $this->em->persist($sber);
         $this->em->persist($alfa);
+
+        $otherOwner = UserBuilder::aUser()->withId('22222222-2222-2222-2222-000000000031')->withEmail('owner-account-search-2@example.com')->build();
+        $other = CompanyBuilder::aCompany()->withIndex(2)->withOwner($otherOwner)->build();
+        $foreign = MoneyAccountBuilder::aMoneyAccount()->withId('33333333-3333-3333-3333-000000000103')->forCompany($other)->withName('Альфа резерв чужой')->build();
+        $foreign->setBankName('ПАО Сбербанк');
+        $this->em->persist($otherOwner);
+        $this->em->persist($other);
+        $this->em->persist($foreign);
         $this->em->flush();
     }
 
