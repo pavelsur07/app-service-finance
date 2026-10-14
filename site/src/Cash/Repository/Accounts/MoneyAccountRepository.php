@@ -60,8 +60,10 @@ class MoneyAccountRepository extends ServiceEntityRepository
         }
 
         if ($q) {
+            // mb_strtolower: strtolower с PHP 8.2 понижает только ASCII, а LOWER() в Postgres —
+            // и кириллицу, поэтому «Сбер» не находил «Сбербанк».
             $qb->andWhere('LOWER(m.name) LIKE :q OR LOWER(m.bankName) LIKE :q OR LOWER(m.accountNumber) LIKE :q OR LOWER(m.walletId) LIKE :q')
-               ->setParameter('q', '%'.strtolower($q).'%');
+               ->setParameter('q', '%'.mb_strtolower($q, 'UTF-8').'%');
         }
 
         foreach ($sort as $field => $direction) {
