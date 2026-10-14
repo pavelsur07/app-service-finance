@@ -26,7 +26,7 @@ final readonly class CounterpartyDisplayNameFormatter
      * Версия правил: поднимать при любом изменении результата format() — пересчёт
      * (app:counterparty:refresh-display-names) обработает все авто-названия заново.
      */
-    public const RULES_VERSION = 1;
+    public const RULES_VERSION = 2;
 
     /**
      * Вариант написания => [каноническая ОПФ, только префиксом]. Порядок — от длинных к коротким:
@@ -91,14 +91,19 @@ final readonly class CounterpartyDisplayNameFormatter
         $split = $this->splitLegalForm($party);
 
         if (null === $split) {
-            // ОПФ нет. В банковской строке это может быть человек — но только узнаваемое ФИО
-            // (с отчеством или инициалами), а не «ВНУТРЕННИЙ ПЕРЕВОД» или «МОСКВА».
-            return $fromBankString && 0 === $this->countLegalForms($party) && $this->looksLikeFullPersonName($party)
-                ? $this->formatPersonName($party)
-                : null;
+            return $this->formatPersonWithoutLegalForm($party, $fromBankString);
         }
 
         [$form, $body] = $split;
+
+        // v2: вложенные кавычки «ООО "КОМПАНИЯ "ТЕНЗОР"» → «ООО «КОМПАНИЯ «ТЕНЗОР»»».
+        if ('ИП' !== $form) {
+            $nested = $this->formatNestedQuotes($body);
+            if (null !== $nested) {
+                return $form.' '.$nested;
+            }
+        }
+
         $body = $this->stripOuterQuotes($body);
 
         if ('ИП' === $form) {
@@ -108,6 +113,43 @@ final readonly class CounterpartyDisplayNameFormatter
         }
 
         return $this->isCleanOrganizationName($body) ? $form.' «'.$body.'»' : null;
+    }
+
+    /**
+     * Человек без ОПФ — только узнаваемое ФИО (с отчеством или инициалами), а не «ВНУТРЕННИЙ
+     * ПЕРЕВОД» или «МОСКВА». В банковской строке — всегда к виду «Фамилия Имя Отчество».
+     * v2: вне банковской строки — только ФИО целиком заглавными или строчными; записанное как
+     * следует («Иванов Иван Иванович») — null, приводить нечего.
+     */
+    private function formatPersonWithoutLegalForm(string $party, bool $fromBankString): ?string
+    {
+        if (0 !== $this->countLegalForms($party) || !$this->looksLikeFullPersonName($party)) {
+            return null;
+        }
+
+        if (!$fromBankString && $party !== mb_strtoupper($party, 'UTF-8') && $party !== mb_strtolower($party, 'UTF-8')) {
+            return null;
+        }
+
+        return $this->formatPersonName($party);
+    }
+
+    /**
+     * Вложенные кавычки 1С и выписок: `"КОМПАНИЯ "ТЕНЗОР"`, `"ПФ "СКБ Контур""`, `«ТД «Ромашка»»`.
+     * Обе части — чистые названия; регистр не меняется. Иначе null — пусть решает общая ветка.
+     */
+    private function formatNestedQuotes(string $body): ?string
+    {
+        if (1 !== preg_match('/^["«“„]([^"«»“”„]+?)\s+["«“„]([^"«»“”„]+?)["»”]{1,2}$/u', $body, $m)) {
+            return null;
+        }
+
+        $outer = trim($m[1]);
+        $inner = trim($m[2]);
+
+        return $this->isCleanOrganizationName($outer) && $this->isCleanOrganizationName($inner)
+            ? '«'.$outer.' «'.$inner.'»»'
+            : null;
     }
 
     /**
@@ -165,6 +207,9 @@ final readonly class CounterpartyDisplayNameFormatter
     private function stripIds(string $value, bool $accounts): string
     {
         $patterns = [
+            // v2: счёт вместе с подписью («Р/С 40702…», «сч 40702…», «кор. счет 30101…») — и вне
+            // банковской строки: подпись не останется в названии без номера.
+            '/(?<![\p{L}\d])(?:р\s*\/\s*с|р\.\s*с\.|л\s*\/\s*с|л\.\s*с\.|кор\.?\s*сч(?:[её]т)?\.?|сч(?:[её]т)?\.?)\s*:?\s*\d{20}(?!\d)/iu',
             '/(?<![\p{L}\d])ИНН\s*:?\s*\d{10}(?:\d{2})?(?!\d)/iu',
             '/(?<![\p{L}\d])КПП\s*:?\s*\d{9}(?!\d)/iu',
             '/(?<![\p{L}\d])ОГРН(?:ИП)?\s*:?\s*\d{13}(?:\d{2})?(?!\d)/iu',
@@ -237,6 +282,12 @@ final readonly class CounterpartyDisplayNameFormatter
                 return [$form, trim($m[1])];
             }
 
+            // v2: суффикс после запятой — так ОПФ пишет 1С («Интернет Решения, ООО»); округ
+            // через запятую не пишут.
+            if (1 === preg_match('/^(.+?),\s*('.$token.')$/iu', $name, $m) && self::isFormToken($m[2], $variant)) {
+                return [$form, trim($m[1])];
+            }
+
             // Голый суффикс — только после названия в кавычках: «"Ромашка" ООО». Без кавычек
             // это округ («Префектура ЗАО», «Ненецкого АО»), а не ОПФ.
             if (1 === preg_match('/^(['.$quote.'].+['.$quote.'])\s+('.$token.')$/iu', $name, $m) && self::isFormToken($m[2], $variant)) {
@@ -244,7 +295,26 @@ final readonly class CounterpartyDisplayNameFormatter
             }
         }
 
-        return null;
+        return $this->splitEntrepreneurSuffix($name);
+    }
+
+    /**
+     * v2: ИП после ФИО — «ФАМИЛИЯ ИМЯ ОТЧЕСТВО (ИП)», «Фамилия И.О. ИП». И в скобках, и без —
+     * только после узнаваемого ФИО (отчество или инициалы): «Магазин у дома (ИП)» — не ФИО, а
+     * слитное «Иванов И.П.» — инициалы, а не ОПФ.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function splitEntrepreneurSuffix(string $name): ?array
+    {
+        if (1 !== preg_match('/^(.+?)(?:\s*\(\s*(ИП)\s*\)|\s+(ИП))$/iu', $name, $m)) {
+            return null;
+        }
+
+        $token = '' !== ($m[2] ?? '') ? $m[2] : ($m[3] ?? '');
+        $person = trim($m[1]);
+
+        return self::isFormToken($token, 'ИП') && $this->looksLikeFullPersonName($person) ? ['ИП', $person] : null;
     }
 
     /**
