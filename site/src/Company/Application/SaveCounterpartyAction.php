@@ -10,6 +10,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Exception\CounterpartyInnAlreadyExistsException;
+use App\Company\Infrastructure\Persistence\CounterpartyDisplayNameWriter;
 use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -28,6 +29,7 @@ final class SaveCounterpartyAction
         private readonly CounterpartyRepository $repository,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
+        private readonly CounterpartyDisplayNameWriter $displayNameWriter,
     ) {
     }
 
@@ -44,6 +46,8 @@ final class SaveCounterpartyAction
                 throw new CounterpartyInnAlreadyExistsException($inn);
             }
         }
+
+        $renamed = null !== $counterparty && $counterparty->getName() !== $name->display;
 
         if (null === $counterparty) {
             $counterparty = new Counterparty(Uuid::uuid7()->toString(), $company, $name, $type);
@@ -66,6 +70,12 @@ final class SaveCounterpartyAction
         }
 
         $this->em->flush();
+
+        if ($renamed) {
+            // Авто-название от старого name: сбросить в БД, даже если пересчёт записал его
+            // после загрузки карточки (см. CounterpartyDisplayNameWriter::resetAuto).
+            $this->displayNameWriter->resetAuto($counterparty->getId());
+        }
 
         return $counterparty;
     }

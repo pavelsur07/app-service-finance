@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Entity;
 
 use App\Company\Domain\ValueObject\CounterpartyName;
+use App\Company\Enum\CounterpartyDisplayNameSource;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -45,6 +46,22 @@ class Counterparty
      */
     #[ORM\Column(length: 255)]
     private string $nameCore;
+
+    /**
+     * Отображаемое название — производное от name (docs/plan/counterparty-display-name.md):
+     * пишет только пересчёт по правилам (RefreshCounterpartyDisplayNamesAction, условным UPDATE
+     * в обход сущности) или ручная правка; null — показывать name.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $displayName = null;
+
+    /** null — ещё не обработано правилами. */
+    #[ORM\Column(length: 16, nullable: true, enumType: CounterpartyDisplayNameSource::class)]
+    private ?CounterpartyDisplayNameSource $displayNameSource = null;
+
+    /** Версия правил, которой посчитано displayName; при смене правил строка пересчитывается. */
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    private ?int $displayRulesVersion = null;
 
     #[ORM\Column(length: 12, nullable: true)]
     #[Assert\Regex(pattern: '/^\d{10}(\d{2})?$/')]
@@ -111,7 +128,47 @@ class Counterparty
 
     public function rename(CounterpartyName $name): void
     {
+        // Форма редактирования вызывает rename() при каждом сохранении — сбрасываем авто-название,
+        // только если сырое действительно сменилось.
+        $nameChanged = $name->display !== $this->name;
         $this->applyName($name);
+
+        // Сырое название сменилось — авто-название посчитано от старого и уйдёт на пересчёт.
+        // Ручное название — решение пользователя, переименование его не отменяет.
+        if ($nameChanged && CounterpartyDisplayNameSource::MANUAL !== $this->displayNameSource) {
+            $this->displayName = null;
+            $this->displayNameSource = null;
+            $this->displayRulesVersion = null;
+        }
+
+        $this->touch();
+    }
+
+    public function getDisplayName(): ?string
+    {
+        return $this->displayName;
+    }
+
+    public function getDisplayNameSource(): ?CounterpartyDisplayNameSource
+    {
+        return $this->displayNameSource;
+    }
+
+    public function getDisplayRulesVersion(): ?int
+    {
+        return $this->displayRulesVersion;
+    }
+
+    /** Ручное отображаемое название: главнее правил (этап 5 — правка в форме). */
+    public function setManualDisplayName(string $displayName): void
+    {
+        $displayName = trim((string) preg_replace('/\s+/u', ' ', $displayName));
+        WebAssert::stringNotEmpty($displayName);
+        WebAssert::maxLength($displayName, 255);
+
+        $this->displayName = $displayName;
+        $this->displayNameSource = CounterpartyDisplayNameSource::MANUAL;
+        $this->displayRulesVersion = null;
         $this->touch();
     }
 
