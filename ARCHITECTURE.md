@@ -1039,6 +1039,24 @@ __invoke(Company $company, CounterpartyFormData $data, ?Counterparty $counterpar
 // CLI: app:counterparty:backfill-names [--dry-run] [--report-company-id] [--similarity]
 __invoke(bool $dryRun): CounterpartyBackfillResult
 
+// Отображаемое название — производное от name (docs/plan/counterparty-display-name.md).
+// Сырое name и импорт не меняются; показ — displayName ?? name (этап 5).
+// src/Company/Domain/Service/CounterpartyDisplayNameFormatter.php — чистые правила,
+// null = «не уверен, показывать name»; RULES_VERSION поднимать при смене результата.
+format(string $rawName): ?string
+
+// Entity Counterparty: displayName / displayNameSource (CounterpartyDisplayNameSource:
+// auto | manual) / displayRulesVersion
+needsAutoDisplayName(int $rulesVersion): bool     // manual — никогда
+applyAutoDisplayName(?string $name, int $version)  // правила; updatedAt не меняется; manual → LogicException
+setManualDisplayName(string $name): void           // правка пользователя, главнее правил; + touch
+// rename() сбрасывает авто-название (пересчитается), ручное сохраняет
+
+// src/Company/Application/RefreshCounterpartyDisplayNamesAction.php
+// Пересчёт по всем компаниям порциями (keyset по id, flush+clear); идемпотентно.
+// CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50]
+__invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
+
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры
 // Цифры → префикс по inn; иначе nameCore префикс + similarity(nameCore) > 0.3.
 // Всегда company_id и is_archived = false, LIMIT 20.
@@ -2584,6 +2602,15 @@ enum Module: string
 ```
 Группы `system` нет: `Admin`, `Mcp`, `/admin/*` и debug-роуты в exempt-зоне под
 `ROLE_ADMIN`/`ROLE_SUPER_ADMIN`. Модуль, который нельзя выдать шаблоном, в enum не нужен.
+
+### `src/Company/Enum/CounterpartyDisplayNameSource.php`
+```php
+enum CounterpartyDisplayNameSource: string
+{
+    case AUTO = 'auto';      // правила CounterpartyDisplayNameFormatter
+    case MANUAL = 'manual';  // правка пользователя, правила не трогают
+}
+```
 
 ### `src/Company/Security/AccessLevel.php`
 ```php
