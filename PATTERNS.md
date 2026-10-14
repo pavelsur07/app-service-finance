@@ -115,7 +115,7 @@ final class CreateProductAction
 }
 ```
 
-**Правила:** без `Request`/`Response` · flush только в Action · максимум ~100 строк · побочные эффекты → Messenger dispatch
+**Правила:** без `Request`/`Response` · Action — граница транзакции: `flush()` / `wrapInTransaction()` здесь (ещё допустимо в MessageHandler и консольной Command), не в сервисе и не в Repository · пакет >100 записей: сервис отдаёт порции, `flush()` + `clear()` каждые N делает Action · максимум ~100 строк · побочные эффекты → Messenger dispatch
 
 Эталон: `CreateProductAction`, проверено 2026-09-13
 
@@ -211,7 +211,13 @@ App\Catalog\Domain\ProductSkuUniquenessChecker:
 ## 6. Infrastructure: Query
 
 Для сложных read-моделей — DBAL QueryBuilder, минуя ORM hydration.
-**Query-класс возвращает `QueryBuilder`, не массив** — обязательно для Pagerfanta.
+
+| Что отдаёт запрос | Тип результата |
+|---|---|
+| Список для UI с пагинацией | `QueryBuilder` — обязательно для Pagerfanta |
+| Агрегат, отчёт, проекция (SUM, GROUP BY) | readonly-DTO или `list<DTO>` |
+
+Нетипизированный `array` из нового Query-класса — нельзя.
 
 Направление сортировки: у **DBAL** `QueryBuilder` — строка `'ASC'`/`'DESC'`
 (тип `?string`), у **ORM** `QueryBuilder` и в `#[ORM\OrderBy]` — `\SortDirection::Ascending`/
@@ -273,7 +279,7 @@ final readonly class CounterpartyFacade
 }
 ```
 
-**Правила:** `final readonly class` · принимает скаляры/DTO, не Entity чужого модуля · без бизнес-логики · минимальный публичный интерфейс
+**Правила:** `final readonly class` · новый Facade — интерфейс `{Name}FacadeInterface` + `final` реализация, потребители зависят от интерфейса (unit-тест мокает интерфейс, без `bypass-finals`; образец — `MarketplaceAnalyticsFacadeInterface`) · принимает скаляры/DTO, не Entity чужого модуля · новый метод возвращает DTO, Enum или скаляры, не Entity · без бизнес-логики · минимальный публичный интерфейс
 
 Эталон: `CounterpartyFacade`, проверено 2026-09-13
 
@@ -352,6 +358,11 @@ final class ProcessWbCostsAction
 | `async_sync` | Внешние HTTP (marketplace, банк, email) | `SyncOzonListingCatalogMessage`, `SendEmailMessage` |
 | `async_pipeline` | Локальная обработка, DB/CPU-heavy | `ProcessRawDocumentMessage`, `RecalcSnapshotsMessage` |
 | `async_ads` | Ozon Performance polling (до 10 мин) | `FetchOzonAdStatisticsMessage` |
+| `async_wb_finance` | Только WB financial report по дням, ретраи до 20 раз | `SyncWbFinancialReportDayMessage` |
+| `ingest_fetch` | Ingestion: загрузка из внешнего источника | `RunSyncChunkMessage` |
+| `ingest_normalize` | Ingestion: нормализация сырых записей | `NormalizeRawRecordMessage` |
+
+Воркеры и текущий routing — `ARCHITECTURE.md`, «Messenger: транспорты и воркеры».
 
 ### Message
 
@@ -465,7 +476,7 @@ class MarketplaceMonthClose
 }
 ```
 
-**Правила:** `new Entity()` только в Action · guard-методы бросают `\DomainException` · нет Repository/Messenger внутри · `DateTimeImmutable` везде
+**Правила:** `new Entity()` только в Action · инварианты защищаются в конструкторе и в методах изменения состояния (`close()`, `reopen()`) — это и есть место для правил агрегата · guard-методы бросают доменное исключение · нет Repository/Messenger/EntityManager внутри, другие агрегаты не меняются · ID — UUID v7: передаёт вызывающий код или конструктор генерирует при `?string $id = null`, переданный — `Assert::uuid()` · `DateTimeImmutable` везде
 
 Эталон: `MarketplaceMonthClose`, проверено 2026-09-13
 
@@ -531,7 +542,21 @@ final class ProductListFilter
 
 ### Поток
 
-Domain/Action бросает конкретное доменное исключение → ExceptionListener маппит класс в HTTP-статус и JSON → Controller остаётся чистым, без try/catch (кроме технических кейсов: stream, lock).
+Domain/Action бросает конкретное доменное исключение → ExceptionListener маппит класс в HTTP-статус и JSON → JSON-контроллер остаётся чистым, без try/catch (кроме технических кейсов: stream, lock, временный файл).
+
+HTML-контроллер с Twig-формой может ловить **конкретное** доменное исключение и превращать его во flash или ошибку формы с redirect — иначе пользователь увидит 500 вместо сообщения:
+
+```php
+try {
+    ($this->createProduct)($companyId, $command);
+} catch (DuplicateSkuException $e) {
+    $this->addFlash('danger', $e->getMessage());
+
+    return $this->redirectToRoute('catalog_product_new');
+}
+```
+
+`catch (\Throwable)` / `catch (\Exception)` ради flash — нельзя.
 
 ### Доменное исключение
 
@@ -575,7 +600,7 @@ try {
 - `try/catch` с пустым телом — глотать исключения нельзя.
 - `throw new \Exception('ошибка')` — только конкретные доменные классы.
 - `return null` там, где сущность обязана существовать — бросай исключение.
-- Бизнес-ошибки через try/catch в Controller — маппинг делает ExceptionListener.
+- Бизнес-ошибки через try/catch в JSON-контроллере — маппинг делает ExceptionListener. В HTML-контроллере — только конкретное доменное исключение → flash/ошибка формы.
 
 > Историческая версия раздела описывала поток «Controller ловит \DomainException → JSON 422» — устарела, в старом коде встречается, не применять в новом. Актуальные правила — CLAUDE.md «Обработка ошибок».
 

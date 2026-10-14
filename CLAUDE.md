@@ -15,8 +15,11 @@
 
 ## Перед кодом
 
-1. `ARCHITECTURE.md` — актуальные Facade-методы, Enum, Entity. Существующие
-   контракты не выдумывать.
+1. `ARCHITECTURE.md` — раздел затронутого модуля и общие разделы, которых
+   касается задача (Messenger, Cron, конфигурация); весь файл не читать.
+   Актуальные Facade-методы, Enum, Entity — оттуда; существующие контракты не
+   выдумывать. В разделы контрактов писать только текущее состояние; история
+   этапов («Stage N добавил…») — строкой в `Changelog` того же файла.
 2. Модуль вывести из соседнего кода; спросить только при материальной
    неоднозначности.
 3. Новый Facade, метод, Enum или Entity, однозначно следующий из ТЗ, — создать
@@ -47,9 +50,16 @@
 
 ### Entity
 
-- UUID v7 в конструкторе: `Uuid::uuid7()->toString()`; `#[ORM\Table(name: ...)]` всегда.
+- ID — UUID v7. Его передаёт вызывающий код (Action, импорт — ради
+  идемпотентности и дедупликации, Builder в тестах) либо генерирует конструктор
+  при `?string $id = null`: `$id ?? Uuid::uuid7()->toString()`. Переданный ID —
+  `Assert::uuid()`. `#[ORM\Table(name: ...)]` всегда.
 - `string $companyId` без setter'а, `Assert::uuid()`; не `#[ManyToOne] Company`.
 - Ссылки на чужие модули — `string $counterpartyId`, не `#[ManyToOne]`.
+- Entity защищает свои инварианты в конструкторе и в методах изменения
+  состояния (`close()`, `replaceSplits()`, `changeStatus()` с доменным
+  событием). Внутри Entity нельзя: Repository, сервисы, Messenger, EntityManager,
+  изменение других агрегатов.
 - `DateTimeImmutable`, не `DateTime`. Паттерн — `PATTERNS.md` §11.
 
 ### IDOR — проверяется в ревью первым
@@ -71,23 +81,44 @@
 | Слой | Правила | `PATTERNS.md` |
 |---|---|---|
 | Controller | один action, `__invoke`, `#[Route]`-атрибуты, только HTTP in/out | §2 |
-| Action | `final`, `__invoke`, без `Request`/`Response`; `flush()` только здесь | §3 |
-| Facade | единственная точка входа между модулями; чужие `Service/`, `Repository/`, `Infrastructure/`, `Application/` не импортировать, кроме `Application/DTO` — это типы контракта Facade; проверяется `site/tests/Architecture/ModuleBoundaryRules.php`; новый Facade или метод → `ARCHITECTURE.md` | §7 |
-| Message / Handler | `readonly class` со scalar ID; routing в `config/packages/messenger.yaml`; ровно один транспорт: `async_sync` — внешние HTTP, `async_pipeline` — DB-heavy локальная обработка, `async_ads` — Ozon Performance polling до 10 мин; Handler без `Request`/`Session`/`Security` | §10 |
+| Action | `final`, `__invoke`, без `Request`/`Response`; граница транзакции — `flush()` / `wrapInTransaction()` здесь (а также в MessageHandler и консольной Command, см. «Транзакции») | §3 |
+| Facade | единственная точка входа между модулями; чужие `Service/`, `Repository/`, `Infrastructure/`, `Application/` не импортировать, кроме `Application/DTO` — это типы контракта Facade; проверяется `site/tests/Architecture/ModuleBoundaryRules.php`; новый Facade или метод → `ARCHITECTURE.md`. Новый Facade — интерфейс `{Name}FacadeInterface` + `final` реализация, потребители зависят от интерфейса (образец — `MarketplaceAnalyticsFacadeInterface`). Новый метод Facade возвращает DTO, Enum или скаляры, не Entity; существующие методы с Entity не переделывать без задачи | §7 |
+| Message / Handler | `readonly class` со scalar ID; routing в `config/packages/messenger.yaml`; ровно один транспорт — см. таблицу ниже; Handler без `Request`/`Session`/`Security` | §10 |
 | Формы | `ChoiceType` с данными из Facade, не `EntityType` с чужой Entity | §8 |
 
-Изменение `messenger.yaml` — HIGH-LOCAL: проверить routing, retry/failure,
-совместимость сообщений, усиленный review; без STOP.
+| Транспорт | Когда |
+|---|---|
+| `async_sync` | Внешние HTTP: маркетплейсы, банки, e-mail, MoySklad |
+| `async_pipeline` | Локальная DB/CPU-обработка уже загруженных данных |
+| `async_ads` | Ozon Performance polling, сообщение может работать до 10 мин |
+| `async_wb_finance` | Только `SyncWbFinancialReportDayMessage`: ретраи до 20 раз под лимиты WB |
+| `ingest_fetch` | Ingestion: загрузка из внешнего источника (DSN общий с `async_sync`) |
+| `ingest_normalize` | Ingestion: нормализация сырых записей (DSN общий с `async_pipeline`) |
+
+Воркеры и текущий routing — `ARCHITECTURE.md`, «Messenger: транспорты и
+воркеры». Изменение `messenger.yaml` — HIGH-LOCAL: проверить routing,
+retry/failure, совместимость сообщений, усиленный review; без STOP.
+
+### Транзакции
+
+- `flush()` и `wrapInTransaction()` — только в Action, MessageHandler и
+  консольной Command. В ORM 3 `flush()` сохраняет весь UnitOfWork, поэтому
+  `flush()` в сервисе или Repository молча сохраняет чужие незавершённые
+  изменения.
+- Пакет больше 100 записей: сервис отдаёт порции (генератор или callback на
+  порцию), `flush()` и `clear()` вызывает Action/Handler/Command каждые N
+  записей.
+- Сервис и Repository только меняют сущности, `persist()` и `remove()`.
 
 ## Глобальные запреты
 
 ```
 dump() / dd() / var_dump()                — нельзя в коммитах
 new SomeService()                         — только constructor injection
-flush() в Repository                      — только в Action
+flush() в Repository / Service / Controller — только Action, Handler, Command
 хардкод секретов / URL / API-ключей       — только через .env
 бизнес-логика в Controller                — вынести в Action
-бизнес-логика в Entity                    — только инварианты в конструкторе
+Repository / сервисы / EM внутри Entity   — Entity держит только свои инварианты
 import Service/Repository чужого модуля   — только через Facade
 import Application/ чужого модуля         — только Application/DTO
 #[ManyToOne] на Entity чужого модуля      — только string $entityId
@@ -122,7 +153,13 @@ Messages — `messenger.yaml`. Готовые блоки — `docs/workflow/new-
   `\RuntimeException` или `AppException`, имя по причине
   (`DocumentNotFoundException`).
 - Поток: Domain/Action бросает → ExceptionListener маппит в HTTP-статус и JSON
-  → в Controller нет `try/catch`, кроме технических кейсов.
+  → в JSON-контроллере нет `try/catch`, кроме технических кейсов (stream,
+  lock, временный файл).
+- HTML-контроллер с Twig-формой может ловить **конкретное** доменное
+  исключение, чтобы показать flash или ошибку формы и сделать redirect: иначе
+  пользователь получит 500 вместо сообщения. `catch (\Throwable)` /
+  `catch (\Exception)` ради flash — нельзя; если такой catch нужен
+  технически — `logger->error` с `companyId` до flash.
 - Формат ответа для нового кода:
 
 ```json
@@ -166,12 +203,15 @@ INFO/DEBUG.
 
 - N+1 чинить в текущем Work item; в Stage self-review проверяется явно.
 - Списки только через Pagerfanta: `?page=1&limit=50`, максимум 200, сверх →
-  422; `OutOfRangeCurrentPageException` → 422 в ExceptionListener; Query-класс
-  отдаёт `QueryBuilder`, не массив.
+  422; `OutOfRangeCurrentPageException` → 422 в ExceptionListener.
+- Query-класс: список для UI — отдаёт `QueryBuilder` под Pagerfanta; агрегат
+  или отчёт (SUM, GROUP BY, проекции) — readonly-DTO или `list<DTO>`.
+  Нетипизированный `array` из нового Query — нельзя.
 - Новое FK-поле в Entity → индекс в миграции; составной `(company_id, field)`,
   если фильтр всегда по компании.
-- Batch больше 100 записей — `flush()` каждые N итераций. Query без `companyId`
-  запрещён: IDOR и полный скан.
+- Batch больше 100 записей — `flush()` каждые N итераций в вызывающем
+  Action/Handler/Command (см. «Транзакции»). Query без `companyId` запрещён:
+  IDOR и полный скан.
 
 ## Гейты качества
 
@@ -185,10 +225,24 @@ INFO/DEBUG.
 - Baseline только сокращать. Рост блокирует CI; осознанный рост — метка
   `[baseline-grow]` в заголовке PR. `make site-stan-baseline` начисто стирает
   ratchet — не использовать вместо починки.
+- Новый гейт (PHPStan/PHPat-правило) вводится одним PR вместе с baseline своих
+  текущих нарушений: метка `[baseline-grow]`, в описании PR — идентификатор
+  правила и число записей. Это не регресс; рост по другим идентификаторам в
+  том же PR не допускается. Дальше записи нового правила только сокращаются.
 - Красный baseline до задачи — не регресс и не индульгенция: проверять
   изменённые файлы точечно и записать факт с цифрой.
 - Устройство гейтов, обязательные job'ы и branch protection —
   `docs/maintenance/quality-gates.md`.
+
+### Правило без гейта — правило ревью
+
+Правило из этого файла либо проверяется машинно, либо проверяется только в
+ревью — и это надо знать. Сейчас машинно: `strict_types`, CS, границы модулей и
+легаси-зона (`ModuleBoundaryRules`), область компании в Repository
+(`RepositoryCompanyScopeRule`), PHPStan level 8 с baseline. Остальное —
+ревью. Правило, которое нарушает больше половины существующего кода, не
+игнорируется и не применяется молча: его пересматривают (меняют формулировку
+или вводят гейт с baseline) отдельным PR в правила.
 
 ## Практики
 

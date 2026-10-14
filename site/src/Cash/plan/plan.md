@@ -1,0 +1,562 @@
+# Модуль `Cash`: единый план исправлений
+
+Дата: 2026-10-14. Объединяет аудит архитектуры `site/src/Cash` и выбор
+паттернов. Каждая найденная ошибка исправляется тем паттерном, который её
+предотвращает, и закрепляется гейтом. Этапы выполняются **строго по порядку**:
+следующий не начинается, пока чек-лист предыдущего не закрыт полностью.
+
+Аудит был статическим: grep по коду и подсчёт записей `phpstan-baseline.neon`.
+Тесты и PHPStan не запускались. **Эксплуатируемых IDOR не найдено**: все
+загрузки по ID проверяют компанию после загрузки.
+
+---
+
+## Общие правила для всех этапов
+
+**Можно:**
+
+- Править файлы, перечисленные в разделе «Лезем» текущего этапа, и их тесты.
+- Создавать в `site/src/Cash/` новые классы по целевой раскладке
+  (`docs/workflow/new-module.md`): `Exception/`, `Application/`, `Domain/`,
+  `Infrastructure/Query/`.
+- Добавлять Facade-методы, если они однозначно следуют из этапа, с обновлением
+  `ARCHITECTURE.md` в том же этапе.
+- Сокращать `phpstan-baseline.neon`: удалять записи, которые этап закрыл.
+
+**Нельзя:**
+
+- Трогать что-либо вне раздела «Лезем» текущего этапа. Найденное по дороге —
+  записать в «Находки» в конце файла, не чинить.
+- Растить baseline. Единственное исключение — новый гейт этапа 4, и только с
+  меткой `[baseline-grow]` в заголовке PR.
+- Запускать `make site-stan-baseline`: он стирает ratchet.
+- Менять схему БД и данные. Миграции в этом плане не предусмотрены; если этапу
+  понадобилась миграция — это STOP и согласование.
+- Менять поведение для пользователя: тексты, маршруты, формат ответов
+  существующих эндпоинтов, вёрстку. Исключение — явно названное в этапе
+  (500 → 422 в этапе 1).
+- Вливать `master` без нужды: проверять mergeable, а не перетаскивать чужие
+  изменения.
+- Коммитить без pathspec: в индексе лежат `design-system-pack.zip` и
+  `operations-dds-pack.zip`, голый `git commit` их заберёт.
+
+**Как работаем:**
+
+- Одна ветка и один PR на этап (для этапа 7 — на подэтап). Внутри этапа —
+  локальные коммиты, push и PR одним шагом на handoff.
+- Перед handoff: `make site-stan`, `make site-cs-check` (без кеша),
+  `make site-cs-strict-types`, `make site-test`. Гейты гонять по одному
+  (на dev-машине OOM при параллельном запуске).
+- Исправление бага → регрессионный тест, красный на старом коде и зелёный на
+  новом. Новый Action → happy-path + 1 негативный тест.
+- Изменение `config/packages/messenger.yaml` — HIGH-LOCAL: проверить routing,
+  retry/failure, совместимость сообщений в очереди; усиленное ревью.
+- Правка `src/Cash/Entity/` — только то, что названо в этапе; инварианты
+  остаются в конструкторе.
+- STOP — только по списку `AGENTS.md` §3.4. Типичный повод в этом плане:
+  исправление требует решения по бизнес-правилу или финансовой семантике
+  (например, как округлять НДС).
+
+**Замеры «до».** Каждый этап начинается с фиксации цифр в разделе «Журнал» в
+конце файла: число записей baseline по затронутым файлам и идентификаторам.
+После этапа — цифры «после» и разница.
+
+---
+
+## Этап 0. Снимок «до» и проверка денежных расхождений на данных
+
+**Цель.** Зафиксировать исходное состояние и проверить на проде, дают ли
+расчёты сумм через `float` реальные расхождения. От результата зависит,
+насколько срочен этап 3.
+
+**Лезем:**
+
+- `phpstan-baseline.neon` — только чтение и подсчёт.
+- Прод — только read-only SQL через `codex-psql-ro`.
+
+**Не лезем:** код, конфиги, данные. Никаких записей в БД, никаких команд
+пересчёта.
+
+**Правила:**
+
+- Время в БД прода — МСК без зоны; в ручных запросах
+  `now() AT TIME ZONE 'Europe/Moscow'`.
+- В отчёт не попадают ФИО, ИНН и суммы конкретных клиентов — только счётчики и
+  агрегаты.
+
+**Что проверить на данных:**
+
+1. `CashTransaction`: сравнить `amount - allocated_amount` в decimal с тем, что
+   показывает интерфейс (расчёт `CashTransaction.php:719–727` через `float`).
+2. `Finance\Document`: сумма операций в decimal против итога, считаемого в
+   `Document.php:253` через `float`.
+3. Число транзакций с НДС, где `VatCalculator::splitGross` получает `float`.
+
+**Результат.** Таблица «до» в «Журнале» и вывод: есть расхождения в копейках
+или нет.
+
+**Чек-лист:**
+
+- [ ] Записаны: baseline всего по `src/Cash/` (ожидается 240), записи
+      `phpat…Cash` (78), `vashfindir.repositoryCompanyScope` по Cash (4),
+      `phpat…Company` из Cash (13), `phpat…Finance` из Cash (3).
+- [ ] Выполнены три проверки на данных, результат — счётчики, без ПДн.
+- [ ] Вывод записан: «расхождения есть: N записей, сумма X» или «нет».
+- [ ] Если расхождения есть — этап 3 помечен как срочный, но порядок этапов не
+      меняется без согласования с Владельцем.
+
+---
+
+## Этап 1. Обработка ошибок: глотание исключений, Messenger, доменные исключения
+
+**Цель.** Убрать места, где ошибки теряются или бесконечно ретраятся, и
+ввести доменные исключения модуля (паттерн «доменные исключения со стабильным
+`code`», `PATTERNS.md` §13; «классификация ошибок в Messenger», §10, §23).
+
+**Лезем:**
+
+- `Controller/Import/CashFileImportController.php` — `catch (\Throwable)` на
+  строке 123.
+- `MessageHandler/Import/BankImportHandler.php`.
+- `Service/Import/Bank/Provider/Alfa/AlfaApiClient.php`.
+- `Controller/Accounts/FundController.php:152`.
+- Новые классы в `Cash/Exception/`.
+- Маппинг новых исключений в `ExceptionListener` — только добавление строк.
+
+**Не лезем:**
+
+- Остальные ~20 мест с голыми исключениями в Cash — они уйдут попутно
+  (см. «Попутные правила»).
+- Логика импорта, ретраи на уровне транспорта, `messenger.yaml`.
+- Другие модули.
+
+**Правила:**
+
+- Неустранимое (компания не найдена, нет активного подключения, неизвестный
+  код банка) → `UnrecoverableMessageHandlingException` + `logger->error`.
+- Временное (429, 5xx, таймаут Alfa) → доменное исключение, в handler —
+  `RecoverableMessageHandlingException` + `logger->warning`.
+- Логи handler'а: старт и финиш с ID сообщения и `companyId`. Внешний HTTP —
+  метод, URL, статус, время; **без тела ответа, токенов и ключей**.
+- `catch (\Throwable)` в контроллере не оставлять пустым по смыслу: сузить тип
+  или логировать `error` с `companyId`. Flash-сообщение пользователю
+  сохраняется как есть.
+- Исключения — `final class`, extends `AppException` или `\RuntimeException`,
+  имя по причине (`BankConnectionNotFoundException`), `code` — snake_case.
+- `FundController`: некорректная сумма → 422 вместо 500. Это единственное
+  разрешённое изменение видимого поведения на этапе.
+
+**Результат.** Ни одна ошибка этих путей не теряется молча; неустранимые
+сообщения не ретраятся; в GlitchTip приходят только настоящие инциденты.
+
+**Чек-лист:**
+
+- [ ] `CashFileImportController:123` — ошибка логируется или тип сужен;
+      регрессионный тест.
+- [ ] `BankImportHandler` — три неустранимые ветки бросают `Unrecoverable…`;
+      логи старта и финиша; тесты на каждую ветку.
+- [ ] `AlfaApiClient` — доменные исключения, временное отличимо от
+      постоянного; unit-тест на 429/5xx и на битый JSON.
+- [ ] `FundController` — некорректная сумма отдаёт 422; тест.
+- [ ] Новые исключения замаплены в `ExceptionListener`.
+- [ ] Baseline не вырос; изменения записаны в «Журнал».
+- [ ] Все гейты зелёные.
+
+---
+
+## Этап 2. Изоляция данных компании: репозитории, контроллеры, формы
+
+**Цель.** Сделать доступ к данным компании безопасным по построению, а не по
+ручной проверке после загрузки (паттерн «доступ только через методы с ID
+компании», `PATTERNS.md` §14).
+
+**Лезем:**
+
+- Репозитории Cash: добавить `findOneByIdAndCompanyId()` /
+  `getByIdAndCompanyId()` там, где их нет.
+- 11 вызовов `find($id)`: `Bank1CImportController` ×3,
+  `BankConnectionController` ×3, `CashFileImportProfileController` ×2,
+  `CashFileImportController:247`, `CashTransactionController:424`,
+  `PaymentCalendarController:262`.
+- 6 аргументов-Entity в контроллерах: `CashTransactionController::show/delete`,
+  `CashTransactionCreateFromController`,
+  `PaymentCalendarController::edit/changeStatus/postpone`.
+- 4 записи `vashfindir.repositoryCompanyScope`:
+  `BankConnectionRepository::findActiveByBankCode`,
+  `PaymentPlanMatchRepository::findOneByTransaction`,
+  `PaymentPlanRepository::findTemplateForRecurrenceRule`,
+  `CashTransactionAutoRuleRepository::findActiveGeneralProjectTargetsWithoutCfo`.
+- Формы: `CashTransactionAutoRuleType` (`ProjectDirection`),
+  `CashflowCategoryType:104` (`PLCategory`), `Form/PaymentPlan/PaymentPlanType`
+  (`query_builder` без компании при `company = null`).
+- `site/tests/PHPStan/Rules/RepositoryCompanyScopeRule.php` — расширение.
+
+**Не лезем:**
+
+- `#[ManyToOne] Company` в сущностях — легаси, задокументировано в
+  `ARCHITECTURE.md`.
+- Репозитории других модулей, даже если в них то же нарушение.
+- Маршруты и URL: `{id}` в пути остаётся, меняется только способ загрузки.
+- Глобальный Doctrine SQL Filter по компании — не вводим.
+
+**Правила:**
+
+- `@companyScopeExempt <причина>` — только где обход всех компаний задуман:
+  cron по всем подключениям, миграционная команда. Там, где компания известна
+  через владельца, — добавить параметр `$companyId`.
+- Чужая сущность в форме → `ChoiceType` с данными из `CompanyFacade` /
+  `FinanceFacade`. Нужного метода нет — создать, обновить `ARCHITECTURE.md`.
+- `PaymentPlanType` без компании — бросать исключение, а не отдавать
+  несфильтрованный список.
+- Ответ на чужой ID — 404, как сейчас. Текст и поведение не меняются.
+
+**Результат.** Ни одной загрузки сущности компании без `companyId` в
+контроллерах Cash; правило ловит это машинно; формы не показывают чужие
+данные.
+
+**Чек-лист:**
+
+- [ ] 11 `find($id)` заменены; на каждый маршрут — тест «чужой ID → 404».
+- [ ] 6 аргументов-Entity заменены на `string $id` + загрузку с компанией;
+      тесты «чужой ID → 404».
+- [ ] 4 записи `repositoryCompanyScope` по Cash удалены из baseline (параметр
+      или `@companyScopeExempt` с причиной).
+- [ ] `RepositoryCompanyScopeRule` ловит `->find(` на репозиториях сущностей
+      компании в контроллерах; тест правила.
+- [ ] Формы: `EntityType` с чужими сущностями убран; тест на отсутствие чужих
+      значений в выборе.
+- [ ] Baseline Cash уменьшился минимум на 4; «Журнал» обновлён.
+- [ ] Все гейты зелёные.
+
+---
+
+## Этап 3. Деньги без `float`: Money Value Object
+
+**Цель.** Исключить ошибки округления в расчётах сумм (паттерн «Money Value
+Object», `PATTERNS.md` §4 Value Object).
+
+**Лезем:**
+
+- Новый `final readonly class Money` (сумма строкой + `FiatCurrency`) в
+  `Cash/Domain/` или общем месте по решению из `ARCHITECTURE.md`.
+- Три места с арифметикой: `CashTransaction.php:719–727` (остаток к
+  распределению), `CashTransactionService:261` + `VatCalculator::splitGross`,
+  `PaymentPlanMatcher:63,78` (сравнение сумм).
+- `Finance/Entity/Document.php:253` — только если этап 0 подтвердил
+  расхождение; иначе — в «Находки» для отдельной задачи в Finance.
+- PHPStan-правило: запрет `(float)` на результатах `get*Amount()` в Cash.
+
+**Не лезем:**
+
+- Типы колонок и схема БД: суммы как были `decimal`/строка, так и остаются.
+- `number_format((float) …)` в импортах (1C, Bank) — это форматирование
+  входной строки, а не арифметика; в «Находки».
+- Отображение сумм (`vf_money`, `vf_amount`, Twig) — без изменений.
+- Остальные модули (Marketplace — 22 места, MarketplaceAnalytics, Catalog).
+
+**Правила:**
+
+- Арифметика только через `bcmath`, масштаб — как у колонки.
+- Округление — один раз, на границе (запись или вывод). Правило округления НДС
+  (банковское или математическое, на строку или на документ) — **бизнес-правило:
+  если текущее поведение не очевидно из кода и тестов, STOP и вопрос
+  Владельцу**.
+- Результат расчёта на существующих данных не должен измениться, кроме случаев,
+  где этап 0 нашёл ошибку. Ожидаемые изменения перечислить в PR.
+- Пересчёт исторических данных на этом этапе не делается.
+
+**Результат.** Суммы в перечисленных расчётах считаются без потери точности;
+новое использование `float` для денег ловится правилом.
+
+**Чек-лист:**
+
+- [ ] `Money` с unit-тестами: сложение, вычитание, сравнение, распределение
+      остатка, разная валюта → исключение.
+- [ ] Три места переведены на `Money`; регрессионный тест на сумму, которая
+      ломается на `float` (например, `0.1 + 0.2`, большие суммы).
+- [ ] Правило PHPStan на `(float)` от денежных геттеров в Cash; его тест.
+- [ ] Записаны ожидаемые изменения результатов (или «изменений нет»).
+- [ ] Baseline не вырос; «Журнал» обновлён.
+- [ ] Все гейты зелёные.
+
+---
+
+## Этап 4. Гейты: закрепить правила машинно
+
+**Цель.** Превратить правила, нарушенные в Cash, из текста в проверки, чтобы
+исправленное не возвращалось (паттерн «правила в виде гейтов»).
+
+**Лезем:**
+
+- `site/tests/Architecture/` и `site/tests/PHPStan/Rules/` — новые правила.
+- `config/packages/messenger.yaml` — только для `ScoreCompanyCounterpartiesMessage`.
+- `phpstan-baseline.neon` — запись текущих нарушений нового правила.
+- Цепочка `ScoreCompanyCounterparties*` в Cash.
+
+**Не лезем:**
+
+- Исправление нарушений, которые найдёт новое правило про `flush`, — это этап 5.
+- Транспорт `CashFileImportMessage` — только проверить, решение в «Находки».
+- Rector и массовая расстановка `final`/`readonly`.
+
+**Правила:**
+
+- Новые гейты:
+  1. Тест: каждое сообщение, у которого есть `#[AsMessageHandler]`, прописано
+     в `messenger.yaml` ровно на одном транспорте.
+  2. PHPStan-правило: `EntityManagerInterface::flush()` вызывается только в
+     `*Action`, `*Handler`, `*Command`.
+  3. PHPat-правило: `EntityType` в формах модуля — только с сущностями своего
+     модуля.
+- Правило 2 и 3 вводятся **с baseline** текущих нарушений: это единственный
+  этап, где baseline растёт, PR с меткой `[baseline-grow]` и списком записей.
+- `ScoreCompanyCounterpartiesMessage`: команда `app:cash:dispatch-scoring`
+  нигде не вызывается. Варианта два — прописать в `async_pipeline` с логами в
+  handler или удалить цепочку целиком. Выбор — вопрос Владельцу (влияет на
+  scope), до ответа — не трогать.
+- `CashFileImportMessage` на `async_sync`: проверить, есть ли внешний HTTP
+  или внешнее хранилище; результат записать, транспорт не менять.
+
+**Результат.** Три новых гейта в CI; все текущие нарушения видны списком в
+baseline и будут сокращаться на этапе 5.
+
+**Чек-лист:**
+
+- [ ] Тест routing зелёный (после решения по `ScoreCompanyCounterparties`).
+- [ ] Правило `flush` работает; у него есть тест; нарушения в baseline
+      перечислены в PR.
+- [ ] Правило `EntityType` работает; у него есть тест.
+- [ ] По `CashFileImportMessage` записан вывод в «Находки».
+- [ ] PR с `[baseline-grow]`, рост объяснён поштучно; «Журнал» обновлён.
+- [ ] Все гейты зелёные.
+
+---
+
+## Этап 5. `flush` только в Action: Action как граница транзакции
+
+**Цель.** Убрать `flush()` из репозиториев, контроллеров и сервисов (паттерн
+«один use case — один `flush`», `PATTERNS.md` §3). В ORM 3 `flush()` сохраняет
+весь UnitOfWork, поэтому `flush` в сервисе сохраняет и чужие изменения.
+
+**Лезем, в этом порядке:**
+
+1. Repository: `BankImportCursorRepository:46,54`.
+2. Controller: `CashTransactionAutoRuleController:496,529,553`,
+   `CashflowCategoryController:175` — логику (применение правила, `AuditLog`,
+   включение/выключение) вынести в Action.
+3. Сервисы: `MoneyAccountService`, `FundService`, `BankConnectionService`,
+   `CashTransactionService` (5 мест), `CashTransactionToDocumentService`,
+   `PaymentPlanMatcher`, `RecurrenceMaterializer`.
+4. Псевдо-фасады `Service/Import/File/CashFileImportFacade` и
+   `Service/PaymentPlan/PaymentCalendarFacade` — превратить в Action или
+   переименовать.
+
+**Не лезем:**
+
+- Пакетные `flush` в импортах (`ClientBank1CImportService`,
+  `BankImportService`, `CashFileImportService`) — правило «каждые N записей»
+  допускает их; перенос инициативы в Handler — отдельной задачей.
+- Разбиение многометодных контроллеров на `__invoke` — только попутно.
+- Логика расчётов, порядок пересчёта балансов, тексты.
+
+**Правила:**
+
+- Порядок записи и пересчёта не меняется: где сейчас стоит комментарий
+  «flush перед пересчётом обязателен», последовательность сохраняется внутри
+  Action.
+- Сервисы после этапа вызывают только `persist`/`remove`.
+- Новый Action — `final`, `__invoke`, без `Request`/`Response`; тесты
+  happy-path + 1 негативный.
+- Каждое удалённое нарушение — минус запись в baseline правила из этапа 4.
+
+**Результат.** В Cash `flush()` только в Action, Handler и Command (кроме
+пакетных импортов); baseline правила `flush` по Cash сократился до записей
+импортов.
+
+**Чек-лист:**
+
+- [ ] Репозиторий без `flush`.
+- [ ] Контроллеры без `flush` и без `EntityManager`; логика в Action с тестами.
+- [ ] 9 сервисов без `flush`; вызывающий код — Action.
+- [ ] Псевдо-фасады устранены.
+- [ ] Baseline правила `flush` по Cash: остались только пакетные импорты;
+      «Журнал» обновлён.
+- [ ] Все гейты зелёные.
+
+---
+
+## Этап 6. Разорвать цикл Cash↔Analytics доменными событиями
+
+**Цель.** Cash перестаёт вызывать инфраструктуру Analytics напрямую (паттерн
+«доменные события», `PATTERNS.md` §20 — первое применение в проекте).
+
+**Лезем:**
+
+- `Cash/Domain/Event/`: `CashTransactionsChanged`, `CashTransferChanged`
+  (`final readonly`, scalar: `companyId`, период).
+- 5 мест вызова `SnapshotCacheInvalidator`: `CashTransactionService`,
+  `SoftDeleteCompanyTransactionsCommand`, `CashTransferLifecycleAction`,
+  `CreateCashTransferAction`, `BulkDeleteCashTransactionsAction`.
+- Analytics: новый подписчик, который сбрасывает кэш.
+
+**Не лезем:**
+
+- Чтение Cash из Analytics (виджеты) — это этап 7.
+- Outbox, новые транспорты, изменения `messenger.yaml`.
+- Другие модули и другие подписчики.
+
+**Правила:**
+
+- Событие отправляется после `flush()`, через `pullDomainEvents()` или явно из
+  Action.
+- Сброс кэша при потере события допустим (кэш истечёт сам) — синхронный
+  `EventDispatcher` достаточен. Для денежных последствий этот механизм **не
+  использовать**: там Message через Doctrine-транспорт в той же транзакции.
+- Поведение кэша для пользователя не меняется: сброс в тех же случаях.
+
+**Результат.** В Cash нет импорта `App\Analytics\…`; кэш сбрасывается в тех же
+сценариях.
+
+**Чек-лист:**
+
+- [ ] `grep "use App\\Analytics" site/src/Cash` пуст.
+- [ ] Тест: изменение транзакции → событие → кэш Analytics сброшен.
+- [ ] `PATTERNS.md` §20 дополнен ссылкой на живой пример.
+- [ ] «Журнал» обновлён; все гейты зелёные.
+
+---
+
+## Этап 7. Границы модуля: чтение через Facade, наружу — DTO
+
+**Цель.** Чужие модули перестают читать репозитории и сервисы Cash, Cash —
+чужие; убираются циклы Cash↔Finance и Cash↔Company (паттерн «Facade + Query +
+DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один PR на подэтап**,
+подэтапы строго по порядку.
+
+| Подэтап | Потребитель | Что импортирует из Cash сейчас |
+|---|---|---|
+| 7.1 | Analytics: 6 виджетов, `LastUpdatedAtResolver` | репозитории транзакций, счетов, фондов; `AccountBalanceProvider` |
+| 7.2 | Finance: 4 отчётных контроллера, `FinanceFacade`, `FinanceDashboardKpiProvider` | репозитории, `DailyBalanceRecalculator`, `AccountBalanceProvider` |
+| 7.3 | `Report/CashflowReportBuilder`, `Ai/CashflowAgent`, `Telegram/SendTelegramReportsCommand` | репозитории |
+| 7.4 | `Twig` ×2, `Company` ×2, `Shared/AuditLogSubscriber`, `DataFixtures` | сервисы Cash |
+| 7.5 | Cash → Company и Finance | `CounterpartyRepository`, `ProjectDirectionRepository`, `UserRepository`, `CompanyRepository`, `CounterpartyNameNormalizer`, `PLCategoryRepository`, `PLRegisterUpdater` |
+
+**Лезем:**
+
+- `Cash/Facade/CashFacade.php` — новые read-методы.
+- `Cash/Infrastructure/Query/` — Query-классы с DBAL-проекциями.
+- `Cash/Application/DTO/` — readonly DTO результатов.
+- Файлы потребителей текущего подэтапа — только замена зависимости.
+- Для 7.5 — `CompanyFacade`, `FinanceFacade` (новые методы).
+- `ARCHITECTURE.md` — каждый новый Facade-метод.
+
+**Не лезем:**
+
+- Возвращаемые типы существующих методов Facade (Entity остаются Entity).
+- Логика отчётов и виджетов: числа на экране не должны измениться.
+- Ужесточение `ModuleBoundaryRules` до «только Facade + DTO + Enum» — отдельная
+  задача (~230 записей по проекту).
+- Потребители следующих подэтапов.
+
+**Правила:**
+
+- Новые Facade-методы возвращают DTO, не Entity. Каждый принимает
+  `string $companyId`.
+- Query-класс — явное перечисление колонок, без `SELECT *`; списки — через
+  Pagerfanta (`limit` ≤ 200).
+- Числа до и после совпадают: для каждого заменённого отчёта/виджета —
+  тест-сравнение результата старого и нового пути на одних данных.
+- N+1 проверяется в self-review каждого подэтапа.
+
+**Результат.** Записи `phpat…Cash` в baseline — 0; записи `phpat…Company` и
+`phpat…Finance` из Cash — 0; циклов Cash↔Finance и Cash↔Company нет.
+
+**Чек-лист (на каждый подэтап):**
+
+- [ ] Потребители подэтапа не импортируют `App\Cash\{Service,Repository,
+      Application(кроме DTO),Infrastructure}`.
+- [ ] Новые методы Facade с тестами и записью в `ARCHITECTURE.md`.
+- [ ] Тест-сравнение: результат не изменился.
+- [ ] Записи baseline подэтапа удалены; «Журнал» обновлён.
+- [ ] Все гейты зелёные.
+
+**Итог этапа 7:**
+
+- [ ] `phpat…Cash` = 0, `phpat…Company` и `phpat…Finance` из `src/Cash/` = 0.
+
+---
+
+## Этап 8. Гигиена модуля
+
+**Цель.** Убрать мёртвый код и устаревшие документы, которые вводят в
+заблуждение.
+
+**Лезем:**
+
+- Удалить `Service/Import/File/CashTransactionPersister.php_` и
+  `Service/Import/File/CashFileImportReader.php_`.
+- Переписать `Cash/README.md` под правила `CLAUDE.md` (сейчас разрешает доступ
+  через `Service\*` и `Repository\*`), сохранив раздел про мультивалютность.
+- Перенести этот план в `docs/plan/`, если Владелец решит хранить его там.
+
+**Не лезем:** код, кроме удаления двух `.php_`.
+
+**Результат.** В модуле нет файлов вне PHP-классов, кроме актуального README.
+
+**Чек-лист:**
+
+- [ ] Два `.php_` удалены, на них нет ссылок.
+- [ ] README не противоречит `CLAUDE.md`.
+- [ ] Все гейты зелёные.
+
+---
+
+## Попутные правила (не этап, действуют всегда)
+
+Применяются только к файлу, который правится по другой задаче. Отдельных PR
+под них не делать.
+
+- **Правило бойскаута:** тронул файл Cash — закрыл его записи baseline, если
+  это не меняет поведение.
+- Перенос в целевую раскладку: `Message/` → `Application/Message/`,
+  `DTO/` → `Application/DTO/`, `Service/` → `Application/` или `Domain/`.
+  Baseline-guard переносы пропускает.
+- `final` на сервисах, репозиториях, контроллерах, формах; `final readonly` на
+  DTO и Message.
+- Голое `\RuntimeException` / `\InvalidArgumentException` → доменное
+  исключение.
+- Многометодный контроллер → `__invoke`-контроллеры, когда правится метод.
+- Выбор провайдера через `match` → tagged services + `ServiceLocator`
+  (`PATTERNS.md` §9), когда добавляется второй банк.
+- Ветвистая логика правил и импорта → чистые Policy-классы с unit-тестами
+  (`PATTERNS.md` §4), когда правится соответствующая ветка.
+
+## Не делаем в рамках плана
+
+- Event Sourcing, полный CQRS с отдельными шинами.
+- Глобальный Doctrine-фильтр по компании.
+- Общий `BaseRepository` или generic CRUD-фасады.
+- Массовый перевод `#[ManyToOne] Company` на `string $companyId`, перенос
+  генерации UUID в конструкторы, `uuid4` → `uuid7` — только вместе с
+  contract-задачами и миграциями.
+- Двунаправленная связь `CashTransaction` → `Finance\Document` — отдельная
+  contract-задача.
+
+---
+
+## Журнал
+
+| Этап | Дата | Baseline Cash до | Baseline Cash после | Прочие цифры | PR |
+|---|---|---|---|---|---|
+| 0 | | 240 | — | phpat…Cash 78, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3 | — |
+
+## Находки
+
+Обнаруженное по ходу работ вне scope текущего этапа. Не чинится в этом плане
+без согласования.
+
+- `number_format((float) …)` в `ClientBank1CImportService:562,797`,
+  `BankImportService:307` — форматирование входа через `float`.
+- `(float)` на суммах вне Cash: Marketplace — 22, Finance — 12, Catalog — 3,
+  MarketplaceAnalytics — 3.
+- `CashFileImportMessage` на `async_sync` — проверить на этапе 4.
