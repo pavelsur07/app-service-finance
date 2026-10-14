@@ -6,7 +6,11 @@ namespace App\Tests\Functional\Company;
 
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -108,6 +112,121 @@ final class CounterpartyDisplayNameSuggestionTest extends WebTestCaseBase
         // Then
         self::assertResponseStatusCodeSame(404);
         self::assertNull($this->displayName($foreignId));
+    }
+
+    public function testAutoNameEqualToRawShowsNoOrigin(): void
+    {
+        // Given: массовый пересчёт записал авто-название, совпадающее с сырым
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 956);
+        $id = $this->createCounterparty($company, 'ООО «Ромашка»');
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement(
+            'UPDATE "counterparty" SET display_name = name, display_name_source = :source, display_rules_version = 2 WHERE id = :id',
+            ['source' => 'auto', 'id' => $id],
+        );
+        $this->login($client, $owner, $company);
+
+        // When
+        $crawler = $client->request('GET', '/counterparties/');
+
+        // Then: «Исходное» не дублирует то же название, подсказки нет
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('.vf-name-origin'));
+        self::assertCount(0, $crawler->filter('.vf-name-suggest'));
+    }
+
+    public function testFinanceWriteMemberWithoutAdminCanApply(): void
+    {
+        // Given: участник с finance:write без admin — новые контроллеры отнесены к FINANCE
+        $client = static::createClient();
+        [$company, $member] = $this->seedMember(957, ['finance' => 'write']);
+        $id = $this->createCounterparty($company, 'ООО "Ромашка"');
+        $this->em()->flush();
+        $this->login($client, $member, $company);
+
+        // When
+        $client->request('POST', '/counterparties/'.$id.'/display-name/apply', ['_token' => $this->csrfToken($client, 'apply_display_name'.$id)]);
+
+        // Then
+        self::assertResponseRedirects('/counterparties/');
+        self::assertSame('ООО «Ромашка»', $this->displayName($id));
+    }
+
+    public function testFinanceReadMemberCannotApply(): void
+    {
+        // Given
+        $client = static::createClient();
+        [$company, $member] = $this->seedMember(958, ['finance' => 'read']);
+        $id = $this->createCounterparty($company, 'ООО "Ромашка"');
+        $this->em()->flush();
+        $this->login($client, $member, $company);
+
+        // When
+        $client->request('POST', '/counterparties/'.$id.'/display-name/apply', ['_token' => $this->csrfToken($client, 'apply_display_name'.$id)]);
+
+        // Then
+        self::assertResponseStatusCodeSame(403);
+        self::assertNull($this->displayName($id));
+    }
+
+    public function testResetForeignIsNotFoundAndBadCsrfChangesNothing(): void
+    {
+        // Given: ручное название у своего и у чужого
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 959);
+        [, $foreignCompany] = $this->createCompany($client, 960);
+        $ownId = $this->createCounterparty($company, 'ООО "Ромашка"');
+        $foreignId = $this->createCounterparty($foreignCompany, 'ООО "Чужая"');
+        $this->em()->flush();
+        foreach ([$ownId, $foreignId] as $id) {
+            $this->em()->getConnection()->executeStatement(
+                'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+                ['name' => 'Вручную', 'source' => 'manual', 'id' => $id],
+            );
+        }
+        $this->login($client, $owner, $company);
+
+        // When: чужой
+        $client->request('POST', '/counterparties/'.$foreignId.'/display-name/reset', ['_token' => $this->csrfToken($client, 'reset_display_name'.$foreignId)]);
+
+        // Then
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame('Вручную', $this->displayName($foreignId));
+
+        // When: свой с поддельным токеном
+        $client->request('POST', '/counterparties/'.$ownId.'/display-name/reset', ['_token' => 'forged']);
+
+        // Then
+        self::assertResponseRedirects('/counterparties/');
+        self::assertSame('Вручную', $this->displayName($ownId));
+    }
+
+    /**
+     * @param array<string, string> $permissions
+     *
+     * @return array{0: Company, 1: User}
+     */
+    private function seedMember(int $index, array $permissions): array
+    {
+        $owner = UserBuilder::aUser()->withIndex($index)->withRoles(['ROLE_COMPANY_OWNER'])->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->withName('Company '.$index)->build();
+        $role = new CompanyRole(Uuid::uuid4()->toString(), 'Шаблон '.$index, $permissions, $company);
+        $member = UserBuilder::aUser()->withIndex($index + 1000)->withRoles(['ROLE_COMPANY_USER'])->build();
+        $membership = CompanyMemberBuilder::aMember()
+            ->withCompany($company)
+            ->withUser($member)
+            ->withRole(CompanyMember::ROLE_OPERATOR)
+            ->withStatus(CompanyMember::STATUS_ACTIVE)
+            ->withAccessRole($role)
+            ->build();
+
+        foreach ([$owner, $company, $role, $member, $membership] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        return [$company, $member];
     }
 
     private function flashes(Crawler $crawler): string

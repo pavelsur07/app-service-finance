@@ -22,6 +22,8 @@ use Ramsey\Uuid\Uuid;
  */
 final class ApplyCounterpartyDisplayNameAction
 {
+    private const STALE = 'Предложение больше не актуально.';
+
     public function __construct(
         private readonly CounterpartyRepository $repository,
         private readonly CounterpartyDisplayNameSuggestion $suggestion,
@@ -56,11 +58,17 @@ final class ApplyCounterpartyDisplayNameAction
                 throw new CounterpartyDisplayNameNotApplicableException('Название уже задано вручную — предложение не применяется.');
             }
 
-            throw new CounterpartyDisplayNameNotApplicableException('Предложение больше не актуально.');
+            throw new CounterpartyDisplayNameNotApplicableException(self::STALE);
         }
 
         if (!$this->writer->writeManualIfUnchanged($counterparty->getId(), $companyId, $counterparty->getName(), $suggested)) {
-            throw new CounterpartyDisplayNameNotApplicableException('Контрагент изменён — обновите страницу и проверьте предложение.');
+            // Двойной клик: вторая запись ждала первую и не совпала по условию — это тот же результат.
+            $current = $this->writer->currentState($counterparty->getId(), $companyId);
+            if (null !== $current && CounterpartyDisplayNameSource::MANUAL->value === $current['display_name_source'] && $suggested === $current['display_name']) {
+                return $suggested;
+            }
+
+            throw new CounterpartyDisplayNameNotApplicableException(self::STALE.' Обновите страницу.');
         }
 
         $this->logger->info('Counterparty display name applied from suggestion.', [

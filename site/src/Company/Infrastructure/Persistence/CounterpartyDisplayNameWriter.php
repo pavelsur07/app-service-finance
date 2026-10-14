@@ -70,7 +70,24 @@ final class CounterpartyDisplayNameWriter
         return 1 === $affected;
     }
 
-    /** «Вернуть исходное»: снять ручное название. false — ручного названия уже нет. */
+    /**
+     * Текущее отображаемое название и источник прямо из БД — после false от условной записи
+     * (повторный клик, параллельная вкладка), когда снимку сущности верить нельзя.
+     *
+     * @return array{display_name: ?string, display_name_source: ?string}|null
+     */
+    public function currentState(string $id, string $companyId): ?array
+    {
+        /** @var array{display_name: ?string, display_name_source: ?string}|false $row */
+        $row = $this->connection->fetchAssociative(
+            'SELECT display_name, display_name_source FROM "counterparty" WHERE id = :id AND company_id = :companyId',
+            ['id' => $id, 'companyId' => $companyId],
+        );
+
+        return false === $row ? null : $row;
+    }
+
+    /** «Вернуть исходное»: снять ручное название (не в архиве). false — ручного названия уже нет. */
     public function resetManual(string $id, string $companyId): bool
     {
         $affected = $this->connection->executeStatement(
@@ -79,6 +96,7 @@ final class CounterpartyDisplayNameWriter
                 SET display_name = NULL, display_name_source = NULL, display_rules_version = NULL, updated_at = :now
                 WHERE id = :id
                   AND company_id = :companyId
+                  AND is_archived = false
                   AND display_name_source = :manual
                 SQL,
             ['now' => new \DateTimeImmutable(), 'id' => $id, 'companyId' => $companyId, 'manual' => 'manual'],

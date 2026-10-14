@@ -135,10 +135,10 @@
                     <tr{% if item.isArchived %} class="vf-row-muted"{% endif %}>
                         <td>
                             <a href="{{ editUrl }}" class="vf-strong">{{ shown }}</a>
-                            {% if item.displayName %}
-                                <div class="vf-sub vf-name-origin">
+                            {% if item.displayName and item.displayName != item.name %}
+                                <div class="vf-name-origin">
                                     <span class="vf-clip" title="{{ item.name }}">Исходное: {{ item.name }}</span>
-                                    {% if item.displayNameSource and item.displayNameSource.value == 'manual' %}
+                                    {% if not item.isArchived and item.displayNameSource and item.displayNameSource.value == 'manual' %}
                                         <form method="post" action="{{ path('counterparty_reset_display_name', {id: item.id}|merge(listState)) }}" class="vf-inline-form">
                                             <input type="hidden" name="_token" value="{{ csrf_token('reset_display_name' ~ item.id) }}">
                                             <button type="submit" class="vf-link-btn" aria-label="Вернуть исходное название «{{ item.name }}»">Вернуть исходное</button>

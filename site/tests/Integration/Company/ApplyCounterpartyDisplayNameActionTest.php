@@ -180,6 +180,112 @@ final class ApplyCounterpartyDisplayNameActionTest extends IntegrationTestCase
         self::assertSame('auto', $this->row($id)['display_name_source']);
     }
 
+    public function testConcurrentRenameIsNotOverwritten(): void
+    {
+        // Given: сущность загружена (снимок в identity map), затем name сменили в обход неё
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        $this->loadIntoIdentityMap($id);
+        $this->connection->executeStatement('UPDATE "counterparty" SET name = :name WHERE id = :id', ['name' => 'ООО "Лютик"', 'id' => $id]);
+
+        // When / Then: предложение посчитано от старого name — запись не проходит
+        try {
+            ($this->apply)($this->companyId(), $id);
+            self::fail('Параллельное переименование не должно затираться.');
+        } catch (CounterpartyDisplayNameNotApplicableException $exception) {
+            self::assertStringContainsString('Предложение больше не актуально', $exception->getMessage());
+        }
+        self::assertNull($this->row($id)['display_name']);
+    }
+
+    public function testConcurrentManualNameIsNotOverwritten(): void
+    {
+        // Given
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        $this->loadIntoIdentityMap($id);
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'Ромашка (поставщик)', 'source' => 'manual', 'id' => $id],
+        );
+
+        // When / Then
+        try {
+            ($this->apply)($this->companyId(), $id);
+            self::fail('Параллельное ручное название не должно затираться.');
+        } catch (CounterpartyDisplayNameNotApplicableException) {
+        }
+        self::assertSame('Ромашка (поставщик)', $this->row($id)['display_name']);
+    }
+
+    public function testDoubleSubmitIsSuccessNotError(): void
+    {
+        // Given: обе отправки видели строку до записи; первая уже записала
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        $this->loadIntoIdentityMap($id);
+        ($this->apply)($this->companyId(), $id);
+
+        // When: вторая — со старым снимком (source null)
+        $applied = ($this->apply)($this->companyId(), $id);
+
+        // Then
+        self::assertSame('ООО «Ромашка»', $applied);
+        self::assertSame('manual', $this->row($id)['display_name_source']);
+    }
+
+    public function testApplyOverOlderAutoNameMakesItManual(): void
+    {
+        // Given: авто-название прошлой версии правил
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = 1 WHERE id = :id',
+            ['name' => 'ООО "Ромашка"', 'source' => 'auto', 'id' => $id],
+        );
+        $this->em->clear();
+
+        // When
+        ($this->apply)($this->companyId(), $id);
+
+        // Then
+        $row = $this->row($id);
+        self::assertSame(['ООО «Ромашка»', 'manual', null], [$row['display_name'], $row['display_name_source'], $row['display_rules_version']]);
+    }
+
+    public function testRepeatedResetWithStaleSnapshotIsSuccess(): void
+    {
+        // Given: ручное название, снимок загружен, первая вкладка уже сбросила
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        ($this->apply)($this->companyId(), $id);
+        $this->em->clear();
+        $this->loadIntoIdentityMap($id);
+        $this->connection->executeStatement('UPDATE "counterparty" SET display_name = NULL, display_name_source = NULL WHERE id = :id', ['id' => $id]);
+
+        // When / Then: не «задано правилами», а успех
+        ($this->reset)($this->companyId(), $id);
+        self::assertNull($this->row($id)['display_name_source']);
+    }
+
+    public function testResetRefusesArchived(): void
+    {
+        // Given
+        $id = $this->persist($this->company, 'ООО "Ромашка"');
+        ($this->apply)($this->companyId(), $id);
+        $this->connection->executeStatement('UPDATE "counterparty" SET is_archived = true WHERE id = :id', ['id' => $id]);
+        $this->em->clear();
+
+        // When / Then
+        try {
+            ($this->reset)($this->companyId(), $id);
+            self::fail('Архивный контрагент не меняется.');
+        } catch (CounterpartyDisplayNameNotApplicableException) {
+        }
+        self::assertSame('manual', $this->row($id)['display_name_source']);
+    }
+
+    private function loadIntoIdentityMap(string $id): void
+    {
+        $this->em->clear();
+        $this->em->getRepository(\App\Company\Entity\Counterparty::class)->find($id);
+    }
+
     private function companyId(): string
     {
         return (string) $this->company->getId();

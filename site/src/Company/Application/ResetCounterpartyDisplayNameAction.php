@@ -32,9 +32,15 @@ final class ResetCounterpartyDisplayNameAction
             throw new CounterpartyNotFoundException();
         }
 
+        if ($counterparty->isArchived()) {
+            throw new CounterpartyDisplayNameNotApplicableException('Контрагент в архиве — верните его из архива, чтобы изменить название.');
+        }
+
         if (!$this->writer->resetManual($counterparty->getId(), $companyId)) {
-            // Уже сброшено (повторный клик) — состояние то, что просили.
-            if (null === $counterparty->getDisplayNameSource()) {
+            // Решаем по свежему состоянию БД: снимок сущности при повторном клике или второй
+            // вкладке ещё показывает manual.
+            $current = $this->writer->currentState($counterparty->getId(), $companyId);
+            if (null === $current || null === $current['display_name_source']) {
                 return;
             }
 

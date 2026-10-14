@@ -1552,7 +1552,7 @@
 .vf-name-origin {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--vf-space-1);
   min-width: 0;
   max-width: 420px;
   margin-top: 2px;
@@ -1565,9 +1565,13 @@
   color: var(--vf-warn-text);
 }
 
+.vf-name-origin {
+  color: var(--vf-text-muted);
+}
+
 .vf-name-suggest .ti {
   flex: none;
-  font-size: 14px;
+  font-size: 1em;
 }
 
 .vf-name-suggest .vf-clip,
@@ -1601,9 +1605,5 @@
 .vf-link-btn:focus-visible {
   outline: 2px solid var(--vf-primary);
   outline-offset: 2px;
-  border-radius: 2px;
-}
-
-.vf-table > tbody > tr.vf-row-muted .vf-name-origin {
-  color: var(--vf-text-muted);
+  border-radius: var(--vf-radius-sm);
 }

@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
  * несут в адресе формы, чтобы вернуть пользователя на ту же страницу с теми же фильтрами.
  * Только строковые значения из белого списка — остальное отбрасывается.
  */
-final class CounterpartyListQuery
+final readonly class CounterpartyListQuery
 {
     private const KEYS = ['q', 'type', 'show_archived', 'limit', 'page'];
 
@@ -26,6 +26,14 @@ final class CounterpartyListQuery
             if (isset($parameters[$key]) && \is_string($parameters[$key]) && '' !== $parameters[$key]) {
                 $query[$key] = $parameters[$key];
             }
+        }
+
+        // Неверные page/limit не переносим — иначе редирект привёл бы на 422 списка.
+        if (isset($query['page']) && false === filter_var($query['page'], \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])) {
+            unset($query['page']);
+        }
+        if (isset($query['limit']) && false === filter_var($query['limit'], \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 200]])) {
+            unset($query['limit']);
         }
 
         return $query;
