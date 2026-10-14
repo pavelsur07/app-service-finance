@@ -27,6 +27,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\CompanyFacade;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
@@ -258,9 +259,9 @@ final class CashTransactionService
             return;
         }
 
-        $split = $this->vatCalculator->splitGross((float) $amount, $rate);
+        $split = $this->vatCalculator->splitGross(Money::fromString($amount, $tx->getCurrency()), $rate);
         $tx->setVatRatePercent($rate);
-        $tx->setVatAmount($split['vat']);
+        $tx->setVatAmount($split['vat']->toDecimalString());
     }
 
     private function resolveCompany(string $companyId): Company

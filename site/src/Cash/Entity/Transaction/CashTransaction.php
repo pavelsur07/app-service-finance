@@ -12,6 +12,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Entity\Document;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -598,59 +599,108 @@ class CashTransaction
             $document->setCashTransaction($this);
         }
 
-        $this->allocatedAmount = number_format(
-            $this->getAllocatedAmount() + $document->getTotalAmount(),
-            2,
-            '.',
-            '',
-        );
+        $this->allocatedAmount = $this->getAllocatedMoney()
+            ->add($this->documentTotal($document))
+            ->toDecimalString();
 
         return $this;
     }
 
+    /**
+     * Распределённая сумма считается в Money по суммам операций документов
+     * (decimal-строки), а не через `Document::getTotalAmount(): float`.
+     */
     public function recalculateAllocatedAmount(): self
     {
-        $allocated = 0.0;
+        $allocated = Money::fromMinor(0, $this->currency);
 
         foreach ($this->documents as $document) {
             if ($document instanceof Document && !$document->isDeleted()) {
-                $allocated += $document->getTotalAmount();
+                $allocated = $allocated->add($this->documentTotal($document));
             }
         }
 
-        $this->allocatedAmount = number_format($allocated, 2, '.', '');
+        $this->allocatedAmount = $allocated->toDecimalString();
 
         return $this;
     }
 
-    public function getAllocatedAmount(): float
+    public function getAllocatedMoney(): Money
     {
-        return (float) $this->allocatedAmount;
+        return $this->money($this->allocatedAmount);
     }
 
-    public function getRemainingAmount(?Document $excludingDocument = null): float
+    /**
+     * Остаток к распределению; отрицательный остаток (переразнесённая
+     * транзакция) считается нулевым.
+     */
+    public function getRemainingMoney(?Document $excludingDocument = null): Money
     {
-        return $this->calculateRemainingAmount($excludingDocument);
-    }
+        $this->recalculateAllocatedAmount();
 
-    public function canAllocateAmount(float $amount, ?Document $excludingDocument = null): bool
-    {
-        if ($amount <= 0.0) {
-            return false;
+        $allocated = $this->getAllocatedMoney();
+
+        if ($excludingDocument instanceof Document
+            && !$excludingDocument->isDeleted()
+            && $this->documents->contains($excludingDocument)) {
+            $allocated = $allocated->subtract($this->documentTotal($excludingDocument));
         }
 
-        return $amount <= $this->getRemainingAmount($excludingDocument);
+        $remaining = $this->money($this->amount)->subtract($allocated);
+
+        return $remaining->isNegative() ? Money::fromMinor(0, $this->currency) : $remaining;
     }
 
-    public function assertCanAllocateAmount(float $amount, ?Document $excludingDocument = null): void
+    public function canAllocate(Money $amount, ?Document $excludingDocument = null): bool
     {
-        if ($amount <= 0.0) {
+        return $amount->isPositive() && $amount->compareTo($this->getRemainingMoney($excludingDocument)) <= 0;
+    }
+
+    public function assertCanAllocate(Money $amount, ?Document $excludingDocument = null): void
+    {
+        if (!$amount->isPositive()) {
             throw new \DomainException('Сумма документа должна быть больше нуля.');
         }
 
-        if (!$this->canAllocateAmount($amount, $excludingDocument)) {
+        if (!$this->canAllocate($amount, $excludingDocument)) {
             throw new \DomainException('Сумма документа превышает доступный остаток транзакции ДДС.');
         }
+    }
+
+    /**
+     * Граница для Finance и шаблонов, которые пока работают с float.
+     * В коде Cash — getAllocatedMoney().
+     */
+    public function getAllocatedAmount(): float
+    {
+        return (float) $this->getAllocatedMoney()->toDecimalString();
+    }
+
+    /**
+     * Граница для Finance и шаблонов, которые пока работают с float.
+     * В коде Cash — getRemainingMoney().
+     */
+    public function getRemainingAmount(?Document $excludingDocument = null): float
+    {
+        return (float) $this->getRemainingMoney($excludingDocument)->toDecimalString();
+    }
+
+    /**
+     * Граница для Finance: сумма документа приходит float из
+     * `Document::getTotalAmount()` и переводится в Money один раз, по копейкам.
+     * В коде Cash — canAllocate().
+     */
+    public function canAllocateAmount(float $amount, ?Document $excludingDocument = null): bool
+    {
+        return $this->canAllocate($this->moneyFromFloat($amount), $excludingDocument);
+    }
+
+    /**
+     * Граница для Finance, см. canAllocateAmount(). В коде Cash — assertCanAllocate().
+     */
+    public function assertCanAllocateAmount(float $amount, ?Document $excludingDocument = null): void
+    {
+        $this->assertCanAllocate($this->moneyFromFloat($amount), $excludingDocument);
     }
 
     public function getCreatedAt(): \DateTimeImmutable
@@ -708,24 +758,34 @@ class CashTransaction
         $this->hasViolatedDocument = true;
     }
 
-    private function calculateRemainingAmount(?Document $excludingDocument): float
+    private function documentTotal(Document $document): Money
     {
-        if (null === $this->amount) {
-            return 0.0;
+        $total = Money::fromMinor(0, $this->currency);
+
+        foreach ($document->getOperations() as $operation) {
+            $total = $total->add($this->money($operation->getAmount()));
         }
 
-        $this->recalculateAllocatedAmount();
+        return $total;
+    }
 
-        $allocated = (float) $this->allocatedAmount;
-
-        if ($excludingDocument instanceof Document
-            && !$excludingDocument->isDeleted()
-            && $this->documents->contains($excludingDocument)) {
-            $allocated -= $excludingDocument->getTotalAmount();
+    /**
+     * Сумма-строка в Money. Обычно это decimal из БД, но форма Finance
+     * (`NumberType` без `input: 'string'`) до сохранения кладёт в операцию
+     * float, приведённый к строке, — `'1.0E-5'`. Такое значение приводится к
+     * копейкам так же, как его сохранит decimal(18,2), а не роняет запрос.
+     */
+    private function money(string $decimal): Money
+    {
+        if (1 !== preg_match('/^-?\d+(\.\d+)?$/', $decimal) && is_numeric($decimal)) {
+            $decimal = number_format((float) $decimal, 2, '.', '');
         }
 
-        $remaining = (float) $this->amount - $allocated;
+        return Money::fromString($decimal, $this->currency);
+    }
 
-        return max($remaining, 0.0);
+    private function moneyFromFloat(float $amount): Money
+    {
+        return Money::fromString(number_format($amount, 2, '.', ''), $this->currency);
     }
 }

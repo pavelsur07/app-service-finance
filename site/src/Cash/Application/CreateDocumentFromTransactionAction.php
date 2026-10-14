@@ -24,7 +24,7 @@ final class CreateDocumentFromTransactionAction
             throw new \DomainException('Для переводов нельзя создать документ ОПиУ.');
         }
 
-        if ($tx->getRemainingAmount() <= 0) {
+        if (!$tx->getRemainingMoney()->isPositive()) {
             throw new \DomainException('Транзакция уже полностью разнесена.');
         }
 
@@ -35,7 +35,7 @@ final class CreateDocumentFromTransactionAction
         $plCategory = $category?->getPlCategory();
         $hasPLCategory = (null !== $plCategory);
 
-        $amount = number_format($tx->getRemainingAmount(), 2, '.', '');
+        $amount = $tx->getRemainingMoney()->toDecimalString();
 
         if ($hasPLCategory) {
             $command = new CreateDocumentCommand(

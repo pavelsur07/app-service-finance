@@ -1039,12 +1039,6 @@ parameters:
 			path: src/Cash/Entity/Transaction/CashTransaction.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between null and string will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: src/Cash/Entity/Transaction/CashTransaction.php
-
-		-
 			message: '#^Property App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\:\:\$cashflowCategory type mapping mismatch\: property can contain App\\Cash\\Entity\\Transaction\\CashflowCategory\|null but database expects App\\Cash\\Entity\\Transaction\\CashflowCategory\.$#'
 			identifier: doctrine.associationType
 			count: 1

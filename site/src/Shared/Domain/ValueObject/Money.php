@@ -124,6 +124,28 @@ final readonly class Money
         return self::createSafe($mode->roundToInteger($value), $this->currency);
     }
 
+    /**
+     * Умножает сумму на дробь numerator/denominator с одним округлением в конце.
+     *
+     * Для коэффициентов с бесконечной десятичной записью, где `multiply()` с
+     * заранее посчитанным множителем потерял бы точность: НДС «из суммы»
+     * `gross × rate / (100 + rate)` — `multiplyByRatio('5', '105')`.
+     * Числитель и знаменатель — decimal-строки не более чем с 12 знаками после
+     * точки (промежуточный scale BCMath — 12), знаменатель не равен нулю.
+     * Округление точное при |знаменателе| < 10^12: усечение частного до 12
+     * знаков не может перенести его через половину минорной единицы.
+     */
+    public function multiplyByRatio(string $numerator, string $denominator, RoundingMode $mode = RoundingMode::HALF_UP): self
+    {
+        Assert::regex($numerator, '/^-?\d+(\.\d{1,12})?$/', 'Numerator must be a decimal string with at most 12 fractional digits.');
+        Assert::regex($denominator, '/^-?\d+(\.\d{1,12})?$/', 'Denominator must be a decimal string with at most 12 fractional digits.');
+        Assert::true(0 !== \bccomp($denominator, '0', 12), 'Denominator must not be zero.');
+
+        $value = \bcdiv(\bcmul((string) $this->amountMinor, $numerator, 12), $denominator, 12);
+
+        return self::createSafe($mode->roundToInteger($value), $this->currency);
+    }
+
     public function equals(self $other): bool
     {
         return $this->amountMinor === $other->amountMinor && $this->currency === $other->currency;

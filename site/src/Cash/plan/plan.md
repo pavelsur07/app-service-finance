@@ -348,14 +348,44 @@ Object», `PATTERNS.md` §4 Value Object).
 
 **Чек-лист:**
 
-- [ ] `Money` с unit-тестами: сложение, вычитание, сравнение, распределение
-      остатка, разная валюта → исключение.
-- [ ] Три места переведены на `Money`; регрессионный тест на сумму, которая
-      ломается на `float` (например, `0.1 + 0.2`, большие суммы).
-- [ ] Правило PHPStan на `(float)` от денежных геттеров в Cash; его тест.
-- [ ] Записаны ожидаемые изменения результатов (или «изменений нет»).
-- [ ] Baseline не вырос; «Журнал» обновлён.
-- [ ] Все гейты зелёные.
+- [x] `Money` — **существующий** `App\Shared\Domain\ValueObject\Money`:
+      `PATTERNS.md` §24 запрещает второй; расширен методом `multiplyByRatio()`
+      с unit-тестами (точный результат, одно округление, полкопейки в обоих
+      режимах, большие суммы, нулевой знаменатель).
+- [x] Расчёты переведены на `Money`; регрессионные тесты на суммы, на которых
+      `float` ошибается (найдены перебором, красные на старом коде).
+- [x] Правило PHPStan `vashfindir.moneyFloatCast` на `(float)` от `get*Amount*()`
+      в `App\Cash`; тест правила; проверено, что срабатывает в анализе проекта.
+- [x] Ожидаемые изменения результатов записаны (см. результат).
+- [x] Baseline −1; «Журнал» обновлён.
+- [x] Все гейты зелёные.
+
+### Результат этапа 3 (2026-10-14)
+
+Этап 0 не нашёл расхождений на данных прода, но перебор показал, где `float`
+ошибается на реальных суммах, — эти случаи закрыты и стали регрессионными
+тестами:
+
+| Расчёт | Ошибка float | Как стало |
+|---|---|---|
+| Остаток к распределению (`CashTransaction`) | транзакция 0.03, документы 0.01 + 0.01 → остаток 0.009999999999999998, последнюю копейку распределить нельзя | `Money` по суммам операций документов (строки); `getAllocatedMoney()`, `getRemainingMoney()`, `canAllocate()`, `assertCanAllocate()` |
+| НДС «из суммы» (`VatCalculator`) | 20% из 0.09 = ровно 0.015; float хранит 0.01499… и давал 0.01 вместо 0.02 (половина от нуля) | `Money::multiplyByRatio(rate, 100 + rate)`, одно округление `HALF_UP`, net = gross − vat |
+| Сопоставление с планом (`PaymentPlanMatcher`) | допуск 5% и выбор кандидата по разнице сумм во float: равные разницы могли разойтись в последнем знаке | целые минорные единицы, допуск `diff × 20 > plan` |
+
+**Изменения результатов.** Правило округления не менялось (`HALF_UP`, как
+задумывал `number_format()`); меняются только случаи, где `float` его нарушал:
+- НДС 20% (ОСНО) ровно на половине копейки — теперь округляется вверх. На
+  проде НДС считают 2 компании на УСН 5%; для 5% и 7% ровная половина копейки
+  математически невозможна, на 20% компаний нет — затронутых строк 0.
+- Матчер плана: разница ровно 5% теперь проходит допуск («больше 5%» — отказ).
+- Распределение: ложные отказы на последней копейке исчезли.
+
+**Граница с Finance.** `getAllocatedAmount()`, `getRemainingAmount()`,
+`canAllocateAmount(float)`, `assertCanAllocateAmount(float)` оставлены тонкой
+обёрткой над точными методами: ими пользуются Finance (`DocumentController`,
+`FinanceFacade`, `RestoreDocumentAction`) и шаблоны. float переводится в
+`Money` один раз, по копейкам; сравнение — точное. Код Cash перешёл на
+точные методы.
 
 ---
 
@@ -635,7 +665,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 |---|---|---|---|---|---|
 | 0 | 2026-10-14 | 240 записей (276 ошибок) | — | phpat…Cash 39, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3; весь baseline — 2332 записи (3425 ошибок); данные: расхождений `float` 0 по трём проверкам | #2677 |
 | 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | #2678 |
-| 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | этот PR |
+| 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | #2679 |
+| 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | этот PR |
 
 ## Находки
 
@@ -688,6 +719,36 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
     `{error: {code, message}}` из `CLAUDE.md` — менять вместе с шаблоном.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
+- Этап 3, вне scope:
+  - Finance работает с распределением через float-обёртки `CashTransaction`
+    (`DocumentController:262,498`, `FinanceFacade:198` с `(float) $command->amount`,
+    `RestoreDocumentAction:32`) и `Document::getTotalAmount(): float` — перевести
+    на `Money`-методы задачей модуля Finance.
+  - Правило `vashfindir.moneyFloatCast` действует только в Cash; вне модуля
+    11 приведений `(float)` от геттеров сумм (Finance 10, Ai 1) — расширять с
+    baseline на этапе 4 или задачей Finance.
+  - Правило `vashfindir.moneyFloatCast` ловит только `(float)` от вызова
+    `get*Amount*()`. В Cash остаётся около 20 денежных `(float)` по
+    переменным: разбор сумм в импортах (`ClientBank1CImportService:562,797,820,826`,
+    `BankImportService:307`, `CashFileRowNormalizer:245`,
+    `Bank1CImportController:274`) и агрегаты (`CashTransactionRepository:711-876`,
+    `ForecastBalanceService`, `CashTransactionXlsxExporter:94`). Зелёный гейт
+    не означает «Cash без float»; импорт — реальный денежный путь через float,
+    кандидат в этап 4 или отдельную задачу.
+  - Форма Finance `DocumentOperationType` — `NumberType` без `input: 'string'`
+    и `scale`: до сохранения в операции оказывается float-строка (`'1.0E-5'`).
+    `CashTransaction` это переваривает, но корень — в форме Finance.
+  - `Money` берёт число знаков валюты из Intl, колонки — `decimal(18,2)`.
+    Сейчас все фиатные валюты Cash (RUB, USD, EUR, KZT) — 2 знака; валюта с
+    0 или 3 знаками начала бы округлять распределение.
+  - `VatPolicy` возвращает 20% для ОСНО, базовая ставка НДС с 2026 — 22%
+    (для 22% ровной половины копейки нет). Проверить с Владельцем.
+  - `tx.remainingAmount` в `templates/transaction/index.html.twig` до трёх раз
+    на строку пересчитывает распределение по документам и операциям (N+1, не
+    новое) — вынести в view-модель.
+  - `addDocument()` прибавляет сумму документа к сохранённой даже для уже
+    привязанного документа (поведение до этапа, не менялось); фактический
+    остаток пересчитывается заново, поэтому на создание документов не влияет.
 - `Finance/Entity/Document::getTotalAmount()` суммирует через `float` —
   расхождений на данных нет (этап 0), перевод на `Money` — задача модуля
   Finance.

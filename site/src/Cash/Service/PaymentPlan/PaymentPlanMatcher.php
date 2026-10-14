@@ -11,6 +11,7 @@ use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
+use App\Shared\Domain\ValueObject\Money;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -63,7 +64,10 @@ final class PaymentPlanMatcher
         /** @var list<PaymentPlan> $candidates */
         $candidates = $qb->getQuery()->getResult();
 
-        $txAmount = abs((float) $transaction->getAmount());
+        // Целые минорные единицы, не float: и допуск 5%, и выбор кандидата по
+        // разнице сумм сравниваются точно — равные разницы не расходятся в
+        // последнем знаке. Сверка только для RUB (проверено выше), план — RUB-only.
+        $txAmount = Money::fromString($transaction->getAmount(), FiatCurrency::RUB->value)->abs()->amountMinor();
         // Решение D2: мультиразбивка исключена из автомэтча. PaymentPlanMatch уникален
         // по transaction_id, поэтому сопоставить план со строкой нельзя без смены модели,
         // а сопоставлять со всей транзакцией, разнесённой по разным статьям, бессмысленно.
@@ -78,15 +82,15 @@ final class PaymentPlanMatcher
         $best = null;
 
         foreach ($candidates as $plan) {
-            $planAmount = abs((float) $plan->getAmount());
+            $planAmount = Money::fromString($plan->getAmount(), FiatCurrency::RUB->value)->abs()->amountMinor();
             $amountDiff = abs($planAmount - $txAmount);
 
-            if ($planAmount > 0.0) {
-                $relativeError = $amountDiff / $planAmount;
-                if ($relativeError > 0.05) {
+            if ($planAmount > 0) {
+                // amountDiff / planAmount > 5% без деления.
+                if ($amountDiff * 20 > $planAmount) {
                     continue;
                 }
-            } elseif ($amountDiff > 0.0) {
+            } elseif ($amountDiff > 0) {
                 continue;
             }
 

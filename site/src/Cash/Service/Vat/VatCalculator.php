@@ -4,28 +4,33 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\Vat;
 
-class VatCalculator
+use App\Shared\Domain\ValueObject\Money;
+
+final readonly class VatCalculator
 {
     /**
-     * @return array{net: string, vat: string}
+     * Выделяет НДС из суммы с НДС: vat = gross × rate / (100 + rate), net = gross − vat.
+     *
+     * Округление одно — у НДС, до минорных единиц валюты, половина от нуля
+     * (`HALF_UP`, как прежний `number_format()`); net — точный остаток, поэтому
+     * net + vat всегда равно gross.
+     *
+     * @return array{net: Money, vat: Money}
      */
-    public function splitGross(float $gross, int $rate): array
+    public function splitGross(Money $gross, int $rate): array
     {
         if ($rate <= 0) {
-            $formattedGross = number_format($gross, 2, '.', '');
-
             return [
-                'net' => $formattedGross,
-                'vat' => '0.00',
+                'net' => $gross,
+                'vat' => Money::fromMinor(0, $gross->currency()),
             ];
         }
 
-        $vat = $gross * $rate / (100 + $rate);
-        $net = $gross - $vat;
+        $vat = $gross->multiplyByRatio((string) $rate, (string) (100 + $rate));
 
         return [
-            'net' => number_format($net, 2, '.', ''),
-            'vat' => number_format($vat, 2, '.', ''),
+            'net' => $gross->subtract($vat),
+            'vat' => $vat,
         ];
     }
 }

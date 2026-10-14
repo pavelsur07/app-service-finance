@@ -3013,6 +3013,8 @@ $money->toDecimalString(): string                            // 12345 (RUB) -> '
 $money->add(self): self;  $money->subtract(self): self;  $money->negate(): self
 $money->multiply(string $factor, RoundingMode = HALF_UP): self
 $money->percentage(string $percent, RoundingMode = HALF_UP): self
+$money->multiplyByRatio(string $numerator, string $denominator, RoundingMode = HALF_UP): self
+                                                             // × numerator/denominator, одно округление; НДС «из суммы»
 $money->abs(): self
 
 // Сравнение / предикаты
@@ -3024,8 +3026,12 @@ $money->amountMinor(): int;  $money->currency(): string
 - `App\Shared\Domain\ValueObject\RoundingMode` — enum `HALF_UP` (от нуля) / `HALF_EVEN` (банковское).
 - Округление масштаба — по числу знаков валюты (`Intl\Currencies::getFractionDigits`, fallback 2).
 - Диапазон: PHP `int` 64-бит ≈ ±9.2·10¹⁶ ₽ (минор). Выход за пределы (в `fromString`,
-  `multiply`, `percentage`, `abs` при `PHP_INT_MIN`) бросает `MoneyOverflowException` —
-  тихого int-wrap нет.
+  `multiply`, `percentage`, `multiplyByRatio`, `abs` при `PHP_INT_MIN`) бросает
+  `MoneyOverflowException` — тихого int-wrap нет.
+- `multiplyByRatio`: числитель и знаменатель — decimal-строки до 12 знаков после
+  точки, знаменатель не ноль; результат точен (верное округление `HALF_UP` и
+  `HALF_EVEN`) при |знаменателе| < 10¹². Деления «на произвольное число»
+  отдельно нет — только эта операция.
 
 **Doctrine-маппинг (Embeddable):** `Money` помечен `#[ORM\Embeddable]` и встраивается в Entity
 через `#[ORM\Embedded(class: Money::class)]` → две колонки (`*_amount_minor` bigint + `*_currency`).
@@ -3683,6 +3689,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.03 | 2026-10-14 | Shared `Money::multiplyByRatio()` — умножение на дробь с одним округлением (НДС «из суммы» в Cash, этап 3 плана Cash) |
 | 2.02 | 2026-10-11 | Marketplace: статья по образцу компании берётся и из правил другого маркетплейса, если у своего образцов нет (`DefaultCostMappingSiblingResolver::resolve()` по всем маркетплейсам, `CompanyCostPlTargetsQuery::fetch()` без фильтра маркетплейса); вывод `sync-default` и аудит-лог отмечают такие правила |
 | 2.01 | 2026-10-10 | Marketplace: ночной `sync-default` назначает статью по образцу компании, когда статьи шаблона у неё нет (`DefaultCostMappingSiblingResolver`, `CompanyCostPlTargetsQuery`); правило с ручной статьёй больше не считается `blocked` |
 | 2.00 | 2026-10-10 | Marketplace: ночной частичный базовый маппинг затрат в ОПиУ (`sync-default`, cron 04:35) и гейт затрат вне ОПиУ (`unmapped-check`, cron 06:50); условие «нет решения по ОПиУ» вынесено в `PreflightCostsQuery::WITHOUT_PL_DECISION` |
