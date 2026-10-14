@@ -120,7 +120,11 @@ class CashFileImportController extends AbstractController
         $storageKey = $this->buildStorageKey($fileHash, $normalizedExtension);
         try {
             $this->storage->write($storageKey, $fileContent);
-        } catch (\Throwable) {
+        } catch (\RuntimeException) {
+            // Сбой уже записан в error декоратором LoggingObjectStorage.
+            // \RuntimeException, а не ObjectStorageException: локальный драйвер
+            // при сбое записи бросает \RuntimeException. Ошибки программы
+            // (\Error, \LogicException) не глотаются и дают 500.
             $this->addFlash('error', 'Не удалось сохранить файл импорта.');
 
             return $this->redirectToRoute('cash_file_import_upload');

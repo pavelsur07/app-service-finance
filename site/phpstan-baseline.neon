@@ -1255,24 +1255,6 @@ parameters:
 			path: src/Cash/MessageHandler/EnqueueAutoRulesForRangeHandler.php
 
 		-
-			message: '#^Parameter \#1 \$company of method App\\Cash\\Repository\\Bank\\BankConnectionRepository\:\:findActiveByCompanyAndBankCode\(\) expects App\\Company\\Entity\\Company, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/MessageHandler/Import/BankImportHandler.php
-
-		-
-			message: '#^Parameter \#2 \$company of method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:importCompany\(\) expects App\\Company\\Entity\\Company, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/MessageHandler/Import/BankImportHandler.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\MessageHandler\\Import\\BankImportHandler should not depend on App\\Company\\Infrastructure\\Repository\\CompanyRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
-			count: 1
-			path: src/Cash/MessageHandler/Import/BankImportHandler.php
-
-		-
 			message: '#^Class App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
@@ -1518,36 +1500,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaApiClient\:\:buildHeaders\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaApiClient.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaApiClient\:\:getAccounts\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaApiClient.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaApiClient\:\:getTransactions\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaApiClient.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaApiClient\:\:request\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaApiClient.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaApiClient\:\:request\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaApiClient.php
 
 		-
 			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaStatementsProvider\:\:getAccounts\(\) return type has no value type specified in iterable type array\.$#'
