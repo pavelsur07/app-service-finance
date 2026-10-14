@@ -92,11 +92,16 @@ final class CounterpartyPickerType extends AbstractType
                 $byId = self::indexById($options['counterparty_choices']);
 
                 return static function (string $id) use ($byId): array {
-                    $choice = $byId[$id] ?? null;
+                    if (!isset($byId[$id])) {
+                        return ['data-name' => '', 'data-raw-name' => '', 'data-inn' => ''];
+                    }
+                    $choice = $byId[$id];
 
                     return [
-                        'data-name' => $choice?->shownName() ?? '',
-                        'data-inn' => $choice?->inn ?? '',
+                        'data-name' => $choice->shownName(),
+                        // Сырое — для локального поиска поля, если API недоступен.
+                        'data-raw-name' => $choice->name,
+                        'data-inn' => $choice->inn ?? '',
                     ];
                 };
             },

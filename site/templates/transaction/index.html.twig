@@ -213,7 +213,7 @@
                     </td>
                     <td>
                         {% if tx.counterparty %}
-                            <div class="vf-ops-strong vf-ops-clip" title="{{ tx.counterparty.name }}">{{ tx.counterparty.name }}</div>
+                            <div class="vf-ops-strong vf-ops-clip" title="{{ tx.counterparty.displayName ?? tx.counterparty.name }}">{{ tx.counterparty.displayName ?? tx.counterparty.name }}</div>
                         {% else %}
                             <div class="text-secondary">—</div>
                         {% endif %}

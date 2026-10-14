@@ -11,11 +11,12 @@ const LOCAL_LIMIT = 20;
 /**
  * @param {object} parts   select, input, searchWrap, clearButton — элементы поля
  * @param {object} options searchUrl, minQuery, adapter, rowFromOption(option),
- *                         labelFromOption(option), texts {invalid, stale}
+ *                         labelFromOption(option), searchTextFromOption(option)?, texts {invalid, stale}
  */
 export function initPickerField(root, parts, options) {
     const { select, input, searchWrap, clearButton } = parts;
     const { searchUrl, minQuery, adapter, rowFromOption, labelFromOption, texts } = options;
+    const searchTextFromOption = options.searchTextFromOption ?? labelFromOption;
 
     // Портал: список живёт в body, а не внутри блока формы (см. positionPortal).
     const portal = document.createElement('div');
@@ -40,7 +41,7 @@ export function initPickerField(root, parts, options) {
 
     const localItems = Array.from(select.options)
         .filter((option) => '' !== option.value)
-        .map((option) => ({ item: adapter(rowFromOption(option)), text: labelFromOption(option).toLowerCase() }));
+        .map((option) => ({ item: adapter(rowFromOption(option)), text: searchTextFromOption(option).toLowerCase() }));
 
     const selectedLabel = () => {
         const selected = select.options[select.selectedIndex];

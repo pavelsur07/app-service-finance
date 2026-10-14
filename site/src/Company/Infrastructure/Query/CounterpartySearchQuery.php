@@ -19,6 +19,7 @@ final class CounterpartySearchQuery
 {
     private const SIMILARITY_THRESHOLD = 0.3;
     private const MAX_LIMIT = 20;
+    private const QUOTES = '«»"“”„\'';
 
     public function __construct(
         private readonly Connection $connection,
@@ -54,7 +55,7 @@ final class CounterpartySearchQuery
             WHERE company_id = :companyId
               AND is_archived = false
               AND inn LIKE :prefix
-            ORDER BY (inn = :query) DESC, name ASC
+            ORDER BY (inn = :query) DESC, COALESCE(display_name, name) ASC
             LIMIT :limit
             SQL;
 
@@ -78,6 +79,9 @@ final class CounterpartySearchQuery
     private function searchByName(string $companyId, string $query, int $limit): array
     {
         $core = $this->normalizer->normalize($query)->core;
+        // Отображаемое название ищется подстрокой без кавычек: в пикере показано оно
+        // («СПАО «Ингосстрах»» на месте банковской строки), и набранное должно его находить.
+        $shown = self::withoutQuotes(mb_strtolower($query, 'UTF-8'));
 
         // Порог задан явным условием, а не оператором `%`: тот зависит от сессионной
         // настройки pg_trgm.similarity_threshold и вёл бы себя по-разному в тестах и проде.
@@ -86,14 +90,17 @@ final class CounterpartySearchQuery
                    CASE
                        WHEN name_core = :core THEN 3.0
                        WHEN name_core LIKE :prefix THEN 2.0
+                       WHEN display_name IS NOT NULL AND regexp_replace(translate(lower(display_name), :quotes, ''), '\s+', ' ', 'g') LIKE :shownLike THEN 1.5
                        ELSE similarity(name_core, :core)
                    END AS rank
             FROM "counterparty"
             WHERE company_id = :companyId
               AND is_archived = false
               AND name_core IS NOT NULL
-              AND (name_core LIKE :prefix OR similarity(name_core, :core) > :threshold)
-            ORDER BY rank DESC, name ASC
+              AND (name_core LIKE :prefix
+                   OR similarity(name_core, :core) > :threshold
+                   OR (display_name IS NOT NULL AND regexp_replace(translate(lower(display_name), :quotes, ''), '\s+', ' ', 'g') LIKE :shownLike))
+            ORDER BY rank DESC, COALESCE(display_name, name) ASC
             LIMIT :limit
             SQL;
 
@@ -106,12 +113,21 @@ final class CounterpartySearchQuery
                 // с процентом матчит несопоставимо шире, чем ожидает пользователь.
                 'prefix' => addcslashes($core, '%_\\').'%',
                 'threshold' => self::SIMILARITY_THRESHOLD,
+                'quotes' => self::QUOTES,
+                'shownLike' => '%'.addcslashes($shown, '%_\\').'%',
                 'limit' => $limit,
             ],
             ['limit' => ParameterType::INTEGER],
         )->fetchAllAssociative();
 
         return $this->toItems($rows);
+    }
+
+    private static function withoutQuotes(string $value): string
+    {
+        $value = str_replace(mb_str_split(self::QUOTES), '', $value);
+
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 
     /**

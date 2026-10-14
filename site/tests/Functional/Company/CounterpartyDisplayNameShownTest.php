@@ -81,6 +81,40 @@ final class CounterpartyDisplayNameShownTest extends WebTestCaseBase
         self::assertCount(0, $crawler->filter('.vf-form [role=note]'));
     }
 
+    public function testEditFormNotesAutoAndArchivedManualCases(): void
+    {
+        // Given
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 974);
+        $autoId = $this->createCounterparty($company, 'ООО "Ромашка"', 'ООО «Ромашка»', 'auto');
+        $sameManualId = $this->createCounterparty($company, 'ООО «Лютик»', 'ООО «Лютик»', 'manual');
+        $archivedManualId = $this->createCounterparty($company, 'ООО "Архив"', 'Архив (вручную)', 'manual');
+        $this->em()->getConnection()->executeStatement('UPDATE "counterparty" SET is_archived = true WHERE id = :id', ['id' => $archivedManualId]);
+        $this->login($client, $owner, $company);
+
+        // Auto: сбросится при переименовании
+        $text = $this->noteText($client, $autoId);
+        self::assertStringContainsString('(по правилам)', $text);
+        self::assertStringContainsString('сбросится', $text);
+
+        // Ручное, совпадающее с наименованием, — всё равно предупреждаем
+        self::assertStringContainsString('(задано вручную)', $this->noteText($client, $sameManualId));
+
+        // Ручное у архивного — без ссылки на «Вернуть исходное», с подсказкой вернуть из архива
+        $text = $this->noteText($client, $archivedManualId);
+        self::assertStringContainsString('сначала верните контрагента из архива', $text);
+    }
+
+    private function noteText(KernelBrowser $client, string $id): string
+    {
+        $crawler = $client->request('GET', '/counterparties/'.$id.'/edit');
+        self::assertResponseIsSuccessful();
+        $note = $crawler->filter('.vf-form [role=note]');
+        self::assertCount(1, $note);
+
+        return (string) preg_replace('/\s+/u', ' ', $note->text());
+    }
+
     private function createCounterparty(Company $company, string $name, ?string $displayName, ?string $source): string
     {
         // После clear() в предыдущем вызове компания отсоединена — берём управляемую ссылку.

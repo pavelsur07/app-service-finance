@@ -49,7 +49,9 @@ class CounterpartyRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.company = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.name', \SortDirection::Ascending);
+            // По показанному названию: в списке выбора подписи — displayName ?? name.
+            ->addSelect('COALESCE(c.displayName, c.name) AS HIDDEN shownName')
+            ->orderBy('shownName', \SortDirection::Ascending);
 
         if (null === $keepId) {
             $qb->andWhere('c.isArchived = false');

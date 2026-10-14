@@ -2594,12 +2594,6 @@ parameters:
 			path: src/Company/Form/Type/CounterpartyPickerType.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>inn" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: src/Company/Form/Type/CounterpartyPickerType.php
-
-		-
 			message: '#^Class App\\Company\\Form\\UserEmailType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
