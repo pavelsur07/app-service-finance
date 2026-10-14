@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Company;
 
 use App\Company\Application\DTO\CounterpartyFormData;
+use App\Company\Application\RefreshCounterpartyDisplayNamesAction;
 use App\Company\Application\SaveCounterpartyAction;
+use App\Company\Domain\Service\CounterpartyDisplayNameFormatter;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
@@ -46,6 +48,65 @@ final class SaveCounterpartyActionTest extends IntegrationTestCase
         self::assertSame('ООО', $counterparty->getLegalFormHint());
         self::assertSame('7707083893', $counterparty->getInn());
         self::assertSame('770701001', $counterparty->getKpp());
+    }
+
+    /**
+     * Внешнее ревью этапа 2: форма загрузила карточку → пересчёт записал авто-название →
+     * пользователь переименовал. В снимке Doctrine поля были пустыми, flush их не трогал, и в БД
+     * оставалось название от старого name с текущей версией — пересчёт его больше не брал.
+     */
+    public function testRenameAfterConcurrentRefreshResetsAutoDisplayNameInDatabase(): void
+    {
+        // Given: карточка загружена до пересчёта
+        $counterparty = ($this->save)($this->company, $this->formData('ООО "Ромашка"', null, null));
+        $id = $counterparty->getId();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = :version WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'auto', 'version' => CounterpartyDisplayNameFormatter::RULES_VERSION, 'id' => $id],
+        );
+
+        // When: пользователь переименовал ту же загруженную сущность
+        ($this->save)($this->company, $this->formData('ООО "Лютик"', null, null), $counterparty);
+
+        // Then: авто-название сброшено — пересчёт возьмёт новое name
+        self::assertSame([null, null, null], $this->displayRow($id));
+        $result = ($this->refresh())(false);
+        self::assertSame(1, $result->processed);
+        self::assertSame('ООО «Лютик»', $this->displayRow($id)[0]);
+    }
+
+    public function testSavingWithoutRenameKeepsAutoDisplayName(): void
+    {
+        // Given
+        $counterparty = ($this->save)($this->company, $this->formData('ООО "Ромашка"', null, null));
+        $id = $counterparty->getId();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = :version WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'auto', 'version' => CounterpartyDisplayNameFormatter::RULES_VERSION, 'id' => $id],
+        );
+
+        // When: правка ИНН, название то же
+        ($this->save)($this->company, $this->formData('ООО "Ромашка"', '7707083893', null), $counterparty);
+
+        // Then
+        self::assertSame(['ООО «Ромашка»', 'auto', CounterpartyDisplayNameFormatter::RULES_VERSION], $this->displayRow($id));
+    }
+
+    public function testRenameKeepsManualDisplayNameInDatabase(): void
+    {
+        // Given
+        $counterparty = ($this->save)($this->company, $this->formData('ООО "Ромашка"', null, null));
+        $id = $counterparty->getId();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'Ромашка (наш поставщик)', 'source' => 'manual', 'id' => $id],
+        );
+
+        // When
+        ($this->save)($this->company, $this->formData('ООО "Лютик"', null, null), $counterparty);
+
+        // Then
+        self::assertSame(['Ромашка (наш поставщик)', 'manual', null], $this->displayRow($id));
     }
 
     public function testCreateCollapsesWhitespaceInName(): void
@@ -198,6 +259,28 @@ final class SaveCounterpartyActionTest extends IntegrationTestCase
             ['companyId' => $this->company->getId()],
         );
         self::assertSame(1, $count);
+    }
+
+    private function refresh(): RefreshCounterpartyDisplayNamesAction
+    {
+        /** @var RefreshCounterpartyDisplayNamesAction $refresh */
+        $refresh = self::getContainer()->get(RefreshCounterpartyDisplayNamesAction::class);
+
+        return $refresh;
+    }
+
+    /**
+     * @return array{0: ?string, 1: ?string, 2: ?int}
+     */
+    private function displayRow(string $id): array
+    {
+        /** @var array{display_name: ?string, display_name_source: ?string, display_rules_version: int|string|null} $row */
+        $row = $this->connection->fetchAssociative(
+            'SELECT display_name, display_name_source, display_rules_version FROM "counterparty" WHERE id = :id',
+            ['id' => $id],
+        );
+
+        return [$row['display_name'], $row['display_name_source'], null === $row['display_rules_version'] ? null : (int) $row['display_rules_version']];
     }
 
     private function formData(string $name, ?string $inn, ?string $kpp): CounterpartyFormData

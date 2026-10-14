@@ -1048,7 +1048,9 @@ format(string $rawName): ?string
 // Entity Counterparty: displayName / displayNameSource (CounterpartyDisplayNameSource:
 // auto | manual) / displayRulesVersion
 setManualDisplayName(string $name): void  // правка пользователя, главнее правил; + touch
-// rename() сбрасывает авто-название, только если name действительно сменилось; ручное сохраняет
+// rename() сбрасывает авто-название, только если name действительно сменилось; ручное сохраняет.
+// SaveCounterpartyAction после переименования сбрасывает его и в БД — CounterpartyDisplayNameWriter::
+// resetAuto() (условный UPDATE): пересчёт мог записать его после загрузки карточки, и flush бы не тронул
 
 // src/Company/Application/RefreshCounterpartyDisplayNamesAction.php
 // Пересчёт по всем компаниям: CounterpartyDisplayNameBacklogQuery (скалярные порции по id,

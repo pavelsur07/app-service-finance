@@ -36,4 +36,22 @@ final class CounterpartyDisplayNameWriter
 
         return 1 === $affected;
     }
+
+    /**
+     * Сырое name сменилось — авто-название в БД посчитано от старого. Отдельным UPDATE, а не
+     * полями сущности: если пересчёт записал его после загрузки карточки, в снимке Doctrine поля
+     * пустые, и «присвоить null» flush бы пропустил. Ручное название не трогается.
+     */
+    public function resetAuto(string $id): void
+    {
+        $this->connection->executeStatement(
+            <<<'SQL'
+                UPDATE "counterparty"
+                SET display_name = NULL, display_name_source = NULL, display_rules_version = NULL
+                WHERE id = :id
+                  AND (display_name_source IS NULL OR display_name_source = :auto)
+                SQL,
+            ['id' => $id, 'auto' => 'auto'],
+        );
+    }
 }

@@ -95,7 +95,10 @@ IMPORTANT 7 (банк вместо человека в строке с `//`, н�
   nullable, без DEFAULT (мгновенный ALTER), данные не меняются; `down()` удаляет колонки.
 - `Counterparty`: поля, геттеры, `setManualDisplayName()` (на этап 5; пробелы схлопываются,
   `touch`); `rename()` сбрасывает авто-название, только если сырое `name` действительно сменилось
-  (форма вызывает `rename()` при каждом сохранении), ручное сохраняет.
+  (форма вызывает `rename()` при каждом сохранении), ручное сохраняет. `SaveCounterpartyAction`
+  после переименования дополнительно сбрасывает авто-название в БД
+  (`CounterpartyDisplayNameWriter::resetAuto()`): если пересчёт записал его уже после загрузки
+  карточки, в снимке Doctrine поля пустые, и flush их бы не тронул (находка внешнего ревью).
 - `CounterpartyDisplayNameFormatter::RULES_VERSION = 1` — поднимать при любом изменении
   результата правил: следующий прогон пересчитает все авто-названия.
 - `RefreshCounterpartyDisplayNamesAction` + `app:counterparty:refresh-display-names
