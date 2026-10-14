@@ -126,21 +126,15 @@ class Counterparty
         return $this->name;
     }
 
+    /**
+     * Поля отображаемого названия здесь не трогаются: их сброс после переименования делает
+     * SaveCounterpartyAction условным UPDATE в БД (CounterpartyDisplayNameWriter::resetAuto, не
+     * трогает manual). Сброс в памяти по устаревшему снимку затирал бы flush'ем ручное название,
+     * записанное «Применить» параллельно (внешнее ревью).
+     */
     public function rename(CounterpartyName $name): void
     {
-        // Форма редактирования вызывает rename() при каждом сохранении — сбрасываем авто-название,
-        // только если сырое действительно сменилось.
-        $nameChanged = $name->display !== $this->name;
         $this->applyName($name);
-
-        // Сырое название сменилось — авто-название посчитано от старого и уйдёт на пересчёт.
-        // Ручное название — решение пользователя, переименование его не отменяет.
-        if ($nameChanged && CounterpartyDisplayNameSource::MANUAL !== $this->displayNameSource) {
-            $this->displayName = null;
-            $this->displayNameSource = null;
-            $this->displayRulesVersion = null;
-        }
-
         $this->touch();
     }
 

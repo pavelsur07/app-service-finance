@@ -109,6 +109,37 @@ final class SaveCounterpartyActionTest extends IntegrationTestCase
         self::assertSame(['Ромашка (наш поставщик)', 'manual', null], $this->displayRow($id));
     }
 
+    /**
+     * Внешнее ревью «Подсказки нормализации»: форма загрузила карточку со старым авто-названием →
+     * «Применить» записало ручное → форма сохранила переименование. Сброс в памяти по устаревшему
+     * снимку затирал flush'ем ручное название; ручное главнее правил и должно остаться.
+     */
+    public function testRenameWithStaleAutoSnapshotKeepsManualAppliedMeanwhile(): void
+    {
+        // Given: авто-название, карточка загружена формой
+        $counterparty = ($this->save)($this->company, $this->formData('ООО "Ромашка"', null, null));
+        $id = $counterparty->getId();
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = 1 WHERE id = :id',
+            ['name' => 'ООО «Ромашка»', 'source' => 'auto', 'id' => $id],
+        );
+        $this->em->clear();
+        $loaded = $this->em->getRepository(Counterparty::class)->find($id);
+        self::assertInstanceOf(Counterparty::class, $loaded);
+
+        // And: «Применить» в другой вкладке записало ручное
+        $this->connection->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source, display_rules_version = NULL WHERE id = :id',
+            ['name' => 'Ромашка (поставщик)', 'source' => 'manual', 'id' => $id],
+        );
+
+        // When: форма сохраняет переименование по устаревшему снимку
+        ($this->save)($this->company, $this->formData('ООО "Лютик"', null, null), $loaded);
+
+        // Then
+        self::assertSame(['Ромашка (поставщик)', 'manual', null], $this->displayRow($id));
+    }
+
     public function testCreateCollapsesWhitespaceInName(): void
     {
         // When
