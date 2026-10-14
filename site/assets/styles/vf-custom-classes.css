@@ -1545,3 +1545,65 @@
   background: var(--vf-navy-50);
   border-radius: 0 0 var(--vf-radius-lg) var(--vf-radius-lg);
 }
+
+/* Подсказка нормализации названия в списке контрагентов (docs/plan/ds-counterparties.md):
+   вторая строка ячейки, 13px, warn-тон DS-Feedback; одна строка — длинное обрезается с title. */
+.vf-name-suggest,
+.vf-name-origin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 420px;
+  margin-top: 2px;
+  font-size: var(--vf-size-sm);
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+
+.vf-name-suggest {
+  color: var(--vf-warn-text);
+}
+
+.vf-name-suggest .ti {
+  flex: none;
+  font-size: 14px;
+}
+
+.vf-name-suggest .vf-clip,
+.vf-name-origin .vf-clip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vf-inline-form {
+  display: inline;
+  flex: none;
+  margin: 0;
+}
+
+/* Кнопка-ссылка: POST-действие в строке без вида кнопки; Action blue, 500. */
+.vf-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vf-primary);
+  font: inherit;
+  font-weight: var(--vf-weight-medium);
+  cursor: pointer;
+}
+
+.vf-link-btn:hover {
+  text-decoration: underline;
+}
+
+.vf-link-btn:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.vf-table > tbody > tr.vf-row-muted .vf-name-origin {
+  color: var(--vf-text-muted);
+}

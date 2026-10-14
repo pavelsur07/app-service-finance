@@ -6,11 +6,13 @@ namespace App\Company\Controller;
 
 use App\Company\Application\DTO\CounterpartyFormData;
 use App\Company\Application\SaveCounterpartyAction;
+use App\Company\Domain\Service\CounterpartyDisplayNameSuggestion;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Company\Exception\CounterpartyInnAlreadyExistsException;
 use App\Company\Form\CounterpartyType;
+use App\Company\Infrastructure\Http\CounterpartyListQuery;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -35,7 +37,7 @@ class CounterpartyController extends AbstractController
     private const MAX_PER_PAGE = 200;
 
     #[Route('/', name: 'counterparty_index', methods: ['GET'])]
-    public function index(Request $request, CounterpartyRepository $repo, ActiveCompanyService $companyService): Response
+    public function index(Request $request, CounterpartyRepository $repo, ActiveCompanyService $companyService, CounterpartyDisplayNameSuggestion $suggestion): Response
     {
         $company = $companyService->getActiveCompany();
         $q = $request->query->get('q');
@@ -62,9 +64,21 @@ class CounterpartyController extends AbstractController
             throw new UnprocessableEntityHttpException('Страница не найдена.', $exception);
         }
 
+        $items = iterator_to_array($pager->getCurrentPageResults(), false);
+
+        // Предложения нормализации — только для строк страницы (≤ limit вызовов чистых правил).
+        $suggestions = [];
+        foreach ($items as $item) {
+            $suggested = $suggestion->for($item);
+            if (null !== $suggested) {
+                $suggestions[$item->getId()] = $suggested;
+            }
+        }
+
         return $this->render('counterparty/index.html.twig', [
             'pager' => $pager,
-            'items' => iterator_to_array($pager->getCurrentPageResults(), false),
+            'items' => $items,
+            'suggestions' => $suggestions,
             'archivedCount' => $showArchived ? $repo->countArchivedInList($company, $typeEnum, $q) : 0,
             'defaultLimit' => self::PER_PAGE,
             'q' => $q,
@@ -169,15 +183,9 @@ class CounterpartyController extends AbstractController
      */
     private function backToList(Request $request, CounterpartyRepository $repo, Company $company): Response
     {
-        $parameters = $request->query->all();
-        $query = [];
-        foreach (['q', 'type', 'show_archived', 'limit'] as $key) {
-            if (isset($parameters[$key]) && \is_string($parameters[$key]) && '' !== $parameters[$key]) {
-                $query[$key] = $parameters[$key];
-            }
-        }
-
-        $page = filter_var($parameters['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $query = CounterpartyListQuery::fromRequest($request);
+        $page = filter_var($query['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        unset($query['page']);
         if (\is_int($page) && $page > 1) {
             $limit = filter_var($query['limit'] ?? self::PER_PAGE, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_PER_PAGE]]);
             $limit = \is_int($limit) ? $limit : self::PER_PAGE;
