@@ -241,19 +241,15 @@ class CashFileImportController extends AbstractController
         }
 
         $profileId = $request->request->get('profile_id');
-        if (!$profileId) {
+        if (!is_string($profileId) || '' === $profileId) {
             $this->addFlash('error', 'Выберите профиль импорта.');
 
             return $this->redirectToRoute('cash_file_import_mapping');
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $profile = $profileRepository->find($profileId);
-        if (
-            !$profile
-            || $profile->getCompany()->getId() !== $company->getId()
-            || CashFileImportProfile::TYPE_CASH_TRANSACTION !== $profile->getType()
-        ) {
+        $profile = $profileRepository->findOneByIdAndCompanyId($profileId, (string) $company->getId());
+        if (null === $profile || CashFileImportProfile::TYPE_CASH_TRANSACTION !== $profile->getType()) {
             $this->addFlash('error', 'Профиль импорта не найден.');
 
             return $this->redirectToRoute('cash_file_import_mapping');

@@ -176,6 +176,8 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
     }
 
     /**
+     * @companyScopeExempt разовое назначение ЦФО из CLI (`AssignGeneralCfoToCashAutoRulesCommand`) обходит правила всех компаний
+     *
      * @return list<CashTransactionAutoRule>
      */
     public function findActiveGeneralProjectTargetsWithoutCfo(): array

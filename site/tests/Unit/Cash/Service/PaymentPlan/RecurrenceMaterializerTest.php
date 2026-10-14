@@ -57,8 +57,8 @@ final class RecurrenceMaterializerTest extends TestCase
 
         $planRepository = $this->createMock(PaymentPlanRepository::class);
         $planRepository->expects($this->once())
-            ->method('findTemplateForRecurrenceRule')
-            ->with($rule)
+            ->method('findTemplateForRecurrenceRuleAndCompanyId')
+            ->with($rule, $company->getId())
             ->willReturn($plan);
         $duplicateDates = [];
         $planRepository->expects($this->exactly(2))
@@ -127,7 +127,7 @@ final class RecurrenceMaterializerTest extends TestCase
         $ruleRepository->expects($this->never())->method('findActiveByCompany');
 
         $planRepository = $this->createMock(PaymentPlanRepository::class);
-        $planRepository->expects($this->never())->method('findTemplateForRecurrenceRule');
+        $planRepository->expects($this->never())->method('findTemplateForRecurrenceRuleAndCompanyId');
         $planRepository->expects($this->never())->method('existsRecurrenceDuplicate');
 
         $recurrenceService = new PaymentRecurrenceService();

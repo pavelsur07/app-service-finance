@@ -697,18 +697,6 @@ parameters:
 			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
 
 		-
-			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
 			message: '#^Parameter \#1 \$companyId of class App\\Cash\\Message\\EnqueueAutoRulesForRange constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -724,12 +712,6 @@ parameters:
 			message: '#^Parameter \#1 \$transactions of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:warmSplits\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransaction\>, array\<mixed\> given\.$#'
 			identifier: argument.type
 			count: 2
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#1 \$tx of method App\\Cash\\Service\\Transaction\\CashTransactionService\:\:restore\(\) expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 1
 			path: src/Cash/Controller/Transaction/CashTransactionController.php
 
 		-
@@ -1165,12 +1147,6 @@ parameters:
 			path: src/Cash/Form/PaymentPlan/PaymentPlanType.php
 
 		-
-			message: '#^If condition is always true\.$#'
-			identifier: if.alwaysTrue
-			count: 2
-			path: src/Cash/Form/PaymentPlan/PaymentPlanType.php
-
-		-
 			message: '#^Class App\\Cash\\Form\\Transaction\\CashTransactionAutoRuleConditionType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
@@ -1298,22 +1274,10 @@ parameters:
 			path: src/Cash/Repository/Accounts/MoneyFundMovementRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Cash\\Repository\\Bank\\BankConnectionRepository\:\:findActiveByBankCode\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Cash/Repository/Bank/BankConnectionRepository.php
-
-		-
 			message: '#^Method App\\Cash\\Repository\\Import\\ImportLogRepository\:\:paginateByCompany\(\) return type with generic class Pagerfanta\\Pagerfanta does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/Cash/Repository/Import/ImportLogRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Cash\\Repository\\PaymentPlan\\PaymentPlanMatchRepository\:\:findOneByTransaction\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Cash/Repository/PaymentPlan/PaymentPlanMatchRepository.php
 
 		-
 			message: '#^Class App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -1322,22 +1286,10 @@ parameters:
 			path: src/Cash/Repository/PaymentPlan/PaymentPlanRepository.php
 
 		-
-			message: '#^Метод\-запрос App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository\:\:findTemplateForRecurrenceRule\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Cash/Repository/PaymentPlan/PaymentPlanRepository.php
-
-		-
 			message: '#^Class App\\Cash\\Repository\\PaymentPlan\\PaymentRecurrenceRuleRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
 			path: src/Cash/Repository/PaymentPlan/PaymentRecurrenceRuleRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Cash\\Repository\\Transaction\\CashTransactionAutoRuleRepository\:\:findActiveGeneralProjectTargetsWithoutCfo\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Cash/Repository/Transaction/CashTransactionAutoRuleRepository.php
 
 		-
 			message: '#^Class App\\Cash\\Repository\\Transaction\\CashTransactionRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
@@ -9681,18 +9633,6 @@ parameters:
 			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
 
 		-
-			message: '#^Call to an undefined method object\:\:getVatAmount\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getVatRatePercent\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
 			message: '#^Call to an undefined method object\:\:isDeleted\(\)\.$#'
 			identifier: method.notFound
 			count: 6
@@ -9708,12 +9648,6 @@ parameters:
 			message: '#^Parameter \#1 \$transaction of callable App\\Cash\\Application\\SaveCashTransactionSplitsAction expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
 			identifier: argument.type
 			count: 1
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
-			message: '#^Parameter \#1 \$transaction of method App\\Cash\\Repository\\PaymentPlan\\PaymentPlanMatchRepository\:\:findOneByTransaction\(\) expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 2
 			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
 
 		-

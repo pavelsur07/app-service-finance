@@ -126,7 +126,10 @@ final class SaveCashTransactionSplitsAction
      */
     private function dropStalePaymentPlanMatch(CashTransaction $transaction): void
     {
-        $match = $this->paymentPlanMatchRepository->findOneByTransaction($transaction);
+        $match = $this->paymentPlanMatchRepository->findOneByTransactionAndCompanyId(
+            $transaction,
+            (string) $transaction->getCompany()->getId(),
+        );
         if (null === $match) {
             return;
         }
