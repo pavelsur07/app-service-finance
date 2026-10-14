@@ -1000,7 +1000,7 @@ company-scoped список, он же no-JS fallback и граница допу
 `EntityType` с `Counterparty` в проекте больше не используется.
 
 Вне форм `CounterpartyRepository` пока импортируется напрямую из `DealManager`,
-`CreatePLDocumentAction`, `FinanceFacade`, `ScoreCompanyCounterpartiesAction` — остаток
+`CreatePLDocumentAction`, `FinanceFacade` — остаток
 долга, отдельная задача.
 
 Название контрагента разделено на три роли и записывается только целиком:

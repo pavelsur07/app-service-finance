@@ -437,13 +437,43 @@ baseline и будут сокращаться на этапе 5.
 
 **Чек-лист:**
 
-- [ ] Тест routing зелёный (после решения по `ScoreCompanyCounterparties`).
-- [ ] Правило `flush` работает; у него есть тест; нарушения в baseline
+- [x] Тест routing зелёный: Владелец решил удалить цепочку
+      `ScoreCompanyCounterparties*` (команда нигде не вызывалась).
+- [x] Правило `flush` работает; у него есть тест; нарушения в baseline
       перечислены в PR.
-- [ ] Правило `EntityType` работает; у него есть тест.
-- [ ] По `CashFileImportMessage` записан вывод в «Находки».
-- [ ] PR с `[baseline-grow]`, рост объяснён поштучно; «Журнал» обновлён.
-- [ ] Все гейты зелёные.
+- [x] Правило `EntityType` работает; у него есть тест.
+- [x] Правила контроллеров (перенесено из этапа 2) работают; тесты.
+- [x] По `CashFileImportMessage` записан вывод.
+- [x] PR с `[baseline-grow]`, рост объяснён по идентификаторам; «Журнал» обновлён.
+- [x] Все гейты зелёные.
+
+### Результат этапа 4 (2026-10-14)
+
+| Гейт | Где | Нарушений на дату введения |
+|---|---|---|
+| Тест routing: сообщение с handler'ом — ровно на одном известном транспорте (не `failed`) | `tests/Unit/Config/MessengerRoutingTest.php` | 0 (одно исключение с причиной и проверкой «нигде не отправляется»: `ProcessMarketplaceRawDocumentCommand`) |
+| `vashfindir.flushOutsideBoundary`: `flush()`/`wrapInTransaction()` только в `*Action`/`*Handler`/`*Command` (фикстуры и тесты вне правила) | `FlushOutsideTransactionBoundaryRule` | 143 вызова в 74 файлах, из них Cash — 37 |
+| `vashfindir.foreignEntityType`: `EntityType` и его подклассы — только с сущностью своего модуля | `ForeignEntityTypeRule` | 6 в 5 файлах (Cash `CashflowCategoryType` → `PLCategory`, `CashTransactionAutoRuleType` → `ProjectDirection`; Finance 2; Loan 1) |
+| `vashfindir.controllerUnscopedFind`: `find()`/`findAll()` сущности компании в контроллере (сущность по типу результата или по метаданным Doctrine для репозиториев без generics) | `ControllerUnscopedFindRule` | 31 в 12 файлах, Cash — 0 |
+| `vashfindir.controllerEntityArgument`: сущность компании (в т. ч. `?Entity`) аргументом действия | `ControllerEntityArgumentRule` | 12 в 6 файлах, Cash — 0 |
+
+Baseline: +111 записей (192 ошибки) только по четырём новым идентификаторам;
+−5 записей удалённой цепочки скоринга. Всего 2312 → 2418 записей; Cash
+223 → 238 (+18 `flush`, +2 `EntityType`, −5 скоринг).
+
+Внутреннее ревью нашло, что первая версия `ControllerUnscopedFindRule` не
+видела `find()` у репозиториев без `@extends …<X>` (16 вызовов в Marketplace)
+— исправлено через метаданные Doctrine (`ObjectMetadataResolver`).
+
+Удалено по решению Владельца: `DispatchCounterpartyScoringCommand`
+(`app:cash:dispatch-scoring`), `ScoreCompanyCounterpartiesMessage`, `…Command`,
+`…Handler`, `ScoreCompanyCounterpartiesAction` и использовавшиеся только ими
+`CounterpartyScoringMath`, `CounterpartyHistoryQuery`. Поля скоринга у
+контрагента (модуль Company) не тронуты — их больше никто не пересчитывает,
+как и раньше.
+
+`CashFileImportMessage` на `async_sync` остаётся: на проде хранилище — S3
+(`docker-compose.prod.yml`), импорт читает файл внешним HTTP, затем пишет в БД.
 
 ---
 
@@ -666,7 +696,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 0 | 2026-10-14 | 240 записей (276 ошибок) | — | phpat…Cash 39, repositoryCompanyScope 4, phpat…Company 13, phpat…Finance 3; весь baseline — 2332 записи (3425 ошибок); данные: расхождений `float` 0 по трём проверкам | #2677 |
 | 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | #2678 |
 | 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | #2679 |
-| 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | этот PR |
+| 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | #2680 |
+| 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | этот PR |
 
 ## Находки
 
@@ -717,6 +748,29 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
     вместе с предыдущим пунктом.
   - JSON-ошибки `create-from` в старом формате `{error: true, message}`, не
     `{error: {code, message}}` из `CLAUDE.md` — менять вместе с шаблоном.
+- Этап 4, вне scope:
+  - `ProcessMarketplaceRawDocumentAction` помечен `#[AsMessageHandler]`, но
+    команда в шину не отправляется — атрибут рудиментарный (Marketplace);
+    в тесте routing — явное исключение.
+  - `ForeignEntityTypeRule` не видит собственные типы-обёртки над
+    `EntityType` (`ProjectDirectionPickerType` в `CashTransactionAutoRuleType`).
+  - `ControllerUnscopedFindRule` не проверяет `findBy()`/`findOneBy()`
+    (критерий может содержать компанию), `$em->find($class, $id)` с классом в
+    переменной, владение глубже одного уровня (`LoanPaymentSchedule` в
+    `LoanSchedule*Controller`) и сам `Company` — тенант-корень без поля
+    компании (`CompanyController`, `CompanyMemberController`); для него нужен
+    отдельный признак — доступ через членство.
+  - `CompanyOwnedEntity` смотрит собственные свойства: наследование сущностей
+    и `MappedSuperclass` с private `$company` станут слепым пятном.
+  - `MessengerRoutingTest` не ловит устаревший routing (запись без handler'а).
+  - Кэш результатов PHPStan не знает, что правила контроллеров (как и
+    `RepositoryCompanyScopeRule`) зависят от сущностей: после добавления поля
+    `company` в сущность закэшированный контроллер локально не перепроверится —
+    полный прогон в CI это обходит. `wrapInTransaction(fn () => $em->flush())`
+    в сервисе даёт две ошибки на одну границу.
+  - В Company осталась заглушка `CounterpartyUpdateScoringAction` с пустым
+    `__invoke` (TODO) и её Command; поля скоринга контрагента никто не
+    пересчитывает — удалить или реализовать отдельной задачей.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - Этап 3, вне scope:

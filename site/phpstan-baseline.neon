@@ -481,12 +481,6 @@ parameters:
 			path: src/Cash/Application/SaveCashTransactionSplitsAction.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\ScoreCompanyCounterpartiesAction should not depend on App\\Company\\Repository\\CounterpartyRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
-			count: 1
-			path: src/Cash/Application/ScoreCompanyCounterpartiesAction.php
-
-		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\Service\\CashTransactionAutoRuleGeneralCfoAssigner should not depend on App\\Company\\Repository\\UserRepository$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
@@ -809,18 +803,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Method App\\Cash\\Domain\\Service\\CounterpartyScoringMath\:\:calculateMedianDelay\(\) has parameter \$delays with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Domain/Service/CounterpartyScoringMath.php
-
-		-
-			message: '#^Method App\\Cash\\Domain\\Service\\CounterpartyScoringMath\:\:calculateReliabilityScore\(\) has parameter \$delays with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Domain/Service/CounterpartyScoringMath.php
 
 		-
 			message: '#^Method App\\Cash\\Entity\\Accounts\\MoneyAccount\:\:getBankAuth\(\) return type has no value type specified in iterable type array\.$#'
@@ -1193,18 +1175,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: src/Cash/Form/Transfer/CashTransferType.php
-
-		-
-			message: '#^Method App\\Cash\\Infrastructure\\Query\\CounterpartyHistoryQuery\:\:getAllActiveCompanyIds\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Infrastructure/Query/CounterpartyHistoryQuery.php
-
-		-
-			message: '#^Method App\\Cash\\Infrastructure\\Query\\CounterpartyHistoryQuery\:\:getDelaysGroupedByCounterparty\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Infrastructure/Query/CounterpartyHistoryQuery.php
 
 		-
 			message: '#^Method App\\Cash\\Message\\ApplyAutoRulesForTransaction\:\:__unserialize\(\) has parameter \$data with no value type specified in iterable type array\.$#'
@@ -13873,3 +13843,668 @@ parameters:
 			identifier: function.alreadyNarrowedType
 			count: 1
 			path: tests/bootstrap.php
+		-
+			message: '#^flush\(\) в App\\Admin\\Controller\\UserController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Admin/Controller/UserController.php
+
+		-
+			message: '#^flush\(\) в App\\Admin\\Service\\UserDeletionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Admin/Service/UserDeletionService.php
+
+		-
+			message: '#^wrapInTransaction\(\) в App\\Admin\\Service\\UserDeletionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Admin/Service/UserDeletionService.php
+
+		-
+			message: '#^flush\(\) в App\\Ai\\Repository\\AiRunRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Ai/Repository/AiRunRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Ai\\Repository\\AiSuggestionRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Ai/Repository/AiSuggestionRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Balance\\Application\\BalanceStructureService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/Balance/Application/BalanceStructureService.php
+
+		-
+			message: '#^flush\(\) в App\\Billing\\Fixture\\BillingFixture\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Billing/Fixture/BillingFixture.php
+
+		-
+			message: '#^wrapInTransaction\(\) в App\\Cash\\Application\\Service\\CashTransactionAutoRuleGeneralCfoAssigner\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Application/Service/CashTransactionAutoRuleGeneralCfoAssigner.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
+
+		-
+			message: '#^wrapInTransaction\(\) в App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Controller\\Transaction\\CashflowCategoryController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
+
+		-
+			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Cash — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
+			identifier: vashfindir.foreignEntityType
+			count: 1
+			path: src/Cash/Form/Transaction/CashTransactionAutoRuleType.php
+
+		-
+			message: '#^EntityType с сущностью чужого модуля App\\Finance\\Entity\\PLCategory в форме модуля Cash — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
+			identifier: vashfindir.foreignEntityType
+			count: 1
+			path: src/Cash/Form/Transaction/CashflowCategoryType.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Repository\\Bank\\BankImportCursorRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Cash/Repository/Bank/BankImportCursorRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Accounts\\FundService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Cash/Service/Accounts/FundService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Accounts\\MoneyAccountService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Cash/Service/Accounts/MoneyAccountService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Bank\\BankConnectionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Cash/Service/Bank/BankConnectionService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Import\\Bank\\BankImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/Import/Bank/BankImportService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Import\\ClientBank1CImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/Import/ClientBank1CImportService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Import\\File\\CashFileImportFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 5
+			path: src/Cash/Service/Import/File/CashFileImportFacade.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Import\\File\\CashFileImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/Import/File/CashFileImportService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Import\\ImportLogger\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/Import/ImportLogger.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\PaymentCalendarFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/Cash/Service/PaymentPlan/PaymentCalendarFacade.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\PaymentPlanMatcher\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/PaymentPlan/PaymentPlanMatcher.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\RecurrenceMaterializer\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/PaymentPlan/RecurrenceMaterializer.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Transaction\\CashTransactionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 5
+			path: src/Cash/Service/Transaction/CashTransactionService.php
+
+		-
+			message: '#^flush\(\) в App\\Cash\\Service\\Transaction\\CashTransactionToDocumentService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Cash/Service/Transaction/CashTransactionToDocumentService.php
+
+		-
+			message: '#^flush\(\) в App\\Catalog\\Infrastructure\\Repository\\ProductImportRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Catalog/Infrastructure/Repository/ProductImportRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Application\\Service\\AccountBootstrapper\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Company/Application/Service/AccountBootstrapper.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Controller\\CompanyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Company/Controller/CompanyController.php
+
+		-
+			message: '#^wrapInTransaction\(\) в App\\Company\\Controller\\CompanyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Company/Controller/CompanyController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Company\\Entity\\CompanyInvite в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Company/Controller/CompanyMemberController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Company\\Entity\\CompanyRole в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 3
+			path: src/Company/Controller/CompanyMemberController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Company\\Entity\\CompanyRole в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Company/Controller/CompanyRoleController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Company\\Entity\\Counterparty в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Company/Controller/CounterpartyController.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Controller\\CounterpartyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Company/Controller/CounterpartyController.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Controller\\ProjectDirectionController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Company/Controller/ProjectDirectionController.php
+
+		-
+			message: '#^Действие App\\Company\\Controller\\ProjectDirectionController\:\:delete\(\) принимает сущность компании App\\Company\\Entity\\ProjectDirection аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Company/Controller/ProjectDirectionController.php
+
+		-
+			message: '#^Действие App\\Company\\Controller\\ProjectDirectionController\:\:edit\(\) принимает сущность компании App\\Company\\Entity\\ProjectDirection аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Company/Controller/ProjectDirectionController.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Repository\\UserRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Company/Repository/UserRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Service\\CompanyInviteManager\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Company/Service/CompanyInviteManager.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Service\\CompanyOwnerAccountCreator\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Company/Service/CompanyOwnerAccountCreator.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Service\\PasswordChanger\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Company/Service/PasswordChanger.php
+
+		-
+			message: '#^flush\(\) в App\\Company\\Service\\ReportApiKeyManager\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Company/Service/ReportApiKeyManager.php
+
+		-
+			message: '#^flush\(\) в App\\Deals\\Service\\ChargeTypeManager\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Deals/Service/ChargeTypeManager.php
+
+		-
+			message: '#^flush\(\) в App\\Deals\\Service\\DealManager\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Deals/Service/DealManager.php
+
+		-
+			message: '#^flush\(\) в App\\Finance\\Application\\Service\\PLRegisterUpdater\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Finance/Application/Service/PLRegisterUpdater.php
+
+		-
+			message: '#^flush\(\) в App\\Finance\\Application\\Service\\PLSnapshotBuilder\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Finance/Application/Service/PLSnapshotBuilder.php
+
+		-
+			message: '#^flush\(\) в App\\Finance\\Controller\\DocumentController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:copy\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:delete\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:edit\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:exportJson\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:show\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/DocumentController.php
+
+		-
+			message: '#^flush\(\) в App\\Finance\\Controller\\PLCategoryController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Finance/Controller/PLCategoryController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\PLCategoryController\:\:delete\(\) принимает сущность компании App\\Finance\\Entity\\PLCategory аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/PLCategoryController.php
+
+		-
+			message: '#^Действие App\\Finance\\Controller\\PLCategoryController\:\:edit\(\) принимает сущность компании App\\Finance\\Entity\\PLCategory аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Finance/Controller/PLCategoryController.php
+
+		-
+			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Finance — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
+			identifier: vashfindir.foreignEntityType
+			count: 1
+			path: src/Finance/Form/DocumentOperationType.php
+
+		-
+			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Finance — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
+			identifier: vashfindir.foreignEntityType
+			count: 1
+			path: src/Finance/Form/DocumentType.php
+
+		-
+			message: '#^flush\(\) в App\\Finance\\Repository\\DocumentRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Finance/Repository/DocumentRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Ingestion\\Application\\Service\\OzonAccrualListingRelinker\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Ingestion/Application/Service/OzonAccrualListingRelinker.php
+
+		-
+			message: '#^flush\(\) в App\\Ingestion\\Facade\\CredentialFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Ingestion/Facade/CredentialFacade.php
+
+		-
+			message: '#^Действие App\\Loan\\Controller\\LoanEditController\:\:__invoke\(\) принимает сущность компании App\\Loan\\Entity\\Loan аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Loan/Controller/LoanEditController.php
+
+		-
+			message: '#^Действие App\\Loan\\Controller\\LoanScheduleAddController\:\:__invoke\(\) принимает сущность компании App\\Loan\\Entity\\Loan аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Loan/Controller/LoanScheduleAddController.php
+
+		-
+			message: '#^Действие App\\Loan\\Controller\\LoanScheduleController\:\:__invoke\(\) принимает сущность компании App\\Loan\\Entity\\Loan аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerEntityArgument
+			count: 1
+			path: src/Loan/Controller/LoanScheduleController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Loan/Controller/LoanScheduleCreateDocumentController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Loan/Controller/LoanScheduleDeleteController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Loan/Controller/LoanScheduleEditController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Loan/Controller/LoanScheduleUploadController.php
+
+		-
+			message: '#^EntityType с сущностью чужого модуля App\\Finance\\Entity\\PLCategory в форме модуля Loan — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
+			identifier: vashfindir.foreignEntityType
+			count: 2
+			path: src/Loan/Form/LoanType.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Marketplace\\Entity\\MappingError в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Marketplace/Controller/Admin/MappingErrorResolveController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\Admin\\MappingErrorResolveController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Controller/Admin/MappingErrorResolveController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\CreatePerformanceConnectionController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Controller/CreatePerformanceConnectionController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\Inventory\\InventorySyncSingleBarcodeController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Controller/Inventory/InventorySyncSingleBarcodeController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Marketplace\\Entity\\MarketplaceConnection в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 8
+			path: src/Marketplace/Controller/MarketplaceController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Marketplace\\Entity\\MarketplaceRawDocument в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 3
+			path: src/Marketplace/Controller/MarketplaceController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\MarketplaceController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 8
+			path: src/Marketplace/Controller/MarketplaceController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Company\\Entity\\ProjectDirection в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 2
+			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Finance\\Entity\\PLCategory в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 2
+			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\MarketplaceSaleMappingController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 3
+			path: src/Marketplace/Controller/MarketplaceSaleMappingController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Controller\\UpdateMarketplaceConnectionApiKeyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Controller/UpdateMarketplaceConnectionApiKeyController.php
+
+		-
+			message: '#^wrapInTransaction\(\) в App\\Marketplace\\Controller\\UpdateMarketplaceConnectionApiKeyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Controller/UpdateMarketplaceConnectionApiKeyController.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Facade\\MarketplaceListingLinkingFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Facade/MarketplaceListingLinkingFacade.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonAccrualCostsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonAccrualCostsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonAccrualReturnsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonAccrualReturnsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonAccrualSalesRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonAccrualSalesRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonCostsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonCostsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonReturnsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonReturnsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Processor\\OzonSalesRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Processor/OzonSalesRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Ozon\\Application\\Service\\OzonListingEnsureService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Ozon/Application/Service/OzonListingEnsureService.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceCostPLMappingRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceCostPLMappingRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceFinancialReportSyncStatusRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/Marketplace/Repository/MarketplaceFinancialReportSyncStatusRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceJobLogRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceJobLogRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceListingRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceListingRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceMonthCloseRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceMonthCloseRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\MarketplaceOzonRealizationRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/MarketplaceOzonRealizationRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Repository\\ReconciliationLogRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Marketplace/Repository/ReconciliationLogRepository.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Wildberries\\Application\\Processor\\WbCostsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Marketplace/Wildberries/Application/Processor/WbCostsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Wildberries\\Application\\Processor\\WbReturnsRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Marketplace/Wildberries/Application/Processor/WbReturnsRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\Marketplace\\Wildberries\\Application\\Processor\\WbSalesRawProcessor\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Marketplace/Wildberries/Application/Processor/WbSalesRawProcessor.php
+
+		-
+			message: '#^flush\(\) в App\\MarketplaceAds\\Application\\Service\\AdBatchPlanner\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/MarketplaceAds/Application/Service/AdBatchPlanner.php
+
+		-
+			message: '#^find\(\) сущности компании App\\MarketplaceAds\\Entity\\AdRawDocument в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/MarketplaceAds/Controller/Api/Admin/DownloadBronzeController.php
+
+		-
+			message: '#^flush\(\) в App\\MarketplaceAds\\Repository\\OzonAdPendingReportRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/MarketplaceAds/Repository/OzonAdPendingReportRepository.php
+
+		-
+			message: '#^flush\(\) в App\\MoySklad\\Application\\StockSnapshotRunner\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/MoySklad/Application/StockSnapshotRunner.php
+
+		-
+			message: '#^flush\(\) в App\\MoySklad\\Application\\StoreSyncRunner\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/MoySklad/Application/StoreSyncRunner.php
+
+		-
+			message: '#^flush\(\) в App\\Telegram\\Controller\\Admin\\TelegramBotController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 4
+			path: src/Telegram/Controller/Admin/TelegramBotController.php
+
+		-
+			message: '#^flush\(\) в App\\Telegram\\Controller\\Integration\\TelegramIntegrationController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 1
+			path: src/Telegram/Controller/Integration/TelegramIntegrationController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Cash\\Entity\\Accounts\\MoneyAccount в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 2
+			path: src/Telegram/Controller/TelegramWebhookController.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Telegram\\Entity\\ClientBinding в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 2
+			path: src/Telegram/Controller/TelegramWebhookController.php
+
+		-
+			message: '#^flush\(\) в App\\Telegram\\Controller\\TelegramWebhookController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 6
+			path: src/Telegram/Controller/TelegramWebhookController.php
+
+		-
+			message: '#^flush\(\) в App\\Telegram\\Service\\BotLinkService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
+			identifier: vashfindir.flushOutsideBoundary
+			count: 2
+			path: src/Telegram/Service/BotLinkService.php

@@ -72,8 +72,12 @@
   публичные `find*`/`get*`/`count*`/… без параметра компании в репозиториях
   сущностей, принадлежащих компании. Единственное санкционированное исключение —
   `@companyScopeExempt <причина>` в docblock.
-- Правило — эвристика: не видит неиспользуемый параметр, владение глубже одного
-  уровня и унаследованные `find()`/`findBy()`/`findAll()` в местах вызова.
+- В контроллерах: `ControllerUnscopedFindRule` ловит `find()`/`findAll()`
+  сущности компании, `ControllerEntityArgumentRule` — сущность компании
+  аргументом действия (Entity value resolver грузит её без компании).
+- Правила — эвристика: не видят неиспользуемый параметр, владение глубже одного
+  уровня, сам `Company`, `findBy()`/`findOneBy()` в местах вызова и вызовы вне
+  контроллеров.
   Зелёный гейт не отменяет ручную проверку. Паттерн — `PATTERNS.md` §14.
 
 ### Слои
@@ -239,8 +243,12 @@ INFO/DEBUG.
 Правило из этого файла либо проверяется машинно, либо проверяется только в
 ревью — и это надо знать. Сейчас машинно: `strict_types`, CS, границы модулей и
 легаси-зона (`ModuleBoundaryRules`), область компании в Repository
-(`RepositoryCompanyScopeRule`), PHPStan level 8 с baseline. Остальное —
-ревью. Правило, которое нарушает больше половины существующего кода, не
+(`RepositoryCompanyScopeRule`) и в контроллерах (`ControllerUnscopedFindRule`,
+`ControllerEntityArgumentRule`), `flush()` вне Action/Handler/Command
+(`FlushOutsideTransactionBoundaryRule`), `EntityType` с чужой сущностью
+(`ForeignEntityTypeRule`), `(float)` от сумм в Cash (`MoneyFloatCastRule`),
+routing каждого сообщения (`MessengerRoutingTest`), PHPStan level 8 с baseline.
+Остальное — ревью. Правило, которое нарушает больше половины существующего кода, не
 игнорируется и не применяется молча: его пересматривают (меняют формулировку
 или вводят гейт с baseline) отдельным PR в правила.
 

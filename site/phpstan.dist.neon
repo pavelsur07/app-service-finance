@@ -5,7 +5,7 @@
 # уровне сразу. Baseline только сжимается — не перегенерируется «начисто» и не
 # удаляется, иначе регресс перестаёт отличаться от нормы.
 #
-# Фактический охват: 2347 из 2363 PHP-файлов src+tests. Исключены два
+# Фактический охват: 2892 из 2921 PHP-файлов src+tests (14.10.2026). Исключены два
 # унаследованных теста и фикстуры правил — причины в excludePaths ниже.
 includes:
     - phpstan-baseline.neon
@@ -51,8 +51,8 @@ parameters:
         analyse:
             - tests/Integration/Marketplace/CloseMonthStageActionRollbackTest.php
             - tests/Unit/Marketplace/MessageHandler/RebuildPreliminaryForPeriodHandlerTest.php
-            # Фикстуры RepositoryCompanyScopeRuleTest: они нарушают правило
-            # намеренно. Под анализом их нарушение попало бы в baseline и
+            # Фикстуры тестов собственных правил (tests/PHPStan/Rules): они
+            # нарушают правила намеренно. Под анализом их нарушение попало бы в baseline и
             # выглядело бы как долг, а не как материал теста.
             - tests/Unit/PHPStan/data
 
@@ -135,6 +135,35 @@ services:
         class: App\Tests\PHPStan\Rules\RepositoryCompanyScopeRule
         arguments:
             reflectionProvider: @reflectionProvider
+        tags:
+            - phpstan.rules.rule
+
+    # Граница транзакции: flush() только в Action, Handler, Command (CLAUDE.md, «Транзакции»).
+    -
+        class: App\Tests\PHPStan\Rules\FlushOutsideTransactionBoundaryRule
+        tags:
+            - phpstan.rules.rule
+
+    # Формы: EntityType только с сущностью своего модуля (CLAUDE.md, «Формы»).
+    -
+        class: App\Tests\PHPStan\Rules\ForeignEntityTypeRule
+        arguments:
+            reflectionProvider: @reflectionProvider
+        tags:
+            - phpstan.rules.rule
+
+    # IDOR в контроллерах: find()/findAll() и аргумент-Entity для сущности компании.
+    -
+        class: App\Tests\PHPStan\Rules\CompanyOwnedEntity
+        arguments:
+            reflectionProvider: @reflectionProvider
+            metadataResolver: @PHPStan\Type\Doctrine\ObjectMetadataResolver
+    -
+        class: App\Tests\PHPStan\Rules\ControllerUnscopedFindRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: App\Tests\PHPStan\Rules\ControllerEntityArgumentRule
         tags:
             - phpstan.rules.rule
 
