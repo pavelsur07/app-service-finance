@@ -458,7 +458,7 @@ final readonly class CashFacade
     }
 
     /**
-     * Время последнего изменения данных ДДС компании: транзакций и движений фондов.
+     * Последняя активность ДДС компании: max(updatedAt транзакций, occurredAt движений фондов).
      */
     public function getLastCashActivityAt(string $companyId): ?\DateTimeImmutable
     {
@@ -512,11 +512,15 @@ final readonly class CashFacade
      */
     public function sumFundBalancesMinorUpToDate(string $companyId, \DateTimeImmutable $date, string $currency): int
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumFundBalancesMinorUpToDate($companyId, $date, $currency);
     }
 
     public function sumInflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumInflowExcludingTransfers($companyId, $from, $to, $currency);
     }
 
@@ -525,6 +529,8 @@ final readonly class CashFacade
      */
     public function sumInflowByDayExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumInflowByDayExcludingTransfers($companyId, $from, $to, $currency);
     }
 
@@ -533,6 +539,8 @@ final readonly class CashFacade
      */
     public function sumOutflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumOutflowExcludingTransfers($companyId, $from, $to, $currency);
     }
 
@@ -541,11 +549,15 @@ final readonly class CashFacade
      */
     public function sumOutflowByDayExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumOutflowByDayExcludingTransfers($companyId, $from, $to, $currency);
     }
 
     public function sumCapexOutflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumCapexOutflowExcludingTransfers($companyId, $from, $to, $currency);
     }
 
@@ -554,6 +566,8 @@ final readonly class CashFacade
      */
     public function sumOutflowByCategoryExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumOutflowByCategoryExcludingTransfers($companyId, $from, $to, $currency);
     }
 
@@ -562,6 +576,8 @@ final readonly class CashFacade
      */
     public function sumNetByFlowKindExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
     {
+        $this->requireCompany($companyId);
+
         return $this->dashboardQuery->sumNetByFlowKindExcludingTransfers($companyId, $from, $to, $currency);
     }
 

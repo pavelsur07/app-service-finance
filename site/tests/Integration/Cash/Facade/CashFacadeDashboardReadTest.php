@@ -64,6 +64,10 @@ final class CashFacadeDashboardReadTest extends IntegrationTestCase
         $this->tx(CashDirection::INFLOW, '999.00', '2026-03-10', null, deleted: true);
         $this->tx(CashDirection::INFLOW, '999.00', '2026-04-01');
         $this->tx(CashDirection::INFLOW, '999.00', '2026-03-10', null, account: $this->account($this->company, 'А-доллары', 'USD'));
+        // Операция в рублях на долларовом счёте в поступления не входит: валюта операции должна совпадать с валютой счёта.
+        $usdAccount = $this->account($this->company, 'Б-доллары', 'USD');
+        $mismatch = new CashTransaction(Uuid::uuid4()->toString(), $this->company, $usdAccount, CashDirection::INFLOW, '999.00', 'RUB', new \DateTimeImmutable('2026-03-10 10:00'));
+        $this->em->persist($mismatch);
         $foreignOwner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('dashboard-foreign@example.com')->withPasswordHash('p')->build();
         $foreign = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($foreignOwner)->build();
         $this->em->persist($foreignOwner);
@@ -80,12 +84,12 @@ final class CashFacadeDashboardReadTest extends IntegrationTestCase
             [new CashDailyAmount('2026-03-03', '150.50'), new CashDailyAmount('2026-03-31', '20.00')],
             $this->facade->sumInflowByDayExcludingTransfers($id, $from, $to, 'RUB'),
         );
-        self::assertSame('80.00', ltrim($this->facade->sumOutflowExcludingTransfers($id, $from, $to, 'RUB'), '-'));
+        self::assertSame('80.00', $this->facade->sumOutflowExcludingTransfers($id, $from, $to, 'RUB'));
         self::assertEquals(
-            ['2026-03-04' => '30.00', '2026-03-05' => '50.00'],
-            array_column(array_map(static fn (CashDailyAmount $d): array => [$d->date, ltrim($d->amount, '-')], $this->facade->sumOutflowByDayExcludingTransfers($id, $from, $to, 'RUB')), 1, 0),
+            [new CashDailyAmount('2026-03-04', '30.00'), new CashDailyAmount('2026-03-05', '50.00')],
+            $this->facade->sumOutflowByDayExcludingTransfers($id, $from, $to, 'RUB'),
         );
-        self::assertSame('45.00', ltrim($this->facade->sumCapexOutflowExcludingTransfers($id, $from, $to, 'RUB'), '-'));
+        self::assertSame('45.00', $this->facade->sumCapexOutflowExcludingTransfers($id, $from, $to, 'RUB'));
         self::assertEquals([
             new CashCategoryAmount((string) $this->capex->getId(), 'CAPEX', '45.00'),
             new CashCategoryAmount((string) $this->rent->getId(), 'Аренда', '30.00'),
@@ -93,9 +97,9 @@ final class CashFacadeDashboardReadTest extends IntegrationTestCase
         ], $this->facade->sumOutflowByCategoryExcludingTransfers($id, $from, $to, 'RUB'));
         $net = $this->facade->sumNetByFlowKindExcludingTransfers($id, $from, $to, 'RUB');
         self::assertSame('0.00', $net['FINANCING']);
-        self::assertSame('30.00', ltrim($net['OPERATING'], '-'));
-        self::assertSame('45.00', ltrim($net['INVESTING'], '-'));
-        self::assertSame('0.00', $this->facade->sumInflowExcludingTransfers((string) $foreign->getId(), new \DateTimeImmutable('2026-04-02'), new \DateTimeImmutable('2026-04-30'), 'RUB'));
+        self::assertSame('30.00', $net['OPERATING']);
+        self::assertSame('45.00', $net['INVESTING']);
+        self::assertSame('999.00', $this->facade->sumInflowExcludingTransfers((string) $foreign->getId(), $from, $to, 'RUB'));
     }
 
     public function testAccountsBalancesAndFundsAreScopedToCompanyAndCurrency(): void
@@ -130,10 +134,46 @@ final class CashFacadeDashboardReadTest extends IntegrationTestCase
         self::assertSame(0, $this->facade->sumFundBalancesMinorUpToDate($id, new \DateTimeImmutable('2026-03-01'), 'RUB'));
     }
 
+    public function testCapexCountsOnlyCapexSplitsOfMixedTransaction(): void
+    {
+        $tx = new CashTransaction(Uuid::uuid4()->toString(), $this->company, $this->rubAccount, CashDirection::OUTFLOW, '100.00', 'RUB', new \DateTimeImmutable('2026-03-07 10:00'));
+        $tx->replaceSplits([
+            new CashTransactionSplit($tx, $this->capex, '60.00', CashTransactionSplitSource::MANUAL),
+            new CashTransactionSplit($tx, $this->rent, '40.00', CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->persist($tx);
+        $this->em->flush();
+
+        $id = (string) $this->company->getId();
+        $from = new \DateTimeImmutable('2026-03-01');
+        $to = new \DateTimeImmutable('2026-03-31');
+
+        self::assertSame('60.00', $this->facade->sumCapexOutflowExcludingTransfers($id, $from, $to, 'RUB'));
+        self::assertSame('100.00', $this->facade->sumOutflowExcludingTransfers($id, $from, $to, 'RUB'));
+    }
+
+    public function testClosingBalancesIgnoreAccountsOfAnotherCompany(): void
+    {
+        $foreignOwner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('dashboard-idor@example.com')->withPasswordHash('p')->build();
+        $foreign = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($foreignOwner)->build();
+        $this->em->persist($foreignOwner);
+        $this->em->persist($foreign);
+        $foreignAccount = $this->account($foreign, 'Чужой', 'RUB');
+        $this->balance($foreignAccount, '2026-03-05', '500.00');
+        $this->balance($this->rubAccount, '2026-03-05', '1.00');
+        $this->em->flush();
+
+        self::assertSame('1.00', $this->facade->sumClosingBalancesUpToDate(
+            (string) $this->company->getId(),
+            new \DateTimeImmutable('2026-03-31'),
+            [(string) $this->rubAccount->getId(), (string) $foreignAccount->getId()],
+        ));
+    }
+
     public function testUnknownCompanyIsRejected(): void
     {
         $this->expectException(\DomainException::class);
-        $this->facade->listActiveMoneyAccountIds(Uuid::uuid4()->toString(), 'RUB');
+        $this->facade->sumInflowExcludingTransfers(Uuid::uuid4()->toString(), new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31'), 'RUB');
     }
 
     private function account(Company $company, string $name, string $currency): MoneyAccount
