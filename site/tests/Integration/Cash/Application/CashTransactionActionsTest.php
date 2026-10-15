@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
+use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Application\DeleteCashTransactionAction;
@@ -86,10 +87,16 @@ final class CashTransactionActionsTest extends IntegrationTestCase
 
     public function testDeleteAndRestoreReachDatabase(): void
     {
+        $cacheInvalidator = self::getContainer()->get(SnapshotCacheInvalidator::class);
+        $versionBefore = $cacheInvalidator->resolveVersionForCompany($this->company);
+
         $tx = $this->action(AddCashTransactionAction::class)($this->dto('100.00', '2024-02-10'));
         $txId = (string) $tx->getId();
+        // CashTransactionsChanged доходит до подписчика Analytics: версия кэша дашборда растёт.
+        self::assertSame($versionBefore + 1, $cacheInvalidator->resolveVersionForCompany($this->company));
 
         $this->action(DeleteCashTransactionAction::class)($tx, null, 'test');
+        self::assertSame($versionBefore + 2, $cacheInvalidator->resolveVersionForCompany($this->company));
         $this->em->clear();
         $deleted = $this->em->find(CashTransaction::class, $txId);
         self::assertInstanceOf(CashTransaction::class, $deleted);

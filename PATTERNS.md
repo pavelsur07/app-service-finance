@@ -978,7 +978,7 @@ public function __invoke(string $dealId, string $companyId, DealStatus $new): vo
 }
 ```
 
-**Правила:** события — `readonly class` только со scalar ID · `pullDomainEvents()` вызывать после `flush()` · подписчики в других модулях — через `EventSubscriber`, не напрямую · тяжёлые подписчики (email, пересчёт) → dispatch через Messenger
+**Правила:** события — `readonly class` только со scalar ID · `pullDomainEvents()` вызывать после `flush()` · подписчики в других модулях — `EventSubscriber` или `#[AsEventListener]`, не прямой вызов · тяжёлые подписчики (email, пересчёт) → dispatch через Messenger
 
 **Живой пример — Cash → Analytics.** `App\Cash\Domain\Event\CashTransactionsChanged(companyId)`
 отправляют Action'ы Cash после `flush()` и пересчёта остатков (явный `dispatch`, без
