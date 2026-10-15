@@ -19,8 +19,16 @@ final class SnapshotCacheInvalidator
 
     public function invalidateForCompany(Company $company): void
     {
-        $versionKey = $this->buildVersionKey($company);
-        $currentVersion = $this->resolveVersionForCompany($company);
+        $this->invalidateForCompanyId((string) $company->getId());
+    }
+
+    /**
+     * То же по id: слушатель событий Cash получает только companyId.
+     */
+    public function invalidateForCompanyId(string $companyId): void
+    {
+        $versionKey = $this->buildVersionKey($companyId);
+        $currentVersion = $this->resolveVersionForCompanyId($companyId);
 
         $this->cache->delete($versionKey);
         $this->cache->get($versionKey, static function (ItemInterface $item) use ($currentVersion): int {
@@ -32,7 +40,12 @@ final class SnapshotCacheInvalidator
 
     public function resolveVersionForCompany(Company $company): int
     {
-        $versionKey = $this->buildVersionKey($company);
+        return $this->resolveVersionForCompanyId((string) $company->getId());
+    }
+
+    private function resolveVersionForCompanyId(string $companyId): int
+    {
+        $versionKey = $this->buildVersionKey($companyId);
 
         return $this->cache->get($versionKey, static function (ItemInterface $item): int {
             $item->expiresAfter(null);
@@ -41,9 +54,9 @@ final class SnapshotCacheInvalidator
         });
     }
 
-    private function buildVersionKey(Company $company): string
+    private function buildVersionKey(string $companyId): string
     {
-        $companyId = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', (string) $company->getId());
+        $companyId = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $companyId);
 
         return sprintf(self::VERSION_CACHE_KEY, $companyId);
     }

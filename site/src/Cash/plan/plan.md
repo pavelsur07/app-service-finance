@@ -633,10 +633,34 @@ skip-reason и conflict.
 
 **Чек-лист:**
 
-- [ ] `grep "use App\\Analytics" site/src/Cash` пуст.
-- [ ] Тест: изменение транзакции → событие → кэш Analytics сброшен.
-- [ ] `PATTERNS.md` §20 дополнен ссылкой на живой пример.
-- [ ] «Журнал» обновлён; все гейты зелёные.
+- [x] `grep "use App\\Analytics" site/src/Cash` пуст.
+- [x] Тест: изменение транзакции → событие → кэш Analytics сброшен.
+- [x] `PATTERNS.md` §20 дополнен ссылкой на живой пример.
+- [x] «Журнал» обновлён; все гейты зелёные.
+
+### Результат этапа 6 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| 7 мест в Cash вызывали `SnapshotCacheInvalidator` из Analytics: `Add/Update/Delete/BulkDeleteCashTransactionsAction`, `CreateCashTransferAction`, `CashTransferLifecycleAction`, `SoftDeleteCompanyTransactionsCommand` (после этапа 5 вызовы из `CashTransactionService` переехали в Action'ы) | те же места после `flush()` и пересчёта отправляют `CashTransactionsChanged(companyId)` через `EventDispatcherInterface` |
+| — | `Analytics\Infrastructure\Cache\InvalidateSnapshotOnCashChangeListener` (`#[AsEventListener]`) вызывает новый `SnapshotCacheInvalidator::invalidateForCompanyId()`; `invalidateForCompany()` делегирует ему |
+| обратную зависимость ничто не запрещало | PHPat `test_cash_does_not_depend_on_analytics`: 0 нарушений, проба `ProbeViolation` в `Cash\Domain\Event` гейт роняет |
+
+Отступление от плана: одно событие вместо двух. `CashTransferChanged` не
+понадобилось — подписчику нужен только `companyId`, а второй тип события без
+второго подписчика был бы мёртвым кодом. Период в событие тоже не вошёл: кэш
+версионируется по компании целиком.
+
+Сквозной `CreateCashTransferActionTest` (версия кэша растёт после перевода)
+прошёл без изменений — цепочка «Action → событие → подписчик → кэш» работает в
+контейнере. `BulkDeleteCashTransactionsActionTest` проверяет событие с
+`companyId` на успехе и его отсутствие при отказе; юнит-тест подписчика —
+что сброс касается только своей компании.
+Интеграционный `CashTransactionActionsTest` проверяет рост версии кэша после
+добавления и удаления через контейнер; без `dispatch` в
+`DeleteCashTransactionAction` тест красный. Update, перевод-жизненный цикл и
+команда мягкого удаления отдельным тестом не покрыты — замена в них
+построчная.
 
 ---
 
@@ -769,7 +793,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | #2681 |
 | 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | #2682 |
 | 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | #2683 |
-| 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | этот PR |
+| 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | #2684 |
+| 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | этот PR |
 
 ## Находки
 

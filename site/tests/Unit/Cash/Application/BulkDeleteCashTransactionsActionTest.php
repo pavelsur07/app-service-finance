@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\BulkDeleteCashTransactionsAction;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
@@ -19,10 +19,13 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 final class BulkDeleteCashTransactionsActionTest extends TestCase
 {
+    /** @var list<CashTransactionsChanged> */
+    private array $dispatched = [];
+
     /**
      * @param mixed[] $selection
      */
@@ -42,7 +45,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             $repository,
             $entityManager,
             $recalculator,
-            new SnapshotCacheInvalidator(new ArrayAdapter()),
+            $this->dispatcher(),
         );
 
         $this->expectException(\DomainException::class);
@@ -97,7 +100,6 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
                 }),
             );
 
-        $cacheInvalidator = new SnapshotCacheInvalidator(new ArrayAdapter());
         $repository->expects(self::once())
             ->method('hasAnyTransferAggregateByIdsAndCompanyId')
             ->with($ids, $company->getId())
@@ -107,10 +109,11 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             $repository,
             $entityManager,
             $recalculator,
-            $cacheInvalidator,
+            $this->dispatcher(),
         ))($company, $ids, '22222222-2222-2222-2222-222222222222');
 
         self::assertSame(2, $deletedCount);
+        self::assertEquals([new CashTransactionsChanged((string) $company->getId())], $this->dispatched);
         self::assertTrue($first->isDeleted());
         self::assertTrue($second->isDeleted());
     }
@@ -129,13 +132,12 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         $entityManager->expects(self::never())->method('flush');
         $recalculator = $this->createMock(DailyBalanceRecalculator::class);
         $recalculator->expects(self::never())->method('recalcRange');
-        $cacheInvalidator = new SnapshotCacheInvalidator(new ArrayAdapter());
 
         $action = new BulkDeleteCashTransactionsAction(
             $repository,
             $entityManager,
             $recalculator,
-            $cacheInvalidator,
+            $this->dispatcher(),
         );
 
         try {
@@ -144,6 +146,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         } catch (FinancePeriodLockedException) {
             self::assertFalse($locked->isDeleted());
             self::assertFalse($open->isDeleted());
+            self::assertSame([], $this->dispatched);
         }
     }
 
@@ -164,13 +167,23 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             $repository,
             $entityManager,
             $recalculator,
-            new SnapshotCacheInvalidator(new ArrayAdapter()),
+            $this->dispatcher(),
         );
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Операции перевода нельзя удалить отдельно.');
 
         $action($company, $ids, null);
+    }
+
+    private function dispatcher(): EventDispatcher
+    {
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(CashTransactionsChanged::class, function (CashTransactionsChanged $event): void {
+            $this->dispatched[] = $event;
+        });
+
+        return $dispatcher;
     }
 
     private function account(Company $company): MoneyAccount

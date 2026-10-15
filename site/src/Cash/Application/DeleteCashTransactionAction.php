@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Service\Transaction\CashTransactionService;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class DeleteCashTransactionAction
 {
@@ -16,7 +17,7 @@ final class DeleteCashTransactionAction
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
-        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly EventDispatcherInterface $eventDispatcher,
     ) {
     }
 
@@ -48,6 +49,6 @@ final class DeleteCashTransactionAction
         // что новый cache key укажет на уже актуальное состояние регистров и остатков.
         // Пересчёт по счёту
         $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
     }
 }

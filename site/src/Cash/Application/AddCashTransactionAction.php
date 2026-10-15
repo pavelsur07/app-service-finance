@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
@@ -17,6 +17,7 @@ use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class AddCashTransactionAction
 {
@@ -26,7 +27,7 @@ final class AddCashTransactionAction
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly CashTransactionRepository $txRepo,
         private readonly PaymentPlanMatcher $paymentPlanMatcher,
-        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
         private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
     ) {
@@ -138,7 +139,7 @@ final class AddCashTransactionAction
         $from = $dto->occurredAt->setTime(0, 0);
         $to = (new \DateTimeImmutable('today'))->setTime(0, 0); // правая граница — сегодня, дальше DailyBalanceRecalculator сам расширит до макс. факта
         $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         return $tx;
     }

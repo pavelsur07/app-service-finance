@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -16,6 +16,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Массовый soft delete (и откат) всех транзакций ДДС компании.
@@ -63,7 +64,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly CompanyRepository $companyRepository,
         private readonly DailyBalanceRecalculator $recalculator,
-        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly EventDispatcherInterface $eventDispatcher,
     ) {
         parent::__construct();
     }
@@ -178,7 +179,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
                 null,
             );
         }
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         // Верификация по пересчёту из БД: после delete в исходном состоянии (активные)
         // не должно остаться строк, после restore — в исходном состоянии (deleted).

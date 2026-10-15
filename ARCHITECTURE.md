@@ -1434,6 +1434,21 @@ manage — только владелец. Новые права автомати
   chart-зависимости и подключает переиспользуемые стили
   `assets/styles/components/financial-chart.css`.
 
+### Cash → Analytics: событие `CashTransactionsChanged`
+
+- `App\Cash\Domain\Event\CashTransactionsChanged(string $companyId)` — синхронное
+  доменное событие «данные ДДС компании изменились». Отправляется после `flush()` и
+  пересчёта остатков из `Add/Update/Delete/BulkDeleteCashTransactionsAction`,
+  `CreateCashTransferAction`, `CashTransferLifecycleAction` и
+  `SoftDeleteCompanyTransactionsCommand`.
+- Подписчик `Analytics\Infrastructure\Cache\InvalidateSnapshotOnCashChangeListener`
+  вызывает `SnapshotCacheInvalidator::invalidateForCompanyId()` — версия кэша дашборда
+  компании растёт.
+- Только для последствий, которые можно потерять: при сбое подписчика кэш истечёт сам.
+  Денежные последствия на это событие не вешать.
+- Cash не зависит от `App\Analytics` — гейт `test_cash_does_not_depend_on_analytics`
+  (`site/tests/Architecture/ModuleBoundaryRules.php`).
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
