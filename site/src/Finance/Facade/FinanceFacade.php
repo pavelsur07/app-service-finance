@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Facade;
 
 use App\Cash\Application\DTO\CreateDocumentCommand;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
@@ -38,7 +38,6 @@ final class FinanceFacade
     public function __construct(
         private readonly CreatePLDocumentAction $createAction,
         private readonly DeletePLDocumentAction $deleteAction,
-        private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly PLCategoryRepository $plCategoryRepository,
@@ -133,18 +132,21 @@ final class FinanceFacade
     /**
      * Создаёт Document + DocumentOperation из транзакции ДДС.
      *
+     * Транзакцию передаёт вызывающий Action Cash, уже загрузившим её в рамках
+     * компании: Finance не читает репозитории Cash (этап 7.2 плана Cash). Связь
+     * Document ↔ CashTransaction остаётся ORM-связью сущностей.
+     *
      * Без flush() — flush выполняется в вызывающем Action.
      *
-     * @throws \DomainException если транзакция не найдена или не принадлежит компании
+     * @throws \DomainException если транзакция не принадлежит компании или не совпадает с командой
      * @throws \DomainException при IDOR-нарушении по контрагенту, проекту или категории
      */
     public function createDocumentFromCashTransaction(
         string $companyId,
+        CashTransaction $tx,
         CreateDocumentCommand $command,
     ): string {
-        $tx = $this->cashTransactionRepository->find($command->cashTransactionId);
-
-        if (!$tx || $tx->getCompany()->getId() !== $companyId) {
+        if ($tx->getId() !== $command->cashTransactionId || $tx->getCompany()->getId() !== $companyId) {
             throw new \DomainException('Транзакция ДДС не найдена или не принадлежит компании.');
         }
 

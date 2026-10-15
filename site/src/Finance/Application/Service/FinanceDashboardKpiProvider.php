@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace App\Finance\Application\Service;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Shared\Domain\ValueObject\RoundingMode;
 
 final readonly class FinanceDashboardKpiProvider
 {
     public function __construct(
-        private AccountBalanceProvider $accountBalanceProvider,
-        private CashTransactionRepository $cashTransactionRepository,
-        private MoneyAccountRepository $moneyAccountRepository,
+        private CashFacade $cashFacade,
     ) {
     }
 
@@ -53,24 +49,18 @@ final readonly class FinanceDashboardKpiProvider
         $previousFrom = $previousTo->modify(sprintf('-%d days', $periodDays - 1));
         $scale = $cashCurrency->scale();
 
-        $accounts = $this->moneyAccountRepository->findByFilters(
-            $company,
-            null,
-            [$cashCurrency->value],
-            true,
-            null,
-            ['name' => \SortDirection::Ascending],
-        );
+        $companyId = (string) $company->getId();
+        $accounts = $this->cashFacade->listMoneyAccounts($companyId, activeOnly: true, currency: $cashCurrency->value);
 
-        $todayBalance = $this->cashBalanceAtDate($company, $accounts, $today, $scale);
+        $todayBalance = $this->cashBalanceAtDate($companyId, $accounts, $today, $scale);
         $selectedFlowKind = match ($activity) {
             'operating' => CashflowFlowKind::OPERATING,
             'financing' => CashflowFlowKind::FINANCING,
             'investing' => CashflowFlowKind::INVESTING,
             default => null,
         };
-        $currentTurnover = $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
-            $company,
+        $currentTurnover = $this->cashFacade->sumGrossTurnoverExcludingTransfers(
+            $companyId,
             $currentFrom,
             $today,
             $cashCurrency->value,
@@ -95,9 +85,9 @@ final readonly class FinanceDashboardKpiProvider
             return ['kpi' => $kpi, 'comparisons' => [], 'periods' => $periods];
         }
 
-        $previousBalance = $this->cashBalanceAtDate($company, $accounts, $previousTo, $scale);
-        $previousTurnover = $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
-            $company,
+        $previousBalance = $this->cashBalanceAtDate($companyId, $accounts, $previousTo, $scale);
+        $previousTurnover = $this->cashFacade->sumGrossTurnoverExcludingTransfers(
+            $companyId,
             $previousFrom,
             $previousTo,
             $cashCurrency->value,
@@ -120,20 +110,20 @@ final readonly class FinanceDashboardKpiProvider
     }
 
     /**
-     * @param list<MoneyAccount> $accounts
+     * @param list<MoneyAccountSummary> $accounts
      */
     private function cashBalanceAtDate(
-        Company $company,
+        string $companyId,
         array $accounts,
         \DateTimeImmutable $date,
         int $scale,
     ): string {
         $accountIds = array_map(
-            static fn (MoneyAccount $account): string => (string) $account->getId(),
+            static fn (MoneyAccountSummary $account): string => $account->id,
             $accounts,
         );
-        $openingBalances = $this->accountBalanceProvider->getOpeningBalancesUpToDate(
-            $company,
+        $openingBalances = $this->cashFacade->getOpeningBalancesUpToDate(
+            $companyId,
             $date,
             $accountIds,
         );
@@ -141,11 +131,11 @@ final readonly class FinanceDashboardKpiProvider
 
         foreach ($accounts as $account) {
             // A balance does not exist before the account's opening date.
-            if ($date < $account->getOpeningBalanceDate()->setTime(0, 0)) {
+            if ($date < $account->openingBalanceDate->setTime(0, 0)) {
                 continue;
             }
 
-            $opening = $openingBalances[(string) $account->getId()] ?? $account->getOpeningBalance();
+            $opening = $openingBalances[$account->id] ?? $account->openingBalance;
             $total = bcadd($total, (string) $opening, $scale);
         }
 

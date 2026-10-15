@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Cash\Application\Service\DailyBalanceRecalculator;
-use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,9 +22,7 @@ class ReportAccountBalancesController extends AbstractController
 {
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
-        private MoneyAccountRepository $accountRepository,
-        private MoneyAccountDailyBalanceRepository $balanceRepository,
-        private DailyBalanceRecalculator $recalculator, // ⬅ добавили сервис пересчёта
+        private CashFacade $cashFacade,
     ) {
     }
 
@@ -38,16 +34,13 @@ class ReportAccountBalancesController extends AbstractController
         $dateParam = $request->query->get('date');
         $date = $dateParam ? (new \DateTimeImmutable($dateParam))->setTime(0, 0) : (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        $accounts = $this->accountRepository->findBy(
-            ['company' => $company, 'isActive' => true],
-            ['type' => 'ASC', 'name' => 'ASC']
-        );
+        $companyId = (string) $company->getId();
+        $accounts = $this->cashFacade->listMoneyAccounts($companyId, activeOnly: true, typeFirst: true);
 
         $accountsByCurrency = [];
         $accountIds = [];
         foreach ($accounts as $account) {
-            /** @var MoneyAccount $account */
-            $currency = $account->getCurrency();
+            $currency = $account->currency;
             if (!isset($accountsByCurrency[$currency])) {
                 $accountsByCurrency[$currency] = [
                     MoneyAccountType::BANK->value => [],
@@ -56,36 +49,12 @@ class ReportAccountBalancesController extends AbstractController
                     MoneyAccountType::CRYPTO_WALLET->value => [],
                 ];
             }
-            $accountsByCurrency[$currency][$account->getType()->value][] = $account;
-            $accountIds[] = $account->getId();
+            $accountsByCurrency[$currency][$account->type->value][] = $account;
+            $accountIds[] = $account->id;
         }
 
-        $balancesByAccountId = [];
-        if ($accountIds) {
-            $qb = $this->balanceRepository->createQueryBuilder('b')
-                ->innerJoin('b.moneyAccount', 'a')
-                ->addSelect('a')
-                ->where('b.company = :company')
-                ->andWhere('b.date <= :date')
-                ->andWhere('b.date >= a.openingBalanceDate')
-                ->andWhere('a.id IN (:accountIds)')
-                ->setParameter('company', $company)
-                ->setParameter('date', $date)
-                ->setParameter('accountIds', $accountIds)
-                ->orderBy('a.id', \SortDirection::Ascending)
-                ->addOrderBy('b.date', \SortDirection::Descending);
-
-            $rows = $qb->getQuery()->getResult();
-            foreach ($rows as $row) {
-                /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
-                $accId = $row->getMoneyAccount()->getId();
-                if (!isset($balancesByAccountId[$accId])) {
-                    $balancesByAccountId[$accId] = $row->getDate()->format('Y-m-d') === $date->format('Y-m-d')
-                        ? $row->getOpeningBalance()
-                        : $row->getClosingBalance();
-                }
-            }
-        }
+        // Остаток на начало выбранного дня: входящий остаток этого дня либо исходящий предыдущего.
+        $balancesByAccountId = $this->cashFacade->getOpeningBalancesUpToDate($companyId, $date, $accountIds);
 
         $totalsByCurrency = [];
         foreach ($accountsByCurrency as $currency => $groups) {
@@ -97,8 +66,8 @@ class ReportAccountBalancesController extends AbstractController
             ];
             foreach ($groups as $type => $accs) {
                 foreach ($accs as $acc) {
-                    /** @var MoneyAccount $acc */
-                    $balance = $balancesByAccountId[$acc->getId()] ?? '0.00';
+                    /** @var MoneyAccountSummary $acc */
+                    $balance = $balancesByAccountId[$acc->id] ?? '0.00';
                     $totalsByType[$type] = bcadd($totalsByType[$type], $balance, 2);
                 }
             }
@@ -147,7 +116,7 @@ class ReportAccountBalancesController extends AbstractController
 
         try {
             // Пересчёт для всех счетов компании (можно добавить выборочные id при необходимости)
-            $this->recalculator->recalcRange($company, $from, $to, null);
+            $this->cashFacade->recalculateDailyBalances((string) $company->getId(), $from, $to);
             $this->addFlash('success', sprintf(
                 'Пересчёт выполнен: %s — %s.',
                 $from->format('d.m.Y'),

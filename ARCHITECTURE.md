@@ -1174,10 +1174,12 @@ createPLDocument(
 // Не использовать для ручного удаления из UI.
 deletePLDocument(string $companyId, string $documentId): void
 
-// Создать Document + DocumentOperation из транзакции ДДС (без flush)
-// Бросает DomainException если tx не найдена / IDOR по любой из сущностей
+// Создать Document + DocumentOperation из транзакции ДДС (без flush).
+// Транзакцию передаёт вызывающий Action Cash (Finance не читает репозитории Cash).
+// Бросает DomainException, если tx другой компании или не совпадает с командой / IDOR по сущностям
 createDocumentFromCashTransaction(
     string $companyId,
+    CashTransaction $tx,             // App\Cash\Entity\Transaction\CashTransaction
     CreateDocumentCommand $command,  // App\Cash\Application\DTO\CreateDocumentCommand
 ): string  // ID созданного Document
 
@@ -1516,6 +1518,36 @@ sumNetByFlowKindExcludingTransfers(...same): array{OPERATING: string, INVESTING:
 
 DTO: `CashDailyAmount(date, amount)`, `CashCategoryAmount(categoryId, categoryName, amountAbs)`
 в `src/Cash/Application/DTO/`.
+
+Чтение для отчётов Finance (этап 7.2 плана Cash): остатки, обороты, выписка, KPI дашборда.
+
+```php
+// Счета компании; $typeFirst — порядок «тип, название», иначе по названию
+listMoneyAccounts(string $companyId, bool $activeOnly, ?string $currency = null, bool $typeFirst = false): list<MoneyAccountSummary>
+
+// Остаток на начало дня (входящий этого дня либо исходящий последнего дня до него) / на конец дня.
+// Ключ — id счёта; счета без строк регистра и чужие счета в ответ не попадают
+getOpeningBalancesUpToDate(string $companyId, \DateTimeImmutable $date, list<string> $accountIds): array<string, string>
+getClosingBalancesUpToDate(string $companyId, \DateTimeImmutable $date, list<string> $accountIds): array<string, string>
+
+// Обороты счетов за период в валюте счёта, переводы включены
+sumTurnoversByAccount(string $companyId, list<string> $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array<string, array{inflow: string, outflow: string}>
+
+// Валовые обороты по строкам разбивки без переводов и технических статей
+sumGrossTurnoverExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency, ?CashflowFlowKind $flowKind): array{inflow: string, outflow: string}
+
+// Строки регистра остатков за период; пустой $accountIds — все счета компании
+listDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, list<string> $accountIds): list<MoneyAccountDailyBalanceRow>
+
+// Строки выписки: по строке разбивки, транзакция без разбивки — одной строкой
+listStatementLines(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $accountId, ?string $categoryId): list<CashStatementLine>
+
+// Запись: пересчитать регистр ежедневных остатков всех счетов компании за период
+recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): void
+```
+
+DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine` — в
+`src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
 запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять»,
