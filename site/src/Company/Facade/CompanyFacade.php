@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Company\Facade;
 
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\Counterparty;
@@ -13,7 +14,6 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -26,7 +26,7 @@ final class CompanyFacade
 
     public function __construct(
         private readonly CompanyRepository $repository,
-        private readonly CompanyOwnerAccountCreator $accountCreator,
+        private readonly CreateCompanyOwnerAccountAction $accountCreator,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CompanyMemberRepository $companyMemberRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
@@ -117,7 +117,7 @@ final class CompanyFacade
         $user = new User(Uuid::uuid7()->toString());
         $user->setEmail($email);
 
-        return $this->accountCreator->create($user, $plainPassword, $companyName);
+        return ($this->accountCreator)($user, $plainPassword, $companyName);
     }
 
     /**

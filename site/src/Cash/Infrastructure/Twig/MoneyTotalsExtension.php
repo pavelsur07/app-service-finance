@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Twig;
+namespace App\Cash\Infrastructure\Twig;
 
 use App\Cash\Service\Accounts\MoneyTotalsWidgetProvider;
 use App\Shared\Service\ActiveCompanyService;

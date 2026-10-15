@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Shared\EventSubscriber;
+namespace App\Tests\Unit\Cash\EventSubscriber;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\EventSubscriber\Audit\AuditLogSubscriber;
 use App\Shared\Audit\AuditContextProvider;
-use App\Shared\EventSubscriber\AuditLogSubscriber;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;

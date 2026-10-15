@@ -155,7 +155,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * с гипотетическим `ROLE_ADMIN_SOMETHING`.
      *
      * `ROLE_COMPANY_OWNER` сюда НЕ входит: это глобальная роль из role_hierarchy, её ставит
-     * CompanyOwnerAccountCreator при регистрации. Она означает «пользователь зарегистрирован
+     * CreateCompanyOwnerAccountAction при регистрации. Она означает «пользователь зарегистрирован
      * как владелец компании», а не «владелец активной компании», поэтому владелец компании A,
      * будучи read-only участником компании B, прошёл бы такой гейт и записал бы в компанию B.
      * Заменой tenant-scoped write-гейту она быть не может — только дополнением.

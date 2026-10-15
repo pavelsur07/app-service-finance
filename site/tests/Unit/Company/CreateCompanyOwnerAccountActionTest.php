@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
-use App\Cash\Service\Category\CashflowSystemCategoryService;
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -12,7 +12,6 @@ use App\Company\Entity\User;
 use App\Company\Event\CompanyCreatedEvent;
 use App\Company\Message\SendRegistrationEmailMessage;
 use App\Company\Repository\CompanyRoleRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
@@ -21,7 +20,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-final class CompanyOwnerAccountCreatorTest extends TestCase
+final class CreateCompanyOwnerAccountActionTest extends TestCase
 {
     public function testCreateBuildsOwnerCompanyMemberAndDispatchesRegistrationEmail(): void
     {
@@ -45,6 +44,9 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $entityManager
             ->expects(self::once())
             ->method('flush');
+        $entityManager
+            ->method('wrapInTransaction')
+            ->willReturnCallback(fn (callable $operation): mixed => $operation($entityManager));
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
@@ -68,16 +70,15 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
                 return $event;
             });
 
-        $creator = new CompanyOwnerAccountCreator(
+        $creator = new CreateCompanyOwnerAccountAction(
             $passwordHasher,
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
-            $this->createSystemCategoryServiceMock(),
             $eventDispatcher,
         );
 
-        $company = $creator->create($user, 'plain-password', '  Acme LLC  ', true);
+        $company = ($creator)($user, 'plain-password', '  Acme LLC  ', true);
 
         self::assertCount(1, $dispatched);
         self::assertInstanceOf(CompanyCreatedEvent::class, $dispatched[0]);
@@ -122,22 +123,24 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $entityManager
             ->expects(self::once())
             ->method('flush');
+        $entityManager
+            ->method('wrapInTransaction')
+            ->willReturnCallback(fn (callable $operation): mixed => $operation($entityManager));
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::never())
             ->method('dispatch');
 
-        $creator = new CompanyOwnerAccountCreator(
+        $creator = new CreateCompanyOwnerAccountAction(
             $passwordHasher,
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
-            $this->createSystemCategoryServiceMock(),
             $this->createMock(EventDispatcherInterface::class),
         );
 
-        $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
+        $company = ($creator)($user, 'plain-password', 'Acme LLC', false);
 
         self::assertInstanceOf(Company::class, $company);
         self::assertSame($user, $persisted[0]);
@@ -164,31 +167,25 @@ final class CompanyOwnerAccountCreatorTest extends TestCase
         $entityManager
             ->expects(self::once())
             ->method('flush');
+        $entityManager
+            ->method('wrapInTransaction')
+            ->willReturnCallback(fn (callable $operation): mixed => $operation($entityManager));
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
             ->expects(self::never())
             ->method('dispatch');
 
-        $creator = new CompanyOwnerAccountCreator(
+        $creator = new CreateCompanyOwnerAccountAction(
             $passwordHasher,
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
-            $this->createSystemCategoryServiceMock(),
             $this->createMock(EventDispatcherInterface::class),
         );
 
-        $company = $creator->create($user, 'plain-password', 'Acme LLC', false);
+        $company = ($creator)($user, 'plain-password', 'Acme LLC', false);
 
         self::assertInstanceOf(Company::class, $company);
-    }
-
-    private function createSystemCategoryServiceMock(): CashflowSystemCategoryService
-    {
-        $service = $this->createMock(CashflowSystemCategoryService::class);
-        $service->expects(self::once())->method('ensureStructure');
-
-        return $service;
     }
 }

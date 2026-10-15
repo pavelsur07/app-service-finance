@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\EventSubscriber;
+namespace App\Cash\EventSubscriber\Audit;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransaction;

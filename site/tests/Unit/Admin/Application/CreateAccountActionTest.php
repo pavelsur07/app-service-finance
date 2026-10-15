@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Admin\Application;
 
 use App\Admin\Application\CreateAccountAction;
-use App\Cash\Service\Category\CashflowSystemCategoryService;
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -20,7 +20,6 @@ use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -58,6 +57,9 @@ final class CreateAccountActionTest extends TestCase
         $entityManager
             ->expects(self::once())
             ->method('flush');
+        $entityManager
+            ->method('wrapInTransaction')
+            ->willReturnCallback(fn (callable $operation): mixed => $operation($entityManager));
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
@@ -66,12 +68,11 @@ final class CreateAccountActionTest extends TestCase
             ->with(self::isInstanceOf(SendRegistrationEmailMessage::class))
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
-        $accountCreator = new CompanyOwnerAccountCreator(
+        $accountCreator = new CreateCompanyOwnerAccountAction(
             $passwordHasher,
             $entityManager,
             $bus,
             new CompanyOwnerMembershipCreator($entityManager, $this->createMock(CompanyRoleRepository::class)),
-            $this->createMock(CashflowSystemCategoryService::class),
             $this->createMock(EventDispatcherInterface::class),
         );
         $companyFacade = new CompanyFacade(

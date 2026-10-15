@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;
 use App\Company\Form\RegistrationFormType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Security\PublicAccess;
 use App\Company\Service\CompanyInviteManager;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Company\Service\InviteTokenService;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,7 +37,7 @@ final class RegistrationController extends AbstractController
         CompanyInviteManager $inviteManager,
         CompanyInviteRepository $inviteRepository,
         InviteTokenService $tokenService,
-        CompanyOwnerAccountCreator $companyOwnerAccountCreator,
+        CreateCompanyOwnerAccountAction $companyOwnerAccountCreator,
     ): Response {
         $user = new User(id: Uuid::uuid4()->toString());
         $inviteToken = $request->query->get('invite');
@@ -87,7 +87,7 @@ final class RegistrationController extends AbstractController
                 $inviteManager->acceptInvite($inviteToken, $user);
                 $request->getSession()->set('active_company_id', $companyId);
             } else {
-                $companyOwnerAccountCreator->create(
+                ($companyOwnerAccountCreator)(
                     user: $user,
                     plainPassword: $plainPassword,
                     companyName: (string) $form->get('companyName')->getData(),

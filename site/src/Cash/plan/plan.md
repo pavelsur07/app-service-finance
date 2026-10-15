@@ -720,9 +720,28 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 **Итог этапа 7:**
 
-- [ ] `phpat…Cash` = 0, `phpat…Company` и `phpat…Finance` из `src/Cash/` = 0.
+- [ ] `phpat…Cash` = 0 (с 7.4 ✔), `phpat…Company` и `phpat…Finance` из `src/Cash/` = 0 (7.5).
 
 ---
+
+### Результат подэтапа 7.4 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `CompanyController::new` и `CompanyOwnerAccountCreator` вызывали `CashflowSystemCategoryService::ensureStructure` | Cash слушает `CompanyCreatedEvent` (`EnsureCashflowSystemCategoriesOnCompanyCreated` → `EnsureCashflowSystemCategoriesAction`) |
+| `CompanyOwnerAccountCreator` (Service с `flush`) — регистрация не в транзакции, статьи сохранялись тем же flush | `Company\Application\CreateCompanyOwnerAccountAction` (`git mv`): flush + событие в `wrapInTransaction`, как в `CompanyController::new` — компания, статьи и структура баланса атомарны; запись `flushOutsideBoundary` ушла |
+| `Shared\EventSubscriber\AuditLogSubscriber` (аудит только `CashTransaction`) зависел от `AutoRuleDispatchGuard` | перенесён в `Cash\EventSubscriber\Audit` (`git mv`) |
+| `Twig\MaskingExtension`, `Twig\MoneyTotalsExtension` зависели от сервисов Cash | перенесены в `Cash\Infrastructure\Twig` (`git mv`); имена Twig-функций те же |
+| `DataFixtures\AppFixtures` пересчитывал остатки через `AccountBalanceService` по трём счетам | `CashFacade::recalculateDailyBalances` — тот же пересчёт по всем (тем же трём) счетам |
+
+Отступление от плана: вместо замены зависимостей на методы фасада — событие и перенос
+файлов, которым место в Cash; переименование `CompanyOwnerAccountCreator` в Action
+понадобилось, чтобы транзакция стояла на законной границе (гейт `flushOutsideBoundary`).
+
+Проверки: функциональные `CompanyCreateFlowTest` и `PublicRegistrationFlowTest` теперь
+проверяют 7 системных статей после создания компании (без слушателя — красные);
+`EnsureCashflowSystemCategoriesActionTest` — идемпотентность и неизвестная компания;
+golden-тест дашборда на фикстурах прошёл без изменений.
 
 ### Результат подэтапа 7.3 (2026-10-15)
 
@@ -867,7 +886,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
 | 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | #2685 |
 | 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | #2686 |
 | 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | #2687 |
-| 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | этот PR |
+| 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | #2688 |
+| 7.4 | 2026-10-15 | 219 записей | 221 запись | −6 `phpat…Cash` (последние в проекте), −1 `flushOutsideBoundary` (`CreateCompanyOwnerAccountAction`); +2 в Cash — записи `AuditLogSubscriber` переехали вместе с классом; всего 2342 → 2335 | этот PR |
 
 ## Находки
 

@@ -17,6 +17,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Import\Bank\BankImportService;
 use App\Cash\Service\Import\Bank\Provider\Alfa\AlfaStatementsProvider;
 use App\Cash\Service\Import\ImportLogger;
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -26,7 +27,6 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use Doctrine\ORM\EntityManagerInterface;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
@@ -163,7 +163,7 @@ final class BankImportHandlerTest extends TestCase
 
         $companyFacade = new CompanyFacade(
             $companyRepository,
-            (new \ReflectionClass(CompanyOwnerAccountCreator::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(CreateCompanyOwnerAccountAction::class))->newInstanceWithoutConstructor(),
             $this->createMock(CounterpartyRepository::class),
             $this->createMock(CompanyMemberRepository::class),
             $this->createMock(ProjectDirectionRepository::class),

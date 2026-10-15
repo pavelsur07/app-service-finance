@@ -7,7 +7,7 @@ namespace App\DataFixtures;
 use App\Balance\Application\SeedBalanceStructureAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Service\Accounts\AccountBalanceService;
+use App\Cash\Facade\CashFacade;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
@@ -29,7 +29,7 @@ class AppFixtures extends Fixture
     public function __construct(
         private UserPasswordHasherInterface $passwordHasher,
         private CounterpartyNameNormalizer $counterpartyNameNormalizer,
-        private AccountBalanceService $accountBalanceService,
+        private CashFacade $cashFacade,
         private SeedBalanceStructureAction $seedBalanceStructureAction,
     ) {
     }
@@ -138,9 +138,8 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         $today = new \DateTimeImmutable('today');
-        $this->accountBalanceService->recalculateDailyRange($company, $alfa, $openingDate, $today);
-        $this->accountBalanceService->recalculateDailyRange($company, $sber, $openingDate, $today);
-        $this->accountBalanceService->recalculateDailyRange($company, $cash, $openingDate, $today);
+        // Все три счёта компании — те же, что раньше пересчитывались по одному.
+        $this->cashFacade->recalculateDailyBalances((string) $company->getId(), $openingDate, $today);
 
         foreach ($usersData as [$email, $plainPassword, $roles]) {
             $user = new User(id: Uuid::uuid4()->toString());
