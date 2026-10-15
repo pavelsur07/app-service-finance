@@ -12,12 +12,16 @@ use App\Cash\Application\DTO\AutoRuleInput;
 use App\Cash\Application\DTO\CashCategoryAmount;
 use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryInput;
+use App\Cash\Application\DTO\CashStatementLine;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
 use App\Cash\Application\DTO\CreateCashTransferResult;
+use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
+use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
+use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -25,10 +29,12 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Entity\Transaction\CashTransactionSplit;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Infrastructure\Query\CashDashboardQuery;
+use App\Cash\Infrastructure\Query\CashReportQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -59,6 +65,8 @@ final readonly class CashFacade
         private CashDashboardQuery $dashboardQuery,
         private AccountBalanceProvider $accountBalanceProvider,
         private MoneyFundMovementRepository $moneyFundMovementRepository,
+        private CashReportQuery $reportQuery,
+        private DailyBalanceRecalculator $dailyBalanceRecalculator,
     ) {
     }
 
@@ -377,6 +385,23 @@ final readonly class CashFacade
         ];
     }
 
+    /**
+     * Ключи — UUID счетов, PHP их в int не превращает; приведение нужно для типа контракта.
+     *
+     * @param array<int|string, string> $byAccountId
+     *
+     * @return array<string, string>
+     */
+    private function stringKeys(array $byAccountId): array
+    {
+        $result = [];
+        foreach ($byAccountId as $accountId => $value) {
+            $result[(string) $accountId] = $value;
+        }
+
+        return $result;
+    }
+
     private function requireCompany(string $companyId): Company
     {
         $company = $this->companyFacade->findById($companyId);
@@ -579,6 +604,129 @@ final readonly class CashFacade
         $this->requireCompany($companyId);
 
         return $this->dashboardQuery->sumNetByFlowKindExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * Денежные счета компании для отчётов. `$typeFirst` — порядок «тип, название»,
+     * иначе по названию.
+     *
+     * @return list<MoneyAccountSummary>
+     */
+    public function listMoneyAccounts(string $companyId, bool $activeOnly, ?string $currency = null, bool $typeFirst = false): array
+    {
+        $accounts = $this->moneyAccountRepository->findByFilters(
+            $this->requireCompany($companyId),
+            null,
+            null === $currency ? null : [$currency],
+            $activeOnly ? true : null,
+            null,
+            $typeFirst
+                ? ['type' => \SortDirection::Ascending, 'name' => \SortDirection::Ascending]
+                : ['name' => \SortDirection::Ascending],
+        );
+
+        return array_values(array_map(static fn (MoneyAccount $account): MoneyAccountSummary => new MoneyAccountSummary(
+            (string) $account->getId(),
+            $account->getName(),
+            $account->getType(),
+            $account->getCurrency(),
+            $account->getOpeningBalance(),
+            $account->getOpeningBalanceDate(),
+        ), $accounts));
+    }
+
+    /**
+     * Остаток каждого счёта на начало дня: входящий остаток этого дня либо исходящий
+     * последнего дня до него. Счета без строк регистра в ответ не попадают.
+     *
+     * @param list<string> $accountIds
+     *
+     * @return array<string, string> accountId => остаток
+     */
+    public function getOpeningBalancesUpToDate(string $companyId, \DateTimeImmutable $date, array $accountIds): array
+    {
+        return $this->stringKeys($this->accountBalanceProvider->getOpeningBalancesUpToDate($this->requireCompany($companyId), $date, $accountIds));
+    }
+
+    /**
+     * Остаток каждого счёта на конец дня. Счета без строк регистра в ответ не попадают.
+     *
+     * @param list<string> $accountIds
+     *
+     * @return array<string, string> accountId => остаток
+     */
+    public function getClosingBalancesUpToDate(string $companyId, \DateTimeImmutable $date, array $accountIds): array
+    {
+        return $this->stringKeys($this->accountBalanceProvider->getClosingBalancesUpToDate($this->requireCompany($companyId), $date, $accountIds));
+    }
+
+    /**
+     * Обороты счетов за период в валюте счёта, включая переводы.
+     *
+     * @param list<string> $accountIds
+     *
+     * @return array<string, array{inflow: string, outflow: string}>
+     */
+    public function sumTurnoversByAccount(string $companyId, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        return $this->cashTransactionRepository->sumByAccountAndPeriod($this->requireCompany($companyId), $accountIds, $from, $to);
+    }
+
+    /**
+     * Валовые обороты по строкам разбивки без переводов и технических статей; с
+     * `$flowKind` — только этот вид потока без «нераспределённого».
+     *
+     * @return array{inflow: string, outflow: string}
+     */
+    public function sumGrossTurnoverExcludingTransfers(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        string $currency,
+        ?CashflowFlowKind $flowKind,
+    ): array {
+        return $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
+            $this->requireCompany($companyId),
+            $from,
+            $to,
+            $currency,
+            $flowKind,
+        );
+    }
+
+    /**
+     * @param list<string> $accountIds пустой — все счета компании
+     *
+     * @return list<MoneyAccountDailyBalanceRow>
+     */
+    public function listDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, array $accountIds): array
+    {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->listDailyBalances($companyId, $from, $to, $accountIds);
+    }
+
+    /**
+     * @return list<CashStatementLine>
+     */
+    public function listStatementLines(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?string $accountId,
+        ?string $categoryId,
+    ): array {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->listStatementLines($companyId, $from, $to, $accountId, $categoryId);
+    }
+
+    /**
+     * Пересчитывает регистр ежедневных остатков всех счетов компании за период.
+     */
+    public function recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): void
+    {
+        $this->dailyBalanceRecalculator->recalcRange($this->requireCompany($companyId), $from, $to, null);
     }
 
     private function findExistingByImport(CreateCashTransactionCommand $command): ?CashTransaction

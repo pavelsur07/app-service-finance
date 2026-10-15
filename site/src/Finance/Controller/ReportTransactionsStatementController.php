@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,9 +19,7 @@ class ReportTransactionsStatementController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompany,
-        private readonly CashTransactionRepository $trxRepo,
-        private readonly MoneyAccountDailyBalanceRepository $dailyRepo,
-        private readonly MoneyAccountRepository $accountRepo,
+        private readonly CashFacade $cashFacade,
     ) {
     }
 
@@ -79,24 +74,23 @@ class ReportTransactionsStatementController extends AbstractController
         $categoryRaw = $request->query->get('category');
         $categoryParam = is_string($categoryRaw) && '' !== $categoryRaw ? $categoryRaw : null;
 
-        $accounts = $this->accountRepo->findBy(['company' => $company], ['name' => 'ASC']);
+        $accounts = $this->cashFacade->listMoneyAccounts((string) $company->getId(), activeOnly: false);
         $accountOptions = [];
         $accountIds = [];
         $selectedAccount = null;
         foreach ($accounts as $account) {
-            /* @var MoneyAccount $account */
             $accountOptions[] = [
-                'id' => $account->getId(),
-                'name' => sprintf('%s (%s)', $account->getName(), $account->getCurrency()),
+                'id' => $account->id,
+                'name' => sprintf('%s (%s)', $account->name, $account->currency),
             ];
-            $accountIds[] = $account->getId();
-            if ($accountParam && $account->getId() === $accountParam) {
+            $accountIds[] = $account->id;
+            if ($accountParam && $account->id === $accountParam) {
                 $selectedAccount = $account;
             }
         }
 
         if ($selectedAccount) {
-            $accountIds = [$selectedAccount->getId()];
+            $accountIds = [$selectedAccount->id];
         } elseif ($accountParam) {
             // Reset invalid account filter
             $accountParam = null;
@@ -265,36 +259,11 @@ class ReportTransactionsStatementController extends AbstractController
      */
     private function fetchDailyBalances(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $accountIds): array
     {
-        if ($from > $to) {
-            return [];
-        }
-
-        $qb = $this->dailyRepo->createQueryBuilder('b')
-            ->innerJoin('b.moneyAccount', 'a')
-            ->addSelect('a')
-            ->where('b.company = :company')
-            ->andWhere('b.date BETWEEN :from AND :to')
-            ->andWhere('b.date >= a.openingBalanceDate')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
-            ->orderBy('b.date', \SortDirection::Ascending);
-
-        if (!empty($accountIds)) {
-            $qb->andWhere('a.id IN (:accountIds)')
-                ->setParameter('accountIds', $accountIds);
-        }
-
-        $rows = $qb->getQuery()->getResult();
-
         $result = [];
-        foreach ($rows as $row) {
-            /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
-            $dateKey = $row->getDate()->format('Y-m-d');
-            $accountId = $row->getMoneyAccount()->getId();
-            $result[$dateKey][$accountId] = [
-                'opening' => (float) $row->getOpeningBalance(),
-                'closing' => (float) $row->getClosingBalance(),
+        foreach ($this->cashFacade->listDailyBalances((string) $company->getId(), $from, $to, $accountIds) as $row) {
+            $result[$row->date][$row->accountId] = [
+                'opening' => (float) $row->openingBalance,
+                'closing' => (float) $row->closingBalance,
             ];
         }
 
@@ -312,57 +281,14 @@ class ReportTransactionsStatementController extends AbstractController
         ?string $categoryId,
         bool $excludeInternal = false,
     ): array {
-        $qb = $this->trxRepo->createQueryBuilder('t')
-            ->leftJoin('t.counterparty', 'counterparty')
-            ->addSelect('counterparty')
-            // LEFT JOIN обязателен: транзакция без категории строк не имеет, и на INNER
-            // она молча пропала бы из ведомости.
-            ->leftJoin('t.splits', 'split')
-            ->addSelect('split')
-            ->leftJoin('split.cashflowCategory', 'category')
-            ->addSelect('category')
-            ->where('t.company = :company')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->orderBy('t.occurredAt', \SortDirection::Ascending)
-            ->addOrderBy('t.id', \SortDirection::Ascending);
-
-        if ($accountId) {
-            $qb->andWhere('IDENTITY(t.moneyAccount) = :accountId')
-                ->setParameter('accountId', $accountId);
-        }
-
-        if ($categoryId) {
-            // Фильтр оставляет только совпавшие строки разбивки, поэтому коллекция
-            // гидрируется частично. Для read-only отчёта это и нужно: транзакция,
-            // разбитая на несколько категорий, показывается суммой выбранной строки,
-            // а не всей транзакции — иначе итог ведомости не сошёлся бы с отчётом ДДС.
-            $qb->andWhere('IDENTITY(split.cashflowCategory) = :categoryId')
-                ->setParameter('categoryId', $categoryId);
-        }
-
-        $rows = $qb->getQuery()->getResult();
+        $lines = $this->cashFacade->listStatementLines((string) $company->getId(), $from, $to, $accountId, $categoryId);
 
         $transactions = [];
         $categories = [];
 
-        foreach ($rows as $row) {
-            if (is_array($row)) {
-                $transaction = $row[0] ?? null;
-            } else {
-                $transaction = $row;
-            }
-
-            if (!$transaction instanceof \App\Cash\Entity\Transaction\CashTransaction) {
-                continue;
-            }
-
-            // Названия/описания для фильтра
-            $counterpartyName = $transaction->getCounterparty() ? $transaction->getCounterparty()->getName() : null;
-            $description = $transaction->getDescription() ?? '';
+        foreach ($lines as $line) {
+            $counterpartyName = $line->counterpartyName;
+            $description = $line->description;
 
             // Исключаем внутренние движения при company-scope без выбранного счёта:
             // переводы между своими счетами, вклад/депозит, возврат депозита и т.п.
@@ -378,35 +304,21 @@ class ReportTransactionsStatementController extends AbstractController
                 }
             }
 
-            $sign = CashDirection::OUTFLOW === $transaction->getDirection() ? -1 : 1;
+            $sign = CashDirection::OUTFLOW === $line->direction ? -1 : 1;
 
-            $splits = $transaction->getSplits();
-            if ($splits->isEmpty()) {
-                // Категория не задана: строка остаётся в ведомости с полной суммой,
-                // как это было до перехода на разбивку.
-                $transactions[] = [
-                    'date' => $transaction->getOccurredAt(),
-                    'document' => $transaction->getExternalId(),
-                    'counterparty' => $counterpartyName,
-                    'description' => $description,
-                    'amount' => round($sign * abs((float) $transaction->getAmount()), 2),
-                ];
-
-                continue;
+            // Строка без категории — транзакция без разбивки: остаётся в ведомости с
+            // полной суммой, как это было до перехода на разбивку.
+            if (null !== $line->categoryId) {
+                $categories[$line->categoryId] = $line->categoryName;
             }
 
-            foreach ($splits as $split) {
-                $category = $split->getCashflowCategory();
-                $categories[$category->getId()] = $category->getName();
-
-                $transactions[] = [
-                    'date' => $transaction->getOccurredAt(),
-                    'document' => $transaction->getExternalId(),
-                    'counterparty' => $counterpartyName,
-                    'description' => $description,
-                    'amount' => round($sign * abs((float) $split->getAmount()), 2),
-                ];
-            }
+            $transactions[] = [
+                'date' => $line->occurredAt,
+                'document' => $line->externalId,
+                'counterparty' => $counterpartyName,
+                'description' => $description,
+                'amount' => round($sign * abs((float) $line->amount), 2),
+            ];
         }
 
         asort($categories, \SORT_LOCALE_STRING);

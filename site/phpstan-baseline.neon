@@ -2793,30 +2793,6 @@ parameters:
 			path: src/Finance/Application/DeletePLDocumentAction.php
 
 		-
-			message: '#^Parameter \#2 \$accounts of method App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider\:\:cashBalanceAtDate\(\) expects list\<App\\Cash\\Entity\\Accounts\\MoneyAccount\>, array\<App\\Cash\\Entity\\Accounts\\MoneyAccount\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Application\\Service\\FinanceDashboardKpiProvider should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Application/Service/FinanceDashboardKpiProvider.php
-
-		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Finance\\Application\\Service\\FinanceDocumentResponsibilityCenterNormalizer should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
@@ -3033,60 +3009,6 @@ parameters:
 			path: src/Finance/Controller/RawPlReportController.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Application\\Service\\DailyBalanceRecalculator$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesController.php
-
-		-
-			message: '#^Parameter \#2 \$accountIds of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumByAccountAndPeriod\(\) expects list\<string\>, non\-empty\-list\<string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
-			message: '#^Parameter \#3 \$accountIds of method App\\Cash\\Service\\Accounts\\AccountBalanceProvider\:\:getClosingBalancesUpToDate\(\) expects array\<int\|string\>, list\<string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
-			message: '#^Parameter \#3 \$accountIds of method App\\Cash\\Service\\Accounts\\AccountBalanceProvider\:\:getOpeningBalancesUpToDate\(\) expects array\<int\|string\>, list\<string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportAccountBalancesStructuredController should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportAccountBalancesStructuredController.php
-
-		-
 			message: '#^Parameter \#3 \$projectDirections of method App\\Report\\Cashflow\\CashflowReportRequestMapper\:\:fromRequest\(\) expects list\<App\\Company\\Entity\\ProjectDirection\>\|null, array\<App\\Company\\Entity\\ProjectDirection\> given\.$#'
 			identifier: argument.type
 			count: 1
@@ -3123,12 +3045,6 @@ parameters:
 			path: src/Finance/Controller/ReportCashflowOpsCheckController.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportCashflowOpsCheckController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportCashflowOpsCheckController.php
-
-		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 4
@@ -3149,36 +3065,6 @@ parameters:
 		-
 			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''Январь'', 2\: ''Февраль'', 3\: ''Март'', 4\: ''Апрель'', 5\: ''Май'', 6\: ''Июнь'', 7\: ''Июль'', 8\: ''Август'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Finance/Controller/ReportTransactionsStatementController.php
-
-		-
-			message: '#^Parameter \#4 \$accountIds of method App\\Finance\\Controller\\ReportTransactionsStatementController\:\:fetchDailyBalances\(\) expects list\<string\>, list\<string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Controller/ReportTransactionsStatementController.php
-
-		-
-			message: '#^Variable \$name on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 1
-			path: src/Finance/Controller/ReportTransactionsStatementController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportTransactionsStatementController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Finance/Controller/ReportTransactionsStatementController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Controller\\ReportTransactionsStatementController should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Finance/Controller/ReportTransactionsStatementController.php
 
@@ -3267,33 +3153,9 @@ parameters:
 			path: src/Finance/Entity/PLMonthlySnapshot.php
 
 		-
-			message: '#^Call to an undefined method object\:\:addDocument\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:assertCanAllocateAmount\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
 			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
 			identifier: method.notFound
-			count: 5
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getDescription\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:markAsHavingViolatedDocument\(\)\.$#'
-			identifier: method.notFound
-			count: 1
+			count: 2
 			path: src/Finance/Facade/FinanceFacade.php
 
 		-
@@ -3329,12 +3191,6 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$projectDirection of method App\\Finance\\Entity\\DocumentOperation\:\:setProjectDirection\(\) expects App\\Company\\Entity\\ProjectDirection\|null, object\|null given\.$#'
 			identifier: argument.type
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Finance\\Facade\\FinanceFacade should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Finance/Facade/FinanceFacade.php
 

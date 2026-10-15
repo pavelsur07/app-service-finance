@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
+use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Facade\CashFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -21,9 +19,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
 {
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
-        private MoneyAccountRepository $accountRepository,
-        private AccountBalanceProvider $accountBalanceProvider,
-        private CashTransactionRepository $cashTransactionRepository,
+        private CashFacade $cashFacade,
     ) {
     }
 
@@ -53,28 +49,25 @@ class ReportAccountBalancesStructuredController extends AbstractController
         $recalcFrom = $company->getFinanceLockBefore()
             ?? $to->setDate((int) $to->format('Y'), 1, 1);
 
-        $accounts = $this->accountRepository->findBy(
-            ['company' => $company, 'isActive' => true],
-            ['type' => 'ASC', 'name' => 'ASC']
-        );
+        $companyId = (string) $company->getId();
+        $accounts = $this->cashFacade->listMoneyAccounts($companyId, activeOnly: true, typeFirst: true);
 
-        $accountIds = array_map(static fn (MoneyAccount $account) => $account->getId(), $accounts);
+        $accountIds = array_map(static fn (MoneyAccountSummary $account): string => $account->id, $accounts);
 
         $openingByAccountId = [];
         $closingByAccountId = [];
         $turnoversByAccountId = [];
         if (!empty($accountIds)) {
-            $openingByAccountId = $this->accountBalanceProvider->getOpeningBalancesUpToDate($company, $from, $accountIds);
-            $closingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $to, $accountIds);
-            $turnoversByAccountId = $this->cashTransactionRepository->sumByAccountAndPeriod($company, $accountIds, $from, $to);
+            $openingByAccountId = $this->cashFacade->getOpeningBalancesUpToDate($companyId, $from, $accountIds);
+            $closingByAccountId = $this->cashFacade->getClosingBalancesUpToDate($companyId, $to, $accountIds);
+            $turnoversByAccountId = $this->cashFacade->sumTurnoversByAccount($companyId, $accountIds, $from, $to);
         }
 
         $rowsByCurrency = [];
 
         foreach ($accounts as $account) {
-            /** @var MoneyAccount $account */
-            $accId = $account->getId();
-            $currency = $account->getCurrency();
+            $accId = $account->id;
+            $currency = $account->currency;
 
             $opening = $openingByAccountId[$accId] ?? '0.00';
             $closing = $closingByAccountId[$accId] ?? '0.00';
@@ -94,9 +87,9 @@ class ReportAccountBalancesStructuredController extends AbstractController
             }
 
             $rowsByCurrency[$currency]['accounts'][] = [
-                'id' => $account->getId(),
-                'name' => $account->getName(),
-                'type' => $account->getType()->value,
+                'id' => $account->id,
+                'name' => $account->name,
+                'type' => $account->type->value,
                 'currency' => $currency,
                 'opening' => $opening,
                 'inflow' => $inflow,

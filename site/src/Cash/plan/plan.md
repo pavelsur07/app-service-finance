@@ -724,6 +724,31 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 ---
 
+### Результат подэтапа 7.2 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `FinanceDashboardKpiProvider` и 4 отчётных контроллера Finance читали `MoneyAccountRepository`, `MoneyAccountDailyBalanceRepository`, `CashTransactionRepository`, `AccountBalanceProvider`, `DailyBalanceRecalculator`; выписка строила DQL по таблицам Cash прямо в контроллере | только `CashFacade`: `listMoneyAccounts` (DTO `MoneyAccountSummary`), остатки на начало/конец дня, обороты по счетам, валовые обороты, `listDailyBalances`, `listStatementLines` (DTO), `recalculateDailyBalances`; DQL выписки — в `Cash\Infrastructure\Query\CashReportQuery` без изменений |
+| Запрос остатков в `ReportAccountBalancesController` | вызов `getOpeningBalancesUpToDate` — запрос был его дословной копией |
+| `FinanceFacade::createDocumentFromCashTransaction` искал транзакцию через `CashTransactionRepository` | транзакцию передаёт вызывающий `CreateDocumentFromTransactionAction`; проверка компании и совпадения с командой осталась в фасаде |
+
+Тест-сравнение: на фикстурах A22 (разбивки с CAPEX, неактивная касса с операциями,
+«внутренний» перевод по тексту и по своему контрагенту) снят HTML 13 страниц
+отчётов (остатки на 3 даты, структурные остатки ×2, выписка ×6 с фильтрами по
+счёту, статье, группировке, scope, пустым периодам; сверка операций ×2) и
+`FinanceDashboardKpiProvider::build` (4 вида деятельности × 30/60 дней × RUB/USD) —
+до и после совпали побайтно. Ноги перевода из фикстур в снимке заменены парой с
+фиксированными id: выписка упорядочивает операции одного времени по id, и со
+случайными UUID два прогона «до» расходились между собой. Постоянный тест —
+`CashFacadeReportReadTest` (фильтры и порядок счетов, остатки, обороты, регистр,
+выписка с разбивкой и фильтрами, пересчёт, изоляция компаний, проверка компании в
+`FinanceFacade`).
+
+Вне подэтапа остались: импорты сущностей Cash в Finance (`Document`, `DocumentController`,
+`BalanceDynamicsQuery`) — слой Entity открыт; сырой SQL `ReportCashflowOpsCheckController`
+по таблицам `cash_transaction`, `money_account`, `cash_transaction_split` — PHPat его не
+видит (см. «Находки»).
+
 ### Результат подэтапа 7.1 (2026-10-15)
 
 | Было | Стало |
@@ -814,13 +839,23 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | #2683 |
 | 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | #2684 |
 | 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | #2685 |
-| 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | этот PR |
+| 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | #2686 |
+| 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | этот PR |
 
 ## Находки
 
 Обнаруженное по ходу работ вне scope текущего этапа. Не чинится в этом плане
 без согласования.
 
+- **Фильтр выписки по статье зависит от identity map (этап 7.2, было и до).**
+  `listStatementLines` с `$categoryId` гидрирует коллекцию разбивок частично; если
+  транзакции уже загружены в том же EntityManager, фильтр не действует. Сегодня
+  контроллер вызывает метод один раз за запрос. Чинить переходом на скалярную
+  гидрацию. Там же: `?category=abc` (не UUID) даёт 500 на сравнении uuid в Postgres.
+- **Finance читает таблицы Cash сырым SQL (этап 7.2).** `ReportCashflowOpsCheckController`
+  через `Connection` выбирает из `cash_transaction`, `money_account`,
+  `cash_transaction_split`, `cashflow_categories`. Граница модуля обходится в обход
+  PHPat; перенос — отдельной задачей (запрос на ~100 строк, отчёт сверки).
 - **`last_updated_at` дашборда всегда `null` (этап 7.1).** Все три источника —
   `CashTransactionRepository`, `MoneyFundMovementRepository`,
   `PLDailyTotalRepository::maxUpdatedAtForCompany` — проверяют результат DQL

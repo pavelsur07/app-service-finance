@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
@@ -26,7 +27,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompany,
         private readonly Connection $db,
-        private readonly MoneyAccountRepository $accountRepo,
+        private readonly CashFacade $cashFacade,
     ) {
     }
 
@@ -43,9 +44,9 @@ final class ReportCashflowOpsCheckController extends AbstractController
         $trxRows = $this->fetchTrxRows($ctx);
         $reconRows = $this->fetchReconRows($ctx);
 
-        $accounts = $this->accountRepo->findBy(['company' => $ctx['company']], ['name' => 'ASC']);
+        $accounts = $this->cashFacade->listMoneyAccounts((string) $ctx['company']->getId(), activeOnly: false);
         $accountOptions = array_map(
-            static fn ($a) => ['id' => $a->getId(), 'name' => $a->getName()],
+            static fn (MoneyAccountSummary $a): array => ['id' => $a->id, 'name' => $a->name],
             $accounts
         );
 

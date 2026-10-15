@@ -51,6 +51,7 @@ final class CreateDocumentFromTransactionAction
 
             $documentId = $this->financeFacade->createDocumentFromCashTransaction(
                 $tx->getCompany()->getId(),
+                $tx,
                 $command,
             );
 
@@ -90,6 +91,7 @@ final class CreateDocumentFromTransactionAction
 
         $documentId = $this->financeFacade->createDocumentFromCashTransaction(
             $tx->getCompany()->getId(),
+            $tx,
             $command,
         );
 
