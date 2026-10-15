@@ -1673,19 +1673,19 @@ parameters:
 			message: '#^Parameter \#1 \$cashflowCategory of method App\\Cash\\Entity\\PaymentPlan\\PaymentPlan\:\:setCashflowCategory\(\) expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentCalendarFacade.php
+			path: src/Cash/Service/PaymentPlan/PaymentPlanDtoApplier.php
 
 		-
 			message: '#^Parameter \#1 \$category of method App\\Cash\\Service\\PaymentPlan\\PaymentPlanService\:\:resolveTypeByCategory\(\) expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentCalendarFacade.php
+			path: src/Cash/Service/PaymentPlan/PaymentPlanDtoApplier.php
 
 		-
 			message: '#^Parameter \#3 \$category of class App\\Cash\\Entity\\PaymentPlan\\PaymentPlan constructor expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentCalendarFacade.php
+			path: src/Cash/Application/CreatePaymentPlanAction.php
 
 		-
 			message: '#^Cannot call method diff\(\) on DateTimeImmutable\|null\.$#'
@@ -1715,7 +1715,7 @@ parameters:
 			message: '#^Parameter \#1 \$object of static method DateTimeImmutable\:\:createFromInterface\(\) expects DateTimeInterface, DateTimeImmutable\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/PaymentPlan/RecurrenceMaterializer.php
+			path: src/Cash/Application/MaterializeRecurringPaymentPlansAction.php
 
 		-
 			message: '#^Match expression does not handle remaining value\: string$#'
@@ -12414,7 +12414,7 @@ parameters:
 			message: '#^Cannot call method format\(\) on DateTimeImmutable\|null\.$#'
 			identifier: method.nonObject
 			count: 1
-			path: tests/Unit/Cash/Service/PaymentPlan/RecurrenceMaterializerTest.php
+			path: tests/Unit/Cash/Application/MaterializeRecurringPaymentPlansActionTest.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
@@ -13910,12 +13910,6 @@ parameters:
 			path: src/Cash/Service/Import/ClientBank1CImportService.php
 
 		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Import\\File\\CashFileImportFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 5
-			path: src/Cash/Service/Import/File/CashFileImportFacade.php
-
-		-
 			message: '#^flush\(\) в App\\Cash\\Service\\Import\\File\\CashFileImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1
@@ -13928,22 +13922,10 @@ parameters:
 			path: src/Cash/Service/Import/ImportLogger.php
 
 		-
-			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\PaymentCalendarFacade\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 4
-			path: src/Cash/Service/PaymentPlan/PaymentCalendarFacade.php
-
-		-
 			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\PaymentPlanMatcher\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1
 			path: src/Cash/Service/PaymentPlan/PaymentPlanMatcher.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\RecurrenceMaterializer\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/PaymentPlan/RecurrenceMaterializer.php
 
 		-
 			message: '#^flush\(\) в App\\Cash\\Service\\Transaction\\CashTransactionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

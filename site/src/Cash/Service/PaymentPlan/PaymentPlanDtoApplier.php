@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Cash\Service\PaymentPlan;
+
+use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
+use App\Company\Entity\Company;
+
+/**
+ * Переносит данные формы планового платежа в сущность. Без flush():
+ * сохраняют CreatePaymentPlanAction и UpdatePaymentPlanAction.
+ */
+final readonly class PaymentPlanDtoApplier
+{
+    public function __construct(private PaymentPlanService $paymentPlanService)
+    {
+    }
+
+    public function apply(PaymentPlan $plan, Company $company, PaymentPlanDTO $dto): void
+    {
+        $this->paymentPlanService->applyCompanyScope($plan, $company);
+        $plan->setCashflowCategory($dto->cashflowCategory);
+        $plan->setPlannedAt(\DateTimeImmutable::createFromInterface($dto->plannedAt));
+        $expectedAt = $dto->expectedAt ?? $dto->plannedAt;
+        $plan->setExpectedAt(\DateTimeImmutable::createFromInterface($expectedAt));
+        $plan->setAmount((string) $dto->amount);
+        $plan->setMoneyAccount($dto->moneyAccount);
+        $plan->setCounterparty($dto->counterparty);
+        $plan->setComment($dto->comment);
+        $plan->setProbability($dto->probability);
+        $plan->setIsFrozen($dto->isFrozen);
+
+        $resolvedType = $this->paymentPlanService->resolveTypeByCategory($dto->cashflowCategory);
+        $plan->setType(PaymentPlanTypeEnum::from($resolvedType));
+        $plan->setStatus($this->resolveStatus($dto->status));
+    }
+
+    private function resolveStatus(?string $status): PaymentPlanStatusEnum
+    {
+        if (null === $status || '' === $status) {
+            return PaymentPlanStatusEnum::PLANNED;
+        }
+
+        return PaymentPlanStatusEnum::from($status);
+    }
+}

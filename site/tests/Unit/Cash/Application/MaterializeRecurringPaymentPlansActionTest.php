@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Cash\Service\PaymentPlan;
+namespace App\Tests\Unit\Cash\Application;
 
+use App\Cash\Application\MaterializeRecurringPaymentPlansAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
@@ -15,7 +16,6 @@ use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
-use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
@@ -25,7 +25,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
-final class RecurrenceMaterializerTest extends TestCase
+final class MaterializeRecurringPaymentPlansActionTest extends TestCase
 {
     public function testMaterializeCreatesMissingPlans(): void
     {
@@ -101,7 +101,7 @@ final class RecurrenceMaterializerTest extends TestCase
             }));
         $entityManager->expects($this->once())->method('flush');
 
-        $materializer = new RecurrenceMaterializer(
+        $materializer = new MaterializeRecurringPaymentPlansAction(
             $ruleRepository,
             $planRepository,
             $recurrenceService,
@@ -109,7 +109,7 @@ final class RecurrenceMaterializerTest extends TestCase
             $entityManager
         );
 
-        $createdCount = $materializer->materialize(
+        $createdCount = $materializer(
             $company,
             new \DateTimeImmutable('2024-02-01'),
             new \DateTimeImmutable('2024-03-01')
@@ -134,7 +134,7 @@ final class RecurrenceMaterializerTest extends TestCase
         $planService = new PaymentPlanService();
         $entityManager = $this->createMock(EntityManagerInterface::class);
 
-        $materializer = new RecurrenceMaterializer(
+        $materializer = new MaterializeRecurringPaymentPlansAction(
             $ruleRepository,
             $planRepository,
             $recurrenceService,
@@ -142,7 +142,7 @@ final class RecurrenceMaterializerTest extends TestCase
             $entityManager
         );
 
-        $created = $materializer->materialize(
+        $created = $materializer(
             $company,
             new \DateTimeImmutable('2024-05-01'),
             new \DateTimeImmutable('2024-04-01')

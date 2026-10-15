@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\CreateCashFileImportProfileAction;
+use App\Cash\Application\StartCashFileImportJobAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Cash\Service\Import\File\CashFileImportFacade;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
@@ -42,7 +43,8 @@ class CashFileImportController extends AbstractController
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly CashFileImportFacade $importFacade,
+        private readonly CreateCashFileImportProfileAction $createProfile,
+        private readonly StartCashFileImportJobAction $startImportJob,
         private readonly MessageBusInterface $messageBus,
         private readonly ObjectStorageInterface $storage,
         private readonly TemporaryLocalFile $temporaryLocalFile,
@@ -309,7 +311,7 @@ class CashFileImportController extends AbstractController
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $profile = $this->importFacade->createProfile(
+        $profile = ($this->createProfile)(
             $company,
             $profileName,
             $mapping,
@@ -501,7 +503,7 @@ class CashFileImportController extends AbstractController
             $userIdentifier = $user;
         }
 
-        $job = $this->importFacade->createJob(
+        $job = ($this->startImportJob)(
             $company,
             $account,
             'cash:file',
@@ -511,7 +513,6 @@ class CashFileImportController extends AbstractController
             is_string($storedExtension) && '' !== $storedExtension ? ['stored_ext' => $storedExtension] : [],
             $userIdentifier
         );
-        $this->importFacade->commitJob($job);
 
         $this->messageBus->dispatch(new CashFileImportMessage($job->getId()));
 
