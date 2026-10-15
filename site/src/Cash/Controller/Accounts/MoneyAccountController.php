@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Accounts;
 
+use App\Cash\Application\SaveMoneyAccountAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Cash\Service\Accounts\MoneyAccountService;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
@@ -26,8 +26,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MoneyAccountController extends AbstractController
 {
     public function __construct(
-        private ActiveCompanyService $activeCompanyService,
-        private MoneyAccountService $moneyAccountService,
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly SaveMoneyAccountAction $saveMoneyAccount,
     ) {
     }
 
@@ -79,7 +79,7 @@ class MoneyAccountController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->moneyAccountService->create($account);
+            ($this->saveMoneyAccount)($account);
             $balanceService->recalculateDailyRange(
                 $company,
                 $account,
@@ -221,7 +221,7 @@ class MoneyAccountController extends AbstractController
                 }
             }
 
-            $this->moneyAccountService->update();
+            ($this->saveMoneyAccount)($account);
 
             $balanceService->recalculateDailyRange(
                 $company,

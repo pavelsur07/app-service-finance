@@ -520,13 +520,48 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 
 **Чек-лист:**
 
-- [ ] Репозиторий без `flush`.
-- [ ] Контроллеры без `flush` и без `EntityManager`; логика в Action с тестами.
-- [ ] 9 сервисов без `flush`; вызывающий код — Action.
-- [ ] Псевдо-фасады устранены.
+- [x] Репозиторий без `flush` (5.1).
+- [x] Контроллеры без `flush`; логика в Action с тестами (5.1).
+- [ ] 9 сервисов без `flush`; вызывающий код — Action: 3 тонких сервиса — 5.1;
+      `RecurrenceMaterializer` — 5.2; `CashTransactionService`,
+      `CashTransactionToDocumentService`, `PaymentPlanMatcher` — 5.3.
+- [ ] Псевдо-фасады устранены (5.2).
 - [ ] Baseline правила `flush` по Cash: остались только пакетные импорты;
       «Журнал» обновлён.
 - [ ] Все гейты зелёные.
+
+**Подэтапы** (по одному PR; гейт `vashfindir.flushOutsideBoundary` из
+этапа 4 даёт точный список — в Cash на старте 37 вызовов в 18 файлах):
+
+| Подэтап | Что | Вызовов |
+|---|---|---|
+| 5.1 | `BankImportCursorRepository`; контроллеры автоправил и статей ДДС; `MoneyAccountService`, `FundService`, `BankConnectionService` → Action'ы; `CashTransactionAutoRuleGeneralCfoAssigner` → Action | 16 |
+| 5.2 | `CashFileImportFacade`, `PaymentCalendarFacade`, `RecurrenceMaterializer` | 10 |
+| 5.3 | `CashTransactionService`, `CashTransactionToDocumentService`, `PaymentPlanMatcher` | 7 |
+| вне этапа | пакетные импорты `BankImportService`, `ClientBank1CImportService`, `CashFileImportService` и их `ImportLogger` | 4 |
+
+### Результат подэтапа 5.1 (2026-10-14)
+
+| Было | Стало |
+|---|---|
+| `MoneyAccountService::create/update` | `SaveMoneyAccountAction` |
+| `FundService::createFund/createMovement` (`update` не использовался) | `SaveMoneyFundAction`, `CreateMoneyFundMovementAction` |
+| `BankConnectionService::create/update/delete` | `SaveBankConnectionAction`, `DeleteBankConnectionAction` |
+| `CashflowCategoryController::delete` — `assertCanDelete` + `remove` + `flush` | `DeleteCashflowCategoryAction` |
+| `CashTransactionAutoRuleController::disable/enable` — `flush` | `ChangeCashTransactionAutoRuleActivityAction` (`flush` только при реальной смене) |
+| `CashTransactionAutoRuleController::applyOne` — блокировка, аудит, `flush` в контроллере | `ApplyAutoRuleToTransactionAction`; блокировка «от чтения до flush» (GlitchTip #414) перенесена целиком, JSON-ответы дословно те же |
+| `CashTransactionAutoRuleGeneralCfoAssigner::run` (`wrapInTransaction`) | `AssignGeneralCfoToCashAutoRulesAction::__invoke` |
+| `BankImportCursorRepository::getOrCreate/save` — `flush` | только `persist`; `BankImportService` сохраняет транзакции дня и курсор одним `flush` (раньше — два подряд) |
+
+`flush` вне Action в Cash: 37 → 21 вызов (18 → 10 файлов).
+
+Единственное отличие поведения (внутреннее ревью): в `applyOne` ветка «транзакции
+нет у компании» раньше бросала 404 внутри `wrapInTransaction` — ORM откатывал
+транзакцию и закрывал EntityManager. Теперь Action возвращает `null`, пустая
+транзакция коммитится, 404 бросает контроллер. Клиент получает тот же 404,
+EntityManager больше не закрывается. Тест контроллера теперь проверяет, что
+блокирующее чтение идёт внутри транзакции (GlitchTip #414), и покрывает ветки
+skip-reason и conflict.
 
 ---
 
@@ -697,7 +732,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 1 | 2026-10-14 | 240 записей | 232 записи | −8: `AlfaApiClient` 5 (`missingType.iterableValue`), `BankImportHandler` 3 (`argument.type` 2, `phpat…Company` 1 → теперь phpat…Company из Cash 12) | #2678 |
 | 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | #2679 |
 | 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | #2680 |
-| 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | этот PR |
+| 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | #2681 |
+| 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | этот PR |
 
 ## Находки
 
@@ -771,6 +807,15 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
   - В Company осталась заглушка `CounterpartyUpdateScoringAction` с пустым
     `__invoke` (TODO) и её Command; поля скоринга контрагента никто не
     пересчитывает — удалить или реализовать отдельной задачей.
+- Ревью подэтапа 5.1, вне scope:
+  - `BankImportServiceTest` не проверяет новый порядок «курсор сохраняется до
+    общего flush дня».
+  - Банковский импорт без блокировки: при двух воркерах на новый курсор второй
+    падает на уникальном индексе уже на первом flush дня (раньше — в
+    `getOrCreate`); дублей нет, `finishImportLog` на закрытом EM маскирует
+    исходную ошибку (как и раньше).
+  - `ApplyAutoRuleToTransactionAction` возвращает готовый JSON-payload с
+    текстами UI — на будущее лучше DTO результата.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - Этап 3, вне scope:
