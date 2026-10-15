@@ -14,6 +14,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Repository\UserRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -526,6 +527,7 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
             self::getContainer()->get(CounterpartyRepository::class),
             self::getContainer()->get(CompanyMemberRepository::class),
             self::getContainer()->get(ProjectDirectionRepository::class),
+            self::getContainer()->get(UserRepository::class),
         );
 
         return new BalanceAccess($security, $facade, $connection, $active);

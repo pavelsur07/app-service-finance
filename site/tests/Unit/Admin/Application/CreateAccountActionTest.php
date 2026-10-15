@@ -20,6 +20,7 @@ use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CompanyRoleRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -81,6 +82,7 @@ final class CreateAccountActionTest extends TestCase
             $this->createMock(CounterpartyRepository::class),
             $this->createMock(CompanyMemberRepository::class),
             $this->createMock(ProjectDirectionRepository::class),
+            $this->createMock(UserRepository::class),
         );
         $action = new CreateAccountAction($companyFacade);
 

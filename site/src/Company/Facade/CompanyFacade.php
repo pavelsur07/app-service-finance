@@ -14,6 +14,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -30,6 +31,7 @@ final class CompanyFacade
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CompanyMemberRepository $companyMemberRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
+        private readonly UserRepository $userRepository,
     ) {
     }
 
@@ -196,6 +198,24 @@ final class CompanyFacade
         }
 
         return false;
+    }
+
+    /**
+     * Пользователь с таким id существует (без проверки доступа к компании).
+     */
+    public function userExists(string $userId): bool
+    {
+        return Uuid::isValid($userId) && null !== $this->userRepository->find($userId);
+    }
+
+    /**
+     * Системный проект «Основной» компании — для документов, которым проект не указан.
+     */
+    public function findDefaultProjectDirection(string $companyId): ?ProjectDirection
+    {
+        $company = $this->findById($companyId);
+
+        return null === $company ? null : $this->projectDirectionRepository->findDefaultForCompany($company);
     }
 
     /**

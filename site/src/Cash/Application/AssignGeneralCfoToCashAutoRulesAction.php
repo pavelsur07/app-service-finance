@@ -7,8 +7,8 @@ namespace App\Cash\Application;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
-use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -17,7 +17,7 @@ final class AssignGeneralCfoToCashAutoRulesAction
     public function __construct(
         private readonly CashTransactionAutoRuleRepository $ruleRepository,
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
-        private readonly UserRepository $userRepository,
+        private readonly CompanyFacade $companyFacade,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -30,7 +30,7 @@ final class AssignGeneralCfoToCashAutoRulesAction
         if ($execute && (null === $actorUserId || !Uuid::isValid($actorUserId))) {
             throw new \InvalidArgumentException('Для --execute укажите UUID согласовавшего пользователя в --actor-user-id.');
         }
-        if ($execute && null === $this->userRepository->find($actorUserId)) {
+        if ($execute && !$this->companyFacade->userExists($actorUserId)) {
             throw new \InvalidArgumentException('Пользователь из --actor-user-id не найден.');
         }
         if ($execute && (null === $expectedCount || $expectedCount < 0)) {

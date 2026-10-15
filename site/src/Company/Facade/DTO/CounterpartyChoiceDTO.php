@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Company\Facade\DTO;
 
+use App\Company\Enum\CounterpartyType;
+
 /**
  * Контрагент как вариант выбора в форме. Скаляры: формы соседних модулей не должны
  * получать Entity модуля Company.
@@ -17,6 +19,7 @@ final readonly class CounterpartyChoiceDTO
         public ?string $kpp,
         public bool $isArchived,
         public ?string $displayName = null,
+        public ?CounterpartyType $type = null,
     ) {
     }
 

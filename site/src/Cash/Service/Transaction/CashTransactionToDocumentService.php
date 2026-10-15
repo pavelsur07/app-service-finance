@@ -7,20 +7,20 @@ namespace App\Cash\Service\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\ProjectDirection;
-use App\Company\Repository\ProjectDirectionRepository;
-use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Company\Facade\CompanyFacade;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
+use App\Finance\Facade\FinanceFacade;
 use App\Shared\Domain\ValueObject\Money;
 use Ramsey\Uuid\Uuid;
 
 class CashTransactionToDocumentService
 {
     public function __construct(
-        private PLRegisterUpdater $plRegisterUpdater,
-        private ProjectDirectionRepository $projectDirections,
+        private FinanceFacade $financeFacade,
+        private CompanyFacade $companyFacade,
     ) {
     }
 
@@ -41,7 +41,7 @@ class CashTransactionToDocumentService
      */
     public function updatePlRegister(Document $document): void
     {
-        $this->plRegisterUpdater->updateForDocument($document);
+        $this->financeFacade->updatePLRegisterForDocument((string) $document->getId());
     }
 
     /**
@@ -116,7 +116,7 @@ class CashTransactionToDocumentService
             return $projectDirection;
         }
 
-        $defaultProject = $this->projectDirections->findDefaultForCompany($transaction->getCompany());
+        $defaultProject = $this->companyFacade->findDefaultProjectDirection((string) $transaction->getCompany()->getId());
         if (!$defaultProject instanceof ProjectDirection) {
             throw new \DomainException('Не найден системный проект "Основной".');
         }

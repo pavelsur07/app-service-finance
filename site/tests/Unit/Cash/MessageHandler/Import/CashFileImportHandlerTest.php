@@ -18,6 +18,7 @@ use App\Cash\Service\Import\ImportLogger;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Facade\CounterpartyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\Storage\LegacyXlsConverter;
@@ -161,7 +162,7 @@ final class CashFileImportHandlerTest extends TestCase
         return new CashFileImportService(
             new CashFileRowNormalizer(),
             new CounterpartyNameNormalizer(),
-            $this->createMock(CounterpartyRepository::class),
+            new CounterpartyFacade($this->createMock(CounterpartyRepository::class), $this->createMock(EntityManagerInterface::class)),
             $this->createMock(CashTransactionRepository::class),
             new ImportLogger($entityManager),
             $entityManager,

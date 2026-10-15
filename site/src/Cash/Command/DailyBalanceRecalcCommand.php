@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Command;
 
 use App\Cash\Application\Service\DailyBalanceRecalculator;
-use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Facade\CompanyFacade;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -20,7 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class DailyBalanceRecalcCommand extends Command
 {
     public function __construct(
-        private readonly CompanyRepository $companyRepo,
+        private readonly CompanyFacade $companyFacade,
         private readonly DailyBalanceRecalculator $recalculator,
     ) {
         parent::__construct();
@@ -47,7 +47,7 @@ class DailyBalanceRecalcCommand extends Command
         $fromArg = (string) $input->getArgument('from');
         $toArg = (string) $input->getArgument('to');
 
-        $company = $this->companyRepo->find($companyId);
+        $company = $this->companyFacade->findById($companyId);
         if (!$company) {
             $output->writeln(sprintf('<error>Компания %s не найдена</error>', $companyId));
 

@@ -27,6 +27,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
@@ -167,6 +168,7 @@ final class BankImportHandlerTest extends TestCase
             $this->createMock(CounterpartyRepository::class),
             $this->createMock(CompanyMemberRepository::class),
             $this->createMock(ProjectDirectionRepository::class),
+            $this->createMock(UserRepository::class),
         );
 
         $logger = new Logger('test', [$this->logs]);

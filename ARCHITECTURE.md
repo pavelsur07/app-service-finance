@@ -964,6 +964,12 @@ listAccessibleCompaniesForUser(string $userId): array
 
 // Владелец компании либо активный CompanyMember — иначе доступа нет.
 userHasAccess(string $companyId, string $userId): bool
+
+// Пользователь с таким id существует (без проверки доступа к компании); не UUID → false.
+userExists(string $userId): bool
+
+// Системный проект «Основной» (PROJECT_GENERAL, иначе по имени) — для документов без проекта.
+findDefaultProjectDirection(string $companyId): ?ProjectDirection
 ```
 
 `Company::getPublicId(): ?int` — постоянный публичный номер, `null` до первого flush.
@@ -982,13 +988,24 @@ PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, на
 ```php
 // Варианты выбора как DTO: Entity чужого модуля в формы не попадает.
 // Архивные не предлагаются, но уже выбранный архивный остаётся (keepId).
-// @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, displayName, shownName(), label()
+// @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, displayName, type, shownName(), label()
 // label() и data-name пикера — по shownName() = displayName ?? name
 getSelectable(string $companyId, ?string $keepId = null): array
 
 // Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
 findEntityByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
+
+// Для импортов ДДС (этап 7.5 плана Cash): контрагентов ищет и создаёт Company, импорт
+// только кэширует. Создание — persist() без flush, flush за вызывающим Action/Handler.
+// ИНН из списка, которые у компании уже заведены (как хранятся).
+findExistingInns(string $companyId, list<string> $inns): list<string>
+findOrCreateByInn(Company $company, string $inn, CounterpartyName $name, CounterpartyType $type): Counterparty
+// По нормализованному названию (ядро + подсказка ОПФ), как CounterpartyRepository::findOneByNormalizedName.
+findOrCreateByNormalizedName(Company $company, CounterpartyName $name, CounterpartyType $type): Counterparty
 ```
+
+`CounterpartyChoiceDTO` с 7.5 несёт `type` (`CounterpartyType`): его читает пикер
+контрагента в строке фильтров операций ДДС.
 
 Выбор контрагента в формах — только через `CounterpartyPickerType`
 (`src/Company/Form/Type/CounterpartyPickerType.php`): `company_id` обязателен и

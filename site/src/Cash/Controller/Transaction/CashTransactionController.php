@@ -23,7 +23,7 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
-use App\Company\Repository\CounterpartyRepository;
+use App\Company\Facade\CounterpartyFacade;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\Document;
 use App\Shared\Audit\AuditContextProvider;
@@ -55,7 +55,7 @@ class CashTransactionController extends AbstractController
         CashTransactionRepository $txRepo,
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo,
+        CounterpartyFacade $counterpartyFacade,
         CashTransferRepository $transferRepository,
     ): Response {
         $company = $this->companyService->getActiveCompany();
@@ -88,7 +88,9 @@ class CashTransactionController extends AbstractController
 
         $accounts = $accountRepo->findBy(['company' => $company]);
         $categories = $categoryRepo->findTreeByCompany($company);
-        $counterparties = $counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']);
+        // Неархивные по показанному названию плюс выбранный в фильтре (даже архивный):
+        // шаблону нужны только они — список и подпись выбранного.
+        $counterparties = $counterpartyFacade->getSelectable((string) $company->getId(), $filters['counterpartyId'] ?? null);
 
         return $this->render('transaction/index.html.twig', [
             'transactions' => $transactions,
