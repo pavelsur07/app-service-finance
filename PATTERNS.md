@@ -980,6 +980,15 @@ public function __invoke(string $dealId, string $companyId, DealStatus $new): vo
 
 **Правила:** события — `readonly class` только со scalar ID · `pullDomainEvents()` вызывать после `flush()` · подписчики в других модулях — через `EventSubscriber`, не напрямую · тяжёлые подписчики (email, пересчёт) → dispatch через Messenger
 
+**Живой пример — Cash → Analytics.** `App\Cash\Domain\Event\CashTransactionsChanged(companyId)`
+отправляют Action'ы Cash после `flush()` и пересчёта остатков (явный `dispatch`, без
+`pullDomainEvents()`: событие про компанию, а не про одну сущность). Подписчик
+`App\Analytics\Infrastructure\Cache\InvalidateSnapshotOnCashChangeListener`
+(`#[AsEventListener]`) сбрасывает кэш дашборда. Обратную ссылку Cash → Analytics
+запрещает гейт `test_cash_does_not_depend_on_analytics` в `ModuleBoundaryRules`.
+Синхронный диспатчер годится только для последствий, которые можно потерять (кэш
+истечёт сам); денежные последствия — Message через Doctrine-транспорт.
+
 ---
 
 ## 21. Оптимистичная блокировка

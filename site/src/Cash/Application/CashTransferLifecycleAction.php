@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Exception\FinancePeriodLockedException;
@@ -16,6 +16,7 @@ use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class CashTransferLifecycleAction
 {
@@ -23,7 +24,7 @@ final readonly class CashTransferLifecycleAction
         private CashTransferRepository $transferRepository,
         private AutoRuleDispatchGuard $autoRuleDispatchGuard,
         private DailyBalanceRecalculator $recalculator,
-        private SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private EventDispatcherInterface $eventDispatcher,
         private EntityManagerInterface $entityManager,
     ) {
     }
@@ -120,7 +121,7 @@ final readonly class CashTransferLifecycleAction
             ),
         );
 
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
     }
 
     private function assertConsistentState(CashTransfer $transfer, bool $delete): void

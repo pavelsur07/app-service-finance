@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class UpdateCashTransactionAction
 {
@@ -20,7 +21,7 @@ final class UpdateCashTransactionAction
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
-        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
         private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
     ) {
@@ -98,7 +99,7 @@ final class UpdateCashTransactionAction
             $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
         }
 
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         return $tx;
     }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
 use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -33,6 +33,7 @@ use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final readonly class CreateCashTransferAction
 {
@@ -45,7 +46,7 @@ final readonly class CreateCashTransferAction
         private EffectiveExchangeRateCalculator $rateCalculator,
         private AutoRuleDispatchGuard $autoRuleDispatchGuard,
         private DailyBalanceRecalculator $recalculator,
-        private SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private EventDispatcherInterface $eventDispatcher,
         private AuditContextProvider $auditContextProvider,
         private EntityManagerInterface $entityManager,
     ) {
@@ -180,7 +181,7 @@ final readonly class CreateCashTransferAction
 
         if ($result->created) {
             // Redis/cache mutation happens only after the database transaction commits.
-            $this->snapshotCacheInvalidator->invalidateForCompany($company);
+            $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
         }
 
         return $result;

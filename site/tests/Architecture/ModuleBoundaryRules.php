@@ -244,6 +244,31 @@ final class ModuleBoundaryRules
     }
 
     /**
+     * Cash не зависит от Analytics: дашборд узнаёт об изменениях ДДС из
+     * события `App\Cash\Domain\Event\CashTransactionsChanged`.
+     *
+     * До этапа 6 плана Cash (`site/src/Cash/plan/plan.md`) семь Action'ов Cash
+     * вызывали `SnapshotCacheInvalidator` напрямую, а Analytics читал данные
+     * Cash — модули зависели друг от друга по кругу. Теперь подписчик живёт в
+     * Analytics (`InvalidateSnapshotOnCashChangeListener`), и обратная ссылка
+     * запрещена. Направление Analytics → Cash правилом не закрывается.
+     *
+     * На момент добавления в `src/Cash/` ноль ссылок на `App\Analytics`.
+     */
+    public function test_cash_does_not_depend_on_analytics(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\Cash'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(Selector::inNamespace('App\Analytics'))
+            ->because(
+                'Cash сообщает об изменениях событием CashTransactionsChanged, '
+                .'Analytics подписывается сам — иначе модули снова зависят по кругу.',
+            );
+    }
+
+    /**
      * Обратное направление: Finance не потребляет сообщения и события Ingestion.
      *
      * Правило выше закрывает путь «Ingestion зовёт Finance», но исторически

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Exception\FinancePeriodLockedException;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -14,6 +14,7 @@ use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class BulkDeleteCashTransactionsAction
 {
@@ -23,7 +24,7 @@ final class BulkDeleteCashTransactionsAction
         private readonly CashTransactionRepository $transactionRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly DailyBalanceRecalculator $recalculator,
-        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
+        private readonly EventDispatcherInterface $eventDispatcher,
     ) {
     }
 
@@ -73,7 +74,7 @@ final class BulkDeleteCashTransactionsAction
             (new \DateTimeImmutable('today'))->setTime(0, 0),
             array_keys($accountIds),
         );
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         return \count($transactions);
     }
