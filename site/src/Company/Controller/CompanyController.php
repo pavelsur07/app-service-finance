@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
-use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -64,7 +63,6 @@ class CompanyController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         EventDispatcherInterface $eventDispatcher,
-        CashflowSystemCategoryService $cashflowSystemCategories,
         CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
     ): Response {
         $user = $this->getUser();
@@ -81,9 +79,8 @@ class CompanyController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             // Подписчики события (Balance) ищут данные через SQL, поэтому им нужен flush до события.
             // Общая транзакция держит создание компании со стартовыми данными атомарным.
-            $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator, $cashflowSystemCategories): void {
+            $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator): void {
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
-                $cashflowSystemCategories->ensureStructure($company);
                 $em->flush();
                 $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
             });

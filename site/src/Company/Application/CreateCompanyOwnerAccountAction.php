@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Company\Service;
+namespace App\Company\Application;
 
-use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -15,19 +14,18 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-final readonly class CompanyOwnerAccountCreator
+final readonly class CreateCompanyOwnerAccountAction
 {
     public function __construct(
         private UserPasswordHasherInterface $userPasswordHasher,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $bus,
         private CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
-        private CashflowSystemCategoryService $cashflowSystemCategories,
         private EventDispatcherInterface $eventDispatcher,
     ) {
     }
 
-    public function create(
+    public function __invoke(
         User $user,
         string $plainPassword,
         string $companyName,
@@ -38,11 +36,14 @@ final readonly class CompanyOwnerAccountCreator
 
         $this->entityManager->persist($user);
         $company = $this->companyOwnerMembershipCreator->createCompany($user, $companyName);
-        $this->cashflowSystemCategories->ensureStructure($company);
 
-        // Подписчики (например, Balance) ищут данные через SQL, поэтому компания должна быть сохранена до события.
-        $this->entityManager->flush();
-        $this->eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
+        // Подписчики (Balance, системные статьи Cash) ищут данные через SQL, поэтому компания
+        // сохраняется до события. Транзакция — чтобы сбой подписчика не оставил компанию без
+        // их данных: так же, как в CompanyController::new.
+        $this->entityManager->wrapInTransaction(function () use ($company): void {
+            $this->entityManager->flush();
+            $this->eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
+        });
 
         if ($sendRegistrationEmail) {
             $this->bus->dispatch(new SendRegistrationEmailMessage(

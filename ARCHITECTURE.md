@@ -1229,7 +1229,8 @@ seedDefaultStructure(string $companyId): bool
 `SeedBalanceStructureAction` (идемпотентно). Запускает его слушатель
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
 `App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
-компании (форма `CompanyController::new` и `CompanyOwnerAccountCreator`) после flush.
+компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
+транзакции.
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
 структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController` и
 `BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
@@ -1435,6 +1436,21 @@ manage — только владелец. Новые права автомати
 - Виджет имеет независимый от KPI период 30/60/90 дней, строит native SVG без
   chart-зависимости и подключает переиспользуемые стили
   `assets/styles/components/financial-chart.css`.
+
+### Company → Cash: системные статьи ДДС по `CompanyCreatedEvent`
+
+- `Cash\EventListener\EnsureCashflowSystemCategoriesOnCompanyCreated` на
+  `App\Company\Event\CompanyCreatedEvent` вызывает `EnsureCashflowSystemCategoriesAction`:
+  7 системных статей (`CF_OP`, `CF_FIN`, `CF_INV`, `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`,
+  `CF_UNALLOC`), идемпотентно, с `flush`. Company больше не вызывает сервис Cash.
+- Оба пути создания компании — `CompanyController::new` и
+  `Company\Application\CreateCompanyOwnerAccountAction` (регистрация и админка через
+  `CompanyFacade::createOwnerAccount`) — диспатчат событие после flush внутри
+  `wrapInTransaction`: сбой подписчика откатывает и компанию.
+- Помощники представления Cash живут в модуле: Twig-расширения
+  `Cash\Infrastructure\Twig\MaskingExtension` (`mask_account`) и `MoneyTotalsExtension`
+  (`money_totals_widget`, `is_funds_feature_enabled`); аудит изменений `CashTransaction` —
+  `Cash\EventSubscriber\Audit\AuditLogSubscriber` (пишет `Shared\Entity\AuditLog`).
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
@@ -3222,7 +3238,7 @@ read-страница обязана объявлять `methods: ['GET']`. Ма
 перечислены в карте политик теста поимённо, и устаревшая запись в ней — тоже падение.
 
 **`ROLE_COMPANY_OWNER` не заменяет модульный write-гейт.** Это глобальная роль из `role_hierarchy`,
-её ставит `CompanyOwnerAccountCreator` при регистрации: она означает «пользователь зарегистрирован
+её ставит `CreateCompanyOwnerAccountAction` при регистрации: она означает «пользователь зарегистрирован
 как владелец компании», а не «владелец активной компании». Владелец компании A, будучи read-only
 участником компании B, проходит такой гейт и пишет в компанию B. Пять контроллеров, стоявших только
 под ней (Inventory snapshots, MarketplaceAds Ozon load/extract, MarketplaceAnalytics), получили

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Company;
 
-use App\Company\Service\CompanyOwnerAccountCreator;
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
-final class CompanyOwnerAccountCreatorBalanceSeedTest extends IntegrationTestCase
+final class CreateCompanyOwnerAccountActionBalanceSeedTest extends IntegrationTestCase
 {
     public function testRegistrationSeedsBalanceStructureFromTemplate(): void
     {
@@ -18,8 +18,8 @@ final class CompanyOwnerAccountCreatorBalanceSeedTest extends IntegrationTestCas
             ->withEmail(Uuid::uuid7()->toString().'@example.test')
             ->build();
 
-        $company = self::getContainer()->get(CompanyOwnerAccountCreator::class)
-            ->create($user, 'plain-password', 'Seed Co', false);
+        $company = self::getContainer()->get(CreateCompanyOwnerAccountAction::class)
+            ->__invoke($user, 'plain-password', 'Seed Co', false);
 
         $codes = $this->connection->fetchFirstColumn('SELECT code FROM balance_articles WHERE company_id=?', [(string) $company->getId()]);
         self::assertCount(33, $codes);

@@ -8,12 +8,12 @@ use App\Balance\Application\BalanceLedgerService;
 use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\Security\BalanceAccess;
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -522,7 +522,7 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
         $active->method('getActiveCompany')->willReturn($company);
         $facade = new CompanyFacade(
             new CompanyRepository(self::getContainer()->get('doctrine'), $connection),
-            self::getContainer()->get(CompanyOwnerAccountCreator::class),
+            self::getContainer()->get(CreateCompanyOwnerAccountAction::class),
             self::getContainer()->get(CounterpartyRepository::class),
             self::getContainer()->get(CompanyMemberRepository::class),
             self::getContainer()->get(ProjectDirectionRepository::class),

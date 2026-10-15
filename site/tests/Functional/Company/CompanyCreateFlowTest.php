@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Company;
 
 use App\Balance\Facade\BalanceFacade;
+use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -83,6 +85,16 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
             (string) $project->getId(),
             $center->getId(),
         ));
+
+        // Системные статьи ДДС создаёт Cash по CompanyCreatedEvent (этап 7.4 плана Cash).
+        /** @var CashflowCategoryRepository $categoryRepository */
+        $categoryRepository = $client->getContainer()->get(CashflowCategoryRepository::class);
+        $systemCodes = array_values(array_filter(array_map(
+            static fn (CashflowCategory $category): ?string => $category->getSystemCode(),
+            $categoryRepository->findBy(['company' => $company]),
+        )));
+        sort($systemCodes);
+        self::assertSame(['CF_FIN', 'CF_INV', 'CF_OP', 'CF_TECH', 'CF_TECH_IN', 'CF_TECH_OUT', 'CF_UNALLOC'], $systemCodes);
     }
 
     public function testInvalidMinimumBalanceShowsValidationError(): void

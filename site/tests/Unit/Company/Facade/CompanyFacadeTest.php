@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company\Facade;
 
+use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\CompanyMember;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Company\Service\CompanyOwnerAccountCreator;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -134,7 +134,7 @@ final class CompanyFacadeTest extends TestCase
 
         return new CompanyFacade(
             $companyRepository,
-            (new \ReflectionClass(CompanyOwnerAccountCreator::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(CreateCompanyOwnerAccountAction::class))->newInstanceWithoutConstructor(),
             $this->createMock(CounterpartyRepository::class),
             $companyMemberRepository,
             $this->createMock(ProjectDirectionRepository::class),

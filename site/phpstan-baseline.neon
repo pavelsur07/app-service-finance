@@ -1976,12 +1976,6 @@ parameters:
 			path: src/Company/Controller/CompanyController.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Company\\Controller\\CompanyController should not depend on App\\Cash\\Service\\Category\\CashflowSystemCategoryService$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Company/Controller/CompanyController.php
-
-		-
 			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -2481,12 +2475,6 @@ parameters:
 			path: src/Company/Security/ModuleAccessVoter.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Company\\Service\\CompanyOwnerAccountCreator should not depend on App\\Cash\\Service\\Category\\CashflowSystemCategoryService$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Company/Service/CompanyOwnerAccountCreator.php
-
-		-
 			message: '#^Parameter \#1 \$companyId of callable App\\Balance\\Application\\SeedBalanceStructureAction expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -2495,12 +2483,6 @@ parameters:
 		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesBalance\: App\\DataFixtures\\AppFixtures should not depend on App\\Balance\\Application\\SeedBalanceStructureAction$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesBalance
-			count: 1
-			path: src/DataFixtures/AppFixtures.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\DataFixtures\\AppFixtures should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceService$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/DataFixtures/AppFixtures.php
 
@@ -7650,19 +7632,13 @@ parameters:
 			message: '#^Call to function method_exists\(\) with App\\Company\\Entity\\Company and ''getId'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Shared/EventSubscriber/AuditLogSubscriber.php
+			path: src/Cash/EventSubscriber/Audit/AuditLogSubscriber.php
 
 		-
-			message: '#^Method App\\Shared\\EventSubscriber\\AuditLogSubscriber\:\:postPersist\(\) has parameter \$args with generic class Doctrine\\Persistence\\Event\\LifecycleEventArgs but does not specify its types\: TObjectManager$#'
+			message: '#^Method App\\Cash\\EventSubscriber\\Audit\\AuditLogSubscriber\:\:postPersist\(\) has parameter \$args with generic class Doctrine\\Persistence\\Event\\LifecycleEventArgs but does not specify its types\: TObjectManager$#'
 			identifier: missingType.generics
 			count: 1
-			path: src/Shared/EventSubscriber/AuditLogSubscriber.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Shared\\EventSubscriber\\AuditLogSubscriber should not depend on App\\Cash\\Application\\Service\\AutoRuleDispatchGuard$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Shared/EventSubscriber/AuditLogSubscriber.php
+			path: src/Cash/EventSubscriber/Audit/AuditLogSubscriber.php
 
 		-
 			message: '#^Class App\\Shared\\Form\\Type\\MoneyValueType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
@@ -8125,18 +8101,6 @@ parameters:
 			identifier: catch.neverThrown
 			count: 1
 			path: src/Twig/CurrencyFormatExtension.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Twig\\MaskingExtension should not depend on App\\Cash\\Service\\Accounts\\AccountMasker$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Twig/MaskingExtension.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Twig\\MoneyTotalsExtension should not depend on App\\Cash\\Service\\Accounts\\MoneyTotalsWidgetProvider$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Twig/MoneyTotalsExtension.php
 
 		-
 			message: '#^Parameter \#2 \$company of class App\\Cash\\Entity\\Transaction\\CashflowCategory constructor expects App\\Company\\Entity\\Company, object given\.$#'
@@ -12108,7 +12072,7 @@ parameters:
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Company\\\\Entity\\\\Company'' and App\\Company\\Entity\\Company will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 2
-			path: tests/Unit/Company/CompanyOwnerAccountCreatorTest.php
+			path: tests/Unit/Company/CreateCompanyOwnerAccountActionTest.php
 
 		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Company\\\\Entity\\\\Company'' and App\\Company\\Entity\\Company will always evaluate to true\.$#'
@@ -13632,12 +13596,6 @@ parameters:
 			identifier: vashfindir.flushOutsideBoundary
 			count: 3
 			path: src/Company/Service/CompanyInviteManager.php
-
-		-
-			message: '#^flush\(\) в App\\Company\\Service\\CompanyOwnerAccountCreator\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Company/Service/CompanyOwnerAccountCreator.php
 
 		-
 			message: '#^flush\(\) в App\\Company\\Service\\PasswordChanger\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
