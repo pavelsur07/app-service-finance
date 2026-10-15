@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Infrastructure\Normalizer;
 
+use App\Cash\Application\DTO\CashflowCategoryNode;
+
 final readonly class CashflowReportJsonFormatter
 {
     /**
@@ -65,9 +67,9 @@ final readonly class CashflowReportJsonFormatter
                 'end' => $this->formatDate($period['end']),
                 'label' => $period['label'],
             ], $payload['periods']),
-            'categories' => array_map(static fn ($category): array => [
-                'id' => $category->getId(),
-                'name' => $category->getName(),
+            'categories' => array_map(static fn (CashflowCategoryNode $category): array => [
+                'id' => $category->id,
+                'name' => $category->name,
             ], $payload['categories']),
             'categoryTotals' => $this->formatCategoryTotals($payload['categoryTotals']),
             'openings' => $payload['openings'],

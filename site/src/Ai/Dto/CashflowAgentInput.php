@@ -7,7 +7,7 @@ namespace App\Ai\Dto;
 /**
  * @psalm-type TotalsByCategory = array<string, array{inflow: float, outflow: float}>
  * @psalm-type DailyBalances = array<string, float>
- * @psalm-type UpcomingPayment = array{dueDate: string, amount: float, description: string, counterparty?: string}
+ * @psalm-type UpcomingPayment = array{dueDate: string, amount: float, description: string, counterparty?: string|null}
  */
 final class CashflowAgentInput
 {

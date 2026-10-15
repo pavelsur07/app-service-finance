@@ -97,18 +97,6 @@ parameters:
 			path: src/Ai/Repository/AiSuggestionRepository.php
 
 		-
-			message: '#^Cannot call method format\(\) on DateTimeImmutable\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:collectUpcomingPayments\(\) should return list\<array\{dueDate\: string, amount\: float, description\: string, counterparty\?\: string\}\> but returns list\<array\{dueDate\: non\-falsy\-string, amount\: float, description\: string, counterparty\: string\|null\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
 			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:normalizeResponse\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -129,24 +117,6 @@ parameters:
 		-
 			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:persistSuggestions\(\) has parameter \$llmPayload with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\PaymentPlan\\PaymentPlanRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Ai\\Service\\Agent\\CashflowAgent should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Ai/Service/Agent/CashflowAgent.php
 
@@ -7611,12 +7581,6 @@ parameters:
 			path: src/Notification/Template/TwigTemplateRenderer.php
 
 		-
-			message: '#^Call to an undefined method object\:\:getOpeningBalance\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
 			message: '#^Method App\\Report\\Cashflow\\CashflowReportBuilder\:\:build\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -7625,12 +7589,6 @@ parameters:
 		-
 			message: '#^Method App\\Report\\Cashflow\\CashflowReportBuilder\:\:buildCategoryTotalsTree\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^Method App\\Report\\Cashflow\\CashflowReportBuilder\:\:buildCategoryTree\(\) should return array\<int, array\{id\: string, name\: string, parentId\: string\|null, level\: int, order\: int\}\> but returns list\<array\{id\: string\|null, name\: string, parentId\: string\|null, level\: int\<0, 4\>, order\: int\<0, max\>\}\>\.$#'
-			identifier: return.type
 			count: 1
 			path: src/Report/Cashflow/CashflowReportBuilder.php
 
@@ -7647,44 +7605,8 @@ parameters:
 			path: src/Report/Cashflow/CashflowReportBuilder.php
 
 		-
-			message: '#^Parameter \#1 \$id of closure expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^Parameter \#1 \$rows of method App\\Report\\Cashflow\\CashflowReportBuilder\:\:buildProjectCenterMatrix\(\) expects list\<array\<string, mixed\>\>, array\<mixed\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
 			message: '#^Parameter \#2 \$periods of method App\\Report\\Cashflow\\CashflowReportBuilder\:\:buildProjectCenterMatrix\(\) expects list\<array\{label\: string, start\: DateTimeInterface, end\: DateTimeInterface\}\>, array given\.$#'
 			identifier: argument.type
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountDailyBalanceRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Report/Cashflow/CashflowReportBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Report\\Cashflow\\CashflowReportBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashflowCategoryRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Report/Cashflow/CashflowReportBuilder.php
 
@@ -7889,24 +7811,6 @@ parameters:
 		-
 			message: '#^Offset ''outflow'' on array\{inflow\: string, outflow\: string\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Telegram/Command/SendTelegramReportsCommand.php
-
-		-
-			message: '#^Parameter \#2 \$accountIds of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumByAccountAndPeriod\(\) expects list\<string\>, non\-empty\-list\<string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Telegram/Command/SendTelegramReportsCommand.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Telegram\\Command\\SendTelegramReportsCommand should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Telegram/Command/SendTelegramReportsCommand.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Telegram\\Command\\SendTelegramReportsCommand should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
 			count: 1
 			path: src/Telegram/Command/SendTelegramReportsCommand.php
 

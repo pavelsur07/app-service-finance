@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Telegram\Command;
 
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Repository\TelegramBotRepository;
@@ -26,8 +26,7 @@ final class SendTelegramReportsCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly TelegramBotRepository $botRepository,
         private readonly HttpClientInterface $httpClient,
-        private readonly MoneyAccountRepository $moneyAccountRepository,
-        private readonly CashTransactionRepository $cashTransactionRepository,
+        private readonly CashFacade $cashFacade,
         private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
         parent::__construct();
@@ -133,18 +132,19 @@ final class SendTelegramReportsCommand extends Command
         $periodEnd = new \DateTimeImmutable('today');
         $periodStart = $periodEnd->sub(new \DateInterval('P7D'));
 
-        $accounts = $this->moneyAccountRepository->findBy(['company' => $company, 'isActive' => true]);
+        $companyId = (string) $company->getId();
+        $accounts = $this->cashFacade->listMoneyAccounts($companyId, activeOnly: true);
         if ([] === $accounts) {
             return 'ДДС: нет активных счетов';
         }
 
-        $accountIds = array_map(static fn ($account) => $account->getId(), $accounts);
+        $accountIds = array_map(static fn (MoneyAccountSummary $account): string => $account->id, $accounts);
         $currencyByAccountId = [];
         foreach ($accounts as $account) {
-            $currencyByAccountId[$account->getId()] = $account->getCurrency();
+            $currencyByAccountId[$account->id] = $account->currency;
         }
 
-        $turnoversByAccount = $this->cashTransactionRepository->sumByAccountAndPeriod($company, $accountIds, $periodStart, $periodEnd);
+        $turnoversByAccount = $this->cashFacade->sumTurnoversByAccount($companyId, $accountIds, $periodStart, $periodEnd);
         if ([] === $turnoversByAccount) {
             return 'ДДС за 7 дней: нет данных';
         }
@@ -175,19 +175,19 @@ final class SendTelegramReportsCommand extends Command
 
     private function calculateBalances(Company $company): array
     {
-        $accounts = $this->moneyAccountRepository->findBy(['company' => $company, 'isActive' => true]);
+        $accounts = $this->cashFacade->listMoneyAccounts((string) $company->getId(), activeOnly: true);
         if ([] === $accounts) {
             return [];
         }
 
         $totals = [];
         foreach ($accounts as $account) {
-            $currency = $account->getCurrency();
+            $currency = $account->currency;
             if (!isset($totals[$currency])) {
                 $totals[$currency] = '0.00';
             }
 
-            $totals[$currency] = bcadd($totals[$currency], (string) $account->getCurrentBalance(), 2);
+            $totals[$currency] = bcadd($totals[$currency], $account->currentBalance, 2);
         }
 
         return $totals;

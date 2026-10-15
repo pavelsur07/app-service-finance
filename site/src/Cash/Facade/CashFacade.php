@@ -10,20 +10,27 @@ use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
 use App\Cash\Application\DTO\CashCategoryAmount;
+use App\Cash\Application\DTO\CashCategoryTurnover;
 use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryInput;
+use App\Cash\Application\DTO\CashflowCategoryNode;
+use App\Cash\Application\DTO\CashflowReportRow;
+use App\Cash\Application\DTO\CashflowReportRowFilter;
 use App\Cash\Application\DTO\CashStatementLine;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
 use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
+use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
 use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Application\DTO\PlannedPaymentSummary;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -37,6 +44,7 @@ use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Infrastructure\Query\CashReportQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
+use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -46,6 +54,7 @@ use App\Company\Entity\Counterparty;
 use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
+use Webmozart\Assert\Assert;
 
 final readonly class CashFacade
 {
@@ -67,6 +76,7 @@ final readonly class CashFacade
         private MoneyFundMovementRepository $moneyFundMovementRepository,
         private CashReportQuery $reportQuery,
         private DailyBalanceRecalculator $dailyBalanceRecalculator,
+        private PaymentPlanRepository $paymentPlanRepository,
     ) {
     }
 
@@ -632,6 +642,7 @@ final readonly class CashFacade
             $account->getCurrency(),
             $account->getOpeningBalance(),
             $account->getOpeningBalanceDate(),
+            $account->getCurrentBalance(),
         ), $accounts));
     }
 
@@ -727,6 +738,130 @@ final readonly class CashFacade
     public function recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
         $this->dailyBalanceRecalculator->recalcRange($this->requireCompany($companyId), $from, $to, null);
+    }
+
+    /**
+     * Все статьи ДДС компании в порядке обхода дерева (корень, затем его потомки
+     * по `sort`). Узел из `children` — тот же объект, что и в списке.
+     *
+     * @return list<CashflowCategoryNode>
+     */
+    public function getCashflowCategoryTree(string $companyId): array
+    {
+        $categories = $this->cashflowCategoryRepository->findTreeByCompany($this->requireCompany($companyId));
+
+        /** @var array<string, CashflowCategoryNode> $nodes */
+        $nodes = [];
+        $toNode = static function (CashflowCategory $category) use (&$toNode, &$nodes): CashflowCategoryNode {
+            $id = (string) $category->getId();
+            if (isset($nodes[$id])) {
+                return $nodes[$id];
+            }
+
+            $children = [];
+            foreach ($category->getChildren() as $child) {
+                $children[] = $toNode($child);
+            }
+
+            return $nodes[$id] = new CashflowCategoryNode(
+                $id,
+                $category->getName(),
+                $category->getLevel(),
+                null === $category->getParent() ? null : (string) $category->getParent()->getId(),
+                $category->getFlowKind(),
+                $category->getSystemCode(),
+                $children,
+            );
+        };
+
+        return array_values(array_map($toNode, $categories));
+    }
+
+    /**
+     * Строки отчёта ДДС (строки разбивки) за период с фильтрами.
+     *
+     * @return list<CashflowReportRow>
+     */
+    public function listCashflowReportRows(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, CashflowReportRowFilter $filter): array
+    {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->listCashflowReportRows($companyId, $from, $to, $filter);
+    }
+
+    /**
+     * Входящие остатки счетов на начало дня для отчёта ДДС: все счета компании
+     * либо, с `$currency`, счета этой валюты по названию.
+     *
+     * @return list<MoneyAccountOpeningBalance>
+     */
+    public function getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $currency = null): array
+    {
+        $company = $this->requireCompany($companyId);
+        $accounts = null !== $currency
+            ? $this->moneyAccountRepository->findByFilters($company, null, [$currency], null, null, ['name' => \SortDirection::Ascending])
+            : $this->moneyAccountRepository->findBy(['company' => $company]);
+
+        return $this->reportQuery->listOpeningBalancesAtDate($companyId, $date, array_values($accounts));
+    }
+
+    /**
+     * Поступления и выбытия по названию статьи. Удалённые операции и переводы входят
+     * (так считает AI-агент ДДС, см. «Находки» плана Cash).
+     *
+     * @return list<CashCategoryTurnover>
+     */
+    public function sumTurnoverByCategoryNameIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumTurnoverByCategoryNameIncludingDeleted($companyId, $from, $to);
+    }
+
+    /**
+     * Чистый поток по дням. Удалённые операции и переводы входят.
+     *
+     * @return list<CashDailyAmount>
+     */
+    public function sumNetByDayIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumNetByDayIncludingDeleted($companyId, $from, $to);
+    }
+
+    /**
+     * Поступления и выбытия за период. Удалённые операции и переводы входят.
+     *
+     * @return array{inflow: string, outflow: string}
+     */
+    public function sumTurnoverIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumTurnoverIncludingDeleted($companyId, $from, $to);
+    }
+
+    /**
+     * Плановые платежи (PLANNED, APPROVED) с датой в периоде, по дате.
+     *
+     * @return list<PlannedPaymentSummary>
+     */
+    public function listPlannedPayments(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $plans = $this->paymentPlanRepository->findPlannedByCompanyAndPeriod($this->requireCompany($companyId), $from, $to);
+
+        return array_map(static function (PaymentPlan $plan): PlannedPaymentSummary {
+            $plannedAt = $plan->getPlannedAt();
+            Assert::notNull($plannedAt);
+
+            return new PlannedPaymentSummary(
+                $plannedAt,
+                $plan->getAmount(),
+                $plan->getCashflowCategory()->getName(),
+                $plan->getCounterparty()?->getName(),
+            );
+        }, $plans);
     }
 
     private function findExistingByImport(CreateCashTransactionCommand $command): ?CashTransaction

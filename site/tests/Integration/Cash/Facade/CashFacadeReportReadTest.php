@@ -64,7 +64,7 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
         self::assertSame(['Альфа-касса', 'Банк'], $names($this->facade->listMoneyAccounts($id, activeOnly: true, currency: 'RUB')));
 
         $summary = $this->facade->listMoneyAccounts($id, activeOnly: true, currency: 'USD')[0];
-        self::assertEquals(new MoneyAccountSummary((string) $usd->getId(), 'Валютный', MoneyAccountType::BANK, 'USD', '10.00', new \DateTimeImmutable('2026-01-01')), $summary);
+        self::assertEquals(new MoneyAccountSummary((string) $usd->getId(), 'Валютный', MoneyAccountType::BANK, 'USD', '10.00', new \DateTimeImmutable('2026-01-01'), '0.00'), $summary);
     }
 
     public function testBalancesTurnoversAndDailyRowsIgnoreForeignAccounts(): void
