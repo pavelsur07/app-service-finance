@@ -208,6 +208,12 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
 
         if ($matches) {
             self::assertSame($plan->getId(), $result?->getId());
+
+            // Матчер только persist(): сохраняет вызывающий Action (AddCashTransactionAction).
+            $this->em->flush();
+            $planId = (string) $plan->getId();
+            $this->em->clear();
+            self::assertSame(PaymentPlanStatusEnum::PAID, $this->em->find(PaymentPlan::class, $planId)?->getStatus());
         } else {
             self::assertNull($result);
         }

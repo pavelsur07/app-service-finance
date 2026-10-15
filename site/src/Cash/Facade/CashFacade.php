@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Facade;
 
+use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
@@ -28,7 +29,6 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Facade\CompanyFacade;
@@ -40,7 +40,7 @@ final readonly class CashFacade
     public const MAX_PER_PAGE = 200;
 
     public function __construct(
-        private CashTransactionService $cashTransactionService,
+        private AddCashTransactionAction $addCashTransaction,
         private CashTransactionRepository $cashTransactionRepository,
         private CashflowCategoryRepository $cashflowCategoryRepository,
         private CashTransactionAutoRuleRepository $autoRuleRepository,
@@ -426,7 +426,7 @@ final readonly class CashFacade
         }
 
         try {
-            $transaction = $this->cashTransactionService->add($dto);
+            $transaction = ($this->addCashTransaction)($dto);
 
             return new CreateCashTransactionResult((string) $transaction->getId(), true, false);
         } catch (UniqueConstraintViolationException $e) {

@@ -1736,12 +1736,6 @@ parameters:
 			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
 
 		-
-			message: '#^Parameter \#4 \$accountIds of method App\\Cash\\Application\\Service\\DailyBalanceRecalculator\:\:recalcRange\(\) expects array\<string\>\|null, array\<int, string\|null\> given\.$#'
-			identifier: argument.type
-			count: 5
-			path: src/Cash/Service/Transaction/CashTransactionService.php
-
-		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Service\\Transaction\\CashTransactionToDocumentService should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
@@ -9591,30 +9585,6 @@ parameters:
 			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
 
 		-
-			message: '#^Parameter \#1 \$transaction of callable App\\Cash\\Application\\SaveCashTransactionSplitsAction expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
-			message: '#^Parameter \#1 \$tx of method App\\Cash\\Service\\Transaction\\CashTransactionService\:\:delete\(\) expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
-			message: '#^Parameter \#1 \$tx of method App\\Cash\\Service\\Transaction\\CashTransactionService\:\:restore\(\) expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
-			message: '#^Parameter \#1 \$tx of method App\\Cash\\Service\\Transaction\\CashTransactionService\:\:update\(\) expects App\\Cash\\Entity\\Transaction\\CashTransaction, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Cash/Application/CreateCashTransferActionTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertInstanceOf\(\) with ''App\\\\Finance\\\\Entity\\\\DocumentOperation'' and App\\Finance\\Entity\\DocumentOperation will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -13902,24 +13872,6 @@ parameters:
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1
 			path: src/Cash/Service/Import/ImportLogger.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\PaymentPlan\\PaymentPlanMatcher\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentPlanMatcher.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Transaction\\CashTransactionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 5
-			path: src/Cash/Service/Transaction/CashTransactionService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Transaction\\CashTransactionToDocumentService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionToDocumentService.php
 
 		-
 			message: '#^flush\(\) в App\\Catalog\\Infrastructure\\Repository\\ProductImportRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

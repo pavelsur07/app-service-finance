@@ -356,7 +356,7 @@ final class CashTransactionSplitSynchronizerTest extends IntegrationTestCase
         );
         $transaction->setCashflowCategory($this->category($company, 'Аренда'));
 
-        // Синхронизация до persist — так это делает CashTransactionService::add().
+        // Синхронизация до persist — так это делает AddCashTransactionAction.
         $this->synchronizer->sync($transaction, CashTransactionSplitSource::MANUAL);
         $this->em->persist($transaction);
         $this->em->flush();

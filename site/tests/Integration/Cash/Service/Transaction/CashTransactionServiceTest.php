@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Transaction;
 
+use App\Cash\Application\AddCashTransactionAction;
+use App\Cash\Application\UpdateCashTransactionAction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -11,7 +13,6 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
@@ -25,13 +26,15 @@ use Ramsey\Uuid\Uuid;
 
 final class CashTransactionServiceTest extends IntegrationTestCase
 {
-    private CashTransactionService $txService;
+    private AddCashTransactionAction $addTransaction;
+    private UpdateCashTransactionAction $updateTransaction;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->txService = self::getContainer()->get(CashTransactionService::class);
+        $this->addTransaction = self::getContainer()->get(AddCashTransactionAction::class);
+        $this->updateTransaction = self::getContainer()->get(UpdateCashTransactionAction::class);
     }
 
     public function testAddPersistsAllFields(): void
@@ -89,7 +92,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $dto->dedupeHash = 'telegram:dedupe:test';
         $dto->rawData = ['source' => 'telegram', 'message_id' => 12345];
 
-        $tx = $this->txService->add($dto);
+        $tx = ($this->addTransaction)($dto);
 
         $this->assertSame('Test tx', $tx->getDescription());
         $this->assertSame($category->getId(), $tx->getCashflowCategory()->getId());
@@ -113,7 +116,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
             $tx->getSplits()->toArray(),
         );
 
-        $repeated = $this->txService->add($dto);
+        $repeated = ($this->addTransaction)($dto);
 
         $this->assertSame($tx->getId(), $repeated->getId(), 'Повторный импорт обязан вернуть ту же операцию.');
         $this->assertCount(2, $repeated->getSplits(), 'Разбивка не должна схлопываться повторным импортом.');
@@ -164,7 +167,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $dto->occurredAt = new \DateTimeImmutable('2024-01-11');
         $dto->description = 'Legacy tx';
 
-        $tx = $this->txService->add($dto);
+        $tx = ($this->addTransaction)($dto);
 
         $this->assertSame('Legacy tx', $tx->getDescription());
         $this->assertSame($systemPair['project']->getId(), $tx->getProjectDirection()?->getId());
@@ -202,7 +205,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
             $dto->occurredAt = new \DateTimeImmutable('2024-01-11');
 
             try {
-                $this->txService->add($dto);
+                ($this->addTransaction)($dto);
                 self::fail('Transaction without amount must be rejected.');
             } catch (\DomainException $exception) {
                 self::assertSame('Укажите сумму.', $exception->getMessage());
@@ -245,7 +248,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $dto->projectDirectionId = $customProject->getId();
         $dto->responsibilityCenterId = $customCenter->getId();
 
-        $tx = $this->txService->add($dto);
+        $tx = ($this->addTransaction)($dto);
 
         self::assertSame($customProject->getId(), $tx->getProjectDirection()?->getId());
         self::assertSame($customCenter->getId(), $tx->getResponsibilityCenterId());
@@ -284,7 +287,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Укажите проект и ЦФО.');
 
-        $this->txService->add($dto);
+        ($this->addTransaction)($dto);
     }
 
     public function testUpdatePreservesUnchangedResponsibilityPair(): void
@@ -319,7 +322,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $create->occurredAt = new \DateTimeImmutable('2024-01-13');
         $create->projectDirectionId = $customProject->getId();
         $create->responsibilityCenterId = $customCenter->getId();
-        $tx = $this->txService->add($create);
+        $tx = ($this->addTransaction)($create);
 
         $update = new CashTransactionDTO();
         $update->moneyAccountId = $account->getId();
@@ -329,7 +332,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $update->occurredAt = new \DateTimeImmutable('2024-01-13');
         $update->description = 'Updated only amount';
 
-        $this->txService->update($tx, $update);
+        ($this->updateTransaction)($tx, $update);
 
         self::assertSame('31', $tx->getAmount());
         self::assertSame('Updated only amount', $tx->getDescription());
@@ -345,7 +348,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Счёт не найден.');
 
-        $this->txService->add($dto);
+        ($this->addTransaction)($dto);
     }
 
     public function testAddRejectsCounterpartyFromAnotherCompany(): void
@@ -357,7 +360,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Контрагент не найден.');
 
-        $this->txService->add($dto);
+        ($this->addTransaction)($dto);
     }
 
     public function testAddRejectsCashflowCategoryFromAnotherCompany(): void
@@ -369,14 +372,14 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Категория ДДС не найдена.');
 
-        $this->txService->add($dto);
+        ($this->addTransaction)($dto);
     }
 
     public function testUpdateRejectsMoneyAccountFromAnotherCompany(): void
     {
         $fixture = $this->tenantSafetyFixture();
         $create = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
-        $transaction = $this->txService->add($create);
+        $transaction = ($this->addTransaction)($create);
 
         $update = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['foreignAccount']->getId());
         $update->amount = '15.00';
@@ -384,7 +387,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Счёт не найден.');
 
-        $this->txService->update($transaction, $update);
+        ($this->updateTransaction)($transaction, $update);
     }
 
     public function testAddRejectsCurrencyDifferentFromAccountCurrency(): void
@@ -396,18 +399,18 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Валюта транзакции должна совпадать с валютой счёта.');
 
-        $this->txService->add($dto);
+        ($this->addTransaction)($dto);
     }
 
     public function testUpdateChangesAccountAndDerivedCurrencyTogether(): void
     {
         $fixture = $this->tenantSafetyFixture();
         $create = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['account']->getId());
-        $transaction = $this->txService->add($create);
+        $transaction = ($this->addTransaction)($create);
 
         $update = $this->tenantSafetyDto($fixture['company']->getId(), $fixture['eurAccount']->getId());
         $update->currency = 'EUR';
-        $this->txService->update($transaction, $update);
+        ($this->updateTransaction)($transaction, $update);
 
         self::assertSame($fixture['eurAccount']->getId(), $transaction->getMoneyAccount()->getId());
         self::assertSame('EUR', $transaction->getCurrency());

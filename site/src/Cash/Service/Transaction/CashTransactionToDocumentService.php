@@ -14,13 +14,11 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
 use App\Shared\Domain\ValueObject\Money;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 class CashTransactionToDocumentService
 {
     public function __construct(
-        private EntityManagerInterface $em,
         private PLRegisterUpdater $plRegisterUpdater,
         private ProjectDirectionRepository $projectDirections,
     ) {
@@ -37,23 +35,13 @@ class CashTransactionToDocumentService
         return $this->createDocument($transaction, $remaining);
     }
 
-    public function createPnlDocumentFromTransaction(CashTransaction $transaction): Document
+    /**
+     * Обновляет регистр ОПиУ по сохранённому документу. Вызывать после flush():
+     * регистр читает документ из БД (см. CreatePnlDocumentFromTransactionAction).
+     */
+    public function updatePlRegister(Document $document): void
     {
-        $this->em->beginTransaction();
-        try {
-            $document = $this->createFromCashTransaction($transaction);
-
-            $this->em->persist($document);
-            $this->em->flush();
-
-            $this->plRegisterUpdater->updateForDocument($document);
-            $this->em->commit();
-
-            return $document;
-        } catch (\Exception $e) {
-            $this->em->rollback();
-            throw $e;
-        }
+        $this->plRegisterUpdater->updateForDocument($document);
     }
 
     /**

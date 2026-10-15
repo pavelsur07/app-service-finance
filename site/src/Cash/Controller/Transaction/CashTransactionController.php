@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\AddCashTransactionAction;
+use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
+use App\Cash\Application\DeleteCashTransactionAction;
+use App\Cash\Application\RestoreCashTransactionAction;
+use App\Cash\Application\UpdateCashTransactionAction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\DTO\CashTransactionFilters;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -18,7 +23,6 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Repository\Transfer\CashTransferRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
-use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\Document;
@@ -221,7 +225,7 @@ class CashTransactionController extends AbstractController
         Request $request,
         string $id,
         CashTransactionRepository $txRepo,
-        CashTransactionToDocumentService $operationFactory,
+        CreatePnlDocumentFromTransactionAction $createPnlDocument,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
@@ -240,7 +244,7 @@ class CashTransactionController extends AbstractController
         }
 
         try {
-            $document = $operationFactory->createPnlDocumentFromTransaction($tx);
+            $document = $createPnlDocument($tx);
             $this->addFlash('success', 'Документ ОПиУ создан.');
 
             return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
@@ -300,7 +304,7 @@ class CashTransactionController extends AbstractController
     #[Route('/new', name: 'cash_transaction_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        CashTransactionService $service,
+        AddCashTransactionAction $addTransaction,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -320,7 +324,7 @@ class CashTransactionController extends AbstractController
                 /** @var CashTransactionDTO $data */
                 $data = $form->getData();
                 try {
-                    $service->add($data);
+                    $addTransaction($data);
                     $this->addFlash('success', 'Транзакция добавлена');
 
                     return $this->redirectToRoute('cash_transaction_index', array_filter(
@@ -349,6 +353,7 @@ class CashTransactionController extends AbstractController
         string $id,
         CashTransactionRepository $txRepo,
         CashTransactionService $service,
+        UpdateCashTransactionAction $updateTransaction,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -388,7 +393,7 @@ class CashTransactionController extends AbstractController
                 /** @var CashTransactionDTO $data */
                 $data = $form->getData();
                 try {
-                    $service->update($tx, $data);
+                    $updateTransaction($tx, $data);
                     $this->addFlash('success', 'Транзакция обновлена');
 
                     return $this->redirectToRoute('cash_transaction_index', array_filter(
@@ -417,7 +422,7 @@ class CashTransactionController extends AbstractController
         Request $request,
         string $id,
         CashTransactionRepository $txRepo,
-        CashTransactionService $service,
+        RestoreCashTransactionAction $restoreTransaction,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
@@ -430,7 +435,7 @@ class CashTransactionController extends AbstractController
         }
 
         try {
-            $service->restore($tx);
+            $restoreTransaction($tx);
             $this->addFlash('success', 'Транзакция восстановлена');
         } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());
@@ -441,7 +446,7 @@ class CashTransactionController extends AbstractController
 
     #[Route('/{id}/delete', name: 'cash_transaction_delete', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function delete(Request $request, string $id, CashTransactionRepository $txRepo, CashTransactionService $service): Response
+    public function delete(Request $request, string $id, CashTransactionRepository $txRepo, DeleteCashTransactionAction $deleteTransaction): Response
     {
         $company = $this->companyService->getActiveCompany();
         $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
@@ -449,7 +454,7 @@ class CashTransactionController extends AbstractController
 
         if ($this->isCsrfTokenValid('tx_delete'.$tx->getId(), $request->request->get('_token'))) {
             try {
-                $service->delete($tx);
+                $deleteTransaction($tx);
                 $this->addFlash('success', 'Транзакция удалена');
             } catch (\DomainException $e) {
                 // Период закрыт — показать сообщение и вернуть на список

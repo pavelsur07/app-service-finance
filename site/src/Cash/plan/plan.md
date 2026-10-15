@@ -522,13 +522,14 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 
 - [x] Репозиторий без `flush` (5.1).
 - [x] Контроллеры без `flush`; логика в Action с тестами (5.1).
-- [ ] 9 сервисов без `flush`; вызывающий код — Action: 3 тонких сервиса — 5.1;
-      `RecurrenceMaterializer` — 5.2 (готово); `CashTransactionService`,
+- [x] 9 сервисов без `flush`; вызывающий код — Action: 3 тонких сервиса — 5.1;
+      `RecurrenceMaterializer` — 5.2; `CashTransactionService`,
       `CashTransactionToDocumentService`, `PaymentPlanMatcher` — 5.3.
 - [x] Псевдо-фасады устранены (5.2).
-- [ ] Baseline правила `flush` по Cash: остались только пакетные импорты;
-      «Журнал» обновлён.
-- [ ] Все гейты зелёные.
+- [x] Baseline правила `flush` по Cash: остались только пакетные импорты
+      (`BankImportService`, `ClientBank1CImportService`, `CashFileImportService`,
+      `ImportLogger` — по 1 вызову); «Журнал» обновлён.
+- [x] Все гейты зелёные.
 
 **Подэтапы** (по одному PR; гейт `vashfindir.flushOutsideBoundary` из
 этапа 4 даёт точный список — в Cash на старте 37 вызовов в 18 файлах):
@@ -539,6 +540,24 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 | 5.2 | `CashFileImportFacade`, `PaymentCalendarFacade`, `RecurrenceMaterializer` | 10 |
 | 5.3 | `CashTransactionService`, `CashTransactionToDocumentService`, `PaymentPlanMatcher` | 7 |
 | вне этапа | пакетные импорты `BankImportService`, `ClientBank1CImportService`, `CashFileImportService` и их `ImportLogger` | 4 |
+
+### Результат подэтапа 5.3 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `CashTransactionService::add/update/delete/restore` (5 `flush`) | `AddCashTransactionAction`, `UpdateCashTransactionAction`, `DeleteCashTransactionAction`, `RestoreCashTransactionAction` — тела перенесены дословно, порядок «flush → сопоставление с планом → пересчёт остатков → сброс кэша» прежний. В `CashTransactionService` остались общие проверки и разрешение ссылок без `flush` |
+| `PaymentPlanMatcher::matchForTransaction` (`flush` внутри) | матчер только `persist`; `AddCashTransactionAction` делает `flush`, если совпадение найдено, — до пересчёта, как раньше |
+| `CashTransactionToDocumentService::createPnlDocumentFromTransaction` | `CreatePnlDocumentFromTransactionAction`: та же транзакция БД (`begin` → `persist` → `flush` → регистр ОПиУ → `commit`/`rollback`); вызов регистра — `updatePlRegister()` в сервисе, чтобы зависимость от Finance осталась в прежнем файле |
+
+Пять старых ошибок PHPStan (`recalcRange` с nullable id счёта) и четыре в тесте
+переводов исправлены (`(string)` id, `assertInstanceOf`), а не перенесены:
+guard baseline не видит перенос кода из удалённых методов в новые файлы.
+Интеграционный `CashTransactionActionsTest` проверяет, что совпадение с
+плановым платежом, удаление/восстановление и документ ОПиУ доходят до БД;
+мутация «без flush после матчера» тестом ловится.
+
+`flush` вне Action в Cash: 11 → 4 вызова — только пакетные импорты, этап 5
+закрыт.
 
 ### Результат подэтапа 5.2 (2026-10-15)
 
@@ -749,7 +768,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | #2680 |
 | 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | #2681 |
 | 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | #2682 |
-| 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | этот PR |
+| 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | #2683 |
+| 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | этот PR |
 
 ## Находки
 
@@ -847,6 +867,16 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
     и `entityManager->getRepository()->findBy` для справочников фильтров.
   - Новые плановые платежи и профили создаются с `Uuid::uuid4` (правило — v7);
     код перенесён дословно.
+- Ревью подэтапа 5.3, вне scope (всё существовало до этапа):
+  - Нет теста `UpdateCashTransactionAction` со сменой счёта: пересчёт остатков
+    и по старому, и по новому счёту не проверен тестом (денежный путь).
+  - `CreatePnlDocumentFromTransactionAction` ловит `\Exception`, а не
+    `\Throwable`: при `\Error` транзакция БД останется открытой; закроется
+    переходом на `wrapInTransaction()`.
+  - `AddCashTransactionAction` не атомарен (flush → матчер → flush → пересчёт
+    через DBAL) — риск C3 из `docs/financial-core/03-current-failure-model.md`.
+  - `CashTransactionServiceTest` теперь тестирует Action'ы — переименовать или
+    перенести в `tests/Integration/Cash/Application/`.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - Этап 3, вне scope:

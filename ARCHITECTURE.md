@@ -1479,7 +1479,7 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 
 Другие модули не должны:
 - создавать `CashTransaction` напрямую;
-- вызывать `CashTransactionService` напрямую;
+- вызывать `CashTransactionService` и Action'ы записи `Add/Update/Delete/RestoreCashTransactionAction` напрямую;
 - делать `persist/flush` `CashTransaction` самостоятельно.
 
 **DTO команды:** `CreateCashTransactionCommand` (`src/Cash/Application/DTO/CreateCashTransactionCommand.php`)
@@ -1504,7 +1504,7 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 - `created: bool`
 - `duplicate: bool`
 
-**Side effects:** создание через `CashFacade::createTransaction()` сохраняет все side effects `CashTransactionService::add()`:
+**Side effects:** создание через `CashFacade::createTransaction()` сохраняет все side effects `AddCashTransactionAction`:
 - VAT logic;
 - project × ЦФО pair resolution through the company-scoped Cash resolver;
 - `PaymentPlanMatcher`;

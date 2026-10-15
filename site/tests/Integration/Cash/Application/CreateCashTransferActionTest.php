@@ -6,9 +6,12 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\BulkDeleteCashTransactionsAction;
+use App\Cash\Application\DeleteCashTransactionAction;
 use App\Cash\Application\DTO\CashTransactionSplitsInput;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
+use App\Cash\Application\RestoreCashTransactionAction;
 use App\Cash\Application\SaveCashTransactionSplitsAction;
+use App\Cash\Application\UpdateCashTransactionAction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -517,13 +520,16 @@ final class CreateCashTransferActionTest extends IntegrationTestCase
             idempotencyKey: 'transfer-generic-guard',
         ));
         $source = $this->transactionRepository->find($created->sourceTransactionId);
-        self::assertNotNull($source);
+        self::assertInstanceOf(CashTransaction::class, $source);
 
         $service = self::getContainer()->get(CashTransactionService::class);
+        $update = self::getContainer()->get(UpdateCashTransactionAction::class);
+        $delete = self::getContainer()->get(DeleteCashTransactionAction::class);
+        $restore = self::getContainer()->get(RestoreCashTransactionAction::class);
         foreach ([
-            static fn () => $service->update($source, new CashTransactionDTO()),
-            static fn () => $service->delete($source),
-            static fn () => $service->restore($source),
+            static fn () => $update($source, new CashTransactionDTO()),
+            static fn () => $delete($source),
+            static fn () => $restore($source),
         ] as $mutation) {
             try {
                 $mutation();

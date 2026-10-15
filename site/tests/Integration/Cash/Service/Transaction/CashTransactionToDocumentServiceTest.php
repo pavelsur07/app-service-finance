@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Transaction;
 
+use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -11,7 +12,6 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -70,9 +70,8 @@ final class CashTransactionToDocumentServiceTest extends IntegrationTestCase
         $this->em->persist(new FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center));
         $this->em->flush();
 
-        $document = self::getContainer()
-            ->get(CashTransactionToDocumentService::class)
-            ->createPnlDocumentFromTransaction($tx);
+        $createPnlDocument = self::getContainer()->get(CreatePnlDocumentFromTransactionAction::class);
+        $document = $createPnlDocument($tx);
 
         self::assertSame($project->getId(), $document->getProjectDirection()?->getId());
         self::assertSame($center->getId(), $document->getResponsibilityCenterId());
