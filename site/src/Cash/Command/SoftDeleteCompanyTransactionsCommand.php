@@ -20,7 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Массовый soft delete (и откат) всех транзакций ДДС компании.
  *
- * Почему один DBAL-UPDATE, а не CashTransactionService::delete() по каждой строке:
+ * Почему один DBAL-UPDATE, а не DeleteCashTransactionAction по каждой строке:
  * сервис на каждую транзакцию пересчитывает диапазон дневных остатков, то есть
  * массовое удаление стоило бы O(N) полных recalc. Здесь мутация идёт одним запросом
  * с теми же полями, что ставит markDeleted() (deleted_at/deleted_by/delete_reason),
@@ -39,7 +39,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * идемпотентен). Финальный вердикт строится по пересчёту строк из БД, а не по
  * счётчику executeStatement, чтобы прерванный прогон не отчитался успехом.
  *
- * updated_at намеренно не трогаем: CashTransactionService::delete() его тоже не
+ * updated_at намеренно не трогаем: DeleteCashTransactionAction его тоже не
  * обновляет (Timestampable-листенеров в проекте нет), массовая операция не должна
  * отличаться от одиночной.
  *
@@ -169,7 +169,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         \assert($company instanceof Company);
 
         if (null !== $minOccurredAt) {
-            // Порядок как в CashTransactionService::delete(): сначала фиксация,
+            // Порядок как в DeleteCashTransactionAction: сначала фиксация,
             // потом пересчёт фактов, и только после этого новая версия snapshot cache.
             $this->recalculator->recalcRange(
                 $company,

@@ -157,9 +157,9 @@ final class PaymentPlanMatcher
             new \DateTimeImmutable(),
         );
 
+        // Без flush(): совпадение и статус плана сохраняет вызывающий Action.
         $this->em->persist($match);
         $this->paymentPlanService->transitionStatus($bestPlan, PaymentPlanStatusEnum::PAID->value);
-        $this->em->flush();
 
         return $bestPlan;
     }

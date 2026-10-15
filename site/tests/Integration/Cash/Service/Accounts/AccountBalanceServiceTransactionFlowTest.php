@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Accounts;
 
+use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
@@ -12,7 +13,6 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -24,7 +24,7 @@ use Ramsey\Uuid\Uuid;
 final class AccountBalanceServiceTransactionFlowTest extends IntegrationTestCase
 {
     private AccountBalanceService $balanceService;
-    private CashTransactionService $txService;
+    private AddCashTransactionAction $addTransaction;
     private MoneyAccountDailyBalanceRepository $balanceRepo;
 
     protected function setUp(): void
@@ -33,7 +33,7 @@ final class AccountBalanceServiceTransactionFlowTest extends IntegrationTestCase
 
         $this->balanceRepo = self::getContainer()->get(MoneyAccountDailyBalanceRepository::class);
         $this->balanceService = self::getContainer()->get(AccountBalanceService::class);
-        $this->txService = self::getContainer()->get(CashTransactionService::class);
+        $this->addTransaction = self::getContainer()->get(AddCashTransactionAction::class);
     }
 
     public function testRecalculateBalances(): void
@@ -67,7 +67,7 @@ final class AccountBalanceServiceTransactionFlowTest extends IntegrationTestCase
         $dto1->amount = '50';
         $dto1->currency = 'USD';
         $dto1->occurredAt = new \DateTimeImmutable('2024-01-01');
-        $this->txService->add($dto1);
+        ($this->addTransaction)($dto1);
 
         $dto2 = new CashTransactionDTO();
         $dto2->companyId = $company->getId();
@@ -76,7 +76,7 @@ final class AccountBalanceServiceTransactionFlowTest extends IntegrationTestCase
         $dto2->amount = '30';
         $dto2->currency = 'USD';
         $dto2->occurredAt = new \DateTimeImmutable('2024-01-02');
-        $this->txService->add($dto2);
+        ($this->addTransaction)($dto2);
 
         $balances = $this->balanceService->getBalancesForPeriod($company, $account, new \DateTimeImmutable('2024-01-01'), new \DateTimeImmutable('2024-01-02'));
         $this->assertCount(2, $balances->balances);
