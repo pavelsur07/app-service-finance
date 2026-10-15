@@ -1552,7 +1552,33 @@ recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeI
 компании просто не попадают в ответ; `\DomainException` бросается только для
 неизвестной компании.
 
-DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine` — в
+Чтение для отчёта ДДС (`Report\Cashflow\CashflowReportBuilder`), Telegram-сводки и
+AI-агента ДДС (этап 7.3 плана Cash). `MoneyAccountSummary` с 7.3 несёт `currentBalance`.
+
+```php
+// Все статьи ДДС компании в порядке обхода дерева; children — те же объекты, что в списке
+getCashflowCategoryTree(string $companyId): list<CashflowCategoryNode>
+
+// Строки отчёта ДДС (строки разбивки, без удалённых) с фильтрами CashflowReportRowFilter
+// (охват KPI дашборда, валюта, проекты, ЦФО); порядок строк не задан
+listCashflowReportRows(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, CashflowReportRowFilter $filter): list<CashflowReportRow>
+
+// Входящий остаток каждого счёта на начало дня: строка регистра за день, иначе последняя
+// до него (не раньше открытия счёта), иначе входящий остаток счёта. С $currency — счета валюты по названию
+getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $currency = null): list<MoneyAccountOpeningBalance>
+
+// Для AI-агента ДДС: удалённые операции и переводы ВХОДЯТ (так считал агент, см. «Находки» плана Cash)
+sumTurnoverByCategoryNameIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<CashCategoryTurnover>
+sumNetByDayIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<CashDailyAmount>
+sumTurnoverIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array{inflow: string, outflow: string}
+
+// Плановые платежи PLANNED/APPROVED с датой в периоде
+listPlannedPayments(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<PlannedPaymentSummary>
+```
+
+DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `CashflowCategoryNode`,
+`CashflowReportRow`, `CashflowReportRowFilter`, `MoneyAccountOpeningBalance`, `CashCategoryTurnover`,
+`PlannedPaymentSummary` — в
 `src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или

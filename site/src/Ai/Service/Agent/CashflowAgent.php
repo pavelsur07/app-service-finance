@@ -15,10 +15,7 @@ use App\Ai\Repository\AiSuggestionRepository;
 use App\Ai\Service\Llm\LlmClient;
 use App\Ai\Service\Llm\LlmOptions;
 use App\Ai\Service\Prompt\CashflowPromptBuilder;
-use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -26,9 +23,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 final class CashflowAgent implements AiAgentInterface
 {
     public function __construct(
-        private readonly CashTransactionRepository $cashTransactionRepository,
-        private readonly MoneyAccountRepository $moneyAccountRepository,
-        private readonly PaymentPlanRepository $paymentPlanRepository,
+        private readonly CashFacade $cashFacade,
         private readonly CashflowPromptBuilder $promptBuilder,
         private readonly LlmClient $llmClient,
         private readonly AiRunRepository $runRepository,
@@ -91,33 +86,11 @@ final class CashflowAgent implements AiAgentInterface
      */
     private function aggregateTotalsByCategory(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
-            ->select("COALESCE(category.name, 'Без категории') AS category")
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS inflow",
-                CashDirection::INFLOW->value
-            ))
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS outflow",
-                CashDirection::OUTFLOW->value
-            ))
-            ->leftJoin('transaction.splits', 'split')
-            ->leftJoin('split.cashflowCategory', 'category')
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
-            ->groupBy('category')
-            ->orderBy('category', \SortDirection::Ascending);
-
-        $results = $qb->getQuery()->getArrayResult();
         $totals = [];
-        foreach ($results as $row) {
-            $categoryName = (string) ($row['category'] ?? 'Без категории');
-            $totals[$categoryName] = [
-                'inflow' => (float) $row['inflow'],
-                'outflow' => (float) $row['outflow'],
+        foreach ($this->cashFacade->sumTurnoverByCategoryNameIncludingDeleted((string) $company->getId(), $from, $to) as $row) {
+            $totals[$row->categoryName] = [
+                'inflow' => (float) $row->inflow,
+                'outflow' => (float) $row->outflow,
             ];
         }
 
@@ -130,50 +103,32 @@ final class CashflowAgent implements AiAgentInterface
     private function aggregateDailyBalances(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         // TODO: заменить на реальный сервис cash balance, когда он появится в проекте.
-        $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
-            ->select('transaction.occurredAt AS day')
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE transaction.amount * -1) AS net",
-                CashDirection::INFLOW->value
-            ))
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->groupBy('day')
-            ->orderBy('day', \SortDirection::Ascending)
-            ->setParameter('company', $company)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to);
-
-        $rows = $qb->getQuery()->getArrayResult();
         $balances = [
             $to->format('Y-m-d') => $this->sumCurrentBalances($company),
         ];
         $running = 0.0;
-        foreach ($rows as $row) {
-            $day = $row['day'];
-            $key = $day instanceof \DateTimeImmutable ? $day->format('Y-m-d') : (string) $day;
-            $running += (float) $row['net'];
-            $balances[$key] = round($running, 2);
+        foreach ($this->cashFacade->sumNetByDayIncludingDeleted((string) $company->getId(), $from, $to) as $row) {
+            $running += (float) $row->amount;
+            $balances[$row->date] = round($running, 2);
         }
 
         return $balances;
     }
 
     /**
-     * @return list<array{dueDate: string, amount: float, description: string, counterparty?: string}>
+     * @return list<array{dueDate: string, amount: float, description: string, counterparty?: string|null}>
      */
     private function collectUpcomingPayments(Company $company, \DateTimeImmutable $periodEnd): array
     {
         $horizon = $periodEnd->add(new \DateInterval('P21D'));
-        $plans = $this->paymentPlanRepository->findPlannedByCompanyAndPeriod($company, $periodEnd, $horizon);
 
         $payments = [];
-        foreach ($plans as $plan) {
+        foreach ($this->cashFacade->listPlannedPayments((string) $company->getId(), $periodEnd, $horizon) as $plan) {
             $payments[] = [
-                'dueDate' => $plan->getPlannedAt()->format('Y-m-d'),
-                'amount' => (float) $plan->getAmount(),
-                'description' => $plan->getCashflowCategory()->getName(),
-                'counterparty' => $plan->getCounterparty()?->getName(),
+                'dueDate' => $plan->plannedAt->format('Y-m-d'),
+                'amount' => (float) $plan->amount,
+                'description' => $plan->categoryName,
+                'counterparty' => $plan->counterpartyName,
             ];
         }
 
@@ -188,28 +143,13 @@ final class CashflowAgent implements AiAgentInterface
         $periodEnd = new \DateTimeImmutable('today');
         $periodStart = $periodEnd->sub(new \DateInterval('P90D'));
 
-        $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
-            ->select(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS inflow",
-                CashDirection::INFLOW->value
-            ))
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS outflow",
-                CashDirection::OUTFLOW->value
-            ))
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->setParameter('company', $company)
-            ->setParameter('from', $periodStart)
-            ->setParameter('to', $periodEnd);
-
-        $totals = $qb->getQuery()->getSingleResult();
+        $totals = $this->cashFacade->sumTurnoverIncludingDeleted((string) $company->getId(), $periodStart, $periodEnd);
         $monthsInterval = $periodStart->diff($periodEnd);
         $months = max(1, (int) floor(($monthsInterval->days ?? 0) / 30));
 
         return [
-            (float) ($totals['inflow'] ?? 0) / $months,
-            (float) ($totals['outflow'] ?? 0) / $months,
+            (float) $totals['inflow'] / $months,
+            (float) $totals['outflow'] / $months,
         ];
     }
 
@@ -225,10 +165,9 @@ final class CashflowAgent implements AiAgentInterface
 
     private function sumCurrentBalances(Company $company): float
     {
-        $accounts = $this->moneyAccountRepository->findBy(['company' => $company]);
         $total = 0.0;
-        foreach ($accounts as $account) {
-            $total += (float) $account->getCurrentBalance();
+        foreach ($this->cashFacade->listMoneyAccounts((string) $company->getId(), activeOnly: false) as $account) {
+            $total += (float) $account->currentBalance;
         }
 
         return $total;

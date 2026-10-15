@@ -724,6 +724,32 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 ---
 
+### Результат подэтапа 7.3 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `Report\Cashflow\CashflowReportBuilder` читал `CashflowCategoryRepository`, `CashTransactionRepository`, `MoneyAccountRepository`, `MoneyAccountDailyBalanceRepository`, строил DQL строк отчёта сам и отдавал в шаблон/JSON сущности `CashflowCategory` | `CashFacade`: `getCashflowCategoryTree` (DTO `CashflowCategoryNode` с теми же `id`, `name`, `level`, `children`), `listCashflowReportRows` с `CashflowReportRowFilter` (DQL — в `CashReportQuery` без изменений условий), `getReportOpeningBalances`; `CashflowReportJsonFormatter` читает свойства DTO |
+| Входящие остатки отчёта: два запроса на счёт (`findOneBy` + `findLastBefore`) | один запрос с той же семантикой (`listOpeningBalancesAtDate`), по строке на счёт через коррелированный `MAX(date)` — N+1 убран без загрузки истории регистра |
+| `SendTelegramReportsCommand` читал репозитории счетов и транзакций | `listMoneyAccounts` (DTO получил `currentBalance`), `sumTurnoversByAccount` |
+| `Ai\…\CashflowAgent` строил три DQL сам и падал на двух из них | `sumTurnoverByCategoryNameIncludingDeleted`, `sumNetByDayIncludingDeleted`, `sumTurnoverIncludingDeleted`, `listPlannedPayments`; DQL исправлен: алиас `categoryName` вместо занятого `category`, `END` в `CASE`. Регрессия — `tests/Integration/Ai/CashflowAgentInputTest` (красный на старом коде) |
+
+Решения Владельца (15.10.2026): дерево статей — DTO, а не сущности в фасаде; агент —
+перевести на фасад и починить, прочие особенности его расчёта сохранить.
+
+Тест-сравнение на фикстурах A22 (+ дочерняя статья, CAPEX, проекты, долларовый и
+неактивный счета, операции за последние 7 дней, плановые платежи всех статусов):
+HTML отчёта ДДС ×10 (группировки день/неделя/месяц/квартал, фильтр проекта, пустой
+фильтр, сверка с дашбордом ×3) — совпал побайтно; JSON-выгрузка и payload билдера
+совпали по значениям, отличается только порядок ключей валют внутри `totals` статьи с
+операциями в двух валютах: он задаётся порядком строк БД, а у запроса нет и не было
+`ORDER BY` (компания теперь передаётся параметром-строкой, план запроса другой);
+Telegram-строка ДДС и балансы, плановые платежи, средние и балансы агента — совпали;
+две выборки агента до правки падали `QueryException`, после — считают.
+
+Порядок валют в балансовой строке Telegram теперь по названию счёта (`listMoneyAccounts`);
+раньше — порядок строк таблицы без `ORDER BY`, который менялся при обновлении остатков.
+Для компании с несколькими валютами порядок может однажды смениться — значения те же.
+
 ### Результат подэтапа 7.2 (2026-10-15)
 
 | Было | Стало |
@@ -840,13 +866,24 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | #2684 |
 | 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | #2685 |
 | 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | #2686 |
-| 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | этот PR |
+| 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | #2687 |
+| 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | этот PR |
 
 ## Находки
 
 Обнаруженное по ходу работ вне scope текущего этапа. Не чинится в этом плане
 без согласования.
 
+- **AI-агент ДДС (этап 7.3).** До 7.3 сбор данных падал на двух DQL, агент ни разу не
+  доходил до LLM; команда `app:ai:run-cashflow-agents` ни в каком расписании не стоит.
+  Сохранённые при переносе особенности расчёта: удалённые операции и переводы входят
+  в суммы, суммы по статье складывают разные валюты, `sumCurrentBalances` берёт и
+  неактивные счета. Нужен ли агент — решение Владельца; если да, считать по правилам
+  ДДС (без удалённых и переводов, по валютам).
+- **N+1 малого объёма, перенесённые в Cash без изменений (этап 7.3).**
+  `listPlannedPayments` лениво грузит статью и контрагента каждого плана,
+  `getCashflowCategoryTree` — детей каждой статьи (`findTreeByCompany`). Строк
+  единицы–десятки; при росте — fetch join.
 - **Фильтр выписки по статье зависит от identity map (этап 7.2, было и до).**
   `listStatementLines` с `$categoryId` гидрирует коллекцию разбивок частично; если
   транзакции уже загружены в том же EntityManager, фильтр не действует. Сегодня

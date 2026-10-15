@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Finance\Infrastructure\Normalizer;
 
-use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Application\DTO\CashflowCategoryNode;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
@@ -19,19 +20,18 @@ final class CashflowReportJsonFormatterTest extends TestCase
         $user = $this->createUser();
         $company = new Company('11111111-1111-4111-8111-111111111111', $user);
         $company->setName('Cashflow Co');
-        $category = new CashflowCategory('22222222-2222-4222-8222-222222222222', $company);
-        $category->setName('Operations');
+        $category = new CashflowCategoryNode('22222222-2222-4222-8222-222222222222', 'Operations', 1, null, CashflowFlowKind::OPERATING, null, []);
 
         $tree = [[
-            'id' => $category->getId(),
-            'name' => $category->getName(),
+            'id' => $category->id,
+            'name' => $category->name,
             'level' => 0,
             'totals' => ['USD' => [123.45]],
             'children' => [],
         ]];
         $categoryTree = [[
-            'id' => $category->getId(),
-            'name' => $category->getName(),
+            'id' => $category->id,
+            'name' => $category->name,
             'parentId' => null,
             'level' => 0,
             'order' => 0,
@@ -49,7 +49,7 @@ final class CashflowReportJsonFormatterTest extends TestCase
             ]],
             'categories' => [$category],
             'categoryTotals' => [
-                $category->getId() => [
+                $category->id => [
                     'entity' => $category,
                     'totals' => ['USD' => [123.45]],
                 ],
@@ -89,11 +89,11 @@ final class CashflowReportJsonFormatterTest extends TestCase
                 'label' => 'Jan 2026',
             ]],
             'categories' => [[
-                'id' => $category->getId(),
+                'id' => $category->id,
                 'name' => 'Operations',
             ]],
             'categoryTotals' => [
-                $category->getId() => [
+                $category->id => [
                     'totals' => ['USD' => [123.45]],
                 ],
             ],

@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Report\Cashflow;
 
+use App\Cash\Application\DTO\CashflowCategoryNode;
+use App\Cash\Application\DTO\CashflowReportRow;
+use App\Cash\Application\DTO\CashflowReportRowFilter;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
-use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\ProjectDirectionRepository;
-use Doctrine\ORM\QueryBuilder;
 
 final class CashflowReportBuilder
 {
@@ -23,10 +22,7 @@ final class CashflowReportBuilder
     private const NO_RESPONSIBILITY_CENTER_KEY = '__no_responsibility_center__';
 
     public function __construct(
-        private CashflowCategoryRepository $categoryRepository,
-        private CashTransactionRepository $transactionRepository,
-        private MoneyAccountRepository $accountRepository,
-        private MoneyAccountDailyBalanceRepository $balanceRepository,
+        private CashFacade $cashFacade,
         private ProjectDirectionRepository $projectDirectionRepository,
     ) {
     }
@@ -42,16 +38,17 @@ final class CashflowReportBuilder
         $periods = $this->buildPeriods($from, $to, $group);
         $periodCount = count($periods);
 
-        $categories = $this->categoryRepository->findTreeByCompany($company);
+        $companyId = (string) $company->getId();
+        $categories = $this->cashFacade->getCashflowCategoryTree($companyId);
         if ($params->isDashboardReconciliation()) {
             $categories = array_values(array_filter(
                 $categories,
-                fn (CashflowCategory $category): bool => $this->categoryMatchesDashboardScope($category, $params),
+                fn (CashflowCategoryNode $category): bool => $this->categoryMatchesDashboardScope($category, $params),
             ));
         }
         $categoryMap = [];
         foreach ($categories as $cat) {
-            $categoryMap[$cat->getId()] = [
+            $categoryMap[$cat->id] = [
                 'entity' => $cat,
                 'totals' => [],
             ];
@@ -74,38 +71,20 @@ final class CashflowReportBuilder
         if ($emptyFilter) {
             $rows = [];
         } else {
-            $transactionQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
-
-            if ($params->isDashboardReconciliation()) {
-                $this->applyDashboardScope($transactionQueryBuilder, $params);
-            }
-
-            if (null !== $projectDirectionIds) {
-                $transactionQueryBuilder
-                    ->andWhere('IDENTITY(t.projectDirection) IN (:projectDirectionIds)')
-                    ->setParameter('projectDirectionIds', $projectDirectionIds);
-            }
-            if (null !== $responsibilityCenterIds) {
-                $transactionQueryBuilder
-                    ->andWhere('t.responsibilityCenterId IN (:responsibilityCenterIds)')
-                    ->setParameter('responsibilityCenterIds', $responsibilityCenterIds);
-            } elseif (null !== $params->responsibilityCenterId) {
-                $transactionQueryBuilder
-                    ->andWhere('t.responsibilityCenterId = :responsibilityCenterId')
-                    ->setParameter('responsibilityCenterId', $params->responsibilityCenterId);
-            }
-
-            $rows = $transactionQueryBuilder->getQuery()->getArrayResult();
+            $rows = $this->transactionRows($companyId, $from, $to, new CashflowReportRowFilter(
+                dashboardScope: $params->isDashboardReconciliation(),
+                dashboardCurrency: $params->dashboardCurrency?->value,
+                dashboardFlowKind: $params->dashboardFlowKind(),
+                projectDirectionIds: $projectDirectionIds,
+                responsibilityCenterIds: $responsibilityCenterIds,
+                responsibilityCenterId: $params->responsibilityCenterId,
+            ));
         }
 
         if ($filtersActive) {
-            $companyQueryBuilder = $this->createTransactionRowsQueryBuilder($company, $from, $to);
-            if ($params->isDashboardReconciliation()) {
-                $companyQueryBuilder
-                    ->andWhere('t.currency = :companyCurrency')
-                    ->setParameter('companyCurrency', $params->dashboardCurrency?->value);
-            }
-            $companyRows = $companyQueryBuilder->getQuery()->getArrayResult();
+            $companyRows = $this->transactionRows($companyId, $from, $to, new CashflowReportRowFilter(
+                currency: $params->isDashboardReconciliation() ? $params->dashboardCurrency?->value : null,
+            ));
         } else {
             $companyRows = $rows;
         }
@@ -148,16 +127,16 @@ final class CashflowReportBuilder
         }
 
         foreach (array_reverse($categories) as $cat) {
-            $parent = $cat->getParent();
-            if ($parent && isset($categoryMap[$parent->getId()])) {
-                $childTotals = $categoryMap[$cat->getId()]['totals'];
+            $parentId = $cat->parentId;
+            if (null !== $parentId && isset($categoryMap[$parentId])) {
+                $childTotals = $categoryMap[$cat->id]['totals'];
                 foreach ($childTotals as $currency => $vals) {
-                    if (!isset($categoryMap[$parent->getId()]['totals'][$currency])) {
-                        $categoryMap[$parent->getId()]['totals'][$currency] = array_fill(0, $periodCount, 0.0);
+                    if (!isset($categoryMap[$parentId]['totals'][$currency])) {
+                        $categoryMap[$parentId]['totals'][$currency] = array_fill(0, $periodCount, 0.0);
                     }
 
                     foreach ($vals as $idx => $val) {
-                        $categoryMap[$parent->getId()]['totals'][$currency][$idx] += $val;
+                        $categoryMap[$parentId]['totals'][$currency][$idx] += $val;
                     }
                 }
             }
@@ -165,44 +144,22 @@ final class CashflowReportBuilder
 
         $rootCategories = [];
         foreach ($categories as $cat) {
-            if (!$cat->getParent()) {
+            if (null === $cat->parentId) {
                 $rootCategories[] = $cat;
             }
         }
 
         $categoryTree = $this->buildCategoryTree($categories);
 
-        $accounts = $params->isDashboardReconciliation()
-            ? $this->accountRepository->findByFilters(
-                $company,
-                null,
-                [$params->dashboardCurrency?->value],
-                null,
-                null,
-                ['name' => \SortDirection::Ascending],
-            )
-            : $this->accountRepository->findBy(['company' => $company]);
+        $accountOpenings = $this->cashFacade->getReportOpeningBalances(
+            $companyId,
+            $from,
+            $params->isDashboardReconciliation() ? $params->dashboardCurrency?->value : null,
+        );
         $openingByCurrency = [];
-        foreach ($accounts as $account) {
-            $date = $from->setTime(0, 0);
-            $snapshot = $this->balanceRepository->findOneBy([
-                'company' => $company,
-                'moneyAccount' => $account,
-                'date' => $date,
-            ]);
-
-            if ($snapshot) {
-                $opening = (float) $snapshot->getOpeningBalance();
-            } else {
-                $prev = $this->balanceRepository->findLastBefore($company, $account, $from);
-                if ($prev) {
-                    $opening = (float) $prev->getClosingBalance();
-                } else {
-                    $opening = (float) $account->getOpeningBalance();
-                }
-            }
-
-            $currency = $account->getCurrency();
+        foreach ($accountOpenings as $accountOpening) {
+            $opening = (float) $accountOpening->openingBalance;
+            $currency = $accountOpening->currency;
             $openingByCurrency[$currency] = ($openingByCurrency[$currency] ?? 0) + $opening;
         }
 
@@ -298,65 +255,33 @@ final class CashflowReportBuilder
         return array_values($expanded);
     }
 
-    private function createTransactionRowsQueryBuilder(
-        Company $company,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
-    ): QueryBuilder {
-        return $this->transactionRepository->createQueryBuilder('t')
-            ->select(
-                'IDENTITY(split.cashflowCategory) AS category',
-                'IDENTITY(t.projectDirection) AS project_id',
-                'project.name AS project_name',
-                't.responsibilityCenterId AS responsibility_center_id',
-                't.direction',
-                'split.amount',
-                't.currency',
-                't.occurredAt',
-            )
-            // LEFT JOIN, а не INNER: транзакция без категории строк не имеет и в отчёт
-            // не попадает по проверке категории ниже — ровно как раньше по пустой колонке.
-            ->leftJoin('t.splits', 'split')
-            ->leftJoin('t.projectDirection', 'project')
-            ->where('t.company = :company')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59));
-    }
-
-    private function applyDashboardScope(QueryBuilder $queryBuilder, CashflowReportParams $params): void
+    /**
+     * Строки отчёта в прежнем виде массива — ниже по коду отчёт работает с ним.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function transactionRows(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, CashflowReportRowFilter $filter): array
     {
-        // Keep this scope identical to CashTransactionRepository::sumGrossTurnoverByPeriodExcludeTransfers().
-        $queryBuilder
-            ->innerJoin('split.cashflowCategory', 'cashflowCategory')
-            ->andWhere('t.currency = :dashboardCurrency')
-            ->andWhere('t.isTransfer = :dashboardTransfer')
-            ->andWhere('cashflowCategory.flowKind != :technicalFlowKind')
-            ->setParameter('dashboardCurrency', $params->dashboardCurrency?->value)
-            ->setParameter('dashboardTransfer', false)
-            ->setParameter('technicalFlowKind', CashflowFlowKind::TECHNICAL);
-
-        $flowKind = $params->dashboardFlowKind();
-        if (null !== $flowKind) {
-            $queryBuilder
-                ->andWhere('cashflowCategory.flowKind = :dashboardFlowKind')
-                ->andWhere('(cashflowCategory.systemCode IS NULL OR cashflowCategory.systemCode NOT IN (:dashboardUnallocatedCodes))')
-                ->setParameter('dashboardFlowKind', $flowKind)
-                ->setParameter('dashboardUnallocatedCodes', [
-                    CashflowCategory::CODE_UNALLOCATED,
-                    CashflowCategory::SYSTEM_UNALLOCATED,
-                ]);
-        }
+        return array_map(static fn (CashflowReportRow $row): array => [
+            'category' => $row->categoryId,
+            'project_id' => $row->projectId,
+            'project_name' => $row->projectName,
+            'responsibility_center_id' => $row->responsibilityCenterId,
+            'direction' => $row->direction,
+            'amount' => $row->amount,
+            'currency' => $row->currency,
+            'occurredAt' => $row->occurredAt,
+        ], $this->cashFacade->listCashflowReportRows($companyId, $from, $to, $filter));
     }
 
+    /**
+     * Presentation categories mirror the same aggregator scope as the dashboard row filter.
+     */
     private function categoryMatchesDashboardScope(
-        CashflowCategory $category,
+        CashflowCategoryNode $category,
         CashflowReportParams $params,
     ): bool {
-        // Presentation categories mirror the same aggregator scope as applyDashboardScope().
-        if (CashflowFlowKind::TECHNICAL === $category->getFlowKind()) {
+        if (CashflowFlowKind::TECHNICAL === $category->flowKind) {
             return false;
         }
 
@@ -365,8 +290,8 @@ final class CashflowReportBuilder
             return true;
         }
 
-        return $flowKind === $category->getFlowKind()
-            && !\in_array($category->getSystemCode(), [
+        return $flowKind === $category->flowKind
+            && !\in_array($category->systemCode, [
                 CashflowCategory::CODE_UNALLOCATED,
                 CashflowCategory::SYSTEM_UNALLOCATED,
             ], true);
@@ -376,8 +301,8 @@ final class CashflowReportBuilder
     private function buildDashboardReconciliation(CashflowReportParams $params): array
     {
         $currency = $params->dashboardCurrency ?? FiatCurrency::RUB;
-        $turnover = $this->transactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
-            $params->company,
+        $turnover = $this->cashFacade->sumGrossTurnoverExcludingTransfers(
+            (string) $params->company->getId(),
             $params->from,
             $params->to,
             $currency->value,
@@ -491,7 +416,7 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
+     * @param list<CashflowCategoryNode> $categories // список в порядке обхода дерева (getCashflowCategoryTree)
      *
      * @return array<int, array{id:string,name:string,parentId:?string,level:int,order:int}>
      */
@@ -503,24 +428,19 @@ final class CashflowReportBuilder
         // Подготовим быстрый доступ по id
         $byId = [];
         foreach ($categories as $c) {
-            $byId[$c->getId()] = $c;
+            $byId[$c->id] = $c;
         }
 
         // Плоский список в текущем порядке (ожидается depth-first из репозитория)
         foreach ($categories as $c) {
-            $level = 0;
-            $p = $c->getParent();
-            // Считаем уровень до 4 (итого 5 уровней: 0..4)
-            while ($p && $level < 4) {
-                ++$level;
-                $p = $p->getParent();
-            }
+            // Число предков, не больше 4 (итого 5 уровней: 0..4); у корня level = 1.
+            $level = min($c->level - 1, 4);
 
             $result[] = [
-                'id' => $c->getId(),
-                'name' => (string) $c->getName(),
-                'parentId' => null !== $c->getParent() && isset($byId[$c->getParent()->getId()])
-                    ? $c->getParent()->getId()
+                'id' => $c->id,
+                'name' => $c->name,
+                'parentId' => null !== $c->parentId && isset($byId[$c->parentId])
+                    ? $c->parentId
                     : null,
                 'level' => $level,
                 'order' => $order++,
@@ -541,8 +461,8 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param CashflowCategory[] $allCategories // полный список (findTreeByCompany)
-     * @param array<string,array{entity:CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
+     * @param list<CashflowCategoryNode> $allCategories // список в порядке обхода дерева
+     * @param array<string,array{entity:CashflowCategoryNode, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>
      */
@@ -551,13 +471,13 @@ final class CashflowReportBuilder
         // Индексы
         $byId = [];
         foreach ($allCategories as $cat) {
-            $byId[$cat->getId()] = $cat;
+            $byId[$cat->id] = $cat;
         }
 
         $children = [];
         foreach ($allCategories as $cat) {
-            $id = $cat->getId();
-            $pid = $cat->getParent() ? $cat->getParent()->getId() : null;
+            $id = $cat->id;
+            $pid = $cat->parentId;
             if (null !== $pid && !isset($byId[$pid])) {
                 $pid = null;
             }
@@ -573,7 +493,7 @@ final class CashflowReportBuilder
 
             $node = [
                 'id' => $id,
-                'name' => (string) $cat->getName(),
+                'name' => $cat->name,
                 'level' => $lvl,
                 'totals' => $totals,    // уже агрегировано (с учётом детей — см. логику выше в build)
                 'children' => [],

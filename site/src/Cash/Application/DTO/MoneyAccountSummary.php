@@ -18,6 +18,7 @@ final readonly class MoneyAccountSummary
         public string $currency,
         public string $openingBalance,
         public \DateTimeImmutable $openingBalanceDate,
+        public string $currentBalance,
     ) {
     }
 }
