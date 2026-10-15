@@ -7,36 +7,50 @@
 
 ## Границы модуля
 
-**Снаружи в Cash** — только:
+**Что закрыто гейтом.** Слои `Service`, `Repository`, `Application` (кроме
+`Application/DTO`) и `Infrastructure` Cash недоступны другим модулям —
+`test_module_internals_are_closed_to_other_modules` в
+`site/tests/Architecture/ModuleBoundaryRules.php`; Cash не зависит от
+`App\Analytics` — `test_cash_does_not_depend_on_analytics`. Симметрично Cash не
+импортирует `Service`, `Repository`, `Application` (кроме DTO) и `Infrastructure`
+модулей Company и Finance.
 
-- `App\Cash\Facade\CashFacade` — чтение и запись для других модулей;
-- типы контракта фасада: `App\Cash\Application\DTO\*`, `App\Cash\Enum\*`;
-- доменные события `App\Cash\Domain\Event\*` (подписка, например
-  `CashTransactionsChanged` → сброс кэша дашборда в Analytics).
+**Как обращаться к Cash снаружи:** `App\Cash\Facade\CashFacade`, типы его контракта
+(`App\Cash\Application\DTO\*`, `App\Cash\Enum\*`) и доменные события
+`App\Cash\Domain\Event\*` (например, `CashTransactionsChanged` → сброс кэша дашборда в
+Analytics).
 
-`Service`, `Repository`, `Application` (кроме `DTO`) и `Infrastructure` Cash
-закрыты для других модулей — гейт `test_module_internals_are_closed_to_other_modules`
-в `site/tests/Architecture/ModuleBoundaryRules.php`. Cash не зависит от
-`App\Analytics` (`test_cash_does_not_depend_on_analytics`).
+**Как Cash обращается наружу:** фасады `CompanyFacade`, `CounterpartyFacade`,
+`FinancialResponsibilityCenterFacade`, `FinanceFacade`, `PLCategoryFacade` и событие
+`CompanyCreatedEvent`. В формах — `ChoiceType` со списком из фасада, не `EntityType` с
+чужой сущностью.
 
-**Из Cash наружу** — только фасады и события чужих модулей: `CompanyFacade`,
-`CounterpartyFacade`, `FinancialResponsibilityCenterFacade`, `FinanceFacade`,
-`PLCategoryFacade`, `CompanyCreatedEvent`. Репозитории и сервисы Company/Finance
-Cash не импортирует; в формах — `ChoiceType` со списком из фасада, не `EntityType`
-с чужой сущностью. Legacy ORM-связи на `Company`, `Counterparty`,
-`ProjectDirection`, `PLCategory` пока остаются (ссылки на сущности — `string $id`
-только для нового кода).
+**Legacy-исключения (слои `Entity`, `Enum`, `Domain`, `Exception` гейтом не закрыты):**
+
+- снаружи читают сущности и исключения Cash: Finance (`Document` ↔ `CashTransaction`,
+  `FinanceFacade`, `BalanceDynamicsQuery`, `DocumentController`), Telegram
+  (`ClientBinding`, `CurrencyMismatchException`), `Report\Cashflow\CashflowReportBuilder`,
+  `Company\…\CompanyOwnerMembershipCreator`, фикстуры;
+- Cash держит ORM-связи на `Company`, `Counterparty`, `ProjectDirection`, `PLCategory` и
+  `Finance\Entity\Document` (`CashTransaction::documents`), сам создаёт `Document` и
+  `DocumentOperation` (`CashTransactionToDocumentService`), использует
+  `Company\Domain\Service\CounterpartyNameNormalizer`, `CounterpartyPickerType`,
+  `Company\Security\ModuleAccess`, enum'ы Company/Finance и DTO
+  `FinancialResponsibilityCenter*`.
+
+Новый код этих исключений не расширяет: ссылки на чужие сущности — `string $id`
+(`CLAUDE.md`, «Entity»).
 
 ## Устройство
 
 | Слой | Что здесь |
 |---|---|
 | `Controller` | HTTP in/out, компания — `ActiveCompanyService`, данные — через Repository с `companyId` или Action |
-| `Application` | Action'ы — граница транзакции, единственное место `flush()` (гейт `FlushOutsideTransactionBoundaryRule`; исключения — пакетные импорты, см. план) |
+| `Application` | Action'ы — граница транзакции; `flush()` — только в Action, MessageHandler и Command (гейт `FlushOutsideTransactionBoundaryRule`), исключения в baseline — сервисы импорта выписок |
 | `Application/DTO` | входы и результаты фасада |
-| `Infrastructure/Query` | read-модели для фасада (`CashDashboardQuery`, `CashReportQuery`, …) |
-| `Repository` | доступ к своим сущностям; каждый метод-запрос принимает компанию (`RepositoryCompanyScopeRule`) |
-| `Service` | legacy-сервисы модуля: `persist()` без `flush()`; исключение — пакетные импорты выписок (`flush` порциями) |
+| `Infrastructure/Query` | read-модели: для фасада — `CashDashboardQuery`, `CashReportQuery`; внутренние — `CashTransactionAutoRuleCandidateQuery` |
+| `Repository` | доступ к своим сущностям; каждый метод-запрос принимает компанию (`RepositoryCompanyScopeRule`), санкционированные исключения помечены `@companyScopeExempt` |
+| `Service` | legacy-сервисы модуля: `persist()` без `flush()`; исключение — сервисы импорта выписок (`flush` порциями, журнал импорта) |
 | `Domain/Event` | синхронные события «данные ДДС изменились» — только для теряемых последствий (кэш) |
 | `EventListener`, `EventSubscriber` | реакция на события Company и Doctrine (системные статьи, аудит, автоправила) |
 
@@ -117,5 +131,6 @@ idempotency key и владения ногами проверяется двум
    код без pair-mutation guards: предпочтителен forward fix; при вынужденном
    rollback сначала блокируются Cash write-paths.
 
-Production migration, category `--execute`, deploy, smoke с записью и rollback
-всегда требуют отдельного явного разрешения Владельца.
+Production migration, category `--execute`, smoke с записью и rollback всегда требуют
+отдельного явного разрешения Владельца; merge и deploy — по одному «merge and deploy»
+(`AGENTS.md` §3.2).

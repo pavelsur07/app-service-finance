@@ -862,7 +862,7 @@ Telegram-строка ДДС и балансы, плановые платежи,
   `Service/Import/File/CashFileImportReader.php_`.
 - Переписать `Cash/README.md` под правила `CLAUDE.md` (сейчас разрешает доступ
   через `Service\*` и `Repository\*`), сохранив раздел про мультивалютность.
-- Перенести этот план в `docs/plan/`, если Владелец решит хранить его там.
+- Перенести этот план из модуля, если Владелец решит (решено: `docs/tasks/cash-architecture/`).
 
 **Не лезем:** код, кроме удаления двух `.php_`.
 
@@ -880,9 +880,10 @@ Telegram-строка ДДС и балансы, плановые платежи,
   `CashFileImportReader.php_` (упоминание в `docs/tasks/cash-p0-import-restore` —
   исторический follow-up, закрыт этим этапом).
 - `site/src/Cash/README.md`: раздел «Целевая модель» (разрешал доступ к Cash через
-  `Service\*` и `Repository\*`) заменён на «Границы модуля» и «Устройство» по
-  `CLAUDE.md` и итогам этапов 4–7; разделы про мультивалютность, переводы, дерево
-  статей и rollout сохранены без изменений.
+  `Service\*` и `Repository\*`) заменён на «Границы модуля» (что закрыто гейтом,
+  что осталось legacy-исключением) и «Устройство» по `CLAUDE.md` и итогам этапов 4–7;
+  разделы про мультивалютность, переводы и дерево статей сохранены, в rollout
+  уточнено, что merge и deploy идут по «merge and deploy» (`AGENTS.md` §3.2).
 - План и `rules.md` перенесены (`git mv`) из `site/src/Cash/plan/` в
   `docs/tasks/cash-architecture/` — решение Владельца 15.10.2026. Ссылки в
   `ARCHITECTURE.md` и `ModuleBoundaryRules.php` обновлены.
