@@ -9,6 +9,7 @@ require dirname(__DIR__).'/vendor/autoload.php';
 DG\BypassFinals::enable();
 DG\BypassFinals::allowPaths([
     '*/src/Marketplace/Facade/MarketplaceFacade.php',
+    '*/src/Cash/Facade/CashFacade.php',
     '*/src/Marketplace/Application/RebuildPreliminaryForPeriodAction.php',
     '*/src/Marketplace/Infrastructure/Query/UnprocessedCostsQuery.php',
     '*/src/MarketplaceAds/Infrastructure/Query/AdSpendByListingQuery.php',

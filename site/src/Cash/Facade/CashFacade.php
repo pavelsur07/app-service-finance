@@ -9,6 +9,8 @@ use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
+use App\Cash\Application\DTO\CashCategoryAmount;
+use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryInput;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
@@ -17,6 +19,7 @@ use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -25,10 +28,13 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Facade\CompanyFacade;
@@ -50,6 +56,9 @@ final readonly class CashFacade
         private SaveCashTransactionAutoRuleAction $saveAutoRule,
         private CreateCashTransferAction $createCashTransfer,
         private CashTransferLifecycleAction $cashTransferLifecycle,
+        private CashDashboardQuery $dashboardQuery,
+        private AccountBalanceProvider $accountBalanceProvider,
+        private MoneyFundMovementRepository $moneyFundMovementRepository,
     ) {
     }
 
@@ -446,6 +455,114 @@ final readonly class CashFacade
 
             throw $e;
         }
+    }
+
+    /**
+     * Время последнего изменения данных ДДС компании: транзакций и движений фондов.
+     */
+    public function getLastCashActivityAt(string $companyId): ?\DateTimeImmutable
+    {
+        $company = $this->requireCompany($companyId);
+        $timestamps = array_filter([
+            $this->cashTransactionRepository->maxUpdatedAtForCompany($company),
+            $this->moneyFundMovementRepository->maxUpdatedAtForCompany($company),
+        ]);
+
+        return [] === $timestamps ? null : max($timestamps);
+    }
+
+    /**
+     * Id активных счетов компании в валюте, по названию счёта.
+     *
+     * @return list<string>
+     */
+    public function listActiveMoneyAccountIds(string $companyId, string $currency): array
+    {
+        $accounts = $this->moneyAccountRepository->findByFilters(
+            $this->requireCompany($companyId),
+            null,
+            [$currency],
+            true,
+            null,
+            ['name' => \SortDirection::Ascending],
+        );
+
+        return array_values(array_map(static fn (MoneyAccount $account): string => (string) $account->getId(), $accounts));
+    }
+
+    /**
+     * Сумма остатков счетов на конец дня, decimal string с двумя знаками.
+     *
+     * @param list<string> $accountIds
+     */
+    public function sumClosingBalancesUpToDate(string $companyId, \DateTimeImmutable $date, array $accountIds): string
+    {
+        $balances = $this->accountBalanceProvider->getClosingBalancesUpToDate($this->requireCompany($companyId), $date, $accountIds);
+
+        $sum = '0.00';
+        foreach ($balances as $balance) {
+            $sum = bcadd($sum, (string) $balance, 2);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * Остаток всех фондов компании в валюте на конец дня, в минорных единицах.
+     */
+    public function sumFundBalancesMinorUpToDate(string $companyId, \DateTimeImmutable $date, string $currency): int
+    {
+        return $this->dashboardQuery->sumFundBalancesMinorUpToDate($companyId, $date, $currency);
+    }
+
+    public function sumInflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
+    {
+        return $this->dashboardQuery->sumInflowExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * @return list<CashDailyAmount>
+     */
+    public function sumInflowByDayExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
+    {
+        return $this->dashboardQuery->sumInflowByDayExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * Сумма расходов со знаком, как она хранится.
+     */
+    public function sumOutflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
+    {
+        return $this->dashboardQuery->sumOutflowExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * @return list<CashDailyAmount> суммы со знаком, как они хранятся
+     */
+    public function sumOutflowByDayExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
+    {
+        return $this->dashboardQuery->sumOutflowByDayExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    public function sumCapexOutflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
+    {
+        return $this->dashboardQuery->sumCapexOutflowExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * @return list<CashCategoryAmount>
+     */
+    public function sumOutflowByCategoryExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
+    {
+        return $this->dashboardQuery->sumOutflowByCategoryExcludingTransfers($companyId, $from, $to, $currency);
+    }
+
+    /**
+     * @return array{OPERATING: string, INVESTING: string, FINANCING: string}
+     */
+    public function sumNetByFlowKindExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): array
+    {
+        return $this->dashboardQuery->sumNetByFlowKindExcludingTransfers($companyId, $from, $to, $currency);
     }
 
     private function findExistingByImport(CreateCashTransactionCommand $command): ?CashTransaction

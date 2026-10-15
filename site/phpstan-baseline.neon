@@ -181,82 +181,10 @@ parameters:
 			path: src/Analytics/Application/DashboardSnapshotService.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Cash\\Repository\\Accounts\\MoneyFundMovementRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/LastUpdatedAtResolver.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/LastUpdatedAtResolver.php
-
-		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Analytics\\Application\\LastUpdatedAtResolver should not depend on App\\Finance\\Repository\\PLDailyTotalRepository$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
 			count: 1
 			path: src/Analytics/Application/LastUpdatedAtResolver.php
-
-		-
-			message: '#^Offset ''FINANCING'' on array\{OPERATING\: float, INVESTING\: float, FINANCING\: float\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
-
-		-
-			message: '#^Offset ''INVESTING'' on array\{OPERATING\: float, INVESTING\: float, FINANCING\: float\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
-
-		-
-			message: '#^Offset ''OPERATING'' on array\{OPERATING\: float, INVESTING\: float, FINANCING\: float\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\CashflowSplitWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/CashflowSplitWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyFundMovementRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\FreeCashWidgetBuilder should not depend on App\\Cash\\Service\\Accounts\\AccountBalanceProvider$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/FreeCashWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\InflowWidgetBuilder should not depend on App\\Cash\\Repository\\Accounts\\MoneyAccountRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/InflowWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\InflowWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/InflowWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\OutflowWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
-			path: src/Analytics/Application/Widget/OutflowWidgetBuilder.php
 
 		-
 			message: '#^Offset ''rawValues'' on array\{periods\: array\<App\\Finance\\Report\\PlReportPeriod\>, rows\: array\<int, array\{id\: string, code\: string\|null, name\: string, level\: int, type\: string, values\: array\<string, string\>\}\>, rawValues\: array\<string, array\<string, float\>\>, formats\: array\<string, App\\Finance\\Enum\\PLValueFormat\>, warnings\: array\<string\>\} on left side of \?\? always exists and is not nullable\.$#'
@@ -316,12 +244,6 @@ parameters:
 			message: '#^Offset ''sumAbs'' on array\{categoryId\: string\|null, categoryName\: string, sumAbs\: float\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 5
-			path: src/Analytics/Application/Widget/TopCashWidgetBuilder.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCash\: App\\Analytics\\Application\\Widget\\TopCashWidgetBuilder should not depend on App\\Cash\\Repository\\Transaction\\CashTransactionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCash
-			count: 1
 			path: src/Analytics/Application/Widget/TopCashWidgetBuilder.php
 
 		-
@@ -1287,12 +1209,6 @@ parameters:
 
 		-
 			message: '#^Method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumByDay\(\) should return list\<array\{date\: string, inflow\: string, outflow\: string\}\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Cash/Repository/Transaction/CashTransactionRepository.php
-
-		-
-			message: '#^Method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:sumOutflowByCategoryExcludeTransfers\(\) should return list\<array\{categoryId\: string\|null, categoryName\: string, sumAbs\: float\}\> but returns array\<array\{categoryId\: string\|null, categoryName\: string, sumAbs\: float\}\>\.$#'
 			identifier: return.type
 			count: 1
 			path: src/Cash/Repository/Transaction/CashTransactionRepository.php

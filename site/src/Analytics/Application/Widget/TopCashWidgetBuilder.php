@@ -6,8 +6,9 @@ namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
+use App\Cash\Application\DTO\CashCategoryAmount;
 use App\Cash\Enum\FiatCurrency;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 
 final readonly class TopCashWidgetBuilder
@@ -17,7 +18,7 @@ final readonly class TopCashWidgetBuilder
     private const TREND_FLAT_THRESHOLD_PCT = 0.5;
 
     public function __construct(
-        private CashTransactionRepository $cashTransactionRepository,
+        private CashFacade $cashFacade,
         private DrilldownBuilder $drilldownBuilder,
     ) {
     }
@@ -27,10 +28,11 @@ final readonly class TopCashWidgetBuilder
      */
     public function build(Company $company, Period $period, FiatCurrency $cashCurrency): array
     {
-        $rows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $period->getFrom(), $period->getTo(), $cashCurrency->value);
+        $companyId = (string) $company->getId();
+        $rows = $this->toRows($this->cashFacade->sumOutflowByCategoryExcludingTransfers($companyId, $period->getFrom(), $period->getTo(), $cashCurrency->value));
 
         $prevPeriod = $period->prevPeriod();
-        $prevRows = $this->cashTransactionRepository->sumOutflowByCategoryExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value);
+        $prevRows = $this->toRows($this->cashFacade->sumOutflowByCategoryExcludingTransfers($companyId, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value));
 
         $prevSums = [];
         foreach ($prevRows as $row) {
@@ -103,6 +105,20 @@ final readonly class TopCashWidgetBuilder
                 'share' => $total > 0.0 ? round($otherSum / $total, 4) : 0.0,
             ],
         ];
+    }
+
+    /**
+     * @param list<CashCategoryAmount> $amounts
+     *
+     * @return list<array{categoryId: ?string, categoryName: string, sumAbs: float}>
+     */
+    private function toRows(array $amounts): array
+    {
+        return array_map(static fn (CashCategoryAmount $amount): array => [
+            'categoryId' => $amount->categoryId,
+            'categoryName' => $amount->categoryName,
+            'sumAbs' => (float) $amount->amountAbs,
+        ], $amounts);
     }
 
     private function resolveTrend(float $deltaPct): string
