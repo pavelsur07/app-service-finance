@@ -22,7 +22,7 @@ use Symfony\Bridge\Doctrine\Form\Type\EntityType;
  * «Слои → Формы»): чужие данные идут через `ChoiceType` и Facade.
  *
  * Ловит `$builder->add('field', EntityType::class, ['class' => Foo::class, …])`,
- * в том числе для подклассов `EntityType` (`ProjectDirectionPickerType`),
+ * в том числе для подклассов `EntityType`,
  * именованных аргументов (`type:`, `options:`) и `class` строкой. Модуль —
  * сегмент пространства имён после корня (`App\Cash\…`). Не видит `class`,
  * собранный динамически, поле, добавленное не через `add()`, и типы-обёртки,

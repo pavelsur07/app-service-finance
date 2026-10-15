@@ -190,7 +190,7 @@ class CashTransactionAutoRuleController extends AbstractController
         $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
-        $projectDirections = $companyFacade->listProjectDirectionEntities((string) $company->getId(), treeOrder: false);
+        $projectDirections = $companyFacade->listProjectDirectionEntities($companyId, treeOrder: false);
 
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),

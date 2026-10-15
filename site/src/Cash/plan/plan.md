@@ -1008,8 +1008,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
   - `ProcessMarketplaceRawDocumentAction` помечен `#[AsMessageHandler]`, но
     команда в шину не отправляется — атрибут рудиментарный (Marketplace);
     в тесте routing — явное исключение.
-  - `ForeignEntityTypeRule` не видит собственные типы-обёртки над
-    `EntityType` (`ProjectDirectionPickerType` в `CashTransactionAutoRuleType`).
+  - ~~`ForeignEntityTypeRule` не видит собственные типы-обёртки над `EntityType`~~ —
+    видит подклассы; `ProjectDirectionPickerType` с 7.5b — `ChoiceType`, вопрос закрыт.
   - `ControllerUnscopedFindRule` не проверяет `findBy()`/`findOneBy()`
     (критерий может содержать компанию), `$em->find($class, $id)` с классом в
     переменной, владение глубже одного уровня (`LoanPaymentSchedule` в
