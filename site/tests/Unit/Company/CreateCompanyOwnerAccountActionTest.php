@@ -41,12 +41,27 @@ final class CreateCompanyOwnerAccountActionTest extends TestCase
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
             });
+        // flush и событие — внутри одной транзакции: сбой подписчика (системные статьи Cash,
+        // структура баланса) откатывает и компанию.
+        $transaction = new \stdClass();
+        $transaction->open = false;
         $entityManager
             ->expects(self::once())
-            ->method('flush');
+            ->method('flush')
+            ->willReturnCallback(static function () use ($transaction): void {
+                self::assertTrue($transaction->open, 'flush() вне транзакции.');
+            });
         $entityManager
+            ->expects(self::once())
             ->method('wrapInTransaction')
-            ->willReturnCallback(fn (callable $operation): mixed => $operation($entityManager));
+            ->willReturnCallback(static function (callable $operation) use ($transaction, $entityManager): mixed {
+                $transaction->open = true;
+                try {
+                    return $operation($entityManager);
+                } finally {
+                    $transaction->open = false;
+                }
+            });
 
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
@@ -64,7 +79,8 @@ final class CreateCompanyOwnerAccountActionTest extends TestCase
         $eventDispatcher
             ->expects(self::once())
             ->method('dispatch')
-            ->willReturnCallback(static function (object $event) use (&$dispatched): object {
+            ->willReturnCallback(static function (object $event) use (&$dispatched, $transaction): object {
+                self::assertTrue($transaction->open, 'CompanyCreatedEvent вне транзакции.');
                 $dispatched[] = $event;
 
                 return $event;
