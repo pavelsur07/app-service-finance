@@ -57,6 +57,27 @@ final class CompanyFacadeCashLookupsTest extends IntegrationTestCase
         self::assertNull($this->companyFacade->findDefaultProjectDirection(Uuid::uuid4()->toString()));
     }
 
+    public function testListProjectDirectionEntitiesInTreeOrNameOrder(): void
+    {
+        $root = new ProjectDirection(Uuid::uuid4()->toString(), $this->company, 'Б-корень');
+        $child = new ProjectDirection(Uuid::uuid4()->toString(), $this->company, 'В-дочерний');
+        $child->setParent($root);
+        $other = new ProjectDirection(Uuid::uuid4()->toString(), $this->company, 'А-другой');
+        $this->em->persist($root);
+        $this->em->persist($child);
+        $this->em->persist($other);
+        $this->em->persist(new ProjectDirection(Uuid::uuid4()->toString(), $this->foreign, 'Чужой'));
+        $this->em->flush();
+        $id = (string) $this->company->getId();
+        $names = static fn (array $projects): array => array_map(static fn (ProjectDirection $p): string => $p->getName(), $projects);
+
+        self::assertSame(['А-другой', 'Б-корень', 'В-дочерний'], $names($this->companyFacade->listProjectDirectionEntities($id, treeOrder: false)));
+        $tree = $names($this->companyFacade->listProjectDirectionEntities($id, treeOrder: true));
+        self::assertLessThan(array_search('В-дочерний', $tree, true), array_search('Б-корень', $tree, true));
+        self::assertNotContains('Чужой', $tree);
+        self::assertSame([], $this->companyFacade->listProjectDirectionEntities(Uuid::uuid4()->toString(), treeOrder: true));
+    }
+
     public function testFindOrCreateByInnReusesCompanyCounterpartyAndCreatesOtherwise(): void
     {
         $existing = $this->counterparty($this->company, 'ООО "Ромашка"', '7707083893');

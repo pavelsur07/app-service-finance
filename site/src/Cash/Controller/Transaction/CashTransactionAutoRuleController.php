@@ -23,8 +23,8 @@ use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
-use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
@@ -174,7 +174,7 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         MoneyAccountRepository $moneyAccountRepo,
-        ProjectDirectionRepository $projectDirectionRepo,
+        CompanyFacade $companyFacade,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         CashTransactionAutoRuleTargetValidator $targetValidator,
         AuditContextProvider $auditContextProvider,
@@ -190,7 +190,7 @@ class CashTransactionAutoRuleController extends AbstractController
         $companyId = (string) $company->getId();
         $categories = $categoryRepo->findTreeByCompany($company);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
-        $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
+        $projectDirections = $companyFacade->listProjectDirectionEntities((string) $company->getId(), treeOrder: false);
 
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
@@ -257,7 +257,7 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         MoneyAccountRepository $moneyAccountRepo,
-        ProjectDirectionRepository $projectDirectionRepo,
+        CompanyFacade $companyFacade,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         CashTransactionAutoRuleTargetValidator $targetValidator,
         AuditContextProvider $auditContextProvider,
@@ -276,7 +276,7 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $categories = $categoryRepo->findTreeByCompany($company);
         $moneyAccounts = $moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
-        $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
+        $projectDirections = $companyFacade->listProjectDirectionEntities((string) $company->getId(), treeOrder: false);
         $currentProjectDirectionId = $rule->getProjectDirection()?->getId();
         $currentResponsibilityCenterId = $rule->getResponsibilityCenterId();
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [

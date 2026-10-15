@@ -970,7 +970,16 @@ userExists(string $userId): bool
 
 // Системный проект «Основной» (PROJECT_GENERAL, иначе по имени) — для документов без проекта.
 findDefaultProjectDirection(string $companyId): ?ProjectDirection
+
+// Проекты компании для пикера в формах с legacy-ассоциацией ProjectDirection:
+// $treeOrder — обход дерева, иначе по названию.
+listProjectDirectionEntities(string $companyId, bool $treeOrder): list<ProjectDirection>
 ```
+
+`Shared\Form\Type\ProjectDirectionPickerType` с этапа 7.5b плана Cash — `ChoiceType`
+(не `EntityType`): список проектов передаётся опцией `choices` (из
+`listProjectDirectionEntities`), значения — id, опция `class` оставлена для совместимости
+и принимает только `ProjectDirection`. Тема — `project_direction_picker`.
 
 `Company::getPublicId(): ?int` — постоянный публичный номер, `null` до первого flush.
 PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, начало 100000, NO CYCLE);

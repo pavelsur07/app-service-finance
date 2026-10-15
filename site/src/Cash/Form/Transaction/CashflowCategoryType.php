@@ -101,9 +101,12 @@ class CashflowCategoryType extends AbstractType
                 'label' => 'Разрешено создавать документы ОПиУ из этой категории',
                 'required' => false,
             ])
-            ->add('plCategory', EntityType::class, [
-                'class' => PLCategory::class,
+            // ChoiceType, не EntityType: список статей ОПиУ приходит из PLCategoryFacade,
+            // форма в БД Finance не ходит; значения — id, как у EntityType.
+            ->add('plCategory', ChoiceType::class, [
                 'choices' => $options['plCategories'],
+                'choice_value' => static fn (?PLCategory $item): ?string => $item?->getId(),
+                'choice_translation_domain' => false,
                 'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },

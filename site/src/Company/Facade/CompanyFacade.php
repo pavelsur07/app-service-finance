@@ -209,6 +209,27 @@ final class CompanyFacade
     }
 
     /**
+     * Проекты компании для пикера в формах, связанных с сущностью (legacy-ассоциации
+     * `ProjectDirection`): `$treeOrder` — обход дерева, иначе по названию.
+     *
+     * @return list<ProjectDirection>
+     */
+    public function listProjectDirectionEntities(string $companyId, bool $treeOrder): array
+    {
+        $company = $this->findById($companyId);
+        if (null === $company) {
+            return [];
+        }
+
+        /** @var list<ProjectDirection> $projects */
+        $projects = array_values($treeOrder
+            ? $this->projectDirectionRepository->findTreeByCompany($company)
+            : $this->projectDirectionRepository->findBy(['company' => $company], ['name' => 'ASC']));
+
+        return $projects;
+    }
+
+    /**
      * Системный проект «Основной» компании — для документов, которым проект не указан.
      */
     public function findDefaultProjectDirection(string $companyId): ?ProjectDirection
