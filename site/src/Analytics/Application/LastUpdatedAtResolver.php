@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Analytics\Application;
 
-use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Finance\Repository\PLDailyTotalRepository;
 
 final class LastUpdatedAtResolver
 {
     public function __construct(
-        private readonly CashTransactionRepository $cashTransactionRepository,
-        private readonly MoneyFundMovementRepository $moneyFundMovementRepository,
+        private readonly CashFacade $cashFacade,
         private readonly PLDailyTotalRepository $plDailyTotalRepository,
     ) {
     }
@@ -21,8 +19,7 @@ final class LastUpdatedAtResolver
     public function resolve(Company $company): ?\DateTimeImmutable
     {
         $timestamps = array_filter([
-            $this->cashTransactionRepository->maxUpdatedAtForCompany($company),
-            $this->moneyFundMovementRepository->maxUpdatedAtForCompany($company),
+            $this->cashFacade->getLastCashActivityAt((string) $company->getId()),
             $this->plDailyTotalRepository->maxUpdatedAtForCompany($company),
         ]);
 

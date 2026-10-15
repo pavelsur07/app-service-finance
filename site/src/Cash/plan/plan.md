@@ -724,6 +724,25 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 ---
 
+### Результат подэтапа 7.1 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| 6 классов Analytics (`LastUpdatedAtResolver`, виджеты FreeCash, Inflow, Outflow, CashflowSplit, TopCash) читали `CashTransactionRepository`, `MoneyAccountRepository`, `MoneyFundMovementRepository`, `AccountBalanceProvider` | читают только `CashFacade`: 11 read-методов с `string $companyId`, суммы — decimal string, строки — DTO `CashDailyAmount`, `CashCategoryAmount` |
+| 8 запросов дашборда в репозиториях Cash | `Cash\Infrastructure\Query\CashDashboardQuery`: DQL перенесён без изменения условий, из репозиториев удалён |
+
+Отступление от плана: запросы остались на DQL, а не DBAL — перенос без
+переписывания гарантирует те же числа. Методы, которыми пользуются и другие
+модули (`findByFilters`, `AccountBalanceProvider`, `maxUpdatedAtForCompany`),
+фасад вызывает как есть; их перенос — в подэтапах их потребителей.
+
+Тест-сравнение: снимок `DashboardSnapshotService` на фикстурах A22 (+ разбивки
+по статьям с CAPEX и движения фонда) — 3 периода × RUB/USD, пять Cash-виджетов
+и `last_updated_at` — до и после совпал побайтно (временный тест, в PR не
+входит). Постоянные: `CashFacadeDashboardReadTest` (суммы, исключения, изоляция
+компаний), unit-тесты Analytics переведены на мок фасада через
+`tests/Support/Mock/MocksFinalClasses` — без роста baseline.
+
 ## Этап 8. Гигиена модуля
 
 **Цель.** Убрать мёртвый код и устаревшие документы, которые вводят в
@@ -794,13 +813,21 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | #2682 |
 | 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | #2683 |
 | 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | #2684 |
-| 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | этот PR |
+| 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | #2685 |
+| 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | этот PR |
 
 ## Находки
 
 Обнаруженное по ходу работ вне scope текущего этапа. Не чинится в этом плане
 без согласования.
 
+- **`last_updated_at` дашборда всегда `null` (этап 7.1).** Все три источника —
+  `CashTransactionRepository`, `MoneyFundMovementRepository`,
+  `PLDailyTotalRepository::maxUpdatedAtForCompany` — проверяют результат DQL
+  `MAX()` на `instanceof \DateTimeInterface`, а Doctrine возвращает строку; PHPStan
+  это видит (записи `instanceof.alwaysFalse` в baseline). На фикстурах с данными
+  `context.last_updated_at` = `null`. Исправление меняет видимое поведение
+  дашборда — отдельной задачей.
 - `number_format((float) …)` в `ClientBank1CImportService:562,797`,
   `BankImportService:307` — форматирование входа через `float`.
 - `(float)` на суммах вне Cash: Marketplace — 22, Finance — 12, Catalog — 3,

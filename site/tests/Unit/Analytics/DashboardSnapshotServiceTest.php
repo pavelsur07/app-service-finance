@@ -19,11 +19,7 @@ use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Enum\FiatCurrency;
-use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Company\Security\AccessLevel;
@@ -39,6 +35,7 @@ use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Mock\MocksFinalClasses;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +46,8 @@ use Symfony\Contracts\Cache\ItemInterface;
 
 final class DashboardSnapshotServiceTest extends TestCase
 {
+    use MocksFinalClasses;
+
     public function testUsesCacheForSamePeriodAndCompany(): void
     {
         $cache = new InMemoryCacheSpy();
@@ -159,30 +158,25 @@ final class DashboardSnapshotServiceTest extends TestCase
 
     private function buildService(CacheInterface $cache, bool $allowFinanceRead, string $companyId): DashboardSnapshotService
     {
-        $accountRepository = $this->createMock(MoneyAccountRepository::class);
-        $accountRepository->method('findByFilters')->willReturn([]);
-
-        $dailyBalanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
-        $accountBalanceProvider = new AccountBalanceProvider($dailyBalanceRepository);
-
-        $fundMovementRepository = $this->createMock(MoneyFundMovementRepository::class);
-        $fundMovementRepository->method('sumFundBalancesUpToDate')->willReturn([]);
-
-        $cashTransactionRepository = $this->createMock(CashTransactionRepository::class);
-        $cashTransactionRepository->method('sumOutflowExcludeTransfers')->willReturn(0.0);
-        $cashTransactionRepository->method('sumOutflowByDayExcludeTransfers')->willReturn([]);
-        $cashTransactionRepository->method('sumCapexOutflowExcludeTransfers')->willReturn(0.0);
-        $cashTransactionRepository->method('sumOutflowByCategoryExcludeTransfers')->willReturn([]);
-        $cashTransactionRepository->method('sumNetByFlowKindExcludeTransfers')->willReturn([
-            'OPERATING' => 0.0,
-            'INVESTING' => 0.0,
-            'FINANCING' => 0.0,
+        $cashFacade = $this->createFinalMock(CashFacade::class);
+        $cashFacade->method('listActiveMoneyAccountIds')->willReturn([]);
+        $cashFacade->method('sumClosingBalancesUpToDate')->willReturn('0.00');
+        $cashFacade->method('sumFundBalancesMinorUpToDate')->willReturn(0);
+        $cashFacade->method('sumOutflowExcludingTransfers')->willReturn('0.00');
+        $cashFacade->method('sumOutflowByDayExcludingTransfers')->willReturn([]);
+        $cashFacade->method('sumCapexOutflowExcludingTransfers')->willReturn('0.00');
+        $cashFacade->method('sumOutflowByCategoryExcludingTransfers')->willReturn([]);
+        $cashFacade->method('sumNetByFlowKindExcludingTransfers')->willReturn([
+            'OPERATING' => '0.00',
+            'INVESTING' => '0.00',
+            'FINANCING' => '0.00',
         ]);
 
-        $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository, new DrilldownBuilder());
-        $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository, new DrilldownBuilder());
-        $outflowWidgetBuilder = new OutflowWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
-        $cashflowSplitWidgetBuilder = new CashflowSplitWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
+        $facade = self::asInstanceOf($cashFacade, CashFacade::class);
+        $widgetBuilder = new FreeCashWidgetBuilder($facade, new DrilldownBuilder());
+        $inflowWidgetBuilder = new InflowWidgetBuilder($facade, new DrilldownBuilder());
+        $outflowWidgetBuilder = new OutflowWidgetBuilder($facade, new DrilldownBuilder());
+        $cashflowSplitWidgetBuilder = new CashflowSplitWidgetBuilder($facade, new DrilldownBuilder());
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
         $plCategoryRepository->method('findBy')->willReturn([]);
@@ -212,12 +206,11 @@ final class DashboardSnapshotServiceTest extends TestCase
 
         $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository, new DrilldownBuilder());
         $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository, new DrilldownBuilder());
-        $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
+        $topCashWidgetBuilder = new TopCashWidgetBuilder($facade, new DrilldownBuilder());
         $topPnlWidgetBuilder = new TopPnlWidgetBuilder($dailyTotalRepository, $plCategoryRepository, new ParetoTopItemsBuilder(), new DrilldownBuilder());
 
         $lastUpdatedAtResolver = new LastUpdatedAtResolver(
-            $cashTransactionRepository,
-            $fundMovementRepository,
+            $facade,
             $dailyTotalRepository,
         );
 

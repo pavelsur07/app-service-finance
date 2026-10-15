@@ -8,13 +8,13 @@ use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
-use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 
 final readonly class CashflowSplitWidgetBuilder
 {
     public function __construct(
-        private CashTransactionRepository $cashTransactionRepository,
+        private CashFacade $cashFacade,
         private DrilldownBuilder $drilldownBuilder,
     ) {
     }
@@ -26,8 +26,9 @@ final readonly class CashflowSplitWidgetBuilder
     {
         $prevPeriod = $period->prevPeriod();
 
-        $netByKind = $this->cashTransactionRepository->sumNetByFlowKindExcludeTransfers($company, $period->getFrom(), $period->getTo(), $cashCurrency->value);
-        $prevNetByKind = $this->cashTransactionRepository->sumNetByFlowKindExcludeTransfers($company, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value);
+        $companyId = (string) $company->getId();
+        $netByKind = $this->toFloats($this->cashFacade->sumNetByFlowKindExcludingTransfers($companyId, $period->getFrom(), $period->getTo(), $cashCurrency->value));
+        $prevNetByKind = $this->toFloats($this->cashFacade->sumNetByFlowKindExcludingTransfers($companyId, $prevPeriod->getFrom(), $prevPeriod->getTo(), $cashCurrency->value));
 
         return [
             'operating' => $this->buildKindPayload(CashflowFlowKind::OPERATING, $netByKind, $prevNetByKind),
@@ -53,6 +54,16 @@ final readonly class CashflowSplitWidgetBuilder
                 CashflowFlowKind::FINANCING->value => $this->buildDrilldownByKind(CashflowFlowKind::FINANCING, $period, $cashCurrency),
             ],
         ];
+    }
+
+    /**
+     * @param array<string, string> $netByKind
+     *
+     * @return array<string, float>
+     */
+    private function toFloats(array $netByKind): array
+    {
+        return array_map(static fn (string $net): float => round((float) $net, 2), $netByKind);
     }
 
     /**

@@ -1479,6 +1479,44 @@ upsertCashflowCategory(string $companyId, CashflowCategoryInput $input): string
 upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = null): string
 ```
 
+Чтение для дашборда Analytics (этап 7.1 плана Cash). Суммы — decimal string с двумя
+знаками; переводы и удалённые операции не входят; период `from..to` по дню
+включительно; валюта операции равна `$currency`. Агрегаты считает
+`Cash\Infrastructure\Query\CashDashboardQuery`.
+
+```php
+// Последняя активность ДДС: max(updatedAt транзакций, occurredAt движений фондов) или null.
+// Сейчас всегда null — см. «Находки» в site/src/Cash/plan/plan.md
+getLastCashActivityAt(string $companyId): ?\DateTimeImmutable
+
+// Id активных счетов в валюте, по названию
+listActiveMoneyAccountIds(string $companyId, string $currency): list<string>
+
+// Сумма остатков счетов на конец дня; пустой список счетов → '0.00'
+sumClosingBalancesUpToDate(string $companyId, \DateTimeImmutable $date, list<string> $accountIds): string
+
+// Остаток фондов в валюте на конец дня, в минорных единицах
+sumFundBalancesMinorUpToDate(string $companyId, \DateTimeImmutable $date, string $currency): int
+
+// Поступления (только в валюте счёта) — итог и по дням
+sumInflowExcludingTransfers(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $currency): string
+sumInflowByDayExcludingTransfers(...same): list<CashDailyAmount>
+
+// Расходы со знаком, как хранятся (модуль берёт потребитель) — итог, по дням, CAPEX
+sumOutflowExcludingTransfers(...same): string
+sumOutflowByDayExcludingTransfers(...same): list<CashDailyAmount>
+sumCapexOutflowExcludingTransfers(...same): string
+
+// Модуль расходов по статьям, по убыванию; categoryId = null — «Без категории»
+sumOutflowByCategoryExcludingTransfers(...same): list<CashCategoryAmount>
+
+// Сумма разбивок по видам потока
+sumNetByFlowKindExcludingTransfers(...same): array{OPERATING: string, INVESTING: string, FINANCING: string}
+```
+
+DTO: `CashDailyAmount(date, amount)`, `CashCategoryAmount(categoryId, categoryName, amountAbs)`
+в `src/Cash/Application/DTO/`.
+
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
 запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять»,
 кроме tri-state поля `CashflowCategoryInput::parentId`: `parentIdProvided=false`
@@ -1525,7 +1563,7 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 - `PaymentPlanMatcher`;
 - `ApplyAutoRulesForTransaction`;
 - `DailyBalanceRecalculator`;
-- `SnapshotCacheInvalidator`.
+- событие `CashTransactionsChanged` (сброс кэша дашборда в Analytics).
 
 #### Регистр ежедневных остатков
 
