@@ -70,7 +70,7 @@ final class CashAutoRulesEnqueueCommand extends Command
             return Command::FAILURE;
         }
         if (null !== $initiatedByUserId
-            && !$this->companyFacade->userHasAccess($companyId, $initiatedByUserId)) {
+            && !$this->companyFacade->userHasAccess(strtolower($companyId), strtolower($initiatedByUserId))) {
             $output->writeln('<error>Пользователь из --actor-user-id не принадлежит указанной компании.</error>');
 
             return Command::FAILURE;

@@ -101,7 +101,7 @@ final class CounterpartyFacade
             return $existing;
         }
 
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, $name, $type);
+        $counterparty = new Counterparty(Uuid::uuid7()->toString(), $company, $name, $type);
         $counterparty->assignTaxIds($inn, null);
         $this->entityManager->persist($counterparty);
 
@@ -119,7 +119,7 @@ final class CounterpartyFacade
             return $existing;
         }
 
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, $name, $type);
+        $counterparty = new Counterparty(Uuid::uuid7()->toString(), $company, $name, $type);
         $this->entityManager->persist($counterparty);
 
         return $counterparty;
