@@ -41,16 +41,18 @@ class BankImportCursorRepository extends ServiceEntityRepository
             return $cursor;
         }
 
+        // Без flush(): курсор сохранит вызывающий код вместе с транзакциями дня.
         $cursor = new BankImportCursor(Uuid::uuid4()->toString(), $company, $bankCode, $accountNumber);
         $this->getEntityManager()->persist($cursor);
-        $this->getEntityManager()->flush();
 
         return $cursor;
     }
 
+    /**
+     * Только persist(): flush() делает вызывающий код (граница транзакции).
+     */
     public function save(BankImportCursor $cursor): void
     {
         $this->getEntityManager()->persist($cursor);
-        $this->getEntityManager()->flush();
     }
 }

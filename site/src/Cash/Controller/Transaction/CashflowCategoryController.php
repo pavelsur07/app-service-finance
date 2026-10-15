@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\DeleteCashflowCategoryAction;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
@@ -11,7 +12,6 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -161,7 +161,7 @@ class CashflowCategoryController extends AbstractController
         Request $request,
         string $id,
         CashflowCategoryRepository $repo,
-        EntityManagerInterface $em,
+        DeleteCashflowCategoryAction $deleteCategory,
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
@@ -170,9 +170,7 @@ class CashflowCategoryController extends AbstractController
 
         if ($this->isCsrfTokenValid('delete'.$article->getId(), $request->request->get('_token'))) {
             try {
-                $article->assertCanDelete();
-                $em->remove($article);
-                $em->flush();
+                $deleteCategory($article);
             } catch (\DomainException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
             }

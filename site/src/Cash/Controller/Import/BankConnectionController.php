@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\DeleteBankConnectionAction;
+use App\Cash\Application\SaveBankConnectionAction;
 use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Form\Bank\BankConnectionType;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
-use App\Cash\Service\Bank\BankConnectionService;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
@@ -25,9 +26,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class BankConnectionController extends AbstractController
 {
     public function __construct(
-        private ActiveCompanyService $activeCompanyService,
-        private MessageBusInterface $bus,
-        private BankConnectionService $bankConnectionService,
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly MessageBusInterface $bus,
+        private readonly SaveBankConnectionAction $saveBankConnection,
+        private readonly DeleteBankConnectionAction $deleteBankConnection,
     ) {
     }
 
@@ -65,7 +67,7 @@ class BankConnectionController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->bankConnectionService->create($connection);
+            ($this->saveBankConnection)($connection);
 
             return $this->redirectToRoute('cash_bank_connection_index');
         }
@@ -107,7 +109,7 @@ class BankConnectionController extends AbstractController
                 $connection->setApiKey($submittedApiKey);
             }
 
-            $this->bankConnectionService->update();
+            ($this->saveBankConnection)($connection);
 
             return $this->redirectToRoute('cash_bank_connection_index');
         }
@@ -133,7 +135,7 @@ class BankConnectionController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$connection->getId(), (string) $request->request->get('_token'))) {
-            $this->bankConnectionService->delete($connection);
+            ($this->deleteBankConnection)($connection);
         }
 
         return $this->redirectToRoute('cash_bank_connection_index');

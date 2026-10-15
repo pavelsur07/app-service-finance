@@ -178,9 +178,10 @@ final class BankImportService
                         ++$page;
                     }
 
-                    $this->entityManager->flush();
+                    // Транзакции дня и курсор — одним flush(): курсор не обгоняет данные.
                     $cursor->setLastImportedDate(new \DateTimeImmutable($date->format('Y-m-d')));
                     $this->cursorRepository->save($cursor);
+                    $this->entityManager->flush();
                 }
             }
 

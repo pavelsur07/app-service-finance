@@ -481,10 +481,10 @@ parameters:
 			path: src/Cash/Application/SaveCashTransactionSplitsAction.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\Service\\CashTransactionAutoRuleGeneralCfoAssigner should not depend on App\\Company\\Repository\\UserRepository$#'
+			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Application\\AssignGeneralCfoToCashAutoRulesAction should not depend on App\\Company\\Repository\\UserRepository$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
-			path: src/Cash/Application/Service/CashTransactionAutoRuleGeneralCfoAssigner.php
+			path: src/Cash/Application/AssignGeneralCfoToCashAutoRulesAction.php
 
 		-
 			message: '#^Parameter \#1 \$audits of method App\\Cash\\Application\\Service\\CashTransactionAutoRuleProvenanceResolver\:\:latestChangeIsAutoAssigned\(\) expects list\<App\\Shared\\Entity\\AuditLog\>, list\<object\> given\.$#'
@@ -13886,30 +13886,6 @@ parameters:
 			path: src/Billing/Fixture/BillingFixture.php
 
 		-
-			message: '#^wrapInTransaction\(\) в App\\Cash\\Application\\Service\\CashTransactionAutoRuleGeneralCfoAssigner\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Application/Service/CashTransactionAutoRuleGeneralCfoAssigner.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 3
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^wrapInTransaction\(\) в App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Controller\\Transaction\\CashflowCategoryController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
 			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Cash — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
 			identifier: vashfindir.foreignEntityType
 			count: 1
@@ -13920,30 +13896,6 @@ parameters:
 			identifier: vashfindir.foreignEntityType
 			count: 1
 			path: src/Cash/Form/Transaction/CashflowCategoryType.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Repository\\Bank\\BankImportCursorRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 2
-			path: src/Cash/Repository/Bank/BankImportCursorRepository.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Accounts\\FundService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 3
-			path: src/Cash/Service/Accounts/FundService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Accounts\\MoneyAccountService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 2
-			path: src/Cash/Service/Accounts/MoneyAccountService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Bank\\BankConnectionService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 3
-			path: src/Cash/Service/Bank/BankConnectionService.php
 
 		-
 			message: '#^flush\(\) в App\\Cash\\Service\\Import\\Bank\\BankImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

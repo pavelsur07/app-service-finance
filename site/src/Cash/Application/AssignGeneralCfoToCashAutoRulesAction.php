@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Application\Service;
+namespace App\Cash\Application;
 
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
@@ -12,20 +12,20 @@ use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
-final readonly class CashTransactionAutoRuleGeneralCfoAssigner
+final class AssignGeneralCfoToCashAutoRulesAction
 {
     public function __construct(
-        private CashTransactionAutoRuleRepository $ruleRepository,
-        private FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
-        private UserRepository $userRepository,
-        private EntityManagerInterface $entityManager,
+        private readonly CashTransactionAutoRuleRepository $ruleRepository,
+        private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+        private readonly UserRepository $userRepository,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
     /**
      * @return array{companies: int, candidates: int, assignable: int, blocked: int, updated: int}
      */
-    public function run(bool $execute, ?string $actorUserId = null, ?int $expectedCount = null): array
+    public function __invoke(bool $execute, ?string $actorUserId = null, ?int $expectedCount = null): array
     {
         if ($execute && (null === $actorUserId || !Uuid::isValid($actorUserId))) {
             throw new \InvalidArgumentException('Для --execute укажите UUID согласовавшего пользователя в --actor-user-id.');

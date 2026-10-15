@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\ApplyAutoRuleToTransactionAction;
+use App\Cash\Application\ChangeCashTransactionAutoRuleActivityAction;
 use App\Cash\Application\DeleteCashTransactionAutoRuleAction;
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashTransactionAutoRulePrefiller;
 use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -15,23 +16,18 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
-use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
-use App\Shared\Entity\AuditLog;
-use App\Shared\Enum\AuditLogAction;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -421,13 +417,8 @@ class CashTransactionAutoRuleController extends AbstractController
         string $transactionId,
         Request $request,
         ActiveCompanyService $companyService,
-        CashTransactionRepository $txRepo,
-        CashTransactionAutoRuleService $autoRuleService,
         CsrfTokenManagerInterface $csrfTokenManager,
-        EntityManagerInterface $entityManager,
-        AutoRuleDispatchGuard $dispatchGuard,
-        AuditContextProvider $auditContextProvider,
-        CashTransactionSplitSynchronizer $splitSynchronizer,
+        ApplyAutoRuleToTransactionAction $applyAutoRule,
     ): Response {
         $csrfToken = new CsrfToken(
             'apply-auto-rule'.$transactionId,
@@ -443,69 +434,12 @@ class CashTransactionAutoRuleController extends AbstractController
         }
 
         $company = $companyService->getActiveCompany();
+        $result = $applyAutoRule((string) $company->getId(), $transactionId, (string) $request->request->get('ruleId', ''));
+        if (null === $result) {
+            throw $this->createNotFoundException();
+        }
 
-        // Блокировка транзакции держится от чтения до flush: параллельное применение (воркер автоправил,
-        // двойной клик) иначе вставило бы ту же строку разбивки дважды — GlitchTip #414.
-        return $entityManager->wrapInTransaction(function () use ($txRepo, $transactionId, $company, $autoRuleService, $request, $entityManager, $dispatchGuard, $auditContextProvider, $splitSynchronizer): Response {
-            /** @var CashTransaction|null $t */
-            $t = $txRepo->findOneByIdAndCompanyIdForUpdate($transactionId, (string) $company->getId());
-            if (!$t) {
-                throw $this->createNotFoundException();
-            }
-
-            $skipReason = $autoRuleService->getSkipReason($t);
-            if (null !== $skipReason) {
-                return new JsonResponse([
-                    'ok' => false,
-                    'changed' => false,
-                    'reason' => $skipReason->value,
-                    'message' => $skipReason->label(),
-                ], 200);
-            }
-
-            $match = $autoRuleService->match($t);
-            if (!$match->hasWinners() && $match->hasConflict()) {
-                return new JsonResponse([
-                    'ok' => false,
-                    'changed' => false,
-                    'reason' => 'conflict',
-                    'message' => 'Все найденные поля конфликтуют и не будут изменены',
-                ], 200);
-            }
-
-            $requestedRuleId = (string) $request->request->get('ruleId', '');
-            $rule = $match->rule;
-            if (!$rule || ('' !== $requestedRuleId && !$match->hasWinnerId($requestedRuleId))) {
-                return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
-            }
-
-            $applicationPlan = $autoRuleService->applyRule($rule, $t, $match);
-            $changed = $applicationPlan?->hasChanges() ?? false;
-            if ($changed) {
-                $entityManager->persist(new AuditLog(
-                    (string) $t->getCompany()->getId(),
-                    CashTransaction::class,
-                    (string) $t->getId(),
-                    AuditLogAction::UPDATE,
-                    $applicationPlan->auditDiff(Uuid::uuid7()->toString()),
-                    $auditContextProvider->getActorUserId(),
-                ));
-                $dispatchGuard->suppress(
-                    static function () use ($splitSynchronizer, $t, $entityManager): void {
-                        $splitSynchronizer->sync($t, CashTransactionSplitSource::AUTO);
-                        $entityManager->flush();
-                    },
-                    $applicationPlan,
-                );
-            }
-
-            return new JsonResponse([
-                'ok' => true,
-                'changed' => $changed,
-                'ruleName' => $rule->getName(),
-                'action' => $rule->getAction()->value,
-            ], 200);
-        });
+        return new JsonResponse($result, 200);
     }
 
     #[Route('/{id}/disable', name: 'cash_transaction_auto_rule_disable', methods: ['POST'])]
@@ -514,7 +448,7 @@ class CashTransactionAutoRuleController extends AbstractController
         string $id,
         Request $request,
         CashTransactionAutoRuleRepository $repo,
-        EntityManagerInterface $em,
+        ChangeCashTransactionAutoRuleActivityAction $changeActivity,
         ActiveCompanyService $companyService,
         AuditContextProvider $auditContextProvider,
     ): Response {
@@ -524,9 +458,8 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        if ($this->isCsrfTokenValid('disable'.$rule->getId(), $request->request->get('_token'))
-            && $rule->disable($auditContextProvider->getActorUserId())) {
-            $em->flush();
+        if ($this->isCsrfTokenValid('disable'.$rule->getId(), $request->request->get('_token'))) {
+            $changeActivity($rule, false, $auditContextProvider->getActorUserId());
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');
@@ -538,7 +471,7 @@ class CashTransactionAutoRuleController extends AbstractController
         string $id,
         Request $request,
         CashTransactionAutoRuleRepository $repo,
-        EntityManagerInterface $em,
+        ChangeCashTransactionAutoRuleActivityAction $changeActivity,
         ActiveCompanyService $companyService,
         AuditContextProvider $auditContextProvider,
     ): Response {
@@ -548,9 +481,8 @@ class CashTransactionAutoRuleController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        if ($this->isCsrfTokenValid('enable'.$rule->getId(), $request->request->get('_token'))
-            && $rule->enable($auditContextProvider->getActorUserId())) {
-            $em->flush();
+        if ($this->isCsrfTokenValid('enable'.$rule->getId(), $request->request->get('_token'))) {
+            $changeActivity($rule, true, $auditContextProvider->getActorUserId());
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');

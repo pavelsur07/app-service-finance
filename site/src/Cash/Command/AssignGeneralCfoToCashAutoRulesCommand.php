@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\Service\CashTransactionAutoRuleGeneralCfoAssigner;
+use App\Cash\Application\AssignGeneralCfoToCashAutoRulesAction;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class AssignGeneralCfoToCashAutoRulesCommand extends Command
 {
     public function __construct(
-        private readonly CashTransactionAutoRuleGeneralCfoAssigner $assigner,
+        private readonly AssignGeneralCfoToCashAutoRulesAction $assignGeneralCfo,
     ) {
         parent::__construct();
     }
@@ -42,7 +42,7 @@ final class AssignGeneralCfoToCashAutoRulesCommand extends Command
         $expectedCount = is_string($expectedCount) && ctype_digit($expectedCount) ? (int) $expectedCount : null;
 
         try {
-            $result = $this->assigner->run($execute, $actorUserId, $expectedCount);
+            $result = ($this->assignGeneralCfo)($execute, $actorUserId, $expectedCount);
         } catch (\InvalidArgumentException $exception) {
             $io->error($exception->getMessage());
 
