@@ -14,9 +14,9 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Form\Type\CounterpartyPickerType;
-use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -33,7 +33,7 @@ class CashTransactionType extends AbstractType
     public function __construct(
         private MoneyAccountRepository $accountRepo,
         private CashflowCategoryRepository $categoryRepo,
-        private ProjectDirectionRepository $projectDirectionRepo,
+        private CompanyFacade $companyFacade,
         private FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
     ) {
     }
@@ -78,7 +78,7 @@ class CashTransactionType extends AbstractType
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'required' => false,
-                'choices' => $this->projectDirectionRepo->findTreeByCompany($company),
+                'choices' => $this->companyFacade->listProjectDirectionEntities((string) $company->getId(), treeOrder: true),
                 'choice_label' => static fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
                 'choice_attr' => static fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,

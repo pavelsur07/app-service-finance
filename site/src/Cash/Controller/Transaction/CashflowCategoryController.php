@@ -10,7 +10,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Security\ModuleAccess;
-use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Facade\PLCategoryFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -70,7 +70,7 @@ class CashflowCategoryController extends AbstractController
         CashflowCategoryRepository $repo,
         SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
-        PLCategoryRepository $plCategoryRepository,
+        PLCategoryFacade $plCategoryFacade,
     ): Response {
         $company = $companyService->getActiveCompany();
 
@@ -82,7 +82,7 @@ class CashflowCategoryController extends AbstractController
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $this->regularParentChoices($repo->findTreeByCompany($company));
-        $plCategories = $plCategoryRepository->findTreeByCompany($company);
+        $plCategories = $plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,
@@ -114,7 +114,7 @@ class CashflowCategoryController extends AbstractController
         CashflowCategoryRepository $repo,
         SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
-        PLCategoryRepository $plCategoryRepository,
+        PLCategoryFacade $plCategoryFacade,
     ): Response {
         $company = $companyService->getActiveCompany();
 
@@ -129,7 +129,7 @@ class CashflowCategoryController extends AbstractController
         $parents = $article->isSystem()
             ? []
             : $this->regularParentChoices($repo->findTreeByCompany($company), $article);
-        $plCategories = $plCategoryRepository->findTreeByCompany($company);
+        $plCategories = $plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
             'parents' => $parents,

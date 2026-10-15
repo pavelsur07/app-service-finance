@@ -71,7 +71,6 @@ class CashTransactionAutoRuleType extends AbstractType
                 'label' => 'Категория движения ДДС',
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [
-                'class' => ProjectDirection::class,
                 'choices' => $options['projectDirections'],
                 'choice_label' => static function (ProjectDirection $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();

@@ -547,12 +547,6 @@ parameters:
 			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
 
 		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
-			count: 2
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
 			message: '#^Parameter \#1 \$companyId of class App\\Cash\\Message\\EnqueueAutoRulesForRange constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -616,12 +610,6 @@ parameters:
 			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesFinance\: App\\Cash\\Controller\\Transaction\\CashflowCategoryController should not depend on App\\Finance\\Repository\\PLCategoryRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesFinance
-			count: 2
 			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
 
 		-
@@ -1011,12 +999,6 @@ parameters:
 		-
 			message: '#^Property App\\Cash\\DTO\\CashTransactionDTO\:\:\$companyId \(string\) does not accept string\|null\.$#'
 			identifier: assign.propertyType
-			count: 1
-			path: src/Cash/Form/Transaction/CashTransactionType.php
-
-		-
-			message: '#^testModuleInternalsAreClosedToOtherModulesCompany\: App\\Cash\\Form\\Transaction\\CashTransactionType should not depend on App\\Company\\Repository\\ProjectDirectionRepository$#'
-			identifier: phpat.testModuleInternalsAreClosedToOtherModulesCompany
 			count: 1
 			path: src/Cash/Form/Transaction/CashTransactionType.php
 
@@ -13418,18 +13400,6 @@ parameters:
 			path: src/Billing/Fixture/BillingFixture.php
 
 		-
-			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Cash — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
-			identifier: vashfindir.foreignEntityType
-			count: 1
-			path: src/Cash/Form/Transaction/CashTransactionAutoRuleType.php
-
-		-
-			message: '#^EntityType с сущностью чужого модуля App\\Finance\\Entity\\PLCategory в форме модуля Cash — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
-			identifier: vashfindir.foreignEntityType
-			count: 1
-			path: src/Cash/Form/Transaction/CashflowCategoryType.php
-
-		-
 			message: '#^flush\(\) в App\\Cash\\Service\\Import\\Bank\\BankImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1
@@ -13626,18 +13596,6 @@ parameters:
 			identifier: vashfindir.controllerEntityArgument
 			count: 1
 			path: src/Finance/Controller/PLCategoryController.php
-
-		-
-			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Finance — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
-			identifier: vashfindir.foreignEntityType
-			count: 1
-			path: src/Finance/Form/DocumentOperationType.php
-
-		-
-			message: '#^EntityType с сущностью чужого модуля App\\Company\\Entity\\ProjectDirection в форме модуля Finance — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
-			identifier: vashfindir.foreignEntityType
-			count: 1
-			path: src/Finance/Form/DocumentType.php
 
 		-
 			message: '#^flush\(\) в App\\Finance\\Repository\\DocumentRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

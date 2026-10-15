@@ -99,6 +99,13 @@ final class CashTransactionAutoRuleEditControllerTest extends WebTestCaseBase
             ],
         );
 
+        // Повторное открытие: сохранённый проект предвыбран в пикере (ChoiceType по id, этап 7.5b).
+        $crawler = $client->request('GET', $editUrl);
+        self::assertSame(
+            (string) $project->getId(),
+            $crawler->filter('select[name="cash_transaction_auto_rule[projectDirection]"] option[selected]')->attr('value'),
+        );
+
         $client->request('GET', '/cash-transaction-auto-rules/');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('table', 'Краснодар [CFO_SOUTH]');

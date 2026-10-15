@@ -720,9 +720,30 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 **Итог этапа 7:**
 
-- [ ] `phpat…Cash` = 0 (с 7.4 ✔), `phpat…Company` и `phpat…Finance` из `src/Cash/` = 0 (7.5).
+- [x] `phpat…Cash` = 0 (7.4), `phpat…Company` и `phpat…Finance` из `src/Cash/` = 0 (7.5a + 7.5b), `foreignEntityType` в `src/Cash/` = 0 (7.5b).
 
 ---
+
+### Результат подэтапа 7.5b (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `Shared\Form\Type\ProjectDirectionPickerType extends EntityType` (сущность Company в формах Cash и Finance) | `ChoiceType` с переданными `choices`, `choice_value` — id, `choice_translation_domain: false` как у EntityType; опция `class` — совместимость |
+| `CashTransactionType` и `CashTransactionAutoRuleController` читали `ProjectDirectionRepository` | `CompanyFacade::listProjectDirectionEntities` (дерево / по названию — как было) |
+| `CashflowCategoryType::plCategory` — `EntityType` с `PLCategory`, контроллер читал `PLCategoryRepository` | `ChoiceType` со списком из существующего `PLCategoryFacade::findTreeEntitiesByCompanyId` (метод для legacy-форм; поле связано с ассоциацией) |
+
+Отступление от плана: «ChoiceType + фасад с DTO» — для полей, связанных с
+ORM-ассоциацией на сущность чужого модуля (`CashflowCategory::plCategory`,
+`CashTransactionAutoRule::projectDirection`), фасад отдаёт сущности, как уже делал
+`PLCategoryFacade::findTreeEntitiesByCompanyId`. Сами ассоциации — отдельная задача
+(«Не лезем» этапа 7: Entity остаются Entity).
+
+Тест-сравнение: HTML 8 страниц с формами (статья ДДС, автоправило, операция ДДС,
+документ ОПиУ — новые и редактирование), отправка 4 форм редактирования без изменений
+и сохранённые связи (статья ОПиУ, проекты) — до и после совпали побайтно.
+
+**Итог этапа 7:** в baseline нет записей `phpat…Cash`; в `src/Cash/` нет `phpat…Company`,
+`phpat…Finance` и `foreignEntityType`. Baseline проекта: 2396 (до этапа) → 2318.
 
 ### Результат подэтапа 7.5a (2026-10-15)
 
@@ -905,7 +926,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
 | 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | #2687 |
 | 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | #2688 |
 | 7.4 | 2026-10-15 | 219 записей | 221 запись | −6 `phpat…Cash` (последние в проекте), −1 `flushOutsideBoundary` (`CreateCompanyOwnerAccountAction`); +2 в Cash — записи `AuditLogSubscriber` переехали вместе с классом; всего 2342 → 2335 | #2689 |
-| 7.5a | 2026-10-15 | 221 запись | 211 записей | −9 `phpat` из Cash (Company ×8, Finance ×1), −1 `argument.type` (`DailyBalanceRecalcCommand`); всего 2335 → 2325 | этот PR |
+| 7.5a | 2026-10-15 | 221 запись | 211 записей | −9 `phpat` из Cash (Company ×8, Finance ×1), −1 `argument.type` (`DailyBalanceRecalcCommand`); всего 2335 → 2325 | #2690 |
+| 7.5b | 2026-10-15 | 211 записей | 206 записей | −3 `phpat` из Cash (Company ×2, Finance ×1), −2 `foreignEntityType` в Cash, попутно −2 `foreignEntityType` в Finance (общий пикер проектов); всего 2325 → 2318. В `src/Cash/` записей `phpat` и `foreignEntityType` — 0 | этот PR |
 
 ## Находки
 
@@ -986,8 +1008,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
   - `ProcessMarketplaceRawDocumentAction` помечен `#[AsMessageHandler]`, но
     команда в шину не отправляется — атрибут рудиментарный (Marketplace);
     в тесте routing — явное исключение.
-  - `ForeignEntityTypeRule` не видит собственные типы-обёртки над
-    `EntityType` (`ProjectDirectionPickerType` в `CashTransactionAutoRuleType`).
+  - ~~`ForeignEntityTypeRule` не видит собственные типы-обёртки над `EntityType`~~ —
+    видит подклассы; `ProjectDirectionPickerType` с 7.5b — `ChoiceType`, вопрос закрыт.
   - `ControllerUnscopedFindRule` не проверяет `findBy()`/`findOneBy()`
     (критерий может содержать компанию), `$em->find($class, $id)` с классом в
     переменной, владение глубже одного уровня (`LoanPaymentSchedule` в
