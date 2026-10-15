@@ -386,6 +386,8 @@ final readonly class CashFacade
     }
 
     /**
+     * Ключи — UUID счетов, PHP их в int не превращает; приведение нужно для типа контракта.
+     *
      * @param array<int|string, string> $byAccountId
      *
      * @return array<string, string>

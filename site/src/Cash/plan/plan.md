@@ -840,13 +840,18 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 5.3 | 2026-10-15 | 224 записи | 220 записей | −3 `flushOutsideBoundary` (−7 вызовов), −1 `argument.type` (`recalcRange`); в тестах −4; всего 2404 → 2396 | #2684 |
 | 6 | 2026-10-15 | 220 записей | 220 записей | baseline не менялся, всего 2396; новое правило `test_cash_does_not_depend_on_analytics` — 0 нарушений, проба ловится | #2685 |
 | 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | #2686 |
-| 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (`FinanceFacade`, `find()` без типа); всего 2382 → 2358 | этот PR |
+| 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | этот PR |
 
 ## Находки
 
 Обнаруженное по ходу работ вне scope текущего этапа. Не чинится в этом плане
 без согласования.
 
+- **Фильтр выписки по статье зависит от identity map (этап 7.2, было и до).**
+  `listStatementLines` с `$categoryId` гидрирует коллекцию разбивок частично; если
+  транзакции уже загружены в том же EntityManager, фильтр не действует. Сегодня
+  контроллер вызывает метод один раз за запрос. Чинить переходом на скалярную
+  гидрацию. Там же: `?category=abc` (не UUID) даёт 500 на сравнении uuid в Postgres.
 - **Finance читает таблицы Cash сырым SQL (этап 7.2).** `ReportCashflowOpsCheckController`
   через `Connection` выбирает из `cash_transaction`, `money_account`,
   `cash_transaction_split`, `cashflow_categories`. Граница модуля обходится в обход

@@ -1539,12 +1539,18 @@ sumGrossTurnoverExcludingTransfers(string $companyId, \DateTimeImmutable $from, 
 // Строки регистра остатков за период; пустой $accountIds — все счета компании
 listDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, list<string> $accountIds): list<MoneyAccountDailyBalanceRow>
 
-// Строки выписки: по строке разбивки, транзакция без разбивки — одной строкой
+// Строки выписки: по строке разбивки, транзакция без разбивки — одной строкой.
+// $accountId/$categoryId: null, '' и '0' — без фильтра. Фильтр по статье опирается на частичную
+// гидрацию разбивок: вызывать один раз на EntityManager (см. «Находки» плана Cash)
 listStatementLines(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $accountId, ?string $categoryId): list<CashStatementLine>
 
 // Запись: пересчитать регистр ежедневных остатков всех счетов компании за период
 recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): void
 ```
+
+Для методов чтения отчётов чужие id счетов и статей не дают ошибки — строки другой
+компании просто не попадают в ответ; `\DomainException` бросается только для
+неизвестной компании.
 
 DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine` — в
 `src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.

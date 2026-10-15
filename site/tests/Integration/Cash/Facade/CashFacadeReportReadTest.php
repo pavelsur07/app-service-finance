@@ -125,6 +125,11 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
         ]);
         $this->tx($this->cash, CashDirection::INFLOW, '5.00', '2026-03-04');
         $this->tx($this->cash, CashDirection::INFLOW, '9.00', '2026-03-04', deleted: true);
+        $foreignAccount = $this->account($this->foreign, 'Чужой', MoneyAccountType::BANK, 'RUB');
+        $foreignCategory = CashflowCategoryBuilder::aCashflowCategory()->withId(Uuid::uuid4()->toString())->withCompany($this->foreign)->withName('Чужая')->build();
+        $this->em->persist($foreignCategory);
+        $foreignTx = $this->tx($foreignAccount, CashDirection::OUTFLOW, '1.00', '2026-03-03');
+        $foreignTx->replaceSplits([new CashTransactionSplit($foreignTx, $foreignCategory, '1.00', CashTransactionSplitSource::MANUAL)]);
         $this->em->flush();
         $id = (string) $this->company->getId();
         $from = new \DateTimeImmutable('2026-03-01');
@@ -146,7 +151,12 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
         $byCategory = $this->facade->listStatementLines($id, $from, $to, null, (string) $tax->getId());
         self::assertSame([['30.00', 'Налоги']], array_map(static fn (CashStatementLine $l): array => [$l->amount, (string) $l->categoryName], $byCategory));
         self::assertCount(1, $this->facade->listStatementLines($id, $from, $to, (string) $this->cash->getId(), null));
-        self::assertSame([], $this->facade->listStatementLines((string) $this->foreign->getId(), $from, $to, null, null));
+        self::assertCount(1, $this->facade->listStatementLines((string) $this->foreign->getId(), $from, $to, null, null));
+
+        $this->em->clear();
+        self::assertSame([], $this->facade->listStatementLines($id, $from, $to, (string) $foreignAccount->getId(), null));
+        self::assertSame([], $this->facade->listStatementLines($id, $from, $to, null, (string) $foreignCategory->getId()));
+        self::assertCount(3, $this->facade->listStatementLines($id, $from, $to, '0', ''));
     }
 
     public function testRecalculateDailyBalancesBuildsRegister(): void
