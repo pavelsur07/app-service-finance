@@ -549,9 +549,10 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 | `PaymentCalendarFacade::createPlanFromDto/updatePlanFromDto/changeStatus/postpone` | `CreatePaymentPlanAction`, `UpdatePaymentPlanAction`, `ChangePaymentPlanStatusAction`, `PostponePaymentPlanAction`; перенос DTO в план — `PaymentPlanDtoApplier` (без `flush`) |
 | `RecurrenceMaterializer::materialize` | `MaterializeRecurringPaymentPlansAction::__invoke` |
 
-Поведение не менялось. Существующие ошибки PHPStan перенесённого кода (5
-записей `argument.type`/`method.nonObject`) переехали в baseline вслед за
-кодом. `flush` вне Action в Cash: 21 → 11 вызовов (7 — подэтап 5.3, 4 —
+Поведение не менялось. Три ошибки `argument.type` (nullable статья плана в
+конструктор и `resolveTypeByCategory`) исправлены явной проверкой
+`Assert::notNull` — контроллер и так вызывает Action только при наличии
+статьи; ещё 2 записи переехали вслед за переименованием материализатора. `flush` вне Action в Cash: 21 → 11 вызовов (7 — подэтап 5.3, 4 —
 пакетные импорты вне этапа).
 
 ### Результат подэтапа 5.1 (2026-10-14)
@@ -748,7 +749,7 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | #2680 |
 | 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | #2681 |
 | 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | #2682 |
-| 5.2 | 2026-10-15 | 230 записей | 227 записей | −3 записи `flushOutsideBoundary` (−10 вызовов); 5 записей перенесены вслед за кодом; всего 2410 → 2407 | этот PR |
+| 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | этот PR |
 
 ## Находки
 

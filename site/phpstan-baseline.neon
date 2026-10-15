@@ -1670,24 +1670,6 @@ parameters:
 			path: src/Cash/Service/Import/File/FileTabularReader.php
 
 		-
-			message: '#^Parameter \#1 \$cashflowCategory of method App\\Cash\\Entity\\PaymentPlan\\PaymentPlan\:\:setCashflowCategory\(\) expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentPlanDtoApplier.php
-
-		-
-			message: '#^Parameter \#1 \$category of method App\\Cash\\Service\\PaymentPlan\\PaymentPlanService\:\:resolveTypeByCategory\(\) expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Service/PaymentPlan/PaymentPlanDtoApplier.php
-
-		-
-			message: '#^Parameter \#3 \$category of class App\\Cash\\Entity\\PaymentPlan\\PaymentPlan constructor expects App\\Cash\\Entity\\Transaction\\CashflowCategory, App\\Cash\\Entity\\Transaction\\CashflowCategory\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/CreatePaymentPlanAction.php
-
-		-
 			message: '#^Cannot call method diff\(\) on DateTimeImmutable\|null\.$#'
 			identifier: method.nonObject
 			count: 1

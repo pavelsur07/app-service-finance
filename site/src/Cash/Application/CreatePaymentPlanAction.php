@@ -10,6 +10,7 @@ use App\Cash\Service\PaymentPlan\PaymentPlanDtoApplier;
 use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Webmozart\Assert\Assert;
 
 /**
  * Создаёт плановый платёж из формы платёжного календаря.
@@ -24,10 +25,13 @@ final class CreatePaymentPlanAction
 
     public function __invoke(Company $company, PaymentPlanDTO $dto): PaymentPlan
     {
+        $category = $dto->cashflowCategory;
+        Assert::notNull($category, 'Статья ДДС планового платежа обязательна.');
+
         $plan = new PaymentPlan(
             Uuid::uuid4()->toString(),
             $company,
-            $dto->cashflowCategory,
+            $category,
             \DateTimeImmutable::createFromInterface($dto->plannedAt),
             (string) $dto->amount
         );

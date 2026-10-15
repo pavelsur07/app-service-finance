@@ -9,6 +9,7 @@ use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Company\Entity\Company;
+use Webmozart\Assert\Assert;
 
 /**
  * Переносит данные формы планового платежа в сущность. Без flush():
@@ -22,8 +23,12 @@ final readonly class PaymentPlanDtoApplier
 
     public function apply(PaymentPlan $plan, Company $company, PaymentPlanDTO $dto): void
     {
+        // Форма требует статью; контроллер вызывает Action только при её наличии.
+        $category = $dto->cashflowCategory;
+        Assert::notNull($category, 'Статья ДДС планового платежа обязательна.');
+
         $this->paymentPlanService->applyCompanyScope($plan, $company);
-        $plan->setCashflowCategory($dto->cashflowCategory);
+        $plan->setCashflowCategory($category);
         $plan->setPlannedAt(\DateTimeImmutable::createFromInterface($dto->plannedAt));
         $expectedAt = $dto->expectedAt ?? $dto->plannedAt;
         $plan->setExpectedAt(\DateTimeImmutable::createFromInterface($expectedAt));
@@ -34,7 +39,7 @@ final readonly class PaymentPlanDtoApplier
         $plan->setProbability($dto->probability);
         $plan->setIsFrozen($dto->isFrozen);
 
-        $resolvedType = $this->paymentPlanService->resolveTypeByCategory($dto->cashflowCategory);
+        $resolvedType = $this->paymentPlanService->resolveTypeByCategory($category);
         $plan->setType(PaymentPlanTypeEnum::from($resolvedType));
         $plan->setStatus($this->resolveStatus($dto->status));
     }
