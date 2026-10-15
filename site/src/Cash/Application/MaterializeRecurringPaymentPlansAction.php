@@ -2,18 +2,24 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Service\PaymentPlan;
+namespace App\Cash\Application;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
+use App\Cash\Service\PaymentPlan\PaymentPlanService;
+use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
-final class RecurrenceMaterializer
+/**
+ * Создаёт плановые платежи повторяющихся правил на период календаря. Вызывается
+ * при открытии календаря; дубли отсекает existsRecurrenceDuplicate().
+ */
+final class MaterializeRecurringPaymentPlansAction
 {
     public function __construct(
         private readonly PaymentRecurrenceRuleRepository $recurrenceRuleRepository,
@@ -24,7 +30,7 @@ final class RecurrenceMaterializer
     ) {
     }
 
-    public function materialize(Company $company, \DateTimeInterface $from, \DateTimeInterface $to): int
+    public function __invoke(Company $company, \DateTimeInterface $from, \DateTimeInterface $to): int
     {
         $rangeStart = \DateTimeImmutable::createFromInterface($from)->setTime(0, 0);
         $rangeEnd = \DateTimeImmutable::createFromInterface($to)->setTime(0, 0);

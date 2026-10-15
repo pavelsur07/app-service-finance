@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\CreateCashFileImportProfileAction;
+use App\Cash\Application\DeleteCashFileImportProfileAction;
+use App\Cash\Application\UpdateCashFileImportProfileAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Cash\Service\Import\File\CashFileImportFacade;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,7 +24,9 @@ class CashFileImportProfileController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly CashFileImportFacade $importFacade,
+        private readonly CreateCashFileImportProfileAction $createProfile,
+        private readonly UpdateCashFileImportProfileAction $updateProfile,
+        private readonly DeleteCashFileImportProfileAction $deleteProfile,
     ) {
     }
 
@@ -77,7 +81,7 @@ class CashFileImportProfileController extends AbstractController
                 return $this->render('cash/file_import_profiles/new.html.twig', $formData);
             }
 
-            $this->importFacade->createProfile(
+            ($this->createProfile)(
                 $company,
                 $name,
                 $mapping,
@@ -141,7 +145,7 @@ class CashFileImportProfileController extends AbstractController
                 return $this->render('cash/file_import_profiles/edit.html.twig', $formData);
             }
 
-            $this->importFacade->updateProfile(
+            ($this->updateProfile)(
                 $profile,
                 $name,
                 $mapping,
@@ -170,7 +174,7 @@ class CashFileImportProfileController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$profile->getId(), (string) $request->request->get('_token'))) {
-            $this->importFacade->deleteProfile($profile);
+            ($this->deleteProfile)($profile);
         }
 
         return $this->redirectToRoute('cash_file_import_profile_index');

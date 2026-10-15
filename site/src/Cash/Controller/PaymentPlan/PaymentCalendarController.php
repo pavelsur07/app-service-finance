@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
+use App\Cash\Application\ChangePaymentPlanStatusAction;
+use App\Cash\Application\CreatePaymentPlanAction;
+use App\Cash\Application\MaterializeRecurringPaymentPlansAction;
+use App\Cash\Application\PostponePaymentPlanAction;
+use App\Cash\Application\UpdatePaymentPlanAction;
 use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\DTO\ForecastDTO;
 use App\Cash\DTO\PaymentPlanDTO;
@@ -15,9 +20,7 @@ use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
-use App\Cash\Service\PaymentPlan\PaymentCalendarFacade;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
-use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Security\ModuleAccess;
@@ -36,14 +39,17 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class PaymentCalendarController extends AbstractController
 {
     public function __construct(
-        private ActiveCompanyService $activeCompanyService,
-        private PaymentPlanRepository $paymentPlanRepository,
-        private EntityManagerInterface $entityManager,
-        private PaymentPlanService $paymentPlanService,
-        private PaymentCalendarFacade $paymentCalendarFacade,
-        private ForecastBalanceService $forecastBalanceService,
-        private RecurrenceMaterializer $recurrenceMaterializer,
-        private MoneyAccountRepository $moneyAccountRepository,
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly PaymentPlanRepository $paymentPlanRepository,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly PaymentPlanService $paymentPlanService,
+        private readonly CreatePaymentPlanAction $createPlan,
+        private readonly UpdatePaymentPlanAction $updatePlan,
+        private readonly ChangePaymentPlanStatusAction $changePlanStatus,
+        private readonly PostponePaymentPlanAction $postponePlan,
+        private readonly ForecastBalanceService $forecastBalanceService,
+        private readonly MaterializeRecurringPaymentPlansAction $materializeRecurringPlans,
+        private readonly MoneyAccountRepository $moneyAccountRepository,
     ) {
     }
 
@@ -74,7 +80,7 @@ final class PaymentCalendarController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid() && null !== $dto->cashflowCategory) {
-            $this->paymentCalendarFacade->createPlanFromDto($company, $dto);
+            ($this->createPlan)($company, $dto);
 
             $this->addFlash('success', 'Создано');
 
@@ -123,7 +129,7 @@ final class PaymentCalendarController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid() && null !== $dto->cashflowCategory) {
-            $this->paymentCalendarFacade->updatePlanFromDto($plan, $company, $dto);
+            ($this->updatePlan)($plan, $company, $dto);
 
             $this->addFlash('success', 'Сохранено');
 
@@ -171,7 +177,7 @@ final class PaymentCalendarController extends AbstractController
         }
 
         try {
-            $this->paymentCalendarFacade->changeStatus($plan, $targetStatus);
+            ($this->changePlanStatus)($plan, $targetStatus);
         } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());
 
@@ -216,7 +222,7 @@ final class PaymentCalendarController extends AbstractController
             return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
         }
 
-        $this->paymentCalendarFacade->postpone($plan, $days);
+        ($this->postponePlan)($plan, $days);
 
         $this->addFlash('success', sprintf('Платёж перенесён на %d дн.', $days));
 
@@ -249,7 +255,7 @@ final class PaymentCalendarController extends AbstractController
         } elseif ($from > $to) {
             $this->addFlash('danger', 'Дата начала периода не может быть позже даты окончания.');
         } else {
-            $this->recurrenceMaterializer->materialize($company, $from, $to);
+            ($this->materializeRecurringPlans)($company, $from, $to);
             $plans = $this->loadPlans($company, $from, $to, $filters);
             $period = ['from' => $from, 'to' => $to];
 

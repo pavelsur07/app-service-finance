@@ -523,9 +523,9 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 - [x] Репозиторий без `flush` (5.1).
 - [x] Контроллеры без `flush`; логика в Action с тестами (5.1).
 - [ ] 9 сервисов без `flush`; вызывающий код — Action: 3 тонких сервиса — 5.1;
-      `RecurrenceMaterializer` — 5.2; `CashTransactionService`,
+      `RecurrenceMaterializer` — 5.2 (готово); `CashTransactionService`,
       `CashTransactionToDocumentService`, `PaymentPlanMatcher` — 5.3.
-- [ ] Псевдо-фасады устранены (5.2).
+- [x] Псевдо-фасады устранены (5.2).
 - [ ] Baseline правила `flush` по Cash: остались только пакетные импорты;
       «Журнал» обновлён.
 - [ ] Все гейты зелёные.
@@ -539,6 +539,21 @@ Baseline: +111 записей (192 ошибки) только по четырё�
 | 5.2 | `CashFileImportFacade`, `PaymentCalendarFacade`, `RecurrenceMaterializer` | 10 |
 | 5.3 | `CashTransactionService`, `CashTransactionToDocumentService`, `PaymentPlanMatcher` | 7 |
 | вне этапа | пакетные импорты `BankImportService`, `ClientBank1CImportService`, `CashFileImportService` и их `ImportLogger` | 4 |
+
+### Результат подэтапа 5.2 (2026-10-15)
+
+| Было | Стало |
+|---|---|
+| `CashFileImportFacade::createProfile/updateProfile/deleteProfile` | `CreateCashFileImportProfileAction`, `UpdateCashFileImportProfileAction`, `DeleteCashFileImportProfileAction` |
+| `CashFileImportFacade::createJob` + `commitJob` (всегда подряд) | `StartCashFileImportJobAction`: те же два `flush` в том же порядке — журнал импорта, затем задание |
+| `PaymentCalendarFacade::createPlanFromDto/updatePlanFromDto/changeStatus/postpone` | `CreatePaymentPlanAction`, `UpdatePaymentPlanAction`, `ChangePaymentPlanStatusAction`, `PostponePaymentPlanAction`; перенос DTO в план — `PaymentPlanDtoApplier` (без `flush`) |
+| `RecurrenceMaterializer::materialize` | `MaterializeRecurringPaymentPlansAction::__invoke` |
+
+Поведение не менялось. Три ошибки `argument.type` (nullable статья плана в
+конструктор и `resolveTypeByCategory`) исправлены явной проверкой
+`Assert::notNull` — контроллер и так вызывает Action только при наличии
+статьи; ещё 2 записи переехали вслед за переименованием материализатора. `flush` вне Action в Cash: 21 → 11 вызовов (7 — подэтап 5.3, 4 —
+пакетные импорты вне этапа).
 
 ### Результат подэтапа 5.1 (2026-10-14)
 
@@ -733,7 +748,8 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | 2 | 2026-10-14 | 232 записи | 224 записи | −8 в Cash: `repositoryCompanyScope` 4 → 0, `CashTransactionController` 3, `PaymentPlanType` 1; −3 в тестах (`CreateCashTransferActionTest`); всего −11 | #2679 |
 | 3 | 2026-10-14 | 224 записи | 223 записи | −1: `CashTransaction` `identical.alwaysFalse` (мёртвая проверка `null === $this->amount`); новое правило `vashfindir.moneyFloatCast` — 0 нарушений в Cash | #2680 |
 | 4 | 2026-10-14 | 223 записи | 238 записей | `[baseline-grow]`: +18 `flushOutsideBoundary`, +2 `foreignEntityType` (Cash); −5 удалённый скоринг. По проекту +111 записей новых идентификаторов (192 ошибки), всего 2312 → 2418 | #2681 |
-| 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | этот PR |
+| 5.1 | 2026-10-14 | 238 записей | 230 записей | −8 записей `flushOutsideBoundary` в 7 файлах (−16 вызовов); запись `phpat…Company` перенесена вслед за переименованием `GeneralCfoAssigner` → `AssignGeneralCfoToCashAutoRulesAction`; всего 2418 → 2410 | #2682 |
+| 5.2 | 2026-10-15 | 230 записей | 224 записи | −3 записи `flushOutsideBoundary` (−10 вызовов); −3 `argument.type` (nullable статья плана — явная проверка, guard baseline не видит перенос в новые файлы); 2 записи перенесены вслед за переименованием; всего 2410 → 2404 | этот PR |
 
 ## Находки
 
@@ -816,6 +832,21 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
     исходную ошибку (как и раньше).
   - `ApplyAutoRuleToTransactionAction` возвращает готовый JSON-payload с
     текстами UI — на будущее лучше DTO результата.
+- Подэтап 5.2, вне scope (существующее поведение, не проверено в UI):
+  `PaymentPlan::setExpectedAt()`/`getExpectedAt()` работают с `plannedAt`, а в
+  форме `PaymentPlanType` это два поля; `PaymentPlanDtoApplier` применяет
+  `expectedAt` после `plannedAt`. При правке плана, где изменена только «Дата»,
+  а «Ожидаемая дата» осталась прежней, новая дата, вероятно, теряется.
+  Проверить в календаре и решить с Владельцем.
+- Ревью подэтапа 5.2, вне scope:
+  - `MaterializeRecurringPaymentPlansAction` пишет в БД на GET календаря;
+    защита от дублей — check-then-insert (`existsRecurrenceDuplicate()`), два
+    параллельных GET могут создать дубли без уникального индекса. Кандидат —
+    перенос в cron/Handler и уникальный индекс.
+  - В `PaymentCalendarController` остаются неиспользуемый `$paymentPlanService`
+    и `entityManager->getRepository()->findBy` для справочников фильтров.
+  - Новые плановые платежи и профили создаются с `Uuid::uuid4` (правило — v7);
+    код перенесён дословно.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
   недостижима (`MoneyType` валидирует ввод); можно удалить при следующей правке.
 - Этап 3, вне scope:

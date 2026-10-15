@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
+use App\Cash\Application\StartCashFileImportJobAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\MessageHandler\Import\CashFileImportHandler;
-use App\Cash\Service\Import\File\CashFileImportFacade;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -23,7 +23,7 @@ use Ramsey\Uuid\Uuid;
 
 /**
  * Окружение файлового импорта ДДС: компания со счётом, системным проектом и ЦФО,
- * файл в объектном хранилище, job из CashFileImportFacade — тот же путь, что
+ * файл в объектном хранилище, job из StartCashFileImportJobAction — тот же путь, что
  * проходит загрузка из UI.
  */
 abstract class CashFileImportTestCase extends IntegrationTestCase
@@ -115,9 +115,9 @@ abstract class CashFileImportTestCase extends IntegrationTestCase
         $this->storage()->write($storageKey, $csv);
         $this->storedKeys[] = $storageKey;
 
-        /** @var CashFileImportFacade $facade */
-        $facade = self::getContainer()->get(CashFileImportFacade::class);
-        $job = $facade->createJob(
+        /** @var StartCashFileImportJobAction $startImportJob */
+        $startImportJob = self::getContainer()->get(StartCashFileImportJobAction::class);
+        $job = $startImportJob(
             $this->company,
             $this->account,
             'cash:file',
@@ -127,7 +127,6 @@ abstract class CashFileImportTestCase extends IntegrationTestCase
             ['stored_ext' => 'csv'],
             null,
         );
-        $facade->commitJob($job);
 
         return $job;
     }
