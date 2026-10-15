@@ -724,6 +724,23 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 
 ---
 
+### Результат подэтапа 7.5a (2026-10-15)
+
+Подэтап 7.5 разделён на два PR: 7.5a — зависимости без форм, 7.5b — формы
+(`EntityType` → `ChoiceType` + DTO), чтобы изменения отправки форм шли отдельно.
+
+| Было (Cash →) | Стало |
+|---|---|
+| `UserRepository::find` в `AssignGeneralCfoToCashAutoRulesAction`, `findOneByIdAndCompanyId` в `CashAutoRulesEnqueueCommand` | `CompanyFacade::userExists` (новый), `CompanyFacade::userHasAccess` (та же семантика: владелец или активный участник) |
+| `CompanyRepository::find` в `DailyBalanceRecalcCommand`, `SoftDeleteCompanyTransactionsCommand` | `CompanyFacade::findById` |
+| `CounterpartyRepository::findBy(company)` — все контрагенты для фильтра списка операций | `CounterpartyFacade::getSelectable(companyId, keepId: выбранный)` — неархивные + выбранный; шаблон читает `isArchived`, DTO получил `type` для пикера |
+| Импорты 1С и файловый: поиск по ИНН / нормализованному названию и `new Counterparty` в Cash | `CounterpartyFacade::findExistingInns`, `findOrCreateByInn`, `findOrCreateByNormalizedName` — сущности Company создаёт Company; кэш остался в импорте |
+| `PLRegisterUpdater`, `ProjectDirectionRepository` в `CashTransactionToDocumentService` | `FinanceFacade::updatePLRegisterForDocument`, `CompanyFacade::findDefaultProjectDirection` (новый) |
+
+Функциональный `CounterpartyDisplayNameShownTest` поймал два несовпадения DTO с
+шаблоном фильтра (`archived`, `type`) — исправлены, тест зелёный. Новые методы —
+`tests/Integration/Company/Facade/CompanyFacadeCashLookupsTest`.
+
 ### Результат подэтапа 7.4 (2026-10-15)
 
 | Было | Стало |
@@ -887,7 +904,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
 | 7.1 | 2026-10-15 | 220 записей | 219 записей | −10 `phpat…Cash` из Analytics, −3 `nullCoalesce.offset` в Analytics, −1 `return.type` (перенесённый запрос); всего 2396 → 2382 | #2686 |
 | 7.2 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −14 `phpat…Cash` из Finance, −5 `argument.type`, −1 `nullCoalesce.variable`, −4 `method.notFound` и count 5 → 2 (−3 вхождения; `FinanceFacade`, `find()` без типа); всего 2382 → 2358 | #2687 |
 | 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | #2688 |
-| 7.4 | 2026-10-15 | 219 записей | 221 запись | −6 `phpat…Cash` (последние в проекте), −1 `flushOutsideBoundary` (`CreateCompanyOwnerAccountAction`); +2 в Cash — записи `AuditLogSubscriber` переехали вместе с классом; всего 2342 → 2335 | этот PR |
+| 7.4 | 2026-10-15 | 219 записей | 221 запись | −6 `phpat…Cash` (последние в проекте), −1 `flushOutsideBoundary` (`CreateCompanyOwnerAccountAction`); +2 в Cash — записи `AuditLogSubscriber` переехали вместе с классом; всего 2342 → 2335 | #2689 |
+| 7.5a | 2026-10-15 | 221 запись | 211 записей | −9 `phpat` из Cash (Company ×8, Finance ×1), −1 `argument.type` (`DailyBalanceRecalcCommand`); всего 2335 → 2325 | этот PR |
 
 ## Находки
 

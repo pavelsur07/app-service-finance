@@ -16,7 +16,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
-use App\Company\Repository\CounterpartyRepository;
+use App\Company\Facade\CounterpartyFacade;
 use App\Shared\Service\Storage\LegacyXlsConverter;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;
@@ -40,7 +40,7 @@ final class CashFileImportService
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
         private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
-        private readonly CounterpartyRepository $counterpartyRepository,
+        private readonly CounterpartyFacade $counterpartyFacade,
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly ImportLogger $importLogger,
         private readonly EntityManagerInterface $entityManager,
@@ -418,24 +418,12 @@ final class CashFileImportService
             return $this->counterpartyCache[$cacheKey];
         }
 
-        $existing = $this->counterpartyRepository->findOneByNormalizedName(
-            $companyId,
-            $normalizedName->core,
-            $normalizedName->legalFormHint,
-        );
-        if ($existing instanceof Counterparty) {
-            return $this->counterpartyCache[$cacheKey] = $existing;
-        }
-
-        $counterparty = new Counterparty(
-            Uuid::uuid4()->toString(),
+        // Ищет и создаёт (persist без flush) Company — импорт только кэширует.
+        return $this->counterpartyCache[$cacheKey] = $this->counterpartyFacade->findOrCreateByNormalizedName(
             $company,
             $normalizedName,
-            CounterpartyType::LEGAL_ENTITY
+            CounterpartyType::LEGAL_ENTITY,
         );
-        $this->entityManager->persist($counterparty);
-
-        return $this->counterpartyCache[$cacheKey] = $counterparty;
     }
 
     /**

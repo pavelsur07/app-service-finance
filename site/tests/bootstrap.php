@@ -10,6 +10,7 @@ DG\BypassFinals::enable();
 DG\BypassFinals::allowPaths([
     '*/src/Marketplace/Facade/MarketplaceFacade.php',
     '*/src/Cash/Facade/CashFacade.php',
+    '*/src/Company/Facade/CompanyFacade.php',
     '*/src/Marketplace/Application/RebuildPreliminaryForPeriodAction.php',
     '*/src/Marketplace/Infrastructure/Query/UnprocessedCostsQuery.php',
     '*/src/MarketplaceAds/Infrastructure/Query/AdSpendByListingQuery.php',

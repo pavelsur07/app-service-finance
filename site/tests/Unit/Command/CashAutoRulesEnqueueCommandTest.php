@@ -7,8 +7,8 @@ namespace App\Tests\Unit\Command;
 use App\Cash\Command\CashAutoRulesEnqueueCommand;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Message\EnqueueAutoRulesForRange;
-use App\Company\Repository\UserRepository;
-use App\Tests\Builders\Company\UserBuilder;
+use App\Company\Facade\CompanyFacade;
+use App\Tests\Support\Mock\MocksFinalClasses;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Command\Command;
@@ -18,6 +18,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class CashAutoRulesEnqueueCommandTest extends TestCase
 {
+    use MocksFinalClasses;
+
     public function testExecuteAddsCorrelationId(): void
     {
         $dispatched = null;
@@ -30,7 +32,7 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
             },
         );
 
-        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->userRepository()));
+        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->companyFacade()));
 
         self::assertSame(Command::SUCCESS, $tester->execute([
             'companyId' => Uuid::uuid7()->toString(),
@@ -45,7 +47,7 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $command = new CashAutoRulesEnqueueCommand($bus, $this->userRepository());
+        $command = new CashAutoRulesEnqueueCommand($bus, $this->companyFacade());
         $tester = new CommandTester($command);
 
         $exitCode = $tester->execute([
@@ -61,7 +63,7 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->userRepository()));
+        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->companyFacade()));
 
         $exitCode = $tester->execute(['companyId' => 'not-a-uuid']);
 
@@ -73,7 +75,7 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->userRepository()));
+        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->companyFacade()));
 
         $exitCode = $tester->execute([
             'companyId' => Uuid::uuid7()->toString(),
@@ -95,7 +97,7 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
                 return new Envelope($message);
             },
         );
-        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->userRepository(true)));
+        $tester = new CommandTester(new CashAutoRulesEnqueueCommand($bus, $this->companyFacade(true)));
         $actorId = Uuid::uuid7()->toString();
 
         $exitCode = $tester->execute([
@@ -111,13 +113,11 @@ final class CashAutoRulesEnqueueCommandTest extends TestCase
         self::assertSame($actorId, $dispatched->initiatedByUserId);
     }
 
-    private function userRepository(bool $userExists = false): UserRepository
+    private function companyFacade(bool $userHasAccess = false): CompanyFacade
     {
-        $repository = $this->createMock(UserRepository::class);
-        $repository->method('findOneByIdAndCompanyId')->willReturn(
-            $userExists ? UserBuilder::aUser()->build() : null,
-        );
+        $facade = $this->createFinalMock(CompanyFacade::class);
+        $facade->method('userHasAccess')->willReturn($userHasAccess);
 
-        return $repository;
+        return self::asInstanceOf($facade, CompanyFacade::class);
     }
 }

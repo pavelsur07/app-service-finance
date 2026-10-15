@@ -11,6 +11,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Company\Repository\UserRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -138,6 +139,7 @@ final class CompanyFacadeTest extends TestCase
             $this->createMock(CounterpartyRepository::class),
             $companyMemberRepository,
             $this->createMock(ProjectDirectionRepository::class),
+            $this->createMock(UserRepository::class),
         );
     }
 }

@@ -7,7 +7,7 @@ namespace App\Cash\Command;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Company\Entity\Company;
-use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Facade\CompanyFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -62,7 +62,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly CompanyRepository $companyRepository,
+        private readonly CompanyFacade $companyFacade,
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly EventDispatcherInterface $eventDispatcher,
     ) {
@@ -90,7 +90,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         }
 
         $companyId = (string) $input->getArgument('companyId');
-        $company = $this->companyRepository->find($companyId);
+        $company = $this->companyFacade->findById($companyId);
         if (!$company instanceof Company) {
             $io->error(sprintf('Компания %s не найдена.', $companyId));
 
@@ -166,7 +166,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         // UPDATE прошёл мимо UnitOfWork: сбрасываем, чтобы пересчёт и верификация
         // читали БД, а не закэшированные сущности.
         $this->entityManager->clear();
-        $company = $this->companyRepository->find($companyId);
+        $company = $this->companyFacade->findById($companyId);
         \assert($company instanceof Company);
 
         if (null !== $minOccurredAt) {

@@ -6,7 +6,7 @@ namespace App\Cash\Command;
 
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Message\EnqueueAutoRulesForRange;
-use App\Company\Repository\UserRepository;
+use App\Company\Facade\CompanyFacade;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -24,7 +24,7 @@ final class CashAutoRulesEnqueueCommand extends Command
 {
     public function __construct(
         private readonly MessageBusInterface $bus,
-        private readonly UserRepository $userRepository,
+        private readonly CompanyFacade $companyFacade,
     ) {
         parent::__construct();
     }
@@ -70,7 +70,7 @@ final class CashAutoRulesEnqueueCommand extends Command
             return Command::FAILURE;
         }
         if (null !== $initiatedByUserId
-            && null === $this->userRepository->findOneByIdAndCompanyId($initiatedByUserId, $companyId)) {
+            && !$this->companyFacade->userHasAccess(strtolower($companyId), strtolower($initiatedByUserId))) {
             $output->writeln('<error>Пользователь из --actor-user-id не принадлежит указанной компании.</error>');
 
             return Command::FAILURE;

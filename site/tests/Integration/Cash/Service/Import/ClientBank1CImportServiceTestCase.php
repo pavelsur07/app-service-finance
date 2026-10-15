@@ -17,6 +17,7 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Facade\CounterpartyFacade;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -81,7 +82,7 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
         $this->service = new ClientBank1CImportService(
             $activeCompanyService,
             new CounterpartyNameNormalizer(),
-            $this->counterpartyRepository,
+            self::getContainer()->get(CounterpartyFacade::class),
             $this->transactionRepository,
             new ImportLogger($this->em),
             $this->em,
