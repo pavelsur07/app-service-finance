@@ -89,6 +89,9 @@ final class CashFacadeCashflowReportReadTest extends IntegrationTestCase
         $this->tx($this->rub, CashDirection::INFLOW, '7.00', '2026-03-04', $op)->setIsTransfer(true);
         $this->tx($usd, CashDirection::INFLOW, '5.00', '2026-03-05', $op);
         $this->tx($this->rub, CashDirection::INFLOW, '9.00', '2026-03-05');
+        $unallocated = $this->category($this->company, 'Нераспределённое', CashflowFlowKind::OPERATING);
+        $unallocated->markAsSystem(CashflowCategory::CODE_UNALLOCATED);
+        $this->tx($this->rub, CashDirection::INFLOW, '8.00', '2026-03-06', $unallocated);
         $this->tx($this->rub, CashDirection::INFLOW, '99.00', '2026-03-05', $op)->markDeleted(null, 'test');
         $this->tx($this->rub, CashDirection::INFLOW, '99.00', '2026-04-01', $op);
         $this->tx($this->account($this->foreign, 'Чужой', 'RUB', '2026-01-01', '0.00'), CashDirection::INFLOW, '99.00', '2026-03-05');
@@ -99,10 +102,11 @@ final class CashFacadeCashflowReportReadTest extends IntegrationTestCase
             $this->facade->listCashflowReportRows($id, new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31'), $f),
         ));
 
-        self::assertSame(['RUB 20.00', 'RUB 30.00', 'RUB 7.00', 'RUB null', 'USD 5.00'], $amounts(new CashflowReportRowFilter()));
-        self::assertSame(['RUB 30.00'], $amounts(new CashflowReportRowFilter(dashboardScope: true, dashboardCurrency: 'RUB')));
-        self::assertSame(['RUB 30.00'], $amounts(new CashflowReportRowFilter(dashboardScope: true, dashboardCurrency: 'RUB', dashboardFlowKind: CashflowFlowKind::OPERATING)));
+        self::assertSame(['RUB 20.00', 'RUB 30.00', 'RUB 7.00', 'RUB 8.00', 'RUB null', 'USD 5.00'], $amounts(new CashflowReportRowFilter()));
         self::assertSame([], $amounts(new CashflowReportRowFilter(dashboardScope: true, dashboardCurrency: 'RUB', dashboardFlowKind: CashflowFlowKind::FINANCING)));
+        // С видом потока «нераспределённое» в охват KPI не входит.
+        self::assertSame(['RUB 30.00'], $amounts(new CashflowReportRowFilter(dashboardScope: true, dashboardCurrency: 'RUB', dashboardFlowKind: CashflowFlowKind::OPERATING)));
+        self::assertSame(['RUB 30.00', 'RUB 8.00'], $amounts(new CashflowReportRowFilter(dashboardScope: true, dashboardCurrency: 'RUB')));
         self::assertSame(['USD 5.00'], $amounts(new CashflowReportRowFilter(currency: 'USD')));
         self::assertSame(['RUB 30.00'], $amounts(new CashflowReportRowFilter(responsibilityCenterId: $centerId)));
         self::assertSame(['RUB 30.00'], $amounts(new CashflowReportRowFilter(responsibilityCenterIds: [$centerId])));

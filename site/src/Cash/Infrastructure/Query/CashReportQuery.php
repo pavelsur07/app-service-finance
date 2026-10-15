@@ -268,7 +268,7 @@ final readonly class CashReportQuery
      * Входящий остаток каждого счёта на начало дня `$date` в порядке `$accounts`:
      * входящий остаток строки регистра за этот день; иначе исходящий остаток
      * последней строки до него, но не раньше даты открытия счёта; иначе входящий
-     * остаток самого счёта. Один запрос вместо двух на счёт.
+     * остаток самого счёта. Один запрос вместо двух на счёт, по строке на счёт.
      *
      * @param list<MoneyAccount> $accounts
      *
@@ -289,7 +289,12 @@ final readonly class CashReportQuery
             ->innerJoin('b.moneyAccount', 'a')
             ->where('b.company = :company')
             ->andWhere('a.id IN (:accountIds)')
-            ->andWhere('b.date = :date OR (b.date < :date AND b.date >= a.openingBalanceDate)')
+            // Только последняя подходящая строка счёта — без истории регистра целиком.
+            ->andWhere(sprintf(
+                'b.date = (SELECT MAX(b2.date) FROM %s b2 WHERE b2.moneyAccount = a AND b2.company = :company'
+                .' AND (b2.date = :date OR (b2.date < :date AND b2.date >= a.openingBalanceDate)))',
+                MoneyAccountDailyBalance::class,
+            ))
             ->setParameter('company', $companyId)
             ->setParameter('accountIds', array_map(static fn (MoneyAccount $a): string => (string) $a->getId(), $accounts))
             ->setParameter('date', $date)

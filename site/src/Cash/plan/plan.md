@@ -729,7 +729,7 @@ DTO», `PATTERNS.md` §6, §7). Самый объёмный этап, **один
 | Было | Стало |
 |---|---|
 | `Report\Cashflow\CashflowReportBuilder` читал `CashflowCategoryRepository`, `CashTransactionRepository`, `MoneyAccountRepository`, `MoneyAccountDailyBalanceRepository`, строил DQL строк отчёта сам и отдавал в шаблон/JSON сущности `CashflowCategory` | `CashFacade`: `getCashflowCategoryTree` (DTO `CashflowCategoryNode` с теми же `id`, `name`, `level`, `children`), `listCashflowReportRows` с `CashflowReportRowFilter` (DQL — в `CashReportQuery` без изменений условий), `getReportOpeningBalances`; `CashflowReportJsonFormatter` читает свойства DTO |
-| Входящие остатки отчёта: два запроса на счёт (`findOneBy` + `findLastBefore`) | один запрос с той же семантикой (`listOpeningBalancesAtDate`) — N+1 убран |
+| Входящие остатки отчёта: два запроса на счёт (`findOneBy` + `findLastBefore`) | один запрос с той же семантикой (`listOpeningBalancesAtDate`), по строке на счёт через коррелированный `MAX(date)` — N+1 убран без загрузки истории регистра |
 | `SendTelegramReportsCommand` читал репозитории счетов и транзакций | `listMoneyAccounts` (DTO получил `currentBalance`), `sumTurnoversByAccount` |
 | `Ai\…\CashflowAgent` строил три DQL сам и падал на двух из них | `sumTurnoverByCategoryNameIncludingDeleted`, `sumNetByDayIncludingDeleted`, `sumTurnoverIncludingDeleted`, `listPlannedPayments`; DQL исправлен: алиас `categoryName` вместо занятого `category`, `END` в `CASE`. Регрессия — `tests/Integration/Ai/CashflowAgentInputTest` (красный на старом коде) |
 
@@ -745,6 +745,10 @@ HTML отчёта ДДС ×10 (группировки день/неделя/ме
 `ORDER BY` (компания теперь передаётся параметром-строкой, план запроса другой);
 Telegram-строка ДДС и балансы, плановые платежи, средние и балансы агента — совпали;
 две выборки агента до правки падали `QueryException`, после — считают.
+
+Порядок валют в балансовой строке Telegram теперь по названию счёта (`listMoneyAccounts`);
+раньше — порядок строк таблицы без `ORDER BY`, который менялся при обновлении остатков.
+Для компании с несколькими валютами порядок может однажды смениться — значения те же.
 
 ### Результат подэтапа 7.2 (2026-10-15)
 
@@ -876,6 +880,10 @@ Telegram-строка ДДС и балансы, плановые платежи,
   в суммы, суммы по статье складывают разные валюты, `sumCurrentBalances` берёт и
   неактивные счета. Нужен ли агент — решение Владельца; если да, считать по правилам
   ДДС (без удалённых и переводов, по валютам).
+- **N+1 малого объёма, перенесённые в Cash без изменений (этап 7.3).**
+  `listPlannedPayments` лениво грузит статью и контрагента каждого плана,
+  `getCashflowCategoryTree` — детей каждой статьи (`findTreeByCompany`). Строк
+  единицы–десятки; при росте — fetch join.
 - **Фильтр выписки по статье зависит от identity map (этап 7.2, было и до).**
   `listStatementLines` с `$categoryId` гидрирует коллекцию разбивок частично; если
   транзакции уже загружены в том же EntityManager, фильтр не действует. Сегодня
