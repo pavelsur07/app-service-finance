@@ -29,7 +29,7 @@ final readonly class DocumentListState
 
     /** Параметры списка, см. DocumentListDTO::fromQuery(); прочее из адреса не сохраняется. */
     private const KEYS = [
-        'page', 'limit', 'dateFrom', 'dateTo', 'type', 'status', 'number', 'counterparty', 'q',
+        'page', 'limit', 'dateFrom', 'dateTo', 'type', 'status', 'number', 'counterpartyId', 'q',
         'projectDirection', 'responsibilityCenter', 'direction', 'category', 'amountFrom', 'amountTo',
     ];
 

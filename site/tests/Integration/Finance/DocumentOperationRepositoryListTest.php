@@ -83,7 +83,10 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         self::assertSame(['61079.35'], $this->amounts(projectDirectionId: (string) $showroom->getId()));
         self::assertSame(['30000.00'], $this->amounts(projectDirectionId: (string) $online->getId()));
         self::assertSame(['30000.00', '61079.35'], $this->amounts(responsibilityCenterId: $centerId));
-        self::assertSame(['61079.35'], $this->amounts(counterparty: 'альфа'));
+        // Фильтр по контрагенту — по шапке: операция со своим контрагентом остаётся в выборке
+        // документа, а свой контрагент операции фильтром не ищется.
+        self::assertSame(['30000.00', '61079.35'], $this->amounts(counterpartyId: $bank->getId()));
+        self::assertSame([], $this->amounts(counterpartyId: $leasing->getId()));
         self::assertSame(['30000.00'], $this->amounts(q: 'балтийский'));
         self::assertSame(['30000.00'], $this->amounts(q: 'опт'));
         self::assertSame(['30000.00', '61079.35'], $this->amounts(q: 'шоурум'), 'Поиск по статье.');
@@ -272,10 +275,10 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         ?string $categoryId = null,
         ?string $amountFrom = null,
         ?string $amountTo = null,
-        ?string $counterparty = null,
+        ?string $counterpartyId = null,
     ): array {
         $this->em->clear();
-        $dto = $this->dto($page, $limit, $q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo, $counterparty);
+        $dto = $this->dto($page, $limit, $q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo, $counterpartyId);
 
         return array_values(iterator_to_array($this->repository->paginateForList($this->companyId(), $dto)->getCurrentPageResults()));
     }
@@ -291,11 +294,11 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         ?string $categoryId = null,
         ?string $amountFrom = null,
         ?string $amountTo = null,
-        ?string $counterparty = null,
+        ?string $counterpartyId = null,
     ): array {
         $amounts = array_map(
             static fn (DocumentOperation $operation): string => $operation->getAmount(),
-            $this->rows(1, 50, $q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo, $counterparty),
+            $this->rows(1, 50, $q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo, $counterpartyId),
         );
         sort($amounts);
 
@@ -312,7 +315,7 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         ?string $categoryId = null,
         ?string $amountFrom = null,
         ?string $amountTo = null,
-        ?string $counterparty = null,
+        ?string $counterpartyId = null,
     ): DocumentListDTO {
         $company = $this->em->find(Company::class, $this->company->getId());
         self::assertInstanceOf(Company::class, $company);
@@ -321,7 +324,7 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
             $company,
             $page,
             $limit,
-            counterparty: $counterparty,
+            counterpartyId: $counterpartyId,
             q: $q,
             projectDirectionId: $projectDirectionId,
             responsibilityCenterId: $responsibilityCenterId,

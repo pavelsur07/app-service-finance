@@ -162,21 +162,64 @@ final class DocumentIndexFilterTest extends WebTestCaseBase
         self::assertStringNotContainsString('ACT-2024-111', $content);
     }
 
-    public function testFiltersByCounterpartyName(): void
+    /**
+     * Пилюля «Контрагент» — как в «Операциях ДДС»: фильтр по контрагенту в шапке документа (id),
+     * а не по части названия.
+     */
+    public function testFiltersByHeaderCounterparty(): void
     {
         $client = static::createClient();
         [$user, $company] = $this->prepareCompanyContext();
 
         $matching = $this->persistCounterparty($company, 'Ромашка Торг');
-        $other = $this->persistCounterparty($company, 'Василёк Логистика');
+        $other = $this->persistCounterparty($company, 'Ромашка Логистика');
 
         $this->persistDocument($company, ['number' => 'CP-MATCH', 'counterparty' => $matching]);
         $this->persistDocument($company, ['number' => 'CP-OTHER', 'counterparty' => $other]);
+        $this->persistDocument($company, ['number' => 'CP-NONE']);
 
-        $content = $this->requestIndex($client, $user, $company, ['counterparty' => 'ромашка']);
+        $content = $this->requestIndex($client, $user, $company, ['counterpartyId' => $matching->getId()]);
 
         self::assertStringContainsString('CP-MATCH', $content);
         self::assertStringNotContainsString('CP-OTHER', $content);
+        self::assertStringNotContainsString('CP-NONE', $content);
+
+        $crawler = $client->getCrawler();
+        $pill = $crawler->filter('[data-picker-pill][data-picker-param="counterpartyId"]');
+        self::assertCount(1, $pill);
+        self::assertSame($matching->getId(), $pill->attr('data-picker-value'));
+        self::assertStringContainsString('Контрагент: Ромашка Торг', $crawler->filter('#doc-pill-counterparty')->text());
+        self::assertStringContainsString('Контрагент: Ромашка Торг', $crawler->filter('.vf-applied')->text());
+        // Вкладка «Операции» переносит фильтр.
+        self::assertStringContainsString('counterpartyId='.$matching->getId(), (string) $crawler->filter('.card-header-tabs a[href^="/documents/operations?"]')->first()->attr('href'));
+        // Старого текстового поля в «Ещё фильтры» нет.
+        self::assertCount(0, $crawler->filter('#document-filter-counterparty'));
+    }
+
+    public function testCounterpartyPillListsCounterpartiesBeforeTyping(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        $this->persistCounterparty($company, 'Альфа Снаб');
+
+        $this->requestIndex($client, $user, $company, []);
+
+        $initial = (string) $client->getCrawler()->filter('[data-picker-pill][data-picker-param="counterpartyId"]')->attr('data-picker-initial');
+        self::assertStringContainsString('Альфа Снаб', json_decode($initial, true, flags: \JSON_THROW_ON_ERROR)[0]['name'] ?? '');
+    }
+
+    /**
+     * Мусор вместо id — «фильтр не задан», а не пустой список: опечатка в адресе не прячет журнал.
+     */
+    public function testGarbageCounterpartyIdIsIgnored(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        $this->persistDocument($company, ['number' => 'ANY-DOC']);
+
+        $content = $this->requestIndex($client, $user, $company, ['counterpartyId' => 'not-a-uuid']);
+
+        self::assertStringContainsString('ANY-DOC', $content);
     }
 
     public function testCombinesSeveralFilters(): void

@@ -54,6 +54,19 @@ final class DocumentListResumeTest extends WebTestCaseBase
         self::assertResponseRedirects('/documents/operations?direction=income');
     }
 
+    public function testCounterpartyFilterIsRemembered(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        $this->login($client, $user, $company);
+        $counterpartyId = Uuid::uuid4()->toString();
+
+        $client->request('GET', '/documents/operations', ['counterpartyId' => $counterpartyId]);
+        $client->request('GET', '/documents/resume');
+
+        self::assertResponseRedirects('/documents/operations?counterpartyId='.$counterpartyId);
+    }
+
     public function testResetAllIsRememberedAsEmptyJournal(): void
     {
         $client = static::createClient();
