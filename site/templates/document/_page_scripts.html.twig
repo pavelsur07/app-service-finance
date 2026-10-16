@@ -60,25 +60,46 @@
         let dirty = !!document.querySelector('[data-error-summary]');
         let submitting = false;
 
+        // Правила регистра ОПиУ (DocumentPlContribution): без статьи — не входит; статья без flow
+        // (NONE) — по знаку суммы; обычный документ — модуль операции; marketplace_pl — модуль
+        // суммы статьи (списание «−», сторно «+»).
+        const isMarketplace = form.getAttribute('data-marketplace') === 'true';
         const recalc = function () {
             let income = 0;
             let expense = 0;
             let sum = 0;
             let uncategorized = 0;
+            const byCategory = {};
             const rows = holder.querySelectorAll('[data-operation-row]');
             rows.forEach(function (row) {
                 const amount = parseAmount(row.querySelector('[data-operation-amount]'));
                 const flow = flowOf(row);
+                const category = (row.querySelector('[data-operation-category]') || {}).value || '';
+                const nature = flow === 'INCOME' || flow === 'EXPENSE' ? flow : (flow === 'NONE' && amount !== 0 ? (amount > 0 ? 'INCOME' : 'EXPENSE') : '');
                 const label = row.querySelector('[data-operation-flow-label]');
-                label.textContent = flow === 'INCOME' ? 'Доход' : (flow === 'EXPENSE' ? 'Расход' : '—');
-                label.setAttribute('data-flow', flow);
+                label.textContent = nature === 'INCOME' ? 'Доход' : (nature === 'EXPENSE' ? 'Расход' : '—');
+                label.setAttribute('data-flow', nature);
                 sum += amount;
-                if (flow === 'INCOME') {
-                    income += amount;
-                } else if (flow === 'EXPENSE') {
-                    expense += amount;
-                } else if (amount) {
-                    uncategorized += 1;
+                if (!category || !nature) {
+                    if (amount) {
+                        uncategorized += 1;
+                    }
+                    return;
+                }
+                if (isMarketplace) {
+                    const key = nature + '|' + category;
+                    byCategory[key] = (byCategory[key] || 0) + amount;
+                } else if (nature === 'INCOME') {
+                    income += Math.abs(amount);
+                } else {
+                    expense += Math.abs(amount);
+                }
+            });
+            Object.keys(byCategory).forEach(function (key) {
+                if (key.indexOf('INCOME|') === 0) {
+                    income += Math.abs(byCategory[key]);
+                } else {
+                    expense += Math.abs(byCategory[key]);
                 }
             });
             set('[data-total-income]', total(income));
