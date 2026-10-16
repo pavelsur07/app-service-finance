@@ -247,7 +247,7 @@ flash удаления/восстановления в `DocumentController`, `Do
   - `DocumentCompanyReferenceTest` — каждая связь (своя, чужая, `null`), другой экземпляр той же компании, операция, заполненная до `addOperation`, прямой `setDocument`, `setCompany` с откатом и успешная смена компании;
   - `CashTransactionCreatePnlDocumentTest` — обычный путь и испорченная статья ДДС: сообщение, документа нет;
   - тесты защиты чтения портят строку SQL-ом.
-- Полный `phpunit` — см. описание PR.
+- Полный `phpunit` — OK (6494 теста, 36827 проверок).
 - PHPStan level 8 — OK, baseline не вырос.
 - cs — OK.
 - Ревью свежим агентом: BLOCKER 0, IMPORTANT 1 (источники Cash не проверены на проде; 500 на кнопке ДДС) — данные проверены, перехват добавлен; MINOR 3 — тесты дописаны.
