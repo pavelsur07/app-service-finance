@@ -247,7 +247,7 @@ final class ModuleBoundaryRules
      * Cash не зависит от Analytics: дашборд узнаёт об изменениях ДДС из
      * события `App\Cash\Domain\Event\CashTransactionsChanged`.
      *
-     * До этапа 6 плана Cash (`site/src/Cash/plan/plan.md`) семь Action'ов Cash
+     * До этапа 6 плана Cash (`docs/tasks/cash-architecture/plan.md`) семь Action'ов Cash
      * вызывали `SnapshotCacheInvalidator` напрямую, а Analytics читал данные
      * Cash — модули зависели друг от друга по кругу. Теперь подписчик живёт в
      * Analytics (`InvalidateSnapshotOnCashChangeListener`), и обратная ссылка

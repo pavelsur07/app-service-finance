@@ -862,7 +862,7 @@ Telegram-строка ДДС и балансы, плановые платежи,
   `Service/Import/File/CashFileImportReader.php_`.
 - Переписать `Cash/README.md` под правила `CLAUDE.md` (сейчас разрешает доступ
   через `Service\*` и `Repository\*`), сохранив раздел про мультивалютность.
-- Перенести этот план в `docs/plan/`, если Владелец решит хранить его там.
+- Перенести этот план из модуля, если Владелец решит (решено: `docs/tasks/cash-architecture/`).
 
 **Не лезем:** код, кроме удаления двух `.php_`.
 
@@ -870,9 +870,26 @@ Telegram-строка ДДС и балансы, плановые платежи,
 
 **Чек-лист:**
 
-- [ ] Два `.php_` удалены, на них нет ссылок.
-- [ ] README не противоречит `CLAUDE.md`.
-- [ ] Все гейты зелёные.
+- [x] Два `.php_` удалены, на них нет ссылок.
+- [x] README не противоречит `CLAUDE.md`.
+- [x] Все гейты зелёные.
+
+### Результат этапа 8 (2026-10-15)
+
+- Удалены мёртвые `Service/Import/File/CashTransactionPersister.php_` и
+  `CashFileImportReader.php_` (упоминание в `docs/tasks/cash-p0-import-restore` —
+  исторический follow-up, закрыт этим этапом).
+- `site/src/Cash/README.md`: раздел «Целевая модель» (разрешал доступ к Cash через
+  `Service\*` и `Repository\*`) заменён на «Границы модуля» (что закрыто гейтом,
+  что осталось legacy-исключением) и «Устройство» по `CLAUDE.md` и итогам этапов 4–7;
+  разделы про мультивалютность, переводы и дерево статей сохранены, в rollout
+  уточнено, что merge и deploy идут по «merge and deploy» (`AGENTS.md` §3.2).
+- План и `rules.md` перенесены (`git mv`) из `site/src/Cash/plan/` в
+  `docs/tasks/cash-architecture/` — решение Владельца 15.10.2026. Ссылки в
+  `ARCHITECTURE.md` и `ModuleBoundaryRules.php` обновлены.
+- В `site/src/Cash/` остались только PHP-классы и `README.md`.
+
+**План завершён: этапы 0–8.**
 
 ---
 
@@ -927,7 +944,8 @@ Telegram-строка ДДС и балансы, плановые платежи,
 | 7.3 | 2026-10-15 | 219 записей | 219 записей | вне Cash: −9 `phpat…Cash` (Report, Ai, Telegram), −3 `argument.type`, −2 `return.type`, −1 `method.notFound`, −1 `method.nonObject`; всего 2358 → 2342 | #2688 |
 | 7.4 | 2026-10-15 | 219 записей | 221 запись | −6 `phpat…Cash` (последние в проекте), −1 `flushOutsideBoundary` (`CreateCompanyOwnerAccountAction`); +2 в Cash — записи `AuditLogSubscriber` переехали вместе с классом; всего 2342 → 2335 | #2689 |
 | 7.5a | 2026-10-15 | 221 запись | 211 записей | −9 `phpat` из Cash (Company ×8, Finance ×1), −1 `argument.type` (`DailyBalanceRecalcCommand`); всего 2335 → 2325 | #2690 |
-| 7.5b | 2026-10-15 | 211 записей | 206 записей | −3 `phpat` из Cash (Company ×2, Finance ×1), −2 `foreignEntityType` в Cash, попутно −2 `foreignEntityType` в Finance (общий пикер проектов); всего 2325 → 2318. В `src/Cash/` записей `phpat` и `foreignEntityType` — 0 | этот PR |
+| 7.5b | 2026-10-15 | 211 записей | 206 записей | −3 `phpat` из Cash (Company ×2, Finance ×1), −2 `foreignEntityType` в Cash, попутно −2 `foreignEntityType` в Finance (общий пикер проектов); всего 2325 → 2318. В `src/Cash/` записей `phpat` и `foreignEntityType` — 0 | #2691 |
+| 8 | 2026-10-15 | 206 записей | 206 записей | только файлы вне кода: удалены два `.php_`, README переписан, план перенесён в `docs/tasks/cash-architecture/`; всего 2318 | этот PR |
 
 ## Находки
 

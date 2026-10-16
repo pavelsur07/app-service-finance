@@ -1530,7 +1530,7 @@ upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = n
 
 ```php
 // Последняя активность ДДС: max(updatedAt транзакций, occurredAt движений фондов) или null.
-// Сейчас всегда null — см. «Находки» в site/src/Cash/plan/plan.md
+// Сейчас всегда null — см. «Находки» в docs/tasks/cash-architecture/plan.md
 getLastCashActivityAt(string $companyId): ?\DateTimeImmutable
 
 // Id активных счетов в валюте, по названию

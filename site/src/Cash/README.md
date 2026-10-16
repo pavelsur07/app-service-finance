@@ -1,47 +1,61 @@
-1️⃣ ЦЕЛЕВАЯ МОДЕЛЬ МОДУЛЯ CASH (ФИКСАЦИЯ)
+# Модуль Cash (ДДС)
 
-Это важно зафиксировать один раз, дальше всё под это правим.
+Денежные счета, операции ДДС, переводы, статьи ДДС, автоправила, платёжный
+календарь, фонды и импорты выписок. Общие правила — `CLAUDE.md`, контракты —
+`ARCHITECTURE.md` (раздел `CashFacade`), история приведения модуля к правилам —
+`docs/tasks/cash-architecture/plan.md`.
 
-1.1. Границы модуля Cash
-✅ Разрешено
+## Границы модуля
 
-Доступ к Cash только через:
+**Что закрыто гейтом.** Слои `Service`, `Repository`, `Application` (кроме
+`Application/DTO`) и `Infrastructure` Cash недоступны другим модулям —
+`test_module_internals_are_closed_to_other_modules` в
+`site/tests/Architecture/ModuleBoundaryRules.php`; Cash не зависит от
+`App\Analytics` — `test_cash_does_not_depend_on_analytics`. Симметрично Cash не
+импортирует `Service`, `Repository`, `Application` (кроме DTO) и `Infrastructure`
+модулей Company и Finance.
 
-App\Cash\Service\* (Application Services)
+**Как обращаться к Cash снаружи:** `App\Cash\Facade\CashFacade`, типы его контракта
+(`App\Cash\Application\DTO\*`, `App\Cash\Enum\*`) и доменные события
+`App\Cash\Domain\Event\*` (например, `CashTransactionsChanged` → сброс кэша дашборда в
+Analytics).
 
-App\Cash\Repository\* (read/write, но только внутри Cash)
+**Как Cash обращается наружу:** фасады `CompanyFacade`, `CounterpartyFacade`,
+`FinancialResponsibilityCenterFacade`, `FinanceFacade`, `PLCategoryFacade` и событие
+`CompanyCreatedEvent`. В формах — `ChoiceType` со списком из фасада, не `EntityType` с
+чужой сущностью.
 
-Контроллеры Cash:
+**Legacy-исключения (слои `Entity`, `Enum`, `Domain`, `Exception` гейтом не закрыты):**
 
-НЕ используют EntityManager напрямую
+- снаружи читают сущности и исключения Cash: Finance (`Document` ↔ `CashTransaction`,
+  `FinanceFacade`, `BalanceDynamicsQuery`, `DocumentController`), Telegram
+  (`ClientBinding`, `CurrencyMismatchException`), `Report\Cashflow\CashflowReportBuilder`,
+  `Company\…\CompanyOwnerMembershipCreator`, фикстуры;
+- Cash держит ORM-связи на `Company`, `Counterparty`, `ProjectDirection`, `PLCategory` и
+  `Finance\Entity\Document` (`CashTransaction::documents`), сам создаёт `Document` и
+  `DocumentOperation` (`CashTransactionToDocumentService`), использует
+  `Company\Domain\Service\CounterpartyNameNormalizer`, `CounterpartyPickerType`,
+  `Company\Security\ModuleAccess`, enum'ы Company/Finance и DTO
+  `FinancialResponsibilityCenter*`.
 
-НЕ строят QueryBuilder
+Новый код этих исключений не расширяет: ссылки на чужие сущности — `string $id`
+(`CLAUDE.md`, «Entity»).
 
-Делают: DTO → Service → Response
+## Устройство
 
-❌ Запрещено
+| Слой | Что здесь |
+|---|---|
+| `Controller` | HTTP in/out, компания — `ActiveCompanyService`, данные — через Repository с `companyId` или Action |
+| `Application` | Action'ы — граница транзакции; `flush()` — только в Action, MessageHandler и Command (гейт `FlushOutsideTransactionBoundaryRule`), исключения в baseline — сервисы импорта выписок |
+| `Application/DTO` | входы и результаты фасада |
+| `Infrastructure/Query` | read-модели: для фасада — `CashDashboardQuery`, `CashReportQuery`; внутренние — `CashTransactionAutoRuleCandidateQuery` |
+| `Repository` | доступ к своим сущностям; каждый метод-запрос принимает компанию (`RepositoryCompanyScopeRule`), санкционированные исключения помечены `@companyScopeExempt` |
+| `Service` | legacy-сервисы модуля: `persist()` без `flush()`; исключение — сервисы импорта выписок (`flush` порциями, журнал импорта) |
+| `Domain/Event` | синхронные события «данные ДДС изменились» — только для теряемых последствий (кэш) |
+| `EventListener`, `EventSubscriber` | реакция на события Company и Doctrine (системные статьи, аудит, автоправила) |
 
-EntityManager / QueryBuilder / DBAL вне Cash
-
-Прямые Cash* Entity в:
-
-DTO
-
-Controllers других модулей
-
-MessageHandler
-
-Telegram / Admin / AI
-
-Прямые ManyToOne на Cash Entity вне Cash (кроме legacy → выносим в адаптер)
-
-⚠️ Отчёты / аналитика (D)
-
-Cash — источник данных, но:
-
-Только через QueryService / ReadModel
-
-Никаких createQueryBuilder() снаружи
+Деньги — `App\Shared\Domain\ValueObject\Money` и decimal string; приведение
+сумм к `float` ловит `MoneyFloatCastRule`.
 
 ## Мультивалютные счета и переводы
 
@@ -117,5 +131,6 @@ idempotency key и владения ногами проверяется двум
    код без pair-mutation guards: предпочтителен forward fix; при вынужденном
    rollback сначала блокируются Cash write-paths.
 
-Production migration, category `--execute`, deploy, smoke с записью и rollback
-всегда требуют отдельного явного разрешения Владельца.
+Production migration, category `--execute`, smoke с записью и rollback всегда требуют
+отдельного явного разрешения Владельца; merge и deploy — по одному «merge and deploy»
+(`AGENTS.md` §3.2).
