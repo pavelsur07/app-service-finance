@@ -49,6 +49,31 @@ final class FinancialResponsibilityCenterRepository extends ServiceEntityReposit
             ->getOneOrNullResult();
     }
 
+    /**
+     * Архивные тоже: документ может ссылаться на ЦФО, который потом отправили в архив.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<FinancialResponsibilityCenter>
+     */
+    public function findByIdsAndCompanyId(array $ids, string $companyId): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<FinancialResponsibilityCenter> $result */
+        $result = $this->createQueryBuilder('center')
+            ->andWhere('center.id IN (:ids)')
+            ->andWhere('center.companyId = :companyId')
+            ->setParameter('ids', $ids)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
     public function findGeneralByCompanyId(string $companyId): ?FinancialResponsibilityCenter
     {
         return $this->createQueryBuilder('center')

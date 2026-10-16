@@ -337,10 +337,14 @@ final class DocumentIndexFilterTest extends WebTestCaseBase
     /**
      * Текст строк таблицы. Форма фильтров возвращает введённое значение в поле ввода,
      * поэтому проверка по всему HTML прошла бы и тогда, когда документа в списке нет.
+     * Каждый документ — свой <tbody>: берётся вся таблица, а не первый документ. Пустой
+     * результат таблицы не рисует (пустое состояние) — тогда строк нет.
      */
     private static function tableText(KernelBrowser $client): string
     {
-        return $client->getCrawler()->filter('table tbody')->first()->text();
+        $table = $client->getCrawler()->filter('table.vf-docs-table');
+
+        return 0 === $table->count() ? '' : $table->text();
     }
 
     /**

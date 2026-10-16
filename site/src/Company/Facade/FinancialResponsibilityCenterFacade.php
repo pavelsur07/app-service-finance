@@ -38,6 +38,24 @@ readonly class FinancialResponsibilityCenterFacade
         return null === $center ? null : self::toDTO($center);
     }
 
+    /**
+     * Названия ЦФО компании по списку идентификаторов — одним запросом на страницу списка.
+     * Чужие и несуществующие идентификаторы в ответ не попадают.
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, string> id => название
+     */
+    public function getNamesByIds(string $companyId, array $ids): array
+    {
+        $names = [];
+        foreach ($this->centerRepository->findByIdsAndCompanyId(array_values(array_unique($ids)), $companyId) as $center) {
+            $names[$center->getId()] = $center->getName();
+        }
+
+        return $names;
+    }
+
     public function findGeneralPair(string $companyId): ?FinancialResponsibilityCenterProjectDTO
     {
         $pair = $this->projectRepository->findGeneralByCompanyId($companyId);

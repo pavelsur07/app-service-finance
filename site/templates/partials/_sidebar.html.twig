@@ -54,13 +54,17 @@
             {% endif %}
 
             <!-- ОПиУ -->
-            {% set documents_active = current_route == 'document_index' %}
+            {# Все страницы раздела: список, «Удалённые», документ. #}
+            {% set documents_active = current_route starts with 'document_' %}
             {% if is_granted('module.finance.read') %}
-            <li class="nav-item {{ documents_active ? 'active' : '' }}">
-                <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
-                    <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
-                    <span class="nav-link-title hide-when-collapsed">Доходы и расходы</span>
+            <li class="nav-item dropdown {{ documents_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ documents_active ? 'show active' : '' }}" href="#navbar-pl" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ documents_active ? 'true' : 'false' }}">
+                    <span class="nav-link-icon"><i class="ti ti-file-invoice" aria-hidden="true"></i></span>
+                    <span class="nav-link-title">Доходы и расходы</span>
                 </a>
+                <div class="dropdown-menu {{ documents_active ? 'show' : '' }}" id="navbar-pl">
+                    <a class="dropdown-item {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}">Документы ОПиУ</a>
+                </div>
             </li>
             <!-- ОПиУ -->
             {% endif %}
