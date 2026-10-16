@@ -49,7 +49,7 @@ final readonly class DocumentListTotalsDTO
      * суммы, а не от операции, — списание −X и сторно +X взаимно гасятся, как в регистре ОПиУ.
      *
      * @param list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain
-     * @param list<array{currency: string, bucket: string, signedTotal: string}>                                                               $marketplace
+     * @param list<array{currency: string, bucket: string, signedTotal: string}> $marketplace
      */
     public static function fromAggregates(array $plain, array $marketplace): self
     {

@@ -328,6 +328,14 @@
 - Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` (поиск, период, направление, проект, ЦФО и др.) к ней не применяются — кнопка выгружает всё. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
 - `amount` остаётся строкой (`NUMERIC(15,2)`); `counterparty` и `project` — значения операции с фоллбэком на документ, как их показывает экран.
 
+### Finance: списки «Документы ОПиУ» и «Операции»
+
+- Вкладки раздела: `document_index` (`GET /documents/`, документы), `document_operation_index` (`GET /documents/operations`, `DocumentOperationIndexController`, одна строка — одна `DocumentOperation`), `document_deleted_index`. У роута операций `priority: 10`: у роутов документа `{id}` без требования формата, и `/documents/operations` иначе ушёл бы в `document_show`.
+- Фильтры обеих вкладок — один `DocumentListDTO::fromQuery()` с одними именами параметров (`q`, `dateFrom`, `dateTo`, `direction`, `type`, `status`, `number`, `counterparty`, `projectDirection`, `responsibilityCenter`, `category`, `amountFrom`, `amountTo`, `limit` 20/30/50); мусор в параметре = «фильтр не задан». Ссылки вкладок переносят фильтры друг другу.
+- Вкладка документов (`DocumentRepository::findByCompany()` / `summarizeByCompany()`): условия на операции — `EXISTS`, документ гидрируется со всеми операциями; направление, статья и сумма — условия на одну и ту же операцию.
+- Вкладка операций (`DocumentOperationRepository::paginateForList()` / `summarizeForList()` / `marketplaceBucketSums()` / `countByDocuments()`): компания — через join документа (`IDENTITY(d.company)`), удалённые документы не входят; проект, ЦФО и контрагент — значения операции, иначе документа (как в `PLRegisterUpdater`); направление — природа операции (flow статьи, у `NONE` — знак суммы). Fetch-join только связей «к одному»: `d.operations` не присоединяется.
+- Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — со знаком суммы найденных операций той же статьи и природы в документе, поэтому сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
+
 ### Finance: responsibility-center fact-schema expansion
 
 - Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`.
@@ -3852,6 +3860,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.04 | 2026-10-16 | Finance: вкладка «Операции» раздела «Документы ОПиУ» (`document_operation_index`, `DocumentOperationRepository::paginateForList()` и итог), фильтры «Статья» и «Сумма» на обеих вкладках, `DocumentListDTO::fromQuery()`, `DocumentPlContribution::forOperation()` |
 | 2.03 | 2026-10-14 | Shared `Money::multiplyByRatio()` — умножение на дробь с одним округлением (НДС «из суммы» в Cash, этап 3 плана Cash) |
 | 2.02 | 2026-10-11 | Marketplace: статья по образцу компании берётся и из правил другого маркетплейса, если у своего образцов нет (`DefaultCostMappingSiblingResolver::resolve()` по всем маркетплейсам, `CompanyCostPlTargetsQuery::fetch()` без фильтра маркетплейса); вывод `sync-default` и аудит-лог отмечают такие правила |
 | 2.01 | 2026-10-10 | Marketplace: ночной `sync-default` назначает статью по образцу компании, когда статьи шаблона у неё нет (`DefaultCostMappingSiblingResolver`, `CompanyCostPlTargetsQuery`); правило с ручной статьёй больше не считается `blocked` |

@@ -103,7 +103,7 @@ final class DocumentListDTOTest extends TestCase
     public static function amounts(): iterable
     {
         yield 'целое' => ['1500', '1500.00'];
-        yield 'разряды и запятая' => ["1 000,5", '1000.50'];
+        yield 'разряды и запятая' => ['1 000,5', '1000.50'];
         yield 'неразрывный пробел' => ["12\u{00A0}345.67", '12345.67'];
         yield 'ноль' => ['0', '0.00'];
         yield 'минус' => ['-5', null];

@@ -5,24 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance;
 
 use App\Company\Entity\Company;
-use App\Company\Entity\Counterparty;
-use App\Company\Entity\FinancialResponsibilityCenter;
-use App\Company\Entity\ProjectDirection;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\Document;
-use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Repository\DocumentRepository;
-use App\Tests\Builders\Cash\CashTransactionBuilder;
-use App\Tests\Builders\Cash\MoneyAccountBuilder;
-use App\Tests\Builders\Company\CompanyBuilder;
-use App\Tests\Builders\Company\CounterpartyBuilder;
-use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
-use Ramsey\Uuid\Uuid;
 
 /**
  * Фильтры и итог списка «Документы ОПиУ». Условия на операции не должны урезать
