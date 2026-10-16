@@ -93,6 +93,8 @@ class CashTransactionType extends AbstractType
                 'company_id' => (string) $company->getId(),
                 'keep_id' => $currentCounterpartyId,
                 'search_url' => '/api/counterparties/search',
+                // Окно как у пилюли «Контрагент» (docs/design-system/components/entity-picker.md).
+                'browse' => true,
             ])
             ->add('description', TextareaType::class, ['required' => false]);
 
