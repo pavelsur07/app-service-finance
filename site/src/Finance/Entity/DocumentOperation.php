@@ -67,6 +67,11 @@ class DocumentOperation
             $this->assertReferencesBelongTo($document);
         }
         $this->document = $document;
+        // Обе стороны связи: операция, привязанная напрямую, без этого не попала бы в коллекцию
+        // документа, и Document::setCompany() не проверил бы её справочники.
+        if (null !== $document && !$document->getOperations()->contains($this)) {
+            $document->addOperation($this);
+        }
 
         return $this;
     }

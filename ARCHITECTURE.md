@@ -330,7 +330,7 @@
 
 ### Finance: справочники документа ОПиУ — только своей компании
 
-- `Document` и `DocumentOperation` держат инвариант: контрагент, проект, основание ДДС (`CashTransaction`) и статья ОПиУ — компании документа. Сеттеры, `Document::addOperation()` (операцию форма и импорт заполняют до привязки), `DocumentOperation::setDocument()` и `Document::setCompany()` (с откатом) бросают `App\Finance\Exception\DocumentForeignReferenceException` (`getReference()`, `getReferenceId()`); `null` разрешён. Сравнение — по id компании. Гидрация из БД сеттеры не вызывает.
+- `Document` и `DocumentOperation` держат инвариант: контрагент, проект, основание ДДС (`CashTransaction`) и статья ОПиУ — компании документа. Сеттеры, `Document::addOperation()` (операцию форма и импорт заполняют до привязки), `DocumentOperation::setDocument()` (синхронизирует обе стороны связи — операция попадает в коллекцию документа) и `Document::setCompany()` (с откатом) бросают `App\Finance\Exception\DocumentForeignReferenceException` (`getReference()`, `getReferenceId()`); `null` разрешён. Сравнение — по id компании. Гидрация из БД сеттеры не вызывает.
 - FK компанию не несут, поэтому без инварианта чужое название показали бы `show`, `edit`, `copy`, JSON документа и «Удалённые», а регистр ОПиУ разнёс бы сумму по чужой статье. Списки вкладок дополнительно присоединяют справочники только своей компании — на случай строк, записанных в обход сущности.
 - ЦФО (`responsibilityCenterId`) — строковый id без связи, сущность его не проверяет; путь записи — форма (активные ЦФО компании) и `FinanceDocumentResponsibilityCenterNormalizer`.
 - `CashTransactionController::createPnlDocument` ловит исключение: `logger->error` с `companyId` и flash вместо 500 (испорченная статья ДДС или справочник операции ДДС).

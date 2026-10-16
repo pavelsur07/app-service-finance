@@ -156,6 +156,23 @@ final class DocumentCompanyReferenceTest extends TestCase
         self::assertSame($this->own, $document->getCompany());
     }
 
+    /**
+     * Операция привязана напрямую через setDocument(): она обязана оказаться в коллекции
+     * документа, иначе смена компании её не проверит (находка ревью Codex).
+     */
+    public function testDirectlyAttachedOperationIsRecheckedOnCompanyChange(): void
+    {
+        $document = $this->document();
+        $operation = (new DocumentOperation())->setCategory($this->category($this->own));
+        $operation->setDocument($document);
+
+        self::assertTrue($document->getOperations()->contains($operation));
+        self::assertCount(1, $document->getOperations());
+
+        $this->expectForeign('P&L category');
+        $document->setCompany($this->foreign);
+    }
+
     public function testChangingCompanyWithoutReferencesSucceeds(): void
     {
         $document = $this->document();
