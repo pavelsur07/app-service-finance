@@ -324,8 +324,8 @@
 ### Finance: выгрузка операций ОПиУ в JSON
 
 - `App\Finance\Infrastructure\Export\PlOperationJsonExporter::export(companyId, companyName, exportedAt)` — единственное место сборки плоской выгрузки операций ОПиУ. Строка результата = одна `DocumentOperation` с продублированными полями своего документа; конверт `{exported_at, company, count, operations[]}`.
-- Маршрут `document_operations_export_json` (`GET /documents/operations/export.json`, `PlOperationJsonExportController`) — кнопка «Выгрузить JSON» в шапке страницы «Операции ОПиУ». Путь намеренно из двух сегментов: `/documents/export.json` перехватил бы `document_show` (`/documents/{id}`).
-- Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` не применяются, потому что контроллер списка их тоже не применяет. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
+- Маршрут `document_operations_export_json` (`GET /documents/operations/export.json`, `PlOperationJsonExportController`) — кнопка «Выгрузить JSON» в шапке страницы «Документы ОПиУ». Путь намеренно из двух сегментов: `/documents/export.json` перехватил бы `document_show` (`/documents/{id}`).
+- Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` (поиск, период, направление, проект, ЦФО и др.) к ней не применяются — кнопка выгружает всё. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
 - `amount` остаётся строкой (`NUMERIC(15,2)`); `counterparty` и `project` — значения операции с фоллбэком на документ, как их показывает экран.
 
 ### Finance: responsibility-center fact-schema expansion
@@ -1217,7 +1217,7 @@ createDocumentFromCashTransaction(
 updatePLRegisterForDocument(string $documentId): void
 ```
 
-Ручное удаление на странице «Операции ОПиУ» является мягким: `Document` получает
+Ручное удаление на странице «Документы ОПиУ» является мягким: `Document` получает
 `deleted_at`, `deleted_by` и `delete_reason`, а основные списки, отчёты и JSON-выгрузки
 читают только неудалённые документы. `SoftDeleteDocumentAction` и
 `RestoreDocumentAction` ограничивают поиск активной компанией, сохраняют операции
