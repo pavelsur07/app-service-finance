@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Infrastructure\Http;
 
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -16,8 +17,10 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * вели не на сброшенный журнал, а туда, где пользователь его оставил. Сам список
  * сессию не читает: «Сбросить всё» по-прежнему даёт пустой журнал.
  *
- * Ключ — по компании: фильтры ссылаются на статьи и направления своей компании,
- * после смены компании чужие идентификаторы не применяются.
+ * Ключ — пользователь и компания: фильтры ссылаются на статьи и направления своей
+ * компании, после смены компании чужие идентификаторы не применяются; сотрудник,
+ * вошедший в том же браузере, не получает журнал предыдущего. Поэтому сессия, а не
+ * localStorage: тот живёт в браузере и переживает выход из учётной записи.
  */
 final readonly class DocumentListState
 {
@@ -33,8 +36,10 @@ final readonly class DocumentListState
     /** Длиннее значения поля поиска не бывают; ограничение держит сессию маленькой. */
     private const MAX_VALUE_LENGTH = 255;
 
-    public function __construct(private RequestStack $requestStack)
-    {
+    public function __construct(
+        private RequestStack $requestStack,
+        private Security $security,
+    ) {
     }
 
     /**
@@ -50,7 +55,7 @@ final readonly class DocumentListState
             }
         }
 
-        $this->requestStack->getSession()->set(self::sessionKey($companyId), ['route' => $route, 'query' => $params]);
+        $this->requestStack->getSession()->set($this->sessionKey($companyId), ['route' => $route, 'query' => $params]);
     }
 
     /**
@@ -58,7 +63,7 @@ final readonly class DocumentListState
      */
     public function recall(string $companyId): array
     {
-        $saved = $this->requestStack->getSession()->get(self::sessionKey($companyId));
+        $saved = $this->requestStack->getSession()->get($this->sessionKey($companyId));
         $route = \is_array($saved) ? ($saved['route'] ?? null) : null;
         $savedQuery = \is_array($saved) ? ($saved['query'] ?? null) : null;
         if (!\is_string($route) || !\in_array($route, self::ROUTES, true) || !\is_array($savedQuery)) {
@@ -75,8 +80,8 @@ final readonly class DocumentListState
         return ['route' => $route, 'query' => $query];
     }
 
-    private static function sessionKey(string $companyId): string
+    private function sessionKey(string $companyId): string
     {
-        return 'finance.document_list.'.$companyId;
+        return 'finance.document_list.'.$this->security->getUser()?->getUserIdentifier().'.'.$companyId;
     }
 }

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Finance;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Finance\Entity\Document;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
@@ -88,6 +90,26 @@ final class DocumentListResumeTest extends WebTestCaseBase
 
         $client->request('GET', '/documents/', ['type' => 'PAYROLL']);
         $this->setClientSessionValue($client, 'active_company_id', $other->getId());
+        $client->request('GET', '/documents/resume');
+
+        self::assertResponseRedirects('/documents/');
+    }
+
+    public function testColleagueInSameBrowserDoesNotGetPreviousUsersFilters(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->prepareCompanyContext();
+        $colleague = UserBuilder::aUser()->withIndex(random_int(10000, 99999))->build();
+        $member = CompanyMemberBuilder::aMember()->withId(Uuid::uuid4()->toString())->withCompany($company)->withUser($colleague)->withRole(CompanyMember::ROLE_OWNER)->build();
+        $this->em()->persist($colleague);
+        $this->em()->persist($member);
+        $this->em()->flush();
+
+        $this->login($client, $owner, $company);
+        $client->request('GET', '/documents/', ['type' => 'PAYROLL']);
+
+        // Тот же браузер и та же сессия, вошёл другой сотрудник той же компании.
+        $client->loginUser($colleague);
         $client->request('GET', '/documents/resume');
 
         self::assertResponseRedirects('/documents/');
