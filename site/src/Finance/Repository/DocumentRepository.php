@@ -11,6 +11,7 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -42,11 +43,12 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect('opProject')
             ->addSelect('opCounterparty')
             ->addSelect('ct')
-            ->leftJoin('d.projectDirection', 'pd')
+            ->leftJoin('d.projectDirection', 'pd', Join::WITH, 'IDENTITY(pd.company) = :companyId')
             ->leftJoin('d.operations', 'op')
-            ->leftJoin('op.category', 'opCategory')
-            ->leftJoin('op.projectDirection', 'opProject')
-            ->leftJoin('op.counterparty', 'opCounterparty')
+            // Справочники — только своей компании (см. createFilteredQueryBuilder).
+            ->leftJoin('op.category', 'opCategory', Join::WITH, 'IDENTITY(opCategory.company) = :companyId')
+            ->leftJoin('op.projectDirection', 'opProject', Join::WITH, 'IDENTITY(opProject.company) = :companyId')
+            ->leftJoin('op.counterparty', 'opCounterparty', Join::WITH, 'IDENTITY(opCounterparty.company) = :companyId')
             ->orderBy('d.date', \SortDirection::Descending)
             // Одной даты мало: при равных датах порядок не определён, и один документ
             // может попасть на две страницы, а другой — ни на одну.
@@ -83,7 +85,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS incomeTotal', $isIncome))
             ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS expenseTotal', $isExpense))
             ->leftJoin('d.operations', 'sumOp')
-            ->leftJoin('sumOp.category', 'sumCategory')
+            ->leftJoin('sumOp.category', 'sumCategory', Join::WITH, 'IDENTITY(sumCategory.company) = :companyId')
             ->groupBy('currency')
             ->setParameter('income', PLFlow::INCOME)
             ->setParameter('expense', PLFlow::EXPENSE)
@@ -98,7 +100,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect(sprintf("CASE WHEN %s THEN 'INCOME' ELSE 'EXPENSE' END AS bucket", $isIncome))
             ->addSelect('SUM(sumOp.amount) AS signedTotal')
             ->innerJoin('d.operations', 'sumOp')
-            ->innerJoin('sumOp.category', 'sumCategory')
+            ->innerJoin('sumOp.category', 'sumCategory', Join::WITH, 'IDENTITY(sumCategory.company) = :companyId')
             ->andWhere('d.type = :marketplace')
             ->andWhere(sprintf('(%s OR %s)', $isIncome, $isExpense))
             ->groupBy('d.id')
@@ -131,9 +133,11 @@ class DocumentRepository extends ServiceEntityRepository
     private function createFilteredQueryBuilder(string $companyId, DocumentListDTO $dto): QueryBuilder
     {
         $queryBuilder = $this->createQueryBuilder('d')
-            ->leftJoin('d.counterparty', 'cp')
+            // Справочники — только своей компании: FK компанию не несут, и испорченная ссылка на
+            // чужого контрагента, статью или проект показала бы чужое название и искалась бы по нему.
+            ->leftJoin('d.counterparty', 'cp', Join::WITH, 'IDENTITY(cp.company) = :companyId')
             // Валюта документа — валюта его основания ДДС: нужна строкам списка и итогу.
-            ->leftJoin('d.cashTransaction', 'ct')
+            ->leftJoin('d.cashTransaction', 'ct', Join::WITH, 'IDENTITY(ct.company) = :companyId')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('companyId', $companyId);
@@ -174,7 +178,7 @@ class DocumentRepository extends ServiceEntityRepository
                 'LOWER(d.number) LIKE :q',
                 'LOWER(cp.name) LIKE :q',
                 sprintf(
-                    'EXISTS (SELECT qOp.id FROM %s qOp JOIN qOp.category qCategory WHERE qOp.document = d AND LOWER(qCategory.name) LIKE :q)',
+                    'EXISTS (SELECT qOp.id FROM %s qOp JOIN qOp.category qCategory WHERE qOp.document = d AND IDENTITY(qCategory.company) = :companyId AND LOWER(qCategory.name) LIKE :q)',
                     DocumentOperation::class,
                 ),
             ))->setParameter('q', self::containsPattern($dto->q));
@@ -225,7 +229,7 @@ class DocumentRepository extends ServiceEntityRepository
         }
         if ([] !== $operationConditions) {
             $queryBuilder->andWhere(sprintf(
-                'EXISTS (SELECT fOp.id FROM %s fOp LEFT JOIN fOp.category fCategory WHERE fOp.document = d AND %s)',
+                'EXISTS (SELECT fOp.id FROM %s fOp LEFT JOIN fOp.category fCategory WITH IDENTITY(fCategory.company) = :companyId WHERE fOp.document = d AND %s)',
                 DocumentOperation::class,
                 implode(' AND ', $operationConditions),
             ));

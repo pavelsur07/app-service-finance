@@ -10,6 +10,7 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -62,8 +63,6 @@ class DocumentOperationRepository extends ServiceEntityRepository
 
         $queryBuilder = $this->createFilteredQueryBuilder($companyId, $dto)
             ->addSelect('d', 'category', 'opCp', 'dCp', 'ct', 'opPd', 'dPd')
-            ->leftJoin('op.projectDirection', 'opPd')
-            ->leftJoin('d.projectDirection', 'dPd')
             ->orderBy('d.date', \SortDirection::Descending)
             // Без id документа и операции порядок при равных датах не определён, и строка
             // могла бы попасть на две страницы.
@@ -152,7 +151,7 @@ class DocumentOperationRepository extends ServiceEntityRepository
             ->addSelect(sprintf("CASE WHEN %s THEN 'INCOME' ELSE 'EXPENSE' END AS bucket", self::IS_INCOME))
             ->addSelect('SUM(op.amount) AS signedTotal')
             ->innerJoin('op.document', 'd')
-            ->innerJoin('op.category', 'category')
+            ->innerJoin('op.category', 'category', Join::WITH, 'IDENTITY(category.company) = :companyId')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.type = :marketplace')
             ->andWhere('d.id IN (:documentIds)')
@@ -242,11 +241,16 @@ class DocumentOperationRepository extends ServiceEntityRepository
     {
         $queryBuilder = $this->createQueryBuilder('op')
             ->innerJoin('op.document', 'd')
-            ->leftJoin('op.category', 'category')
-            ->leftJoin('op.counterparty', 'opCp')
-            ->leftJoin('d.counterparty', 'dCp')
+            // Справочники — только своей компании: FK компанию не несут, и испорченная ссылка на
+            // чужую статью, контрагента или проект показала бы чужое название и искалась бы по нему.
+            // Такая связь гидрируется как пустая (как в JSON-выгрузке ОПиУ).
+            ->leftJoin('op.category', 'category', Join::WITH, 'IDENTITY(category.company) = :companyId')
+            ->leftJoin('op.counterparty', 'opCp', Join::WITH, 'IDENTITY(opCp.company) = :companyId')
+            ->leftJoin('d.counterparty', 'dCp', Join::WITH, 'IDENTITY(dCp.company) = :companyId')
+            ->leftJoin('op.projectDirection', 'opPd', Join::WITH, 'IDENTITY(opPd.company) = :companyId')
+            ->leftJoin('d.projectDirection', 'dPd', Join::WITH, 'IDENTITY(dPd.company) = :companyId')
             // Валюта операции — валюта основания ДДС её документа, без основания — рубли.
-            ->leftJoin('d.cashTransaction', 'ct')
+            ->leftJoin('d.cashTransaction', 'ct', Join::WITH, 'IDENTITY(ct.company) = :companyId')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('companyId', $companyId);
@@ -288,7 +292,7 @@ class DocumentOperationRepository extends ServiceEntityRepository
         }
 
         if (null !== $dto->projectDirectionId) {
-            $queryBuilder->andWhere('COALESCE(IDENTITY(op.projectDirection), IDENTITY(d.projectDirection)) = :projectDirectionId')
+            $queryBuilder->andWhere('COALESCE(opPd.id, dPd.id) = :projectDirectionId')
                 ->setParameter('projectDirectionId', $dto->projectDirectionId);
         }
 
@@ -306,7 +310,7 @@ class DocumentOperationRepository extends ServiceEntityRepository
         }
 
         if (null !== $dto->categoryId) {
-            $queryBuilder->andWhere('IDENTITY(op.category) = :categoryId')->setParameter('categoryId', $dto->categoryId);
+            $queryBuilder->andWhere('category.id = :categoryId')->setParameter('categoryId', $dto->categoryId);
         }
 
         if (null !== $dto->amountFrom) {

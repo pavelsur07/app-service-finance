@@ -158,6 +158,55 @@ final class DocumentOperationIndexViewTest extends WebTestCaseBase
         self::assertStringNotContainsString('FOREIGN', $crawler->filter('.card')->text());
     }
 
+    /**
+     * Испорченная строка: документ компании A ссылается на статью, контрагента и проект
+     * компании B (FK компанию не несут). Ни одна вкладка не показывает и не ищет чужие названия.
+     */
+    public function testForeignReferenceNamesDoNotLeakOnEitherTab(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        [, $foreign] = $this->prepareCompanyContext();
+        [$foreignIncome] = $this->persistCategories($foreign);
+        $em = $this->em();
+        $foreignProject = new ProjectDirection(Uuid::uuid4()->toString(), $foreign, 'Чужой проект Б');
+        $foreignCounterparty = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($foreign)->withName('ООО Чужой Б')->build();
+        $em->persist($foreignProject);
+        $em->persist($foreignCounterparty);
+
+        $document = $this->persistDocument($company, 'BROKEN', [[$foreignIncome, '100.00']]);
+        $document->setCounterparty($foreignCounterparty);
+        $document->setProjectDirection($foreignProject);
+        $operation = $document->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        $operation->setCounterparty($foreignCounterparty);
+        $operation->setProjectDirection($foreignProject);
+        $em->flush();
+        // Как в настоящем запросе — пустой EntityManager: иначе в нём уже лежат сущности фикстуры.
+        $em->clear();
+
+        foreach (['/documents/operations', '/documents/'] as $url) {
+            $client->loginUser($user);
+            $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+            $crawler = $client->request('GET', $url);
+            self::assertResponseIsSuccessful();
+            $card = $crawler->filter('.card')->text();
+            self::assertStringContainsString('BROKEN', $card, $url);
+            foreach ([$foreignIncome->getName(), 'Чужой проект Б', 'ООО Чужой Б'] as $foreignName) {
+                self::assertStringNotContainsString($foreignName, $card, $url.': '.$foreignName);
+            }
+            // Чужая статья не входит в итог: у строки нет своей статьи.
+            self::assertStringContainsString('Доходы 0,00', self::normalize($crawler->filter('.vf-docs__totals')->text()), $url);
+
+            foreach (['ООО Чужой', 'Выручка', 'Чужой проект'] as $q) {
+                $found = $client->request('GET', $url, ['q' => $q]);
+                self::assertCount(0, $found->filter('tr[data-operation-row], tbody[data-document-row]'), $url.' q='.$q);
+            }
+            $byCategory = $client->request('GET', $url, ['category' => (string) $foreignIncome->getId()]);
+            self::assertCount(0, $byCategory->filter('tr[data-operation-row], tbody[data-document-row]'), $url.' category');
+        }
+    }
+
     public function testQueryCountDoesNotGrowWithNumberOfRows(): void
     {
         $client = static::createClient();
