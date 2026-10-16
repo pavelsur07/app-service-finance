@@ -63,6 +63,9 @@ class DocumentOperation
 
     public function setDocument(?Document $document): self
     {
+        if (null !== $document) {
+            $this->assertReferencesBelongTo($document);
+        }
         $this->document = $document;
 
         return $this;
@@ -75,6 +78,7 @@ class DocumentOperation
 
     public function setCategory(?PLCategory $category): self
     {
+        $this->document?->assertOwnReference('P&L category', $category?->getCompany(), $category?->getId());
         $this->category = $category;
 
         return $this;
@@ -109,6 +113,7 @@ class DocumentOperation
 
     public function setCounterparty(?Counterparty $counterparty): self
     {
+        $this->document?->assertOwnReference('counterparty', $counterparty?->getCompany(), $counterparty?->getId());
         $this->counterparty = $counterparty;
 
         return $this;
@@ -121,6 +126,7 @@ class DocumentOperation
 
     public function setProjectDirection(?ProjectDirection $projectDirection): self
     {
+        $this->document?->assertOwnReference('project direction', $projectDirection?->getCompany(), $projectDirection?->getId());
         $this->projectDirection = $projectDirection;
 
         return $this;
@@ -148,5 +154,15 @@ class DocumentOperation
         $this->comment = $comment;
 
         return $this;
+    }
+
+    /**
+     * Справочники операции — компании документа (инвариант держит Document::assertOwnReference).
+     */
+    public function assertReferencesBelongTo(Document $document): void
+    {
+        $document->assertOwnReference('P&L category', $this->category?->getCompany(), $this->category?->getId());
+        $document->assertOwnReference('counterparty', $this->counterparty?->getCompany(), $this->counterparty?->getId());
+        $document->assertOwnReference('project direction', $this->projectDirection?->getCompany(), $this->projectDirection?->getId());
     }
 }

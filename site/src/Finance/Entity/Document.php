@@ -12,6 +12,7 @@ use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Exception\DocumentForeignReferenceException;
 use App\Finance\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -104,7 +105,22 @@ class Document
 
     public function setCompany(Company $company): self
     {
+        $previous = $this->company;
         $this->company = $company;
+        // Справочники документа и операций обязаны остаться своей компании и после смены;
+        // при отказе документ остаётся в прежней компании.
+        try {
+            $this->assertOwnReference('counterparty', $this->counterparty?->getCompany(), $this->counterparty?->getId());
+            $this->assertOwnReference('project direction', $this->projectDirection?->getCompany(), $this->projectDirection?->getId());
+            $this->assertOwnReference('cash transaction', $this->cashTransaction?->getCompany(), $this->cashTransaction?->getId());
+            foreach ($this->operations as $operation) {
+                $operation->assertReferencesBelongTo($this);
+            }
+        } catch (DocumentForeignReferenceException $exception) {
+            $this->company = $previous;
+
+            throw $exception;
+        }
 
         return $this;
     }
@@ -116,6 +132,7 @@ class Document
 
     public function setCashTransaction(?CashTransaction $cashTransaction): self
     {
+        $this->assertOwnReference('cash transaction', $cashTransaction?->getCompany(), $cashTransaction?->getId());
         $this->cashTransaction = $cashTransaction;
 
         return $this;
@@ -164,6 +181,7 @@ class Document
 
     public function setCounterparty(?Counterparty $counterparty): self
     {
+        $this->assertOwnReference('counterparty', $counterparty?->getCompany(), $counterparty?->getId());
         $this->counterparty = $counterparty;
 
         return $this;
@@ -176,6 +194,7 @@ class Document
 
     public function setProjectDirection(?ProjectDirection $projectDirection): self
     {
+        $this->assertOwnReference('project direction', $projectDirection?->getCompany(), $projectDirection?->getId());
         $this->projectDirection = $projectDirection;
 
         return $this;
@@ -226,6 +245,9 @@ class Document
     public function addOperation(DocumentOperation $op): self
     {
         if (!$this->operations->contains($op)) {
+            // Операцию форма и импорт заполняют до привязки к документу: её справочники
+            // проверяются здесь, до того как она станет частью документа.
+            $op->assertReferencesBelongTo($this);
             $this->operations->add($op);
             $op->setDocument($this);
         }
@@ -328,5 +350,23 @@ class Document
         $this->deletedAt = null;
         $this->deletedBy = null;
         $this->deleteReason = null;
+    }
+
+    /**
+     * Справочник документа — только своей компании: FK компанию не несут. Сравнение по id:
+     * одна компания может прийти разными экземплярами (прокси Doctrine и загруженный объект).
+     *
+     * @internal для DocumentOperation — тот же инвариант для справочников операции
+     */
+    public function assertOwnReference(string $reference, ?Company $referenceCompany, ?string $referenceId): void
+    {
+        if (null === $referenceCompany) {
+            return;
+        }
+
+        $companyId = (string) $this->company->getId();
+        if ((string) $referenceCompany->getId() !== $companyId) {
+            throw new DocumentForeignReferenceException($reference, (string) $referenceId, $companyId);
+        }
     }
 }

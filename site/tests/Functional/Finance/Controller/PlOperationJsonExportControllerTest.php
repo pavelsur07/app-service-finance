@@ -156,11 +156,22 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
         $foreignCounterparty = $this->seedCounterparty($companyB, 'ООО Чужой');
         $foreignProject = $this->seedProject($companyB, 'Чужой проект');
 
+        $ownCategory = $this->seedCategory($companyA, 'Своя категория', 'OWN');
         $document = $this->seedDocument($companyA, '2026-04-15', 'ДОК-1');
-        $document->setCounterparty($foreignCounterparty);
-        $document->setProjectDirection($foreignProject);
-        $this->addOperation($document, $foreignCategory, '100.00');
+        $operation = $this->addOperation($document, $ownCategory, '100.00');
         $this->em()->flush();
+        // Сущность чужую ссылку не примет (DocumentForeignReferenceException) — строку портим
+        // в БД напрямую: проверяется защита чтения на случай данных, записанных в обход сущности.
+        $connection = $this->em()->getConnection();
+        $connection->executeStatement(
+            'UPDATE documents SET counterparty_id = :cp, project_direction_id = :pd WHERE id = :id',
+            ['cp' => $foreignCounterparty->getId(), 'pd' => $foreignProject->getId(), 'id' => $document->getId()],
+        );
+        $connection->executeStatement(
+            'UPDATE document_operations SET category_id = :cat WHERE id = :id',
+            ['cat' => $foreignCategory->getId(), 'id' => $operation->getId()],
+        );
+        $this->em()->clear();
 
         $this->loginWithActiveCompany($client, $userA, $companyA);
 
