@@ -1046,6 +1046,22 @@
   white-space: normal;
 }
 
+/* Поле формы в режиме browse — окно как у пилюли: не уже 360px, строка в одну линию,
+   ИНН справа (CounterpartyPickerType browse: true). */
+.vf-pick-portal--browse .vf-pick-option {
+  flex-wrap: nowrap;
+  column-gap: var(--vf-space-3);
+}
+
+.vf-pick-portal--browse .vf-pick-option__label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.vf-pick-portal--browse .vf-pick-pop__hint {
+  padding-bottom: var(--vf-space-1);
+}
+
 .vf-pick-option__hint {
   flex: none;
   font-size: var(--vf-size-xs);

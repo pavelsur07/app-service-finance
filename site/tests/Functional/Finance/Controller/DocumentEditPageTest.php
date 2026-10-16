@@ -16,6 +16,7 @@ use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -127,6 +128,68 @@ final class DocumentEditPageTest extends WebTestCaseBase
         $operation = $reloaded->getOperations()->first();
         self::assertInstanceOf(DocumentOperation::class, $operation);
         self::assertSame('Новый комментарий', $operation->getComment());
+    }
+
+    /**
+     * Регрессия: новая операция получает контрагента шапки (_page_scripts.html.twig), но архивного
+     * среди её вариантов не было — подстановка молча не срабатывала, поле оставалось пустым.
+     */
+    public function testNewOperationAcceptsArchivedCounterpartyOfTheHeader(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $income] = $this->prepare();
+        $document = $this->persistDocument($company, $income, false);
+        $archived = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)
+            ->withName('Архивный поставщик')->asArchived()->build();
+        $document->setCounterparty($archived);
+        $this->em()->persist($archived);
+        $this->em()->flush();
+        $archivedId = $archived->getId();
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+        self::assertResponseIsSuccessful();
+
+        $prototype = (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype');
+        self::assertStringContainsString(sprintf('value="%s"', $archivedId), $prototype);
+        self::assertStringContainsString('data-archived="1"', $prototype);
+
+        $values = $crawler->selectButton('Сохранить')->form()->getPhpValues();
+        $values['document']['operations'][5] = ['category' => (string) $income->getId(), 'amount' => '50.00', 'counterparty' => $archivedId];
+        $client->request('POST', sprintf('/documents/%s/edit', $document->getId()), $values);
+        self::assertResponseRedirects('/documents/resume');
+
+        $this->em()->clear();
+        $reloaded = $this->em()->find(Document::class, $document->getId());
+        self::assertInstanceOf(Document::class, $reloaded);
+        $counterparties = array_map(
+            static fn (DocumentOperation $operation): ?string => $operation->getCounterparty()?->getId(),
+            $reloaded->getOperations()->toArray(),
+        );
+        self::assertContains($archivedId, $counterparties);
+    }
+
+    /**
+     * Контрагент в шапке и в операциях — окно выбора как у пилюли фильтра (browse): тип варианта
+     * нужен окну для групп и иконок.
+     */
+    public function testCounterpartyFieldsUseBrowseWindow(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepare();
+        $counterparty = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)->withName('ООО Ромашка')->build();
+        $this->em()->persist($counterparty);
+        $this->em()->flush();
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', '/documents/new');
+        self::assertResponseIsSuccessful();
+
+        $header = $crawler->filter('[data-document-counterparty]')->closest('[data-cp-picker]');
+        self::assertNotNull($header);
+        self::assertSame('1', $header->attr('data-cp-browse'));
+        self::assertSame($counterparty->getType()->value, $crawler->filter(sprintf('[data-document-counterparty] option[value="%s"]', $counterparty->getId()))->attr('data-type'));
+        self::assertStringContainsString('data-cp-browse="1"', (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype'));
     }
 
     private function persistDocument(Company $company, PLCategory $income, bool $withBase): Document

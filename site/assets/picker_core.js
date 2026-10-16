@@ -377,14 +377,20 @@ export function createListbox(container, input, { onChoose = () => {}, hrefFor =
  * мало места. Внутри формы он попадал в стакинг-контекст блока условия и оказывался под
  * кнопками «Удалить» и «+ Добавить условие»; в модалке и оффканвасе дефект возвращался.
  */
-export function positionPortal(portal, anchor) {
+export function positionPortal(portal, anchor, { minWidth = 0 } = {}) {
     const rect = anchor.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
     const spaceAbove = rect.top - VIEWPORT_MARGIN;
     const openUp = spaceBelow < MIN_PORTAL_HEIGHT && spaceAbove > spaceBelow;
+    // Шире поля и не помещается вправо — выравнивается по правому краю поля, как
+    // dropdown-menu-end: у края страницы окно уходило под полосу прокрутки.
+    const viewportWidth = document.documentElement.clientWidth;
+    const width = Math.min(Math.max(rect.width, minWidth), viewportWidth - 2 * VIEWPORT_MARGIN);
+    const fitsRight = rect.left + width <= viewportWidth - VIEWPORT_MARGIN;
+    const left = Math.max(VIEWPORT_MARGIN, fitsRight ? rect.left : rect.right - width);
 
-    portal.style.left = `${rect.left}px`;
-    portal.style.width = `${rect.width}px`;
+    portal.style.left = `${left}px`;
+    portal.style.width = `${width}px`;
     portal.style.maxHeight = `${Math.max(120, Math.min(320, openUp ? spaceAbove : spaceBelow))}px`;
 
     if (openUp) {
