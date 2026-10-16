@@ -1,326 +1,597 @@
 {% extends 'base.html.twig' %}
-{% block title %}Операции ОПиУ{% endblock %}
-{#{% block breadcrumbs %}
-    {% include 'partials/_breadcrumbs.html.twig' with {
-        breadcrumbs: [
-            {'label': 'Главная', 'path': 'app_home_index'},
-            {'label': 'Финансы'},
-            {'label': 'Документы'}
-        ]
-    } %}
-{% endblock %}#}
+{% block title %}Документы ОПиУ{% endblock %}
 {% block body %}
-    {% set typeShortLabels = {
-        'DEAL_SALE': 'Сделка',
-        'PAYROLL': 'Зарплата',
-        'TAXES': 'Налоги',
-        'LOANS': 'Кредиты',
-        'OBLIGATIONS': 'Обязательства',
-        'ASSETS': 'Имущество',
-        'CASH': 'Касса',
-        'CASHFLOW_EXPENSE': 'Расход из ДДС',
-        'OTHER': 'Прочие'
-    } %}
-    {% set statusLabels = {
-        'DRAFT': 'Черновик',
-        'ACTIVE': 'Активен',
-        'INACTIVE': 'Неактивен',
-        'TO_DELETE': 'На удаление'
-    } %}
-    {% set filterKeys = ['dateFrom', 'dateTo', 'type', 'status', 'number', 'counterparty'] %}
-    {% set statusClasses = {
-        'DRAFT': 'bg-secondary text-white',
-        'ACTIVE': 'bg-success text-white',
-        'INACTIVE': 'bg-warning text-dark',
-        'TO_DELETE': 'bg-danger text-white'
-    } %}
+{# Эталон — docs/design-system/screens/OperationsPnl.dc.html и pnl-refs/01–02; спецификация и разрыв с моделью —
+   docs/design-system/PNL-DOCUMENTS-SPEC.md; отчёт — docs/plan/ds-pnl-documents.md. Композиция и классы — «Операции ДДС».
+   Итог (totals) посчитан репозиторием по всей выборке фильтра, а не по странице. #}
+{% macro plural(n, one, few, many) %}{{ n % 10 == 1 and n % 100 != 11 ? one : (n % 10 in 2..4 and (n % 100 < 10 or n % 100 >= 20) ? few : many) }}{% endmacro %}
+{% macro pill(label, active, id) %}
+    <button type="button"
+            class="vf-ops-pill{{ active ? ' active' : '' }}"
+            id="{{ id }}"
+            data-bs-toggle="dropdown"
+            data-bs-offset="0,6"
+            aria-haspopup="true"
+            aria-expanded="false">
+        <span class="vf-ops-pill__label">{{ label }}</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+    </button>
+{% endmacro %}
+{% macro hidden(params) %}
+    {% for k, v in params %}
+        <input type="hidden" name="{{ k }}" value="{{ v }}">
+    {% endfor %}
+{% endmacro %}
+{% macro clip(text) %}{{ text|length > 22 ? text|slice(0, 21)|trim ~ '…' : text }}{% endmacro %}
+{% import _self as ui %}
 
-    <div class="page-header d-print-none">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <div class="page-pretitle">Отчёт о прибылях и убытках</div>
-                <h2 class="page-title">Операции ОПиУ</h2>
-            </div>
-            <div class="col-auto ms-auto d-print-none">
-                <div class="btn-list">
-                    <a href="{{ path('document_operations_export_json') }}"
-                       class="btn btn-outline-secondary"
-                       title="Скачать все операции ОПиУ в формате JSON"
-                       download>
-                        <i class="ti ti-download"></i>
-                        Выгрузить JSON
-                    </a>
-                    <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
-                </div>
-            </div>
-        </div>
+{% set route = 'document_index' %}
+{% set typeShortLabels = {
+    'DEAL_SALE': 'Сделка',
+    'PAYROLL': 'Зарплата',
+    'TAXES': 'Налоги',
+    'LOANS': 'Кредиты',
+    'OBLIGATIONS': 'Обязательства',
+    'ASSETS': 'Имущество',
+    'CASH': 'Касса',
+    'CASHFLOW_EXPENSE': 'Расход из ДДС',
+    'OTHER': 'Прочие'
+} %}
+{% set statusLabels = {
+    'DRAFT': 'Черновик',
+    'ACTIVE': 'Активен',
+    'INACTIVE': 'Неактивен',
+    'TO_DELETE': 'На удаление'
+} %}
+{% set directionLabels = {'income': 'Доходы', 'expense': 'Расходы'} %}
+{% set directionValue = filters.direction ? (filters.direction.value == 'INCOME' ? 'income' : 'expense') : null %}
+
+{# Параметры ссылок — нормализованные фильтры из DTO: мусор из адреса в ссылки не переносится.
+   page не входит — смена фильтра возвращает на первую страницу; limit — только нестандартный. #}
+{% set baseQuery = {
+    q: filters.q,
+    dateFrom: filters.dateFrom ? filters.dateFrom|date('Y-m-d') : null,
+    dateTo: filters.dateTo ? filters.dateTo|date('Y-m-d') : null,
+    direction: directionValue,
+    type: filters.type ? filters.type.value : null,
+    projectDirection: filters.projectDirectionId,
+    responsibilityCenter: filters.responsibilityCenterId,
+    status: filters.status ? filters.status.value : null,
+    number: filters.number,
+    counterparty: filters.counterparty,
+    limit: limit != 20 ? limit : null,
+}|filter(v => v is not null) %}
+
+{% set project = filters.projectDirectionId ? projectDirections|filter(p => p.id == filters.projectDirectionId)|first : null %}
+{% set center = filters.responsibilityCenterId ? responsibilityCenters|filter(c => c.id == filters.responsibilityCenterId)|first : null %}
+{% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) + (filters.counterparty ? 1 : 0) %}
+
+{% set presetsHtml %}{% include 'partials/_period_presets.html.twig' with {
+    route: route,
+    params: baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo']),
+    current_from: baseQuery.dateFrom ?? null,
+    current_to: baseQuery.dateTo ?? null,
+    class: 'vf-seg',
+} only %}{% endset %}
+{% set customRange = (filters.dateFrom or filters.dateTo) and 'aria-current="true"' not in (presetsHtml ~ '') %}
+{% set periodLabel = (filters.dateFrom ? filters.dateFrom|date('d.m.Y') : '…') ~ ' — ' ~ (filters.dateTo ? filters.dateTo|date('d.m.Y') : '…') %}
+
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Доходы и расходы</li>
+                <li class="breadcrumb-item active" aria-current="page">Документы ОПиУ</li>
+            </ol>
+        </nav>
+        <h1>Документы ОПиУ</h1>
+        <p class="vf-page-head__lead">Документы, из которых строится отчёт о прибылях и убытках. В одном документе может быть несколько операций: по разным статьям и проектам.</p>
     </div>
-    <div class="mt-3">
-        <div class="card">
-            <div class="card-header card-head d-flex align-items-center gap-3 flex-wrap">
-                {% include 'document/_tabs.html.twig' with {active: 'index'} only %}
+    <div class="btn-list d-print-none">
+        <a href="{{ path('document_operations_export_json') }}"
+           class="btn"
+           title="Скачать все операции документов ОПиУ в формате JSON"
+           download>
+            <i class="ti ti-download me-1" aria-hidden="true"></i>
+            Выгрузить JSON
+        </a>
+        <a href="{{ path('document_new') }}" class="btn btn-primary">
+            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+            Добавить документ
+        </a>
+    </div>
+</div>
+
+<div class="card vf-card vf-docs mb-4">
+    <div class="card-header">
+        {% include 'document/_tabs.html.twig' with {active: 'index'} only %}
+    </div>
+
+    <div class="vf-card-bar d-print-none">
+        <div class="vf-card-bar__row">
+            <form method="get" action="{{ path(route) }}" class="vf-search vf-docs__search" role="search">
+                {{ ui.hidden(baseQuery|filter((v, k) => k not in ['q'])) }}
+                <button type="submit" class="vf-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
+                <input type="search" name="q" value="{{ filters.q }}" class="form-control" placeholder="Описание, статья, № документа" aria-label="Поиск по описанию, статье, номеру и контрагенту">
+            </form>
+
+            {{ presetsHtml }}
+
+            <div class="dropdown">
                 <button type="button"
-                        class="btn ms-auto"
-                        data-bs-toggle="offcanvas"
-                        data-bs-target="#document-filters-offcanvas"
-                        aria-controls="document-filters-offcanvas">
-                    <i class="ti ti-filter"></i>
-                    Фильтр
+                        class="btn vf-ops-range{{ customRange ? ' active' : '' }}"
+                        id="doc-pill-period"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,6"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        aria-label="Выбрать период{{ filters.dateFrom or filters.dateTo ? ': ' ~ periodLabel }}">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    {{ filters.dateFrom or filters.dateTo ? periodLabel : 'Выбрать период' }}
                 </button>
-            </div>
-            <div class="table-responsive">
-                <table class="table card-table align-middle">
-                    <thead>
-                        <tr>
-                            <th class="text-nowrap">Дата</th>
-                            <th>Тип</th>
-                            <th class="text-nowrap">Н док.</th>
-                            <th>Проект</th>
-                            <th>Контрагент</th>
-                            <th class="text-end text-nowrap">Доход, ₽</th>
-                            <th class="text-end text-nowrap">Расход, ₽</th>
-                            <th class="text-end text-nowrap">Итог, ₽</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in items %}
-                            {% set income = 0 %}
-                            {% set expense = 0 %}
-                            {% for op in item.operations %}
-                                {% set category = op.plCategory ?? op.category ?? null %}
-                                {% set flow = category ? category.flow.value : null %}
-                                {% if flow == 'INCOME' %}
-                                    {% set income = income + op.amount %}
-                                {% elseif flow == 'EXPENSE' %}
-                                    {% set expense = expense + op.amount %}
-                                {% endif %}
-                            {% endfor %}
-                            {% set total = income - expense %}
-                            {% set deleteLabel = item.number ? '№ ' ~ item.number : (item.description ?: 'Выбранная операция') %}
-                            <tr>
-                                {% set statusValue = item.status.value %}
-                                {% set statusLabel = statusLabels[statusValue] ?? statusValue %}
-                                {% set statusClass = statusClasses[statusValue] ?? 'bg-secondary text-white' %}
-                                <td class="text-nowrap">
-                                    <div>{{ item.date|date('d.m.Y') }}</div>
-                                    <span class="badge {{ statusClass }} mt-1">{{ statusLabel }}</span>
-                                </td>
-                                <td>
-                                    <div class="fw-semibold">
-                                        {{ typeShortLabels[item.type.value] ?? item.type.label() }}
-                                        {% if item.isCreatedWithViolation %}
-                                          <span class="badge bg-warning text-dark ms-1"
-                                                title="Документ создан без полного маппинга категорий ОПиУ">
-                                            <i class="ti ti-alert-triangle me-1"></i>Без маппинга
-                                          </span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="text-muted small">{{ item.description }}</div>
-                                </td>
-                                <td class="text-nowrap">{{ item.number ?: '—' }}</td>
-                                <td>{{ item.projectDirection ? item.projectDirection.name : '-' }}</td>
-                                <td>{{ item.counterparty ? item.counterparty.name : '—' }}</td>
-                                <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
-                                <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
-                                <td class="text-end fw-semibold text-nowrap">{{ total ? total|vf_amount : '—' }}</td>
-                                <td class="text-end text-nowrap">
-                                    <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
-                                        <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                                                <circle cx="5" cy="12" r="1"/>
-                                                <circle cx="12" cy="12" r="1"/>
-                                                <circle cx="19" cy="12" r="1"/>
-                                            </svg>
-                                        </button>
-
-                                        <div class="dropdown-menu dropdown-menu-end shadow-sm">
-                                            <a class="dropdown-item" href="{{ path('document_show', {'id': item.id}) }}">
-                                                <i class="ti ti-eye me-2"></i> Просмотр
-                                            </a>
-                                            <a class="dropdown-item" href="{{ path('document_copy', {'id': item.id}) }}">
-                                                <i class="ti ti-copy me-2"></i> Копировать
-                                            </a>
-                                            <a class="dropdown-item" href="{{ path('document_edit', {'id': item.id}) }}">
-                                                <i class="ti ti-pencil me-2"></i> Редактировать
-                                            </a>
-                                            <div class="dropdown-divider"></div>
-                                            <button type="button"
-                                                    class="dropdown-item text-danger d-flex align-items-center gap-2"
-                                                    data-document-delete-trigger
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#document-delete-modal"
-                                                    data-delete-action="{{ path('document_delete', {'id': item.id}) }}"
-                                                    data-delete-token="{{ csrf_token('delete' ~ item.id) }}"
-                                                    data-delete-label="{{ deleteLabel|length > 80 ? deleteLabel|slice(0, 80) ~ '…' : deleteLabel }}">
-                                                <i class="ti ti-trash"></i> Удалить
-                                            </button>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr><td colspan="9" class="text-center">Нет данных</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
-                <form method="get" id="document-limit-form" class="d-flex align-items-center gap-2">
-                    <label for="document-limit" class="form-label mb-0">Показывать по</label>
-                    <select id="document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
-                        {% for option in [20, 30, 50] %}
-                            <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="hidden" name="page" value="1">
-                    {# Смена размера страницы не должна сбрасывать активные фильтры.
-                       Сравнение с пустой строкой, а не проверка на истинность: «0» — это значение фильтра. #}
-                    {% for key in filterKeys %}
-                        {% set filterValue = app.request.query.get(key) %}
-                        {% if filterValue is not null and filterValue != '' %}
-                            <input type="hidden" name="{{ key }}" value="{{ filterValue }}">
-                        {% endif %}
-                    {% endfor %}
-                </form>
-                <div class="ms-md-auto w-100 w-md-auto">
-                    {% include 'partials/_pagination.html.twig' with { pager: pager, route: 'document_index', params: app.request.query.all|merge({'limit': limit}) } %}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" role="dialog" aria-labelledby="doc-pill-period">
+                    <form method="get" action="{{ path(route) }}">
+                        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo'])) }}
+                        <div class="vf-ops-pop__body vf-ops-pop__pair">
+                            <div>
+                                <label class="form-label" for="document-filter-date-from">Дата с</label>
+                                <input type="date" id="document-filter-date-from" name="dateFrom" value="{{ baseQuery.dateFrom ?? '' }}" class="form-control">
+                            </div>
+                            <div>
+                                <label class="form-label" for="document-filter-date-to">Дата по</label>
+                                <input type="date" id="document-filter-date-to" name="dateTo" value="{{ baseQuery.dateTo ?? '' }}" class="form-control">
+                            </div>
+                        </div>
+                        <div class="vf-ops-pop__footer">
+                            {% if filters.dateFrom or filters.dateTo %}
+                                <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo'])) }}" class="btn btn-link">Сбросить</a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-sm">Применить</button>
+                        </div>
+                    </form>
                 </div>
             </div>
+        </div>
+
+        <div class="vf-card-bar__row">
+            {# Направление — по flow статей операций: «Доходы» — документы, где есть доходная операция. #}
+            <div class="vf-seg" role="group" aria-label="Направление">
+                {% for d in [{value: null, label: 'Все'}, {value: 'income', label: 'Доходы'}, {value: 'expense', label: 'Расходы'}] %}
+                    <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['direction'])|merge(d.value ? {direction: d.value} : {})) }}"
+                       {% if directionValue == d.value %}class="active" aria-current="true"{% endif %}>{{ d.label }}</a>
+                {% endfor %}
+            </div>
+
+            <span class="vf-caps-label vf-docs__pills-label">Фильтры</span>
+
+            <div class="dropdown">
+                {{ ui.pill(filters.type ? 'Тип: ' ~ ui.clip(typeShortLabels[filters.type.value] ?? filters.type.label()) : 'Тип', filters.type, 'doc-pill-type') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-type">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])) }}"{% if not filters.type %} aria-current="true"{% endif %}>Все типы</a>
+                        {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
+                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])|merge({type: documentType.value})) }}"{% if filters.type and filters.type.value == documentType.value %} aria-current="true"{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# Проект — у документа или у любой его операции. Родительские проекты не выбираются и в формах. #}
+            <div class="dropdown">
+                {{ ui.pill(project ? 'Проект: ' ~ ui.clip(project.name) : 'Проект', project, 'doc-pill-project') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-project">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])) }}"{% if not filters.projectDirectionId %} aria-current="true"{% endif %}>Все проекты</a>
+                        {% for p in projectDirections %}
+                            <a class="dropdown-item vf-ops-lvl-{{ min(p.level, 5) }}" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])|merge({projectDirection: p.id})) }}"{% if filters.projectDirectionId == p.id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+                        {% else %}
+                            <div class="vf-ops-pop__empty">Проектов нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# ЦФО — у документа или у любой его операции. В списке — активные ЦФО компании. #}
+            <div class="dropdown">
+                {{ ui.pill(center ? 'ЦФО: ' ~ ui.clip(center.name) : 'ЦФО', center or filters.responsibilityCenterId, 'doc-pill-center') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-center">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['responsibilityCenter'])) }}"{% if not filters.responsibilityCenterId %} aria-current="true"{% endif %}>Все ЦФО</a>
+                        {% for c in responsibilityCenters %}
+                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['responsibilityCenter'])|merge({responsibilityCenter: c.id})) }}"{% if filters.responsibilityCenterId == c.id %} aria-current="true"{% endif %}>{{ c.name }}</a>
+                        {% else %}
+                            <div class="vf-ops-pop__empty">ЦФО нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <button type="button"
+                    class="vf-ops-pill{{ moreCount ? ' active' : '' }}"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#document-filters-offcanvas"
+                    aria-controls="document-filters-offcanvas">
+                <i class="ti ti-adjustments-horizontal" aria-hidden="true"></i>
+                Ещё фильтры
+                {% if moreCount %}
+                    <span class="vf-ops-filterbar__count">{{ moreCount }}<span class="visually-hidden"> применено</span></span>
+                {% endif %}
+            </button>
         </div>
     </div>
 
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="document-filters-offcanvas" aria-labelledby="document-filters-offcanvas-label">
-        <div class="offcanvas-header">
-            <h2 class="offcanvas-title" id="document-filters-offcanvas-label">Фильтры</h2>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+    {% set chips = [
+        filters.q ? {label: 'Поиск: «' ~ filters.q ~ '»', keys: ['q']} : null,
+        filters.dateFrom or filters.dateTo ? {label: 'Период: ' ~ periodLabel, keys: ['dateFrom', 'dateTo']} : null,
+        directionValue ? {label: directionLabels[directionValue], keys: ['direction']} : null,
+        filters.type ? {label: 'Тип: ' ~ (typeShortLabels[filters.type.value] ?? filters.type.label()), keys: ['type']} : null,
+        filters.projectDirectionId ? {label: 'Проект: ' ~ (project ? project.name : 'не найден'), keys: ['projectDirection']} : null,
+        filters.responsibilityCenterId ? {label: 'ЦФО: ' ~ (center ? center.name : (responsibilityCenterNames[filters.responsibilityCenterId] ?? 'не найден')), keys: ['responsibilityCenter']} : null,
+        filters.status ? {label: 'Статус: ' ~ (statusLabels[filters.status.value] ?? filters.status.value), keys: ['status']} : null,
+        filters.number ? {label: 'Номер: ' ~ filters.number, keys: ['number']} : null,
+        filters.counterparty ? {label: 'Контрагент: ' ~ filters.counterparty, keys: ['counterparty']} : null,
+    ]|filter(c => c) %}
+    {% if chips is not empty %}
+        <div class="vf-applied">
+            <span class="vf-caps-label">Применено</span>
+            {% for chip in chips %}
+                <span class="vf-chip">
+                    {{ chip.label }}
+                    <a href="{{ path(route, baseQuery|filter((v, k) => k not in chip.keys)) }}" aria-label="Снять фильтр «{{ chip.label }}»"><i class="ti ti-x" aria-hidden="true"></i></a>
+                </span>
+            {% endfor %}
+            <a href="{{ path(route, limit != 20 ? {limit: limit} : {}) }}" class="small fw-medium">Сбросить всё</a>
         </div>
-        <div class="offcanvas-body">
-            <form method="get" class="d-flex flex-column gap-4">
-                <input type="hidden" name="page" value="1">
-                <input type="hidden" name="limit" value="{{ limit }}">
+    {% endif %}
 
-                <div class="row g-3">
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-date-from">Дата с</label>
-                        <input type="date" id="document-filter-date-from" name="dateFrom" value="{{ app.request.query.get('dateFrom') }}" class="form-control" />
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-date-to">Дата по</label>
-                        <input type="date" id="document-filter-date-to" name="dateTo" value="{{ app.request.query.get('dateTo') }}" class="form-control" />
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-type">Тип</label>
-                        <select id="document-filter-type" name="type" class="form-select">
-                            <option value="">Все</option>
-                            {# Список ведётся от самого enum: тип, добавленный в DocumentType,
-                               обязан появиться и здесь, иначе отфильтровать его через интерфейс нельзя. #}
-                            {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
-                                <option value="{{ documentType.value }}" {% if app.request.query.get('type') == documentType.value %}selected{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-status">Статус</label>
-                        <select id="document-filter-status" name="status" class="form-select">
-                            <option value="">Все</option>
-                            {% for value, label in statusLabels %}
-                                <option value="{{ value }}" {% if app.request.query.get('status') == value %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-number">Номер документа</label>
-                        <input type="text" id="document-filter-number" name="number" value="{{ app.request.query.get('number') }}" class="form-control" />
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label" for="document-filter-counterparty">Контрагент</label>
-                        <input type="text" id="document-filter-counterparty" name="counterparty" value="{{ app.request.query.get('counterparty') }}" class="form-control" />
-                    </div>
+    {% if items is not empty or filters.hasFilters %}
+        <div class="vf-bar vf-docs__totals" role="status">
+            <span>Найдено {{ totals.documents|vf_number }} {{ ui.plural(totals.documents, 'документ', 'документа', 'документов') }} · {{ totals.operations|vf_number }} {{ ui.plural(totals.operations, 'операция', 'операции', 'операций') }}</span>
+            <span class="vf-docs__total">Доходы <strong>{{ totals.income|vf_amount(2, 'income') }}</strong></span>
+            <span class="vf-docs__total">Расходы <strong>{{ totals.expense|vf_amount }}</strong></span>
+            {# DS-Money: красный для сумм не используется — отрицательный результат несёт знак «−». #}
+            <span class="vf-docs__total vf-docs__total--result">Результат <strong>{{ totals.result|vf_amount }} ₽</strong></span>
+        </div>
+    {% endif %}
+
+    {% if items is empty %}
+        <div class="vf-empty">
+            <span class="empty-icon" aria-hidden="true"><i class="ti {{ filters.hasFilters ? 'ti-search' : 'ti-file-invoice' }}"></i></span>
+            {% if filters.hasFilters %}
+                <div class="vf-empty__title">Документы не найдены</div>
+                <div class="vf-empty__hint">По выбранным фильтрам ничего нет. Измените фильтры или сбросьте их.</div>
+                <div class="btn-list">
+                    <a href="{{ path(route, limit != 20 ? {limit: limit} : {}) }}" class="btn btn-sm">Сбросить фильтры</a>
                 </div>
+            {% else %}
+                <div class="vf-empty__title">Документов ОПиУ пока нет</div>
+                <div class="vf-empty__hint">Добавьте документ вручную или создайте его из операции ДДС.</div>
+                <div class="btn-list">
+                    <a href="{{ path('document_new') }}" class="btn btn-primary btn-sm"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить документ</a>
+                    <a href="{{ path('cash_transaction_index') }}" class="btn btn-sm">Операции ДДС</a>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table card-table vf-table vf-docs-table">
+                <thead class="sticky-top">
+                    <tr>
+                        <th class="vf-docs-table__date">Дата</th>
+                        <th>Документ</th>
+                        <th class="vf-docs-col-meta">Статья ОПиУ</th>
+                        <th class="vf-docs-col-meta">Проект / ЦФО</th>
+                        <th class="vf-docs-col-meta">Контрагент</th>
+                        <th class="text-end text-nowrap">Доход, ₽</th>
+                        <th class="text-end text-nowrap">Расход, ₽</th>
+                        <th class="text-end text-nowrap">Итог, ₽</th>
+                        <th class="vf-actions"><span class="visually-hidden">Действия</span></th>
+                    </tr>
+                </thead>
+                {% for item in items %}
+                    {# Знак операции задаёт flow статьи; без статьи операция в доход и расход не входит — как в итоге. #}
+                    {% set income = 0 %}
+                    {% set expense = 0 %}
+                    {% set categoryNames = [] %}
+                    {% set projectNames = [] %}
+                    {% set centerNames = [] %}
+                    {% set counterpartyNames = [] %}
+                    {% set uncategorized = 0 %}
+                    {% for op in item.operations %}
+                        {% set category = op.plCategory %}
+                        {% set flow = category ? category.flow.value : null %}
+                        {% if flow == 'INCOME' %}
+                            {% set income = income + op.amount %}
+                        {% elseif flow == 'EXPENSE' %}
+                            {% set expense = expense + op.amount %}
+                        {% endif %}
+                        {% if category %}
+                            {% set categoryNames = categoryNames|merge([category.name]) %}
+                        {% else %}
+                            {% set uncategorized = uncategorized + 1 %}
+                        {% endif %}
+                        {% set opProject = op.projectDirection ?? item.projectDirection %}
+                        {% if opProject %}{% set projectNames = projectNames|merge([opProject.name]) %}{% endif %}
+                        {% set opCenterId = op.responsibilityCenterId ?? item.responsibilityCenterId %}
+                        {% if opCenterId %}{% set centerNames = centerNames|merge([responsibilityCenterNames[opCenterId] ?? 'ЦФО не найден']) %}{% endif %}
+                        {% set opCounterparty = op.counterparty ?? item.counterparty %}
+                        {% if opCounterparty %}{% set counterpartyNames = counterpartyNames|merge([opCounterparty.displayName ?? opCounterparty.name]) %}{% endif %}
+                    {% endfor %}
+                    {% if item.operations is empty %}
+                        {% if item.projectDirection %}{% set projectNames = [item.projectDirection.name] %}{% endif %}
+                        {% if item.responsibilityCenterId %}{% set centerNames = [responsibilityCenterNames[item.responsibilityCenterId] ?? 'ЦФО не найден'] %}{% endif %}
+                        {% if item.counterparty %}{% set counterpartyNames = [item.counterparty.displayName ?? item.counterparty.name] %}{% endif %}
+                    {% endif %}
+                    {% set categoryNames = categoryNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
+                    {% set projectNames = projectNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
+                    {% set centerNames = centerNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
+                    {% set counterpartyNames = counterpartyNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
+                    {% set total = income - expense %}
+                    {% set opCount = item.operations|length %}
+                    {% set statusValue = item.status.value %}
+                    {% set deleteLabel = item.number ? '№ ' ~ item.number : (item.description ?: 'Выбранный документ') %}
 
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">Применить</button>
-                    <a href="{{ path('document_index', {'limit': limit}) }}" class="btn btn-outline-secondary">Сбросить</a>
+                    {% set categoryText = categoryNames|length > 1 ? categoryNames|length ~ ' ' ~ ui.plural(categoryNames|length, 'статья', 'статьи', 'статей') : (categoryNames|first ?: null) %}
+                    {% set projectText = projectNames|length > 1 ? projectNames|length ~ ' ' ~ ui.plural(projectNames|length, 'проект', 'проекта', 'проектов') : (projectNames|first ?: null) %}
+                    {% set centerText = centerNames|length > 1 ? centerNames|length ~ ' ЦФО' : (centerNames|first ?: null) %}
+                    {% set counterpartyText = counterpartyNames|length > 1 ? counterpartyNames|length ~ ' ' ~ ui.plural(counterpartyNames|length, 'контрагент', 'контрагента', 'контрагентов') : (counterpartyNames|first ?: null) %}
+                    {% set needsCategory = uncategorized > 0 and categoryNames is empty %}
+
+                    <tbody class="vf-doc" data-document-row="{{ item.id }}">
+                        <tr>
+                            <td class="vf-docs-table__date text-nowrap">{{ item.date|date('d.m.Y') }}</td>
+                            <td class="vf-doc__main">
+                                <div class="vf-doc__title">
+                                    <a href="{{ path('document_show', {id: item.id}) }}" class="vf-strong">{{ typeShortLabels[item.type.value] ?? item.type.label() }}</a>
+                                    {% if item.number %}<span class="vf-doc__number">№ {{ item.number }}</span>{% endif %}
+                                    {% if item.cashTransaction %}<span class="badge vf-doc-badge">Из ДДС</span>{% endif %}
+                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ statusLabels[statusValue] }}</span>{% endif %}
+                                    {% if item.isCreatedWithViolation %}
+                                        <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
+                                    {% endif %}
+                                </div>
+                                {% if item.description %}
+                                    <div class="vf-sub vf-doc__desc" title="{{ item.description }}">{{ item.description }}</div>
+                                {% endif %}
+                                {# Узкий экран: статья, проект и контрагент — подстрокой вместо колонок. #}
+                                <div class="vf-sub vf-doc__meta">
+                                    {{ [needsCategory ? 'Нужно указать статью' : categoryText, projectText, centerText, counterpartyText]|filter(v => v)|join(' · ') ?: '—' }}
+                                </div>
+                                {% if opCount > 1 %}
+                                    {# Раскрытие без JS: строки операций ниже показывает CSS, пока <details> открыт. #}
+                                    <details class="vf-doc__toggle">
+                                        <summary>{{ opCount }} {{ ui.plural(opCount, 'операция', 'операции', 'операций') }}</summary>
+                                    </details>
+                                {% endif %}
+                            </td>
+                            <td class="vf-docs-col-meta">
+                                {% if needsCategory %}
+                                    <span class="vf-ops-badge-warn">Нужно указать статью</span>
+                                {% else %}
+                                    {{ categoryText ?? '—' }}
+                                    {% if uncategorized > 0 %}<div class="vf-sub">{{ uncategorized }} без статьи</div>{% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="vf-docs-col-meta">
+                                {{ projectText ?? '—' }}
+                                {% if centerText %}<div class="vf-sub">{{ centerText }}</div>{% endif %}
+                            </td>
+                            <td class="vf-docs-col-meta">{{ counterpartyText ?? '—' }}</td>
+                            <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
+                            <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
+                            <td class="text-end text-nowrap vf-doc__total">{{ total ? total|vf_amount : '—' }}</td>
+                            <td class="vf-actions text-end">
+                                <div class="dropdown">
+                                    <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с документом {{ deleteLabel }}">
+                                        <i class="ti ti-dots" aria-hidden="true"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item" href="{{ path('document_show', {'id': item.id}) }}">
+                                            <i class="ti ti-eye me-2" aria-hidden="true"></i> Просмотр
+                                        </a>
+                                        <a class="dropdown-item" href="{{ path('document_edit', {'id': item.id}) }}">
+                                            <i class="ti ti-pencil me-2" aria-hidden="true"></i> Редактировать
+                                        </a>
+                                        <a class="dropdown-item" href="{{ path('document_copy', {'id': item.id}) }}">
+                                            <i class="ti ti-copy me-2" aria-hidden="true"></i> Копировать
+                                        </a>
+                                        {% if item.cashTransaction %}
+                                            <a class="dropdown-item" href="{{ path('cash_transaction_show', {'id': item.cashTransaction.id}) }}">
+                                                <i class="ti ti-arrows-exchange me-2" aria-hidden="true"></i> Открыть операцию ДДС
+                                            </a>
+                                        {% endif %}
+                                        <div class="dropdown-divider"></div>
+                                        <button type="button"
+                                                class="dropdown-item text-danger"
+                                                data-document-delete-trigger
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#document-delete-modal"
+                                                data-delete-action="{{ path('document_delete', {'id': item.id}) }}"
+                                                data-delete-token="{{ csrf_token('delete' ~ item.id) }}"
+                                                data-delete-label="{{ deleteLabel|length > 80 ? deleteLabel|slice(0, 80) ~ '…' : deleteLabel }}">
+                                            <i class="ti ti-trash me-2" aria-hidden="true"></i> Удалить
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% if opCount > 1 %}
+                            {% for op in item.operations %}
+                                {% set category = op.plCategory %}
+                                {% set flow = category ? category.flow.value : null %}
+                                {% set opProject = op.projectDirection ?? item.projectDirection %}
+                                {% set opCenterId = op.responsibilityCenterId ?? item.responsibilityCenterId %}
+                                {% set opCenter = opCenterId ? (responsibilityCenterNames[opCenterId] ?? 'ЦФО не найден') : null %}
+                                {% set opCounterparty = op.counterparty ?? item.counterparty %}
+                                <tr class="vf-doc__op">
+                                    <td></td>
+                                    <td>
+                                        <div class="vf-sub">Операция {{ loop.index }} из {{ opCount }}</div>
+                                        <div class="vf-sub vf-doc__meta">
+                                            {{ [category ? category.name : 'Нужно указать статью', opProject ? opProject.name : null, opCenter, opCounterparty ? (opCounterparty.displayName ?? opCounterparty.name) : null]|filter(v => v)|join(' · ') }}
+                                        </div>
+                                        {% if op.comment %}<div class="vf-sub vf-doc__desc" title="{{ op.comment }}">{{ op.comment }}</div>{% endif %}
+                                    </td>
+                                    <td class="vf-docs-col-meta">
+                                        {% if category %}{{ category.name }}{% else %}<span class="vf-ops-badge-warn">Нужно указать статью</span>{% endif %}
+                                    </td>
+                                    <td class="vf-docs-col-meta">
+                                        {{ opProject ? opProject.name : '—' }}
+                                        {% if opCenter %}<div class="vf-sub">{{ opCenter }}</div>{% endif %}
+                                    </td>
+                                    <td class="vf-docs-col-meta">{{ opCounterparty ? (opCounterparty.displayName ?? opCounterparty.name) : '—' }}</td>
+                                    <td class="text-end text-nowrap">{{ flow == 'INCOME' ? op.amount|vf_amount(2, 'income') : '' }}</td>
+                                    <td class="text-end text-nowrap">{{ flow == 'EXPENSE' ? op.amount|vf_amount : '' }}</td>
+                                    <td class="text-end text-nowrap">{% if flow not in ['INCOME', 'EXPENSE'] %}<span class="vf-sub" title="Без статьи доходов или расходов операция в итог не входит">{{ op.amount|vf_amount }}</span>{% endif %}</td>
+                                    <td></td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
+
+    <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
+        <form method="get" id="document-limit-form" class="d-flex align-items-center gap-2">
+            <label for="document-limit" class="form-label mb-0">Показывать по</label>
+            <select id="document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for option in [20, 30, 50] %}
+                    <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="page" value="1">
+            {# Смена размера страницы не сбрасывает фильтры: они уже нормализованы и без пустых значений. #}
+            {{ ui.hidden(baseQuery|filter((v, k) => k not in ['limit'])) }}
+        </form>
+        <div class="ms-md-auto w-100 w-md-auto">
+            {% include 'partials/_pagination.html.twig' with { pager: pager, route: route, params: baseQuery|merge({'limit': limit}) } %}
+        </div>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end vf-ops-filters" tabindex="-1" id="document-filters-offcanvas" aria-labelledby="document-filters-offcanvas-label">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="document-filters-offcanvas-label">Ещё фильтры</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+    </div>
+    <form method="get" class="offcanvas-body" action="{{ path(route) }}">
+        {# Остальные фильтры страницы форма несёт скрытыми полями: «Применить» не сбрасывает их. #}
+        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}
+        <div class="vf-ops-filters__scroll">
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-type">Тип</label>
+                <select id="document-filter-type" name="type" class="form-select">
+                    <option value="">Все</option>
+                    {# Список ведётся от самого enum: тип, добавленный в DocumentType,
+                       обязан появиться и здесь, иначе отфильтровать его через интерфейс нельзя. #}
+                    {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
+                        <option value="{{ documentType.value }}" {% if filters.type and filters.type.value == documentType.value %}selected{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-status">Статус</label>
+                <select id="document-filter-status" name="status" class="form-select">
+                    <option value="">Все</option>
+                    {% for value, label in statusLabels %}
+                        <option value="{{ value }}" {% if filters.status and filters.status.value == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-number">Номер документа</label>
+                <input type="text" id="document-filter-number" name="number" value="{{ filters.number }}" class="form-control">
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-counterparty">Контрагент</label>
+                <input type="text" id="document-filter-counterparty" name="counterparty" value="{{ filters.counterparty }}" class="form-control">
+                <div class="vf-ops-filters__hint">Часть названия контрагента документа</div>
+            </div>
+        </div>
+        <div class="vf-ops-filters__footer">
+            <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}" class="btn btn-link">Сбросить</a>
+            <button type="submit" class="btn btn-primary">Применить</button>
+        </div>
+    </form>
+</div>
+
+<div class="modal modal-blur fade"
+     id="document-delete-modal"
+     tabindex="-1"
+     role="dialog"
+     aria-labelledby="document-delete-modal-title"
+     aria-describedby="document-delete-modal-description"
+     aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="document-delete-form">
+                <input type="hidden" name="_token" id="document-delete-token" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="document-delete-modal-title">Удалить документ ОПиУ?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body" id="document-delete-modal-description">
+                    Документ «<strong id="document-delete-label" class="text-break">Выбранный документ</strong>» со всеми операциями
+                    будет перемещён в раздел «Удалённые». Его можно будет восстановить.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger" id="document-delete-submit" disabled>
+                        Переместить в удалённые
+                    </button>
                 </div>
             </form>
         </div>
     </div>
+</div>
 
-    <div class="modal modal-blur fade"
-         id="document-delete-modal"
-         tabindex="-1"
-         role="dialog"
-         aria-labelledby="document-delete-modal-title"
-         aria-describedby="document-delete-modal-description"
-         aria-hidden="true">
-        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <form method="post" id="document-delete-form">
-                    <input type="hidden" name="_token" id="document-delete-token" value="">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="document-delete-modal-title">Удалить операцию ОПиУ?</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-                    </div>
-                    <div class="modal-body" id="document-delete-modal-description">
-                        Операция «<strong id="document-delete-label" class="text-break">Выбранная операция</strong>» будет перемещена
-                        в раздел «Удалённые». Её можно будет восстановить.
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-danger" id="document-delete-submit" disabled>
-                            Переместить в удалённые
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+<script>
+    (function () {
+        var modal = document.getElementById('document-delete-modal');
+        var form = document.getElementById('document-delete-form');
+        var token = document.getElementById('document-delete-token');
+        var label = document.getElementById('document-delete-label');
+        var submit = document.getElementById('document-delete-submit');
+        var lastTrigger = null;
 
-    <script>
-        (function () {
-            var modal = document.getElementById('document-delete-modal');
-            var form = document.getElementById('document-delete-form');
-            var token = document.getElementById('document-delete-token');
-            var label = document.getElementById('document-delete-label');
-            var submit = document.getElementById('document-delete-submit');
-            var lastTrigger = null;
+        modal.addEventListener('show.bs.modal', function (event) {
+            var trigger = event.relatedTarget;
+            var action = trigger && trigger.getAttribute('data-delete-action');
+            var csrfToken = trigger && trigger.getAttribute('data-delete-token');
 
-            modal.addEventListener('show.bs.modal', function (event) {
-                var trigger = event.relatedTarget;
-                var action = trigger && trigger.getAttribute('data-delete-action');
-                var csrfToken = trigger && trigger.getAttribute('data-delete-token');
+            if (!action || !csrfToken) {
+                event.preventDefault();
+                return;
+            }
 
-                if (!action || !csrfToken) {
-                    event.preventDefault();
-                    return;
-                }
+            form.action = action;
+            token.value = csrfToken;
+            label.textContent = trigger.getAttribute('data-delete-label') || 'Выбранный документ';
+            submit.disabled = false;
+            lastTrigger = trigger;
+        });
 
-                form.action = action;
-                token.value = csrfToken;
-                label.textContent = trigger.getAttribute('data-delete-label') || 'Выбранная операция';
-                submit.disabled = false;
-                lastTrigger = trigger;
-            });
+        modal.addEventListener('hidden.bs.modal', function () {
+            var dropdown = lastTrigger && lastTrigger.closest('.dropdown');
+            var dropdownToggle = dropdown && dropdown.querySelector('[data-bs-toggle="dropdown"]');
 
-            modal.addEventListener('hidden.bs.modal', function () {
-                var dropdown = lastTrigger && lastTrigger.closest('.dropdown');
-                var dropdownToggle = dropdown && dropdown.querySelector('[data-bs-toggle="dropdown"]');
+            form.removeAttribute('action');
+            token.value = '';
+            label.textContent = 'Выбранный документ';
+            submit.disabled = true;
 
-                form.removeAttribute('action');
-                token.value = '';
-                label.textContent = 'Выбранная операция';
-                submit.disabled = true;
+            if (dropdownToggle) {
+                dropdownToggle.focus();
+            }
+            lastTrigger = null;
+        });
 
-                if (dropdownToggle) {
-                    dropdownToggle.focus();
-                }
-                lastTrigger = null;
-            });
-
-            form.addEventListener('submit', function () {
-                submit.disabled = true;
-            });
-        })();
-    </script>
+        form.addEventListener('submit', function () {
+            submit.disabled = true;
+        });
+    })();
+</script>
 {% endblock %}

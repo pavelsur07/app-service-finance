@@ -104,11 +104,11 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', '/documents/');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('.nav-tabs', 'Операции ОПиУ');
+        self::assertSelectorTextContains('.nav-tabs', 'Документы ОПиУ');
         self::assertSelectorTextContains('.nav-tabs', 'Удалённые');
         self::assertStringContainsString('ACTIVE-OWN', (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('DELETED-OWN', (string) $client->getResponse()->getContent());
-        self::assertCount(1, $crawler->filter('.nav-tabs .nav-link.active:contains("Операции ОПиУ")'));
+        self::assertCount(1, $crawler->filter('.nav-tabs .nav-link.active:contains("Документы ОПиУ")'));
 
         $crawler = $client->request('GET', '/documents/deleted');
         self::assertResponseIsSuccessful();

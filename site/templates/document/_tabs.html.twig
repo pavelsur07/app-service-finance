@@ -1,5 +1,5 @@
-{# Вкладки раздела «Операции ОПиУ». active: index | deleted #}
+{# Вкладки раздела «Документы ОПиУ». active: index | deleted #}
 {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
-    {label: 'Операции ОПиУ', href: path('document_index'), active: active == 'index'},
+    {label: 'Документы ОПиУ', href: path('document_index'), active: active == 'index'},
     {label: 'Удалённые', href: path('document_deleted_index'), active: active == 'deleted'},
 ]} only %}

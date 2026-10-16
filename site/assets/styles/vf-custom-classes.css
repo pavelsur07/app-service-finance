@@ -1607,3 +1607,182 @@
   outline-offset: 2px;
   border-radius: var(--vf-radius-sm);
 }
+
+/* ===== Документы ОПиУ (docs/design-system/screens/OperationsPnl.dc.html, pnl-refs/01–02).
+   Отчёт и отклонения — docs/plan/ds-pnl-documents.md. Основа — нейтральные vf-card/vf-card-bar/vf-table. */
+
+/* Вкладки в шапке карточки: без отрицательного margin Tabler (иначе уходят под границу карточки). */
+.vf-docs > .card-header .card-header-tabs {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.vf-docs__search {
+  max-width: 400px;
+}
+
+.vf-docs__pills-label {
+  margin-left: var(--vf-space-2);
+}
+
+/* Полоса итога по всей выборке: счётчики слева, суммы — подписью и значением. */
+.vf-docs__totals {
+  column-gap: var(--vf-space-5);
+}
+
+.vf-docs__total strong {
+  margin-left: var(--vf-space-1);
+  color: var(--vf-text);
+  font-size: var(--vf-size-md);
+  font-weight: var(--vf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-docs__total--result strong {
+  font-weight: var(--vf-weight-bold);
+}
+
+.vf-docs-table__date {
+  width: 1%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Документ — свой <tbody>: главная строка и строки операций под ней. */
+.vf-docs-table > tbody.vf-doc + tbody.vf-doc {
+  border-top: 1px solid var(--vf-border);
+}
+
+.vf-doc__main {
+  min-width: 200px;
+}
+
+/* Слова не рвём посреди («АЛЬФА-БАНК» по буквам): общий overflow-wrap: anywhere таблиц
+   здесь не нужен — колонки узкие, но описание обрезается, а длинное название переносится по словам. */
+@media (min-width: 1200px) {
+  .vf-card .vf-docs-table td {
+    overflow-wrap: break-word;
+  }
+}
+
+.vf-docs-table .vf-docs-col-meta {
+  max-width: 170px;
+}
+
+.vf-docs-table > thead > tr > th,
+.vf-docs-table > tbody > tr > td {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.vf-docs .card-footer .form-label {
+  white-space: nowrap;
+}
+
+.vf-docs .card-footer .form-select {
+  width: auto;
+}
+
+.vf-doc__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--vf-space-2);
+}
+
+.vf-doc__number {
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-doc-badge {
+  background: var(--vf-surface-alt);
+  color: var(--vf-text-secondary);
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-docs-table .vf-doc__desc {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-doc__total {
+  font-weight: var(--vf-weight-semibold);
+}
+
+/* Раскрытие операций без JS: <details> в ячейке документа открывает строки операций через :has. */
+.vf-doc__toggle > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--vf-primary);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-medium);
+  cursor: pointer;
+  list-style: none;
+}
+
+.vf-doc__toggle > summary::-webkit-details-marker {
+  display: none;
+}
+
+.vf-doc__toggle > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.vf-doc__toggle[open] > summary::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.vf-doc__toggle > summary:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  border-radius: var(--vf-radius-sm);
+}
+
+.vf-docs-table > tbody > tr.vf-doc__op {
+  display: none;
+}
+
+.vf-doc:has(.vf-doc__toggle[open]) > tr.vf-doc__op {
+  display: table-row;
+}
+
+.vf-docs-table > tbody > tr.vf-doc__op > td {
+  padding-top: var(--vf-space-2);
+  padding-bottom: var(--vf-space-2);
+  border-top: 1px dashed var(--vf-border);
+  background: var(--vf-bg);
+  font-size: var(--vf-size-sm);
+}
+
+/* Строки одного документа — без внутренних сплошных границ Tabler. */
+.vf-docs-table > tbody.vf-doc > tr:first-child > td {
+  border-bottom: 0;
+}
+
+/* Широкий экран: статья, проект и контрагент — колонками, подстрока не нужна. */
+.vf-doc__meta {
+  display: none;
+}
+
+/* ≤1340px колонки статьи, проекта и контрагента сворачиваются в подстроку под описанием:
+   иначе таблица не помещается в карточку и страница уходит в горизонтальный скролл. */
+@media (max-width: 1340px) {
+  .vf-docs-table .vf-docs-col-meta {
+    display: none;
+  }
+
+  .vf-doc__meta {
+    display: block;
+  }
+}

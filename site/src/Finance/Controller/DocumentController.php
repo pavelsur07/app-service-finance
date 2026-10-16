@@ -416,7 +416,7 @@ class DocumentController extends AbstractController
                 $auditContextProvider->getActorUserId(),
                 'manual-ui',
             );
-            $this->addFlash('success', 'Операция ОПиУ перемещена в «Удалённые».');
+            $this->addFlash('success', 'Документ ОПиУ перемещён в «Удалённые».');
         } else {
             $this->addFlash('danger', 'Неверный CSRF токен.');
         }
@@ -448,7 +448,7 @@ class DocumentController extends AbstractController
 
         try {
             $restoreDocument((string) $company->getId(), $id);
-            $this->addFlash('success', 'Операция ОПиУ восстановлена.');
+            $this->addFlash('success', 'Документ ОПиУ восстановлен.');
         } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());
         }

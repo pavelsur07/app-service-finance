@@ -68,11 +68,11 @@ final class DocumentIndexListQueryTest extends WebTestCaseBase
 
         $firstPage = $client->request('GET', '/documents/', ['limit' => 20]);
         self::assertResponseIsSuccessful();
-        self::assertCount(20, $firstPage->filter('table tbody tr'));
+        self::assertCount(20, $firstPage->filter('table tbody[data-document-row]'));
 
         $secondPage = $client->request('GET', '/documents/', ['limit' => 20, 'page' => 2]);
         self::assertResponseIsSuccessful();
-        self::assertCount(5, $secondPage->filter('table tbody tr'));
+        self::assertCount(5, $secondPage->filter('table tbody[data-document-row]'));
 
         // Считать строки мало: страницы обязаны не пересекаться и вместе покрывать весь список.
         $firstPageNumbers = self::documentNumbers($firstPage);
@@ -87,8 +87,8 @@ final class DocumentIndexListQueryTest extends WebTestCaseBase
      */
     private static function documentNumbers(Crawler $page): array
     {
-        return $page->filter('table tbody tr td:nth-child(3)')->each(
-            static fn (Crawler $cell): string => trim($cell->text()),
+        return $page->filter('table tbody[data-document-row] .vf-doc__number')->each(
+            static fn (Crawler $cell): string => trim(str_replace('№', '', $cell->text())),
         );
     }
 
