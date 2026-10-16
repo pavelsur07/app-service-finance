@@ -23,6 +23,9 @@ final class DocumentListDTOTest extends TestCase
         self::assertNull($dto->projectDirectionId);
         self::assertNull($dto->responsibilityCenterId);
         self::assertNull($dto->direction);
+        self::assertNull($dto->categoryId);
+        self::assertNull($dto->amountFrom);
+        self::assertNull($dto->amountTo);
     }
 
     public function testSearchIsTrimmedAndKeptVerbatim(): void
@@ -77,6 +80,39 @@ final class DocumentListDTOTest extends TestCase
         self::assertNull($this->dto(direction: 'all')->direction);
     }
 
+    public function testCategoryIsUuidOnly(): void
+    {
+        self::assertSame(self::PROJECT_ID, $this->dto(categoryId: strtoupper(self::PROJECT_ID))->categoryId);
+        self::assertNull($this->dto(categoryId: 'revenue')->categoryId);
+        self::assertTrue($this->dto(categoryId: self::PROJECT_ID)->hasFilters());
+    }
+
+    #[DataProvider('amounts')]
+    public function testAmountBoundIsNormalized(string $raw, ?string $expected): void
+    {
+        $dto = $this->dto(amountFrom: $raw, amountTo: $raw);
+
+        self::assertSame($expected, $dto->amountFrom);
+        self::assertSame($expected, $dto->amountTo);
+        self::assertSame(null !== $expected, $dto->hasFilters());
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null}>
+     */
+    public static function amounts(): iterable
+    {
+        yield 'целое' => ['1500', '1500.00'];
+        yield 'разряды и запятая' => ["1 000,5", '1000.50'];
+        yield 'неразрывный пробел' => ["12\u{00A0}345.67", '12345.67'];
+        yield 'ноль' => ['0', '0.00'];
+        yield 'минус' => ['-5', null];
+        yield 'три знака' => ['1.005', null];
+        yield 'буквы' => ['abc', null];
+        yield 'пусто' => ['  ', null];
+        yield 'больше колонки' => ['12345678901234', null];
+    }
+
     public function testGarbageDateIsIgnoredButValidBoundaryDateIsKept(): void
     {
         $dto = $this->dto(dateFrom: '2024-02-30', dateTo: '2024-02-29');
@@ -93,6 +129,9 @@ final class DocumentListDTOTest extends TestCase
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
         ?string $direction = null,
+        ?string $categoryId = null,
+        ?string $amountFrom = null,
+        ?string $amountTo = null,
     ): DocumentListDTO {
         return new DocumentListDTO(
             CompanyBuilder::aCompany()->build(),
@@ -104,6 +143,9 @@ final class DocumentListDTOTest extends TestCase
             projectDirectionId: $projectDirectionId,
             responsibilityCenterId: $responsibilityCenterId,
             direction: $direction,
+            categoryId: $categoryId,
+            amountFrom: $amountFrom,
+            amountTo: $amountTo,
         );
     }
 }

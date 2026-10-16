@@ -1,0 +1,143 @@
+{% extends 'document/_list_layout.html.twig' %}
+{# Вкладка «Операции»: одна строка — одна операция документа ОПиУ. Эталон — docs/design-system/screens/pnl-refs/03–04;
+   решения по разрыву с макетом — docs/tasks/ds-pnl-operations/plan.md. Общая часть — document/_list_layout.html.twig. #}
+{% set route = 'document_operation_index' %}
+{% set tab = 'operations' %}
+
+{% block title %}Операции · Документы ОПиУ{% endblock %}
+
+{% block list_totals %}
+{% import 'document/_list_macros.html.twig' as ui %}
+    {% if items is not empty or filters.hasFilters %}
+        <div class="vf-bar vf-docs__totals" role="status">
+            <span>Найдено {{ totals.operations|vf_number }} {{ ui.plural(totals.operations, 'операция', 'операции', 'операций') }} · {{ totals.documents|vf_number }} {{ ui.plural(totals.documents, 'документ', 'документа', 'документов') }}</span>
+            <span class="vf-docs__total">Доходы <strong>{{ totals.income|vf_amount(2, 'income') }}</strong></span>
+            <span class="vf-docs__total">Расходы <strong>{{ totals.expense|vf_amount }}</strong></span>
+            {# DS-Money: красный для сумм не используется — отрицательный результат несёт знак «−». #}
+            <span class="vf-docs__total vf-docs__total--result">Результат <strong>{{ totals.result|vf_amount }} ₽</strong></span>
+            {% for other in totals.others %}
+                <span class="vf-docs__total vf-docs__other">в валюте {{ other.currency }}: доходы {{ other.income|vf_amount(currency: other.currency) }}, расходы {{ other.expense|vf_amount(currency: other.currency) }}, результат {{ other.result|vf_amount(currency: other.currency) }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block list_content %}
+{% import 'document/_list_macros.html.twig' as ui %}
+    {% if items is empty %}
+        <div class="vf-empty">
+            <span class="empty-icon" aria-hidden="true"><i class="ti {{ filters.hasFilters ? 'ti-search' : 'ti-list-details' }}"></i></span>
+            {% if filters.hasFilters %}
+                <div class="vf-empty__title">Операции не найдены</div>
+                <div class="vf-empty__hint">По выбранным фильтрам ничего нет. Измените фильтры или сбросьте их.</div>
+                <div class="btn-list">
+                    <a href="{{ path(route, limit != 20 ? {limit: limit} : {}) }}" class="btn btn-sm">Сбросить фильтры</a>
+                </div>
+            {% else %}
+                <div class="vf-empty__title">Операций ОПиУ пока нет</div>
+                <div class="vf-empty__hint">Операции появляются вместе с документами ОПиУ: добавьте документ вручную или создайте его из операции ДДС.</div>
+                <div class="btn-list">
+                    <a href="{{ path('document_new') }}" class="btn btn-primary btn-sm"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить документ</a>
+                    <a href="{{ path('cash_transaction_index') }}" class="btn btn-sm">Операции ДДС</a>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table card-table vf-table vf-docs-table vf-pnlops-table">
+                <thead class="sticky-top">
+                    <tr>
+                        <th class="vf-docs-table__date">Дата</th>
+                        <th>Документ</th>
+                        <th class="vf-docs-col-meta">Статья ОПиУ</th>
+                        <th class="vf-docs-col-meta">Проект / ЦФО</th>
+                        <th class="vf-docs-col-meta">Контрагент</th>
+                        <th class="text-end text-nowrap">Доход, ₽</th>
+                        <th class="text-end text-nowrap">Расход, ₽</th>
+                        <th class="vf-actions"><span class="visually-hidden">Действия</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for op in items %}
+                        {% set document = op.document %}
+                        {# Вклад строки — DocumentPlContribution::forOperation (правила регистра ОПиУ, как у итога):
+                           без статьи — null; у marketplace_pl — со знаком суммы статьи. #}
+                        {% set share = contributions[op.id] %}
+                        {% set rowCurrency = share ? share.currency : (document.cashTransaction ? document.cashTransaction.currency : 'RUB') %}
+                        {% set category = op.plCategory %}
+                        {% set opProject = op.projectDirection ?? document.projectDirection %}
+                        {% set opCenterId = op.responsibilityCenterId ?? document.responsibilityCenterId %}
+                        {% set opCenter = opCenterId ? (responsibilityCenterNames[opCenterId] ?? 'ЦФО не найден') : null %}
+                        {% set opCounterparty = op.counterparty ?? document.counterparty %}
+                        {% set counterpartyName = opCounterparty ? (opCounterparty.displayName ?? opCounterparty.name) : null %}
+                        {% set opCount = operationCounts[document.id] ?? 1 %}
+                        {% set statusValue = document.status.value %}
+                        {% set documentLabel = (typeShortLabels[document.type.value] ?? document.type.label()) ~ (document.number ? ' № ' ~ document.number : '') %}
+                        <tr data-operation-row="{{ op.id }}">
+                            <td class="vf-docs-table__date text-nowrap">{{ document.date|date('d.m.Y') }}</td>
+                            <td class="vf-doc__main">
+                                <div class="vf-doc__title">
+                                    <a href="{{ path('document_show', {id: document.id}) }}" class="vf-strong">{{ typeShortLabels[document.type.value] ?? document.type.label() }}</a>
+                                    {% if document.number %}<span class="vf-doc__number">№ {{ document.number }}</span>{% endif %}
+                                    {% if document.cashTransaction %}<span class="badge vf-doc-badge">Из ДДС</span>{% endif %}
+                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ statusLabels[statusValue] }}</span>{% endif %}
+                                </div>
+                                {% if document.description %}
+                                    <div class="vf-sub vf-doc__desc" title="{{ document.description }}">{{ document.description }}</div>
+                                {% endif %}
+                                {# Порядкового номера «k из n» нет: у операций документа нет порядка. #}
+                                {% if opCount > 1 %}
+                                    <div class="vf-sub vf-pnlops__count">В документе {{ opCount }} {{ ui.plural(opCount, 'операция', 'операции', 'операций') }}</div>
+                                {% endif %}
+                                {% if op.comment %}
+                                    <div class="vf-sub vf-doc__desc vf-pnlops__comment" title="{{ op.comment }}">{{ op.comment }}</div>
+                                {% endif %}
+                                {# Узкий экран: статья, проект, ЦФО и контрагент — подстрокой вместо колонок. #}
+                                <div class="vf-sub vf-doc__meta">
+                                    {{ [category ? category.name : 'Нужно указать статью', opProject ? opProject.name : null, opCenter, counterpartyName]|filter(v => v)|join(' · ') }}
+                                </div>
+                            </td>
+                            <td class="vf-docs-col-meta">
+                                {% if category %}{{ category.name }}{% else %}<span class="vf-ops-badge-warn">Нужно указать статью</span>{% endif %}
+                            </td>
+                            <td class="vf-docs-col-meta">
+                                {{ opProject ? opProject.name : '—' }}
+                                {% if opCenter %}<div class="vf-sub">{{ opCenter }}</div>{% endif %}
+                            </td>
+                            <td class="vf-docs-col-meta">{{ counterpartyName ?? '—' }}</td>
+                            {% if share %}
+                                <td class="text-end text-nowrap">{{ share.nature == 'INCOME' ? share.amount|vf_amount(2, 'income', currency: rowCurrency) : '—' }}</td>
+                                <td class="text-end text-nowrap">{{ share.nature == 'EXPENSE' ? share.amount|vf_amount(currency: rowCurrency) : '—' }}</td>
+                            {% else %}
+                                {# Без статьи у операции нет природы: сумма видна, но ни в доход, ни в расход не входит. #}
+                                <td class="text-end text-nowrap" colspan="2">
+                                    <span class="vf-sub" title="Без статьи операция в итог не входит">{{ op.amount|vf_amount(currency: rowCurrency) }} · не в итоге</span>
+                                </td>
+                            {% endif %}
+                            <td class="vf-actions text-end">
+                                <div class="dropdown">
+                                    <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с операцией документа {{ documentLabel }}">
+                                        <i class="ti ti-dots" aria-hidden="true"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <a class="dropdown-item" href="{{ path('document_edit', {'id': document.id}) }}">
+                                            <i class="ti ti-pencil me-2" aria-hidden="true"></i> Открыть документ
+                                        </a>
+                                        <a class="dropdown-item" href="{{ path('document_show', {'id': document.id}) }}">
+                                            <i class="ti ti-eye me-2" aria-hidden="true"></i> Просмотр документа
+                                        </a>
+                                        {% if document.cashTransaction %}
+                                            <a class="dropdown-item" href="{{ path('cash_transaction_show', {'id': document.cashTransaction.id}) }}">
+                                                <i class="ti ti-arrows-exchange me-2" aria-hidden="true"></i> Открыть операцию ДДС
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

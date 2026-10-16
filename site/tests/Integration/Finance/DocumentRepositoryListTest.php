@@ -30,6 +30,8 @@ use Ramsey\Uuid\Uuid;
  */
 final class DocumentRepositoryListTest extends IntegrationTestCase
 {
+    use DocumentListFixturesTrait;
+
     private DocumentRepository $repository;
     private Company $company;
     private Company $foreignCompany;
@@ -115,6 +117,32 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         self::assertSame(['INCOME-ONLY', 'MIXED'], $this->numbers(direction: 'income'));
         self::assertSame(['EXPENSE-ONLY', 'MIXED'], $this->numbers(direction: 'expense'));
         self::assertSame(['EXPENSE-ONLY', 'INCOME-ONLY', 'MIXED', 'UNCATEGORIZED'], $this->numbers());
+    }
+
+    public function testCategoryFilterKeepsAllOperationsOfFoundDocument(): void
+    {
+        $mixed = $this->persistDocument('MIXED', operations: [[$this->revenue, '10.00'], [$this->rent, '3.00']]);
+        $this->persistDocument('RENT-ONLY', operations: [[$this->rent, '7.00']]);
+
+        $result = $this->list(categoryId: (string) $this->revenue->getId());
+
+        self::assertSame(['MIXED'], self::sortedNumbers($result));
+        self::assertSame($mixed->getId(), $result[0]->getId());
+        self::assertCount(2, $result[0]->getOperations(), 'Фильтр по статье урезал операции документа.');
+    }
+
+    public function testAmountFilterUsesModulusAndOneOperationCarriesAllConditions(): void
+    {
+        $this->persistDocument('SMALL', operations: [[$this->rent, '99.99']]);
+        $this->persistDocument('STORNO', operations: [[$this->rent, '-150.00']]);
+        $this->persistDocument('BIG', operations: [[$this->rent, '1000.00']]);
+        // Доход на 150 и расход на 5: ни одна операция не «расход от 100».
+        $this->persistDocument('SPLIT', operations: [[$this->revenue, '150.00'], [$this->rent, '5.00']]);
+
+        self::assertSame(['BIG', 'SPLIT', 'STORNO'], $this->numbers(amountFrom: '100.00'));
+        self::assertSame(['SPLIT', 'STORNO'], $this->numbers(amountFrom: '100.00', amountTo: '150.00'));
+        self::assertSame(['BIG', 'STORNO'], $this->numbers(direction: 'expense', amountFrom: '100.00'));
+        self::assertSame([], $this->numbers(categoryId: (string) $this->rent->getId(), amountFrom: '1000.01'));
     }
 
     public function testTotalsCoverTheWholeSelectionNotThePage(): void
@@ -230,6 +258,8 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
             ['projectDirectionId' => (string) $foreignProject->getId()],
             ['responsibilityCenterId' => $centerId],
             ['direction' => 'income'],
+            ['categoryId' => (string) $foreignCategory->getId()],
+            ['amountFrom' => '999.00'],
         ];
 
         foreach ($filters as $filter) {
@@ -259,8 +289,11 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
         ?string $direction = null,
+        ?string $categoryId = null,
+        ?string $amountFrom = null,
+        ?string $amountTo = null,
     ): array {
-        return self::sortedNumbers($this->list($q, $projectDirectionId, $responsibilityCenterId, $direction));
+        return self::sortedNumbers($this->list($q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo));
     }
 
     /**
@@ -271,9 +304,12 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
         ?string $direction = null,
+        ?string $categoryId = null,
+        ?string $amountFrom = null,
+        ?string $amountTo = null,
     ): array {
         $this->em->clear();
-        $dto = $this->dto(50, $q, $projectDirectionId, $responsibilityCenterId, $direction);
+        $dto = $this->dto(50, $q, $projectDirectionId, $responsibilityCenterId, $direction, $categoryId, $amountFrom, $amountTo);
 
         return array_values(iterator_to_array($this->repository->findByCompany($dto)->getCurrentPageResults()));
     }
@@ -297,6 +333,9 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
         ?string $direction = null,
+        ?string $categoryId = null,
+        ?string $amountFrom = null,
+        ?string $amountTo = null,
     ): DocumentListDTO {
         $company = $this->em->find(Company::class, $this->company->getId());
         self::assertInstanceOf(Company::class, $company);
@@ -309,108 +348,9 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
             projectDirectionId: $projectDirectionId,
             responsibilityCenterId: $responsibilityCenterId,
             direction: $direction,
+            categoryId: $categoryId,
+            amountFrom: $amountFrom,
+            amountTo: $amountTo,
         );
-    }
-
-    /**
-     * @param list<array{0: PLCategory|null, 1: string, 2?: ProjectDirection|null, 3?: string|null}> $operations
-     */
-    private function persistDocument(
-        string $number,
-        ?string $description = null,
-        ?Company $company = null,
-        ?Counterparty $counterparty = null,
-        ?ProjectDirection $project = null,
-        ?string $responsibilityCenterId = null,
-        array $operations = [],
-        DocumentType $type = DocumentType::OTHER,
-        ?string $currency = null,
-    ): Document {
-        $document = new Document(Uuid::uuid4()->toString(), $company ?? $this->company);
-        $document->setType($type);
-        if (null !== $currency) {
-            $account = MoneyAccountBuilder::aMoneyAccount()->withId(Uuid::uuid4()->toString())->forCompany($company ?? $this->company)->withCurrency($currency)->build();
-            $transaction = CashTransactionBuilder::aCashTransaction()->withId(Uuid::uuid4()->toString())->forCompany($company ?? $this->company)->withMoneyAccount($account)->withAmount('1000.00')->withCurrency($currency)->build();
-            $this->em->persist($account);
-            $this->em->persist($transaction);
-            $document->setCashTransaction($transaction);
-        }
-        $document->setNumber($number);
-        $document->setDescription($description);
-        $document->setDate(new \DateTimeImmutable('2026-10-08'));
-        $document->setCounterparty($counterparty);
-        $document->setProjectDirection($project);
-        $document->setResponsibilityCenterId($responsibilityCenterId);
-
-        foreach ($operations as $row) {
-            $operation = new DocumentOperation();
-            $operation->setCategory($row[0]);
-            $operation->setAmount($row[1]);
-            $operation->setProjectDirection($row[2] ?? null);
-            $operation->setResponsibilityCenterId($row[3] ?? null);
-            $document->addOperation($operation);
-            $this->em->persist($operation);
-        }
-
-        $this->em->persist($document);
-        $this->em->flush();
-
-        return $document;
-    }
-
-    private function persistCompany(int $index): Company
-    {
-        $owner = UserBuilder::aUser()->withIndex(9100 + $index)->build();
-        $company = CompanyBuilder::aCompany()->withIndex(9100 + $index)->withOwner($owner)->build();
-        $this->em->persist($owner);
-        $this->em->persist($company);
-        $this->em->flush();
-
-        return $company;
-    }
-
-    private function persistCategory(Company $company, string $name, PLFlow $flow): PLCategory
-    {
-        $category = PLCategoryBuilder::aPLCategory()
-            ->withId(Uuid::uuid4()->toString())
-            ->forCompany($company)
-            ->withName($name)
-            ->withFlow($flow)
-            ->build();
-        $this->em->persist($category);
-        $this->em->flush();
-
-        return $category;
-    }
-
-    private function persistCenter(Company $company, string $code): string
-    {
-        $center = new FinancialResponsibilityCenter((string) $company->getId(), $code, $code);
-        $this->em->persist($center);
-        $this->em->flush();
-
-        return $center->getId();
-    }
-
-    private function persistProject(Company $company, string $name): ProjectDirection
-    {
-        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, $name);
-        $this->em->persist($project);
-        $this->em->flush();
-
-        return $project;
-    }
-
-    private function persistCounterparty(Company $company, string $name): Counterparty
-    {
-        $counterparty = CounterpartyBuilder::aCounterparty()
-            ->withId(Uuid::uuid4()->toString())
-            ->withCompany($company)
-            ->withName($name)
-            ->build();
-        $this->em->persist($counterparty);
-        $this->em->flush();
-
-        return $counterparty;
     }
 }

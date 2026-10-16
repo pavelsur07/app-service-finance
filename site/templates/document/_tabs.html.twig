@@ -1,5 +1,10 @@
-{# Вкладки раздела «Документы ОПиУ». active: index | deleted #}
+{# Вкладки раздела «Документы ОПиУ». active: index | operations | deleted.
+   query — фильтры списка: вкладки «Документы» и «Операции» переносят их друг другу; у «Удалённых» фильтров нет.
+   count — «Найдено» активной вкладки; у соседней счётчика нет: под фильтрами по операциям он значил бы другое. #}
+{% set query = query ?? {} %}
+{% set count = count ?? null %}
 {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
-    {label: 'Документы ОПиУ', href: path('document_index'), active: active == 'index'},
+    {label: 'Документы ОПиУ', href: path('document_index', query), active: active == 'index', count: active == 'index' ? count : null},
+    {label: 'Операции', href: path('document_operation_index', query), active: active == 'operations', count: active == 'operations' ? count : null},
     {label: 'Удалённые', href: path('document_deleted_index'), active: active == 'deleted'},
 ]} only %}

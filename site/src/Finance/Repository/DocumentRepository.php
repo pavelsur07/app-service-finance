@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Finance\Repository;
 
-use App\Finance\DTO\DocumentCurrencyTotalsDTO;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
@@ -113,32 +112,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
-        $documents = 0;
-        $operations = 0;
-        /** @var array<string, array{income: string, expense: string}> $byCurrency */
-        $byCurrency = [];
-        foreach ($plain as $row) {
-            $documents += (int) $row['documents'];
-            $operations += (int) $row['operations'];
-            $byCurrency[$row['currency']] = [
-                'income' => bcadd((string) ($row['incomeTotal'] ?? '0'), '0', 2),
-                'expense' => bcadd((string) ($row['expenseTotal'] ?? '0'), '0', 2),
-            ];
-        }
-        foreach ($marketplace as $row) {
-            $key = 'INCOME' === $row['bucket'] ? 'income' : 'expense';
-            $sum = (string) $row['signedTotal'];
-            $abs = -1 === bccomp($sum, '0', 2) ? bcmul($sum, '-1', 2) : $sum;
-            $byCurrency[$row['currency']] ??= ['income' => '0.00', 'expense' => '0.00'];
-            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $abs, 2);
-        }
-
-        $currencies = [];
-        foreach ($byCurrency as $currency => $sums) {
-            $currencies[] = new DocumentCurrencyTotalsDTO($currency, $sums['income'], $sums['expense']);
-        }
-
-        return new DocumentListTotalsDTO($documents, $operations, $currencies);
+        return DocumentListTotalsDTO::fromAggregates($plain, $marketplace);
     }
 
     /**
@@ -219,11 +193,31 @@ class DocumentRepository extends ServiceEntityRepository
             ))->setParameter('responsibilityCenterId', $dto->responsibilityCenterId);
         }
 
+        // Направление, статья и сумма — условия на одну и ту же операцию: «документ с доходной
+        // операцией по статье X на сумму от N», а не три разных операции.
+        $operationConditions = [];
         if (null !== $dto->direction) {
+            $operationConditions[] = 'fCategory.flow = :direction';
+            $queryBuilder->setParameter('direction', $dto->direction);
+        }
+        if (null !== $dto->categoryId) {
+            $operationConditions[] = 'fCategory.id = :categoryId';
+            $queryBuilder->setParameter('categoryId', $dto->categoryId);
+        }
+        if (null !== $dto->amountFrom) {
+            $operationConditions[] = 'ABS(fOp.amount) >= :amountFrom';
+            $queryBuilder->setParameter('amountFrom', $dto->amountFrom);
+        }
+        if (null !== $dto->amountTo) {
+            $operationConditions[] = 'ABS(fOp.amount) <= :amountTo';
+            $queryBuilder->setParameter('amountTo', $dto->amountTo);
+        }
+        if ([] !== $operationConditions) {
             $queryBuilder->andWhere(sprintf(
-                'EXISTS (SELECT fOp.id FROM %s fOp JOIN fOp.category fCategory WHERE fOp.document = d AND fCategory.flow = :direction)',
+                'EXISTS (SELECT fOp.id FROM %s fOp LEFT JOIN fOp.category fCategory WHERE fOp.document = d AND %s)',
                 DocumentOperation::class,
-            ))->setParameter('direction', $dto->direction);
+                implode(' AND ', $operationConditions),
+            ));
         }
 
         return $queryBuilder;

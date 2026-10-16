@@ -87,6 +87,45 @@ final readonly class DocumentPlContribution
         ];
     }
 
+    /**
+     * Вклад строки вкладки «Операции». Обычный документ — модуль операции; marketplace_pl —
+     * со знаком: если сумма найденных операций той же статьи и природы в документе
+     * отрицательна (списания), вклад = −amount, иначе amount. Ключ суммы —
+     * «documentId|categoryId|INCOME|EXPENSE» (DocumentOperationRepository::marketplaceBucketSums).
+     * Без статьи или с нулевой суммой у статьи без потока — null: в итог не входит.
+     *
+     * @param array<string, string> $marketplaceBucketSums
+     *
+     * @return array{nature: string, amount: string, currency: string}|null
+     */
+    public function forOperation(DocumentOperation $operation, array $marketplaceBucketSums): ?array
+    {
+        $category = $operation->getPlCategory();
+        $document = $operation->getDocument();
+        if (null === $category || null === $document) {
+            return null;
+        }
+
+        $nature = $this->natureResolver->forOperation($operation);
+        if (null === $nature) {
+            return null;
+        }
+
+        $amount = bcadd($operation->getAmount(), '0', 2);
+        if (DocumentType::MARKETPLACE_PL === $document->getType()) {
+            $sum = $marketplaceBucketSums[sprintf('%s|%s|%s', $document->getId(), $category->getId(), $nature->value)] ?? $amount;
+            $contribution = self::isNegative($sum) ? self::negate($amount) : $amount;
+        } else {
+            $contribution = self::abs($amount);
+        }
+
+        return [
+            'nature' => $nature->value,
+            'amount' => $contribution,
+            'currency' => $document->getCashTransaction()?->getCurrency() ?? 'RUB',
+        ];
+    }
+
     private static function isNegative(string $value): bool
     {
         return -1 === bccomp($value, '0', 2);

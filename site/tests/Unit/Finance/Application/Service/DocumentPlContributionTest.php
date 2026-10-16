@@ -70,6 +70,33 @@ final class DocumentPlContributionTest extends TestCase
         self::assertSame('40.00', array_values($result['operations'])[0]['amount']);
     }
 
+    public function testListedOperationOfPlainDocumentTakesModulus(): void
+    {
+        $operations = $this->document(DocumentType::OTHER, [['EXPENSE', '-30.00'], ['NONE', '-5.00'], [null, '9.00'], ['NONE', '0.00']])->getOperations()->toArray();
+        $service = $this->service();
+
+        self::assertSame(['nature' => 'EXPENSE', 'amount' => '30.00', 'currency' => 'RUB'], $service->forOperation($operations[0], []));
+        self::assertSame(['nature' => 'EXPENSE', 'amount' => '5.00', 'currency' => 'RUB'], $service->forOperation($operations[1], []));
+        self::assertNull($service->forOperation($operations[2], []), 'Без статьи — не в итоге.');
+        self::assertNull($service->forOperation($operations[3], []), 'Нулевая операция без flow не имеет природы.');
+    }
+
+    public function testListedMarketplaceOperationTakesSignOfItsBucketSum(): void
+    {
+        $document = $this->document(DocumentType::MARKETPLACE_PL, [['EXPENSE', '-100.00'], ['EXPENSE', '20.00']]);
+        [$charge, $storno] = $document->getOperations()->toArray();
+        $key = sprintf('%s|%s|EXPENSE', $document->getId(), $charge->getPlCategory()?->getId());
+        $service = $this->service();
+
+        // Сумма статьи −80: списание входит как 100, сторно — как −20.
+        self::assertSame('100.00', $service->forOperation($charge, [$key => '-80.00'])['amount'] ?? null);
+        self::assertSame('-20.00', $service->forOperation($storno, [$key => '-80.00'])['amount'] ?? null);
+        // Сумма статьи положительна (возвраты «+X»): как есть.
+        self::assertSame('20.00', $service->forOperation($storno, [$key => '20.00'])['amount'] ?? null);
+        // Суммы нет (документ вне выборки сумм) — по знаку самой операции.
+        self::assertSame('100.00', $service->forOperation($charge, [])['amount'] ?? null);
+    }
+
     /**
      * @param list<array{0: 'INCOME'|'EXPENSE'|'NONE'|null, 1: string}> $operations
      */

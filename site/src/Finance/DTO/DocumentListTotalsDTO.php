@@ -44,6 +44,44 @@ final readonly class DocumentListTotalsDTO
     }
 
     /**
+     * Итог из двух агрегатов списка: обычные документы уже просуммированы запросом по валютам,
+     * marketplace_pl — подписанные суммы по (документ, статья, природа): модуль берётся от
+     * суммы, а не от операции, — списание −X и сторно +X взаимно гасятся, как в регистре ОПиУ.
+     *
+     * @param list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain
+     * @param list<array{currency: string, bucket: string, signedTotal: string}>                                                               $marketplace
+     */
+    public static function fromAggregates(array $plain, array $marketplace): self
+    {
+        $documents = 0;
+        $operations = 0;
+        /** @var array<string, array{income: string, expense: string}> $byCurrency */
+        $byCurrency = [];
+        foreach ($plain as $row) {
+            $documents += (int) $row['documents'];
+            $operations += (int) $row['operations'];
+            $byCurrency[$row['currency']] = [
+                'income' => bcadd((string) ($row['incomeTotal'] ?? '0'), '0', 2),
+                'expense' => bcadd((string) ($row['expenseTotal'] ?? '0'), '0', 2),
+            ];
+        }
+        foreach ($marketplace as $row) {
+            $key = 'INCOME' === $row['bucket'] ? 'income' : 'expense';
+            $sum = (string) $row['signedTotal'];
+            $abs = -1 === bccomp($sum, '0', 2) ? bcmul($sum, '-1', 2) : $sum;
+            $byCurrency[$row['currency']] ??= ['income' => '0.00', 'expense' => '0.00'];
+            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $abs, 2);
+        }
+
+        $currencies = [];
+        foreach ($byCurrency as $currency => $sums) {
+            $currencies[] = new DocumentCurrencyTotalsDTO($currency, $sums['income'], $sums['expense']);
+        }
+
+        return new self($documents, $operations, $currencies);
+    }
+
+    /**
      * @return list<DocumentCurrencyTotalsDTO>
      */
     public function others(): array
