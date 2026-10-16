@@ -334,11 +334,13 @@ final readonly class OzonAccrualProjectionHealthQuery
             return 0;
         }
 
-        // Порциями — тот же лимит параметров Postgres, что в projectedExternalIdSet().
-        $updated = 0;
-        foreach (array_chunk($externalIds, self::EXTERNAL_ID_CHUNK) as $chunk) {
-            $updated += (int) $this->connection->executeStatement(
-                'UPDATE ingest_financial_transactions
+        // Порциями — тот же лимит параметров Postgres, что в projectedExternalIdSet(). В одной
+        // транзакции: сбой поздней порции не оставляет ранние применёнными при отчёте «0».
+        return (int) $this->connection->transactional(function () use ($companyId, $shopRef, $rawRecordId, $rawFetchedAt, $externalIds): int {
+            $updated = 0;
+            foreach (array_chunk($externalIds, self::EXTERNAL_ID_CHUNK) as $chunk) {
+                $updated += (int) $this->connection->executeStatement(
+                    'UPDATE ingest_financial_transactions
              SET raw_record_id = :rawRecordId,
                  external_updated_at = GREATEST(external_updated_at, CAST(:rawFetchedAt AS TIMESTAMP)),
                  updated_at = NOW()
@@ -348,21 +350,22 @@ final readonly class OzonAccrualProjectionHealthQuery
                AND external_id IN (:externalIds)
                AND external_updated_at <= CAST(:rawFetchedAt AS TIMESTAMP)
                AND raw_record_id <> :rawRecordId',
-                [
-                    'companyId' => $companyId,
-                    'shopRef' => $shopRef,
-                    'rawRecordId' => $rawRecordId,
-                    'rawFetchedAt' => $rawFetchedAt->format('Y-m-d H:i:s.u'),
-                    'source' => IngestSource::OZON->value,
-                    'externalIds' => $chunk,
-                ],
-                [
-                    'externalIds' => ArrayParameterType::STRING,
-                ],
-            );
-        }
+                    [
+                        'companyId' => $companyId,
+                        'shopRef' => $shopRef,
+                        'rawRecordId' => $rawRecordId,
+                        'rawFetchedAt' => $rawFetchedAt->format('Y-m-d H:i:s.u'),
+                        'source' => IngestSource::OZON->value,
+                        'externalIds' => $chunk,
+                    ],
+                    [
+                        'externalIds' => ArrayParameterType::STRING,
+                    ],
+                );
+            }
 
-        return $updated;
+            return $updated;
+        });
     }
 
     /**

@@ -8,9 +8,13 @@ use App\Ingestion\Application\Service\OzonAccrualListingRelinker;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayPreviewMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\DTO\RawBatch;
+use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\TransactionDirection;
+use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Ingestion\Infrastructure\Query\OzonAccrualProjectionHealthQuery;
+use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -52,11 +56,31 @@ final class OzonAccrualListingRelinkerMemoryTest extends IntegrationTestCase
     {
         $companyId = $this->companyId();
         $keys = array_map(static fn (int $i): string => 'ozon:accrual:'.$i, range(1, 70_000));
+        // Ключ за границей первой порции (5000): результат должен собираться со всех порций.
+        $projectedKey = $keys[6000];
+        $oldRaw = $this->storeSnapshot($companyId, 'day-old', 1000);
+        $newRaw = $this->storeSnapshot($companyId, 'day-new', 2000);
+        $this->em->persist(new FinancialTransaction(
+            companyId: $companyId,
+            connectionRef: 'shop-1',
+            shopRef: 'shop-1',
+            source: IngestSource::OZON,
+            externalId: $projectedKey,
+            externalUpdatedAt: new \DateTimeImmutable('2026-06-02 00:00:00'),
+            operationGroupId: Uuid::uuid7()->toString(),
+            type: TransactionType::COMMISSION,
+            direction: TransactionDirection::OUT,
+            money: Money::fromMinor(10000, 'RUB'),
+            occurredAt: new \DateTimeImmutable('2026-06-02 12:00:00'),
+            rawRecordId: $oldRaw,
+        ));
+        $this->em->flush();
 
         $query = self::getContainer()->get(OzonAccrualProjectionHealthQuery::class);
 
-        self::assertSame([], $query->projectedExternalIdSet($companyId, 'shop-1', $keys));
-        self::assertSame(0, $query->reattributeProjectedExternalIds($companyId, 'shop-1', Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-06-08'), $keys));
+        self::assertSame([$projectedKey => true], $query->projectedExternalIdSet($companyId, 'shop-1', $keys));
+        self::assertSame(1, $query->reattributeProjectedExternalIds($companyId, 'shop-1', $newRaw, new \DateTimeImmutable('2026-06-08'), $keys));
+        self::assertSame(0, $query->reattributeProjectedExternalIds($companyId, 'shop-1', $newRaw, new \DateTimeImmutable('2026-06-08'), $keys));
     }
 
     private function companyId(): string
