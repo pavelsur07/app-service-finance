@@ -56,27 +56,11 @@ class DocumentController extends AbstractController
         CompanyFacade $companyFacade,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         DocumentPlContribution $plContribution,
+        PLCategoryRepository $categoryRepository,
     ): Response {
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = (int) $request->query->get('limit', 20);
-
-        $filters = new DocumentListDTO(
-            $company,
-            $page,
-            $limit,
-            $request->query->getString('dateFrom'),
-            $request->query->getString('dateTo'),
-            $request->query->getString('type'),
-            $request->query->getString('status'),
-            $request->query->getString('number'),
-            $request->query->getString('counterparty'),
-            $request->query->getString('q'),
-            $request->query->getString('projectDirection'),
-            $request->query->getString('responsibilityCenter'),
-            $request->query->getString('direction'),
-        );
+        $filters = DocumentListDTO::fromQuery($company, $request->query);
         $pager = $repo->findByCompany($filters);
         $items = iterator_to_array($pager->getCurrentPageResults());
 
@@ -107,6 +91,7 @@ class DocumentController extends AbstractController
             ),
             'projectDirections' => $companyFacade->listProjectDirectionEntities($companyId, true),
             'responsibilityCenters' => $responsibilityCenterFacade->getActiveChoices($companyId),
+            'categories' => $categoryRepository->findTreeByCompany($company),
         ]);
     }
 

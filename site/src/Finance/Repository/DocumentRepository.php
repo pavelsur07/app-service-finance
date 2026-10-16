@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Finance\Repository;
 
-use App\Finance\DTO\DocumentCurrencyTotalsDTO;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
@@ -12,6 +11,7 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -43,11 +43,12 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect('opProject')
             ->addSelect('opCounterparty')
             ->addSelect('ct')
-            ->leftJoin('d.projectDirection', 'pd')
+            ->leftJoin('d.projectDirection', 'pd', Join::WITH, 'IDENTITY(pd.company) = :companyId')
             ->leftJoin('d.operations', 'op')
-            ->leftJoin('op.category', 'opCategory')
-            ->leftJoin('op.projectDirection', 'opProject')
-            ->leftJoin('op.counterparty', 'opCounterparty')
+            // Справочники — только своей компании (см. createFilteredQueryBuilder).
+            ->leftJoin('op.category', 'opCategory', Join::WITH, 'IDENTITY(opCategory.company) = :companyId')
+            ->leftJoin('op.projectDirection', 'opProject', Join::WITH, 'IDENTITY(opProject.company) = :companyId')
+            ->leftJoin('op.counterparty', 'opCounterparty', Join::WITH, 'IDENTITY(opCounterparty.company) = :companyId')
             ->orderBy('d.date', \SortDirection::Descending)
             // Одной даты мало: при равных датах порядок не определён, и один документ
             // может попасть на две страницы, а другой — ни на одну.
@@ -84,7 +85,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS incomeTotal', $isIncome))
             ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS expenseTotal', $isExpense))
             ->leftJoin('d.operations', 'sumOp')
-            ->leftJoin('sumOp.category', 'sumCategory')
+            ->leftJoin('sumOp.category', 'sumCategory', Join::WITH, 'IDENTITY(sumCategory.company) = :companyId')
             ->groupBy('currency')
             ->setParameter('income', PLFlow::INCOME)
             ->setParameter('expense', PLFlow::EXPENSE)
@@ -99,7 +100,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect(sprintf("CASE WHEN %s THEN 'INCOME' ELSE 'EXPENSE' END AS bucket", $isIncome))
             ->addSelect('SUM(sumOp.amount) AS signedTotal')
             ->innerJoin('d.operations', 'sumOp')
-            ->innerJoin('sumOp.category', 'sumCategory')
+            ->innerJoin('sumOp.category', 'sumCategory', Join::WITH, 'IDENTITY(sumCategory.company) = :companyId')
             ->andWhere('d.type = :marketplace')
             ->andWhere(sprintf('(%s OR %s)', $isIncome, $isExpense))
             ->groupBy('d.id')
@@ -113,32 +114,14 @@ class DocumentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
-        $documents = 0;
-        $operations = 0;
-        /** @var array<string, array{income: string, expense: string}> $byCurrency */
-        $byCurrency = [];
-        foreach ($plain as $row) {
-            $documents += (int) $row['documents'];
-            $operations += (int) $row['operations'];
-            $byCurrency[$row['currency']] = [
-                'income' => bcadd((string) ($row['incomeTotal'] ?? '0'), '0', 2),
-                'expense' => bcadd((string) ($row['expenseTotal'] ?? '0'), '0', 2),
-            ];
-        }
-        foreach ($marketplace as $row) {
-            $key = 'INCOME' === $row['bucket'] ? 'income' : 'expense';
-            $sum = (string) $row['signedTotal'];
-            $abs = -1 === bccomp($sum, '0', 2) ? bcmul($sum, '-1', 2) : $sum;
-            $byCurrency[$row['currency']] ??= ['income' => '0.00', 'expense' => '0.00'];
-            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $abs, 2);
-        }
+        // Документ входит со всеми операциями, поэтому сумма статьи здесь полная: вклад — её модуль.
+        $marketplace = array_map(static fn (array $row): array => [
+            'currency' => $row['currency'],
+            'bucket' => $row['bucket'],
+            'amount' => -1 === bccomp((string) $row['signedTotal'], '0', 2) ? bcmul((string) $row['signedTotal'], '-1', 2) : bcadd((string) $row['signedTotal'], '0', 2),
+        ], $marketplace);
 
-        $currencies = [];
-        foreach ($byCurrency as $currency => $sums) {
-            $currencies[] = new DocumentCurrencyTotalsDTO($currency, $sums['income'], $sums['expense']);
-        }
-
-        return new DocumentListTotalsDTO($documents, $operations, $currencies);
+        return DocumentListTotalsDTO::fromAggregates($plain, $marketplace);
     }
 
     /**
@@ -150,9 +133,11 @@ class DocumentRepository extends ServiceEntityRepository
     private function createFilteredQueryBuilder(string $companyId, DocumentListDTO $dto): QueryBuilder
     {
         $queryBuilder = $this->createQueryBuilder('d')
-            ->leftJoin('d.counterparty', 'cp')
+            // Справочники — только своей компании: FK компанию не несут, и испорченная ссылка на
+            // чужого контрагента, статью или проект показала бы чужое название и искалась бы по нему.
+            ->leftJoin('d.counterparty', 'cp', Join::WITH, 'IDENTITY(cp.company) = :companyId')
             // Валюта документа — валюта его основания ДДС: нужна строкам списка и итогу.
-            ->leftJoin('d.cashTransaction', 'ct')
+            ->leftJoin('d.cashTransaction', 'ct', Join::WITH, 'IDENTITY(ct.company) = :companyId')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('companyId', $companyId);
@@ -193,7 +178,7 @@ class DocumentRepository extends ServiceEntityRepository
                 'LOWER(d.number) LIKE :q',
                 'LOWER(cp.name) LIKE :q',
                 sprintf(
-                    'EXISTS (SELECT qOp.id FROM %s qOp JOIN qOp.category qCategory WHERE qOp.document = d AND LOWER(qCategory.name) LIKE :q)',
+                    'EXISTS (SELECT qOp.id FROM %s qOp JOIN qOp.category qCategory WHERE qOp.document = d AND IDENTITY(qCategory.company) = :companyId AND LOWER(qCategory.name) LIKE :q)',
                     DocumentOperation::class,
                 ),
             ))->setParameter('q', self::containsPattern($dto->q));
@@ -219,11 +204,35 @@ class DocumentRepository extends ServiceEntityRepository
             ))->setParameter('responsibilityCenterId', $dto->responsibilityCenterId);
         }
 
+        // Направление, статья и сумма — условия на одну и ту же операцию: «документ с доходной
+        // операцией по статье X на сумму от N», а не три разных операции.
+        $operationConditions = [];
         if (null !== $dto->direction) {
+            // Природа операции, как в итоге и на вкладке «Операции»: у статьи без потока — знак суммы.
+            $operationConditions[] = sprintf(
+                '(fCategory.flow = :direction OR (fCategory.flow = :directionNone AND fOp.amount %s 0))',
+                PLFlow::INCOME === $dto->direction ? '>' : '<',
+            );
+            $queryBuilder->setParameter('direction', $dto->direction)->setParameter('directionNone', PLFlow::NONE);
+        }
+        if (null !== $dto->categoryId) {
+            $operationConditions[] = 'fCategory.id = :categoryId';
+            $queryBuilder->setParameter('categoryId', $dto->categoryId);
+        }
+        if (null !== $dto->amountFrom) {
+            $operationConditions[] = 'ABS(fOp.amount) >= :amountFrom';
+            $queryBuilder->setParameter('amountFrom', $dto->amountFrom);
+        }
+        if (null !== $dto->amountTo) {
+            $operationConditions[] = 'ABS(fOp.amount) <= :amountTo';
+            $queryBuilder->setParameter('amountTo', $dto->amountTo);
+        }
+        if ([] !== $operationConditions) {
             $queryBuilder->andWhere(sprintf(
-                'EXISTS (SELECT fOp.id FROM %s fOp JOIN fOp.category fCategory WHERE fOp.document = d AND fCategory.flow = :direction)',
+                'EXISTS (SELECT fOp.id FROM %s fOp LEFT JOIN fOp.category fCategory WITH IDENTITY(fCategory.company) = :companyId WHERE fOp.document = d AND %s)',
                 DocumentOperation::class,
-            ))->setParameter('direction', $dto->direction);
+                implode(' AND ', $operationConditions),
+            ));
         }
 
         return $queryBuilder;

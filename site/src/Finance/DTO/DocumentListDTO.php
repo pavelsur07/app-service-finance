@@ -9,6 +9,7 @@ use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\HttpFoundation\InputBag;
 
 /**
  * Параметры списка документов ОПиУ.
@@ -32,6 +33,10 @@ class DocumentListDTO
     public readonly ?string $responsibilityCenterId;
     /** Документы, где есть хотя бы одна операция со статьёй этого направления. */
     public readonly ?PLFlow $direction;
+    public readonly ?string $categoryId;
+    /** Границы модуля суммы операции, десятичная строка с точкой: «1 000,50» → `1000.50`. */
+    public readonly ?string $amountFrom;
+    public readonly ?string $amountTo;
 
     public function __construct(
         public readonly Company $company,
@@ -47,6 +52,9 @@ class DocumentListDTO
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
         ?string $direction = null,
+        ?string $categoryId = null,
+        ?string $amountFrom = null,
+        ?string $amountTo = null,
     ) {
         $this->dateFrom = self::parseDate($dateFrom)?->setTime(0, 0, 0);
         $this->dateTo = self::parseDate($dateTo)?->setTime(23, 59, 59);
@@ -62,6 +70,43 @@ class DocumentListDTO
             'expense' => PLFlow::EXPENSE,
             default => null,
         };
+        $this->categoryId = self::parseUuid($categoryId);
+        $amountFrom = self::parseAmount($amountFrom);
+        $amountTo = self::parseAmount($amountTo);
+        // Перепутанные границы — опечатка, а не «ничего не показывать».
+        if (null !== $amountFrom && null !== $amountTo && 1 === bccomp($amountFrom, $amountTo, 2)) {
+            [$amountFrom, $amountTo] = [$amountTo, $amountFrom];
+        }
+        $this->amountFrom = $amountFrom;
+        $this->amountTo = $amountTo;
+    }
+
+    /**
+     * Фильтры вкладок раздела из строки запроса — одни имена параметров у «Документов» и
+     * «Операций», чтобы ссылка вкладки переносила фильтры как есть.
+     *
+     * @param InputBag<string> $query
+     */
+    public static function fromQuery(Company $company, InputBag $query): self
+    {
+        return new self(
+            $company,
+            max(1, (int) $query->get('page', 1)),
+            (int) $query->get('limit', 20),
+            $query->getString('dateFrom'),
+            $query->getString('dateTo'),
+            $query->getString('type'),
+            $query->getString('status'),
+            $query->getString('number'),
+            $query->getString('counterparty'),
+            $query->getString('q'),
+            $query->getString('projectDirection'),
+            $query->getString('responsibilityCenter'),
+            $query->getString('direction'),
+            $query->getString('category'),
+            $query->getString('amountFrom'),
+            $query->getString('amountTo'),
+        );
     }
 
     /**
@@ -73,7 +118,28 @@ class DocumentListDTO
         return null !== $this->dateFrom || null !== $this->dateTo || null !== $this->type
             || null !== $this->status || null !== $this->number || null !== $this->counterparty
             || null !== $this->q || null !== $this->projectDirectionId
-            || null !== $this->responsibilityCenterId || null !== $this->direction;
+            || null !== $this->responsibilityCenterId || null !== $this->direction
+            || null !== $this->categoryId || null !== $this->amountFrom || null !== $this->amountTo;
+    }
+
+    /**
+     * Граница суммы: неотрицательное число с не более чем двумя знаками после запятой
+     * (точность колонки). Пробелы-разделители разрядов и запятая допускаются — так сумму
+     * пишут руками. Знак минус — мусор: фильтр по модулю, «−5» означал бы непонятно что.
+     */
+    private static function parseAmount(?string $value): ?string
+    {
+        $value = self::normalizeText($value);
+        if (null === $value) {
+            return null;
+        }
+
+        $value = str_replace(',', '.', (string) preg_replace('/[\s\x{00A0}\x{202F}]+/u', '', $value));
+        if (1 !== preg_match('/^\d{1,13}(\.\d{1,2})?$/', $value)) {
+            return null;
+        }
+
+        return bcadd($value, '0', 2);
     }
 
     /**

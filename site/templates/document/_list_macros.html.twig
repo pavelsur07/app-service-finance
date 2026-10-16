@@ -1,0 +1,19 @@
+{# Макросы списков раздела «Документы ОПиУ»: склонение, пилюля фильтра, скрытые поля формы. #}
+{% macro plural(n, one, few, many) %}{{ n % 10 == 1 and n % 100 != 11 ? one : (n % 10 in 2..4 and (n % 100 < 10 or n % 100 >= 20) ? few : many) }}{% endmacro %}
+{% macro pill(label, active, id) %}
+    <button type="button"
+            class="vf-ops-pill{{ active ? ' active' : '' }}"
+            id="{{ id }}"
+            data-bs-toggle="dropdown"
+            data-bs-offset="0,6"
+            aria-haspopup="true"
+            aria-expanded="false">
+        <span class="vf-ops-pill__label">{{ label }}</span>
+        <i class="ti ti-chevron-down" aria-hidden="true"></i>
+    </button>
+{% endmacro %}
+{% macro hidden(params) %}
+    {% for k, v in params %}
+        <input type="hidden" name="{{ k }}" value="{{ v }}">
+    {% endfor %}
+{% endmacro %}

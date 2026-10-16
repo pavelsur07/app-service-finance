@@ -1,0 +1,382 @@
+{% extends 'base.html.twig' %}
+{% block title %}Документы ОПиУ{% endblock %}
+{#
+  Общий макет вкладок «Документы ОПиУ» и «Операции»: шапка, вкладки, строка фильтров, чипсы,
+  пагинация и «Ещё фильтры». Вкладка задаёт route (имя роута списка), tab (index | operations)
+  и блоки list_totals, list_content, list_after. Параметры фильтров у вкладок одни — ссылка
+  вкладки переносит их как есть.
+#}
+{% block body %}
+{# Эталон — docs/design-system/screens/OperationsPnl.dc.html и pnl-refs/01–02; спецификация и разрыв с моделью —
+   docs/design-system/PNL-DOCUMENTS-SPEC.md; отчёт — docs/plan/ds-pnl-documents.md. Композиция и классы — «Операции ДДС».
+   Итог (totals) посчитан репозиторием по всей выборке фильтра, а не по странице. #}
+{% set route = route ?? 'document_index' %}
+{% set tab = tab ?? 'index' %}
+{% import 'document/_list_macros.html.twig' as ui %}
+
+{% set typeShortLabels = {
+    'DEAL_SALE': 'Сделка',
+    'PAYROLL': 'Зарплата',
+    'TAXES': 'Налоги',
+    'LOANS': 'Кредиты',
+    'OBLIGATIONS': 'Обязательства',
+    'ASSETS': 'Имущество',
+    'CASH': 'Касса',
+    'CASHFLOW_EXPENSE': 'Расход из ДДС',
+    'OTHER': 'Прочие'
+} %}
+{% set statusLabels = {
+    'DRAFT': 'Черновик',
+    'ACTIVE': 'Активен',
+    'INACTIVE': 'Неактивен',
+    'TO_DELETE': 'На удаление'
+} %}
+{% set directionLabels = {'income': 'Доходы', 'expense': 'Расходы'} %}
+{% set directionValue = filters.direction ? (filters.direction.value == 'INCOME' ? 'income' : 'expense') : null %}
+
+{# Параметры ссылок — нормализованные фильтры из DTO: мусор из адреса в ссылки не переносится.
+   page не входит — смена фильтра возвращает на первую страницу; limit — только нестандартный. #}
+{% set baseQuery = {
+    q: filters.q,
+    dateFrom: filters.dateFrom ? filters.dateFrom|date('Y-m-d') : null,
+    dateTo: filters.dateTo ? filters.dateTo|date('Y-m-d') : null,
+    direction: directionValue,
+    type: filters.type ? filters.type.value : null,
+    projectDirection: filters.projectDirectionId,
+    responsibilityCenter: filters.responsibilityCenterId,
+    status: filters.status ? filters.status.value : null,
+    number: filters.number,
+    counterparty: filters.counterparty,
+    category: filters.categoryId,
+    amountFrom: filters.amountFrom,
+    amountTo: filters.amountTo,
+    limit: limit != 20 ? limit : null,
+}|filter(v => v is not null) %}
+
+{% set project = filters.projectDirectionId ? projectDirections|filter(p => p.id == filters.projectDirectionId)|first : null %}
+{% set center = filters.responsibilityCenterId ? responsibilityCenters|filter(c => c.id == filters.responsibilityCenterId)|first : null %}
+{# Подписи пилюль — строки, а не вывод макроса: макрос отдаёт уже экранированный Markup, и после
+   склейки с префиксом «A&B» экранировался бы второй раз. #}
+{% set clipLen = 22 %}
+{# Родители — по parent уже загруженного дерева: p.children — ленивая коллекция, запрос на каждый проект. #}
+{% set parentProjectIds = projectDirections|filter(p => p.parent)|map(p => p.parent.id) %}
+{% set typeName = filters.type ? (typeShortLabels[filters.type.value] ?? filters.type.label()) : '' %}
+{% set projectName = project ? project.name : '' %}
+{% set centerName = center ? center.name : '' %}
+{% set category = filters.categoryId ? categories|filter(c => c.id == filters.categoryId)|first : null %}
+{% set categoryName = category ? category.name : '' %}
+{% set amountLabel = filters.amountFrom is not null and filters.amountTo is not null
+    ? filters.amountFrom|vf_money ~ ' — ' ~ filters.amountTo|vf_money
+    : (filters.amountFrom is not null ? 'от ' ~ filters.amountFrom|vf_money : (filters.amountTo is not null ? 'до ' ~ filters.amountTo|vf_money : '')) %}
+{% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) + (filters.counterparty ? 1 : 0) %}
+
+{% set presetsHtml %}{% include 'partials/_period_presets.html.twig' with {
+    route: route,
+    params: baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo']),
+    current_from: baseQuery.dateFrom ?? null,
+    current_to: baseQuery.dateTo ?? null,
+    class: 'vf-seg',
+} only %}{% endset %}
+{% set customRange = (filters.dateFrom or filters.dateTo) and 'aria-current="true"' not in (presetsHtml ~ '') %}
+{% set periodLabel = (filters.dateFrom ? filters.dateFrom|date('d.m.Y') : '…') ~ ' — ' ~ (filters.dateTo ? filters.dateTo|date('d.m.Y') : '…') %}
+
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Доходы и расходы</li>
+                <li class="breadcrumb-item active" aria-current="page">Документы ОПиУ</li>
+            </ol>
+        </nav>
+        <h1>Документы ОПиУ</h1>
+        <p class="vf-page-head__lead">Документы, из которых строится отчёт о прибылях и убытках. В одном документе может быть несколько операций: по разным статьям и проектам.</p>
+    </div>
+    <div class="btn-list d-print-none">
+        <a href="{{ path('document_operations_export_json') }}"
+           class="btn"
+           title="Скачать все операции документов ОПиУ в формате JSON"
+           download>
+            <i class="ti ti-download me-1" aria-hidden="true"></i>
+            Выгрузить JSON
+        </a>
+        <a href="{{ path('document_new') }}" class="btn btn-primary">
+            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+            Добавить документ
+        </a>
+    </div>
+</div>
+
+<div class="card vf-card vf-docs mb-4">
+    <div class="card-header">
+        {% include 'document/_tabs.html.twig' with {active: tab, query: baseQuery, count: tab == 'operations' ? totals.operations : totals.documents} only %}
+    </div>
+
+    <div class="vf-card-bar d-print-none">
+        <div class="vf-card-bar__row">
+            <form method="get" action="{{ path(route) }}" class="vf-search vf-docs__search" role="search">
+                {{ ui.hidden(baseQuery|filter((v, k) => k not in ['q'])) }}
+                <button type="submit" class="vf-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
+                <input type="search" name="q" value="{{ filters.q }}" class="form-control" placeholder="Описание, статья, № документа" aria-label="Поиск по описанию, статье, номеру и контрагенту">
+            </form>
+
+            {{ presetsHtml }}
+
+            <div class="dropdown">
+                <button type="button"
+                        class="btn vf-ops-range{{ customRange ? ' active' : '' }}"
+                        id="doc-pill-period"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,6"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        aria-label="Выбрать период{{ filters.dateFrom or filters.dateTo ? ': ' ~ periodLabel }}">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    {{ filters.dateFrom or filters.dateTo ? periodLabel : 'Выбрать период' }}
+                </button>
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" role="dialog" aria-labelledby="doc-pill-period">
+                    <form method="get" action="{{ path(route) }}">
+                        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo'])) }}
+                        <div class="vf-ops-pop__body vf-ops-pop__pair">
+                            <div>
+                                <label class="form-label" for="document-filter-date-from">Дата с</label>
+                                <input type="date" id="document-filter-date-from" name="dateFrom" value="{{ baseQuery.dateFrom ?? '' }}" class="form-control">
+                            </div>
+                            <div>
+                                <label class="form-label" for="document-filter-date-to">Дата по</label>
+                                <input type="date" id="document-filter-date-to" name="dateTo" value="{{ baseQuery.dateTo ?? '' }}" class="form-control">
+                            </div>
+                        </div>
+                        <div class="vf-ops-pop__footer">
+                            {% if filters.dateFrom or filters.dateTo %}
+                                <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['dateFrom', 'dateTo'])) }}" class="btn btn-link">Сбросить</a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-sm">Применить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="vf-card-bar__row">
+            {# Направление: на вкладке документов — документы с доходной (расходной) операцией,
+               на вкладке операций — операции этой природы. #}
+            <div class="vf-seg" role="group" aria-label="Направление">
+                {% for d in [{value: null, label: 'Все'}, {value: 'income', label: 'Доходы'}, {value: 'expense', label: 'Расходы'}] %}
+                    <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['direction'])|merge(d.value ? {direction: d.value} : {})) }}"
+                       {% if directionValue == d.value %}class="active" aria-current="true"{% endif %}>{{ d.label }}</a>
+                {% endfor %}
+            </div>
+
+            <span class="vf-caps-label vf-docs__pills-label">Фильтры</span>
+
+            <div class="dropdown">
+                {{ ui.pill(filters.type ? 'Тип: ' ~ (typeName|length > clipLen ? typeName|slice(0, clipLen - 1)|trim ~ '…' : typeName) : 'Тип', filters.type, 'doc-pill-type') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-type">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])) }}"{% if not filters.type %} aria-current="true"{% endif %}>Все типы</a>
+                        {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
+                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])|merge({type: documentType.value})) }}"{% if filters.type and filters.type.value == documentType.value %} aria-current="true"{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# Проект — у документа или у любой его операции (на вкладке операций — проект операции, иначе документа).
+               Родительские проекты не выбираются и в формах. #}
+            <div class="dropdown">
+                {{ ui.pill(project ? 'Проект: ' ~ (projectName|length > clipLen ? projectName|slice(0, clipLen - 1)|trim ~ '…' : projectName) : 'Проект', project, 'doc-pill-project') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-project">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])) }}"{% if not filters.projectDirectionId %} aria-current="true"{% endif %}>Все проекты</a>
+                        {% for p in projectDirections %}
+                            {# Родительский проект документу не назначается (в формах он disabled): выбор дал бы пустой список. #}
+                            {% if p.id not in parentProjectIds %}
+                                <a class="dropdown-item vf-ops-lvl-{{ min(p.level, 5) }}" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])|merge({projectDirection: p.id})) }}"{% if filters.projectDirectionId == p.id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+                            {% else %}
+                                <span class="dropdown-header vf-ops-lvl-{{ min(p.level, 5) }}">{{ p.name }}</span>
+                            {% endif %}
+                        {% else %}
+                            <div class="vf-ops-pop__empty">Проектов нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# ЦФО — как проект. В списке — активные ЦФО компании. #}
+            <div class="dropdown">
+                {{ ui.pill(center ? 'ЦФО: ' ~ (centerName|length > clipLen ? centerName|slice(0, clipLen - 1)|trim ~ '…' : centerName) : 'ЦФО', center or filters.responsibilityCenterId, 'doc-pill-center') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-center">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['responsibilityCenter'])) }}"{% if not filters.responsibilityCenterId %} aria-current="true"{% endif %}>Все ЦФО</a>
+                        {% for c in responsibilityCenters %}
+                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['responsibilityCenter'])|merge({responsibilityCenter: c.id})) }}"{% if filters.responsibilityCenterId == c.id %} aria-current="true"{% endif %}>{{ c.name }}</a>
+                        {% else %}
+                            <div class="vf-ops-pop__empty">ЦФО нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# Статья — точное совпадение: операции заводятся и на родительские статьи (в форме они выбираются). #}
+            <div class="dropdown">
+                {{ ui.pill(category ? 'Статья: ' ~ (categoryName|length > clipLen ? categoryName|slice(0, clipLen - 1)|trim ~ '…' : categoryName) : 'Статья ОПиУ', filters.categoryId, 'doc-pill-category') }}
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-category">
+                    <div class="vf-ops-pop__list">
+                        <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['category'])) }}"{% if not filters.categoryId %} aria-current="true"{% endif %}>Все статьи</a>
+                        {% for c in categories %}
+                            <a class="dropdown-item vf-ops-lvl-{{ min(c.level, 5) }}" href="{{ path(route, baseQuery|filter((v, k) => k not in ['category'])|merge({category: c.id})) }}"{% if filters.categoryId == c.id %} aria-current="true"{% endif %}>{{ c.name }}</a>
+                        {% else %}
+                            <div class="vf-ops-pop__empty">Статей нет</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {# Сумма — по модулю суммы операции: сторно −150 попадает в «от 100». #}
+            <div class="dropdown">
+                <button type="button"
+                        class="vf-ops-pill{{ amountLabel ? ' active' : '' }}"
+                        id="doc-pill-amount"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,6"
+                        aria-haspopup="dialog"
+                        aria-expanded="false">
+                    <span class="vf-ops-pill__label">{{ amountLabel ? 'Сумма: ' ~ amountLabel : 'Сумма' }}</span>
+                    <i class="ti ti-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" role="dialog" aria-labelledby="doc-pill-amount">
+                    <form method="get" action="{{ path(route) }}">
+                        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['amountFrom', 'amountTo'])) }}
+                        <div class="vf-ops-pop__body vf-ops-pop__pair">
+                            <div>
+                                <label class="form-label" for="document-filter-amount-from">Сумма от, ₽</label>
+                                <input type="text" inputmode="decimal" id="document-filter-amount-from" name="amountFrom" value="{{ filters.amountFrom }}" class="form-control" autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="form-label" for="document-filter-amount-to">Сумма до, ₽</label>
+                                <input type="text" inputmode="decimal" id="document-filter-amount-to" name="amountTo" value="{{ filters.amountTo }}" class="form-control" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="vf-ops-pop__footer">
+                            {% if amountLabel %}
+                                <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['amountFrom', 'amountTo'])) }}" class="btn btn-link">Сбросить</a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-sm">Применить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <button type="button"
+                    class="vf-ops-pill{{ moreCount ? ' active' : '' }}"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#document-filters-offcanvas"
+                    aria-controls="document-filters-offcanvas">
+                <i class="ti ti-adjustments-horizontal" aria-hidden="true"></i>
+                Ещё фильтры
+                {% if moreCount %}
+                    <span class="vf-ops-filterbar__count">{{ moreCount }}<span class="visually-hidden"> применено</span></span>
+                {% endif %}
+            </button>
+        </div>
+    </div>
+
+    {% set chips = [
+        filters.q ? {label: 'Поиск: «' ~ filters.q ~ '»', keys: ['q']} : null,
+        filters.dateFrom or filters.dateTo ? {label: 'Период: ' ~ periodLabel, keys: ['dateFrom', 'dateTo']} : null,
+        directionValue ? {label: directionLabels[directionValue], keys: ['direction']} : null,
+        filters.type ? {label: 'Тип: ' ~ (typeShortLabels[filters.type.value] ?? filters.type.label()), keys: ['type']} : null,
+        filters.projectDirectionId ? {label: 'Проект: ' ~ (project ? project.name : 'не найден'), keys: ['projectDirection']} : null,
+        filters.responsibilityCenterId ? {label: 'ЦФО: ' ~ (center ? center.name : (responsibilityCenterNames[filters.responsibilityCenterId] ?? 'не найден')), keys: ['responsibilityCenter']} : null,
+        filters.categoryId ? {label: 'Статья: ' ~ (category ? category.name : 'не найдена'), keys: ['category']} : null,
+        amountLabel ? {label: 'Сумма: ' ~ amountLabel, keys: ['amountFrom', 'amountTo']} : null,
+        filters.status ? {label: 'Статус: ' ~ (statusLabels[filters.status.value] ?? filters.status.value), keys: ['status']} : null,
+        filters.number ? {label: 'Номер: ' ~ filters.number, keys: ['number']} : null,
+        filters.counterparty ? {label: 'Контрагент: ' ~ filters.counterparty, keys: ['counterparty']} : null,
+    ]|filter(c => c) %}
+    {% if chips is not empty %}
+        <div class="vf-applied">
+            <span class="vf-caps-label">Применено</span>
+            {% for chip in chips %}
+                <span class="vf-chip">
+                    {{ chip.label }}
+                    <a href="{{ path(route, baseQuery|filter((v, k) => k not in chip.keys)) }}" aria-label="Снять фильтр «{{ chip.label }}»"><i class="ti ti-x" aria-hidden="true"></i></a>
+                </span>
+            {% endfor %}
+            <a href="{{ path(route, limit != 20 ? {limit: limit} : {}) }}" class="small fw-medium">Сбросить всё</a>
+        </div>
+    {% endif %}
+
+
+    {% block list_totals %}{% endblock %}
+
+    {% block list_content %}{% endblock %}
+
+    <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
+        <form method="get" id="document-limit-form" class="d-flex align-items-center gap-2">
+            <label for="document-limit" class="form-label mb-0">Показывать по</label>
+            <select id="document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for option in [20, 30, 50] %}
+                    <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="page" value="1">
+            {# Смена размера страницы не сбрасывает фильтры: они уже нормализованы и без пустых значений. #}
+            {{ ui.hidden(baseQuery|filter((v, k) => k not in ['limit'])) }}
+        </form>
+        <div class="ms-md-auto w-100 w-md-auto">
+            {% include 'partials/_pagination.html.twig' with { pager: pager, route: route, params: baseQuery|merge({'limit': limit}) } %}
+        </div>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end vf-ops-filters" tabindex="-1" id="document-filters-offcanvas" aria-labelledby="document-filters-offcanvas-label">
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="document-filters-offcanvas-label">Ещё фильтры</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+    </div>
+    <form method="get" class="offcanvas-body" action="{{ path(route) }}">
+        {# Остальные фильтры страницы форма несёт скрытыми полями: «Применить» не сбрасывает их. #}
+        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}
+        <div class="vf-ops-filters__scroll">
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-type">Тип</label>
+                <select id="document-filter-type" name="type" class="form-select">
+                    <option value="">Все</option>
+                    {# Список ведётся от самого enum: тип, добавленный в DocumentType,
+                       обязан появиться и здесь, иначе отфильтровать его через интерфейс нельзя. #}
+                    {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
+                        <option value="{{ documentType.value }}" {% if filters.type and filters.type.value == documentType.value %}selected{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-status">Статус</label>
+                <select id="document-filter-status" name="status" class="form-select">
+                    <option value="">Все</option>
+                    {% for value, label in statusLabels %}
+                        <option value="{{ value }}" {% if filters.status and filters.status.value == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-number">Номер документа</label>
+                <input type="text" id="document-filter-number" name="number" value="{{ filters.number }}" class="form-control">
+            </div>
+            <div class="vf-ops-filters__section">
+                <label class="form-label" for="document-filter-counterparty">Контрагент</label>
+                <input type="text" id="document-filter-counterparty" name="counterparty" value="{{ filters.counterparty }}" class="form-control">
+                <div class="vf-ops-filters__hint">{{ tab == 'operations' ? 'Часть названия контрагента операции, а если его нет — документа' : 'Часть названия контрагента документа' }}</div>
+            </div>
+        </div>
+        <div class="vf-ops-filters__footer">
+            <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}" class="btn btn-link">Сбросить</a>
+            <button type="submit" class="btn btn-primary">Применить</button>
+        </div>
+    </form>
+</div>
+
+{% block list_after %}{% endblock %}
+{% endblock %}
