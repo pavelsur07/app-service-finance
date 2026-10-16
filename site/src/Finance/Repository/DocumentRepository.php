@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Finance\Repository;
 
+use App\Finance\DTO\DocumentCurrencyTotalsDTO;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
@@ -40,6 +42,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->addSelect('opCategory')
             ->addSelect('opProject')
             ->addSelect('opCounterparty')
+            ->addSelect('ct')
             ->leftJoin('d.projectDirection', 'pd')
             ->leftJoin('d.operations', 'op')
             ->leftJoin('op.category', 'opCategory')
@@ -58,33 +61,84 @@ class DocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Итог по всей выборке фильтра, а не по странице: число документов и операций,
-     * доход, расход и результат. Знак операции задаёт `flow` её статьи (сумма в БД
-     * без знака); операция без статьи или со статьёй `NONE` в суммы не входит, но
-     * считается в числе операций — так же считает строка списка.
+     * Итог по всей выборке фильтра, а не по странице: число документов и операций, доход,
+     * расход и результат — отдельно по валютам (документ из операции ДДС переносит её сумму
+     * без пересчёта; ручной — в рублях). Правила — как у регистра ОПиУ и DocumentPlContribution:
+     * операция без статьи не входит; природа — flow статьи, у статьи NONE — знак суммы;
+     * обычный документ — модуль каждой операции; marketplace_pl (списание «−», сторно «+») —
+     * модуль суммы статьи. Регистр сворачивает marketplace_pl по дню, проекту и ЦФО, здесь —
+     * по документу: итог списка — сумма строк, которые видит пользователь.
      *
      * Компания — отдельным параметром: ограничение берётся из него, а не из DTO.
      */
     public function summarizeByCompany(string $companyId, DocumentListDTO $dto): DocumentListTotalsDTO
     {
-        $row = $this->createFilteredQueryBuilder($companyId, $dto)
-            ->select('COUNT(DISTINCT d.id) AS documents')
+        $isIncome = '(sumCategory.flow = :income OR (sumCategory.flow = :none AND sumOp.amount > 0))';
+        $isExpense = '(sumCategory.flow = :expense OR (sumCategory.flow = :none AND sumOp.amount < 0))';
+
+        /** @var list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain */
+        $plain = $this->createFilteredQueryBuilder($companyId, $dto)
+            ->select("COALESCE(ct.currency, 'RUB') AS currency")
+            ->addSelect('COUNT(DISTINCT d.id) AS documents')
             ->addSelect('COUNT(sumOp.id) AS operations')
-            ->addSelect('COALESCE(SUM(CASE WHEN sumCategory.flow = :income THEN sumOp.amount ELSE 0 END), 0) AS incomeTotal')
-            ->addSelect('COALESCE(SUM(CASE WHEN sumCategory.flow = :expense THEN sumOp.amount ELSE 0 END), 0) AS expenseTotal')
+            ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS incomeTotal', $isIncome))
+            ->addSelect(sprintf('SUM(CASE WHEN d.type <> :marketplace AND %s THEN ABS(sumOp.amount) ELSE 0 END) AS expenseTotal', $isExpense))
             ->leftJoin('d.operations', 'sumOp')
             ->leftJoin('sumOp.category', 'sumCategory')
+            ->groupBy('currency')
             ->setParameter('income', PLFlow::INCOME)
             ->setParameter('expense', PLFlow::EXPENSE)
+            ->setParameter('none', PLFlow::NONE)
+            ->setParameter('marketplace', DocumentType::MARKETPLACE_PL)
             ->getQuery()
-            ->getSingleResult();
+            ->getScalarResult();
 
-        return new DocumentListTotalsDTO(
-            documents: (int) $row['documents'],
-            operations: (int) $row['operations'],
-            income: (string) $row['incomeTotal'],
-            expense: (string) $row['expenseTotal'],
-        );
+        /** @var list<array{currency: string, bucket: string, signedTotal: string}> $marketplace */
+        $marketplace = $this->createFilteredQueryBuilder($companyId, $dto)
+            ->select("COALESCE(ct.currency, 'RUB') AS currency")
+            ->addSelect(sprintf("CASE WHEN %s THEN 'INCOME' ELSE 'EXPENSE' END AS bucket", $isIncome))
+            ->addSelect('SUM(sumOp.amount) AS signedTotal')
+            ->innerJoin('d.operations', 'sumOp')
+            ->innerJoin('sumOp.category', 'sumCategory')
+            ->andWhere('d.type = :marketplace')
+            ->andWhere(sprintf('(%s OR %s)', $isIncome, $isExpense))
+            ->groupBy('d.id')
+            ->addGroupBy('sumCategory.id')
+            ->addGroupBy('bucket')
+            ->addGroupBy('currency')
+            ->setParameter('income', PLFlow::INCOME)
+            ->setParameter('expense', PLFlow::EXPENSE)
+            ->setParameter('none', PLFlow::NONE)
+            ->setParameter('marketplace', DocumentType::MARKETPLACE_PL)
+            ->getQuery()
+            ->getScalarResult();
+
+        $documents = 0;
+        $operations = 0;
+        /** @var array<string, array{income: string, expense: string}> $byCurrency */
+        $byCurrency = [];
+        foreach ($plain as $row) {
+            $documents += (int) $row['documents'];
+            $operations += (int) $row['operations'];
+            $byCurrency[$row['currency']] = [
+                'income' => bcadd((string) ($row['incomeTotal'] ?? '0'), '0', 2),
+                'expense' => bcadd((string) ($row['expenseTotal'] ?? '0'), '0', 2),
+            ];
+        }
+        foreach ($marketplace as $row) {
+            $key = 'INCOME' === $row['bucket'] ? 'income' : 'expense';
+            $sum = (string) $row['signedTotal'];
+            $abs = -1 === bccomp($sum, '0', 2) ? bcmul($sum, '-1', 2) : $sum;
+            $byCurrency[$row['currency']] ??= ['income' => '0.00', 'expense' => '0.00'];
+            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $abs, 2);
+        }
+
+        $currencies = [];
+        foreach ($byCurrency as $currency => $sums) {
+            $currencies[] = new DocumentCurrencyTotalsDTO($currency, $sums['income'], $sums['expense']);
+        }
+
+        return new DocumentListTotalsDTO($documents, $operations, $currencies);
     }
 
     /**
@@ -97,6 +151,8 @@ class DocumentRepository extends ServiceEntityRepository
     {
         $queryBuilder = $this->createQueryBuilder('d')
             ->leftJoin('d.counterparty', 'cp')
+            // Валюта документа — валюта его основания ДДС: нужна строкам списка и итогу.
+            ->leftJoin('d.cashTransaction', 'ct')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NULL')
             ->setParameter('companyId', $companyId);

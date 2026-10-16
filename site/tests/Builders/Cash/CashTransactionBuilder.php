@@ -86,6 +86,14 @@ final class CashTransactionBuilder
         return $clone;
     }
 
+    public function withCurrency(string $currency): self
+    {
+        $clone = clone $this;
+        $clone->currency = $currency;
+
+        return $clone;
+    }
+
     public function withAllocatedAmount(string $allocatedAmount): self
     {
         $clone = clone $this;

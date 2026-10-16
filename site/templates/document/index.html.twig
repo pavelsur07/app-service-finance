@@ -264,6 +264,10 @@
             <span class="vf-docs__total">Расходы <strong>{{ totals.expense|vf_amount }}</strong></span>
             {# DS-Money: красный для сумм не используется — отрицательный результат несёт знак «−». #}
             <span class="vf-docs__total vf-docs__total--result">Результат <strong>{{ totals.result|vf_amount }} ₽</strong></span>
+            {# Документы из операций ДДС в валюте несут её сумму без пересчёта: в рубли не складываются (DS-Money, «в том числе в валюте»). #}
+            {% for other in totals.others %}
+                <span class="vf-docs__total vf-docs__other">в валюте {{ other.currency }}: доходы {{ other.income|vf_amount(currency: other.currency) }}, расходы {{ other.expense|vf_amount(currency: other.currency) }}, результат {{ other.result|vf_amount(currency: other.currency) }}</span>
+            {% endfor %}
         </div>
     {% endif %}
 
@@ -302,9 +306,10 @@
                     </tr>
                 </thead>
                 {% for item in items %}
-                    {# Знак операции задаёт flow статьи; без статьи операция в доход и расход не входит — как в итоге. #}
-                    {% set income = 0 %}
-                    {% set expense = 0 %}
+                    {# Доход и расход строки — DocumentPlContribution (правила регистра ОПиУ, как и у итога):
+                       без статьи операция не входит; у marketplace_pl — модуль суммы статьи. #}
+                    {% set contribution = contributions[item.id] %}
+                    {% set rowCurrency = contribution.currency %}
                     {% set categoryNames = [] %}
                     {% set projectNames = [] %}
                     {% set centerNames = [] %}
@@ -312,12 +317,6 @@
                     {% set uncategorized = 0 %}
                     {% for op in item.operations %}
                         {% set category = op.plCategory %}
-                        {% set flow = category ? category.flow.value : null %}
-                        {% if flow == 'INCOME' %}
-                            {% set income = income + op.amount %}
-                        {% elseif flow == 'EXPENSE' %}
-                            {% set expense = expense + op.amount %}
-                        {% endif %}
                         {% if category %}
                             {% set categoryNames = categoryNames|merge([category.name]) %}
                         {% else %}
@@ -339,7 +338,6 @@
                     {% set projectNames = projectNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
                     {% set centerNames = centerNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
                     {% set counterpartyNames = counterpartyNames|reduce((carry, v) => v in carry ? carry : carry|merge([v]), []) %}
-                    {% set total = income - expense %}
                     {% set opCount = item.operations|length %}
                     {% set statusValue = item.status.value %}
                     {% set deleteLabel = item.number ? '№ ' ~ item.number : (item.description ?: 'Выбранный документ') %}
@@ -390,9 +388,9 @@
                                 {% if centerText %}<div class="vf-sub">{{ centerText }}</div>{% endif %}
                             </td>
                             <td class="vf-docs-col-meta">{{ counterpartyText ?? '—' }}</td>
-                            <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
-                            <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
-                            <td class="text-end text-nowrap vf-doc__total">{{ total ? total|vf_amount : '—' }}</td>
+                            <td class="text-end text-nowrap">{{ contribution.income != '0.00' ? contribution.income|vf_amount(2, 'income', currency: rowCurrency) : '—' }}</td>
+                            <td class="text-end text-nowrap">{{ contribution.expense != '0.00' ? contribution.expense|vf_amount(currency: rowCurrency) : '—' }}</td>
+                            <td class="text-end text-nowrap vf-doc__total">{{ contribution.result != '0.00' ? contribution.result|vf_amount(currency: rowCurrency) : '—' }}</td>
                             <td class="vf-actions text-end">
                                 <div class="dropdown">
                                     <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с документом {{ deleteLabel }}">
@@ -431,7 +429,8 @@
                         {% if opCount > 1 %}
                             {% for op in item.operations %}
                                 {% set category = op.plCategory %}
-                                {% set flow = category ? category.flow.value : null %}
+                                {% set share = contribution.operations[op.id] ?? null %}
+                                {% set flow = share ? share.nature : null %}
                                 {% set opProject = op.projectDirection ?? item.projectDirection %}
                                 {% set opCenterId = op.responsibilityCenterId ?? item.responsibilityCenterId %}
                                 {% set opCenter = opCenterId ? (responsibilityCenterNames[opCenterId] ?? 'ЦФО не найден') : null %}
@@ -453,9 +452,9 @@
                                         {% if opCenter %}<div class="vf-sub">{{ opCenter }}</div>{% endif %}
                                     </td>
                                     <td class="vf-docs-col-meta">{{ opCounterparty ? (opCounterparty.displayName ?? opCounterparty.name) : '—' }}</td>
-                                    <td class="text-end text-nowrap">{{ flow == 'INCOME' ? op.amount|vf_amount(2, 'income') : '' }}</td>
-                                    <td class="text-end text-nowrap">{{ flow == 'EXPENSE' ? op.amount|vf_amount : '' }}</td>
-                                    <td class="text-end text-nowrap">{% if flow not in ['INCOME', 'EXPENSE'] %}<span class="vf-sub" title="Без статьи доходов или расходов операция в итог не входит">{{ op.amount|vf_amount }}</span>{% endif %}</td>
+                                    <td class="text-end text-nowrap">{{ flow == 'INCOME' ? share.amount|vf_amount(2, 'income', currency: rowCurrency) : '' }}</td>
+                                    <td class="text-end text-nowrap">{{ flow == 'EXPENSE' ? share.amount|vf_amount(currency: rowCurrency) : '' }}</td>
+                                    <td class="text-end text-nowrap">{% if not share %}<span class="vf-sub" title="Без статьи операция в итог не входит">{{ op.amount|vf_amount(currency: rowCurrency) }}</span>{% endif %}</td>
                                     <td></td>
                                 </tr>
                             {% endfor %}

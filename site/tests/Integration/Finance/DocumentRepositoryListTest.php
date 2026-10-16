@@ -12,8 +12,11 @@ use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Repository\DocumentRepository;
+use App\Tests\Builders\Cash\CashTransactionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -131,23 +134,60 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         self::assertSame('1501.25', $totals->result);
     }
 
-    public function testTotalsSkipOperationsWithoutIncomeOrExpenseCategory(): void
+    /**
+     * Как регистр ОПиУ: без статьи — не входит; статья без flow (NONE) — по знаку суммы.
+     */
+    public function testTotalsFollowRegisterRulesForUncategorizedAndNoneFlow(): void
     {
         $this->persistDocument('MIXED', operations: [
             [$this->revenue, '91079.35'],
             [$this->rent, '1820.00'],
             [null, '500.00'],
             [$this->neutral, '700.00'],
+            [$this->neutral, '-30.00'],
         ]);
         $this->persistDocument('EMPTY');
 
         $totals = $this->repository->summarizeByCompany((string) $this->company->getId(), $this->dto());
 
         self::assertSame(2, $totals->documents);
-        self::assertSame(4, $totals->operations);
-        self::assertSame('91079.35', $totals->income);
-        self::assertSame('1820.00', $totals->expense);
-        self::assertSame('89259.35', $totals->result);
+        self::assertSame(5, $totals->operations);
+        self::assertSame('91779.35', $totals->income);
+        self::assertSame('1850.00', $totals->expense);
+        self::assertSame('89929.35', $totals->result);
+    }
+
+    /**
+     * marketplace_pl: списание −X, сторно +X — взаимозачёт внутри статьи, модуль от итога.
+     */
+    public function testMarketplaceChargesAndStornoNetWithinCategory(): void
+    {
+        $this->persistDocument('MP', type: DocumentType::MARKETPLACE_PL, operations: [
+            [$this->rent, '-100.00'],
+            [$this->rent, '20.00'],
+            [$this->revenue, '500.00'],
+        ]);
+
+        $totals = $this->repository->summarizeByCompany((string) $this->company->getId(), $this->dto());
+
+        self::assertSame('500.00', $totals->income);
+        self::assertSame('80.00', $totals->expense);
+        self::assertSame('420.00', $totals->result);
+    }
+
+    public function testCurrenciesAreNotSummedTogether(): void
+    {
+        $this->persistDocument('RUB-MANUAL', operations: [[$this->revenue, '100.00']]);
+        $this->persistDocument('USD-BASE', currency: 'USD', operations: [[$this->revenue, '100.00'], [$this->rent, '30.00']]);
+
+        $totals = $this->repository->summarizeByCompany((string) $this->company->getId(), $this->dto());
+
+        self::assertSame(2, $totals->documents);
+        self::assertSame('100.00', $totals->income);
+        self::assertCount(1, $totals->others());
+        self::assertSame('USD', $totals->others()[0]->currency);
+        self::assertSame('100.00', $totals->others()[0]->income);
+        self::assertSame('70.00', $totals->others()[0]->result);
     }
 
     public function testNegativeResult(): void
@@ -283,8 +323,18 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         ?ProjectDirection $project = null,
         ?string $responsibilityCenterId = null,
         array $operations = [],
+        DocumentType $type = DocumentType::OTHER,
+        ?string $currency = null,
     ): Document {
         $document = new Document(Uuid::uuid4()->toString(), $company ?? $this->company);
+        $document->setType($type);
+        if (null !== $currency) {
+            $account = MoneyAccountBuilder::aMoneyAccount()->withId(Uuid::uuid4()->toString())->forCompany($company ?? $this->company)->withCurrency($currency)->build();
+            $transaction = CashTransactionBuilder::aCashTransaction()->withId(Uuid::uuid4()->toString())->forCompany($company ?? $this->company)->withMoneyAccount($account)->withAmount('1000.00')->withCurrency($currency)->build();
+            $this->em->persist($account);
+            $this->em->persist($transaction);
+            $document->setCashTransaction($transaction);
+        }
         $document->setNumber($number);
         $document->setDescription($description);
         $document->setDate(new \DateTimeImmutable('2026-10-08'));

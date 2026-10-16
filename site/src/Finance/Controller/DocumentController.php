@@ -11,6 +11,7 @@ use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Application\RestoreDocumentAction;
+use App\Finance\Application\Service\DocumentPlContribution;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PlNatureResolver;
 use App\Finance\Application\Service\PLRegisterUpdater;
@@ -54,6 +55,7 @@ class DocumentController extends AbstractController
         PlNatureResolver $natureResolver,
         CompanyFacade $companyFacade,
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+        DocumentPlContribution $plContribution,
     ): Response {
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -79,10 +81,12 @@ class DocumentController extends AbstractController
         $items = iterator_to_array($pager->getCurrentPageResults());
 
         $documentNatures = [];
+        $contributions = [];
         $responsibilityCenterIds = [];
         foreach ($items as $item) {
             $id = $item->getId() ?? spl_object_hash($item);
             $documentNatures[$id] = $this->buildNatureView($natureResolver->forDocument($item));
+            $contributions[$id] = $plContribution->forDocument($item);
             $responsibilityCenterIds[] = $item->getResponsibilityCenterId();
             foreach ($item->getOperations() as $operation) {
                 $responsibilityCenterIds[] = $operation->getResponsibilityCenterId();
@@ -92,6 +96,7 @@ class DocumentController extends AbstractController
         return $this->render('document/index.html.twig', [
             'items' => $items,
             'documentNatures' => $documentNatures,
+            'contributions' => $contributions,
             'pager' => $pager,
             'limit' => $pager->getMaxPerPage(),
             'filters' => $filters,
