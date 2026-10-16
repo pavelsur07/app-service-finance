@@ -120,7 +120,7 @@ final class DocumentEditPageTest extends WebTestCaseBase
         $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
         $client->submit($crawler->selectButton('Сохранить')->form(), ['document[operations][0][comment]' => 'Новый комментарий']);
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
         $this->em()->clear();
         $reloaded = $this->em()->find(Document::class, $document->getId());
         self::assertInstanceOf(Document::class, $reloaded);

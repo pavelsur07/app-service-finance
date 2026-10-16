@@ -9,9 +9,11 @@ use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Finance\Application\Service\DocumentPlContribution;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Infrastructure\Http\DocumentListState;
 use App\Finance\Repository\DocumentOperationRepository;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,6 +34,7 @@ final class DocumentOperationIndexController extends AbstractController
         private readonly CompanyFacade $companyFacade,
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         private readonly PLCategoryRepository $categoryRepository,
+        private readonly DocumentListState $listState,
     ) {
     }
 
@@ -44,7 +47,13 @@ final class DocumentOperationIndexController extends AbstractController
         $companyId = (string) $company->getId();
         $filters = DocumentListDTO::fromQuery($company, $request->query);
 
-        $pager = $this->operationRepository->paginateForList($companyId, $filters);
+        try {
+            $pager = $this->operationRepository->paginateForList($companyId, $filters);
+        } catch (OutOfRangeCurrentPageException) {
+            // Запомненная страница могла опустеть после удаления — фильтры сохраняются, страница первая.
+            return $this->redirectToRoute('document_operation_index', array_diff_key($request->query->all(), ['page' => true]));
+        }
+        $this->listState->remember($companyId, 'document_operation_index', $request->query);
         /** @var list<DocumentOperation> $items */
         $items = array_values(iterator_to_array($pager->getCurrentPageResults()));
 

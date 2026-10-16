@@ -106,7 +106,7 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
 
         $client->submitForm('Сохранить');
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
         $client->followRedirect();
 
         $documents = $em->getRepository(Document::class)->findBy(['company' => $company]);

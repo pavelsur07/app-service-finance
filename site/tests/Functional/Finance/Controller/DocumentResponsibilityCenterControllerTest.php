@@ -28,7 +28,7 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
 
         $this->submitDocumentForm($client, '/documents/new', $graph);
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
 
         /** @var Document $document */
         $document = $em->getRepository(Document::class)->findOneBy(['number' => 'DOC-default']);
@@ -96,7 +96,7 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
             ),
         ]);
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
 
         $em->clear();
         /** @var Document $reloaded */

@@ -90,7 +90,7 @@
         <nav aria-label="Путь">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item">Доходы и расходы</li>
-                <li class="breadcrumb-item"><a href="{{ path('document_index') }}">Документы ОПиУ</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('document_list_resume') }}">Документы ОПиУ</a></li>
                 <li class="breadcrumb-item active" aria-current="page">{{ isEdit ? (doc.number ? '№ ' ~ doc.number : 'Документ') : 'Новый' }}</li>
             </ol>
         </nav>
@@ -247,7 +247,7 @@
 <div class="vf-docform-footer d-print-none">
     <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Изменений нет' : 'Заполните документ и сохраните') }}</span>
     <div class="btn-list">
-        <a class="btn" href="{{ path('document_index') }}">Отмена</a>
+        <a class="btn" href="{{ path('document_list_resume') }}">Отмена</a>
         <button type="submit" class="btn btn-primary">Сохранить</button>
     </div>
 </div>

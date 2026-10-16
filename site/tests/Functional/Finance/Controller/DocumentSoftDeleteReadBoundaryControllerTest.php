@@ -159,7 +159,7 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
 
         $client->request('POST', (string) $deleteAction, ['_token' => $deleteToken]);
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
         self::assertTrue($this->reloadDocument((string) $document->getId())->isDeleted());
     }
 
@@ -176,7 +176,7 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
             '_token' => $this->csrfToken($client, 'delete'.$documentId),
         ]);
 
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
         $deleted = $this->reloadDocument($documentId);
         self::assertTrue($deleted->isDeleted());
         self::assertSame($user->getId(), $deleted->getDeletedBy());
@@ -208,7 +208,7 @@ final class DocumentSoftDeleteReadBoundaryControllerTest extends WebTestCaseBase
 
         $this->loginWithActiveCompany($client, $user, $company);
         $client->request('POST', sprintf('/documents/%s/delete', $activeId), ['_token' => 'invalid']);
-        self::assertResponseRedirects('/documents/');
+        self::assertResponseRedirects('/documents/resume');
         self::assertFalse($this->reloadDocument($activeId)->isDeleted());
 
         $client->request('POST', sprintf('/documents/%s/restore', $deletedId), ['_token' => 'invalid']);

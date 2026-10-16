@@ -22,11 +22,13 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\PlNature;
 use App\Finance\Form\DocumentType;
+use App\Finance\Infrastructure\Http\DocumentListState;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -57,11 +59,18 @@ class DocumentController extends AbstractController
         FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         DocumentPlContribution $plContribution,
         PLCategoryRepository $categoryRepository,
+        DocumentListState $listState,
     ): Response {
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
         $filters = DocumentListDTO::fromQuery($company, $request->query);
-        $pager = $repo->findByCompany($filters);
+        try {
+            $pager = $repo->findByCompany($filters);
+        } catch (OutOfRangeCurrentPageException) {
+            // Запомненная страница могла опустеть после удаления — фильтры сохраняются, страница первая.
+            return $this->redirectToRoute('document_index', array_diff_key($request->query->all(), ['page' => true]));
+        }
+        $listState->remember($companyId, 'document_index', $request->query);
         $items = iterator_to_array($pager->getCurrentPageResults());
 
         $documentNatures = [];
@@ -147,7 +156,7 @@ class DocumentController extends AbstractController
 
                 $this->plRegisterUpdater->updateForDocument($document);
 
-                return $this->redirectToRoute('document_index');
+                return $this->redirectToRoute('document_list_resume');
             }
         }
 
@@ -200,7 +209,7 @@ class DocumentController extends AbstractController
 
                 $this->plRegisterUpdater->updateForDocument($copy);
 
-                return $this->redirectToRoute('document_index');
+                return $this->redirectToRoute('document_list_resume');
             }
         }
 
@@ -319,7 +328,7 @@ class DocumentController extends AbstractController
                         $this->plRegisterUpdater->recalcRange($company, $day, $day);
                     }
 
-                    return $this->redirectToRoute('document_index');
+                    return $this->redirectToRoute('document_list_resume');
                 }
             }
         }
@@ -414,7 +423,7 @@ class DocumentController extends AbstractController
             $this->addFlash('danger', 'Неверный CSRF токен.');
         }
 
-        return $this->redirectToRoute('document_index');
+        return $this->redirectToRoute('document_list_resume');
     }
 
     #[Route('/{id}/restore', name: 'document_restore', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
