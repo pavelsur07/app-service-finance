@@ -7,21 +7,28 @@
 import { createListbox, createSearch, positionPortal } from './picker_core.js';
 
 const LOCAL_LIMIT = 20;
+// Окно browse не уже поповера пилюли: в узкой ячейке строки операции название не читалось бы.
+const BROWSE_MIN_WIDTH = 360;
 
 /**
  * @param {object} parts   select, input, searchWrap, clearButton — элементы поля
  * @param {object} options searchUrl, minQuery, adapter, rowFromOption(option),
- *                         labelFromOption(option), searchTextFromOption(option)?, texts {invalid, stale}
+ *                         labelFromOption(option), searchTextFromOption(option)?, texts {invalid, stale},
+ *                         browse? — окно как у пилюли фильтра: до ввода выбранный и первые
+ *                         LOCAL_LIMIT неархивных из <option>, группы и иконки адаптера,
+ *                         hint? — подсказка над списком до ввода
  */
 export function initPickerField(root, parts, options) {
     const { select, input, searchWrap, clearButton } = parts;
     const { searchUrl, minQuery, adapter, rowFromOption, labelFromOption, texts } = options;
     const searchTextFromOption = options.searchTextFromOption ?? labelFromOption;
+    const browse = Boolean(options.browse);
 
     // Портал: список живёт в body, а не внутри блока формы (см. positionPortal).
     const portal = document.createElement('div');
     portal.className = 'vf-pick-portal';
     portal.hidden = true;
+    portal.classList.toggle('vf-pick-portal--browse', browse);
     document.body.appendChild(portal);
 
     let lastQuery = '';
@@ -51,10 +58,15 @@ export function initPickerField(root, parts, options) {
 
     const isOpen = () => !portal.hidden;
 
+    // browse: окно по ширине всей группы поля (с кнопками), но не уже BROWSE_MIN_WIDTH.
+    const place = () => (browse
+        ? positionPortal(portal, searchWrap, { minWidth: BROWSE_MIN_WIDTH })
+        : positionPortal(portal, input));
+
     const show = () => {
         portal.hidden = false;
         input.setAttribute('aria-expanded', 'true');
-        positionPortal(portal, input);
+        place();
     };
 
     const hide = () => {
@@ -103,10 +115,43 @@ export function initPickerField(root, parts, options) {
         hide();
     };
 
-    const listbox = createListbox(portal, input, { onChoose: choose });
+    const listbox = createListbox(portal, input, { onChoose: choose, grouped: browse, icons: browse });
+
+    // Подсказка над списком до ввода — как у пилюли; ядро кладёт список в начало портала.
+    const hint = browse && options.hint ? document.createElement('div') : null;
+    if (hint) {
+        hint.className = 'vf-pick-pop__hint';
+        hint.textContent = options.hint;
+        portal.prepend(hint);
+    }
+    const setHint = (visible) => {
+        if (hint) {
+            hint.hidden = !visible;
+        }
+    };
 
     const render = (items, query) => {
-        listbox.render(items, { query, emptyText: 'Ничего не найдено' });
+        setHint(false);
+        listbox.render(items, { query, selected: select.value, emptyText: 'Ничего не найдено' });
+        show();
+    };
+
+    // До ввода: выбранный первым (даже архивный — иначе выбор не виден), затем первые
+    // неархивные по порядку <option> (сервер отдаёт их по алфавиту).
+    const initialItems = () => {
+        const selected = select.options[select.selectedIndex];
+        const head = selected && '' !== selected.value ? [selected] : [];
+        const rest = Array.from(select.options)
+            .filter((option) => '' !== option.value && option !== selected && '1' !== option.dataset.archived)
+            .slice(0, LOCAL_LIMIT);
+
+        return head.concat(rest).map((option) => adapter(rowFromOption(option)));
+    };
+
+    const showInitial = () => {
+        search?.cancel();
+        setHint(true);
+        listbox.render(initialItems(), { selected: select.value });
         show();
     };
 
@@ -121,6 +166,7 @@ export function initPickerField(root, parts, options) {
             url: searchUrl,
             adapter,
             onLoading: () => {
+                setHint(false);
                 listbox.loading();
                 show();
             },
@@ -148,7 +194,11 @@ export function initPickerField(root, parts, options) {
         }
 
         if (query.length < minQuery) {
-            hide();
+            if (browse) {
+                showInitial();
+            } else {
+                hide();
+            }
 
             return;
         }
@@ -173,6 +223,13 @@ export function initPickerField(root, parts, options) {
             return;
         }
 
+        if (browse && !isOpen() && 'ArrowDown' === event.key) {
+            event.preventDefault();
+            showInitial();
+
+            return;
+        }
+
         listbox.handleKey(event);
     });
 
@@ -181,6 +238,31 @@ export function initPickerField(root, parts, options) {
 
         if (lastQuery.length >= minQuery && input.value.trim() === lastQuery && '' === select.value) {
             runSearch(lastQuery);
+
+            return;
+        }
+
+        // browse: фокус открывает список, подпись выбранного выделена — ввод её заменяет.
+        if (browse) {
+            input.select();
+            showInitial();
+        }
+    });
+
+    // browse открывается на фокусе, поэтому Tab к соседнему полю обязан его закрыть, иначе окно
+    // висит поверх формы. Без relatedTarget (клик по полосе прокрутки окна) не закрываем:
+    // клик мимо закрывает обработчик mousedown ниже.
+    input.addEventListener('blur', (event) => {
+        if (browse && event.relatedTarget && !portal.contains(event.relatedTarget)) {
+            search?.cancel();
+            hide();
+        }
+    });
+
+    // Клик по уже сфокусированному полю после Esc или выбора снова открывает список.
+    input.addEventListener('click', () => {
+        if (browse && !isOpen()) {
+            showInitial();
         }
     });
 
@@ -203,8 +285,8 @@ export function initPickerField(root, parts, options) {
 
     // Портал не двигается вместе с инпутом: пересчитываем позицию на скролле страницы,
     // прокрутке модалки (capture) и ресайзе.
-    window.addEventListener('scroll', () => isOpen() && positionPortal(portal, input), true);
-    window.addEventListener('resize', () => isOpen() && positionPortal(portal, input));
+    window.addEventListener('scroll', () => isOpen() && place(), true);
+    window.addEventListener('resize', () => isOpen() && place());
 
     // Свободный текст без выбора не уходит на сервер: значение поля — идентификатор,
     // а не введённая строка.

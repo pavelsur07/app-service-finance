@@ -36,10 +36,13 @@ function initOnePicker(root) {
         searchUrl: root.dataset.cpSearchUrl || '',
         minQuery: DEFAULT_MIN_QUERY,
         adapter: adapters.counterparty,
-        rowFromOption: (option) => ({ id: option.value, name: optionName(option), inn: option.dataset.inn || null, type: null }),
+        rowFromOption: (option) => ({ id: option.value, name: optionName(option), inn: option.dataset.inn || null, type: option.dataset.type || null }),
         labelFromOption: optionLabel,
         // Локальный поиск — и по показанному, и по сырому названию.
         searchTextFromOption: (option) => `${optionLabel(option)} ${option.dataset.rawName || ''}`,
+        // CounterpartyPickerType с browse: true — окно как у пилюли фильтра «Контрагент».
+        browse: '1' === root.dataset.cpBrowse,
+        hint: 'Начните вводить название или ИНН',
         texts: {
             invalid: 'Выберите контрагента из списка.',
             stale: 'Обновите страницу: контрагент появился после её открытия.',

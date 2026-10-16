@@ -43,11 +43,12 @@ final class CounterpartyPickerType extends AbstractType
     }
 
     /**
-     * @param array{allow_create: bool, search_url: string|null, counterparty_choices: list<CounterpartyChoiceDTO>} $options
+     * @param array{allow_create: bool, browse: bool, search_url: string|null, counterparty_choices: list<CounterpartyChoiceDTO>} $options
      */
     public function buildView(FormView $view, FormInterface $form, array $options): void
     {
         $view->vars['allow_create'] = $options['allow_create'];
+        $view->vars['browse'] = $options['browse'];
         $view->vars['search_url'] = $options['search_url'];
         $view->vars['counterparties'] = $options['counterparty_choices'];
     }
@@ -60,16 +61,20 @@ final class CounterpartyPickerType extends AbstractType
         // форма выглядела рабочей, но выбранное значение исчезало.
         $resolver->setAllowedValues('company_id', static fn (string $companyId): bool => Uuid::isValid($companyId));
 
-        $resolver->setDefined(['keep_id', 'value_type', 'allow_create', 'search_url', 'counterparty_choices']);
+        $resolver->setDefined(['keep_id', 'value_type', 'allow_create', 'browse', 'search_url', 'counterparty_choices']);
         $resolver->setAllowedTypes('keep_id', ['string', 'null']);
         $resolver->setAllowedValues('value_type', ['id', 'entity']);
         $resolver->setAllowedTypes('allow_create', 'bool');
+        $resolver->setAllowedTypes('browse', 'bool');
         $resolver->setAllowedTypes('search_url', ['string', 'null']);
 
         $resolver->setDefaults([
             'keep_id' => null,
             'value_type' => 'id',
             'allow_create' => false,
+            // Окно выбора как у пилюли фильтра: список до ввода, группы по типу, иконки
+            // (docs/design-system/components/entity-picker.md). Стандарт для новых форм.
+            'browse' => false,
             'search_url' => null,
             'required' => false,
             'placeholder' => 'Без контрагента',
@@ -93,7 +98,7 @@ final class CounterpartyPickerType extends AbstractType
 
                 return static function (string $id) use ($byId): array {
                     if (!isset($byId[$id])) {
-                        return ['data-name' => '', 'data-raw-name' => '', 'data-inn' => ''];
+                        return ['data-name' => '', 'data-raw-name' => '', 'data-inn' => '', 'data-type' => ''];
                     }
                     $choice = $byId[$id];
 
@@ -102,7 +107,9 @@ final class CounterpartyPickerType extends AbstractType
                         // Сырое — для локального поиска поля, если API недоступен.
                         'data-raw-name' => $choice->name,
                         'data-inn' => $choice->inn ?? '',
-                    ];
+                        // Группа и иконка в окне выбора (адаптер counterparty в picker_core.js).
+                        'data-type' => $choice->type->value ?? '',
+                    ] + ($choice->isArchived ? ['data-archived' => '1'] : []);
                 };
             },
         ]);

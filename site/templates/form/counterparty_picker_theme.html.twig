@@ -21,6 +21,7 @@
          data-cp-picker
          data-cp-field-id="{{ fieldId }}"
          {% if searchUrl %}data-cp-search-url="{{ searchUrl }}"{% endif %}
+         {% if form.vars.browse|default(false) %}data-cp-browse="1"{% endif %}
     >
         {# Настоящий <select> остаётся в DOM: он же работает без JS, он же граница
            допустимых значений при submit, и существующие скрипты читают .value. #}

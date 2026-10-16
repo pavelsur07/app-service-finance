@@ -68,9 +68,10 @@ class DocumentOperationType extends AbstractType
             ])
             ->add('counterparty', CounterpartyPickerType::class, [
                 'company_id' => (string) $options['company']->getId(),
-                'keep_id' => $builder->getData()?->getCounterparty()?->getId(),
+                'keep_id' => $builder->getData()?->getCounterparty()?->getId() ?? $options['header_counterparty_id'],
                 'value_type' => 'entity',
                 'search_url' => '/api/counterparties/search',
+                'browse' => true,
                 'attr' => [
                     'data-operation-counterparty' => 'true',
                 ],
@@ -116,10 +117,12 @@ class DocumentOperationType extends AbstractType
             'categories' => [],
             'project_directions' => [],
             'extra_responsibility_center_ids' => [],
+            'header_counterparty_id' => null,
         ]);
         $resolver->setRequired('company');
         $resolver->setAllowedTypes('company', Company::class);
         $resolver->setAllowedTypes('extra_responsibility_center_ids', ['array']);
+        $resolver->setAllowedTypes('header_counterparty_id', ['string', 'null']);
     }
 
     /**
