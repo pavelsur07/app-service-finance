@@ -7,6 +7,7 @@ namespace App\Finance\Controller;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
+use App\Company\Facade\CounterpartyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
@@ -60,6 +61,7 @@ class DocumentController extends AbstractController
         DocumentPlContribution $plContribution,
         PLCategoryRepository $categoryRepository,
         DocumentListState $listState,
+        CounterpartyFacade $counterpartyFacade,
     ): Response {
         $company = $companyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -101,6 +103,8 @@ class DocumentController extends AbstractController
             'projectDirections' => $companyFacade->listProjectDirectionEntities($companyId, true),
             'responsibilityCenters' => $responsibilityCenterFacade->getActiveChoices($companyId),
             'categories' => $categoryRepository->findTreeByCompany($company),
+            // Пилюля «Контрагент»: неархивные плюс выбранный в фильтре (даже архивный) — как в ДДС.
+            'counterparties' => $counterpartyFacade->getSelectable($companyId, $filters->counterpartyId),
         ]);
     }
 

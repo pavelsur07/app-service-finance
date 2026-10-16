@@ -167,9 +167,9 @@ class DocumentRepository extends ServiceEntityRepository
                 ->setParameter('number', self::containsPattern($dto->number));
         }
 
-        if (null !== $dto->counterparty) {
-            $queryBuilder->andWhere('LOWER(cp.name) LIKE :counterparty')
-                ->setParameter('counterparty', self::containsPattern($dto->counterparty));
+        if (null !== $dto->counterpartyId) {
+            $queryBuilder->andWhere('IDENTITY(d.counterparty) = :counterpartyId')
+                ->setParameter('counterpartyId', $dto->counterpartyId);
         }
 
         if (null !== $dto->q) {

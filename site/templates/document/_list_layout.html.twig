@@ -46,7 +46,7 @@
     responsibilityCenter: filters.responsibilityCenterId,
     status: filters.status ? filters.status.value : null,
     number: filters.number,
-    counterparty: filters.counterparty,
+    counterpartyId: filters.counterpartyId,
     category: filters.categoryId,
     amountFrom: filters.amountFrom,
     amountTo: filters.amountTo,
@@ -68,7 +68,9 @@
 {% set amountLabel = filters.amountFrom is not null and filters.amountTo is not null
     ? filters.amountFrom|vf_money ~ ' — ' ~ filters.amountTo|vf_money
     : (filters.amountFrom is not null ? 'от ' ~ filters.amountFrom|vf_money : (filters.amountTo is not null ? 'до ' ~ filters.amountTo|vf_money : '')) %}
-{% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) + (filters.counterparty ? 1 : 0) %}
+{% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) %}
+{# Выбранный контрагент — из списка контроллера: туда он попадает и архивным. #}
+{% set filterCounterparty = filters.counterpartyId ? counterparties|filter(c => c.id == filters.counterpartyId)|first : null %}
 
 {% set presetsHtml %}{% include 'partials/_period_presets.html.twig' with {
     route: route,
@@ -233,6 +235,30 @@
                 </div>
             </div>
 
+            {# Контрагент — как в «Операциях ДДС» (transaction/_filter_bar.html.twig): окно выбора из справочника,
+               до ввода — применённый (даже архивный) и первые 20 неархивных по алфавиту, дальше поиск.
+               Фильтр — по контрагенту в шапке документа; на вкладке «Операции» — все операции таких документов. #}
+            {% include 'partials/_filter_pill_picker.html.twig' with {
+                id: 'doc-pill-counterparty',
+                name: 'counterpartyId',
+                label: 'Контрагент',
+                route: route,
+                params: baseQuery,
+                value: filters.counterpartyId ?? '',
+                valueLabel: filterCounterparty ? (filterCounterparty.displayName ?? filterCounterparty.name) : '',
+                searchUrl: path('api_counterparty_search'),
+                adapter: 'counterparty',
+                initial: (filterCounterparty ? [filterCounterparty] : [])
+                    |merge(counterparties|filter(c => not c.isArchived and c.id != filters.counterpartyId)|sort((a, b) => (a.displayName ?? a.name) <=> (b.displayName ?? b.name))|slice(0, 20))
+                    |map(c => {id: c.id, name: c.name, displayName: c.displayName, inn: c.inn, type: c.type ? c.type.value : null}),
+                emptyText: 'Никого не нашли. Проверьте название или ИНН.',
+                allLabel: 'Все контрагенты',
+                placeholder: 'Название или ИНН',
+                searchLabel: 'Найти контрагента по названию или ИНН',
+                dialogLabel: 'Фильтр по контрагенту',
+                hint: 'Начните вводить название или ИНН',
+            } only %}
+
             {# Сумма — по модулю суммы операции: сторно −150 попадает в «от 100». #}
             <div class="dropdown">
                 <button type="button"
@@ -291,10 +317,10 @@
         filters.projectDirectionId ? {label: 'Проект: ' ~ (project ? project.name : 'не найден'), keys: ['projectDirection']} : null,
         filters.responsibilityCenterId ? {label: 'ЦФО: ' ~ (center ? center.name : (responsibilityCenterNames[filters.responsibilityCenterId] ?? 'не найден')), keys: ['responsibilityCenter']} : null,
         filters.categoryId ? {label: 'Статья: ' ~ (category ? category.name : 'не найдена'), keys: ['category']} : null,
+        filters.counterpartyId ? {label: 'Контрагент: ' ~ (filterCounterparty ? (filterCounterparty.displayName ?? filterCounterparty.name) : 'не найден'), keys: ['counterpartyId']} : null,
         amountLabel ? {label: 'Сумма: ' ~ amountLabel, keys: ['amountFrom', 'amountTo']} : null,
         filters.status ? {label: 'Статус: ' ~ (statusLabels[filters.status.value] ?? filters.status.value), keys: ['status']} : null,
         filters.number ? {label: 'Номер: ' ~ filters.number, keys: ['number']} : null,
-        filters.counterparty ? {label: 'Контрагент: ' ~ filters.counterparty, keys: ['counterparty']} : null,
     ]|filter(c => c) %}
     {% if chips is not empty %}
         <div class="vf-applied">
@@ -339,7 +365,7 @@
     </div>
     <form method="get" class="offcanvas-body" action="{{ path(route) }}">
         {# Остальные фильтры страницы форма несёт скрытыми полями: «Применить» не сбрасывает их. #}
-        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}
+        {{ ui.hidden(baseQuery|filter((v, k) => k not in ['type', 'status', 'number'])) }}
         <div class="vf-ops-filters__scroll">
             <div class="vf-ops-filters__section">
                 <label class="form-label" for="document-filter-type">Тип</label>
@@ -365,14 +391,9 @@
                 <label class="form-label" for="document-filter-number">Номер документа</label>
                 <input type="text" id="document-filter-number" name="number" value="{{ filters.number }}" class="form-control">
             </div>
-            <div class="vf-ops-filters__section">
-                <label class="form-label" for="document-filter-counterparty">Контрагент</label>
-                <input type="text" id="document-filter-counterparty" name="counterparty" value="{{ filters.counterparty }}" class="form-control">
-                <div class="vf-ops-filters__hint">{{ tab == 'operations' ? 'Часть названия контрагента операции, а если его нет — документа' : 'Часть названия контрагента документа' }}</div>
-            </div>
         </div>
         <div class="vf-ops-filters__footer">
-            <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['type', 'status', 'number', 'counterparty'])) }}" class="btn btn-link">Сбросить</a>
+            <a href="{{ path(route, baseQuery|filter((v, k) => k not in ['type', 'status', 'number'])) }}" class="btn btn-link">Сбросить</a>
             <button type="submit" class="btn btn-primary">Применить</button>
         </div>
     </form>

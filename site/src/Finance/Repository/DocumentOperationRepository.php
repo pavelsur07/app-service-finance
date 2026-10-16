@@ -276,9 +276,10 @@ class DocumentOperationRepository extends ServiceEntityRepository
                 ->setParameter('number', self::containsPattern($dto->number));
         }
 
-        if (null !== $dto->counterparty) {
-            $queryBuilder->andWhere('LOWER(COALESCE(opCp.name, dCp.name)) LIKE :counterparty')
-                ->setParameter('counterparty', self::containsPattern($dto->counterparty));
+        // Как на вкладке документов — по шапке: все операции документа выбранного контрагента.
+        if (null !== $dto->counterpartyId) {
+            $queryBuilder->andWhere('IDENTITY(d.counterparty) = :counterpartyId')
+                ->setParameter('counterpartyId', $dto->counterpartyId);
         }
 
         if (null !== $dto->q) {

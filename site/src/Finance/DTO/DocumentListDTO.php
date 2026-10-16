@@ -27,7 +27,8 @@ class DocumentListDTO
     public readonly ?DocumentType $type;
     public readonly ?DocumentStatus $status;
     public readonly ?string $number;
-    public readonly ?string $counterparty;
+    /** Контрагент в шапке документа; контрагент операции фильтр не учитывает. */
+    public readonly ?string $counterpartyId;
     public readonly ?string $q;
     public readonly ?string $projectDirectionId;
     public readonly ?string $responsibilityCenterId;
@@ -47,7 +48,7 @@ class DocumentListDTO
         ?string $type = null,
         ?string $status = null,
         ?string $number = null,
-        ?string $counterparty = null,
+        ?string $counterpartyId = null,
         ?string $q = null,
         ?string $projectDirectionId = null,
         ?string $responsibilityCenterId = null,
@@ -61,7 +62,7 @@ class DocumentListDTO
         $this->type = DocumentType::tryFrom(self::normalizeText($type) ?? '');
         $this->status = DocumentStatus::tryFrom(self::normalizeText($status) ?? '');
         $this->number = self::normalizeText($number);
-        $this->counterparty = self::normalizeText($counterparty);
+        $this->counterpartyId = self::parseUuid($counterpartyId);
         $this->q = self::normalizeText($q);
         $this->projectDirectionId = self::parseUuid($projectDirectionId);
         $this->responsibilityCenterId = self::parseUuid($responsibilityCenterId);
@@ -98,7 +99,7 @@ class DocumentListDTO
             $query->getString('type'),
             $query->getString('status'),
             $query->getString('number'),
-            $query->getString('counterparty'),
+            $query->getString('counterpartyId'),
             $query->getString('q'),
             $query->getString('projectDirection'),
             $query->getString('responsibilityCenter'),
@@ -116,7 +117,7 @@ class DocumentListDTO
     public function hasFilters(): bool
     {
         return null !== $this->dateFrom || null !== $this->dateTo || null !== $this->type
-            || null !== $this->status || null !== $this->number || null !== $this->counterparty
+            || null !== $this->status || null !== $this->number || null !== $this->counterpartyId
             || null !== $this->q || null !== $this->projectDirectionId
             || null !== $this->responsibilityCenterId || null !== $this->direction
             || null !== $this->categoryId || null !== $this->amountFrom || null !== $this->amountTo;

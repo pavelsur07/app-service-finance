@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Company\Facade\CompanyFacade;
+use App\Company\Facade\CounterpartyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Finance\Application\Service\DocumentPlContribution;
 use App\Finance\DTO\DocumentListDTO;
@@ -35,6 +36,7 @@ final class DocumentOperationIndexController extends AbstractController
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         private readonly PLCategoryRepository $categoryRepository,
         private readonly DocumentListState $listState,
+        private readonly CounterpartyFacade $counterpartyFacade,
     ) {
     }
 
@@ -86,6 +88,7 @@ final class DocumentOperationIndexController extends AbstractController
             'projectDirections' => $this->companyFacade->listProjectDirectionEntities($companyId, true),
             'responsibilityCenters' => $this->responsibilityCenterFacade->getActiveChoices($companyId),
             'categories' => $this->categoryRepository->findTreeByCompany($company),
+            'counterparties' => $this->counterpartyFacade->getSelectable($companyId, $filters->counterpartyId),
         ]);
     }
 }
