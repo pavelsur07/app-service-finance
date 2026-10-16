@@ -6,6 +6,8 @@ namespace App\Finance\Controller;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
+use App\Company\Facade\CompanyFacade;
+use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Application\RestoreDocumentAction;
@@ -45,13 +47,20 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/', name: 'document_index', methods: ['GET'])]
-    public function index(Request $request, DocumentRepository $repo, ActiveCompanyService $companyService, PlNatureResolver $natureResolver): Response
-    {
+    public function index(
+        Request $request,
+        DocumentRepository $repo,
+        ActiveCompanyService $companyService,
+        PlNatureResolver $natureResolver,
+        CompanyFacade $companyFacade,
+        FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+    ): Response {
         $company = $companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = (int) $request->query->get('limit', 20);
 
-        $pager = $repo->findByCompany(new DocumentListDTO(
+        $filters = new DocumentListDTO(
             $company,
             $page,
             $limit,
@@ -61,13 +70,23 @@ class DocumentController extends AbstractController
             $request->query->getString('status'),
             $request->query->getString('number'),
             $request->query->getString('counterparty'),
-        ));
+            $request->query->getString('q'),
+            $request->query->getString('projectDirection'),
+            $request->query->getString('responsibilityCenter'),
+            $request->query->getString('direction'),
+        );
+        $pager = $repo->findByCompany($filters);
         $items = iterator_to_array($pager->getCurrentPageResults());
 
         $documentNatures = [];
+        $responsibilityCenterIds = [];
         foreach ($items as $item) {
             $id = $item->getId() ?? spl_object_hash($item);
             $documentNatures[$id] = $this->buildNatureView($natureResolver->forDocument($item));
+            $responsibilityCenterIds[] = $item->getResponsibilityCenterId();
+            foreach ($item->getOperations() as $operation) {
+                $responsibilityCenterIds[] = $operation->getResponsibilityCenterId();
+            }
         }
 
         return $this->render('document/index.html.twig', [
@@ -75,6 +94,14 @@ class DocumentController extends AbstractController
             'documentNatures' => $documentNatures,
             'pager' => $pager,
             'limit' => $pager->getMaxPerPage(),
+            'filters' => $filters,
+            'totals' => $repo->summarizeByCompany($companyId, $filters),
+            'responsibilityCenterNames' => $responsibilityCenterFacade->getNamesByIds(
+                $companyId,
+                array_values(array_filter($responsibilityCenterIds, static fn (?string $id): bool => null !== $id)),
+            ),
+            'projectDirections' => $companyFacade->listProjectDirectionEntities($companyId, true),
+            'responsibilityCenters' => $responsibilityCenterFacade->getActiveChoices($companyId),
         ]);
     }
 

@@ -82,5 +82,14 @@ final class FinancialResponsibilityCenterRepositoryTest extends IntegrationTestC
         self::assertSame($centerA->getId(), $activePairs[0]->responsibilityCenterId);
         self::assertSame(FinancialResponsibilityCenter::NAME_GENERAL, $activePairs[0]->responsibilityCenterName);
         self::assertTrue($activePairs[0]->system);
+
+        // Название нужно и архивному ЦФО: старый документ ссылается на него по-прежнему.
+        // Чужой ЦФО в ответ не попадает, даже если его id передан.
+        $names = $facade->getNamesByIds((string) $companyA->getId(), [$centerA->getId(), $archivedCenter->getId(), $centerB->getId(), $centerA->getId()]);
+        ksort($names);
+        $expected = [$centerA->getId() => FinancialResponsibilityCenter::NAME_GENERAL, $archivedCenter->getId() => 'Archived'];
+        ksort($expected);
+        self::assertSame($expected, $names);
+        self::assertSame([], $facade->getNamesByIds((string) $companyA->getId(), []));
     }
 }

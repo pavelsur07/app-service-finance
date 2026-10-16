@@ -1132,6 +1132,10 @@ getActiveChoices(string $companyId): array
 // DTO содержит optimistic-lock version для последующей записи.
 findByIdAndCompany(string $id, string $companyId): ?FinancialResponsibilityCenterDTO
 
+// Названия ЦФО компании (включая архивные) одним запросом; чужие id отбрасываются.
+// @param list<string> $ids  @return array<string, string> id => name
+getNamesByIds(string $companyId, array $ids): array
+
 // Системная пара PROJECT_GENERAL × CFO_GENERAL компании как scalar DTO.
 findGeneralPair(string $companyId): ?FinancialResponsibilityCenterProjectDTO
 
