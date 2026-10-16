@@ -3,104 +3,113 @@
 {% block title %}Удалённые документы ОПиУ{% endblock %}
 
 {% block body %}
-    {% set type_short_labels = {
-        'DEAL_SALE': 'Сделка',
-        'PAYROLL': 'Зарплата',
-        'TAXES': 'Налоги',
-        'LOANS': 'Кредиты',
-        'OBLIGATIONS': 'Обязательства',
-        'ASSETS': 'Имущество',
-        'CASH': 'Касса',
-        'CASHFLOW_EXPENSE': 'Расход из ДДС',
-        'OTHER': 'Прочие'
-    } %}
+{# Те же токены и таблица, что у списка «Документы ОПиУ»; новых функций нет. #}
+{% set type_short_labels = {
+    'DEAL_SALE': 'Сделка',
+    'PAYROLL': 'Зарплата',
+    'TAXES': 'Налоги',
+    'LOANS': 'Кредиты',
+    'OBLIGATIONS': 'Обязательства',
+    'ASSETS': 'Имущество',
+    'CASH': 'Касса',
+    'CASHFLOW_EXPENSE': 'Расход из ДДС',
+    'OTHER': 'Прочие'
+} %}
 
-    <div class="page-header d-print-none">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <div class="page-pretitle">Отчёт о прибылях и убытках</div>
-                <h2 class="page-title">Удалённые документы ОПиУ</h2>
-            </div>
-        </div>
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Доходы и расходы</li>
+                <li class="breadcrumb-item"><a href="{{ path('document_index') }}">Документы ОПиУ</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Удалённые</li>
+            </ol>
+        </nav>
+        <h1>Удалённые документы ОПиУ</h1>
+        <p class="vf-page-head__lead">Удалённые документы не входят в ОПиУ. Восстановленный документ вернётся в список со всеми операциями.</p>
     </div>
+</div>
 
-    <div class="mt-3">
-        <div class="card">
-            <div class="card-header card-head">
-                {% include 'document/_tabs.html.twig' with {active: 'deleted'} only %}
-            </div>
-            <div class="table-responsive">
-                <table class="table card-table align-middle">
-                    <thead>
+<div class="card vf-card vf-docs mb-4">
+    <div class="card-header">
+        {% include 'document/_tabs.html.twig' with {active: 'deleted'} only %}
+    </div>
+    {% if items is empty %}
+        <div class="vf-empty">
+            <span class="empty-icon" aria-hidden="true"><i class="ti ti-trash"></i></span>
+            <div class="vf-empty__title">Удалённых документов ОПиУ нет</div>
+            <div class="vf-empty__hint">Удалённые из списка документы появятся здесь, их можно будет восстановить.</div>
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table card-table vf-table">
+                <thead>
+                    <tr>
+                        <th class="text-nowrap">Удалён</th>
+                        <th class="text-nowrap">Дата</th>
+                        <th>Документ</th>
+                        <th>Проект</th>
+                        <th>Контрагент</th>
+                        <th class="text-end text-nowrap">Доход, ₽</th>
+                        <th class="text-end text-nowrap">Расход, ₽</th>
+                        <th class="text-end text-nowrap">Итог, ₽</th>
+                        <th class="vf-actions"><span class="visually-hidden">Действия</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        {% set income = 0 %}
+                        {% set expense = 0 %}
+                        {% for op in item.operations %}
+                            {% set category = op.plCategory %}
+                            {% set flow = category ? category.flow.value : null %}
+                            {% if flow == 'INCOME' %}
+                                {% set income = income + op.amount %}
+                            {% elseif flow == 'EXPENSE' %}
+                                {% set expense = expense + op.amount %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set total = income - expense %}
                         <tr>
-                            <th class="text-nowrap">Дата удаления</th>
-                            <th class="text-nowrap">Дата операции</th>
-                            <th>Тип</th>
-                            <th class="text-nowrap">Н док.</th>
-                            <th>Проект</th>
-                            <th>Контрагент</th>
-                            <th class="text-end text-nowrap">Доход, ₽</th>
-                            <th class="text-end text-nowrap">Расход, ₽</th>
-                            <th class="text-end text-nowrap">Итог, ₽</th>
-                            <th class="text-end">Действия</th>
+                            <td class="text-nowrap vf-sub">{{ item.deletedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-nowrap">{{ item.date|date('d.m.Y') }}</td>
+                            <td>
+                                <div class="vf-doc__title">
+                                    <span class="vf-strong">{{ type_short_labels[item.type.value] ?? item.type.label() }}</span>
+                                    {% if item.number %}<span class="vf-doc__number">№ {{ item.number }}</span>{% endif %}
+                                </div>
+                                {% if item.description %}<div class="vf-sub vf-doc__desc" title="{{ item.description }}">{{ item.description }}</div>{% endif %}
+                            </td>
+                            <td>{{ item.projectDirection ? item.projectDirection.name : '—' }}</td>
+                            <td>{{ item.counterparty ? (item.counterparty.displayName ?? item.counterparty.name) : '—' }}</td>
+                            <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
+                            <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
+                            <td class="text-end text-nowrap vf-doc__total">{{ total ? total|vf_amount : '—' }}</td>
+                            <td class="vf-actions text-end">
+                                <form method="post" action="{{ path('document_restore', {'id': item.id}) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('document_restore' ~ item.id) }}">
+                                    <button type="submit" class="btn btn-sm">Восстановить</button>
+                                </form>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in items %}
-                            {% set income = 0 %}
-                            {% set expense = 0 %}
-                            {% for op in item.operations %}
-                                {% set category = op.plCategory ?? op.category ?? null %}
-                                {% set flow = category ? category.flow.value : null %}
-                                {% if flow == 'INCOME' %}
-                                    {% set income = income + op.amount %}
-                                {% elseif flow == 'EXPENSE' %}
-                                    {% set expense = expense + op.amount %}
-                                {% endif %}
-                            {% endfor %}
-                            {% set total = income - expense %}
-                            <tr>
-                                <td class="text-nowrap">{{ item.deletedAt|date('d.m.Y H:i') }}</td>
-                                <td class="text-nowrap">{{ item.date|date('d.m.Y') }}</td>
-                                <td>
-                                    <div class="fw-semibold">{{ type_short_labels[item.type.value] ?? item.type.label() }}</div>
-                                    <div class="text-muted small">{{ item.description }}</div>
-                                </td>
-                                <td class="text-nowrap">{{ item.number ?: '—' }}</td>
-                                <td>{{ item.projectDirection ? item.projectDirection.name : '—' }}</td>
-                                <td>{{ item.counterparty ? item.counterparty.name : '—' }}</td>
-                                <td class="text-end text-nowrap">{{ income ? income|vf_amount(2, 'income') : '—' }}</td>
-                                <td class="text-end text-nowrap">{{ expense ? expense|vf_amount : '—' }}</td>
-                                <td class="text-end fw-semibold text-nowrap">{{ total ? total|vf_amount : '—' }}</td>
-                                <td class="text-end">
-                                    <form method="post" action="{{ path('document_restore', {'id': item.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('document_restore' ~ item.id) }}">
-                                        <button type="submit" class="btn btn-outline-primary btn-sm">Восстановить</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="10" class="text-center text-muted">Нет удалённых операций ОПиУ</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
-                <form method="get" class="d-flex align-items-center gap-2">
-                    <label for="deleted-document-limit" class="form-label mb-0">Показывать по</label>
-                    <select id="deleted-document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
-                        {% for option in [20, 30, 50] %}
-                            <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="hidden" name="page" value="1">
-                </form>
-                <div class="ms-md-auto w-100 w-md-auto">
-                    {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'document_deleted_index', params: {'limit': limit}} %}
-                </div>
-            </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+    <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label for="deleted-document-limit" class="form-label mb-0">Показывать по</label>
+            <select id="deleted-document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+                {% for option in [20, 30, 50] %}
+                    <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="page" value="1">
+        </form>
+        <div class="ms-md-auto w-100 w-md-auto">
+            {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'document_deleted_index', params: {'limit': limit}} %}
         </div>
     </div>
+</div>
 {% endblock %}

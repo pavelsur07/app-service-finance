@@ -16,8 +16,11 @@ use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\NotBlank;
 
 class DocumentOperationType extends AbstractType
 {
@@ -43,13 +46,18 @@ class DocumentOperationType extends AbstractType
                 'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
-                'label' => 'Категория',
-                'placeholder' => '—',
+                // Знак операции задаёт flow статьи: страница документа показывает по нему тип
+                // «Доход/Расход» и считает итоги до сохранения.
+                'choice_attr' => static fn (PLCategory $item): array => ['data-flow' => $item->getFlow()->value],
+                'label' => 'Статья ОПиУ',
+                'placeholder' => 'Выберите статью',
                 'required' => false,
                 'empty_data' => null,
             ])
             ->add('amount', NumberType::class, [
                 'label' => 'Сумма',
+                // Без суммы операция не сохраняется (колонка NOT NULL): ошибка под полем, а не сбой при записи.
+                'constraints' => [new NotBlank(message: 'Введите сумму')],
             ])
             ->add('counterparty', CounterpartyPickerType::class, [
                 'company_id' => (string) $options['company']->getId(),
@@ -85,6 +93,12 @@ class DocumentOperationType extends AbstractType
                 'attr' => [
                     'data-operation-responsibility-center' => 'true',
                 ],
+            ])
+            ->add('comment', TextType::class, [
+                'required' => false,
+                'label' => 'Комментарий',
+                'constraints' => [new Length(max: 255)],
+                'attr' => ['maxlength' => 255],
             ]);
     }
 

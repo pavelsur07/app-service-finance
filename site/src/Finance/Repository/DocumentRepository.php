@@ -257,9 +257,14 @@ class DocumentRepository extends ServiceEntityRepository
     {
         $perPage = max(1, min(200, $perPage));
 
+        // Шаблон «Удалённых» считает доход и расход по операциям каждого документа:
+        // без fetch-join каждая строка добавляла свои запросы.
         $queryBuilder = $this->createQueryBuilder('d')
-            ->addSelect('pd')
+            ->addSelect('pd', 'cp', 'op', 'opCategory')
             ->leftJoin('d.projectDirection', 'pd')
+            ->leftJoin('d.counterparty', 'cp')
+            ->leftJoin('d.operations', 'op')
+            ->leftJoin('op.category', 'opCategory')
             ->andWhere('IDENTITY(d.company) = :companyId')
             ->andWhere('d.deletedAt IS NOT NULL')
             ->setParameter('companyId', $companyId)

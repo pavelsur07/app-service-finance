@@ -1,78 +1,105 @@
 {% extends 'base.html.twig' %}
-{% block title %}Просмотр документа{% endblock %}
+{% block title %}Документ ОПиУ{{ item.number ? ' № ' ~ item.number : '' }}{% endblock %}
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <h2 class="page-title">Документ {{ item.number ? '№' ~ item.number : item.id }}</h2>
+{# Просмотр документа: те же токены и таблица, что у списка и формы; новых функций нет. #}
+{% set statusLabels = {'DRAFT': 'Черновик', 'ACTIVE': 'Активен', 'INACTIVE': 'Неактивен', 'TO_DELETE': 'На удаление'} %}
+{# Документ из операции ДДС копирует её сумму без пересчёта — валюта операции; ручной документ — рубли. #}
+{% set doc_currency = item.cashTransaction ? item.cashTransaction.currency : 'RUB' %}
+
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Доходы и расходы</li>
+                <li class="breadcrumb-item"><a href="{{ path('document_index') }}">Документы ОПиУ</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ item.number ? '№ ' ~ item.number : 'Документ' }}</li>
+            </ol>
+        </nav>
+        <div class="vf-docform-head__line">
+            <h1>Документ ОПиУ{{ item.number ? ' № ' ~ item.number : '' }}</h1>
+            <span class="badge vf-docform-status vf-docform-status--{{ item.status.value|lower }}">{{ statusLabels[item.status.value] ?? item.status.value }}</span>
+            {% if item.isCreatedWithViolation %}
+                <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
+            {% endif %}
         </div>
     </div>
-    <div class="container-xl mt-3">
-        <div class="card">
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Дата</dt>
-                    <dd class="col-sm-9">{{ item.date|date('Y-m-d H:i') }}</dd>
-                    <dt class="col-sm-3">Номер</dt>
-                    <dd class="col-sm-9">{{ item.number }}</dd>
-                    <dt class="col-sm-3">Тип</dt>
-                    <dd class="col-sm-9">{{ item.type.label() }}</dd>
-                    {% if documentNature is defined %}
-                        <dt class="col-sm-3">Природа</dt>
-                        <dd class="col-sm-9">
-                            <span class="badge {{ documentNature.badgeClass }}">{{ documentNature.label }}</span>
-                        </dd>
-                    {% endif %}
-                    <dt class="col-sm-3">Контрагент</dt>
-                    <dd class="col-sm-9">{{ item.counterparty ? item.counterparty.name : '' }}</dd>
-                    <dt class="col-sm-3">Описание</dt>
-                    <dd class="col-sm-9">{{ item.description }}</dd>
-                </dl>
-                <h4>Операции</h4>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Категория</th>
-                            <th>Природа</th>
-                            {# Документ из операции ДДС копирует её сумму без пересчёта — валюта операции; ручной документ — рубли. #}
-                            {% set doc_currency = item.cashTransaction ? item.cashTransaction.currency : 'RUB' %}
-                            <th class="text-end">Сумма{% if doc_currency == 'RUB' %}, ₽{% endif %}</th>
-                            <th>Контрагент</th>
-                            <th>Комментарий</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for view in operationViews %}
-                            {% set op = view.operation %}
-                            <tr>
-                                <td>
-                                    {% if view.categoryName %}
-                                        {{ view.categoryName }}
-                                    {% else %}
-                                        <span class="text-warning">Без категории</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if view.natureLabel %}
-                                        <span class="badge {{ view.badgeClass }}">{{ view.natureLabel }}</span>
-                                        {% if view.isFallback %}
-                                            <span class="text-warning small ms-1">нужно указать статью</span>
-                                        {% endif %}
-                                    {% elseif view.needsCategorization %}
-                                        <span class="badge bg-warning-lt text-warning">Нужно указать статью</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end">{{ op.amount|vf_amount(currency: doc_currency) }}</td>
-                                <td>{{ op.counterparty ? op.counterparty.name : '' }}</td>
-                                <td>{{ op.comment }}</td>
-                            </tr>
-                        {% else %}
-                            <tr><td colspan="5" class="text-center">Нет операций</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="btn-list d-print-none">
+        <a class="btn" href="{{ path('document_export_json', {'id': item.id}) }}" target="_blank" rel="noopener">
+            <i class="ti ti-download me-1" aria-hidden="true"></i> Выгрузить JSON
+        </a>
+        <a class="btn btn-primary" href="{{ path('document_edit', {'id': item.id}) }}">
+            <i class="ti ti-pencil me-1" aria-hidden="true"></i> Редактировать
+        </a>
     </div>
+</div>
+
+<section class="card vf-card vf-docform-section mb-4" aria-labelledby="doc-show-main">
+    <div class="card-header"><h2 class="card-title" id="doc-show-main">Основные данные</h2></div>
+    <div class="card-body">
+        <dl class="vf-docform-facts">
+            <div><dt>Дата</dt><dd>{{ item.date|date('d.m.Y') }}</dd></div>
+            <div><dt>Номер</dt><dd>{{ item.number ?: '—' }}</dd></div>
+            <div><dt>Тип</dt><dd>{{ item.type.label() }}</dd></div>
+            {% if documentNature is defined %}
+                <div><dt>Природа</dt><dd><span class="badge {{ documentNature.badgeClass }}">{{ documentNature.label }}</span></dd></div>
+            {% endif %}
+            <div><dt>Контрагент</dt><dd>{{ item.counterparty ? (item.counterparty.displayName ?? item.counterparty.name) : '—' }}</dd></div>
+            <div><dt>Проект</dt><dd>{{ item.projectDirection ? item.projectDirection.name : '—' }}</dd></div>
+            {% if item.cashTransaction %}
+                <div><dt>Основание</dt><dd><a href="{{ path('cash_transaction_show', {'id': item.cashTransaction.id}) }}">Операция ДДС от {{ item.cashTransaction.occurredAt|date('d.m.Y') }}</a></dd></div>
+            {% endif %}
+        </dl>
+        {% if item.description %}
+            <p class="vf-docform-note">{{ item.description }}</p>
+        {% endif %}
+    </div>
+</section>
+
+<div class="card vf-card mb-4">
+    <div class="card-header"><h2 class="card-title">Операции документа <span class="cnt">{{ operationViews|length }}</span></h2></div>
+    <div class="table-responsive">
+        <table class="table card-table vf-table">
+            <thead>
+                <tr>
+                    <th>Статья ОПиУ</th>
+                    <th>Тип</th>
+                    <th class="text-end">Сумма{% if doc_currency == 'RUB' %}, ₽{% endif %}</th>
+                    <th>Контрагент</th>
+                    <th>Комментарий</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for view in operationViews %}
+                    {% set op = view.operation %}
+                    <tr>
+                        <td>
+                            {% if view.categoryName %}
+                                {{ view.categoryName }}
+                            {% else %}
+                                <span class="vf-ops-badge-warn">Без статьи</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if view.natureLabel %}
+                                <span class="badge {{ view.badgeClass }}">{{ view.natureLabel }}</span>
+                                {% if view.isFallback %}
+                                    <span class="vf-sub ms-1">нужно указать статью</span>
+                                {% endif %}
+                            {% elseif view.needsCategorization %}
+                                <span class="vf-ops-badge-warn">Нужно указать статью</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">{{ op.amount|vf_amount(currency: doc_currency) }}</td>
+                        <td>{{ op.counterparty ? (op.counterparty.displayName ?? op.counterparty.name) : '—' }}</td>
+                        <td>{{ op.comment ?: '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="text-center text-secondary">Операций нет</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}

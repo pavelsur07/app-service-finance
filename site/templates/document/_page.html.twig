@@ -1,0 +1,292 @@
+{#
+  Страница документа ОПиУ — создание, копия и правка (document_new, document_copy, document_edit).
+  Эталон — docs/design-system/screens/PnlDocument.dc.html и pnl-refs/05–07; отчёт — docs/plan/ds-pnl-documents.md.
+  Контекст: form; для правки — item и transactionAllocation (null, если нет основания).
+  Хуки JS и тестов сохранены: data-collection-holder + data-prototype, .add_item_link, .remove-item,
+  .document-operation-card, data-document-*, data-operation-*; имена полей и CSRF формы — прежние.
+  Итоги, тип операции и остаток по основанию считает клиент для подсказки; истина — сервер при сохранении.
+#}
+{% set doc = item ?? form.vars.value %}
+{% set isEdit = item is defined and item is not null %}
+{% set statusLabels = {'DRAFT': 'Черновик', 'ACTIVE': 'Активен', 'INACTIVE': 'Неактивен', 'TO_DELETE': 'На удаление'} %}
+{% set title = isEdit
+    ? 'Документ ОПиУ' ~ (doc.number ? ' № ' ~ doc.number : '')
+    : (app.request.attributes.get('_route') == 'document_copy' ? 'Копия документа ОПиУ' : 'Новый документ ОПиУ') %}
+{% set allocation = transactionAllocation ?? null %}
+{% set cashTransaction = isEdit ? doc.cashTransaction : null %}
+{% set currency = cashTransaction ? cashTransaction.currency : 'RUB' %}
+
+{# Сводка ошибок: форма целиком, поля шапки, затем поля операций с номером строки. #}
+{% set summary = [] %}
+{% for error in form.vars.errors %}
+    {% set summary = summary|merge([{text: error.message, target: null}]) %}
+{% endfor %}
+{% for child in form %}
+    {% if child.vars.name not in ['operations', '_token'] %}
+        {% for error in child.vars.errors %}
+            {% set summary = summary|merge([{text: child.vars.label ~ ': ' ~ error.message, target: child.vars.id}]) %}
+        {% endfor %}
+    {% endif %}
+{% endfor %}
+{% for op in form.operations %}
+    {% set n = loop.index %}
+    {% for error in op.vars.errors %}
+        {% set summary = summary|merge([{text: 'Операция ' ~ n ~ ': ' ~ error.message, target: null}]) %}
+    {% endfor %}
+    {% for field in op %}
+        {% for error in field.vars.errors %}
+            {% set summary = summary|merge([{text: 'Операция ' ~ n ~ ', ' ~ field.vars.label|lower ~ ': ' ~ error.message, target: field.vars.id}]) %}
+        {% endfor %}
+    {% endfor %}
+{% endfor %}
+
+{% macro opRow(operationForm) %}
+    {% set selected = operationForm.category.vars.value %}
+    {% set flow = null %}
+    {% for choice in operationForm.category.vars.choices %}
+        {% if choice.value == selected %}{% set flow = choice.attr['data-flow'] ?? null %}{% endif %}
+    {% endfor %}
+    <div class="vf-docform-op document-operation-card" data-operation-row>
+        <div class="vf-docform-op__type">
+            <span class="vf-docform-flow" data-operation-flow-label data-flow="{{ flow ?? '' }}">{{ flow == 'INCOME' ? 'Доход' : (flow == 'EXPENSE' ? 'Расход' : '—') }}</span>
+        </div>
+        {% for name in ['category', 'amount', 'counterparty', 'projectDirection', 'responsibilityCenterId'] %}
+            {% set field = operationForm[name] %}
+            <div class="vf-docform-op__cell vf-docform-op__cell--{{ name }}">
+                {{ form_label(field, null, {label_attr: {class: 'visually-hidden'}}) }}
+                {% if name == 'amount' %}
+                    {{ form_widget(field, {attr: {class: 'vf-num', inputmode: 'decimal', 'data-operation-amount': 'true', placeholder: '0,00'}}) }}
+                {% elseif name == 'category' %}
+                    {{ form_widget(field, {attr: {'data-operation-category': 'true'}}) }}
+                {% else %}
+                    {{ form_widget(field) }}
+                {% endif %}
+                {{ form_errors(field) }}
+                {% if name == 'responsibilityCenterId' and not field.vars.value %}
+                    <div class="form-hint vf-docform-op__hint">Без ЦФО операция не попадёт в разрез по ЦФО</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <div class="vf-docform-op__cell vf-docform-op__cell--comment">
+            {{ form_label(operationForm.comment, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.comment, {attr: {placeholder: 'Комментарий к операции'}}) }}
+            {{ form_errors(operationForm.comment) }}
+        </div>
+        <div class="vf-docform-op__actions">
+            <button type="button"
+                    class="btn btn-ghost-secondary btn-icon btn-sm remove-item"
+                    title="Удалить операцию"
+                    aria-label="Удалить операцию">
+                <i class="ti ti-trash" aria-hidden="true"></i>
+            </button>
+        </div>
+        {{ form_errors(operationForm) }}
+    </div>
+{% endmacro %}
+{% import _self as page %}
+
+<div class="vf-page-head vf-docform-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Доходы и расходы</li>
+                <li class="breadcrumb-item"><a href="{{ path('document_index') }}">Документы ОПиУ</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ isEdit ? (doc.number ? '№ ' ~ doc.number : 'Документ') : 'Новый' }}</li>
+            </ol>
+        </nav>
+        <div class="vf-docform-head__line">
+            <h1>{{ title }}</h1>
+            {% if isEdit %}
+                <span class="badge vf-docform-status vf-docform-status--{{ doc.status.value|lower }}">{{ statusLabels[doc.status.value] ?? doc.status.value }}</span>
+            {% endif %}
+            {% if isEdit and doc.isCreatedWithViolation %}
+                <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
+            {% endif %}
+            <span class="vf-ops-badge-warn" data-dirty-badge hidden>Есть несохранённые изменения</span>
+        </div>
+    </div>
+    {% if isEdit %}
+        <div class="btn-list d-print-none">
+            <div class="dropdown">
+                <button type="button" class="btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    Ещё <i class="ti ti-chevron-down ms-1" aria-hidden="true"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <a class="dropdown-item" href="{{ path('document_export_json', {'id': doc.id}) }}" target="_blank" rel="noopener" data-leave-safe>
+                        <i class="ti ti-download me-2" aria-hidden="true"></i> Выгрузить JSON
+                    </a>
+                    <a class="dropdown-item" href="{{ path('document_copy', {'id': doc.id}) }}">
+                        <i class="ti ti-copy me-2" aria-hidden="true"></i> Копировать
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#document-delete-modal">
+                        <i class="ti ti-trash me-2" aria-hidden="true"></i> Удалить
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{{ form_start(form, {attr: {class: 'vf-docform', novalidate: 'novalidate', 'data-document-form': 'true'}}) }}
+
+{% if summary is not empty %}
+    <div class="alert alert-danger vf-docform-summary" role="alert" tabindex="-1" data-error-summary>
+        <div class="vf-docform-summary__title">Не удалось сохранить: {{ summary|length }} {{ summary|length % 10 == 1 and summary|length % 100 != 11 ? 'ошибка' : (summary|length % 10 in 2..4 and (summary|length % 100 < 10 or summary|length % 100 >= 20) ? 'ошибки' : 'ошибок') }}. Исправьте отмеченные поля.</div>
+        <ul>
+            {% for entry in summary %}
+                <li>{% if entry.target %}<a href="#{{ entry.target }}" data-leave-safe>{{ entry.text }}</a>{% else %}{{ entry.text }}{% endif %}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+<div class="vf-docform-grid{{ allocation ? ' vf-docform-grid--aside' : '' }}">
+    <div class="vf-docform-main">
+        <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-main">
+            <div class="card-header"><h2 class="card-title" id="doc-section-main">Основные данные</h2></div>
+            <div class="card-body">
+                <div class="vf-docform-fields">
+                    <div>{{ form_row(form.date, {label: 'Дата документа'}) }}</div>
+                    <div>{{ form_row(form.number, {label: 'Номер документа'}) }}</div>
+                    <div>{{ form_row(form.type) }}</div>
+                    <div>{{ form_row(form.counterparty) }}</div>
+                    <div>{{ form_row(form.projectDirection) }}</div>
+                    <div>{{ form_row(form.responsibilityCenterId) }}</div>
+                    <div class="vf-docform-fields__wide">{{ form_row(form.description, {attr: {rows: 3}}) }}</div>
+                </div>
+            </div>
+        </section>
+
+        {% if cashTransaction %}
+            <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-base">
+                <div class="card-header"><h2 class="card-title" id="doc-section-base">Основание</h2></div>
+                <div class="card-body">
+                    <dl class="vf-docform-facts">
+                        <div>
+                            <dt>Источник</dt>
+                            <dd><a href="{{ path('cash_transaction_show', {'id': cashTransaction.id}) }}">Операция ДДС от {{ cashTransaction.occurredAt|date('d.m.Y') }}</a></dd>
+                        </div>
+                        <div>
+                            <dt>Счёт</dt>
+                            <dd>{{ cashTransaction.moneyAccount.name }}</dd>
+                        </div>
+                        <div>
+                            <dt>Сумма по ДДС</dt>
+                            <dd>{{ cashTransaction.amount|vf_amount(currency: currency) }}{% if currency == 'RUB' %} ₽{% endif %}</dd>
+                        </div>
+                    </dl>
+                    {# Правило CashTransaction::assertCanAllocate: сумма операций > 0 и не больше остатка основания. #}
+                    <p class="vf-docform-note">Сумма операций документа не может превышать остаток операции ДДС. Основание здесь не меняется.</p>
+                </div>
+            </section>
+        {% endif %}
+    </div>
+
+    {% if allocation %}
+        <aside class="vf-docform-aside">
+            <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-allocation"
+                     data-allocation
+                     data-allocation-available="{{ allocation.availableForDocument }}">
+                <div class="card-header"><h2 class="card-title" id="doc-section-allocation">Сверка с основанием</h2></div>
+                <div class="card-body">
+                    <dl class="vf-docform-recon">
+                        <div><dt>По ДДС</dt><dd>{{ allocation.transactionAmount|vf_amount(currency: currency) }}</dd></div>
+                        <div><dt>Распределено на документы ОПиУ</dt><dd>{{ allocation.allocatedAmount|vf_amount(currency: currency) }}</dd></div>
+                        <div class="vf-docform-recon__rest"><dt>Остаток</dt><dd data-allocation-rest>{{ allocation.remainingAmount|vf_amount(currency: currency) }}</dd></div>
+                    </dl>
+                    <div class="vf-docform-recon__state vf-docform-recon__state--ok" data-allocation-ok{% if allocation.remainingAmount < 0 %} hidden{% endif %}>
+                        <i class="ti ti-check" aria-hidden="true"></i> <span data-allocation-ok-text>{{ allocation.remainingAmount == 0 ? 'Всё распределено' : 'Остаток можно распределить другими документами' }}</span>
+                    </div>
+                    <div class="vf-docform-recon__state vf-docform-recon__state--warn" data-allocation-over{% if allocation.remainingAmount >= 0 %} hidden{% endif %} role="status">
+                        Операции документа превышают остаток основания. Сохранить нельзя.
+                    </div>
+                    <button type="button" class="btn btn-sm w-100 mt-2" data-allocation-fill hidden>Добавить операцию на остаток</button>
+                    <div class="vf-docform-note mt-2" data-allocation-live hidden>Остаток пересчитан по несохранённым правкам.</div>
+                </div>
+            </section>
+        </aside>
+    {% endif %}
+</div>
+
+<section class="card vf-card vf-docform-section vf-docform-ops" aria-labelledby="doc-section-ops">
+    <div class="card-header">
+        <h2 class="card-title" id="doc-section-ops">Операции документа <span class="cnt" data-operations-count>{{ form.operations|length }}</span></h2>
+        <div class="card-actions">
+            <button type="button" class="btn btn-sm add_item_link"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить операцию</button>
+        </div>
+    </div>
+    <div class="vf-docform-ops__head" aria-hidden="true">
+        <span>Тип</span><span>Статья ОПиУ</span><span class="text-end">Сумма{% if currency == 'RUB' %}, ₽{% endif %}</span><span>Контрагент</span><span>Проект</span><span>ЦФО</span><span></span>
+    </div>
+    {% set operationPrototype %}{{ page.opRow(form.operations.vars.prototype) }}{% endset %}
+    <div class="vf-docform-ops__list" data-collection-holder data-prototype="{{ operationPrototype|e('html_attr') }}">
+        {% for op in form.operations %}
+            {{ page.opRow(op) }}
+        {% endfor %}
+    </div>
+    {# Пустая коллекция иначе вывалится в form_rest меткой «Операции» и вторым holder'ом. #}
+    {% do form.operations.setRendered %}
+    <div class="vf-docform-ops__empty" data-operations-empty{% if form.operations is not empty %} hidden{% endif %}>
+        Операций нет. Добавьте хотя бы одну: без операций документ не попадёт в ОПиУ.
+    </div>
+    <div class="vf-bar vf-docform-ops__totals" aria-live="polite">
+        <span>Доходы <strong data-total-income>—</strong></span>
+        <span>Расходы <strong data-total-expense>—</strong></span>
+        <span class="vf-docform-ops__result">Итого <strong data-total-result>—</strong></span>
+        <span class="vf-docform-ops__uncat" data-total-uncategorized hidden></span>
+        {% if allocation %}
+            <span class="ms-auto">Остаток по основанию <strong data-allocation-rest-footer>{{ allocation.remainingAmount|vf_amount(currency: currency) }}</strong></span>
+        {% endif %}
+    </div>
+</section>
+
+{{ form_rest(form) }}
+
+<div class="vf-docform-footer d-print-none">
+    <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Изменений нет' : 'Заполните документ и сохраните') }}</span>
+    <div class="btn-list">
+        <a class="btn" href="{{ path('document_index') }}">Отмена</a>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+</div>
+{{ form_end(form) }}
+
+{% if isEdit %}
+    <div class="modal modal-blur fade" id="document-delete-modal" tabindex="-1" role="dialog" aria-labelledby="document-delete-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('document_delete', {'id': doc.id}) }}" data-leave-safe-form>
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ doc.id) }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="document-delete-modal-title">Удалить документ ОПиУ?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        Документ со всеми операциями будет перемещён в раздел «Удалённые». Его можно будет восстановить.
+                        Несохранённые правки будут потеряны.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger">Переместить в удалённые</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<div class="modal modal-blur fade" id="document-leave-modal" tabindex="-1" role="dialog" aria-labelledby="document-leave-modal-title" aria-describedby="document-leave-modal-text" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered vf-docform-leave" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <h5 class="modal-title" id="document-leave-modal-title">Выйти без сохранения?</h5>
+                <p class="text-secondary mb-0 mt-1" id="document-leave-modal-text">Внесённые изменения будут потеряны.</p>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn" data-leave-confirm>Выйти без сохранения</a>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Остаться</button>
+            </div>
+        </div>
+    </div>
+</div>

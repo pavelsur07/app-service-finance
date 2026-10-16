@@ -1,0 +1,222 @@
+<script>
+    // Страница документа ОПиУ (document/_page.html.twig). Подсказки считаются на клиенте; истина — сервер.
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('[data-document-form]');
+        if (!form) {
+            return;
+        }
+        const documentCounterpartyField = document.querySelector('[data-document-counterparty]');
+        const documentProjectField = document.querySelector('[data-document-project-direction]');
+        const documentResponsibilityCenterField = document.querySelector('[data-document-responsibility-center]');
+
+        // Префилл новой операции из шапки документа: только в пустое поле.
+        const prefill = function (card, source, selector) {
+            if (!source || !source.value) {
+                return;
+            }
+            const target = card.querySelector(selector);
+            if (target && !target.value) {
+                target.value = source.value;
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+
+        // Деньги по DS-Money: неразрывные пробелы в разрядах, запятая, настоящий минус.
+        const formatter = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const money = function (value) {
+            return formatter.format(value).replace(/[   ]/g, ' ').replace('-', '−');
+        };
+        const parseAmount = function (input) {
+            const raw = (input && input.value ? input.value : '').replace(/[\s  ]/g, '').replace(',', '.');
+            const value = parseFloat(raw);
+            return isFinite(value) ? value : 0;
+        };
+        const flowOf = function (row) {
+            const select = row.querySelector('[data-operation-category]');
+            const option = select && select.selectedOptions ? select.selectedOptions[0] : null;
+            return option ? option.getAttribute('data-flow') || '' : '';
+        };
+
+        const holder = form.querySelector('[data-collection-holder]');
+        const addButton = form.querySelector('.add_item_link');
+        const countBadge = form.querySelector('[data-operations-count]');
+        const emptyState = form.querySelector('[data-operations-empty]');
+        const allocation = document.querySelector('[data-allocation]');
+        const available = allocation ? parseFloat(allocation.getAttribute('data-allocation-available')) : null;
+        const set = function (selector, text) {
+            document.querySelectorAll(selector).forEach(function (node) { node.textContent = text; });
+        };
+
+        let dirty = false;
+        let submitting = false;
+
+        const recalc = function () {
+            let income = 0;
+            let expense = 0;
+            let sum = 0;
+            let uncategorized = 0;
+            const rows = holder.querySelectorAll('[data-operation-row]');
+            rows.forEach(function (row) {
+                const amount = parseAmount(row.querySelector('[data-operation-amount]'));
+                const flow = flowOf(row);
+                const label = row.querySelector('[data-operation-flow-label]');
+                label.textContent = flow === 'INCOME' ? 'Доход' : (flow === 'EXPENSE' ? 'Расход' : '—');
+                label.setAttribute('data-flow', flow);
+                sum += amount;
+                if (flow === 'INCOME') {
+                    income += amount;
+                } else if (flow === 'EXPENSE') {
+                    expense += amount;
+                } else if (amount) {
+                    uncategorized += 1;
+                }
+            });
+            set('[data-total-income]', money(income) + ' ₽');
+            set('[data-total-expense]', money(expense) + ' ₽');
+            set('[data-total-result]', money(income - expense) + ' ₽');
+            const uncat = form.querySelector('[data-total-uncategorized]');
+            uncat.hidden = uncategorized === 0;
+            uncat.textContent = uncategorized ? uncategorized + ' без статьи — не входят в итог' : '';
+            countBadge.textContent = String(rows.length);
+            emptyState.hidden = rows.length > 0;
+
+            if (allocation && isFinite(available)) {
+                const rest = Math.round((available - sum) * 100) / 100;
+                set('[data-allocation-rest], [data-allocation-rest-footer]', money(rest));
+                document.querySelectorAll('[data-allocation-rest], [data-allocation-rest-footer]').forEach(function (node) {
+                    node.classList.toggle('text-danger', rest < 0);
+                });
+                allocation.querySelector('[data-allocation-over]').hidden = rest >= 0;
+                allocation.querySelector('[data-allocation-ok]').hidden = rest < 0;
+                allocation.querySelector('[data-allocation-ok-text]').textContent = rest === 0 ? 'Всё распределено' : 'Остаток можно распределить другими документами';
+                allocation.querySelector('[data-allocation-fill]').hidden = rest <= 0;
+                allocation.querySelector('[data-allocation-live]').hidden = !dirty;
+            }
+        };
+
+        const markDirty = function () {
+            if (dirty) {
+                recalc();
+                return;
+            }
+            dirty = true;
+            const badge = document.querySelector('[data-dirty-badge]');
+            if (badge) {
+                badge.hidden = false;
+            }
+            set('[data-dirty-text]', 'Есть несохранённые изменения');
+            recalc();
+        };
+
+        // Индекс новой строки — больше любого существующего: после удаления строки счёт по
+        // количеству повторил бы индекс оставшейся, и две операции слились бы в одну.
+        let nextIndex = 0;
+        holder.querySelectorAll('[name^="document[operations]["]').forEach(function (field) {
+            const match = field.name.match(/^document\[operations\]\[(\d+)\]/);
+            if (match) {
+                nextIndex = Math.max(nextIndex, parseInt(match[1], 10) + 1);
+            }
+        });
+
+        const addOperation = function (amount) {
+            const html = holder.dataset.prototype.replace(/__name__/g, String(nextIndex++));
+            const template = document.createElement('template');
+            template.innerHTML = html.trim();
+            const row = template.content.firstElementChild;
+            holder.appendChild(row);
+            prefill(row, documentCounterpartyField, '[data-operation-counterparty]');
+            prefill(row, documentProjectField, '[data-operation-project-direction]');
+            prefill(row, documentResponsibilityCenterField, '[data-operation-responsibility-center]');
+            if (amount) {
+                row.querySelector('[data-operation-amount]').value = amount.toFixed(2);
+            }
+            markDirty();
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const first = row.querySelector('select, input:not([type="hidden"])');
+            if (first) {
+                first.focus({ preventScroll: true });
+            }
+        };
+
+        addButton.addEventListener('click', function () { addOperation(0); });
+        holder.addEventListener('click', function (e) {
+            const removeButton = e.target.closest('.remove-item');
+            if (!removeButton) {
+                return;
+            }
+            const card = removeButton.closest('.document-operation-card');
+            if (card) {
+                card.remove();
+                markDirty();
+                addButton.focus();
+            }
+        });
+        if (allocation) {
+            allocation.querySelector('[data-allocation-fill]').addEventListener('click', function () {
+                let sum = 0;
+                holder.querySelectorAll('[data-operation-amount]').forEach(function (input) { sum += parseAmount(input); });
+                const rest = Math.round((available - sum) * 100) / 100;
+                if (rest > 0) {
+                    addOperation(rest);
+                }
+            });
+        }
+
+        form.addEventListener('input', markDirty);
+        form.addEventListener('change', markDirty);
+        form.addEventListener('submit', function () { submitting = true; });
+        document.querySelectorAll('[data-leave-safe-form]').forEach(function (f) {
+            f.addEventListener('submit', function () { submitting = true; });
+        });
+
+        // Уход с несохранёнными правками: свой диалог для ссылок страницы, системный — для
+        // закрытия вкладки и адресной строки (текст там задаёт браузер).
+        window.addEventListener('beforeunload', function (e) {
+            if (dirty && !submitting) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        const leaveModalEl = document.getElementById('document-leave-modal');
+        const leaveConfirm = leaveModalEl.querySelector('[data-leave-confirm]');
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('a[href]');
+            if (!dirty || !link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) {
+                return;
+            }
+            const href = link.getAttribute('href');
+            if (!href || href.charAt(0) === '#' || link.target === '_blank' || link.hasAttribute('download')
+                || link.hasAttribute('data-leave-safe') || link.hasAttribute('data-bs-toggle') || link === leaveConfirm) {
+                return;
+            }
+            e.preventDefault();
+            leaveConfirm.setAttribute('href', link.href);
+            bootstrap.Modal.getOrCreateInstance(leaveModalEl).show();
+        });
+        leaveConfirm.addEventListener('click', function () { submitting = true; });
+
+        // После неудачного сохранения — фокус на первое невалидное поле; сводка ошибок наверху
+        // ведёт ссылками к полям. Ошибка без поля (сумма против основания) — фокус на сводку.
+        const summary = document.querySelector('[data-error-summary]');
+        const firstInvalid = form.querySelector('.is-invalid');
+        if (firstInvalid) {
+            firstInvalid.scrollIntoView({ block: 'center' });
+            firstInvalid.focus({ preventScroll: true });
+        } else if (summary) {
+            summary.focus();
+        }
+        if (summary) {
+            summary.addEventListener('click', function (e) {
+                const link = e.target.closest('a[href^="#"]');
+                const target = link ? document.getElementById(link.getAttribute('href').slice(1)) : null;
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ block: 'center' });
+                    target.focus();
+                }
+            });
+        }
+
+        recalc();
+    });
+</script>

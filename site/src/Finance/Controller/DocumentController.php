@@ -282,14 +282,17 @@ class DocumentController extends AbstractController
         ]);
         $initialStatus = $document->getStatus();
         $initialDate = $document->getDate()->setTime(0, 0);
-        $form->handleRequest($request);
-
+        // Сверка — по сохранённому состоянию, до применения формы: после handleRequest в документе
+        // могут быть отклонённые валидацией операции без суммы, и пересчёт по ним падал.
         $transactionAllocation = $this->buildTransactionAllocationView($document);
+        $form->handleRequest($request);
 
         if ($form->isSubmitted()) {
             $cashTransaction = $document->getCashTransaction();
 
-            if ($cashTransaction instanceof CashTransaction) {
+            // Сумму документа считают только по валидным операциям: у операции, отклонённой
+            // валидацией (пустая сумма), сумма не задана, и подсчёт падал с 500.
+            if ($form->isValid() && $cashTransaction instanceof CashTransaction) {
                 try {
                     $cashTransaction->assertCanAllocateAmount($document->getTotalAmount(), $document);
                 } catch (\DomainException $e) {
@@ -529,6 +532,9 @@ class DocumentController extends AbstractController
             'transactionAmount' => (float) $transaction->getAmount(),
             'allocatedAmount' => $transaction->getAllocatedAmount(),
             'remainingAmount' => $transaction->getRemainingAmount(),
+            // Сколько доступно этому документу: остаток без его собственных операций — по нему
+            // страница пересчитывает остаток на лету, пока операции правят (истина — сервер).
+            'availableForDocument' => $transaction->getRemainingAmount($document),
         ];
     }
 
