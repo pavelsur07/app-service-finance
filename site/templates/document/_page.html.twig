@@ -128,7 +128,8 @@
     {% endif %}
 </div>
 
-{{ form_start(form, {attr: {class: 'vf-docform', novalidate: 'novalidate', 'data-document-form': 'true'}}) }}
+{# Валюта документа — для сумм, которые считает JS: из основания ДДС без пересчёта, у ручного — рубли. #}
+{{ form_start(form, {attr: {class: 'vf-docform', novalidate: 'novalidate', 'data-document-form': 'true', 'data-currency': currency, 'data-currency-symbol': vf_currency_symbol(currency)}}) }}
 
 {% if summary is not empty %}
     <div class="alert alert-danger vf-docform-summary" role="alert" tabindex="-1" data-error-summary>

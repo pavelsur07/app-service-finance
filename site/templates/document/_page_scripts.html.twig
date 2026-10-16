@@ -26,6 +26,15 @@
         const money = function (value) {
             return formatter.format(value).replace(/[   ]/g, ' ').replace('-', '−');
         };
+        // Итоги — с символом валюты всегда; остаток по основанию — как vf_amount: рубль не пишется.
+        const currencyCode = form.getAttribute('data-currency') || 'RUB';
+        const currencySymbol = form.getAttribute('data-currency-symbol') || '₽';
+        const total = function (value) {
+            return money(value) + '\u00A0' + currencySymbol;
+        };
+        const rest = function (value) {
+            return money(value) + (currencyCode === 'RUB' ? '' : '\u00A0' + currencySymbol);
+        };
         const parseAmount = function (input) {
             const raw = (input && input.value ? input.value : '').replace(/[\s  ]/g, '').replace(',', '.');
             const value = parseFloat(raw);
@@ -47,7 +56,8 @@
             document.querySelectorAll(selector).forEach(function (node) { node.textContent = text; });
         };
 
-        let dirty = false;
+        // После неудачного сохранения на странице — отклонённые сервером правки: они тоже не сохранены.
+        let dirty = !!document.querySelector('[data-error-summary]');
         let submitting = false;
 
         const recalc = function () {
@@ -71,9 +81,9 @@
                     uncategorized += 1;
                 }
             });
-            set('[data-total-income]', money(income) + ' ₽');
-            set('[data-total-expense]', money(expense) + ' ₽');
-            set('[data-total-result]', money(income - expense) + ' ₽');
+            set('[data-total-income]', total(income));
+            set('[data-total-expense]', total(expense));
+            set('[data-total-result]', total(income - expense));
             const uncat = form.querySelector('[data-total-uncategorized]');
             uncat.hidden = uncategorized === 0;
             uncat.textContent = uncategorized ? uncategorized + ' без статьи — не входят в итог' : '';
@@ -81,15 +91,15 @@
             emptyState.hidden = rows.length > 0;
 
             if (allocation && isFinite(available)) {
-                const rest = Math.round((available - sum) * 100) / 100;
-                set('[data-allocation-rest], [data-allocation-rest-footer]', money(rest));
+                const left = Math.round((available - sum) * 100) / 100;
+                set('[data-allocation-rest], [data-allocation-rest-footer]', rest(left));
                 document.querySelectorAll('[data-allocation-rest], [data-allocation-rest-footer]').forEach(function (node) {
-                    node.classList.toggle('text-danger', rest < 0);
+                    node.classList.toggle('text-danger', left < 0);
                 });
-                allocation.querySelector('[data-allocation-over]').hidden = rest >= 0;
-                allocation.querySelector('[data-allocation-ok]').hidden = rest < 0;
-                allocation.querySelector('[data-allocation-ok-text]').textContent = rest === 0 ? 'Всё распределено' : 'Остаток можно распределить другими документами';
-                allocation.querySelector('[data-allocation-fill]').hidden = rest <= 0;
+                allocation.querySelector('[data-allocation-over]').hidden = left >= 0;
+                allocation.querySelector('[data-allocation-ok]').hidden = left < 0;
+                allocation.querySelector('[data-allocation-ok-text]').textContent = left === 0 ? 'Всё распределено' : 'Остаток можно распределить другими документами';
+                allocation.querySelector('[data-allocation-fill]').hidden = left <= 0;
                 allocation.querySelector('[data-allocation-live]').hidden = !dirty;
             }
         };
@@ -155,9 +165,9 @@
             allocation.querySelector('[data-allocation-fill]').addEventListener('click', function () {
                 let sum = 0;
                 holder.querySelectorAll('[data-operation-amount]').forEach(function (input) { sum += parseAmount(input); });
-                const rest = Math.round((available - sum) * 100) / 100;
-                if (rest > 0) {
-                    addOperation(rest);
+                const left = Math.round((available - sum) * 100) / 100;
+                if (left > 0) {
+                    addOperation(left);
                 }
             });
         }
@@ -217,6 +227,12 @@
             });
         }
 
+        if (dirty) {
+            const badge = document.querySelector('[data-dirty-badge]');
+            if (badge) {
+                badge.hidden = false;
+            }
+        }
         recalc();
     });
 </script>

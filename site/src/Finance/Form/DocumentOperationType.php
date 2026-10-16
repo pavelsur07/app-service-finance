@@ -58,6 +58,13 @@ class DocumentOperationType extends AbstractType
                 'label' => 'Сумма',
                 // Без суммы операция не сохраняется (колонка NOT NULL): ошибка под полем, а не сбой при записи.
                 'constraints' => [new NotBlank(message: 'Введите сумму')],
+                // Пустое поле не пишется в setAmount(string): иначе очищенная сумма сохранённой операции
+                // роняла форму TypeError'ом до валидации. NotBlank проверяет значение поля, а не сущности.
+                'setter' => static function (DocumentOperation $operation, mixed $amount): void {
+                    if (null !== $amount) {
+                        $operation->setAmount((string) $amount);
+                    }
+                },
             ])
             ->add('counterparty', CounterpartyPickerType::class, [
                 'company_id' => (string) $options['company']->getId(),

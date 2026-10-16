@@ -69,6 +69,28 @@ final class DocumentEditPageTest extends WebTestCaseBase
         yield 'с основанием ДДС' => [true];
     }
 
+    /**
+     * Очистить сумму у уже сохранённой операции: форма писала null в setAmount(string) — 500
+     * до валидации. Ожидается ошибка под полем, сумма в БД прежняя.
+     */
+    public function testClearingAmountOfExistingOperationIsAFormError(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $income] = $this->prepare();
+        $document = $this->persistDocument($company, $income, false);
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+        $client->submit($crawler->selectButton('Сохранить')->form(), ['document[operations][0][amount]' => '']);
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $client->getCrawler()->filter('#document_operations_0_amount.is-invalid'));
+        $this->em()->clear();
+        $operation = $this->em()->find(Document::class, $document->getId())?->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        self::assertSame('100.00', $operation->getAmount());
+    }
+
     public function testEditPageRendersFlowTypeCommentAndKeepsJsHooks(): void
     {
         $client = static::createClient();
