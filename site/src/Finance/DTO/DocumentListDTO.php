@@ -71,8 +71,14 @@ class DocumentListDTO
             default => null,
         };
         $this->categoryId = self::parseUuid($categoryId);
-        $this->amountFrom = self::parseAmount($amountFrom);
-        $this->amountTo = self::parseAmount($amountTo);
+        $amountFrom = self::parseAmount($amountFrom);
+        $amountTo = self::parseAmount($amountTo);
+        // Перепутанные границы — опечатка, а не «ничего не показывать».
+        if (null !== $amountFrom && null !== $amountTo && 1 === bccomp($amountFrom, $amountTo, 2)) {
+            [$amountFrom, $amountTo] = [$amountTo, $amountFrom];
+        }
+        $this->amountFrom = $amountFrom;
+        $this->amountTo = $amountTo;
     }
 
     /**

@@ -113,6 +113,14 @@ final class DocumentListDTOTest extends TestCase
         yield 'больше колонки' => ['12345678901234', null];
     }
 
+    public function testSwappedAmountBoundsAreReordered(): void
+    {
+        $dto = $this->dto(amountFrom: '500', amountTo: '100,5');
+
+        self::assertSame('100.50', $dto->amountFrom);
+        self::assertSame('500.00', $dto->amountTo);
+    }
+
     public function testGarbageDateIsIgnoredButValidBoundaryDateIsKept(): void
     {
         $dto = $this->dto(dateFrom: '2024-02-30', dateTo: '2024-02-29');

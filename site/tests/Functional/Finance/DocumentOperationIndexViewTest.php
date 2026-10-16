@@ -111,6 +111,25 @@ final class DocumentOperationIndexViewTest extends WebTestCaseBase
         self::assertCount(1, $documents->filter('tbody[data-document-row]'));
     }
 
+    public function testNeighbourRoutesStillResolve(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        [$income] = $this->persistCategories($company);
+        $document = $this->persistDocument($company, 'SHOW-ME', [[$income, '1.00']]);
+
+        $crawler = $this->requestOperations($client, $user, $company, []);
+        self::assertSame('Операции · Документы ОПиУ', trim($crawler->filter('title')->text()));
+
+        $client->request('GET', '/documents/'.$document->getId());
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('SHOW-ME', (string) $client->getResponse()->getContent());
+
+        $client->request('GET', '/documents/operations/export.json');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('application/json', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
     public function testEmptyStates(): void
     {
         $client = static::createClient();

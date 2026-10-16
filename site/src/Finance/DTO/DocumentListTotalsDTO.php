@@ -45,11 +45,11 @@ final readonly class DocumentListTotalsDTO
 
     /**
      * Итог из двух агрегатов списка: обычные документы уже просуммированы запросом по валютам,
-     * marketplace_pl — подписанные суммы по (документ, статья, природа): модуль берётся от
-     * суммы, а не от операции, — списание −X и сторно +X взаимно гасятся, как в регистре ОПиУ.
+     * marketplace_pl — вклады по (документ, статья, природа), уже приведённые к знаку
+     * регистра ОПиУ вызывающим: списание −X и сторно +X взаимно гасятся внутри статьи.
      *
      * @param list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain
-     * @param list<array{currency: string, bucket: string, signedTotal: string}> $marketplace
+     * @param list<array{currency: string, bucket: string, amount: string}> $marketplace
      */
     public static function fromAggregates(array $plain, array $marketplace): self
     {
@@ -67,10 +67,8 @@ final readonly class DocumentListTotalsDTO
         }
         foreach ($marketplace as $row) {
             $key = 'INCOME' === $row['bucket'] ? 'income' : 'expense';
-            $sum = (string) $row['signedTotal'];
-            $abs = -1 === bccomp($sum, '0', 2) ? bcmul($sum, '-1', 2) : $sum;
             $byCurrency[$row['currency']] ??= ['income' => '0.00', 'expense' => '0.00'];
-            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $abs, 2);
+            $byCurrency[$row['currency']][$key] = bcadd($byCurrency[$row['currency']][$key], $row['amount'], 2);
         }
 
         $currencies = [];

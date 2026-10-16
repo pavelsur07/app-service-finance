@@ -112,6 +112,13 @@ class DocumentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
+        // Документ входит со всеми операциями, поэтому сумма статьи здесь полная: вклад — её модуль.
+        $marketplace = array_map(static fn (array $row): array => [
+            'currency' => $row['currency'],
+            'bucket' => $row['bucket'],
+            'amount' => -1 === bccomp((string) $row['signedTotal'], '0', 2) ? bcmul((string) $row['signedTotal'], '-1', 2) : bcadd((string) $row['signedTotal'], '0', 2),
+        ], $marketplace);
+
         return DocumentListTotalsDTO::fromAggregates($plain, $marketplace);
     }
 
@@ -197,8 +204,12 @@ class DocumentRepository extends ServiceEntityRepository
         // операцией по статье X на сумму от N», а не три разных операции.
         $operationConditions = [];
         if (null !== $dto->direction) {
-            $operationConditions[] = 'fCategory.flow = :direction';
-            $queryBuilder->setParameter('direction', $dto->direction);
+            // Природа операции, как в итоге и на вкладке «Операции»: у статьи без потока — знак суммы.
+            $operationConditions[] = sprintf(
+                '(fCategory.flow = :direction OR (fCategory.flow = :directionNone AND fOp.amount %s 0))',
+                PLFlow::INCOME === $dto->direction ? '>' : '<',
+            );
+            $queryBuilder->setParameter('direction', $dto->direction)->setParameter('directionNone', PLFlow::NONE);
         }
         if (null !== $dto->categoryId) {
             $operationConditions[] = 'fCategory.id = :categoryId';

@@ -96,16 +96,19 @@ final class DocumentRepositoryListTest extends IntegrationTestCase
         self::assertSame(['DOC-CFO', 'OP-CFO'], $this->numbers(responsibilityCenterId: strtoupper($centerId)));
     }
 
-    public function testDirectionFilterUsesCategoryFlowAndKeepsMixedDocuments(): void
+    public function testDirectionFilterUsesOperationNatureAndKeepsMixedDocuments(): void
     {
         $this->persistDocument('INCOME-ONLY', operations: [[$this->revenue, '10.00']]);
         $this->persistDocument('EXPENSE-ONLY', operations: [[$this->rent, '10.00']]);
         $this->persistDocument('MIXED', operations: [[$this->revenue, '10.00'], [$this->rent, '3.00']]);
-        $this->persistDocument('UNCATEGORIZED', operations: [[null, '10.00'], [$this->neutral, '10.00']]);
+        $this->persistDocument('UNCATEGORIZED', operations: [[null, '10.00']]);
+        // Статья без потока — по знаку суммы, как в итоге и на вкладке «Операции».
+        $this->persistDocument('NONE-PLUS', operations: [[$this->neutral, '10.00']]);
+        $this->persistDocument('NONE-MINUS', operations: [[$this->neutral, '-10.00']]);
 
-        self::assertSame(['INCOME-ONLY', 'MIXED'], $this->numbers(direction: 'income'));
-        self::assertSame(['EXPENSE-ONLY', 'MIXED'], $this->numbers(direction: 'expense'));
-        self::assertSame(['EXPENSE-ONLY', 'INCOME-ONLY', 'MIXED', 'UNCATEGORIZED'], $this->numbers());
+        self::assertSame(['INCOME-ONLY', 'MIXED', 'NONE-PLUS'], $this->numbers(direction: 'income'));
+        self::assertSame(['EXPENSE-ONLY', 'MIXED', 'NONE-MINUS'], $this->numbers(direction: 'expense'));
+        self::assertSame(['EXPENSE-ONLY', 'INCOME-ONLY', 'MIXED', 'NONE-MINUS', 'NONE-PLUS', 'UNCATEGORIZED'], $this->numbers());
     }
 
     public function testCategoryFilterKeepsAllOperationsOfFoundDocument(): void

@@ -153,7 +153,7 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
 
         $rows = $this->rows();
         $documentIds = array_values(array_unique(array_map(static fn (DocumentOperation $op): string => (string) $op->getDocument()?->getId(), $rows)));
-        $sums = $this->repository->marketplaceBucketSums($this->companyId(), $dto, $documentIds);
+        $sums = $this->repository->marketplaceBucketSums($this->companyId(), $documentIds);
         $contribution = self::getContainer()->get(DocumentPlContribution::class);
 
         $byNature = ['INCOME' => '0.00', 'EXPENSE' => '0.00'];
@@ -169,6 +169,29 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         self::assertSame(['-20.00', '30.00', '100.00', '500.00'], $amounts);
         self::assertSame($totals->income, $byNature['INCOME']);
         self::assertSame($totals->expense, $byNature['EXPENSE']);
+    }
+
+    /**
+     * Фильтр оставил одно сторно (+200) статьи, где итог — списание (−800): сторно уменьшает
+     * расход, как в регистре и на странице документа, а не становится расходом.
+     */
+    public function testFilteredStornoKeepsSignOfWholeCategory(): void
+    {
+        $this->persistDocument('MP', type: DocumentType::MARKETPLACE_PL, operations: [
+            [$this->rent, '-1000.00'],
+            [$this->rent, '200.00'],
+        ]);
+
+        $dto = $this->dto(amountTo: '500');
+        $totals = $this->repository->summarizeForList($this->companyId(), $dto);
+        self::assertSame(1, $totals->operations);
+        self::assertSame('-200.00', $totals->expense);
+
+        $rows = $this->rows(amountTo: '500');
+        self::assertCount(1, $rows);
+        $sums = $this->repository->marketplaceBucketSums($this->companyId(), [(string) $rows[0]->getDocument()?->getId()]);
+        $row = self::getContainer()->get(DocumentPlContribution::class)->forOperation($rows[0], $sums);
+        self::assertSame(['nature' => 'EXPENSE', 'amount' => '-200.00', 'currency' => 'RUB'], $row);
     }
 
     public function testCurrenciesAreNotSummedTogether(): void
@@ -233,7 +256,7 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
             self::assertSame([], $totals->others(), $label);
         }
 
-        self::assertSame([], $this->repository->marketplaceBucketSums($this->companyId(), $this->dto(), [(string) $foreign->getId()]));
+        self::assertSame([], $this->repository->marketplaceBucketSums($this->companyId(), [(string) $foreign->getId()]));
     }
 
     /**

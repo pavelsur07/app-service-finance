@@ -20,6 +20,8 @@ class DocumentOperationRepository extends ServiceEntityRepository
     /** Природа операции, как у регистра ОПиУ: flow статьи, у статьи без потока — знак суммы. */
     private const IS_INCOME = '(category.flow = :income OR (category.flow = :none AND op.amount > 0))';
     private const IS_EXPENSE = '(category.flow = :expense OR (category.flow = :none AND op.amount < 0))';
+    /** Порция id документов в IN: длинный список параметров PostgreSQL принимает плохо. */
+    private const ID_CHUNK = 5000;
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -79,8 +81,8 @@ class DocumentOperationRepository extends ServiceEntityRepository
     /**
      * Итог вкладки «Операции» по всей выборке фильтра: число операций и их документов,
      * доход, расход и результат по валютам. Правила — как у вкладки документов
-     * (DocumentRepository::summarizeByCompany), но в итог входят только найденные операции:
-     * у marketplace_pl модуль берётся от суммы найденных операций статьи документа.
+     * (DocumentRepository::summarizeByCompany), но в итог входят только найденные операции;
+     * у marketplace_pl знак — по полной сумме статьи документа (marketplaceBucketSums).
      */
     public function summarizeForList(string $companyId, DocumentListDTO $dto): DocumentListTotalsDTO
     {
@@ -96,37 +98,71 @@ class DocumentOperationRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
-        /** @var list<array{currency: string, bucket: string, signedTotal: string}> $marketplace */
-        $marketplace = $this->marketplaceBuckets($companyId, $dto)
+        /** @var list<array{currency: string, bucket: string, documentId: string, categoryId: string, signedTotal: string}> $found */
+        $found = $this->marketplaceBuckets($companyId, $dto)
             ->addSelect("COALESCE(ct.currency, 'RUB') AS currency")
+            ->addSelect('d.id AS documentId')
+            ->addSelect('category.id AS categoryId')
             ->addGroupBy('currency')
             ->getQuery()
             ->getScalarResult();
+
+        // Знак — по полной сумме статьи и природы в документе, без фильтров списка: фильтр,
+        // оставивший одно сторно (+X), не должен превращать его в расход. Вклад найденных
+        // операций = −сумма при отрицательной полной сумме (списания), иначе сумма.
+        $documentIds = array_values(array_unique(array_map(static fn (array $row): string => (string) $row['documentId'], $found)));
+        $fullSums = [];
+        foreach (array_chunk($documentIds, self::ID_CHUNK) as $chunk) {
+            $fullSums += $this->marketplaceBucketSums($companyId, $chunk);
+        }
+
+        $marketplace = [];
+        foreach ($found as $row) {
+            $sum = bcadd((string) $row['signedTotal'], '0', 2);
+            $full = $fullSums[sprintf('%s|%s|%s', $row['documentId'], $row['categoryId'], $row['bucket'])] ?? $sum;
+            $marketplace[] = [
+                'currency' => $row['currency'],
+                'bucket' => $row['bucket'],
+                'amount' => -1 === bccomp($full, '0', 2) ? bcmul($sum, '-1', 2) : $sum,
+            ];
+        }
 
         return DocumentListTotalsDTO::fromAggregates($plain, $marketplace);
     }
 
     /**
-     * Подписанные суммы найденных операций marketplace_pl по (документ, статья, природа) для
-     * документов страницы: знак суммы решает, со знаком ли операция входит в строку. Тот же
-     * разрез, что у итога, — сумма строк равна итогу.
+     * Полные подписанные суммы операций marketplace_pl по (документ, статья, природа) — без
+     * фильтров списка: знак суммы решает, со знаком ли операция входит в строку и в итог
+     * (списание −X → X, сторно +X → −X), как в регистре ОПиУ и на странице документа.
      *
      * @param list<string> $documentIds
      *
      * @return array<string, string> ключ — «documentId|categoryId|INCOME|EXPENSE»
      */
-    public function marketplaceBucketSums(string $companyId, DocumentListDTO $dto, array $documentIds): array
+    public function marketplaceBucketSums(string $companyId, array $documentIds): array
     {
         if ([] === $documentIds) {
             return [];
         }
 
         /** @var list<array{documentId: string, categoryId: string, bucket: string, signedTotal: string}> $rows */
-        $rows = $this->marketplaceBuckets($companyId, $dto)
-            ->addSelect('d.id AS documentId')
+        $rows = $this->withNatureParameters($this->createQueryBuilder('op'))
+            ->select('d.id AS documentId')
             ->addSelect('category.id AS categoryId')
+            ->addSelect(sprintf("CASE WHEN %s THEN 'INCOME' ELSE 'EXPENSE' END AS bucket", self::IS_INCOME))
+            ->addSelect('SUM(op.amount) AS signedTotal')
+            ->innerJoin('op.document', 'd')
+            ->innerJoin('op.category', 'category')
+            ->andWhere('IDENTITY(d.company) = :companyId')
+            ->andWhere('d.type = :marketplace')
             ->andWhere('d.id IN (:documentIds)')
+            ->andWhere(sprintf('(%s OR %s)', self::IS_INCOME, self::IS_EXPENSE))
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', DocumentType::MARKETPLACE_PL)
             ->setParameter('documentIds', $documentIds)
+            ->groupBy('d.id')
+            ->addGroupBy('category.id')
+            ->addGroupBy('bucket')
             ->getQuery()
             ->getScalarResult();
 

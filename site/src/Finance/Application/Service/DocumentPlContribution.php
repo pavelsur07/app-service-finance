@@ -89,7 +89,7 @@ final readonly class DocumentPlContribution
 
     /**
      * Вклад строки вкладки «Операции». Обычный документ — модуль операции; marketplace_pl —
-     * со знаком: если сумма найденных операций той же статьи и природы в документе
+     * со знаком: если полная сумма операций той же статьи и природы в документе
      * отрицательна (списания), вклад = −amount, иначе amount. Ключ суммы —
      * «documentId|categoryId|INCOME|EXPENSE» (DocumentOperationRepository::marketplaceBucketSums).
      * Без статьи или с нулевой суммой у статьи без потока — null: в итог не входит.

@@ -56,7 +56,7 @@ final class DocumentOperationIndexController extends AbstractController
         }
         $documentIds = array_values(array_unique($documentIds));
 
-        $bucketSums = $this->operationRepository->marketplaceBucketSums($companyId, $filters, $documentIds);
+        $bucketSums = $this->operationRepository->marketplaceBucketSums($companyId, $documentIds);
         $contributions = [];
         foreach ($items as $operation) {
             $contributions[(string) $operation->getId()] = $this->plContribution->forOperation($operation, $bucketSums);
