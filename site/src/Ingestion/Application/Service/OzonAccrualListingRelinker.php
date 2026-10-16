@@ -211,7 +211,11 @@ final readonly class OzonAccrualListingRelinker
      */
     private function recoverListingSourceData(array $rows): array
     {
-        $rawRecordIdsByCompany = [];
+        // Только ключи транзакций порции: раньше в память шёл контекст листинга КАЖДОЙ
+        // строки каждого упомянутого снимка (порция до 5000 транзакций ссылается на сотни
+        // снимков), и сверка #422 падала по memory_limit 1G, хотя самый крупный снимок —
+        // ~0,7 МБ. Теперь память — O(транзакций порции), снимок читается потоково.
+        $neededByRecord = [];
         foreach ($rows as $row) {
             $sourceData = $this->decodeSourceData($row['source_data'] ?? null);
             if ($this->hasMarketplaceSkuContext($sourceData)) {
@@ -220,30 +224,42 @@ final readonly class OzonAccrualListingRelinker
 
             $companyId = $this->stringValue($row['company_id'] ?? null);
             $rawRecordId = $this->stringValue($row['raw_record_id'] ?? null);
-            if (null === $companyId || null === $rawRecordId) {
+            $externalId = $this->stringValue($row['external_id'] ?? null);
+            if (null === $companyId || null === $rawRecordId || null === $externalId) {
                 continue;
             }
 
-            $rawRecordIdsByCompany[$companyId][$rawRecordId] = $rawRecordId;
+            $neededByRecord[$companyId][$rawRecordId][$externalId] = true;
         }
 
         $recovered = [];
-        foreach ($rawRecordIdsByCompany as $companyId => $rawRecordIds) {
-            foreach ($rawRecordIds as $rawRecordId) {
+        foreach ($neededByRecord as $companyId => $records) {
+            foreach ($records as $rawRecordId => $neededSourceKeys) {
+                // Снимок, разбор которого упал, не даёт ничего — как раньше с preview():
+                // строки копятся отдельно и попадают в результат только после полного разбора.
+                $recordSourceData = [];
                 try {
-                    $rawRows = $this->rawStorageFacade->read($rawRecordId, $companyId);
-                    $previewRows = $this->previewMapper->preview($companyId, $rawRows, includeSaleRefund: true);
+                    $previewRows = $this->previewMapper->previewEach(
+                        (string) $companyId,
+                        $this->rawStorageFacade->read((string) $rawRecordId, (string) $companyId),
+                        includeSaleRefund: true,
+                    );
+                    foreach ($previewRows as $previewRow) {
+                        if (!isset($neededSourceKeys[$previewRow->sourceKey])) {
+                            continue;
+                        }
+
+                        $sourceData = $this->listingSourceData($previewRow);
+                        if ([] !== $sourceData) {
+                            $recordSourceData[$previewRow->sourceKey] = $sourceData;
+                        }
+                    }
                 } catch (\Throwable) {
                     continue;
                 }
 
-                foreach ($previewRows as $previewRow) {
-                    $sourceData = $this->listingSourceData($previewRow);
-                    if ([] === $sourceData) {
-                        continue;
-                    }
-
-                    $recovered[$companyId][$rawRecordId][$previewRow->sourceKey] = $sourceData;
+                if ([] !== $recordSourceData) {
+                    $recovered[$companyId][$rawRecordId] = $recordSourceData;
                 }
             }
         }
