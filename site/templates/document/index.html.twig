@@ -22,7 +22,6 @@
         <input type="hidden" name="{{ k }}" value="{{ v }}">
     {% endfor %}
 {% endmacro %}
-{% macro clip(text) %}{{ text|length > 22 ? text|slice(0, 21)|trim ~ '…' : text }}{% endmacro %}
 {% import _self as ui %}
 
 {% set route = 'document_index' %}
@@ -64,6 +63,14 @@
 
 {% set project = filters.projectDirectionId ? projectDirections|filter(p => p.id == filters.projectDirectionId)|first : null %}
 {% set center = filters.responsibilityCenterId ? responsibilityCenters|filter(c => c.id == filters.responsibilityCenterId)|first : null %}
+{# Подписи пилюль — строки, а не вывод макроса: макрос отдаёт уже экранированный Markup, и после
+   склейки с префиксом «A&B» экранировался бы второй раз. #}
+{% set clipLen = 22 %}
+{# Родители — по parent уже загруженного дерева: p.children — ленивая коллекция, запрос на каждый проект. #}
+{% set parentProjectIds = projectDirections|filter(p => p.parent)|map(p => p.parent.id) %}
+{% set typeName = filters.type ? (typeShortLabels[filters.type.value] ?? filters.type.label()) : '' %}
+{% set projectName = project ? project.name : '' %}
+{% set centerName = center ? center.name : '' %}
 {% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) + (filters.counterparty ? 1 : 0) %}
 
 {% set presetsHtml %}{% include 'partials/_period_presets.html.twig' with {
@@ -166,7 +173,7 @@
             <span class="vf-caps-label vf-docs__pills-label">Фильтры</span>
 
             <div class="dropdown">
-                {{ ui.pill(filters.type ? 'Тип: ' ~ ui.clip(typeShortLabels[filters.type.value] ?? filters.type.label()) : 'Тип', filters.type, 'doc-pill-type') }}
+                {{ ui.pill(filters.type ? 'Тип: ' ~ (typeName|length > clipLen ? typeName|slice(0, clipLen - 1)|trim ~ '…' : typeName) : 'Тип', filters.type, 'doc-pill-type') }}
                 <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-type">
                     <div class="vf-ops-pop__list">
                         <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])) }}"{% if not filters.type %} aria-current="true"{% endif %}>Все типы</a>
@@ -179,12 +186,17 @@
 
             {# Проект — у документа или у любой его операции. Родительские проекты не выбираются и в формах. #}
             <div class="dropdown">
-                {{ ui.pill(project ? 'Проект: ' ~ ui.clip(project.name) : 'Проект', project, 'doc-pill-project') }}
+                {{ ui.pill(project ? 'Проект: ' ~ (projectName|length > clipLen ? projectName|slice(0, clipLen - 1)|trim ~ '…' : projectName) : 'Проект', project, 'doc-pill-project') }}
                 <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-project">
                     <div class="vf-ops-pop__list">
                         <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])) }}"{% if not filters.projectDirectionId %} aria-current="true"{% endif %}>Все проекты</a>
                         {% for p in projectDirections %}
-                            <a class="dropdown-item vf-ops-lvl-{{ min(p.level, 5) }}" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])|merge({projectDirection: p.id})) }}"{% if filters.projectDirectionId == p.id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+                            {# Родительский проект документу не назначается (в формах он disabled): выбор дал бы пустой список. #}
+                            {% if p.id not in parentProjectIds %}
+                                <a class="dropdown-item vf-ops-lvl-{{ min(p.level, 5) }}" href="{{ path(route, baseQuery|filter((v, k) => k not in ['projectDirection'])|merge({projectDirection: p.id})) }}"{% if filters.projectDirectionId == p.id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+                            {% else %}
+                                <span class="dropdown-header vf-ops-lvl-{{ min(p.level, 5) }}">{{ p.name }}</span>
+                            {% endif %}
                         {% else %}
                             <div class="vf-ops-pop__empty">Проектов нет</div>
                         {% endfor %}
@@ -194,7 +206,7 @@
 
             {# ЦФО — у документа или у любой его операции. В списке — активные ЦФО компании. #}
             <div class="dropdown">
-                {{ ui.pill(center ? 'ЦФО: ' ~ ui.clip(center.name) : 'ЦФО', center or filters.responsibilityCenterId, 'doc-pill-center') }}
+                {{ ui.pill(center ? 'ЦФО: ' ~ (centerName|length > clipLen ? centerName|slice(0, clipLen - 1)|trim ~ '…' : centerName) : 'ЦФО', center or filters.responsibilityCenterId, 'doc-pill-center') }}
                 <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm" aria-labelledby="doc-pill-center">
                     <div class="vf-ops-pop__list">
                         <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['responsibilityCenter'])) }}"{% if not filters.responsibilityCenterId %} aria-current="true"{% endif %}>Все ЦФО</a>
