@@ -85,6 +85,12 @@ Ready: PR #<n> "<title>" — merge into master with automatic production deploy?
 Reply: "merge and deploy #<n>"
 ```
 
+"Делай" from the owner is the same approval. Locally a PreToolUse hook
+(`~/.claude/hooks/vf-merge-approval.py`) lets `gh pr merge` / `git merge` pass
+without a permission prompt once either phrase is in the session; push, PR and
+Ready are allowed by settings (§3.1). A permission prompt from the tool is never
+a reason to ask the owner in chat.
+
 That approval covers the whole pipeline: Ready → merge → CI → automatic deploy
 → post-deploy acceptance through read-only wrappers → report — including PRs
 split out of the same work for delivery reasons and every step inside the
