@@ -143,11 +143,10 @@ final class DocumentIndexListQueryTest extends WebTestCaseBase
 
             for ($j = 0; $j < self::OPERATIONS_PER_DOCUMENT; ++$j) {
                 $operation = new DocumentOperation();
-                $operation->setDocument($document);
                 $operation->setCategory(0 === $j % 2 ? $income : $expense);
                 $operation->setAmount('100.00');
 
-                $document->getOperations()->add($operation);
+                $document->addOperation($operation);
                 $em->persist($operation);
             }
         }

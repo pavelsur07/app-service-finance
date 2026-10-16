@@ -174,14 +174,21 @@ final class DocumentOperationIndexViewTest extends WebTestCaseBase
         $em->persist($foreignProject);
         $em->persist($foreignCounterparty);
 
-        $document = $this->persistDocument($company, 'BROKEN', [[$foreignIncome, '100.00']]);
-        $document->setCounterparty($foreignCounterparty);
-        $document->setProjectDirection($foreignProject);
+        $document = $this->persistDocument($company, 'BROKEN', [[null, '100.00']]);
         $operation = $document->getOperations()->first();
         self::assertInstanceOf(DocumentOperation::class, $operation);
-        $operation->setCounterparty($foreignCounterparty);
-        $operation->setProjectDirection($foreignProject);
         $em->flush();
+        // Сущность чужую ссылку не примет (DocumentForeignReferenceException) — строку портим
+        // в БД напрямую: проверяется защита чтения на случай данных, записанных в обход сущности.
+        $connection = $em->getConnection();
+        $connection->executeStatement(
+            'UPDATE documents SET counterparty_id = :cp, project_direction_id = :pd WHERE id = :id',
+            ['cp' => $foreignCounterparty->getId(), 'pd' => $foreignProject->getId(), 'id' => $document->getId()],
+        );
+        $connection->executeStatement(
+            'UPDATE document_operations SET category_id = :cat, counterparty_id = :cp, project_direction_id = :pd WHERE id = :id',
+            ['cat' => $foreignIncome->getId(), 'cp' => $foreignCounterparty->getId(), 'pd' => $foreignProject->getId(), 'id' => $operation->getId()],
+        );
         // Как в настоящем запросе — пустой EntityManager: иначе в нём уже лежат сущности фикстуры.
         $em->clear();
 

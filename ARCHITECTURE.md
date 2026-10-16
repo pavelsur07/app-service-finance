@@ -328,6 +328,13 @@
 - Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` (поиск, период, направление, проект, ЦФО и др.) к ней не применяются — кнопка выгружает всё. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
 - `amount` остаётся строкой (`NUMERIC(15,2)`); `counterparty` и `project` — значения операции с фоллбэком на документ, как их показывает экран.
 
+### Finance: справочники документа ОПиУ — только своей компании
+
+- `Document` и `DocumentOperation` держат инвариант: контрагент, проект, основание ДДС (`CashTransaction`) и статья ОПиУ — компании документа. Сеттеры, `Document::addOperation()` (операцию форма и импорт заполняют до привязки), `DocumentOperation::setDocument()` (синхронизирует обе стороны связи — операция попадает в коллекцию документа) и `Document::setCompany()` (с откатом) бросают `App\Finance\Exception\DocumentForeignReferenceException` (`getReference()`, `getReferenceId()`); `null` разрешён. Сравнение — по id компании. Гидрация из БД сеттеры не вызывает.
+- FK компанию не несут, поэтому без инварианта чужое название показали бы `show`, `edit`, `copy`, JSON документа и «Удалённые», а регистр ОПиУ разнёс бы сумму по чужой статье. Списки вкладок дополнительно присоединяют справочники только своей компании — на случай строк, записанных в обход сущности.
+- ЦФО (`responsibilityCenterId`) — строковый id без связи, сущность его не проверяет; путь записи — форма (активные ЦФО компании) и `FinanceDocumentResponsibilityCenterNormalizer`.
+- `CashTransactionController::createPnlDocument` ловит исключение: `logger->error` с `companyId` и flash вместо 500 (испорченная статья ДДС или справочник операции ДДС).
+
 ### Finance: списки «Документы ОПиУ» и «Операции»
 
 - Вкладки раздела: `document_index` (`GET /documents/`, документы), `document_operation_index` (`GET /documents/operations`, `DocumentOperationIndexController`, одна строка — одна `DocumentOperation`), `document_deleted_index`. У роута операций `priority: 10`: у роутов документа `{id}` без требования формата, и `/documents/operations` иначе ушёл бы в `document_show`.
@@ -3861,6 +3868,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.05 | 2026-10-16 | Finance: инвариант «справочники документа ОПиУ и операций — своей компании» (`DocumentForeignReferenceException`), перехват в создании документа из операции ДДС |
 | 2.04 | 2026-10-16 | Finance: вкладка «Операции» раздела «Документы ОПиУ» (`document_operation_index`, `DocumentOperationRepository::paginateForList()` и итог), фильтры «Статья» и «Сумма» на обеих вкладках, `DocumentListDTO::fromQuery()`, `DocumentPlContribution::forOperation()` |
 | 2.03 | 2026-10-14 | Shared `Money::multiplyByRatio()` — умножение на дробь с одним округлением (НДС «из суммы» в Cash, этап 3 плана Cash) |
 | 2.02 | 2026-10-11 | Marketplace: статья по образцу компании берётся и из правил другого маркетплейса, если у своего образцов нет (`DefaultCostMappingSiblingResolver::resolve()` по всем маркетплейсам, `CompanyCostPlTargetsQuery::fetch()` без фильтра маркетплейса); вывод `sync-default` и аудит-лог отмечают такие правила |

@@ -26,10 +26,12 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Facade\CounterpartyFacade;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\Document;
+use App\Finance\Exception\DocumentForeignReferenceException;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -228,6 +230,7 @@ class CashTransactionController extends AbstractController
         string $id,
         CashTransactionRepository $txRepo,
         CreatePnlDocumentFromTransactionAction $createPnlDocument,
+        LoggerInterface $logger,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $tx = $txRepo->findOneByIdAndCompanyId($id, (string) $company->getId())
@@ -252,6 +255,17 @@ class CashTransactionController extends AbstractController
             return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
         } catch (\DomainException $e) {
             $this->addFlash('danger', $e->getMessage());
+        } catch (DocumentForeignReferenceException $e) {
+            // Испорченные данные: статья ДДС, контрагент или проект операции ссылаются на
+            // справочник другой компании. Документ не создаётся — иначе чужое название попало
+            // бы в ОПиУ компании; это инцидент, его чинят данными.
+            $logger->error('P&L document from cash transaction refused: foreign reference', [
+                'companyId' => (string) $company->getId(),
+                'cashTransactionId' => $tx->getId(),
+                'reference' => $e->getReference(),
+                'referenceId' => $e->getReferenceId(),
+            ]);
+            $this->addFlash('danger', 'Документ ОПиУ не создан: в операции ДДС или её статье указан справочник другой компании. Мы уже знаем об ошибке.');
         }
 
         return $this->redirectToRoute('cash_transaction_show', ['id' => $tx->getId()]);
