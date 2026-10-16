@@ -143,6 +143,29 @@ final class DocumentCompanyReferenceTest extends TestCase
         self::assertSame($this->own, $document->getCompany(), 'При отказе компания документа прежняя.');
     }
 
+    public function testChangingCompanyRechecksDocumentReferences(): void
+    {
+        $document = $this->document()->setCounterparty($this->counterparty($this->own));
+
+        try {
+            $document->setCompany($this->foreign);
+            self::fail('Документ сменил компанию с контрагентом прежней компании.');
+        } catch (DocumentForeignReferenceException $exception) {
+            self::assertSame('counterparty', $exception->getReference());
+        }
+        self::assertSame($this->own, $document->getCompany());
+    }
+
+    public function testChangingCompanyWithoutReferencesSucceeds(): void
+    {
+        $document = $this->document();
+        $document->addOperation(new DocumentOperation());
+
+        $document->setCompany($this->foreign);
+
+        self::assertSame($this->foreign, $document->getCompany());
+    }
+
     private function expectForeign(string $reference): void
     {
         $this->expectException(DocumentForeignReferenceException::class);
