@@ -625,6 +625,22 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 - Рекламные удержания WB с постоянным текстом («WB Медиа», подписка «Джем», аванс «Баллы за отзывы») внесены в `WbCostCategory` под теми же кодами, что даёт слугификация: `forDeductionName()` для них не нужен, группа аналитики — «Продвижение и реклама». «Добровольная выплата за товары» намеренно без правила ОПиУ (решение Владельца 26.09.2026).
 - Услуги Ozon by-day разбираются по `OzonCostCategory::$accrualTypeNames`. Каждая услуга снимка справочника `tests/Fixtures/Marketplace/Ozon/accrual_types.json` либо размечена, либо стоит в `OzonCostCategoryTest::AWAITING_CLASSIFICATION` — тест падает на услуге без решения. Размечать только при однозначной категории, которая уже получала деньги; сомнительная услуга остаётся `ozon_unknown_<id>`: видимая очередь безопаснее тихой ошибки в строке ОПиУ.
 
+### Marketplace: предпросмотр ОПиУ по тегам
+
+Отчёт «что покажет ОПиУ, если провести нормализованные данные периода по текущему маппингу» с
+колонками по тегам листингов. Ничего не пишет: ни документов ОПиУ, ни `pl_daily_totals`, ни
+`document_id` у строк. Постановка — `docs/plan/marketplace-pl-preview-by-tags.md`.
+
+- Факты — `Infrastructure\Query\PlPreviewFactsQuery::fetch(companyId, from, to, ?marketplace,
+  byListing)`: `list<PlPreviewFactDTO(plCategoryId, ?listingId, amount)>`, сумма в знаке строки
+  документа `marketplace_pl`. Источники, правила и знаки — как у `CloseMonthStageAction`: продажи
+  и возвраты (`MarketplacePlAmountSql`), затраты (модуль суммы группы «категория затрат × сторно»,
+  у сторно знак правила обратный), «Реализация» Ozon (документ входит, если целиком внутри
+  периода). Берутся **все** строки периода, проведённые или нет; `preliminary`-фильтры не
+  применяются.
+- Модуль у затрат нелинеен, поэтому итог по статье — отдельный вызов с `byListing = false`; сумма
+  по листингам с ним совпадает, только когда внутри группы нет сумм разного знака.
+
 ### `UnitEconomyCostMapping` — поля
 
 | Поле | Тип | Описание |
@@ -3889,6 +3905,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.08 | 2026-10-17 | Marketplace: `PlPreviewFactsQuery` — суммы предпросмотра ОПиУ по статьям и листингам (раздел «Marketplace: предпросмотр ОПиУ по тегам») |
 | 2.07 | 2026-10-17 | Finance: `FinanceFacade::calculatePlPreview()` — дерево ОПиУ по колонкам без записи (`PlPreviewCalculator`, `InMemoryFactsProvider`, `PlReportCalculator::withFacts()`, DTO `PlPreview*`, enum `PlPreviewUnplacedReason`) |
 | 2.06 | 2026-10-17 | Marketplace: формулы сумм продаж и возвратов по `amount_source` вынесены в `MarketplacePlAmountSql` (этап 1 предпросмотра ОПиУ по тегам), поведение проведения не меняется |
 | 2.05 | 2026-10-16 | Finance: инвариант «справочники документа ОПиУ и операций — своей компании» (`DocumentForeignReferenceException`), перехват в создании документа из операции ДДС |
