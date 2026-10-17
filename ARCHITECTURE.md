@@ -3352,6 +3352,15 @@ internal_api → stateless, /internal/* для сервисов services/
 - Контроллеры — `App\{Module}\Controller\Internal\`; модульный гейт их
   пропускает (`ModuleAccessMap::EXEMPT_PREFIXES`), контекст компании не
   используется. `GET /internal/ping` → `{"status":"ok"}`.
+- `GET /internal/marketplace-connections?provider=ozon` — снимок активных
+  Ozon-кабинетов с ключами по контракту `services/_contracts/marketplace-connections/v1`
+  (`MarketplaceConnectionsController` → `ActiveConnectionCredentialsQuery`
+  (`@companyScopeExempt`, расшифровка через `ConnectionApiKeyCodec`) →
+  `MarketplaceConnectionsSnapshotBuilder`). Кабинет = компания: seller и
+  performance одной компании — один элемент; `connection_ref` — id seller,
+  без seller — id performance. Ключ, который не расшифровался, — кабинет без
+  него, один error-лог на запрос; кабинет без пригодных ключей не выдаётся.
+  Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
 Admin-роли: `ROLE_ADMIN → ROLE_SUPER_ADMIN`
@@ -3975,6 +3984,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.18 | 2026-10-17 | Marketplace: `GET /internal/marketplace-connections` — активные Ozon-кабинеты и ключи для сервисов `services/` (`ActiveConnectionCredentialsQuery`, `MarketplaceConnectionsSnapshotBuilder`, DTO `Application/DTO/Internal`) |
 | 2.17 | 2026-10-17 | Shared: firewall `internal_api` для `/internal/*` (static token + IP-allowlist, `InternalAccessPolicy`), `GET /internal/ping`; `AuditContextProvider::getCompanyId()` — `null` для principal без пользователя |
 | 2.16 | 2026-10-17 | Finance: `calculatePlPreview(…, natureBaseColumn)` — колонки-доли берут знак статьи от итога и складываются в него |
 | 2.15 | 2026-10-17 | Marketplace: реклама Ozon (клики) и WB («Продвижение») в колонках тегов предпросмотра — из рекламной статистики, «Итого» — учёт |

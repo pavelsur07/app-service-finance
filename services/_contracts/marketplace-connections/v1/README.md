@@ -10,6 +10,26 @@
 `ActiveOzonPerformanceConnectionsQuery` и кодеком ключей
 (`ConnectionApiKeyCodec`).
 
+## Реализация в Symfony
+
+`site/src/Marketplace/Controller/Internal/MarketplaceConnectionsController.php`
+(firewall `internal_api`, этап 2 `docs/tasks/ozon-fetcher-ingestion/plan.md`).
+
+- Поддерживается только `provider=ozon` (по умолчанию): `seller` требует
+  `client_id`, у WB его нет. Другой провайдер — 422 `unsupported_provider`.
+- **Кабинет = компания.** Seller- и performance-подключение одной компании —
+  один элемент. `connection_ref` — id seller-подключения, без него — id
+  performance. Новое подключение даёт новый ref; правка ключей того же
+  подключения ref не меняет.
+- Ключ, который не удалось расшифровать, или seller без `client_id` — тип
+  ключа `null`. Кабинет без пригодных ключей в ответ не попадает.
+- `auth_status` подключения не фильтруется: пауза кабинета по 401 — на
+  стороне сервиса.
+- `resource_types`: seller → `ozon.finance.accrual-by-day`,
+  `ozon.finance.accrual-types`, `ozon.finance.realization`,
+  `ozon.finance.mutual-settlement`; performance → `ozon.ads.statistics`.
+- `updated_at` — максимум из подключений кабинета.
+
 ## Правила
 
 - Отдаёт только **активные** подключения. Credentials сгруппированы по типу
@@ -19,10 +39,8 @@
     (`api-performance.ozon.ru/api/client/token`), рекламная статистика.
   - Тип равен `null` — ключа нет, job'ы на его ресурсы не создаются.
 - `resource_types` — выводимое поле (из наличия ключей), не источник истины:
-  seller → `ozon.finance.*`, performance → `ozon.ads.*`. Значения seller
-  первой волны: `ozon.finance.accrual-by-day`, `ozon.finance.accrual-types`,
-  `ozon.finance.realization`, `ozon.finance.mutual-settlement`
-  (`services/ozon-fetcher/docs/ozon-api.md`).
+  seller → `ozon.finance.*`, performance → `ozon.ads.*` (значения — раздел
+  «Реализация в Symfony»).
 - Сервис кэширует ответ **только в памяти**; значения ключей не попадают в
   БД сервиса и в логи (M1 §2). `updated_at` — для инвалидации кэша и
   force-refresh при 401 от Ozon.
