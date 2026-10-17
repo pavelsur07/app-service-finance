@@ -80,6 +80,31 @@ final class PlPreviewSalesCoverageQuery
     }
 
     /**
+     * Документы «Реализации» Ozon, которые пересекают период, но не входят в него целиком: проведение
+     * берёт документ только целиком, поэтому предпросмотр их не показывает — об этом надо сказать.
+     *
+     * @return list<array{from: \DateTimeImmutable, to: \DateTimeImmutable}>
+     */
+    public function fetchPartialRealizationPeriods(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT DISTINCT r.period_from, r.period_to
+             FROM marketplace_ozon_realizations r
+             WHERE r.company_id = :companyId
+                 AND r.period_from <= :periodTo
+                 AND r.period_to >= :periodFrom
+                 AND (r.period_from < :periodFrom OR r.period_to > :periodTo)
+             ORDER BY r.period_from, r.period_to',
+            ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
+        );
+
+        return array_map(static fn (array $row): array => [
+            'from' => new \DateTimeImmutable((string) $row['period_from']),
+            'to' => new \DateTimeImmutable((string) $row['period_to']),
+        ], $rows);
+    }
+
+    /**
      * @param list<AmountSource> $sources
      */
     private function branch(

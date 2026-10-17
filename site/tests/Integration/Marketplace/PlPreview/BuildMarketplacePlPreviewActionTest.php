@@ -115,10 +115,30 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         $this->em->persist($wb);
         $this->em->flush();
 
-        $warnings = $this->build()->warnings;
+        $warnings = array_values(array_filter($this->build()->warnings, static fn (string $w): bool => str_contains($w, 'проект')));
 
         self::assertCount(1, $warnings);
         self::assertStringStartsWith(MarketplaceType::OZON->getDisplayName().':', $warnings[0]);
+    }
+
+    public function testWarnsWhenPeriodCutsOzonRealization(): void
+    {
+        $report = ($this->action)(new BuildMarketplacePlPreviewCommand(
+            $this->companyId(),
+            new \DateTimeImmutable('2026-01-15'),
+            new \DateTimeImmutable('2026-02-14'),
+            MarketplaceType::OZON,
+        ));
+
+        $realization = array_values(array_filter($report->warnings, static fn (string $w): bool => str_starts_with($w, 'Реализация Ozon')));
+        // Декабрьско-январский документ (15.12–14.01) с периодом не пересекается — о нём молчим.
+        self::assertSame([
+            'Реализация Ozon за 01.01.2026 — 31.01.2026 входит в период не целиком и в предпросмотр не попала: выберите период, который содержит её полностью.',
+        ], $realization);
+        self::assertSame([], array_filter(
+            $this->build()->warnings,
+            static fn (string $w): bool => str_contains($w, '01.01.2026 — 31.01.2026'),
+        ), 'Январь целиком — январская реализация в периоде.');
     }
 
     public function testWritesNothing(): void

@@ -45,7 +45,7 @@ final class PlPreviewFilterTest extends TestCase
         self::assertSame('company-id', $command->companyId);
         self::assertSame(['a', 'b'], $command->tagIds);
         self::assertSame(
-            ['dateFrom' => '2026-01-01', 'dateTo' => '2026-03-31', 'marketplace' => 'ozon', 'tags' => ['a', 'b'], 'empty' => '1'],
+            ['dateFrom' => '2026-01-01', 'dateTo' => '2026-03-31', 'marketplace' => 'ozon', 'tags_set' => '1', 'tags' => ['a', 'b'], 'empty' => '1'],
             $filter->toQuery(),
         );
     }
@@ -67,5 +67,7 @@ final class PlPreviewFilterTest extends TestCase
     public function testEmptyTagListMeansNoTagColumns(): void
     {
         self::assertSame([], PlPreviewFilter::fromQuery(['tags' => ['']], $this->today)->tagIds);
+        // Все флажки сняты: браузер не шлёт tags[], только маркер формы.
+        self::assertSame([], PlPreviewFilter::fromQuery(['tags_set' => '1'], $this->today)->tagIds);
     }
 }

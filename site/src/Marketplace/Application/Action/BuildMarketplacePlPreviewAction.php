@@ -14,6 +14,7 @@ use App\Marketplace\Application\DTO\PlPreviewFactDTO;
 use App\Marketplace\Application\DTO\PlPreviewSalesCoverageDTO;
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Enum\MarketplaceConnectionType;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
@@ -131,7 +132,11 @@ final readonly class BuildMarketplacePlPreviewAction
             costTotal: bcadd($costTotal, '0', 2),
             costReconciliationDelta: bcsub($costTotal, $costByStatus, 2),
             salesCoverage: $salesCoverage,
-            warnings: [...$pl->warnings, ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage)],
+            warnings: [
+                ...$pl->warnings,
+                ...$this->realizationWarnings($companyId, $from, $to, $command->marketplace),
+                ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage),
+            ],
         );
     }
 
@@ -179,6 +184,28 @@ final readonly class BuildMarketplacePlPreviewAction
     }
 
     /**
+     * Проведение берёт документ «Реализации» Ozon только целиком; период, который его режет,
+     * молча терял бы выручку по реализации.
+     *
+     * @return list<string>
+     */
+    private function realizationWarnings(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?MarketplaceType $marketplace): array
+    {
+        if (null !== $marketplace && MarketplaceType::OZON !== $marketplace) {
+            return [];
+        }
+
+        return array_map(
+            static fn (array $period): string => sprintf(
+                'Реализация Ozon за %s — %s входит в период не целиком и в предпросмотр не попала: выберите период, который содержит её полностью.',
+                $period['from']->format('d.m.Y'),
+                $period['to']->format('d.m.Y'),
+            ),
+            $this->salesCoverageQuery->fetchPartialRealizationPeriods($companyId, $from, $to),
+        );
+    }
+
+    /**
      * Регистр ОПиУ пропускает операции без проекта; у затрат проект — только из подключения.
      *
      * @param list<PlPreviewCostCoverageDTO> $costCoverage
@@ -199,7 +226,7 @@ final readonly class BuildMarketplacePlPreviewAction
             $connection = $this->connections->findByCompanyIdAndMarketplace($companyId, $marketplace, MarketplaceConnectionType::SELLER);
             if (null === $connection?->getProjectDirectionId()) {
                 $warnings[] = sprintf(
-                    '%s: у подключения не задан проект ОПиУ — суммы без проекта при проведении в отчёт ОПиУ не попадут.',
+                    '%s: у подключения не задан проект ОПиУ — затраты и продажи по правилам без своего проекта при проведении в отчёт ОПиУ не попадут.',
                     $marketplace->getDisplayName(),
                 );
             }

@@ -6,8 +6,6 @@ namespace App\Marketplace\Exception;
 
 final class MarketplacePlPreviewPeriodException extends \RuntimeException
 {
-    public const string CODE = 'invalid_period';
-
     public static function reversed(): self
     {
         return new self('Начало периода позже окончания.');

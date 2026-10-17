@@ -65,7 +65,8 @@ final class PlPreviewControllerTest extends WebTestCaseBase
     public function testOtherCompanySeesNothingOfThisOne(): void
     {
         $client = static::createClient();
-        new PlPreviewFixture($this->em(), 441);
+        $fixture = new PlPreviewFixture($this->em(), 441);
+        $this->em()->persist(MarketplaceListingTagBuilder::aTag()->forCompanyId((string) $fixture->company->getId())->withName('Чужой тег')->build());
         $owner = UserBuilder::aUser()->withIndex(900)->withEmail('pl-preview-stranger@example.test')->build();
         $stranger = CompanyBuilder::aCompany()->withIndex(900)->withOwner($owner)->build();
         $this->em()->persist($owner);
@@ -81,6 +82,12 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         self::assertSame(['Статья', 'Общие / без тега', 'Итого'], $crawler->filter('[data-testid="pl-preview-table"] thead th')->each(static fn ($th): string => trim($th->text())));
         self::assertSelectorNotExists('[data-testid="pl-preview-unmapped-costs"]');
         self::assertSelectorExists('[data-testid="pl-preview-all-mapped"]');
+        self::assertSelectorNotExists('[data-testid="pl-preview-tags"]');
+        self::assertStringNotContainsString('Чужой тег', (string) $client->getResponse()->getContent());
+
+        // Чужой tagId в ссылке не даёт колонку.
+        $client->request('GET', self::URL.'&tags_set=1&tags[]='.$this->em()->getConnection()->fetchOne("SELECT id FROM marketplace_listing_tags WHERE name = 'Чужой тег'"));
+        self::assertStringNotContainsString('Чужой тег', (string) $client->getResponse()->getContent());
     }
 
     public function testEmptyRowsAreHiddenUntilAsked(): void

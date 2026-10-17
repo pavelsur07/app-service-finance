@@ -34,7 +34,8 @@ final readonly class PlPreviewFilter
         $today = $today->setTime(0, 0);
         $marketplace = \is_string($query['marketplace'] ?? null) ? MarketplaceType::tryFrom($query['marketplace']) : null;
 
-        $tagIds = null;
+        // Форма шлёт tags_set=1: снятые все флажки — «без колонок тегов», а не «все теги».
+        $tagIds = '1' === ($query['tags_set'] ?? null) ? [] : null;
         if (\is_array($query['tags'] ?? null)) {
             $tagIds = array_values(array_unique(array_filter(
                 $query['tags'],
@@ -68,6 +69,7 @@ final readonly class PlPreviewFilter
             $query['marketplace'] = $this->marketplace->value;
         }
         if (null !== $this->tagIds) {
+            $query['tags_set'] = '1';
             $query['tags'] = $this->tagIds;
         }
         if ($this->showEmptyRows) {

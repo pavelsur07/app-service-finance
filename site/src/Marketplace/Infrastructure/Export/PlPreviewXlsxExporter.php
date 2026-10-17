@@ -10,6 +10,7 @@ use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Application\DTO\PlPreviewCostCoverageDTO;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\Color;
@@ -80,7 +81,7 @@ final readonly class PlPreviewXlsxExporter
             $valueStyle = (new Style())->setFormat(self::numberFormat($row->format))->setCellAlignment(CellAlignment::RIGHT);
             $totalStyle = (clone $valueStyle)->setFontBold();
 
-            $cells = [Cell::fromValue(str_repeat("\u{00A0}\u{00A0}", max(0, $row->level - 1)).$row->name)];
+            $cells = [self::text(str_repeat("\u{00A0}\u{00A0}", max(0, $row->level - 1)).$row->name)];
             foreach ($report->columns as $column) {
                 $cells[] = Cell::fromValue(
                     $row->values[$column->key] ?? 0.0,
@@ -110,8 +111,8 @@ final readonly class PlPreviewXlsxExporter
         $writer->addRow($this->headerRow(['Маркетплейс', 'Вид', 'Строк', 'Сумма, ₽']));
         foreach ($report->salesWithoutMapping() as $row) {
             $writer->addRow(new Row([
-                Cell::fromValue($row->marketplace->getDisplayName()),
-                Cell::fromValue($row->kind->label()),
+                self::text($row->marketplace->getDisplayName()),
+                self::text($row->kind->label()),
                 Cell::fromValue($row->rowsCount),
                 Cell::fromValue((float) $row->amount, $money),
             ]));
@@ -122,8 +123,8 @@ final readonly class PlPreviewXlsxExporter
         $writer->addRow($this->headerRow(['Статья', 'Причина', 'Сумма, ₽']));
         foreach ($report->unplaced as $item) {
             $writer->addRow(new Row([
-                Cell::fromValue($item->categoryName ?? 'Статья удалена или недоступна'),
-                Cell::fromValue($item->reason->label()),
+                self::text($item->categoryName ?? 'Статья удалена или недоступна'),
+                self::text($item->reason->label()),
                 Cell::fromValue((float) ($item->values[BuildMarketplacePlPreviewAction::TOTAL_KEY] ?? '0'), $money),
             ]));
         }
@@ -147,14 +148,14 @@ final readonly class PlPreviewXlsxExporter
             'Не размечено' => $byStatus['unmapped'],
             'Расхождение' => $report->costReconciliationDelta,
         ] as $label => $amount) {
-            $writer->addRow(new Row([Cell::fromValue($label), Cell::fromValue((float) $amount, $money)]));
+            $writer->addRow(new Row([self::text($label), Cell::fromValue((float) $amount, $money)]));
         }
 
         if ([] !== $report->warnings) {
             $writer->addRow(Row::fromValues([]));
             $writer->addRow(Row::fromValues(['Предупреждения'], (new Style())->setFontBold()));
             foreach ($report->warnings as $warning) {
-                $writer->addRow(Row::fromValues([$warning]));
+                $writer->addRow(new Row([self::text($warning)]));
             }
         }
     }
@@ -168,9 +169,9 @@ final readonly class PlPreviewXlsxExporter
         $writer->addRow($this->headerRow(['Маркетплейс', 'Категория затрат', 'Код', 'Строк', 'Сумма, ₽']));
         foreach ($rows as $row) {
             $writer->addRow(new Row([
-                Cell::fromValue($row->marketplace->getDisplayName()),
-                Cell::fromValue($row->costCategoryName ?? 'Без категории'),
-                Cell::fromValue($row->costCategoryCode ?? ''),
+                self::text($row->marketplace->getDisplayName()),
+                self::text($row->costCategoryName ?? 'Без категории'),
+                self::text($row->costCategoryCode ?? ''),
                 Cell::fromValue($row->rowsCount),
                 Cell::fromValue((float) $row->netAmount, $money),
             ]));
@@ -182,10 +183,19 @@ final readonly class PlPreviewXlsxExporter
      */
     private function headerRow(array $headers): Row
     {
-        return Row::fromValues($headers, (new Style())
+        return new Row(array_map(self::text(...), $headers), (new Style())
             ->setFontBold()
             ->setFontColor(Color::WHITE)
             ->setBackgroundColor(self::HEADER_BG_COLOR));
+    }
+
+    /**
+     * Строка из пользовательских названий (теги, статьи) — всегда текст: Cell::fromValue() делает
+     * формулу из любой строки на «=».
+     */
+    private static function text(string $value): StringCell
+    {
+        return new StringCell($value, null);
     }
 
     private static function numberFormat(PLValueFormat $format): string

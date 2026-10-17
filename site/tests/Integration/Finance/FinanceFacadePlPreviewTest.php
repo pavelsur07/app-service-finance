@@ -54,7 +54,9 @@ final class FinanceFacadePlPreviewTest extends IntegrationTestCase
         foreach ($result->rows as $row) {
             $values[$row->code] = $row->values['total'];
         }
-        self::assertSame(['REV_TOTAL' => 1500.0, 'REV_WB' => 1500.0, 'COMMISSION' => -200.0], $values);
+        // Порядок корней с одинаковым sortOrder не задан — сравниваем без порядка.
+        ksort($values);
+        self::assertSame(['COMMISSION' => -200.0, 'REV_TOTAL' => 1500.0, 'REV_WB' => 1500.0], $values);
 
         self::assertCount(1, $result->unplaced);
         self::assertSame((string) $foreignLeaf->getId(), $result->unplaced[0]->categoryId);

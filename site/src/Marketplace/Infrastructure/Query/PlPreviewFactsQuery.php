@@ -75,21 +75,30 @@ final class PlPreviewFactsQuery
                 MarketplacePlAmountSql::returnAmount(),
                 $marketplaceFilter('r'),
             ),
+            // Затраты: проведение берёт модуль суммы группы «категория затрат × сторно» (NULL —
+            // своя группа, знак как у начисления). Доля листинга — его сумма со знаком итога
+            // группы: доли складываются ровно в модуль, разрез по листингам остаётся линейным.
             sprintf(
-                "SELECT m.pl_category_id, %s AS listing_id,
-                     CASE WHEN m.is_negative <> COALESCE(c.operation_type = 'storno', false) THEN -1 ELSE 1 END
-                         * ABS(SUM(c.amount)) AS amount
-                 FROM marketplace_costs c
-                 INNER JOIN marketplace_cost_pl_mappings m
-                     ON m.cost_category_id = c.category_id
-                     AND m.company_id = c.company_id
-                 WHERE c.company_id = :companyId
-                     AND c.cost_date >= :periodFrom
-                     AND c.cost_date <= :periodTo
-                     AND m.include_in_pl = true
-                     AND m.pl_category_id IS NOT NULL
-                     %s
-                 GROUP BY m.pl_category_id, %s c.category_id, COALESCE(c.operation_type = 'storno', false), m.is_negative",
+                "SELECT g.pl_category_id, g.listing_id,
+                     g.sign * g.listing_sum
+                         * SIGN(SUM(g.listing_sum) OVER (PARTITION BY g.pl_category_id, g.category_id, g.storno_key, g.sign)) AS amount
+                 FROM (
+                     SELECT m.pl_category_id, %s AS listing_id, c.category_id,
+                            (c.operation_type = 'storno') AS storno_key,
+                            CASE WHEN m.is_negative <> COALESCE(c.operation_type = 'storno', false) THEN -1 ELSE 1 END AS sign,
+                            SUM(c.amount) AS listing_sum
+                     FROM marketplace_costs c
+                     INNER JOIN marketplace_cost_pl_mappings m
+                         ON m.cost_category_id = c.category_id
+                         AND m.company_id = c.company_id
+                     WHERE c.company_id = :companyId
+                         AND c.cost_date >= :periodFrom
+                         AND c.cost_date <= :periodTo
+                         AND m.include_in_pl = true
+                         AND m.pl_category_id IS NOT NULL
+                         %s
+                     GROUP BY m.pl_category_id, %s c.category_id, (c.operation_type = 'storno'), m.is_negative
+                 ) g",
                 $listing('c'),
                 $marketplaceFilter('c'),
                 $byListing ? 'c.listing_id,' : '',

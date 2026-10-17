@@ -638,8 +638,9 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   у сторно знак правила обратный), «Реализация» Ozon (документ входит, если целиком внутри
   периода). Берутся **все** строки периода, проведённые или нет; `preliminary`-фильтры не
   применяются.
-- Модуль у затрат нелинеен, поэтому итог по статье — отдельный вызов с `byListing = false`; сумма
-  по листингам с ним совпадает, только когда внутри группы нет сумм разного знака.
+- Затраты: доля листинга — его сумма со знаком итога группы «категория затрат × сторно» (NULL
+  `operation_type` — своя группа, как у проведения), поэтому сумма по листингам равна итогу. Итог
+  «Итого» всё равно берётся вызовом с `byListing = false` — тем же путём, что проведение.
 - Что не попадёт в ОПиУ: `PlPreviewCostCoverageQuery::fetch()` — затраты по «маркетплейс × категория»
   со статусом `PlPreviewCostStatus` (`mapped` / `excluded` — `include_in_pl = false` / `unmapped` —
   условие гейта `PreflightCostsQuery::WITHOUT_PL_DECISION` или затрата без категории) и нетто-суммой
@@ -655,17 +656,20 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   от фильтра тегов); `total` — факты без разреза по листингам. Дерево — один вызов
   `FinanceFacade::calculatePlPreview()`. Теги листингов — `tagsForListings()` порциями по 5000.
   Период: `from ≤ to`, не длиннее 366 дней, иначе `MarketplacePlPreviewPeriodException`
-  (`invalid_period`). Предупреждения: ошибки формул дерева и маркетплейсы с данными, у
-  SELLER-подключения которых нет проекта (`PLRegisterUpdater` пропускает операции без проекта).
+  Предупреждения: ошибки формул дерева; документы «Реализации» Ozon, которые период режет
+  (`PlPreviewSalesCoverageQuery::fetchPartialRealizationPeriods()` — проведение берёт документ только
+  целиком); маркетплейсы с данными, у SELLER-подключения которых нет проекта (`PLRegisterUpdater`
+  пропускает операции без проекта; у затрат проект — только из подключения).
 - Экран — вкладка «Предпросмотр ОПиУ» раздела «Маркетплейсы»: `GET /marketplace/pl-preview`
   (`marketplace_pl_preview_index`, `PlPreviewController`, `MARKETPLACE_READ`). Параметры —
   `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
-  текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги), `empty=1`;
+  текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги; `tags_set=1` без `tags[]` — ни одного), `empty=1`;
   мусор — значения по умолчанию. Ошибка периода — сообщение на странице, не 500.
 - Выгрузка — `GET /marketplace/pl-preview/xlsx` (`marketplace_pl_preview_xlsx`,
   `PlPreviewXlsxController`, `Infrastructure\Export\PlPreviewXlsxExporter`): тот же фильтр и
   тот же отчёт, листы «ОПиУ по тегам», «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
-  с форматом выгрузки ОПиУ. Ошибка периода — flash и redirect на вкладку.
+  с форматом выгрузки ОПиУ, названия — текстовыми ячейками (строка на «=» не становится формулой).
+  Ошибка периода — flash и redirect на вкладку.
 
 ### `UnitEconomyCostMapping` — поля
 

@@ -99,8 +99,9 @@
             </div>
             {% if tags is not empty %}
                 <div class="dropdown">
-                    <span class="form-label d-block">Теги</span>
-                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <span class="form-label d-block" id="pl-preview-tags-label">Теги</span>
+                    <input type="hidden" name="tags_set" value="1">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="pl-preview-tags-button" aria-labelledby="pl-preview-tags-label pl-preview-tags-button">
                         {{ filter.tagIds is null ? 'Все теги' : 'Выбрано: ' ~ filter.tagIds|length }}
                     </button>
                     <div class="dropdown-menu p-2 pl-preview-tags" data-testid="pl-preview-tags">

@@ -19,7 +19,8 @@ use Doctrine\DBAL\Connection;
  */
 final class PlPreviewCostCoverageQuery
 {
-    private const string IS_STORNO = "COALESCE(c.operation_type = 'storno', false)";
+    // NULL — своя группа, как в UnprocessedCostsQuery; знак у неё — как у начисления.
+    private const string IS_STORNO = "(c.operation_type = 'storno')";
 
     public function __construct(
         private readonly Connection $connection,
@@ -36,9 +37,9 @@ final class PlPreviewCostCoverageQuery
                     SUM(g.rows_count) AS rows_count, SUM(g.net_amount) AS net_amount
              FROM (
                  SELECT r.marketplace, r.category_id, r.status, COUNT(*) AS rows_count,
-                        CASE WHEN r.is_storno THEN -1 ELSE 1 END * ABS(SUM(r.amount)) AS net_amount
+                        CASE WHEN COALESCE(r.storno_key, false) THEN -1 ELSE 1 END * ABS(SUM(r.amount)) AS net_amount
                  FROM (
-                     SELECT c.marketplace, c.category_id, c.amount, %s AS is_storno,
+                     SELECT c.marketplace, c.category_id, c.amount, %s AS storno_key,
                             CASE
                                 WHEN c.category_id IS NULL OR %s THEN '%s'
                                 WHEN m.include_in_pl = false THEN '%s'
@@ -50,7 +51,7 @@ final class PlPreviewCostCoverageQuery
                          AND m.company_id = c.company_id
                      WHERE %s
                  ) r
-                 GROUP BY r.marketplace, r.category_id, r.status, r.is_storno
+                 GROUP BY r.marketplace, r.category_id, r.status, r.storno_key
              ) g
              LEFT JOIN marketplace_cost_categories mcc ON mcc.id = g.category_id
              GROUP BY g.marketplace, g.category_id, mcc.code, mcc.name, g.status
@@ -87,7 +88,7 @@ final class PlPreviewCostCoverageQuery
         $sql = sprintf(
             'SELECT COALESCE(SUM(g.net_amount), 0)
              FROM (
-                 SELECT CASE WHEN %1$s THEN -1 ELSE 1 END * ABS(SUM(c.amount)) AS net_amount
+                 SELECT CASE WHEN COALESCE(%1$s, false) THEN -1 ELSE 1 END * ABS(SUM(c.amount)) AS net_amount
                  FROM marketplace_costs c
                  WHERE %2$s
                  GROUP BY c.marketplace, c.category_id, %1$s

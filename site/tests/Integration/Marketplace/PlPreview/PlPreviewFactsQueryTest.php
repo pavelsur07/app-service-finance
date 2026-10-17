@@ -121,6 +121,48 @@ final class PlPreviewFactsQueryTest extends IntegrationTestCase
         self::assertEqualsWithDelta($posting, $preview, 0.001);
     }
 
+    public function testListingSharesAddUpToTotalWithMixedSignsAndNullOperationType(): void
+    {
+        $connection = $this->em->getConnection();
+        $logisticsId = (string) $connection->fetchOne(
+            "SELECT id FROM marketplace_cost_categories WHERE company_id = :companyId AND code = 'wb_logistics'",
+            ['companyId' => (string) $this->fixture->company->getId()],
+        );
+        foreach ([[$this->fixture->wbB->getId(), '-80.00', 'charge'], [$this->fixture->wbA->getId(), '10.00', null]] as [$listingId, $amount, $type]) {
+            $connection->insert('marketplace_costs', [
+                'id' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                'company_id' => (string) $this->fixture->company->getId(),
+                'category_id' => $logisticsId,
+                'listing_id' => $listingId,
+                'marketplace' => 'wildberries',
+                'amount' => $amount,
+                'cost_date' => '2026-01-20',
+                'operation_type' => $type,
+                'created_at' => '2026-01-20 00:00:00',
+                'updated_at' => '2026-01-20 00:00:00',
+            ]);
+        }
+
+        $byListing = 0.0;
+        foreach ($this->fetch(null, true) as $fact) {
+            if ('COST' === $this->code($fact->plCategoryId)) {
+                $byListing += (float) $fact->amount;
+            }
+        }
+        $total = $this->map($this->fetch(null, false))[$this->key('COST', null)];
+
+        // Начисления 100 + (50 − 80) + 70 = 140, сторно 30, начисление без типа 10 — своя группа.
+        self::assertEqualsWithDelta(-120.0, $total, 0.001);
+        self::assertEqualsWithDelta($total, $byListing, 0.001);
+        self::assertEqualsWithDelta(30.0, $this->map($this->fetch(null, true))[$this->key('COST', $this->fixture->wbB->getId())], 0.001);
+
+        $posting = 0.0;
+        foreach (self::getContainer()->get(UnprocessedCostsQuery::class)->execute((string) $this->fixture->company->getId(), 'wildberries', '2026-01-01', '2026-01-31') as $row) {
+            $posting += (bool) $row['is_negative'] ? -(float) $row['total_amount'] : (float) $row['total_amount'];
+        }
+        self::assertEqualsWithDelta($posting, $total, 0.001);
+    }
+
     /**
      * @return list<PlPreviewFactDTO>
      */
