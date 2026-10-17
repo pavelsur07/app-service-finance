@@ -75,6 +75,7 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `INTERNAL_AUTH_TOKEN` | Внутренний static token для `/internal/*` (с обеих сторон) | этап 6 |
 | `CONNECTIONS_POLL_INTERVAL` | Интервал поллинга конфигурации, по умолчанию `5m` | этап 6 |
 | `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно (по умолчанию 4, на проде 2) | этап 10 |
+| `SENTRY_DSN`, `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | GlitchTip (на проде — свой проект, секрет `OZON_FETCHER_SENTRY_DSN`): записи ERROR уходят событием (теги `service`, `stage`, `error_class`, `connection_ref`, `resource_type`); пустой DSN — только лог | нет |
 | `CONNECTION_ALLOWLIST` | Только эти кабинеты: `connection_ref` или `company_id` через запятую; пусто — все | этап 14 |
 | `OZON_BASE_URL` | Seller API, по умолчанию `https://api-seller.ozon.ru` (на стенде — мок) | этап 11 |
 | `TAIL_DAYS`, `RECONCILE_WEEKDAY`, `FINAL_DAY`, `PLAN_EVERY` | Окна планировщика: 3, 1 (пн), 10, 1h | этап 11 |

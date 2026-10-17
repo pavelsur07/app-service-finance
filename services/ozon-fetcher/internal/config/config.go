@@ -41,6 +41,11 @@ type Config struct {
 	FinalDay         int
 	PlanEvery        time.Duration
 
+	// GlitchTip (Sentry-протокол): пустой DSN — ошибки только в лог.
+	SentryDSN         string
+	SentryRelease     string
+	SentryEnvironment string
+
 	// S3Bucket пуст — запись raw выключена (режим scaffold).
 	S3Endpoint        string
 	S3Region          string
@@ -62,6 +67,9 @@ func Load() (Config, error) {
 		ReconcileWeekday:        time.Monday,
 		FinalDay:                10,
 		PlanEvery:               time.Hour,
+		SentryDSN:               os.Getenv("SENTRY_DSN"),
+		SentryRelease:           os.Getenv("SENTRY_RELEASE"),
+		SentryEnvironment:       envOr("SENTRY_ENVIRONMENT", "prod"),
 		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
 		S3Region:                os.Getenv("S3_REGION"),
 		S3Bucket:                os.Getenv("S3_BUCKET"),

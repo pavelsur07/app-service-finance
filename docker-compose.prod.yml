@@ -535,6 +535,10 @@ services:
             CONNECTIONS_POLL_INTERVAL: 5m
             MAX_PARALLEL_CONNECTIONS: "2"
             CONNECTION_ALLOWLIST: ${OZON_FETCHER_CONNECTION_ALLOWLIST:-}
+            # Ошибки (ERROR) — в свой проект GlitchTip (секрет OZON_FETCHER_SENTRY_DSN; пусто — только лог).
+            SENTRY_DSN: ${OZON_FETCHER_SENTRY_DSN:-}
+            SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+            SENTRY_ENVIRONMENT: prod
             S3_ENDPOINT: "https://s3.twcstorage.ru"
             S3_REGION: "ru-1"
             S3_BUCKET: "vashfindir-services-raw"
