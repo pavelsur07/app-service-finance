@@ -3,6 +3,7 @@ package ozon
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -136,11 +137,15 @@ func TestPostRejectsOversizedBody(t *testing.T) {
 
 func TestCredentialsNeverPrintTheKey(t *testing.T) {
 	logs := &bytes.Buffer{}
-	slog.New(slog.NewJSONHandler(logs, nil)).Info("x", slog.Any("creds", testCreds))
+	logger := slog.New(slog.NewJSONHandler(logs, nil))
+	logger.Info("x", slog.Any("creds", testCreds))
+	logger.Info("nested", slog.Any("holder", struct{ Creds *Credentials }{&testCreds}))
+	asJSON, err := json.Marshal(struct{ Creds Credentials }{testCreds})
+	require.NoError(t, err)
 
 	for _, s := range []string{
 		fmt.Sprint(testCreds), fmt.Sprintf("%v", testCreds), fmt.Sprintf("%+v", testCreds),
-		fmt.Sprintf("%#v", testCreds), testCreds.String(), logs.String(),
+		fmt.Sprintf("%#v", testCreds), testCreds.String(), logs.String(), string(asJSON),
 	} {
 		assert.NotContains(t, s, testAPIKey)
 		assert.True(t, strings.Contains(s, testClientID), s)
