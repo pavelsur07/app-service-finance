@@ -1,0 +1,312 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{#
+  Значение строки ОПиУ по формату строки, как в отчёте ОПиУ (finance/report/preview.html.twig):
+  деньги — vf_amount, процент и коэффициент — vf_number; отрицательные — в скобках
+  (согласованный для ОПиУ бухгалтерский формат, DS-Money). title совпадает с видимым текстом.
+#}
+{% macro cell(value, format, class) %}
+    {%- set kind = format.value ?? 'MONEY' -%}
+    {%- set negative = value < 0 -%}
+    {%- set abs = negative ? -value : value -%}
+    {%- if kind == 'PERCENT' -%}
+        {%- set plain = (abs * 100)|vf_number(1) ~ ' %' -%}
+    {%- elseif kind == 'RATIO' -%}
+        {%- set plain = abs|vf_number(4) -%}
+    {%- else -%}
+        {%- set plain = abs|vf_number(2) -%}
+    {%- endif -%}
+    <td class="{{ class }}" title="{{ negative ? '(' ~ plain ~ ')' : plain }}">
+        {%- if negative %}({% endif -%}
+        {%- if kind == 'MONEY' %}{{ abs|vf_amount }}{% else %}{{ plain }}{% endif -%}
+        {%- if negative %}){% endif -%}
+    </td>
+{% endmacro %}
+{% import _self as ui %}
+
+{% block title %}Предпросмотр ОПиУ{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        /* Рецепт таблицы — как в отчёте ОПиУ: «Статья» закреплена слева, «Итого» — справа,
+           остальные колонки фиксированной ширины прокручиваются. */
+        .table.pl-preview-table {
+            --pl-col-name: 300px;
+            --pl-col-value: 150px;
+            table-layout: fixed;
+        }
+        .table.pl-preview-table th,
+        .table.pl-preview-table td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .table.pl-preview-table col.pl-col-name { width: var(--pl-col-name); }
+        .table.pl-preview-table col.pl-col-value { width: var(--pl-col-value); }
+        .table.pl-preview-table .text-end { font-variant-numeric: tabular-nums; }
+        .table.pl-preview-table thead th:first-child,
+        .table.pl-preview-table tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            box-shadow: inset -1px 0 0 var(--tblr-border-color);
+        }
+        .table.pl-preview-table .pl-cell-total {
+            position: sticky;
+            right: 0;
+            z-index: 2;
+            background: var(--tblr-bg-surface);
+            box-shadow: inset 1px 0 0 var(--tblr-border-color);
+        }
+        .table.pl-preview-table thead th:first-child,
+        .table.pl-preview-table thead th.pl-cell-total { background: var(--vf-navy-50); }
+        .pl-preview-tags { max-height: 16rem; overflow-y: auto; }
+        /* Узкий экран: две закреплённые колонки закрыли бы колонки тегов целиком. */
+        @media (max-width: 767.98px) {
+            .table.pl-preview-table { --pl-col-name: 160px; --pl-col-value: 120px; }
+            .table.pl-preview-table .pl-cell-total { position: static; box-shadow: none; }
+        }
+    </style>
+{% endblock %}
+
+{% block tab_content %}
+    {% set base_query = filter.toQuery() %}
+    <div class="p-3" data-testid="pl-preview">
+        <p class="text-secondary mb-3">
+            Каким будет ОПиУ, если провести данные маркетплейсов за период по текущим правилам маппинга.
+            Предпросмотр ничего не записывает: документы ОПиУ создаёт только закрытие месяца.
+        </p>
+
+        <form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-2" data-testid="pl-preview-filter">
+            <div>
+                <label class="form-label" for="pl-preview-from">С</label>
+                <input class="form-control" type="date" id="pl-preview-from" name="dateFrom" value="{{ filter.from|date('Y-m-d') }}">
+            </div>
+            <div>
+                <label class="form-label" for="pl-preview-to">По</label>
+                <input class="form-control" type="date" id="pl-preview-to" name="dateTo" value="{{ filter.to|date('Y-m-d') }}">
+            </div>
+            <div>
+                <label class="form-label" for="pl-preview-marketplace">Маркетплейс</label>
+                <select class="form-select" id="pl-preview-marketplace" name="marketplace">
+                    <option value="">Все</option>
+                    {% for marketplace in marketplaces %}
+                        <option value="{{ marketplace.value }}" {{ filter.marketplace == marketplace ? 'selected' }}>{{ marketplace.displayName }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if tags is not empty %}
+                <div class="dropdown">
+                    <span class="form-label d-block">Теги</span>
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                        {{ filter.tagIds is null ? 'Все теги' : 'Выбрано: ' ~ filter.tagIds|length }}
+                    </button>
+                    <div class="dropdown-menu p-2 pl-preview-tags" data-testid="pl-preview-tags">
+                        {% for tag in tags %}
+                            <label class="form-check dropdown-item">
+                                <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
+                                       {{ filter.tagIds is null or tag.id in filter.tagIds ? 'checked' }}>
+                                <span class="form-check-label">{{ tag.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="empty" value="1" {{ filter.showEmptyRows ? 'checked' }}>
+                <span class="form-check-label">Показывать пустые строки</span>
+            </label>
+            <button type="submit" class="btn btn-primary">Показать</button>
+        </form>
+        {% include 'partials/_period_presets.html.twig' with {
+            route: 'marketplace_pl_preview_index',
+            params: base_query|filter((v, k) => k != 'dateFrom' and k != 'dateTo'),
+            current_from: filter.from|date('Y-m-d'),
+            current_to: filter.to|date('Y-m-d'),
+            class: 'vf-seg mb-3',
+        } only %}
+
+        {% if error is not null %}
+            <div class="alert alert-danger" role="alert" data-testid="pl-preview-error">{{ error }}</div>
+        {% elseif report is not null %}
+            {% for warning in report.warnings %}
+                {% if loop.first %}<div class="alert alert-warning" data-testid="pl-preview-warnings"><ul class="mb-0">{% endif %}
+                <li>{{ warning }}</li>
+                {% if loop.last %}</ul></div>{% endif %}
+            {% endfor %}
+
+            {% if report.tagsOverlap %}
+                <p class="text-secondary small mb-2" data-testid="pl-preview-overlap">
+                    Листинг с несколькими тегами входит в каждый из них полной суммой — сумма колонок тегов не равна «Итого».
+                </p>
+            {% endif %}
+
+            {% set value_columns = report.columns|length %}
+            <div class="card table-responsive mb-4">
+                <table class="table table-vcenter pl-preview-table mb-0" data-testid="pl-preview-table"
+                       style="min-width: calc(var(--pl-col-name) + {{ value_columns }} * var(--pl-col-value));">
+                    <colgroup>
+                        <col class="pl-col-name">
+                        {% for column in report.columns %}<col class="pl-col-value">{% endfor %}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Статья</th>
+                            {% for column in report.columns %}
+                                <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.label }}" data-column="{{ column.key }}">{{ column.label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set shown = 0 %}
+                        {% for row in report.rows %}
+                            {% set has_children = report.rows[loop.index] is defined and report.rows[loop.index].level > row.level %}
+                            {% set is_empty = row.values|filter(v => v > 0.004 or v < -0.004)|length == 0 %}
+                            {% if filter.showEmptyRows or not is_empty %}
+                                {% set shown = shown + 1 %}
+                                <tr class="{{ has_children ? 'fw-bold' }}" data-row-code="{{ row.code }}">
+                                    <td style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;" title="{{ row.name }}">{{ row.name }}</td>
+                                    {% for column in report.columns %}
+                                        {{ ui.cell(row.values[column.key] ?? 0, row.format, 'text-end' ~ (column.kind.value == 'total' ? ' fw-bold pl-cell-total')) }}
+                                    {% endfor %}
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                        {% if shown == 0 %}
+                            <tr>
+                                <td colspan="{{ value_columns + 1 }}" class="text-secondary" data-testid="pl-preview-empty">
+                                    {{ report.rows is empty ? 'У компании нет дерева статей ОПиУ.' : 'За период нет сумм, которые попадут в ОПиУ.' }}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% set unmapped = report.unmappedCosts %}
+            {% set unmapped_sales = report.salesWithoutMapping %}
+            <h3 class="mb-2">Не попадёт в ОПиУ</h3>
+            {% if unmapped is empty and unmapped_sales is empty and report.unplaced is empty %}
+                <p class="text-secondary" data-testid="pl-preview-all-mapped">Все данные периода попадут в ОПиУ.</p>
+            {% endif %}
+
+            {% if unmapped is not empty %}
+                <div class="card mb-3" data-testid="pl-preview-unmapped-costs">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">Затраты без решения по ОПиУ</h4>
+                        <a class="ms-auto" href="{{ path('marketplace_cost_pl_mapping_index') }}">Маппинг затрат</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead><tr><th>Маркетплейс</th><th>Категория затрат</th><th class="text-end">Строк</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                            <tbody>
+                                {% for row in unmapped %}
+                                    <tr>
+                                        <td>{{ row.marketplace.displayName }}</td>
+                                        <td>{{ row.costCategoryName ?? 'Без категории' }}{% if row.costCategoryCode %} <code>{{ row.costCategoryCode }}</code>{% endif %}</td>
+                                        <td class="text-end">{{ row.rowsCount|vf_number }}</td>
+                                        <td class="text-end">{{ row.netAmount|vf_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if unmapped_sales is not empty %}
+                <div class="card mb-3" data-testid="pl-preview-unmapped-sales">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">Продажи и возвраты без правила ОПиУ</h4>
+                        <a class="ms-auto" href="{{ path('marketplace_pl_mappings_index') }}">Маппинг ОПиУ</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead><tr><th>Маркетплейс</th><th>Вид</th><th class="text-end">Строк</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                            <tbody>
+                                {% for row in unmapped_sales %}
+                                    <tr>
+                                        <td>{{ row.marketplace.displayName }}</td>
+                                        <td>{{ row.kind.label }}</td>
+                                        <td class="text-end">{{ row.rowsCount|vf_number }}</td>
+                                        <td class="text-end">{{ row.amount|vf_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if report.unplaced is not empty %}
+                <div class="card mb-3" data-testid="pl-preview-unplaced">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">Правила ведут на статьи, которых нет в отчёте ОПиУ</h4>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead><tr><th>Статья</th><th>Причина</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                            <tbody>
+                                {% for item in report.unplaced %}
+                                    <tr>
+                                        <td>{{ item.categoryName ?? 'Статья удалена или недоступна' }}</td>
+                                        <td>{{ item.reason.label }}</td>
+                                        <td class="text-end">{{ (item.values['total'] ?? 0)|vf_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% set excluded = report.excludedCosts %}
+            {% if excluded is not empty %}
+                <h3 class="mb-2">Исключено из ОПиУ <span class="text-secondary fw-normal">— справочно</span></h3>
+                <div class="card mb-3" data-testid="pl-preview-excluded">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead><tr><th>Маркетплейс</th><th>Категория затрат</th><th class="text-end">Строк</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                            <tbody>
+                                {% for row in excluded %}
+                                    <tr>
+                                        <td>{{ row.marketplace.displayName }}</td>
+                                        <td>{{ row.costCategoryName ?? 'Без категории' }}{% if row.costCategoryCode %} <code>{{ row.costCategoryCode }}</code>{% endif %}</td>
+                                        <td class="text-end">{{ row.rowsCount|vf_number }}</td>
+                                        <td class="text-end">{{ row.netAmount|vf_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% set by_status = report.costTotalsByStatus %}
+            {% set reconciled = report.costReconciliationDelta == '0.00' %}
+            <h3 class="mb-2">Сверка затрат</h3>
+            <div class="card mb-3" data-testid="pl-preview-reconciliation" data-reconciled="{{ reconciled ? 'yes' : 'no' }}">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead><tr><th>Затраты периода</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                        <tbody>
+                            <tr><td>Всего в данных маркетплейсов</td><td class="text-end fw-bold">{{ report.costTotal|vf_amount }}</td></tr>
+                            <tr><td>Размечено в ОПиУ</td><td class="text-end">{{ by_status['mapped']|vf_amount }}</td></tr>
+                            <tr><td>Исключено из ОПиУ</td><td class="text-end">{{ by_status['excluded']|vf_amount }}</td></tr>
+                            <tr><td>Не размечено</td><td class="text-end">{{ by_status['unmapped']|vf_amount }}</td></tr>
+                            <tr>
+                                <td>Расхождение</td>
+                                <td class="text-end">{{ reconciled ? 'сходится' : report.costReconciliationDelta|vf_amount }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% if not reconciled %}
+                <div class="alert alert-danger">Сумма по статусам не совпала с итогом затрат — сообщите разработчикам: предпросмотр мог потерять или задвоить строки.</div>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

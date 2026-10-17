@@ -51,6 +51,43 @@ final readonly class MarketplacePlPreviewReport
     }
 
     /**
+     * @return list<PlPreviewCostCoverageDTO>
+     */
+    public function unmappedCosts(): array
+    {
+        return $this->costsWithStatus(PlPreviewCostStatus::UNMAPPED);
+    }
+
+    /**
+     * @return list<PlPreviewCostCoverageDTO>
+     */
+    public function excludedCosts(): array
+    {
+        return $this->costsWithStatus(PlPreviewCostStatus::EXCLUDED);
+    }
+
+    /**
+     * Нетто затрат по статусу — строки сверки.
+     *
+     * @return array<string, string> значение PlPreviewCostStatus → сумма
+     */
+    public function costTotalsByStatus(): array
+    {
+        $totals = [];
+        foreach (PlPreviewCostStatus::cases() as $status) {
+            $sum = '0';
+            foreach ($this->costsWithStatus($status) as $row) {
+                // bcmath_compat объявляет bcadd() без типа результата.
+                /** @var numeric-string $sum */
+                $sum = bcadd($sum, $row->netAmount, 2);
+            }
+            $totals[$status->value] = bcadd($sum, '0', 2);
+        }
+
+        return $totals;
+    }
+
+    /**
      * @return list<PlPreviewSalesCoverageDTO>
      */
     public function salesWithoutMapping(): array

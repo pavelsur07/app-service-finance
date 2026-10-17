@@ -657,6 +657,11 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   Период: `from ≤ to`, не длиннее 366 дней, иначе `MarketplacePlPreviewPeriodException`
   (`invalid_period`). Предупреждения: ошибки формул дерева и маркетплейсы с данными, у
   SELLER-подключения которых нет проекта (`PLRegisterUpdater` пропускает операции без проекта).
+- Экран — вкладка «Предпросмотр ОПиУ» раздела «Маркетплейсы»: `GET /marketplace/pl-preview`
+  (`marketplace_pl_preview_index`, `PlPreviewController`, `MARKETPLACE_READ`). Параметры —
+  `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
+  текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги), `empty=1`;
+  мусор — значения по умолчанию. Ошибка периода — сообщение на странице, не 500.
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -3922,6 +3927,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |
 | 2.10 | 2026-10-17 | Marketplace: `BuildMarketplacePlPreviewAction` — сборка предпросмотра ОПиУ по тегам (`MarketplacePlPreviewReport`, `PlPreviewColumnKind`, `MarketplacePlPreviewPeriodException`) |
 | 2.09 | 2026-10-17 | Marketplace: `PlPreviewCostCoverageQuery`, `PlPreviewSalesCoverageQuery` — «не размечено», «исключено» и сверка затрат предпросмотра ОПиУ |
 | 2.08 | 2026-10-17 | Marketplace: `PlPreviewFactsQuery` — суммы предпросмотра ОПиУ по статьям и листингам (раздел «Marketplace: предпросмотр ОПиУ по тегам») |

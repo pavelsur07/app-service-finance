@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\PlPreview;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
@@ -46,6 +47,8 @@ use Ramsey\Uuid\Uuid;
 final class PlPreviewFixture
 {
     public Company $company;
+    public User $owner;
+    private User $lastOwner;
     public PLCategory $revenue;
     public PLCategory $returns;
     public PLCategory $costs;
@@ -60,6 +63,7 @@ final class PlPreviewFixture
     public function __construct(private readonly EntityManagerInterface $em, int $seed)
     {
         $this->company = $this->company($seed, 'pl-preview');
+        $this->owner = $this->lastOwner;
         $foreign = $this->company($seed + 1, 'pl-preview-foreign');
 
         $this->revenue = $this->category('REV', PLFlow::INCOME);
@@ -129,6 +133,7 @@ final class PlPreviewFixture
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-'.$suffix)->withOwner($owner)->build();
         $this->em->persist($owner);
         $this->em->persist($company);
+        $this->lastOwner = $owner;
 
         return $company;
     }
