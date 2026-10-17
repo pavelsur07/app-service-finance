@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("LISTEN_ADDR", "")
@@ -31,5 +35,47 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.DBDSN == "" {
 		t.Error("DBDSN is empty, want value from env")
+	}
+}
+
+func TestLoadConnectionsSettings(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		token    string
+		interval string
+		wantErr  bool
+	}{
+		{name: "disabled without base url", baseURL: "", token: ""},
+		{name: "enabled", baseURL: "http://site-nginx", token: "0123456789abcdef0123456789abcdef", interval: "30s"},
+		{name: "short token", baseURL: "http://site-nginx", token: "short", wantErr: true},
+		{name: "no token", baseURL: "http://site-nginx", wantErr: true},
+		{name: "not a url", baseURL: "site-nginx", token: "0123456789abcdef0123456789abcdef", wantErr: true},
+		{name: "bad interval", interval: "soon", wantErr: true},
+		{name: "zero interval", interval: "0s", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("SYMFONY_INTERNAL_BASE_URL", tt.baseURL)
+			t.Setenv("INTERNAL_AUTH_TOKEN", tt.token)
+			t.Setenv("CONNECTIONS_POLL_INTERVAL", tt.interval)
+
+			cfg, err := Load()
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("want error")
+				}
+				if tt.token != "" && strings.Contains(err.Error(), tt.token) {
+					t.Fatal("token leaked into error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.interval == "" && cfg.ConnectionsPollInterval != 5*time.Minute {
+				t.Errorf("default interval = %v", cfg.ConnectionsPollInterval)
+			}
+		})
 	}
 }
