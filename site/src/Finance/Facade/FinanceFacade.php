@@ -131,12 +131,15 @@ final class FinanceFacade
      * PlPreviewResult::$unplaced.
      *
      * @param list<PlPreviewColumn> $columns
+     * @param string|null $natureBaseColumn колонка-итог: знак статьи по ней, остальные колонки —
+     *                                      линейные доли, складываются в итог
      */
     public function calculatePlPreview(
         string $companyId,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         array $columns,
+        ?string $natureBaseColumn = null,
     ): PlPreviewResult {
         $company = $this->entityManager->getReference(Company::class, $companyId)
             ?? throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
@@ -145,6 +148,7 @@ final class FinanceFacade
             $company,
             PlReportPeriod::forRange($from, $to),
             $columns,
+            $natureBaseColumn,
         );
     }
 

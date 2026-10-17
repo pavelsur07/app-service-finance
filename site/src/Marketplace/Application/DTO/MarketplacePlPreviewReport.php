@@ -23,6 +23,7 @@ final readonly class MarketplacePlPreviewReport
      * @param list<PlPreviewCostCoverageDTO> $costCoverage затраты периода по категориям и статусам
      * @param list<PlPreviewSalesCoverageDTO> $salesCoverage
      * @param list<string> $warnings
+     * @param list<PlPreviewAdReconciliationDTO> $adReconciliation реклама: учёт против статистики
      */
     public function __construct(
         public \DateTimeImmutable $from,
@@ -37,6 +38,7 @@ final readonly class MarketplacePlPreviewReport
         public string $costReconciliationDelta,
         public array $salesCoverage,
         public array $warnings,
+        public array $adReconciliation = [],
     ) {
     }
 

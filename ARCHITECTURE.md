@@ -649,6 +649,20 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   покрытие продаж, возвратов и реализации Ozon (`PlPreviewSalesKind`): строки, естественная сумма,
   есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
   одна продажа даёт несколько сумм по разным правилам.
+- Реклама из статистики: учётные категории, которые покрывает рекламная статистика, —
+  `Domain\PlPreview\AdStatisticsCostCategories::codeFor()` (одна на маркетплейс: Ozon `ozon_cpc`, WB
+  `wb_okazanie_uslug_wb_prodvizhenie`; список в коде — свойство источника данных, не настройка
+  компании). Расход по листингам — порт `Facade\PlPreviewAdSpendProviderInterface`
+  (`PlPreviewAdSpendDTO`: по листингам, всего, `unallocated()`), реализация —
+  `MarketplaceAds\Facade\PlPreviewAdSpendProvider` поверх `MarketplaceAdsFacade`. Порт в
+  Marketplace, а не вызов `MarketplaceAdsFacade`: MarketplaceAds уже зависит от Marketplace.
+- Расчёт рекламы под статистикой (`PlPreviewAdLedgerQuery` — правило категории со статьёй и
+  `include_in_pl` и учётная сумма за период): из фактов по листингам категория исключается
+  (`excludedCostCategoryIds`); вместо неё — расход статистики каждого листинга со знаком правила,
+  а остаток «учёт − статистика по листингам» (статистика без товара + расхождение) — на статье без
+  листинга, то есть в «Общих». «Итого» — учёт, как было. Сверка — `PlPreviewAdReconciliationDTO`
+  (учёт, статистика, на товарах, без товара, расхождение) в `MarketplacePlPreviewReport::$adReconciliation`.
+  На экране — пометка над таблицей и блок «Реклама: учёт и статистика», в xlsx — раздел листа «Сверка».
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
   from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
   `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
@@ -1288,12 +1302,17 @@ calculatePlPreview(
     \DateTimeImmutable $from,
     \DateTimeImmutable $to,
     array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
+    ?string $natureBaseColumn = null, // колонка-итог: знак статьи по ней, остальные — линейные доли
 ): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
 ```
 
 Предпросмотр (`Report\PlPreviewCalculator`) переводит сумму статьи в факт так же, как
 `PLRegisterUpdater` для `marketplace_pl`: суммы статьи складываются со знаком, от итога берётся
-модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. Регистр берёт модуль в корзине
+модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. С `natureBaseColumn` (Marketplace передаёт `total`)
+направление берётся по сумме колонки-итога и применяется ко всем колонкам линейно: факт доли =
+`±знак(S_итога) × S_доли`, доли складываются в итог (доля с обратным итогу знаком не становится
+вторым расходом). Итог статьи 0 или статьи нет в итоге — доли со знаком документа, без модуля.
+Без него каждая колонка считается как отдельный документ. Регистр берёт модуль в корзине
 «день документа × проект», предпросмотр — по колонке за весь период. Дерево считает тот же
 `PlReportCalculator` через `withFacts(InMemoryFactsProvider)` — регистр не читается. Сумма на
 статье, которой нет в компании, которая не `LEAF_INPUT` или без `code`, в отчёт ОПиУ не попадает
@@ -3936,6 +3955,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.16 | 2026-10-17 | Finance: `calculatePlPreview(…, natureBaseColumn)` — колонки-доли берут знак статьи от итога и складываются в него |
+| 2.15 | 2026-10-17 | Marketplace: реклама Ozon (клики) и WB («Продвижение») в колонках тегов предпросмотра — из рекламной статистики, «Итого» — учёт |
+| 2.14 | 2026-10-17 | Marketplace: категории под рекламной статистикой и порт `PlPreviewAdSpendProviderInterface` (реализация в MarketplaceAds) |
 | 2.13 | 2026-10-17 | Marketplace: подпункт бокового меню «Предпросмотр ОПиУ» |
 | 2.12 | 2026-10-17 | Marketplace: выгрузка предпросмотра ОПиУ в xlsx (`/marketplace/pl-preview/xlsx`, `PlPreviewXlsxExporter`) |
 | 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |

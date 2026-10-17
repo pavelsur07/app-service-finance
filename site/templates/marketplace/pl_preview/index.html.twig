@@ -150,6 +150,15 @@
                 </p>
             {% endif %}
 
+            {% if report.adReconciliation is not empty %}
+                {% set ad_labels = {ozon: 'Ozon (клики)', wildberries: 'WB («Продвижение»)'} %}
+                <p class="text-secondary small mb-2" data-testid="pl-preview-ads-note">
+                    Реклама {{ report.adReconciliation|map(a => ad_labels[a.marketplace.value] ?? a.marketplace.displayName)|join(' и ') }}
+                    в колонках тегов — по рекламной статистике; реклама без товара и разница с учётом — в «Общих».
+                    «Итого» — по учёту.
+                </p>
+            {% endif %}
+
             {% set value_columns = report.columns|length %}
             <div class="card table-responsive mb-4">
                 <table class="table table-vcenter pl-preview-table mb-0" data-testid="pl-preview-table"
@@ -307,6 +316,42 @@
                     </table>
                 </div>
             </div>
+            {% if report.adReconciliation is not empty %}
+                <h3 class="mb-2">Реклама: учёт и статистика</h3>
+                <div class="card mb-3" data-testid="pl-preview-ads">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                                <tr>
+                                    <th>Маркетплейс</th>
+                                    <th class="text-end">Учёт, ₽</th>
+                                    <th class="text-end">Статистика, ₽</th>
+                                    <th class="text-end">На товарах, ₽</th>
+                                    <th class="text-end">Без товара, ₽</th>
+                                    <th class="text-end">Расхождение, ₽</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ads in report.adReconciliation %}
+                                    <tr data-marketplace="{{ ads.marketplace.value }}">
+                                        <td>{{ ads.marketplace.displayName }}</td>
+                                        <td class="text-end">{{ ads.ledger|vf_amount }}</td>
+                                        <td class="text-end">{{ ads.statistics|vf_amount }}</td>
+                                        <td class="text-end">{{ ads.onListings|vf_amount }}</td>
+                                        <td class="text-end">{{ ads.unallocated|vf_amount }}</td>
+                                        <td class="text-end">{{ ads.difference|vf_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer text-secondary small">
+                        Расхождение = учёт − статистика. Частые причины: дни, которых нет в одном из источников;
+                        недельные удержания WB на стыке месяцев; реклама, оплаченная предоплатой.
+                    </div>
+                </div>
+            {% endif %}
+
             {% if not reconciled %}
                 <div class="alert alert-danger">Сумма по статусам не совпала с итогом затрат — сообщите разработчикам: предпросмотр мог потерять или задвоить строки.</div>
             {% endif %}
