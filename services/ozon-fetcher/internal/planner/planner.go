@@ -39,11 +39,12 @@ func DefaultConfig(loc *time.Location) Config {
 	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10}
 }
 
-// Refresh — проход с перезагрузкой, выполняемый один раз за RunDate.
+// Refresh — проход с перезагрузкой кабинета, выполняемый один раз за RunDate.
 type Refresh struct {
-	Kind    string
-	RunDate string // YYYY-MM-DD (МСК)
-	Specs   []store.TaskSpec
+	Kind          string
+	RunDate       string // YYYY-MM-DD (МСК)
+	ConnectionRef string
+	Specs         []store.TaskSpec
 }
 
 // Plan — результат прохода: Ensure ставится всегда (идемпотентно), каждый
@@ -63,15 +64,15 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 	runDate := today.Format(time.DateOnly)
 
 	var plan Plan
-	tail := Refresh{Kind: KindTail, RunDate: runDate}
-	types := Refresh{Kind: KindTypes, RunDate: runDate}
-	reconcile := Refresh{Kind: KindReconcile, RunDate: runDate}
-	final := Refresh{Kind: KindFinal, RunDate: runDate}
-
 	for _, cab := range cabinets {
 		if cab.Seller == nil {
 			continue
 		}
+		tail := Refresh{Kind: KindTail, RunDate: runDate, ConnectionRef: cab.Ref}
+		types := Refresh{Kind: KindTypes, RunDate: runDate, ConnectionRef: cab.Ref}
+		reconcile := Refresh{Kind: KindReconcile, RunDate: runDate, ConnectionRef: cab.Ref}
+		final := Refresh{Kind: KindFinal, RunDate: runDate, ConnectionRef: cab.Ref}
+
 		if cab.Supports(executor.ResourceAccrualByDay) {
 			// Первичная загрузка и подхват пропусков: M — главнее, M-1/M-2 — фоном.
 			for d := m2Start; !d.After(yesterday); d = d.AddDate(0, 0, 1) {
@@ -101,13 +102,14 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 			}
 		}
 		if cab.Supports(executor.ResourceAccrualTypes) {
+			// ensure — новый кабинет получает справочник сразу; refresh — раз в сутки.
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAccrualTypes, executor.PeriodRef, PriorityRoutine, false, now))
 			types.Specs = append(types.Specs, spec(cab.Ref, executor.ResourceAccrualTypes, executor.PeriodRef, PriorityRoutine, true, now))
 		}
-	}
-
-	for _, r := range []Refresh{tail, types, reconcile, final} {
-		if len(r.Specs) > 0 {
-			plan.Refreshes = append(plan.Refreshes, r)
+		for _, r := range []Refresh{tail, types, reconcile, final} {
+			if len(r.Specs) > 0 {
+				plan.Refreshes = append(plan.Refreshes, r)
+			}
 		}
 	}
 	return plan

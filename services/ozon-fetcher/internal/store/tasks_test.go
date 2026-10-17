@@ -338,7 +338,7 @@ func TestPlanOnceRunsOncePerDateEvenConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			done, err := tasks.PlanOnce(ctx, "tail", "2026-10-17", []TaskSpec{s})
+			done, err := tasks.PlanOnce(ctx, "tail", "2026-10-17", "ref-a", []TaskSpec{s})
 			assert.NoError(t, err)
 			if done {
 				ran.Add(1)
@@ -354,12 +354,12 @@ func TestPlanOnceRunsOncePerDateEvenConcurrently(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
 	require.NoError(t, err)
-	done, err := tasks.PlanOnce(ctx, "tail", "2026-10-17", []TaskSpec{s})
+	done, err := tasks.PlanOnce(ctx, "tail", "2026-10-17", "ref-a", []TaskSpec{s})
 	require.NoError(t, err)
 	assert.False(t, done)
 	assert.Equal(t, StatusDone, status(t, tasks, s.TaskKey))
 
-	done, err = tasks.PlanOnce(ctx, "tail", "2026-10-18", []TaskSpec{s})
+	done, err = tasks.PlanOnce(ctx, "tail", "2026-10-18", "ref-a", []TaskSpec{s})
 	require.NoError(t, err)
 	assert.True(t, done, "следующая дата — новый проход")
 }
@@ -459,4 +459,68 @@ func TestFindObjectByContentWithinTask(t *testing.T) {
 	_, found, err = tasks.FindObject(ctx, a.TaskKey, hash("other"))
 	require.NoError(t, err)
 	assert.False(t, found)
+}
+
+func TestPlanOnceIsPerCabinet(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	a := spec("ref-a", "r", "2026-10-01", 5)
+	b := spec("ref-b", "r", "2026-10-01", 5)
+	a.Refresh, b.Refresh = true, true
+
+	done, err := tasks.PlanOnce(ctx, "tail", "2026-10-17", "ref-a", []TaskSpec{a})
+	require.NoError(t, err)
+	assert.True(t, done)
+	done, err = tasks.PlanOnce(ctx, "tail", "2026-10-17", "ref-b", []TaskSpec{b})
+	require.NoError(t, err)
+	assert.True(t, done, "кабинет, появившийся позже за тот же день, получает свою перезагрузку")
+	assert.Equal(t, StatusPending, status(t, tasks, b.TaskKey))
+}
+
+func TestRefreshOfRunningTaskAppliesAfterAttempt(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "r", "2026-08-15", 1)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+
+	// Финальная перезагрузка M-2 пришла посреди загрузки дня.
+	s.Refresh = true
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	assert.Equal(t, StatusRunning, status(t, tasks, s.TaskKey), "lease не прерывается")
+
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("partial")}, t0)
+	require.NoError(t, err)
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey), "после попытки — снова в очередь")
+
+	again, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	assert.Empty(t, again.Cursor, "перезагрузка — с первой страницы")
+	assert.Equal(t, 1, again.NextPageNo)
+	assert.Empty(t, again.PageHashes)
+
+	_, err = tasks.FinishTask(ctx, again.TaskKey, again.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("full")}, t0)
+	require.NoError(t, err)
+	assert.Equal(t, StatusDone, status(t, tasks, s.TaskKey), "флаг одноразовый")
+}
+
+func TestRefreshPendingSurvivesLeaseExpiryAsFullReload(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "r", "2026-08-15", 1)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+	s.Refresh = true
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, again.Cursor)
+	assert.Empty(t, again.PageHashes)
 }

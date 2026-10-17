@@ -88,6 +88,7 @@ func sendUpserts(ctx context.Context, conn batchSender, specs []TaskSpec) error 
 			ON CONFLICT (connection_ref, resource_type, period_key) DO UPDATE SET
 				priority    = GREATEST(fetch_task.priority, EXCLUDED.priority),
 				status      = CASE WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN 'pending' ELSE fetch_task.status END,
+				refresh_pending = fetch_task.refresh_pending OR (fetch_task.status = 'running' AND $6),
 				next_run_at = CASE
 					WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN EXCLUDED.next_run_at
 					WHEN fetch_task.status IN ('pending', 'not_ready', 'failed_retryable') AND EXCLUDED.priority > fetch_task.priority
@@ -102,16 +103,17 @@ func sendUpserts(ctx context.Context, conn batchSender, specs []TaskSpec) error 
 	return nil
 }
 
-// PlanOnce ставит specs, только если проход kind за runDate ещё не выполнялся:
-// маркер planner_run и постановка — одна транзакция. false — уже выполнен.
-func (t *Tasks) PlanOnce(ctx context.Context, kind, runDate string, specs []TaskSpec) (bool, error) {
+// PlanOnce ставит specs, только если проход kind за runDate для кабинета ещё
+// не выполнялся: маркер planner_run и постановка — одна транзакция. false —
+// уже выполнен.
+func (t *Tasks) PlanOnce(ctx context.Context, kind, runDate, connectionRef string, specs []TaskSpec) (bool, error) {
 	tx, err := t.pool.Begin(ctx)
 	if err != nil {
 		return false, fmt.Errorf("store: plan once begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	tag, err := tx.Exec(ctx, `INSERT INTO planner_run (kind, run_date) VALUES ($1, $2) ON CONFLICT DO NOTHING`, kind, runDate)
+	tag, err := tx.Exec(ctx, `INSERT INTO planner_run (kind, run_date, connection_ref) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, kind, runDate, connectionRef)
 	if err != nil {
 		return false, fmt.Errorf("store: plan once marker: %w", err)
 	}
@@ -312,15 +314,18 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// refresh_pending (перезагрузка пришла во время попытки): итог попытки
+	// записывается, затем задача снова pending с первой страницы.
 	var revision int
 	err = tx.QueryRow(ctx, `
 		UPDATE fetch_task SET
-			status       = $5,
+			status       = CASE WHEN refresh_pending AND $5 IN ('done', 'failed_permanent') THEN 'pending' ELSE $5 END,
 			lease_owner  = NULL, lease_until = NULL, attempt_id = NULL,
-			next_run_at  = CASE WHEN $5 = 'done' THEN next_run_at ELSE $6 END,
-			cursor       = CASE WHEN $7 THEN cursor ELSE NULL END,
-			next_page_no = CASE WHEN $7 THEN next_page_no ELSE 1 END,
-			page_hashes  = CASE WHEN $7 THEN page_hashes ELSE '' END,
+			next_run_at  = CASE WHEN refresh_pending THEN $10 WHEN $5 = 'done' THEN next_run_at ELSE $6 END,
+			cursor       = CASE WHEN $7 AND NOT refresh_pending THEN cursor ELSE NULL END,
+			next_page_no = CASE WHEN $7 AND NOT refresh_pending THEN next_page_no ELSE 1 END,
+			page_hashes  = CASE WHEN $7 AND NOT refresh_pending THEN page_hashes ELSE '' END,
+			refresh_pending = false,
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,
@@ -365,8 +370,13 @@ func (t *Tasks) ReleaseExpired(ctx context.Context, now time.Time) (int64, error
 			WHERE status = 'running' AND lease_until < $1
 			FOR UPDATE SKIP LOCKED
 		), released AS (
+			-- Курсор сохраняется, кроме ожидающей перезагрузки: она — с первой страницы.
 			UPDATE fetch_task t SET status = 'pending', lease_owner = NULL, lease_until = NULL, attempt_id = NULL,
-				next_run_at = $1, last_error_class = 'lease_expired', updated_at = $1
+				next_run_at = $1, last_error_class = 'lease_expired', updated_at = $1,
+				cursor = CASE WHEN t.refresh_pending THEN NULL ELSE t.cursor END,
+				next_page_no = CASE WHEN t.refresh_pending THEN 1 ELSE t.next_page_no END,
+				page_hashes = CASE WHEN t.refresh_pending THEN '' ELSE t.page_hashes END,
+				refresh_pending = false
 			FROM expired e
 			WHERE t.connection_ref = e.connection_ref AND t.resource_type = e.resource_type AND t.period_key = e.period_key
 			RETURNING e.attempt_id

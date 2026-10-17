@@ -573,3 +573,11 @@ func TestUnchangedPagesAreNotUploadedAgain(t *testing.T) {
 	assert.Equal(t, "s3://b/old-p1", h.tasks.pages[0].StorageURI)
 	assert.Contains(t, h.logs.String(), `"pages_reused":1`)
 }
+
+func TestAnySuccessResetsCabinetAuthCounter(t *testing.T) {
+	h := newHarness(&fakeOzon{singlePage: page(`{"accrual_types":[]}`, "")})
+
+	h.exec.Run(context.Background(), task(ResourceAccrualTypes, PeriodRef), cabinet, "trace") // задача сама 401 не получала
+
+	assert.Equal(t, []string{"ref-a"}, h.tasks.resumed, "успех кабинета сбрасывает счётчик отказов ключа")
+}

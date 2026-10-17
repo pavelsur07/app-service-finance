@@ -167,7 +167,10 @@ func TestCabinetsWithoutSellerOrResourcesGetNothing(t *testing.T) {
 	}
 	p := Build(at("2026-10-19 09:00"), cabs, DefaultConfig(msk))
 
-	assert.Empty(t, p.Ensure)
+	for _, s := range p.Ensure {
+		assert.Equal(t, "types-only", s.ConnectionRef)
+		assert.Equal(t, executor.ResourceAccrualTypes, s.ResourceType)
+	}
 	for _, r := range p.Refreshes {
 		for _, s := range r.Specs {
 			assert.Equal(t, "types-only", s.ConnectionRef)
@@ -189,13 +192,13 @@ func (f *fakeStore) Upsert(_ context.Context, specs []store.TaskSpec) error {
 	return nil
 }
 
-func (f *fakeStore) PlanOnce(_ context.Context, kind, runDate string, _ []store.TaskSpec) (bool, error) {
+func (f *fakeStore) PlanOnce(_ context.Context, kind, runDate, ref string, _ []store.TaskSpec) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.runs == nil {
 		f.runs = map[string]bool{}
 	}
-	key := kind + "/" + runDate
+	key := kind + "/" + runDate + "/" + ref
 	if f.runs[key] {
 		return false, nil
 	}
@@ -228,8 +231,8 @@ func TestSchedulerTicks(t *testing.T) {
 	s := NewScheduler(DefaultConfig(msk), time.Hour, st, fakeCabs{ready: true, list: []connections.Cabinet{seller("a", allFinance...)}}, logger, now)
 	s.Tick(context.Background())
 	s.Tick(context.Background())
-	assert.True(t, st.runs[KindTail+"/2026-10-19"])
-	assert.True(t, st.runs[KindReconcile+"/2026-10-19"])
+	assert.True(t, st.runs[KindTail+"/2026-10-19/a"])
+	assert.True(t, st.runs[KindReconcile+"/2026-10-19/a"])
 	assert.Len(t, st.runs, 3, "tail, accrual_types, reconcile_m1 — по разу")
 }
 
@@ -278,4 +281,19 @@ func TestSchedulerRetriesSoonUntilSnapshotArrives(t *testing.T) {
 		defer st.mu.Unlock()
 		return st.ensured > 0
 	}, NotReadyRetry+3*time.Second, 50*time.Millisecond, "проход — вскоре после появления снимка, не через час")
+}
+
+func TestRefreshesAreBuiltPerCabinetAndTypesAreEnsured(t *testing.T) {
+	p := Build(at("2026-10-17 09:00"), []connections.Cabinet{seller("a", allFinance...), seller("b", allFinance...)}, DefaultConfig(msk))
+
+	byRef := map[string][]string{}
+	for _, r := range p.Refreshes {
+		byRef[r.ConnectionRef] = append(byRef[r.ConnectionRef], r.Kind)
+		for _, s := range r.Specs {
+			assert.Equal(t, r.ConnectionRef, s.ConnectionRef, "проход кабинета — только его задачи")
+		}
+	}
+	assert.ElementsMatch(t, []string{KindTail, KindTypes}, byRef["a"])
+	assert.ElementsMatch(t, []string{KindTail, KindTypes}, byRef["b"])
+	assert.Contains(t, periods(p.Ensure, executor.ResourceAccrualTypes), executor.PeriodRef, "справочник новому кабинету — без ожидания перезагрузки")
 }

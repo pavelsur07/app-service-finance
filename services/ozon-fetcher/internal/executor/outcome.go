@@ -26,9 +26,9 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		if hash == task.ContentHash {
 			label = "unchanged"
 		}
-		if task.LastErrorClass == string(ozon.ClassAuth) {
-			e.sideEffect(log, "resume connection", e.tasks.ResumeConnection(side, task.ConnectionRef))
-		}
+		// Успех с ключом кабинета сбрасывает счётчик отказов, даже если эта
+		// задача сама 401 не получала (no-op, когда сбрасывать нечего).
+		e.sideEffect(log, "resume connection", e.tasks.ResumeConnection(side, task.ConnectionRef))
 		return store.Outcome{Status: store.StatusDone, Label: label, ContentHash: hash}
 	}
 

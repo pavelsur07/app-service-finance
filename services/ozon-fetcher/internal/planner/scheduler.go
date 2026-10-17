@@ -12,7 +12,7 @@ import (
 // TaskStore — постановка задач.
 type TaskStore interface {
 	Upsert(ctx context.Context, specs []store.TaskSpec) error
-	PlanOnce(ctx context.Context, kind, runDate string, specs []store.TaskSpec) (bool, error)
+	PlanOnce(ctx context.Context, kind, runDate, connectionRef string, specs []store.TaskSpec) (bool, error)
 }
 
 // Cabinets — снимок кабинетов.
@@ -69,7 +69,7 @@ func (s *Scheduler) Tick(ctx context.Context) bool {
 	}
 	var refreshed []string
 	for _, r := range plan.Refreshes {
-		done, err := s.tasks.PlanOnce(ctx, r.Kind, r.RunDate, r.Specs)
+		done, err := s.tasks.PlanOnce(ctx, r.Kind, r.RunDate, r.ConnectionRef, r.Specs)
 		if err != nil {
 			if ctx.Err() == nil {
 				s.logger.Warn("planner: refresh failed", slog.String("stage", "plan"), slog.String("kind", r.Kind), slog.String("error", err.Error()))
@@ -77,7 +77,7 @@ func (s *Scheduler) Tick(ctx context.Context) bool {
 			continue
 		}
 		if done {
-			refreshed = append(refreshed, r.Kind)
+			refreshed = append(refreshed, r.Kind+"/"+r.ConnectionRef)
 		}
 	}
 	s.logger.Info("planner pass",
