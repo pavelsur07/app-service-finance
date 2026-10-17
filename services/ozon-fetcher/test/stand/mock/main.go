@@ -3,6 +3,10 @@
 //
 // Кабинеты: cab-ok (обычный), cab-429 (каждый 3-й запрос by-day — 429 с
 // Retry-After: 1), cab-401 (ключ отклонён). Счётчики — GET /stats.
+//
+// REAL_CLIENT_ID + REAL_API_KEY: снимок отдаёт один реальный кабинет с этими
+// ключами (проверка на настоящем Ozon; OZON_BASE_URL сервиса — по умолчанию).
+// Ключи живут только в env контейнера и не логируются.
 package main
 
 import (
@@ -53,6 +57,12 @@ func main() {
 			return
 		}
 		count("snapshot")
+		if id, key := os.Getenv("REAL_CLIENT_ID"), os.Getenv("REAL_API_KEY"); id != "" && key != "" {
+			real := cabinet("cab-real")
+			real["credentials"] = map[string]any{"seller": map[string]string{"client_id": id, "api_key": key}, "performance": nil}
+			writeJSON(w, 200, map[string]any{"schema_version": "1", "generated_at": time.Now().Format(time.RFC3339), "connections": []any{real}})
+			return
+		}
 		writeJSON(w, 200, map[string]any{
 			"schema_version": "1", "generated_at": time.Now().Format(time.RFC3339),
 			"connections": []any{cabinet("cab-ok"), cabinet("cab-429"), cabinet("cab-401")},
