@@ -6,13 +6,18 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
 // MinInternalTokenLength — как InternalAccessPolicy::MIN_TOKEN_LENGTH в Symfony.
 const MinInternalTokenLength = 32
 
-const defaultPollInterval = 5 * time.Minute
+const (
+	defaultPollInterval = 5 * time.Minute
+	defaultMaxParallel  = 4
+	maxMaxParallel      = 64
+)
 
 type Config struct {
 	ListenAddr string
@@ -22,6 +27,8 @@ type Config struct {
 	SymfonyBaseURL          string
 	InternalAuthToken       string
 	ConnectionsPollInterval time.Duration
+	// MaxParallelConnections — сколько кабинетов загружается одновременно.
+	MaxParallelConnections int
 
 	// S3Bucket пуст — запись raw выключена (режим scaffold).
 	S3Endpoint        string
@@ -38,6 +45,7 @@ func Load() (Config, error) {
 		SymfonyBaseURL:          os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
 		InternalAuthToken:       os.Getenv("INTERNAL_AUTH_TOKEN"),
 		ConnectionsPollInterval: defaultPollInterval,
+		MaxParallelConnections:  defaultMaxParallel,
 		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
 		S3Region:                os.Getenv("S3_REGION"),
 		S3Bucket:                os.Getenv("S3_BUCKET"),
@@ -54,6 +62,14 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("config: CONNECTIONS_POLL_INTERVAL must be a positive duration, got %q", raw)
 		}
 		cfg.ConnectionsPollInterval = d
+	}
+
+	if raw := os.Getenv("MAX_PARALLEL_CONNECTIONS"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > maxMaxParallel {
+			return Config{}, fmt.Errorf("config: MAX_PARALLEL_CONNECTIONS must be 1..%d, got %q", maxMaxParallel, raw)
+		}
+		cfg.MaxParallelConnections = n
 	}
 
 	if cfg.SymfonyBaseURL != "" {

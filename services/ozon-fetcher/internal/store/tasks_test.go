@@ -24,7 +24,7 @@ func testTasks(t *testing.T) *Tasks {
 	}
 	ctx := context.Background()
 	require.NoError(t, Migrate(ctx, dsn))
-	pool, err := Open(ctx, dsn)
+	pool, err := Open(ctx, dsn, PoolSize(4))
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 	_, err = pool.Exec(ctx, `TRUNCATE raw_object, fetch_attempt, fetch_task, connection_state, connection_limit, resource_stop`)

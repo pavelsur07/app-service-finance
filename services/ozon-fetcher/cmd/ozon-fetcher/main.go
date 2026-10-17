@@ -46,7 +46,7 @@ func run() error {
 
 	var pool *store.Pool
 	if cfg.DBDSN != "" {
-		p, err := store.Open(ctx, cfg.DBDSN)
+		p, err := store.Open(ctx, cfg.DBDSN, store.PoolSize(cfg.MaxParallelConnections))
 		if err != nil {
 			return err
 		}

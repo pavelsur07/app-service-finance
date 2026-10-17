@@ -123,3 +123,27 @@ func TestLoadS3Settings(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadMaxParallel(t *testing.T) {
+	for raw, want := range map[string]int{"": 4, "1": 1, "64": 64, "0": -1, "65": -1, "many": -1} {
+		t.Run("value "+raw, func(t *testing.T) {
+			t.Setenv("MAX_PARALLEL_CONNECTIONS", raw)
+			t.Setenv("SYMFONY_INTERNAL_BASE_URL", "")
+			t.Setenv("CONNECTIONS_POLL_INTERVAL", "")
+			t.Setenv("S3_BUCKET", "")
+			cfg, err := Load()
+			if want < 0 {
+				if err == nil {
+					t.Fatal("want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.MaxParallelConnections != want {
+				t.Errorf("got %d, want %d", cfg.MaxParallelConnections, want)
+			}
+		})
+	}
+}
