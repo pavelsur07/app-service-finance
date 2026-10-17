@@ -72,12 +72,9 @@ final readonly class PlPreviewXlsxExporter
         }
         $writer->addRow($this->headerRow($headers));
 
-        foreach ($report->rows as $index => $row) {
-            if (!$showEmptyRows && [] === array_filter($row->values, static fn (float $v): bool => abs($v) >= 0.005)) {
-                continue;
-            }
-
-            $hasChildren = isset($report->rows[$index + 1]) && $report->rows[$index + 1]->level > $row->level;
+        $rows = $report->visibleRows($showEmptyRows);
+        foreach ($rows as $index => $row) {
+            $hasChildren = isset($rows[$index + 1]) && $rows[$index + 1]->level > $row->level;
             $valueStyle = (new Style())->setFormat(self::numberFormat($row->format))->setCellAlignment(CellAlignment::RIGHT);
             $totalStyle = (clone $valueStyle)->setFontBold();
 

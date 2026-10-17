@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\DTO;
 
 use App\Finance\Application\DTO\PlPreviewRow;
 use App\Finance\Application\DTO\PlPreviewUnplacedAmount;
+use App\Finance\Enum\PLValueFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 
@@ -37,6 +38,34 @@ final readonly class MarketplacePlPreviewReport
         public array $salesCoverage,
         public array $warnings,
     ) {
+    }
+
+    /**
+     * Строки для показа — одно правило для экрана и xlsx. Пустая строка — та, что во всех колонках
+     * показала бы ноль при точности своего формата: KPI 0,3 % пустым не считается.
+     *
+     * @return list<PlPreviewRow>
+     */
+    public function visibleRows(bool $showEmptyRows): array
+    {
+        if ($showEmptyRows) {
+            return $this->rows;
+        }
+
+        return array_values(array_filter($this->rows, static function (PlPreviewRow $row): bool {
+            $halfUnit = match ($row->format) {
+                PLValueFormat::PERCENT => 0.0005, // доля, показывается в процентах с одним знаком
+                PLValueFormat::RATIO => 0.00005,
+                PLValueFormat::MONEY, PLValueFormat::QTY => 0.005,
+            };
+            foreach ($row->values as $value) {
+                if (abs($value) >= $halfUnit) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
     }
 
     /**

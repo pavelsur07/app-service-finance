@@ -167,21 +167,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% set shown = 0 %}
-                        {% for row in report.rows %}
-                            {% set has_children = report.rows[loop.index] is defined and report.rows[loop.index].level > row.level %}
-                            {% set is_empty = row.values|filter(v => v > 0.004 or v < -0.004)|length == 0 %}
-                            {% if filter.showEmptyRows or not is_empty %}
-                                {% set shown = shown + 1 %}
-                                <tr class="{{ has_children ? 'fw-bold' }}" data-row-code="{{ row.code }}">
-                                    <td style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;" title="{{ row.name }}">{{ row.name }}</td>
-                                    {% for column in report.columns %}
-                                        {{ ui.cell(row.values[column.key] ?? 0, row.format, 'text-end' ~ (column.kind.value == 'total' ? ' fw-bold pl-cell-total')) }}
-                                    {% endfor %}
-                                </tr>
-                            {% endif %}
+                        {% set visible_rows = report.visibleRows(filter.showEmptyRows) %}
+                        {% for row in visible_rows %}
+                            {% set has_children = visible_rows[loop.index] is defined and visible_rows[loop.index].level > row.level %}
+                            <tr class="{{ has_children ? 'fw-bold' }}" data-row-code="{{ row.code }}">
+                                <td style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;" title="{{ row.name }}">{{ row.name }}</td>
+                                {% for column in report.columns %}
+                                    {{ ui.cell(row.values[column.key] ?? 0, row.format, 'text-end' ~ (column.kind.value == 'total' ? ' fw-bold pl-cell-total')) }}
+                                {% endfor %}
+                            </tr>
                         {% endfor %}
-                        {% if shown == 0 %}
+                        {% if visible_rows is empty %}
                             <tr>
                                 <td colspan="{{ value_columns + 1 }}" class="text-secondary" data-testid="pl-preview-empty">
                                     {{ report.rows is empty ? 'У компании нет дерева статей ОПиУ.' : 'За период нет сумм, которые попадут в ОПиУ.' }}
