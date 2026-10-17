@@ -27,12 +27,17 @@ type fakePutter struct {
 	objects  map[string][]byte
 	inputs   []*s3.PutObjectInput
 	err      error
+	hang     bool
 	inFlight atomic.Int32
 	maxSeen  atomic.Int32
 	delay    time.Duration
 }
 
-func (f *fakePutter) PutObject(_ context.Context, in *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+func (f *fakePutter) PutObject(ctx context.Context, in *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	if f.hang {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	n := f.inFlight.Add(1)
 	defer f.inFlight.Add(-1)
 	for {
@@ -202,4 +207,23 @@ func envOr(name, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func TestConditionalConflictIsNotSuccess(t *testing.T) {
+	putter := &fakePutter{err: &smithy.GenericAPIError{Code: "ConditionalRequestConflict"}}
+
+	_, err := New(putter, "b", 1).Put(context.Background(), page(`{}`))
+
+	require.Error(t, err, "409 не доказывает, что объект сохранён")
+}
+
+func TestHungPutIsBoundedByTimeout(t *testing.T) {
+	store := New(&fakePutter{hang: true}, "b", 1).WithPutTimeout(20 * time.Millisecond)
+
+	started := time.Now()
+	_, err := store.Put(context.Background(), page(`{}`))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), time.Second)
 }

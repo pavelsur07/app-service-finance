@@ -45,15 +45,27 @@ type Stored struct {
 	StoredBytes int64
 }
 
+// DefaultPutTimeout — предел одного PUT вместе с повторами SDK: зависший S3
+// не должен держать задачу и слот диспетчера.
+const DefaultPutTimeout = 2 * time.Minute
+
 // Store пишет объекты в один бакет; parallel ограничивает одновременные PUT.
 type Store struct {
-	client Putter
-	bucket string
-	sem    chan struct{}
+	client     Putter
+	bucket     string
+	sem        chan struct{}
+	putTimeout time.Duration
 }
 
 func New(client Putter, bucket string, parallel int) *Store {
-	return &Store{client: client, bucket: bucket, sem: make(chan struct{}, max(parallel, 1))}
+	return &Store{client: client, bucket: bucket, sem: make(chan struct{}, max(parallel, 1)), putTimeout: DefaultPutTimeout}
+}
+
+// WithPutTimeout — копия с другим пределом PUT.
+func (s *Store) WithPutTimeout(d time.Duration) *Store {
+	clone := *s
+	clone.putTimeout = d
+	return &clone
 }
 
 // Put записывает объект. Ключ содержит попытку, страницу и sha256: тот же
@@ -76,7 +88,9 @@ func (s *Store) Put(ctx context.Context, obj Object) (Stored, error) {
 	}
 	defer func() { <-s.sem }()
 
-	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+	putCtx, cancel := context.WithTimeout(ctx, s.putTimeout)
+	defer cancel()
+	_, err = s.client.PutObject(putCtx, &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(key),
 		Body:          bytes.NewReader(compressed),
@@ -94,6 +108,7 @@ func (s *Store) Put(ctx context.Context, obj Object) (Stored, error) {
 		if ctx.Err() != nil {
 			return Stored{}, ctx.Err()
 		}
+		// Таймаут PUT — обычная ошибка хранилища (повтор задачи), не отмена задачи.
 		return Stored{}, fmt.Errorf("rawstore: put %s: %w", key, err)
 	}
 
@@ -160,12 +175,8 @@ func gzipBytes(b []byte) ([]byte, error) {
 }
 
 func isAlreadyExists(err error) bool {
+	// Только 412: объект с этим ключом уже есть. 409 ConditionalRequestConflict
+	// не гарантирует, что объект сохранён, — это ошибка, задача повторит PUT.
 	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		switch apiErr.ErrorCode() {
-		case "PreconditionFailed", "ConditionalRequestConflict":
-			return true
-		}
-	}
-	return false
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PreconditionFailed"
 }

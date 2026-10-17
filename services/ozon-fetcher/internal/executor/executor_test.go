@@ -28,21 +28,22 @@ var t0 = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 // --- фейки ---
 
 type fakeTasks struct {
-	mu         sync.Mutex
-	pages      []store.RawObject
-	cursors    []string
-	finished   *store.Outcome
-	suspended  []string
-	resumed    []string
-	stopped    []string
-	extends    int
-	pageErr    error // ошибка RecordPage
-	extendErr  error
-	finishErr  error
-	revision   int
-	suspendErr error
-	stopErr    error
-	extendHang bool // ExtendLease ждёт отмены контекста
+	mu          sync.Mutex
+	pages       []store.RawObject
+	cursors     []string
+	finished    *store.Outcome
+	suspended   []string
+	resumed     []string
+	stopped     []string
+	extends     int
+	pageErr     error // ошибка RecordPage
+	extendErr   error
+	finishErr   error
+	revision    int
+	suspendErr  error
+	stopErr     error
+	controlHang bool // SuspendConnection/StopResource ждут отмены контекста
+	extendHang  bool // ExtendLease ждёт отмены контекста
 }
 
 func (f *fakeTasks) ExtendLease(ctx context.Context, _ store.TaskKey, _ string, _ time.Time) error {
@@ -75,7 +76,11 @@ func (f *fakeTasks) FinishTask(_ context.Context, _ store.TaskKey, _ string, out
 	return f.revision, f.finishErr
 }
 
-func (f *fakeTasks) SuspendConnection(_ context.Context, ref, _ string, _ time.Time) error {
+func (f *fakeTasks) SuspendConnection(ctx context.Context, ref, _ string, _ time.Time) error {
+	if f.controlHang {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	if f.suspendErr != nil {
 		return f.suspendErr
 	}
@@ -516,4 +521,24 @@ func TestFailedControlWritesKeepTaskRetryable(t *testing.T) {
 		assert.Equal(t, store.StatusFailedRetryable, h.tasks.finished.Status)
 		assert.NotContains(t, h.logs.String(), "resource stopped")
 	})
+}
+
+func TestHungControlWriteIsBoundedAndKeepsTaskRetryable(t *testing.T) {
+	h := newHarness(&fakeOzon{singleErr: &ozon.APIError{Class: ozon.ClassAuth, Status: 401}})
+	h.exec.cfg.FinishTimeout = 30 * time.Millisecond
+	h.tasks.controlHang = true
+	tk := task(ResourceAccrualTypes, PeriodRef)
+	tk.LastErrorClass = "auth"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // shutdown уже идёт
+
+	done := make(chan Result, 1)
+	go func() { done <- h.exec.Run(ctx, tk, cabinet, "trace") }()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run is stuck behind a hung control write")
+	}
+	require.NotNil(t, h.tasks.finished)
 }

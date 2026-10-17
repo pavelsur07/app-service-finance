@@ -134,9 +134,11 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 
 	run := &taskRun{exec: e, task: task, hashes: append([]string(nil), task.PageHashes...), cursor: task.Cursor, nextPage: task.NextPageNo}
 	fetchErr := run.fetch(taskCtx, cabinet)
-	stopLease()
 
+	// Lease продлевается и во время побочных действий исхода (пауза кабинета,
+	// стоп ресурса); у них свой ограниченный контекст.
 	out := e.outcome(ctx, taskCtx, task, run, fetchErr, log)
+	stopLease()
 	result := Result{Outcome: out.Label, Pages: run.pages}
 
 	if !errors.Is(context.Cause(taskCtx), errLeaseLost) {

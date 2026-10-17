@@ -15,7 +15,10 @@ import (
 // выполняются здесь же — до записи итога задачи.
 func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run *taskRun, err error, log *slog.Logger) store.Outcome {
 	now := e.now()
-	side := context.WithoutCancel(parent)
+	// Побочные записи переживают отмену задачи, но ограничены по времени:
+	// зависшее соединение с БД не задерживает shutdown и не переживает lease.
+	side, cancelSide := context.WithTimeout(context.WithoutCancel(parent), e.cfg.FinishTimeout)
+	defer cancelSide()
 
 	if err == nil {
 		label := "done"
