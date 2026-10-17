@@ -1,0 +1,23 @@
+## Current checkpoint
+
+**Phase:** handoff PR-группы 5; дальше — этап 14 (отдельная ветка) по решению Владельца
+**Status:** Stage 0–13 done (реальный кабинет пройден 17.10)
+**PR (цепочкой):** #2706 (0) → #2707 (1–2) → #2708 (3–6) → #2709 (7–10) → #2710 draft (11–13, `feat/ozon-fetcher-run`)
+**Этап 14:** отдельная ветка `infra/ozon-fetcher-deploy` (секреты, CI, прод) — решение Владельца 17.10, не начат
+
+### Exact next action
+- Владелец кладёт ключи: `~/.config/ozon-fetcher/vumjoy.env` (`OZON_CLIENT_ID`, `OZON_API_KEY`, 0600)
+- запустить `<scratchpad>/real-run.sh`: мок отдаёт `cab-real` с ключами из env, сервис ходит в настоящий Ozon, лимит by-day 0,3 запроса/с, `MAX_PARALLEL_CONNECTIONS=1`
+- проверить `/internal/fetch-status`, форму by-day/справочника/реализации/взаиморасчётов, 429; затем удалить данные (`DROP DATABASE ozon_fetcher_real`, `docker rm -f -v asf9-s3`)
+- закрыть Stage 13, PR #2710 → ready
+
+### Окружение (dev-машина)
+- мои контейнеры: `asf9-pg`, `asf9-redis`, `asf9-s3` (seaweedfs, tmpfs 160m, тома 4 МБ ×24) в `asf9-net`; бинарники стенда — `<scratchpad>/bin`
+- Go-тесты: контейнер `--memory=1200m`, `GOMAXPROCS=2`, `-p=1`, по пакету (OOM)
+- стенд-БД `ozon_fetcher_stand` создана со старой `00003` — пересоздать перед использованием
+
+### GitHub (заведено 17.10.2026)
+- secrets: `INTERNAL_AUTH_TOKEN`, `OZON_FETCHER_DB_PASSWORD` (агент, случайные hex-48); S3-ключи — за Владельцем
+- variables: `OZON_FETCHER_CONNECTION_ALLOWLIST=90b72323-784a-4268-88aa-10778c3da78b` («Вумджой»), `OZON_FETCHER_ENABLED=true`
+- **после тестирования удалить обе переменные** (указание Владельца 17.10): без
+  `ALLOWLIST` — все кабинеты; без `ENABLED` деплой останавливает сервис

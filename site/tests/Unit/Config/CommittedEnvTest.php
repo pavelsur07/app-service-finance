@@ -33,6 +33,17 @@ final class CommittedEnvTest extends TestCase
     }
 
     /**
+     * Токен `/internal/*` открывает выдачу ключей маркетплейсов сервисам: заполненное
+     * здесь значение досталось бы каждому окружению. Прод получает его из окружения.
+     */
+    public function testCommittedEnvDoesNotShipAnInternalAuthToken(): void
+    {
+        $value = $this->envValue('INTERNAL_AUTH_TOKEN');
+        self::assertNotNull($value, 'Ключ INTERNAL_AUTH_TOKEN исчез из .env: подстановка окружения перестанет быть явной.');
+        self::assertSame('', $value, 'В коммитируемом .env задан INTERNAL_AUTH_TOKEN: внутренний API откроется везде, где лежит этот файл.');
+    }
+
+    /**
      * Тот же класс дефекта шире одного ключа: DSN-образное значение вида
      * https://<ключ>@<хост>/<project id> — это пишущая учётка трекера, и в git ей не место.
      */

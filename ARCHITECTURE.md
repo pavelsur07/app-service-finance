@@ -3331,7 +3331,36 @@ $money->amountMinor(): int;  $money->currency(): string
 main        → form_login для пользователей
 admin       → отдельный firewall для /admin
 public_api  → stateless, анонимный /api/public/
+internal_api → stateless, /internal/* для сервисов services/
 ```
+
+### Внутренний API `/internal/*` (сервисы `services/`)
+
+- Firewall `internal_api` (`^/internal/`), `InternalServiceAuthenticator` →
+  `InternalAccessPolicy`: `Authorization: Bearer <INTERNAL_AUTH_TOKEN>`
+  (`hash_equals`, токен ≥ 32 символов) и IP клиента в `INTERNAL_ALLOWED_IPS`
+  (CIDR через запятую, `IpUtils`). Principal — `InternalServicePrincipal`,
+  роль `ROLE_INTERNAL_SERVICE`, без пользователя и компании.
+- Пустой токен или allowlist — закрыто для всех (fail-closed). В `site/.env`
+  значения пустые; прод-значения задаются вместе с выводом сервисов на прод.
+- Отказ: `{"error":{"code","message"}}` — 401 `internal_auth_required`,
+  403 `internal_ip_forbidden`, 403 `internal_api_disabled`; warning-лог с
+  путём, IP и причиной, без токена.
+- nginx (`docker/common/nginx/conf.d/default.conf`): `/internal/` с
+  `X-Forwarded-For` (пришёл через публичный traefik) → 404. Сервисы ходят в
+  `site-nginx` напрямую по docker-сети.
+- Контроллеры — `App\{Module}\Controller\Internal\`; модульный гейт их
+  пропускает (`ModuleAccessMap::EXEMPT_PREFIXES`), контекст компании не
+  используется. `GET /internal/ping` → `{"status":"ok"}`.
+- `GET /internal/marketplace-connections?provider=ozon` — снимок активных
+  Ozon-кабинетов с ключами по контракту `services/_contracts/marketplace-connections/v1`
+  (`MarketplaceConnectionsController` → `ActiveConnectionCredentialsQuery`
+  (`@companyScopeExempt`, расшифровка через `ConnectionApiKeyCodec`) →
+  `MarketplaceConnectionsSnapshotBuilder`). Кабинет = компания: seller и
+  performance одной компании — один элемент; `connection_ref` — id seller,
+  без seller — id performance. Ключ, который не расшифровался, — кабинет без
+  него, один error-лог на запрос; кабинет без пригодных ключей не выдаётся.
+  Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
 Admin-роли: `ROLE_ADMIN → ROLE_SUPER_ADMIN`
@@ -3955,6 +3984,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.18 | 2026-10-17 | Marketplace: `GET /internal/marketplace-connections` — активные Ozon-кабинеты и ключи для сервисов `services/` (`ActiveConnectionCredentialsQuery`, `MarketplaceConnectionsSnapshotBuilder`, DTO `Application/DTO/Internal`) |
+| 2.17 | 2026-10-17 | Shared: firewall `internal_api` для `/internal/*` (static token + IP-allowlist, `InternalAccessPolicy`), `GET /internal/ping`; `AuditContextProvider::getCompanyId()` — `null` для principal без пользователя |
 | 2.16 | 2026-10-17 | Finance: `calculatePlPreview(…, natureBaseColumn)` — колонки-доли берут знак статьи от итога и складываются в него |
 | 2.15 | 2026-10-17 | Marketplace: реклама Ozon (клики) и WB («Продвижение») в колонках тегов предпросмотра — из рекламной статистики, «Итого» — учёт |
 | 2.14 | 2026-10-17 | Marketplace: категории под рекламной статистикой и порт `PlPreviewAdSpendProviderInterface` (реализация в MarketplaceAds) |

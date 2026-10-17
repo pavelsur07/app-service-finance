@@ -1,5 +1,12 @@
 # marketplace-connections — CHANGELOG
 
+## Правка проекта (2026-10-17, до утверждения)
+
+- Пример `resource_types` — `ozon.finance.accrual-by-day` вместо
+  `ozon.finance.transaction-list`: Ozon снял `/v3/finance/transaction/list`
+  09.09.2026. Перечислены значения seller первой волны. Структура схемы не
+  менялась.
+
 ## v1.0.0-draft (2026-10-13) — первый проект
 
 Решения:

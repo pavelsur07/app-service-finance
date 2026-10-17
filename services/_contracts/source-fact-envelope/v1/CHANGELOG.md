@@ -1,5 +1,14 @@
 # source-fact-envelope — CHANGELOG
 
+## Правка проекта (2026-10-17, до утверждения)
+
+- Ozon снял `/v3/finance/transaction/list` 09.09.2026: ресурс
+  `ozon.finance.transaction-list` заменён на `ozon.finance.accrual-by-day`.
+- `source_key` для by-day — `ozon:accrual-by-day:{accrual_id}:{component}`
+  (без состояния, паритет с Ingestion). Прежний проект опирался на ключи
+  Marketplace, которые зависят от состояния БД Symfony и producer'у недоступны.
+- Схема полей не менялась.
+
 ## Доставка (2026-10-13, до утверждения)
 
 Транспорт пересмотрен владельцем: вместо push (`POST` в inbox Symfony) —
