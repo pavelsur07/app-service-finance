@@ -91,6 +91,9 @@ final class ModuleAccessMap
     private const EXEMPT_PREFIXES = [
         // ApiAccessSubscriber requires the external firewall principal and an explicit endpoint policy.
         'App\\Api\\Controller\\External\\',
+        // /internal/* для services/: firewall internal_api (token + IP), ROLE_INTERNAL_SERVICE, без компании.
+        'App\\Shared\\Controller\\Internal\\',
+        'App\\Marketplace\\Controller\\Internal\\',
 
         'App\\Admin\\',                          // админка под ROLE_ADMIN
         'App\\Mcp\\',                            // MCP-интеграции со своей авторизацией

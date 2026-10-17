@@ -17,6 +17,13 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        internal_api:
+            # Сервисы services/ (docs/tasks/ozon-fetcher-ingestion): static token + IP-allowlist
+            pattern: ^/internal/
+            stateless: true
+            custom_authenticators:
+                - App\Shared\Security\Internal\InternalServiceAuthenticator
+            entry_point: App\Shared\Security\Internal\InternalServiceAuthenticator
         external_api:
             pattern: ^/api/external/v1/
             stateless: true
@@ -67,6 +74,7 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
+        - { path: ^/internal/, roles: ROLE_INTERNAL_SERVICE }
         - { path: ^/api/external/v1/, roles: ROLE_EXTERNAL_API }
         - { path: ^/api/public/, roles: PUBLIC_ACCESS }
         - { path: ^/_health, roles: PUBLIC_ACCESS }

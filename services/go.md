@@ -131,7 +131,8 @@ outbox, immutable raw, dev-контейнер `services-postgres`).
 - `make <name>-lint` — golangci-lint v2, конфиг `.golangci.yml`
   (`golangci-lint fmt` — форматирование импортов).
 - `make <name>-vet` — `go vet ./...`.
-- `make <name>-test` — `go test -race ./...`.
+- `make <name>-test` — `go test -race ./...`. `-race` требует cgo: тулчейн-контейнер
+  тестов — `golang:1.27` (debian, с gcc) и `CGO_ENABLED=1`, не alpine.
 - CI дополнительно: `govulncheck` (пин версии), `go build -trimpath`,
   проверка чистоты форматирования.
 - Порядок: fmt → vet → lint → test; красный гейт останавливает пайплайн.

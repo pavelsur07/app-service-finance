@@ -5,9 +5,9 @@ Go-сервис: загрузка финансовых данных Ozon Seller 
 контракту [source-fact-envelope](../_contracts/source-fact-envelope/v1/)
 (pull-модель, после первой волны).
 
-Статус: **scaffold + store** — health/ready endpoints, конфигурация, доступ к
-собственной БД (pgxpool + goose-миграции, таблицы `sync_job`/`checkpoint`/
-`outbox_batch`). План работ по этапам —
+Статус: **загрузка raw** — кабинеты из Symfony, планировщик, диспетчер,
+исполнитель, raw в S3, журнал в своей БД, `/internal/fetch-status`. Прод —
+`docs/maintenance/ozon-fetcher-prod.md`. План работ по этапам —
 [`docs/tasks/ozon-fetcher-ingestion/plan.md`](../../docs/tasks/ozon-fetcher-ingestion/plan.md);
 ресурсы и лимиты Ozon — [`docs/ozon-api.md`](docs/ozon-api.md).
 
@@ -30,6 +30,33 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 `services-ozon-fetcher-dev` как `DB_DSN`. Без `DB_DSN` сервис работает в
 режиме без БД (`/ready` отвечает `db: disabled`).
 
+## Схема БД
+
+Только техническое состояние (`services/AGENTS.md` §9). Миграции —
+`internal/store/migrations`, прогон — `make ozon-fetcher-migrate`.
+
+| Таблица | Назначение |
+|---|---|
+| `fetch_task` | Что должно быть загружено: `(connection_ref, resource_type, period_key)`, статус (`pending → running → done \| not_ready \| failed_retryable \| failed_permanent`), приоритет, попытки, `next_run_at`, lease, курсор и номер следующей страницы, `content_hash` + `revision` |
+| `fetch_attempt` | Журнал попыток (append-only): время, исход, HTTP-статус, страницы, байты |
+| `raw_object` | Объект S3 на страницу попытки: `storage_uri`, sha256 несжатых байтов, размеры |
+| `connection_state` | Кабинет: `last_served_at` (честная очередь), пауза после `auth` |
+| `connection_limit` | Пара (кабинет, endpoint): ручное `rps_override`, адаптированная `rps_current` |
+| `resource_stop` | Ресурс, снятый у Ozon (`obsolete_endpoint`), — не выдаётся никому |
+| `sync_job`, `checkpoint`, `outbox_batch` | `00001`, под выдачу фактов (позже) |
+
+Инварианты: у кабинета не больше одной `running`-задачи (частичный уникальный
+индекс); страница и курсор пишутся одной транзакцией; просроченный lease
+возвращает задачу в `pending` с сохранённым курсором.
+
+Интеграционные тесты `internal/store`: `TEST_DB_DSN` — пустая БД; без
+переменной тесты пропускаются.
+
+**Raw в S3** (`internal/rawstore`): ключ
+`ozon/{connection_ref}/{resource_type}/{period_key}/{fetched_at}_{attempt}_p{NNN}_{sha8}.{ext}.gz`,
+gzip исходных байтов, `If-None-Match: *`, sha256 несжатых — в метаданных и
+`raw_object`. Интеграционный тест — `TEST_S3_ENDPOINT`, `TEST_S3_BUCKET`.
+
 ## Переменные окружения
 
 Секреты — только env, значения не коммитятся (шаблон — `.env.example`).
@@ -39,7 +66,7 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 | Переменная | Назначение | Обязательная |
 |---|---|---|
 | `LISTEN_ADDR` | Адрес HTTP, по умолчанию `:8080` | нет |
-| `DB_DSN` | PostgreSQL сервисной БД (`sslmode=require` в prod) | нет |
+| `DB_DSN` | PostgreSQL сервисной БД (на проде — общий инстанс в той же docker-сети, `sslmode=disable`, как у Symfony) | нет |
 | `S3_ENDPOINT` | `https://s3.twcstorage.ru` | этап 8 |
 | `S3_REGION` | `ru-1` | этап 8 |
 | `S3_BUCKET` | `vashfindir-services-raw` | этап 8 |
@@ -47,7 +74,10 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 | `SYMFONY_INTERNAL_BASE_URL` | Базовый URL внутреннего API Symfony (`/internal/marketplace-connections`) | этап 6 |
 | `INTERNAL_AUTH_TOKEN` | Внутренний static token для `/internal/*` (с обеих сторон) | этап 6 |
 | `CONNECTIONS_POLL_INTERVAL` | Интервал поллинга конфигурации, по умолчанию `5m` | этап 6 |
-| `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно | этап 10 |
+| `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно (по умолчанию 4, на проде 2) | этап 10 |
+| `CONNECTION_ALLOWLIST` | Только эти кабинеты: `connection_ref` или `company_id` через запятую; пусто — все | этап 14 |
+| `OZON_BASE_URL` | Seller API, по умолчанию `https://api-seller.ozon.ru` (на стенде — мок) | этап 11 |
+| `TAIL_DAYS`, `RECONCILE_WEEKDAY`, `FINAL_DAY`, `PLAN_EVERY` | Окна планировщика: 3, 1 (пн), 10, 1h | этап 11 |
 
 ## Внутренний API сервиса (контракты, к кодовым Stage'ам)
 

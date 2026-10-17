@@ -58,6 +58,12 @@ x-php-env: &php-env
     APP_OBJECT_STORAGE_S3_REGION: "ru-1"
     # Если бакет не резолвится virtual-hosted стилем — переключить на "1" (path-style)
     APP_OBJECT_STORAGE_S3_PATH_STYLE_ENDPOINT: "0"
+    # ─── Внутренний API /internal/* для сервисов services/ (ozon-fetcher) ───
+    # Пустой токен — /internal/* закрыт для всех (fail-closed), пока секрет не заведён.
+    # Allowlist — docker-сети хоста: внешний клиент через traefik приходит с публичным
+    # IP и с X-Forwarded-For (nginx отдаёт 404). См. docs/maintenance/ozon-fetcher-prod.md.
+    INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-}
+    INTERNAL_ALLOWED_IPS: "172.16.0.0/12"
     # Ключи — только через GitHub Secrets (deploy.yml экспортирует их в host-env)
     APP_OBJECT_STORAGE_S3_ACCESS_KEY: ${APP_OBJECT_STORAGE_S3_ACCESS_KEY:-}
     APP_OBJECT_STORAGE_S3_SECRET_KEY: ${APP_OBJECT_STORAGE_S3_SECRET_KEY:-}
@@ -508,6 +514,50 @@ services:
                     memory: 3G
                 reservations:
                     memory: 256M
+
+    # Загрузка финансовых данных Ozon (services/ozon-fetcher). Профиль: контейнер
+    # не стартует, пока деплой не включит его переменной OZON_FETCHER_ENABLED=true
+    # (`up -d --remove-orphans` поднимает все сервисы без профиля).
+    # Без ingress: только сеть default. См. docs/maintenance/ozon-fetcher-prod.md.
+    ozon-fetcher:
+        image: ghcr.io/pavelsur07/ozon-fetcher:${IMAGE_TAG:-latest}
+        container_name: ozon-fetcher
+        profiles: ["ozon-fetcher"]
+        restart: always
+        logging: *default-logging
+        environment:
+            TZ: Europe/Moscow
+            LISTEN_ADDR: ":8080"
+            # Общий инстанс PostgreSQL в той же docker-сети, без SSL — как у Symfony.
+            DB_DSN: postgres://svc_ozon_fetcher:${OZON_FETCHER_DB_PASSWORD:-}@site-postgres:5432/ozon_fetcher?sslmode=disable
+            SYMFONY_INTERNAL_BASE_URL: http://site-nginx
+            INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-}
+            CONNECTIONS_POLL_INTERVAL: 5m
+            MAX_PARALLEL_CONNECTIONS: "2"
+            CONNECTION_ALLOWLIST: ${OZON_FETCHER_CONNECTION_ALLOWLIST:-}
+            S3_ENDPOINT: "https://s3.twcstorage.ru"
+            S3_REGION: "ru-1"
+            S3_BUCKET: "vashfindir-services-raw"
+            S3_ACCESS_KEY_ID: ${OZON_FETCHER_S3_ACCESS_KEY_ID:-}
+            S3_SECRET_ACCESS_KEY: ${OZON_FETCHER_S3_SECRET_ACCESS_KEY:-}
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        stop_grace_period: 30s
+        healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    memory: 384M
+                reservations:
+                    memory: 64M
 
 volumes:
     site_storage:

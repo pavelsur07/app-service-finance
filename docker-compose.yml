@@ -192,10 +192,12 @@ services:
     # Тулчейн-контейнеры сервиса (гейты make ozon-fetcher-test/-vet/-lint);
     # не публикуются и не деплоятся. См. services/go.md «Гейты».
     services-ozon-fetcher-dev:
-        image: golang:1.27-alpine
+        # debian-образ: go test -race требует cgo (в alpine нет gcc)
+        image: golang:1.27
         working_dir: /src
         environment:
             <<: *tz-env
+            CGO_ENABLED: "1"
             # dev-only DSN на services-postgres; продакшен-значение — только env сервиса.
             DB_DSN: "postgres://svc_ozon_fetcher:ozon_fetcher_dev@services-postgres:5432/ozon_fetcher?sslmode=disable"
         depends_on:
