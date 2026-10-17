@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -285,6 +286,56 @@ func TestFetchMutualSettlement(t *testing.T) {
 			assert.Equal(t, tt.wantClass, apiErr.Class)
 		})
 	}
+}
+
+func TestFetchMutualSettlementDeadlineCountsSlowStatusRequests(t *testing.T) {
+	srv, polls := mutualSettlementServer(t, msScript{infoStatuses: []string{"waiting"}})
+	slow := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == EndpointReportInfo {
+			time.Sleep(40 * time.Millisecond)
+		}
+		srv.Config.Handler.ServeHTTP(w, r)
+	})
+	slowSrv := httptest.NewTLSServer(slow)
+	t.Cleanup(slowSrv.Close)
+	client := NewClient(slowSrv.URL, slowSrv.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)), time.Now)
+	poll := ReportPoll{Initial: time.Millisecond, Max: time.Millisecond, Deadline: 100 * time.Millisecond}
+
+	started := time.Now()
+	_, err := client.FetchMutualSettlement(context.Background(), testCreds, "conn-1", 2026, 9, poll, noSleep)
+
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, ClassNotReady, apiErr.Class)
+	assert.Less(t, time.Since(started), time.Second, "дедлайн — по реальному времени, а не по сумме пауз")
+	assert.LessOrEqual(t, *polls, 3)
+}
+
+func TestFetchMutualSettlementParentCancelIsNotNotReady(t *testing.T) {
+	srv, _ := mutualSettlementServer(t, msScript{infoStatuses: []string{"waiting"}})
+	client := NewClient(srv.URL, srv.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)), time.Now)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := client.FetchMutualSettlement(ctx, testCreds, "conn-1", 2026, 9, fastPoll, SleepContext)
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestDownloadErrorDoesNotLeakSignedURL(t *testing.T) {
+	const signature = "X-Amz-Signature=very-secret-signature"
+	srv, _ := mutualSettlementServer(t, msScript{infoStatuses: []string{"success"}, fileLink: "https://127.0.0.1:1/file.xlsx?" + signature})
+	client := NewClient(srv.URL, srv.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)), time.Now)
+
+	_, err := client.FetchMutualSettlement(context.Background(), testCreds, "conn-1", 2026, 9, fastPoll, noSleep)
+
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, ClassTransient, apiErr.Class)
+	assert.NotContains(t, err.Error(), "very-secret-signature")
+	assert.NotContains(t, fmt.Sprintf("%+v", err), "very-secret-signature")
+	asJSON, _ := json.Marshal(apiErr)
+	assert.NotContains(t, string(asJSON), "very-secret-signature")
 }
 
 func TestFetchMutualSettlementWithoutCode(t *testing.T) {

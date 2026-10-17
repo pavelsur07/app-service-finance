@@ -57,10 +57,12 @@ func TestParseValidSnapshot(t *testing.T) {
 
 func TestParseRejectsInvalidSnapshots(t *testing.T) {
 	for name, body := range map[string]string{
-		"not json":        `<html>`,
-		"unknown version": `{"schema_version":"2","connections":[]}`,
-		"no version":      `{"connections":[]}`,
-		"no connections":  `{"schema_version":"1"}`,
+		"not json":         `<html>`,
+		"unknown version":  `{"schema_version":"2","connections":[]}`,
+		"no version":       `{"connections":[]}`,
+		"no connections":   `{"schema_version":"1","generated_at":"2026-10-17T12:00:00+03:00"}`,
+		"no generated_at":  `{"schema_version":"1","connections":[]}`,
+		"bad generated_at": `{"schema_version":"1","generated_at":"today","connections":[]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, _, err := parse([]byte(body))
@@ -70,7 +72,7 @@ func TestParseRejectsInvalidSnapshots(t *testing.T) {
 }
 
 func TestParseSkipsBrokenCabinets(t *testing.T) {
-	body := `{"schema_version":"1","generated_at":"x","connections":[
+	body := `{"schema_version":"1","generated_at":"2026-10-17T12:00:00+03:00","connections":[
 	  {"connection_ref":"ok","company_id":"c","provider":"ozon","updated_at":"2026-10-11T09:00:00+03:00","credentials":{"seller":{"client_id":"1","api_key":"k"},"performance":null},"resource_types":[]},
 	  {"connection_ref":"no-company","company_id":"","provider":"ozon","updated_at":"2026-10-11T09:00:00+03:00","credentials":{"seller":null,"performance":null},"resource_types":[]},
 	  {"connection_ref":"wb","company_id":"c","provider":"wildberries","updated_at":"2026-10-11T09:00:00+03:00","credentials":{"seller":null,"performance":null},"resource_types":[]},
@@ -203,15 +205,40 @@ func TestForceRefreshIsThrottled(t *testing.T) {
 	assert.Equal(t, 2, f.calls)
 }
 
-func TestListReturnsCopy(t *testing.T) {
-	f := &scriptedFetcher{results: []fetchResult{{cabinets: []Cabinet{{Ref: "ref-a"}}}}}
-	cache, _, _ := newCache(f)
+func TestListAndGetReturnDeepCopies(t *testing.T) {
+	cabinets, _, err := parse([]byte(validSnapshot))
+	require.NoError(t, err)
+	cache, _, _ := newCache(&scriptedFetcher{results: []fetchResult{{cabinets: cabinets}}})
 	require.NoError(t, cache.Refresh(context.Background()))
 
 	list := cache.List()
 	list[0].Ref = "mutated"
+	list[0].Seller.APIKey = "mutated"
+	list[0].ResourceTypes[0] = "mutated"
+	got, ok := cache.Get("ref-a")
+	require.True(t, ok)
+	got.Seller.APIKey = "mutated-too"
+	got.ResourceTypes[0] = "mutated-too"
 
+	fresh, _ := cache.Get("ref-a")
 	assert.Equal(t, "ref-a", cache.List()[0].Ref)
+	assert.Equal(t, "seller-key-a", fresh.Seller.APIKey)
+	assert.Equal(t, "ozon.finance.accrual-by-day", fresh.ResourceTypes[0])
+}
+
+func TestInvalidSnapshotPreservesCache(t *testing.T) {
+	srvBody := validSnapshot
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, srvBody)
+	}))
+	defer srv.Close()
+	cache, _, _ := newCache(NewClient(srv.URL, token, srv.Client()))
+	require.NoError(t, cache.Refresh(context.Background()))
+
+	srvBody = `{"schema_version":"1","connections":[]}`
+	require.ErrorIs(t, cache.Refresh(context.Background()), ErrInvalidSnapshot)
+
+	assert.Len(t, cache.List(), 2, "битый снимок не обнуляет кэш")
 }
 
 func TestRunRefreshesUntilCanceled(t *testing.T) {

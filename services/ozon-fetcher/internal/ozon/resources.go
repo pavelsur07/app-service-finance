@@ -163,15 +163,29 @@ func (c *Client) FetchMutualSettlement(ctx context.Context, creds Credentials, c
 		return Page{}, invalidResponse(EndpointMutualSettlement, "response has no report code")
 	}
 
+	// Дедлайн опроса — по реальному времени: включает запросы статуса и
+	// ожидание лимитера, а не только паузы между ними.
+	pollCtx, cancel := context.WithTimeout(ctx, poll.Deadline)
+	defer cancel()
+	pollExpired := func(err error) bool {
+		return ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) && pollCtx.Err() != nil
+	}
+
 	delay, waited := poll.Initial, time.Duration(0)
 	for {
-		if err := sleep(ctx, delay); err != nil {
+		if err := sleep(pollCtx, delay); err != nil {
+			if pollExpired(err) {
+				return Page{}, notReady(EndpointReportInfo, 0, "report is not ready before deadline")
+			}
 			return Page{}, err
 		}
 		waited += delay
 
-		info, err := c.Post(ctx, creds, connectionRef, EndpointReportInfo, map[string]string{"code": code})
+		info, err := c.Post(pollCtx, creds, connectionRef, EndpointReportInfo, map[string]string{"code": code})
 		if err != nil {
+			if pollExpired(err) {
+				return Page{}, notReady(EndpointReportInfo, 0, "report is not ready before deadline")
+			}
 			return Page{}, err
 		}
 		switch strings.ToLower(firstString(info.Body, []string{"result", "status"}, []string{"status"})) {
@@ -185,7 +199,7 @@ func (c *Client) FetchMutualSettlement(ctx context.Context, creds Credentials, c
 			return Page{}, &APIError{Class: ClassTransient, Endpoint: EndpointReportInfo, Status: info.Status, Err: errors.New("report generation failed")}
 		}
 
-		if waited >= poll.Deadline {
+		if waited >= poll.Deadline || pollCtx.Err() != nil {
 			return Page{}, notReady(EndpointReportInfo, info.Status, "report is not ready before deadline")
 		}
 		delay = min(delay*2, poll.Max, poll.Deadline-waited)
@@ -211,7 +225,7 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 			return Page{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, 0, c.now().Sub(started), string(ClassTransient))
-		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Err: err}
+		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Err: withoutURL(err)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -223,7 +237,7 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 			return Page{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassTransient))
-		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: err}
+		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: withoutURL(err)}
 	case len(raw) > MaxBodyBytes:
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassInvalidResponse))
 		return Page{}, &APIError{Class: ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ErrBodyTooLarge}
@@ -238,6 +252,16 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 
 	c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, "ok")
 	return Page{No: 1, Body: raw, ContentType: resp.Header.Get("Content-Type")}, nil
+}
+
+// withoutURL убирает из ошибки транспорта адрес запроса: pre-signed ссылка
+// несёт подпись в query, и она не должна попасть в лог через APIError.Error().
+func withoutURL(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("%s report file: %w", urlErr.Op, urlErr.Err)
+	}
+	return err
 }
 
 // SleepContext — пауза с отменой по контексту.

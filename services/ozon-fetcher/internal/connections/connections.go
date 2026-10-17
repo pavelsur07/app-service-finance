@@ -120,6 +120,9 @@ func parse(raw []byte) ([]Cabinet, []string, error) {
 	if snap.SchemaVersion != schemaVersion {
 		return nil, nil, fmt.Errorf("%w: schema_version %q", ErrInvalidSnapshot, snap.SchemaVersion)
 	}
+	if _, err := time.Parse(time.RFC3339, snap.GeneratedAt); err != nil {
+		return nil, nil, fmt.Errorf("%w: generated_at", ErrInvalidSnapshot)
+	}
 	if snap.Connections == nil {
 		return nil, nil, fmt.Errorf("%w: no connections array", ErrInvalidSnapshot)
 	}
@@ -194,18 +197,31 @@ func (c *Cache) Ready() bool {
 	return c.ready
 }
 
-// List — кабинеты последнего снимка (копия).
+// List — кабинеты последнего снимка; глубокая копия: вызывающий не меняет кэш.
 func (c *Cache) List() []Cabinet {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return append([]Cabinet(nil), c.list...)
+	out := make([]Cabinet, len(c.list))
+	for i, cab := range c.list {
+		out[i] = cab.clone()
+	}
+	return out
 }
 
 func (c *Cache) Get(ref string) (Cabinet, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	cab, ok := c.byRef[ref]
-	return cab, ok
+	return cab.clone(), ok
+}
+
+func (c Cabinet) clone() Cabinet {
+	if c.Seller != nil {
+		seller := *c.Seller
+		c.Seller = &seller
+	}
+	c.ResourceTypes = append([]string(nil), c.ResourceTypes...)
+	return c
 }
 
 // Refresh запрашивает снимок; при сбое кэш не меняется.
