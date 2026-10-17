@@ -28,6 +28,7 @@ jobs:
             static_analysis: ${{ steps.matrix.outputs.static_analysis }}
             frontend: ${{ steps.matrix.outputs.frontend }}
             landing: ${{ steps.matrix.outputs.landing }}
+            services: ${{ steps.matrix.outputs.services }}
             matrix: ${{ steps.matrix.outputs.matrix }}
         steps:
             - name: 📦 Checkout repository
@@ -72,6 +73,9 @@ jobs:
                         - 'site/yarn.lock'
                       landing:
                         - 'landing/**'
+                      # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
+                      services:
+                        - 'services/ozon-fetcher/**'
                       # Не входит в deployable-матрицу: правка конфига или baseline
                       # PHPStan обязана снова прогнать анализ, но production-образы
                       # и деплой от неё не зависят. Dev-образ php-cli при этом может
@@ -97,11 +101,15 @@ jobs:
                   fe='${{ steps.f.outputs.frontend }}'
                   la='${{ steps.f.outputs.landing }}'
                   sa='${{ steps.f.outputs.static_analysis }}'
+                  sv='${{ steps.f.outputs.services }}'
 
+                  # На master деплой тянет ВСЕ образы по SHA коммита, включая
+                  # ozon-fetcher, — поэтому его образ собирается вместе с остальными.
                   if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
-                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ]; then
+                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ] || [ "$sv" = 'true' ]; then
                       be=true
                       la=true
+                      sv=true
                     fi
                   fi
 
@@ -110,6 +118,7 @@ jobs:
                     fe=false
                     la=false
                     sa=false
+                    sv=false
 
                     if [ "$PRODUCTION_ACTION" != 'none' ] && [ "$GITHUB_REF" != 'refs/heads/master' ]; then
                       echo '::error::Production gates can run only from master'
@@ -124,6 +133,7 @@ jobs:
                     if [ "$PRODUCTION_ACTION" = 'deploy' ] || [ "$PRODUCTION_ACTION" = 'migrations' ]; then
                       be=true
                       la=true
+                      sv=true
                     fi
                   fi
 
@@ -142,11 +152,15 @@ jobs:
                   if [ "$la" = "true" ]; then
                     items+=('{"service":"landing","context":"./landing","file":"./landing/docker/production/nginx/Dockerfile","image":"land-nginx"}')
                   fi
+                  if [ "$sv" = "true" ]; then
+                    items+=('{"service":"ozon-fetcher","context":"./services/ozon-fetcher","file":"./services/ozon-fetcher/docker/Dockerfile","image":"ozon-fetcher"}')
+                  fi
                   IFS=,
                   echo "backend=$be" >> "$GITHUB_OUTPUT"
                   echo "frontend=$fe" >> "$GITHUB_OUTPUT"
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "static_analysis=$sa" >> "$GITHUB_OUTPUT"
+                  echo "services=$sv" >> "$GITHUB_OUTPUT"
                   echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
 
     # Dev-образ php-cli для тестовых job'ов: публикуется в ghcr и переиспользуется.
@@ -547,11 +561,32 @@ jobs:
                   fi
 
     # 1. ЭТАП СБОРКИ: собираем только затронутые образы (динамическая матрица).
+    # Гейты Go-сервиса (services/go.md «Гейты»): те же образы, что локально.
+    #   -race требует cgo — образ golang:1.27 (debian), не alpine.
+    #   Интеграционные тесты (TEST_DB_DSN, TEST_S3_ENDPOINT) здесь пропускаются.
+    services-go:
+        name: 🐹 ozon-fetcher gates
+        needs: changes
+        if: ${{ needs.changes.outputs.services == 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v6
+
+            - name: 🔍 go vet
+              run: docker run --rm -v "$PWD/services/ozon-fetcher:/src" -w /src golang:1.27 go vet ./...
+
+            - name: 🧹 golangci-lint
+              run: docker run --rm -v "$PWD/services/ozon-fetcher:/src" -w /src golangci/golangci-lint:v2.14.0-alpine golangci-lint run ./...
+
+            - name: 🧪 go test -race
+              run: docker run --rm -e CGO_ENABLED=1 -v "$PWD/services/ozon-fetcher:/src" -w /src golang:1.27 go test -race ./...
+
     build-and-push:
-        needs: [ changes, unit-tests, cs-check ]
+        needs: [ changes, unit-tests, cs-check, services-go ]
         # !cancelled() — чтобы job стартовал даже когда unit-tests/cs-check пропущены (frontend/landing-only).
-        # != 'failure'  — но НЕ собираем, если бэкенд-тесты или проверка стиля упали.
-        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
+        # != 'failure'  — но НЕ собираем, если бэкенд-тесты, проверка стиля или гейты сервиса упали.
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs['services-go'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -689,6 +724,23 @@ jobs:
                     # строка крона выключает себя сама по [ -n "$..." ].
                     # См. docs/maintenance/mailer-monitoring.md
                     export GLITCHTIP_SCHEDULER_HEARTBEAT_URL="${{ secrets.GLITCHTIP_SCHEDULER_HEARTBEAT_URL }}"
+                    # Внутренний API /internal/* и сервис ozon-fetcher (docs/maintenance/ozon-fetcher-prod.md).
+                    # Секрет не заведён → пусто → /internal/* закрыт, сервис не включён.
+                    # Одинарные кавычки + алфавит A-Za-z0-9._~- (проверка ниже): значение не
+                    # исполняется удалённым shell и безопасно в userinfo DSN без URL-кодирования.
+                    export INTERNAL_AUTH_TOKEN='${{ secrets.INTERNAL_AUTH_TOKEN }}'
+                    export OZON_FETCHER_DB_PASSWORD='${{ secrets.OZON_FETCHER_DB_PASSWORD }}'
+                    export OZON_FETCHER_S3_ACCESS_KEY_ID='${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}'
+                    export OZON_FETCHER_S3_SECRET_ACCESS_KEY='${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}'
+                    export OZON_FETCHER_CONNECTION_ALLOWLIST='${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}'
+                    OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                      eval "val=\${$v}"
+                      if printf '%s' "$val" | grep -q '[^A-Za-z0-9._~-]'; then
+                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                        exit 1
+                      fi
+                    done
 
                     printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
 
@@ -714,6 +766,28 @@ jobs:
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
                     docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads scheduler
+
+                    # ozon-fetcher — за профилем: без OZON_FETCHER_ENABLED=true не стартует.
+                    # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
+                    if [ "$OZON_FETCHER_ENABLED" = "true" ]; then
+                      export COMPOSE_PROFILES=ozon-fetcher
+                      echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
+                      if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ]; then
+                        echo "❌ OZON_FETCHER_ENABLED=true, но не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN"
+                        exit 1
+                      fi
+                      # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).
+                      # Пароль — через окружение (-e без значения), не в аргументах процессов.
+                      docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
+                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
+                      docker compose -f docker-compose.prod.yml pull ozon-fetcher
+                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate
+                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher
+                      echo "✅ ozon-fetcher healthy"
+                    else
+                      echo "⏸ ozon-fetcher выключен (vars.OZON_FETCHER_ENABLED != true)"
+                      docker compose -f docker-compose.prod.yml --profile ozon-fetcher stop ozon-fetcher 2>/dev/null || true
+                    fi
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
