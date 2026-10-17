@@ -50,6 +50,12 @@ class AuditContextProvider
             return $principal->companyId;
         }
 
+        // Активная компания есть только у пользователя с сессией; сервисный
+        // principal (`/internal/*`) компании не имеет.
+        if (!$principal instanceof User) {
+            return null;
+        }
+
         try {
             $company = $this->activeCompanyService->getActiveCompany();
         } catch (NotFoundHttpException) {
