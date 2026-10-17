@@ -726,12 +726,21 @@ jobs:
                     export GLITCHTIP_SCHEDULER_HEARTBEAT_URL="${{ secrets.GLITCHTIP_SCHEDULER_HEARTBEAT_URL }}"
                     # Внутренний API /internal/* и сервис ozon-fetcher (docs/maintenance/ozon-fetcher-prod.md).
                     # Секрет не заведён → пусто → /internal/* закрыт, сервис не включён.
-                    export INTERNAL_AUTH_TOKEN="${{ secrets.INTERNAL_AUTH_TOKEN }}"
-                    export OZON_FETCHER_DB_PASSWORD="${{ secrets.OZON_FETCHER_DB_PASSWORD }}"
-                    export OZON_FETCHER_S3_ACCESS_KEY_ID="${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}"
-                    export OZON_FETCHER_S3_SECRET_ACCESS_KEY="${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}"
-                    export OZON_FETCHER_CONNECTION_ALLOWLIST="${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}"
-                    OZON_FETCHER_ENABLED="${{ vars.OZON_FETCHER_ENABLED }}"
+                    # Одинарные кавычки + алфавит A-Za-z0-9._~- (проверка ниже): значение не
+                    # исполняется удалённым shell и безопасно в userinfo DSN без URL-кодирования.
+                    export INTERNAL_AUTH_TOKEN='${{ secrets.INTERNAL_AUTH_TOKEN }}'
+                    export OZON_FETCHER_DB_PASSWORD='${{ secrets.OZON_FETCHER_DB_PASSWORD }}'
+                    export OZON_FETCHER_S3_ACCESS_KEY_ID='${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}'
+                    export OZON_FETCHER_S3_SECRET_ACCESS_KEY='${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}'
+                    export OZON_FETCHER_CONNECTION_ALLOWLIST='${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}'
+                    OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                      eval "val=\${$v}"
+                      if printf '%s' "$val" | grep -q '[^A-Za-z0-9._~-]'; then
+                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                        exit 1
+                      fi
+                    done
 
                     printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
 
@@ -768,9 +777,9 @@ jobs:
                         exit 1
                       fi
                       # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).
-                      docker compose -f docker-compose.prod.yml exec -T site-postgres \
-                        psql -U app -d app -v ON_ERROR_STOP=1 -q -v pwd="$OZON_FETCHER_DB_PASSWORD" \
-                        < docker/ozon-fetcher/db-bootstrap.sql
+                      # Пароль — через окружение (-e без значения), не в аргументах процессов.
+                      docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
+                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
                       docker compose -f docker-compose.prod.yml pull ozon-fetcher
                       docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate
                       docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher

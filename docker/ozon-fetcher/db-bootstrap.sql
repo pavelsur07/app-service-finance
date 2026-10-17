@@ -1,8 +1,11 @@
 -- БД и роль сервиса ozon-fetcher на общем инстансе PostgreSQL прода
 -- (services/AGENTS.md §9: своя БД, одна роль, права только на свою БД).
 -- Идемпотентно; выполняется шагом деплоя от суперпользователя app при
--- OZON_FETCHER_ENABLED=true. Пароль — переменная psql :'pwd' (секрет
--- OZON_FETCHER_DB_PASSWORD), синхронизируется при каждом деплое.
+-- OZON_FETCHER_ENABLED=true. Пароль — из окружения psql (секрет
+-- OZON_FETCHER_DB_PASSWORD, не в аргументах процесса), синхронизируется при
+-- каждом деплое.
+
+\getenv pwd OZON_FETCHER_DB_PASSWORD
 
 SELECT 'CREATE ROLE svc_ozon_fetcher LOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'svc_ozon_fetcher')\gexec

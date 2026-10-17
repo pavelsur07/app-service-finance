@@ -10,7 +10,7 @@
    пользователь с доступом **только** к нему → Access Key и Secret Key.
 2. **GitHub → Settings → Secrets and variables → Actions.**
 
-   Secrets:
+   Secrets (только символы `A-Za-z0-9._~-` — деплой проверяет и падает на других):
 
    | Имя | Значение |
    |---|---|
