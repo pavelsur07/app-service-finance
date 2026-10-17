@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** handoff
-**Status:** planned
+**Status:** done
 **Stage base commit:** (после коммита Stage 1)
 
 ### Completed
@@ -18,10 +18,10 @@
 
 ### Review status
 - internal: Stage 1 — open: none
-- external: pending (handoff)
+- external: round 1, IMPORTANT 1 — fixed without re-run
 
 ### Exact next action
-- Handoff: полные гейты, финальное ревью в свежей сессии, внешнее ревью Codex, `handoff.md`, push + PR. Стенд asf9-fpm/asf9-nginx и пару asf9-pg/asf9-redis убрать.
+- Ждём «merge and deploy». Миграций нет.
 
 ### Files to inspect first on resume
 - `docs/tasks/marketplace-pl-preview-by-tags/plan.md`, `stages/`
