@@ -46,7 +46,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 
 	cabinets := connections.NewCache(
 		connections.NewClient(cfg.SymfonyBaseURL, cfg.InternalAuthToken, &http.Client{Timeout: 30 * time.Second}),
-		logger, now)
+		logger, now).WithAllowlist(cfg.ConnectionAllowlist)
 
 	limits := ratelimit.New(ratelimit.DefaultConfig(), now, ozon.SleepContext, func(ref, endpoint string, rps float64) {
 		go func() {
@@ -94,7 +94,8 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 			run(ctx)
 		}()
 	}
-	logger.Info("ingestion started", slog.String("stage", "start"), slog.Int("max_parallel", cfg.MaxParallelConnections))
+	logger.Info("ingestion started", slog.String("stage", "start"), slog.Int("max_parallel", cfg.MaxParallelConnections),
+		slog.Int("allowlist", len(cfg.ConnectionAllowlist)))
 	return ing, nil
 }
 

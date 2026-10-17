@@ -195,3 +195,15 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadConnectionAllowlist(t *testing.T) {
+	t.Setenv("SYMFONY_INTERNAL_BASE_URL", "")
+	t.Setenv("CONNECTION_ALLOWLIST", " ref-a, ,company-b ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(cfg.ConnectionAllowlist, "|") != "ref-a|company-b" {
+		t.Errorf("allowlist = %q", cfg.ConnectionAllowlist)
+	}
+}

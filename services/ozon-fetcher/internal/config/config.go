@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,8 @@ type Config struct {
 	ConnectionsPollInterval time.Duration
 	// MaxParallelConnections — сколько кабинетов загружается одновременно.
 	MaxParallelConnections int
+	// ConnectionAllowlist — только эти кабинеты (connection_ref или company_id); пусто — все.
+	ConnectionAllowlist []string
 
 	// OzonBaseURL — Seller API (на стенде — мок).
 	OzonBaseURL string
@@ -83,6 +86,12 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("config: MAX_PARALLEL_CONNECTIONS must be 1..%d, got %q", maxMaxParallel, raw)
 		}
 		cfg.MaxParallelConnections = n
+	}
+
+	for _, id := range strings.Split(os.Getenv("CONNECTION_ALLOWLIST"), ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			cfg.ConnectionAllowlist = append(cfg.ConnectionAllowlist, id)
+		}
 	}
 
 	if err := loadPlanner(&cfg); err != nil {
