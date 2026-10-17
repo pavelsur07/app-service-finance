@@ -17,21 +17,20 @@ use App\Marketplace\Enum\MarketplaceType;
  */
 final class AdStatisticsCostCategories
 {
+    // Одна категория на маркетплейс: статистика — одна сумма на листинг, делить её между
+    // несколькими учётными категориями не на чем.
     private const array CODES = [
-        'ozon' => ['ozon_cpc'],
-        'wildberries' => ['wb_okazanie_uslug_wb_prodvizhenie'],
+        'ozon' => 'ozon_cpc',
+        'wildberries' => 'wb_okazanie_uslug_wb_prodvizhenie',
     ];
 
-    /**
-     * @return list<string>
-     */
-    public static function codesFor(MarketplaceType $marketplace): array
+    public static function codeFor(MarketplaceType $marketplace): ?string
     {
-        return self::CODES[$marketplace->value] ?? [];
+        return self::CODES[$marketplace->value] ?? null;
     }
 
     public static function covers(MarketplaceType $marketplace, string $costCategoryCode): bool
     {
-        return \in_array($costCategoryCode, self::codesFor($marketplace), true);
+        return self::codeFor($marketplace) === $costCategoryCode;
     }
 }

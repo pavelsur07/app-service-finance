@@ -9,6 +9,8 @@ use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewColumn;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
+use App\Marketplace\Application\DTO\PlPreviewAdLedgerDTO;
+use App\Marketplace\Application\DTO\PlPreviewAdReconciliationDTO;
 use App\Marketplace\Application\DTO\PlPreviewCostCoverageDTO;
 use App\Marketplace\Application\DTO\PlPreviewFactDTO;
 use App\Marketplace\Application\DTO\PlPreviewSalesCoverageDTO;
@@ -17,7 +19,9 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
+use App\Marketplace\Facade\PlPreviewAdSpendProviderInterface;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
+use App\Marketplace\Infrastructure\Query\PlPreviewAdLedgerQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewCostCoverageQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewFactsQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewSalesCoverageQuery;
@@ -47,6 +51,8 @@ final readonly class BuildMarketplacePlPreviewAction
         private ListingTagAssignmentRepository $tagAssignments,
         private MarketplaceConnectionRepository $connections,
         private FinanceFacade $financeFacade,
+        private PlPreviewAdLedgerQuery $adLedgerQuery,
+        private PlPreviewAdSpendProviderInterface $adSpend,
     ) {
     }
 
@@ -64,7 +70,18 @@ final readonly class BuildMarketplacePlPreviewAction
         $companyId = $command->companyId;
         $tags = $this->selectedTags($companyId, $command->tagIds);
 
-        $byListing = $this->factsQuery->fetch($companyId, $from, $to, $command->marketplace, true);
+        // Реклама под статистикой: на теги — из рекламной статистики, «Итого» — из учёта.
+        $adLedgers = $this->adLedgerQuery->fetch($companyId, $from, $to, $command->marketplace);
+        $byListing = $this->factsQuery->fetch(
+            $companyId,
+            $from,
+            $to,
+            $command->marketplace,
+            true,
+            array_map(static fn (PlPreviewAdLedgerDTO $ledger): string => $ledger->costCategoryId, $adLedgers),
+        );
+        [$adFacts, $adReconciliation] = $this->adFacts($companyId, $from, $to, $adLedgers);
+        $byListing = [...$byListing, ...$adFacts];
         $totals = $this->factsQuery->fetch($companyId, $from, $to, $command->marketplace, false);
         $tagsByListing = $this->tagIdsByListing($companyId, $byListing);
 
@@ -132,12 +149,58 @@ final readonly class BuildMarketplacePlPreviewAction
             costTotal: bcadd($costTotal, '0', 2),
             costReconciliationDelta: bcsub($costTotal, $costByStatus, 2),
             salesCoverage: $salesCoverage,
+            adReconciliation: $adReconciliation,
             warnings: [
                 ...$pl->warnings,
                 ...$this->realizationWarnings($companyId, $from, $to, $command->marketplace),
                 ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage),
             ],
         );
+    }
+
+    /**
+     * Реклама по листингам из статистики в знаке документа и остаток на статье без листинга:
+     * учёт − статистика по листингам (статистика без товара + расхождение с учётом). Колонки
+     * складываются в учётную сумму, «Итого» не меняется.
+     *
+     * @param list<PlPreviewAdLedgerDTO> $adLedgers
+     *
+     * @return array{0: list<PlPreviewFactDTO>, 1: list<PlPreviewAdReconciliationDTO>}
+     */
+    private function adFacts(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, array $adLedgers): array
+    {
+        $facts = [];
+        $reconciliation = [];
+        foreach ($adLedgers as $ledger) {
+            $spend = $this->adSpend->spendForPeriod($companyId, $ledger->marketplace, $from, $to);
+
+            $allocated = '0';
+            foreach ($spend->byListing as $listingId => $amount) {
+                $signed = $ledger->signed($amount);
+                $facts[] = new PlPreviewFactDTO($ledger->plCategoryId, (string) $listingId, $signed);
+                // bcmath_compat объявляет bcadd() без типа результата.
+                /** @var numeric-string $allocated */
+                $allocated = bcadd($allocated, $signed, 2);
+            }
+
+            $rest = bcsub($ledger->ledgerAmount, $allocated, 2);
+            if (0 !== bccomp($rest, '0', 2)) {
+                $facts[] = new PlPreviewFactDTO($ledger->plCategoryId, null, $rest);
+            }
+
+            $ledgerSpend = $ledger->signed($ledger->ledgerAmount);
+            $unallocated = $spend->unallocated();
+            $reconciliation[] = new PlPreviewAdReconciliationDTO(
+                marketplace: $ledger->marketplace,
+                ledger: $ledgerSpend,
+                statistics: bcadd($spend->total, '0', 2),
+                onListings: bcsub($spend->total, $unallocated, 2),
+                unallocated: $unallocated,
+                difference: bcsub($ledgerSpend, $spend->total, 2),
+            );
+        }
+
+        return [$facts, $reconciliation];
     }
 
     /**

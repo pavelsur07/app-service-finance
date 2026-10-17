@@ -10,18 +10,29 @@ use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceCostCategory;
+use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Entity\MarketplaceListingTag;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
+use App\Marketplace\Infrastructure\Query\PlPreviewAdLedgerQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewCostCoverageQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewFactsQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewSalesCoverageQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingTagRepository;
+use App\MarketplaceAds\Entity\AdDocument;
+use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
+use App\MarketplaceAds\Facade\PlPreviewAdSpendProvider;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
+use App\Tests\Builders\MarketplaceAds\AdDocumentBuilder;
+use App\Tests\Builders\MarketplaceAds\AdDocumentLineBuilder;
+use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -60,6 +71,8 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
             $assignments,
             $container->get(MarketplaceConnectionRepository::class),
             $container->get(FinanceFacade::class),
+            new PlPreviewAdLedgerQuery($connection),
+            new PlPreviewAdSpendProvider($container->get(MarketplaceAdsFacade::class)),
         );
     }
 
@@ -141,6 +154,64 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         ), 'Январь целиком — январская реализация в периоде.');
     }
 
+    public function testAdsGoToTagsFromStatisticsAndTotalStaysLedger(): void
+    {
+        $this->wbPromotion(includeInPl: true, ledger: '1000.00');
+        $this->adStatistics(['wbA' => '600.00', 'wbB' => '300.00'], unallocated: '50.00');
+
+        $report = $this->build();
+
+        $winter = 'tag:'.$this->winter->getId();
+        $summer = 'tag:'.$this->summer->getId();
+        // Логистика: wbA −70, wbB −50, без листинга −70. Реклама: wbA −600, wbB −300, остаток −100.
+        self::assertSame(
+            [$winter => -670.0, $summer => -670.0, 'common' => -520.0, 'total' => -1190.0],
+            $this->values($report)['COST'],
+        );
+        self::assertCount(1, $report->adReconciliation);
+        $ads = $report->adReconciliation[0];
+        self::assertSame(MarketplaceType::WILDBERRIES, $ads->marketplace);
+        self::assertSame(['1000.00', '950.00', '900.00', '50.00', '50.00'], [$ads->ledger, $ads->statistics, $ads->onListings, $ads->unallocated, $ads->difference]);
+    }
+
+    public function testWithoutStatisticsWholeLedgerStaysCommon(): void
+    {
+        $this->wbPromotion(includeInPl: true, ledger: '1000.00');
+
+        $report = $this->build();
+
+        self::assertSame(-70.0, $this->values($report)['COST']['tag:'.$this->winter->getId()]);
+        self::assertSame(-1120.0, $this->values($report)['COST']['common']);
+        self::assertSame(-1190.0, $this->values($report)['COST']['total']);
+        self::assertSame(['1000.00', '0.00', '1000.00'], [$report->adReconciliation[0]->ledger, $report->adReconciliation[0]->statistics, $report->adReconciliation[0]->difference]);
+    }
+
+    public function testExcludedAdCategoryIgnoresStatistics(): void
+    {
+        $this->wbPromotion(includeInPl: false, ledger: '1000.00');
+        $this->adStatistics(['wbA' => '600.00'], unallocated: '0.00');
+
+        $report = $this->build();
+
+        self::assertSame([], $report->adReconciliation);
+        self::assertSame(-70.0, $this->values($report)['COST']['tag:'.$this->winter->getId()]);
+    }
+
+    public function testMarketplaceFilterLimitsStatistics(): void
+    {
+        $this->wbPromotion(includeInPl: true, ledger: '1000.00');
+        $this->adStatistics(['wbA' => '600.00'], unallocated: '0.00');
+
+        $report = ($this->action)(new BuildMarketplacePlPreviewCommand(
+            $this->companyId(),
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            MarketplaceType::OZON,
+        ));
+
+        self::assertSame([], $report->adReconciliation);
+    }
+
     public function testWritesNothing(): void
     {
         $this->build();
@@ -178,6 +249,55 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         $this->expectException(MarketplacePlPreviewPeriodException::class);
 
         ($this->action)(new BuildMarketplacePlPreviewCommand($this->companyId(), new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2026-01-02')));
+    }
+
+    private function wbPromotion(bool $includeInPl, string $ledger): void
+    {
+        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::WILDBERRIES);
+        $category->setName('WB Продвижение');
+        $category->setCode('wb_okazanie_uslug_wb_prodvizhenie');
+        $this->em->persist($category);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), $this->companyId(), $category, $this->fixture->costs->getId(), $includeInPl));
+        $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::WILDBERRIES, $category);
+        $cost->setAmount($ledger);
+        $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
+        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+        $this->em->persist($cost);
+        $this->em->flush();
+    }
+
+    /**
+     * @param array<string, string> $byListing имя листинга фикстуры → расход
+     */
+    private function adStatistics(array $byListing, string $unallocated): void
+    {
+        $raw = AdRawDocumentBuilder::aRawDocument()->withIndex(421)->withCompanyId($this->companyId())->withMarketplace(MarketplaceType::WILDBERRIES)->build();
+        $this->em->persist($raw);
+        $index = 0;
+        foreach ($byListing as $name => $amount) {
+            $document = $this->adDocument(++$index, $amount, $raw->getId());
+            $listing = 'wbA' === $name ? $this->fixture->wbA : $this->fixture->wbB;
+            $this->em->persist(AdDocumentLineBuilder::aLine()->withIndex(420 + $index)->withAdDocument($document)->withListingId($listing->getId())->withCost($amount)->build());
+        }
+        if (0 !== bccomp($unallocated, '0', 2)) {
+            $this->adDocument(++$index, $unallocated, $raw->getId());
+        }
+        $this->em->flush();
+    }
+
+    private function adDocument(int $index, string $cost, string $rawId): AdDocument
+    {
+        $document = AdDocumentBuilder::aDocument()
+            ->withIndex(420 + $index)
+            ->withCompanyId($this->companyId())
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withReportDate(new \DateTimeImmutable('2026-01-15'))
+            ->withTotalCost($cost)
+            ->withAdRawDocumentId($rawId)
+            ->build();
+        $this->em->persist($document);
+
+        return $document;
     }
 
     /**

@@ -12,10 +12,10 @@ final class AdStatisticsCostCategoriesTest extends TestCase
 {
     public function testOzonClicksAndWbPromotionOnly(): void
     {
-        self::assertSame(['ozon_cpc'], AdStatisticsCostCategories::codesFor(MarketplaceType::OZON));
-        self::assertSame(['wb_okazanie_uslug_wb_prodvizhenie'], AdStatisticsCostCategories::codesFor(MarketplaceType::WILDBERRIES));
-        self::assertSame([], AdStatisticsCostCategories::codesFor(MarketplaceType::YANDEX_MARKET));
-        self::assertSame([], AdStatisticsCostCategories::codesFor(MarketplaceType::SBER_MEGAMARKET));
+        self::assertSame('ozon_cpc', AdStatisticsCostCategories::codeFor(MarketplaceType::OZON));
+        self::assertSame('wb_okazanie_uslug_wb_prodvizhenie', AdStatisticsCostCategories::codeFor(MarketplaceType::WILDBERRIES));
+        self::assertNull(AdStatisticsCostCategories::codeFor(MarketplaceType::YANDEX_MARKET));
+        self::assertNull(AdStatisticsCostCategories::codeFor(MarketplaceType::SBER_MEGAMARKET));
     }
 
     public function testCoversIsPerMarketplace(): void

@@ -6,6 +6,7 @@ namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\Application\DTO\PlPreviewFactDTO;
 use App\Marketplace\Enum\MarketplaceType;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -25,6 +26,9 @@ final class PlPreviewFactsQuery
     }
 
     /**
+     * @param list<string> $excludedCostCategoryIds категории затрат, которые не брать из учёта
+     *                                              (реклама, которую предпросмотр берёт из статистики)
+     *
      * @return list<PlPreviewFactDTO>
      */
     public function fetch(
@@ -33,6 +37,7 @@ final class PlPreviewFactsQuery
         \DateTimeImmutable $to,
         ?MarketplaceType $marketplace,
         bool $byListing,
+        array $excludedCostCategoryIds = [],
     ): array {
         $listing = static fn (string $alias): string => $byListing ? $alias.'.listing_id' : 'CAST(NULL AS UUID)';
         $marketplaceFilter = static fn (string $alias): string => null === $marketplace ? '' : "AND $alias.marketplace = :marketplace";
@@ -97,10 +102,12 @@ final class PlPreviewFactsQuery
                          AND m.include_in_pl = true
                          AND m.pl_category_id IS NOT NULL
                          %s
+                         %s
                      GROUP BY m.pl_category_id, %s c.category_id, (c.operation_type = 'storno'), m.is_negative
                  ) g",
                 $listing('c'),
                 $marketplaceFilter('c'),
+                [] === $excludedCostCategoryIds ? '' : 'AND c.category_id NOT IN (:excludedCostCategoryIds)',
                 $byListing ? 'c.listing_id,' : '',
             ),
         ];
@@ -146,9 +153,14 @@ final class PlPreviewFactsQuery
         if (null !== $marketplace) {
             $params['marketplace'] = $marketplace->value;
         }
+        $types = [];
+        if ([] !== $excludedCostCategoryIds) {
+            $params['excludedCostCategoryIds'] = $excludedCostCategoryIds;
+            $types['excludedCostCategoryIds'] = ArrayParameterType::STRING;
+        }
 
         $facts = [];
-        foreach ($this->connection->fetchAllAssociative($sql, $params) as $row) {
+        foreach ($this->connection->fetchAllAssociative($sql, $params, $types) as $row) {
             $facts[] = new PlPreviewFactDTO(
                 (string) $row['pl_category_id'],
                 null === $row['listing_id'] ? null : (string) $row['listing_id'],
