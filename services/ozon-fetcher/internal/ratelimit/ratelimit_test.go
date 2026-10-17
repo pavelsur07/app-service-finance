@@ -125,6 +125,40 @@ func TestRateLimitResetsSuccessStreak(t *testing.T) {
 	assert.InDelta(t, 0.5, r.Rate(refA, ep), 1e-9)
 }
 
+func TestAnyErrorBreaksSuccessStreak(t *testing.T) {
+	r, _, _ := newRegistry()
+	r.Observe(refA, ep, nil)
+	r.Observe(refA, ep, nil)
+	r.Observe(refA, ep, &ozon.APIError{Class: ozon.ClassTransient})
+	r.Observe(refA, ep, nil)
+	assert.InDelta(t, 1.0, r.Rate(refA, ep), 1e-9, "успехи не подряд — роста нет")
+	r.Observe(refA, ep, nil)
+	r.Observe(refA, ep, nil)
+	assert.InDelta(t, 1.5, r.Rate(refA, ep), 1e-9)
+}
+
+func TestCallerQueuedForTokenRespectsPauseSetMeanwhile(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)}
+	r := New(Config{Fallback: EndpointLimit{Start: 5, Floor: 5, Ceiling: 5, DefaultPause: time.Minute}}, clock.Now, clock.Sleep, nil)
+	require.NoError(t, r.Wait(context.Background(), refA, "/x"), "первый токен — сразу")
+
+	done := make(chan error, 1)
+	go func() { done <- r.Wait(context.Background(), refA, "/x") }() // ждёт второй токен ~200 мс
+	time.Sleep(20 * time.Millisecond)
+	r.Observe(refA, "/x", rateLimited(time.Hour)) // соседу пришёл 429, пока B в очереди
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Wait did not return")
+	}
+	clock.mu.Lock()
+	defer clock.mu.Unlock()
+	require.NotEmpty(t, clock.sleeps, "ожидавший токен не проскочил паузу")
+	assert.InDelta(t, time.Hour.Seconds(), clock.sleeps[0].Seconds(), 1)
+}
+
 func TestOtherErrorsDoNotChangeRate(t *testing.T) {
 	r, _, ch := newRegistry()
 	for _, class := range []ozon.Class{ozon.ClassTransient, ozon.ClassAuth, ozon.ClassInvalidRequest, ozon.ClassNotReady} {

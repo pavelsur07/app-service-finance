@@ -153,21 +153,40 @@ func (r *Registry) Rate(ref, endpoint string) float64 {
 	return p.current
 }
 
-// Wait ждёт паузу после 429 и токен пары.
+// Wait ждёт паузу после 429 и токен пары. Пауза проверяется и после
+// получения токена: запрос, стоявший в очереди за токеном, пока сосед получил
+// 429, не должен проскочить паузу (SetLimit не переносит уже выданные резервы).
 func (r *Registry) Wait(ctx context.Context, ref, endpoint string) error {
 	p := r.get(ref, endpoint)
 	for {
-		p.mu.Lock()
-		wait := p.pausedUntil.Sub(r.now())
-		p.mu.Unlock()
+		if err := r.waitPause(ctx, p); err != nil {
+			return err
+		}
+		if err := p.bucket.Wait(ctx); err != nil {
+			return err
+		}
+		if p.pauseLeft(r.now()) <= 0 {
+			return nil
+		}
+	}
+}
+
+func (r *Registry) waitPause(ctx context.Context, p *pair) error {
+	for {
+		wait := p.pauseLeft(r.now())
 		if wait <= 0 {
-			break
+			return nil
 		}
 		if err := r.sleep(ctx, wait); err != nil {
 			return err
 		}
 	}
-	return p.bucket.Wait(ctx)
+}
+
+func (p *pair) pauseLeft(now time.Time) time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pausedUntil.Sub(now)
 }
 
 // Observe подстраивает скорость по исходу запроса (apiErr nil — успех).
@@ -192,6 +211,9 @@ func (r *Registry) Observe(ref, endpoint string, apiErr *ozon.APIError) {
 		if until := r.now().Add(pause); until.After(p.pausedUntil) {
 			p.pausedUntil = until
 		}
+	default:
+		// Серия успехов — подряд: любая ошибка её прерывает, скорость не меняет.
+		p.successes = 0
 	}
 	current := p.current
 	p.mu.Unlock()
