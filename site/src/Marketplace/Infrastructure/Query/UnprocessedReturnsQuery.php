@@ -41,6 +41,7 @@ final class UnprocessedReturnsQuery
         string $periodTo,
         bool $preliminary = false,
     ): array {
+        $amountCase = MarketplacePlAmountSql::returnAmount();
         $preliminaryFilter = $preliminary
             ? 'AND r.cost_price IS NOT NULL AND r.cost_price > 0'
             : '';
@@ -52,24 +53,7 @@ final class UnprocessedReturnsQuery
                 m.is_negative,
                 m.description_template,
                 m.sort_order,
-                SUM(
-                    CASE m.amount_source
-                        WHEN 'return_refund'
-                            THEN COALESCE(r.refund_amount, 0)
-                        WHEN 'return_gross'
-                            THEN COALESCE(
-                                ms.price_per_unit * r.quantity,
-                                r.refund_amount,
-                                0
-                            )
-                        WHEN 'return_cost_price'
-                            THEN COALESCE(
-                                r.cost_price * r.quantity,
-                                0
-                            )
-                        ELSE 0
-                    END
-                ) AS total_amount
+                SUM($amountCase) AS total_amount
             FROM marketplace_returns r
             LEFT JOIN marketplace_sales ms
                 ON ms.id = r.sale_id
@@ -91,24 +75,7 @@ final class UnprocessedReturnsQuery
                 m.is_negative,
                 m.description_template,
                 m.sort_order
-            HAVING SUM(
-                CASE m.amount_source
-                    WHEN 'return_refund'
-                        THEN COALESCE(r.refund_amount, 0)
-                    WHEN 'return_gross'
-                        THEN COALESCE(
-                            ms.price_per_unit * r.quantity,
-                            r.refund_amount,
-                            0
-                        )
-                    WHEN 'return_cost_price'
-                        THEN COALESCE(
-                            r.cost_price * r.quantity,
-                            0
-                        )
-                    ELSE 0
-                END
-            ) != 0
+            HAVING SUM($amountCase) != 0
             ORDER BY m.sort_order ASC
         SQL;
 

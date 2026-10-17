@@ -103,4 +103,24 @@ final class PlReportCalculatorTest extends TestCase
             self::assertSame($responsibilityCenterId, $call['responsibilityCenterId']);
         }
     }
+
+    public function testWithFactsReadsGivenFactsInsteadOfRegister(): void
+    {
+        $company = $this->createMock(Company::class);
+        $repo = $this->createMock(PLCategoryRepository::class);
+        $repo->method('findBy')->willReturn(MiniTreeFactory::build($company));
+
+        $register = $this->createMock(FactsProviderInterface::class);
+        $register->expects(self::never())->method('value');
+
+        $calc = (new PlReportCalculator($repo, $register))
+            ->withFacts(new \App\Finance\Facts\InMemoryFactsProvider(['REV_WB' => 300.0, 'COGS' => 120.0]));
+        $res = $calc->calculate($company, PlReportPeriod::forMonth(new \DateTimeImmutable('2025-01-01')));
+
+        $map = [];
+        foreach ($res->rows as $r) {
+            $map[$r->code ?? $r->id] = $r->rawValue;
+        }
+        self::assertSame(180.0, $map['MARGIN']);
+    }
 }

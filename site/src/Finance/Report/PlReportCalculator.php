@@ -230,4 +230,13 @@ final class PlReportCalculator
 
         return null;
     }
+
+    /**
+     * Тот же калькулятор с другим источником фактов статей ввода — для предпросмотра ОПиУ, где
+     * факты посчитаны заранее и регистр не читается.
+     */
+    public function withFacts(FactsProviderInterface $facts): self
+    {
+        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt);
+    }
 }

@@ -617,12 +617,59 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 
 - **Существующее правило не перезаписывается.** Затраты дополняют только пустой `pl_category_id` (`WILL_FILL_EMPTY`), продажи не трогают ничего: активное правило на источник суммы → `SKIPPED_EXISTING`.
 - Отсутствующая или не-`LEAF_INPUT` категория ОПиУ, **найденная на preview**, блокирует apply целиком (`hasBlockingIssues()`), а не пропускает строку. Исключение — `ApplyDefaultCostMappingCommand::$partial = true` (только ночной `sync-default`): такое правило получает статью **по образцу компании** — куда она относит свои включённые правила с тем же `pl_code` шаблона, только если все они указывают на одну статью LEAF_INPUT (`DefaultCostMappingSiblingResolver`, `CompanyCostPlTargetsQuery`); образцы сначала из того же маркетплейса, а если там у компании нет ни одного решения по этому `pl_code` (ни правила со статьёй, ни исключённого из ОПиУ) — из правил других маркетплейсов компании; разнобой или исключение внутри своего маркетплейса чужими образцами не перекрываются; выведенное правило со следующей ночи само становится образцом, а признак «по другому маркетплейсу» остаётся только в аудит-логе; без единогласного образца правило уходит в `blocked`, остальные применяются; затраты, оставшиеся вне ОПиУ, показывает гейт `unmapped-check`. Если категория исчезает, меняет код или тип уже во время записи, вставка этого правила не проходит и строка отчитывается как `skipped`; остальные правила сохраняются.
+- Сумма строки продажи / возврата по `amount_source` — только `MarketplacePlAmountSql::saleAmount()` / `returnAmount()` (`Infrastructure/Query`): её используют проведение (`UnprocessedSalesQuery`, `UnprocessedReturnsQuery`, `MarkProcessedQuery`) и предпросмотр ОПиУ. Своя копия `CASE m.amount_source` в запросе — будущее расхождение предпросмотра с документом. `saleAmount(null)` — для запроса по нескольким маркетплейсам: выручка без СПП ветвится по `s.marketplace`.
 - Правила продаж пишутся одной инструкцией `INSERT … SELECT` из `pl_categories`: категория перепроверяется по компании, коду и типу внутри самой вставки, а частичный индекс `uniq_active_sale_mapping_source` не даёт появиться второму активному правилу на источник суммы.
 - Правила продаж создаются сразу активными; уникальный ключ `uniq_sale_mapping` включает `pl_category_id`, поэтому отключённое правило с той же целью занимает место — preview показывает это отдельным сообщением.
 - Знак: у всех правил с `operation_type = return` обязателен `is_negative: true` (источники отдают возвраты положительными, а родитель-`SUBTOTAL` суммирует листья напрямую). Инвариант закреплён тестом `tests/Unit/Marketplace/Config/DefaultMappingConfigTest.php`, там же гварды на неизвестные `cost_code` / `pl_code`.
 - Коды затрат WB частично динамические: `WbDeductionCalculator` слугифицирует неизвестные названия удержаний и режет их до 50 символов. Известные причины получают стабильные коды: добровольная выплата за товары — `wb_dobrovolnaya_vyplata_za_tovary`, складская утилизация — `wb_warehouse_disposal`. `external_id` сохраняет прежнюю reason-based идентичность, чтобы replay старого отчёта не создал дубль с новым кодом категории. Старые помесячные коды утилизации остаются в конфиге как исторические aliases до ремонта данных.
 - Рекламные удержания WB с постоянным текстом («WB Медиа», подписка «Джем», аванс «Баллы за отзывы») внесены в `WbCostCategory` под теми же кодами, что даёт слугификация: `forDeductionName()` для них не нужен, группа аналитики — «Продвижение и реклама». «Добровольная выплата за товары» намеренно без правила ОПиУ (решение Владельца 26.09.2026).
 - Услуги Ozon by-day разбираются по `OzonCostCategory::$accrualTypeNames`. Каждая услуга снимка справочника `tests/Fixtures/Marketplace/Ozon/accrual_types.json` либо размечена, либо стоит в `OzonCostCategoryTest::AWAITING_CLASSIFICATION` — тест падает на услуге без решения. Размечать только при однозначной категории, которая уже получала деньги; сомнительная услуга остаётся `ozon_unknown_<id>`: видимая очередь безопаснее тихой ошибки в строке ОПиУ.
+
+### Marketplace: предпросмотр ОПиУ по тегам
+
+Отчёт «что покажет ОПиУ, если провести нормализованные данные периода по текущему маппингу» с
+колонками по тегам листингов. Ничего не пишет: ни документов ОПиУ, ни `pl_daily_totals`, ни
+`document_id` у строк. Постановка — `docs/plan/marketplace-pl-preview-by-tags.md`.
+
+- Факты — `Infrastructure\Query\PlPreviewFactsQuery::fetch(companyId, from, to, ?marketplace,
+  byListing)`: `list<PlPreviewFactDTO(plCategoryId, ?listingId, amount)>`, сумма в знаке строки
+  документа `marketplace_pl`. Источники, правила и знаки — как у `CloseMonthStageAction`: продажи
+  и возвраты (`MarketplacePlAmountSql`), затраты (модуль суммы группы «категория затрат × сторно»,
+  у сторно знак правила обратный), «Реализация» Ozon (документ входит, если целиком внутри
+  периода). Берутся **все** строки периода, проведённые или нет; `preliminary`-фильтры не
+  применяются.
+- Затраты: доля листинга — его сумма со знаком итога группы «категория затрат × сторно» (NULL
+  `operation_type` — своя группа, как у проведения), поэтому сумма по листингам равна итогу. Итог
+  «Итого» всё равно берётся вызовом с `byListing = false` — тем же путём, что проведение.
+- Что не попадёт в ОПиУ: `PlPreviewCostCoverageQuery::fetch()` — затраты по «маркетплейс × категория»
+  со статусом `PlPreviewCostStatus` (`mapped` / `excluded` — `include_in_pl = false` / `unmapped` —
+  условие гейта `PreflightCostsQuery::WITHOUT_PL_DECISION` или затрата без категории) и нетто-суммой
+  (начисления − сторно, модуль по группе, как у проведения). `fetchTotal()` — нетто всех затрат
+  без джойна правил: сверка `итог = mapped + excluded + unmapped`. `PlPreviewSalesCoverageQuery` —
+  покрытие продаж, возвратов и реализации Ozon (`PlPreviewSalesKind`): строки, естественная сумма,
+  есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
+  одна продажа даёт несколько сумм по разным правилам.
+- Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
+  from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
+  `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
+  выбранных тега); `common` — факты без листинга и листингов без единого тега компании (не зависит
+  от фильтра тегов); `total` — факты без разреза по листингам. Дерево — один вызов
+  `FinanceFacade::calculatePlPreview()`. Теги листингов — `tagsForListings()` порциями по 5000.
+  Период: `from ≤ to`, не длиннее 366 дней, иначе `MarketplacePlPreviewPeriodException`
+  Предупреждения: ошибки формул дерева; документы «Реализации» Ozon, которые период режет
+  (`PlPreviewSalesCoverageQuery::fetchPartialRealizationPeriods()` — проведение берёт документ только
+  целиком); маркетплейсы с данными, у SELLER-подключения которых нет проекта (`PLRegisterUpdater`
+  пропускает операции без проекта; у затрат проект — только из подключения).
+- Экран — вкладка «Предпросмотр ОПиУ» раздела «Маркетплейсы»: `GET /marketplace/pl-preview`
+  (`marketplace_pl_preview_index`, `PlPreviewController`, `MARKETPLACE_READ`). Параметры —
+  `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
+  текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги; `tags_set=1` без `tags[]` — ни одного), `empty=1`;
+  мусор — значения по умолчанию. Ошибка периода — сообщение на странице, не 500.
+- Выгрузка — `GET /marketplace/pl-preview/xlsx` (`marketplace_pl_preview_xlsx`,
+  `PlPreviewXlsxController`, `Infrastructure\Export\PlPreviewXlsxExporter`): тот же фильтр и
+  тот же отчёт, листы «ОПиУ по тегам», «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
+  с форматом выгрузки ОПиУ, названия — текстовыми ячейками (строка на «=» не становится формулой).
+  Ошибка периода — flash и redirect на вкладку.
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -1231,7 +1278,27 @@ createDocumentFromCashTransaction(
 
 // Обновить PL-регистр за день документа (вызывать после flush в Action)
 updatePLRegisterForDocument(string $documentId): void
+
+// Предпросмотр ОПиУ без записи: дерево статей компании со значениями по колонкам, как если
+// бы суммы колонок провели документом marketplace_pl. Суммы — в знаке строк документа
+// (после is_negative). Пустой список или повтор ключа колонки — InvalidArgumentException.
+calculatePlPreview(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
+): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
 ```
+
+Предпросмотр (`Report\PlPreviewCalculator`) переводит сумму статьи в факт так же, как
+`PLRegisterUpdater` для `marketplace_pl`: суммы статьи складываются со знаком, от итога берётся
+модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. Регистр берёт модуль в корзине
+«день документа × проект», предпросмотр — по колонке за весь период. Дерево считает тот же
+`PlReportCalculator` через `withFacts(InMemoryFactsProvider)` — регистр не читается. Сумма на
+статье, которой нет в компании, которая не `LEAF_INPUT` или без `code`, в отчёт ОПиУ не попадает
+(калькулятор берёт факты только у листьев по коду) и возвращается в `unplaced` с причиной
+`PlPreviewUnplacedReason` (`category_not_found` / `not_leaf_input` / `no_code`); название чужой
+статьи не раскрывается.
 
 Ручное удаление на странице «Документы ОПиУ» является мягким: `Document` получает
 `deleted_at`, `deleted_by` и `delete_reason`, а основные списки, отчёты и JSON-выгрузки
@@ -3868,6 +3935,13 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.12 | 2026-10-17 | Marketplace: выгрузка предпросмотра ОПиУ в xlsx (`/marketplace/pl-preview/xlsx`, `PlPreviewXlsxExporter`) |
+| 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |
+| 2.10 | 2026-10-17 | Marketplace: `BuildMarketplacePlPreviewAction` — сборка предпросмотра ОПиУ по тегам (`MarketplacePlPreviewReport`, `PlPreviewColumnKind`, `MarketplacePlPreviewPeriodException`) |
+| 2.09 | 2026-10-17 | Marketplace: `PlPreviewCostCoverageQuery`, `PlPreviewSalesCoverageQuery` — «не размечено», «исключено» и сверка затрат предпросмотра ОПиУ |
+| 2.08 | 2026-10-17 | Marketplace: `PlPreviewFactsQuery` — суммы предпросмотра ОПиУ по статьям и листингам (раздел «Marketplace: предпросмотр ОПиУ по тегам») |
+| 2.07 | 2026-10-17 | Finance: `FinanceFacade::calculatePlPreview()` — дерево ОПиУ по колонкам без записи (`PlPreviewCalculator`, `InMemoryFactsProvider`, `PlReportCalculator::withFacts()`, DTO `PlPreview*`, enum `PlPreviewUnplacedReason`) |
+| 2.06 | 2026-10-17 | Marketplace: формулы сумм продаж и возвратов по `amount_source` вынесены в `MarketplacePlAmountSql` (этап 1 предпросмотра ОПиУ по тегам), поведение проведения не меняется |
 | 2.05 | 2026-10-16 | Finance: инвариант «справочники документа ОПиУ и операций — своей компании» (`DocumentForeignReferenceException`), перехват в создании документа из операции ДДС |
 | 2.04 | 2026-10-16 | Finance: вкладка «Операции» раздела «Документы ОПиУ» (`document_operation_index`, `DocumentOperationRepository::paginateForList()` и итог), фильтры «Статья» и «Сумма» на обеих вкладках, `DocumentListDTO::fromQuery()`, `DocumentPlContribution::forOperation()` |
 | 2.03 | 2026-10-14 | Shared `Money::multiplyByRatio()` — умножение на дробь с одним округлением (НДС «из суммы» в Cash, этап 3 плана Cash) |

@@ -6,12 +6,15 @@ namespace App\Finance\Facade;
 
 use App\Cash\Application\DTO\CreateDocumentCommand;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Company\Entity\Company;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
 use App\Finance\Application\DeletePLDocumentAction;
+use App\Finance\Application\DTO\PlPreviewColumn;
+use App\Finance\Application\DTO\PlPreviewResult;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
@@ -20,6 +23,8 @@ use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Report\PlPreviewCalculator;
+use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,6 +50,7 @@ final class FinanceFacade
         private readonly PLRegisterUpdater $plRegisterUpdater,
         private readonly FinanceDocumentResponsibilityCenterNormalizer $responsibilityCenterNormalizer,
         private readonly EntityManagerInterface $entityManager,
+        private readonly PlPreviewCalculator $plPreviewCalculator,
     ) {
     }
 
@@ -114,6 +120,32 @@ final class FinanceFacade
         );
 
         return ($this->createAction)($command);
+    }
+
+    /**
+     * Предпросмотр ОПиУ: дерево статей компании со значениями по колонкам, как если бы суммы
+     * колонок провели документом marketplace_pl. Ничего не пишет.
+     *
+     * Суммы — в знаке строк документа (после is_negative). Сумма на статье, которой нет в
+     * компании, которая не строка ввода или без кода, в отчёт не попадёт — она возвращается в
+     * PlPreviewResult::$unplaced.
+     *
+     * @param list<PlPreviewColumn> $columns
+     */
+    public function calculatePlPreview(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        array $columns,
+    ): PlPreviewResult {
+        $company = $this->entityManager->getReference(Company::class, $companyId)
+            ?? throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
+
+        return $this->plPreviewCalculator->calculate(
+            $company,
+            PlReportPeriod::forRange($from, $to),
+            $columns,
+        );
     }
 
     /**
