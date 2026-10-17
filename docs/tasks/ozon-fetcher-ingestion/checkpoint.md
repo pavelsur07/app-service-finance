@@ -15,3 +15,9 @@
 - мои контейнеры: `asf9-pg`, `asf9-redis`, `asf9-s3` (seaweedfs, tmpfs 160m, тома 4 МБ ×24) в `asf9-net`; бинарники стенда — `<scratchpad>/bin`
 - Go-тесты: контейнер `--memory=1200m`, `GOMAXPROCS=2`, `-p=1`, по пакету (OOM)
 - стенд-БД `ozon_fetcher_stand` создана со старой `00003` — пересоздать перед использованием
+
+### GitHub (заведено 17.10.2026)
+- secrets: `INTERNAL_AUTH_TOKEN`, `OZON_FETCHER_DB_PASSWORD` (агент, случайные hex-48); S3-ключи — за Владельцем
+- variables: `OZON_FETCHER_CONNECTION_ALLOWLIST=90b72323-784a-4268-88aa-10778c3da78b` («Вумджой»), `OZON_FETCHER_ENABLED=true`
+- **после тестирования удалить обе переменные** (указание Владельца 17.10): без
+  `ALLOWLIST` — все кабинеты; без `ENABLED` деплой останавливает сервис
