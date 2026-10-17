@@ -90,7 +90,7 @@
                             "type": "string",
                             "minLength": 1
                         },
-                        "description": "Ресурсы, доступные с имеющимися credentials; например ozon.finance.transaction-list при наличии seller"
+                        "description": "Ресурсы, доступные с имеющимися credentials; например ozon.finance.accrual-by-day при наличии seller"
                     }
                 }
             }

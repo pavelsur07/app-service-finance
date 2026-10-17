@@ -19,7 +19,10 @@
     (`api-performance.ozon.ru/api/client/token`), рекламная статистика.
   - Тип равен `null` — ключа нет, job'ы на его ресурсы не создаются.
 - `resource_types` — выводимое поле (из наличия ключей), не источник истины:
-  seller → `ozon.finance.*`, performance → `ozon.ads.*`.
+  seller → `ozon.finance.*`, performance → `ozon.ads.*`. Значения seller
+  первой волны: `ozon.finance.accrual-by-day`, `ozon.finance.accrual-types`,
+  `ozon.finance.realization`, `ozon.finance.mutual-settlement`
+  (`services/ozon-fetcher/docs/ozon-api.md`).
 - Сервис кэширует ответ **только в памяти**; значения ключей не попадают в
   БД сервиса и в логи (M1 §2). `updated_at` — для инвалидации кэша и
   force-refresh при 401 от Ozon.

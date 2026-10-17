@@ -34,7 +34,14 @@ Endpoint'ы — только внутри docker-сети / за IP-allowlist + 
 
 | provider | resource_type | Семантика `source_key` |
 |---|---|---|
-| ozon | `ozon.finance.transaction-list` | проект: `ozon-accrual-{operation_id}-product-{i}` / `ozon-accrual-{operation_id}-return-product-{i}`; суффикс `-acc{accrual_id}` при наличии accrual (паритет с `docs/architecture/marketplace-audit/08-normalization-boundary.md` §7) |
+| ozon | `ozon.finance.accrual-by-day` | проект: `ozon:accrual-by-day:{accrual_id}:{component}` — без состояния, вычисляется из одной строки ответа; `component` — позиция внутри начисления (`sale:product-{i}`, `refund:product-{i}`, `commission:product-{i}`, `delivery:product-{i}:service-{j}:type-{type_id}`, `item_fee:group-{g}:fee-{f}`, `non_item_fee:…`; полный перечень — в mapper'е), нормализация `[^a-z0-9_:-]` → `_`. Паритет с `site/src/Ingestion/Application/Source/Ozon/OzonAccrualByDayPreviewMapper.php` |
+
+Ключи Marketplace (`ozon-accrual-{posting}-product-{i}` с суффиксом
+`-acc{accrual_id}`, `site/src/Marketplace/Ozon/Application/Service/OzonAccrualRecordKey.php`)
+зависят от занятости ключа в БД Symfony — producer их вычислить не может
+(`services/AGENTS.md` §1); сопоставление со своими записями делает Symfony
+при импорте. Ключи `realization`, `mutual-settlement` и `accrual-types`
+фиксируются вместе с задачей выдачи фактов.
 
 Ключи остальных провайдеров/ресурсов фиксируются здесь до реализации
 соответствующего producer.
