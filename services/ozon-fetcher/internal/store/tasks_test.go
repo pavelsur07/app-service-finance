@@ -439,3 +439,24 @@ func TestStatusReport(t *testing.T) {
 	assert.Equal(t, 1, b.AuthFailures)
 	assert.Equal(t, []string{"ozon.finance.mutual-settlement"}, report.StoppedResources)
 }
+
+func TestFindObjectByContentWithinTask(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{spec("ref-a", "r", "2026-10-01", 0), spec("ref-b", "r", "2026-10-01", 0)}))
+	a, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, a.TaskKey, a.AttemptID, rawObj(1), ""))
+
+	got, found, err := tasks.FindObject(ctx, a.TaskKey, hash("p"))
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "s3://bucket/p1", got.StorageURI)
+
+	_, found, err = tasks.FindObject(ctx, TaskKey{ConnectionRef: "ref-b", ResourceType: "r", PeriodKey: "2026-10-01"}, hash("p"))
+	require.NoError(t, err)
+	assert.False(t, found, "объекты другого кабинета не переиспользуются")
+	_, found, err = tasks.FindObject(ctx, a.TaskKey, hash("other"))
+	require.NoError(t, err)
+	assert.False(t, found)
+}

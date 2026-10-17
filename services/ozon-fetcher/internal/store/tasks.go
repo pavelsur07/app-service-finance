@@ -235,6 +235,26 @@ type RawObject struct {
 	ContentType string
 }
 
+// FindObject — уже сохранённый объект этой задачи с тем же содержимым
+// (sha256 несжатых байтов): повторная загрузка без изменений не пишет в S3.
+func (t *Tasks) FindObject(ctx context.Context, key TaskKey, sha256 string) (RawObject, bool, error) {
+	var obj RawObject
+	err := t.pool.QueryRow(ctx, `
+		SELECT r.page_no, r.storage_uri, r.sha256, r.size_bytes, r.stored_bytes, r.content_type
+		FROM raw_object r JOIN fetch_attempt a ON a.attempt_id = r.attempt_id
+		WHERE a.connection_ref = $1 AND a.resource_type = $2 AND a.period_key = $3 AND r.sha256 = $4
+		ORDER BY r.created_at DESC LIMIT 1`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, sha256,
+	).Scan(&obj.PageNo, &obj.StorageURI, &obj.SHA256, &obj.SizeBytes, &obj.StoredBytes, &obj.ContentType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RawObject{}, false, nil
+	}
+	if err != nil {
+		return RawObject{}, false, fmt.Errorf("store: find object: %w", err)
+	}
+	return obj, true, nil
+}
+
 // RecordPage — страница и курсор следующей одной транзакцией.
 func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, obj RawObject, nextCursor string) error {
 	tx, err := t.pool.Begin(ctx)

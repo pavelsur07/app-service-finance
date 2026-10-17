@@ -40,6 +40,7 @@ type fakeTasks struct {
 	extendErr    error
 	finishErr    error
 	revision     int
+	known        []store.RawObject // объекты прежних попыток (для FindObject)
 	suspendErr   error
 	authFailures int             // счётчик отказов кабинета подряд
 	pauses       []time.Duration // паузы, выданные RecordAuthFailure
@@ -69,6 +70,17 @@ func (f *fakeTasks) RecordPage(_ context.Context, _ store.TaskKey, _ string, obj
 	f.pages = append(f.pages, obj)
 	f.cursors = append(f.cursors, next)
 	return nil
+}
+
+func (f *fakeTasks) FindObject(_ context.Context, _ store.TaskKey, sha string) (store.RawObject, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range append(append([]store.RawObject(nil), f.known...), f.pages...) {
+		if p.SHA256 == sha {
+			return p, true, nil
+		}
+	}
+	return store.RawObject{}, false, nil
 }
 
 func (f *fakeTasks) FinishTask(_ context.Context, _ store.TaskKey, _ string, out store.Outcome, _ time.Time) (int, error) {
@@ -546,4 +558,18 @@ func TestHungControlWriteIsBoundedAndKeepsTaskRetryable(t *testing.T) {
 		t.Fatal("Run is stuck behind a hung control write")
 	}
 	require.NotNil(t, h.tasks.finished)
+}
+
+func TestUnchangedPagesAreNotUploadedAgain(t *testing.T) {
+	h := newHarness(&fakeOzon{pages: twoPageDay()})
+	h.tasks.known = []store.RawObject{{PageNo: 1, StorageURI: "s3://b/old-p1", SHA256: sha(`{"p":1}`), StoredBytes: 7}}
+
+	res := h.exec.Run(context.Background(), task(ResourceAccrualByDay, "2026-10-15"), cabinet, "trace")
+
+	assert.Equal(t, "done", res.Outcome)
+	require.Len(t, h.raw.puts, 1, "в S3 — только изменившаяся страница")
+	assert.Equal(t, 2, h.raw.puts[0].PageNo)
+	require.Len(t, h.tasks.pages, 2, "журнал попытки — обе страницы")
+	assert.Equal(t, "s3://b/old-p1", h.tasks.pages[0].StorageURI)
+	assert.Contains(t, h.logs.String(), `"pages_reused":1`)
 }
