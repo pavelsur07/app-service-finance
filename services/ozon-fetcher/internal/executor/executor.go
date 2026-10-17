@@ -34,7 +34,7 @@ type TaskStore interface {
 	ExtendLease(ctx context.Context, key store.TaskKey, attemptID string, until time.Time) error
 	RecordPage(ctx context.Context, key store.TaskKey, attemptID string, obj store.RawObject, nextCursor string) error
 	FinishTask(ctx context.Context, key store.TaskKey, attemptID string, out store.Outcome, now time.Time) (int, error)
-	SuspendConnection(ctx context.Context, connectionRef, reason string, until time.Time) error
+	RecordAuthFailure(ctx context.Context, connectionRef string, now time.Time, pauseFor func(failures int) time.Duration) (int, error)
 	ResumeConnection(ctx context.Context, connectionRef string) error
 	StopResource(ctx context.Context, resourceType, reason string) error
 }
@@ -64,6 +64,7 @@ type Config struct {
 	BackoffBase     time.Duration // transient: base·2^(n−1)
 	BackoffMax      time.Duration
 	RateLimitPause  time.Duration // 429 без Retry-After
+	AuthRetryPause  time.Duration // пауза кабинета после первого auth: снимок с новым ключом успевает обновиться
 	AuthSuspend     time.Duration // пауза кабинета на втором auth подряд
 	NoCredentialsIn time.Duration // повтор задачи без ключа seller
 	NotReadyDelay   map[string]time.Duration
@@ -78,6 +79,7 @@ func DefaultConfig() Config {
 		BackoffBase:     time.Minute,
 		BackoffMax:      time.Hour,
 		RateLimitPause:  30 * time.Second,
+		AuthRetryPause:  time.Minute,
 		AuthSuspend:     time.Hour,
 		NoCredentialsIn: time.Hour,
 		NotReadyDelay: map[string]time.Duration{

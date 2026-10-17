@@ -70,19 +70,27 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return out
 
 	case ozon.ClassAuth:
+		// Счётчик подряд — по кабинету: первая пауза короткая (снимок с новым
+		// ключом успевает обновиться), со второго отказа — длинная + ERROR.
+		failures, err := e.tasks.RecordAuthFailure(side, task.ConnectionRef, now, func(n int) time.Duration {
+			if n >= 2 {
+				return e.cfg.AuthSuspend
+			}
+			return e.cfg.AuthRetryPause
+		})
+		if err != nil {
+			// Пауза не записана — кабинет не должен сразу уйти в новый круг 401.
+			e.sideEffect(log, "record auth failure", err)
+			out := e.retryable(task, string(apiErr.Class), now, true)
+			out.HTTPStatus = apiErr.Status
+			return out
+		}
 		_, refreshErr := e.refresher.ForceRefresh(side)
 		e.sideEffect(log, "refresh connections", refreshErr)
-		if task.LastErrorClass == string(ozon.ClassAuth) {
-			until := now.Add(e.cfg.AuthSuspend)
-			if err := e.tasks.SuspendConnection(side, task.ConnectionRef, string(apiErr.Class), until); err != nil {
-				// Пауза не записана — кабинет не должен сразу уйти в новый круг 401.
-				e.sideEffect(log, "suspend connection", err)
-				out := e.retryable(task, string(apiErr.Class), now, true)
-				out.HTTPStatus = apiErr.Status
-				return out
-			}
-			log.Error("ozon rejected cabinet keys twice, cabinet suspended",
-				slog.String("stage", "fetch"), slog.Int("http_status", apiErr.Status), slog.Time("suspended_until", until))
+		if failures >= 2 {
+			log.Error("ozon rejected cabinet keys again, cabinet suspended",
+				slog.String("stage", "fetch"), slog.Int("http_status", apiErr.Status), slog.Int("auth_failures", failures),
+				slog.Time("suspended_until", now.Add(e.cfg.AuthSuspend)))
 		}
 		return store.Outcome{Status: store.StatusPending, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, KeepCursor: true, NextRunAt: now}
 

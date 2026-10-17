@@ -59,6 +59,10 @@ func TestLoadConnectionsSettings(t *testing.T) {
 			t.Setenv("SYMFONY_INTERNAL_BASE_URL", tt.baseURL)
 			t.Setenv("INTERNAL_AUTH_TOKEN", tt.token)
 			t.Setenv("CONNECTIONS_POLL_INTERVAL", tt.interval)
+			t.Setenv("DB_DSN", "postgres://svc@db:5432/ozon_fetcher")
+			for k, v := range map[string]string{"S3_ENDPOINT": "https://s3.example", "S3_REGION": "ru-1", "S3_BUCKET": "b", "S3_ACCESS_KEY_ID": "id", "S3_SECRET_ACCESS_KEY": "secret"} {
+				t.Setenv(k, v)
+			}
 
 			cfg, err := Load()
 			if tt.wantErr {
@@ -146,4 +150,48 @@ func TestLoadMaxParallel(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadPlannerAndIngestionSettings(t *testing.T) {
+	clear := func(t *testing.T) {
+		for _, k := range []string{"TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
+			t.Setenv(k, "")
+		}
+	}
+	t.Run("defaults", func(t *testing.T) {
+		clear(t)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.TailDays != 3 || cfg.FinalDay != 10 || cfg.ReconcileWeekday != time.Monday || cfg.PlanEvery != time.Hour {
+			t.Errorf("defaults = %+v", cfg)
+		}
+		if cfg.OzonBaseURL != "https://api-seller.ozon.ru" || cfg.IngestionEnabled() {
+			t.Errorf("ozon/ingestion = %q %v", cfg.OzonBaseURL, cfg.IngestionEnabled())
+		}
+	})
+	for name, env := range map[string][2]string{
+		"tail too big":     {"TAIL_DAYS", "40"},
+		"final day 31":     {"FINAL_DAY", "31"},
+		"weekday 7":        {"RECONCILE_WEEKDAY", "7"},
+		"plan every short": {"PLAN_EVERY", "10s"},
+		"ozon url":         {"OZON_BASE_URL", "api-seller.ozon.ru"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			clear(t)
+			t.Setenv(env[0], env[1])
+			if _, err := Load(); err == nil {
+				t.Fatal("want error")
+			}
+		})
+	}
+	t.Run("ingestion needs db and s3", func(t *testing.T) {
+		clear(t)
+		t.Setenv("SYMFONY_INTERNAL_BASE_URL", "http://site-nginx")
+		t.Setenv("INTERNAL_AUTH_TOKEN", "0123456789abcdef0123456789abcdef")
+		if _, err := Load(); err == nil {
+			t.Fatal("want error without DB_DSN and S3_BUCKET")
+		}
+	})
 }

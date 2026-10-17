@@ -71,6 +71,15 @@ func (t *Tasks) Upsert(ctx context.Context, specs []TaskSpec) error {
 	if len(specs) == 0 {
 		return nil
 	}
+	return sendUpserts(ctx, t.pool, specs)
+}
+
+// batchSender — пул или транзакция.
+type batchSender interface {
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
+func sendUpserts(ctx context.Context, conn batchSender, specs []TaskSpec) error {
 	batch := &pgx.Batch{}
 	for _, s := range specs {
 		batch.Queue(`
@@ -87,10 +96,37 @@ func (t *Tasks) Upsert(ctx context.Context, specs []TaskSpec) error {
 				updated_at  = now()`,
 			s.ConnectionRef, s.ResourceType, s.PeriodKey, s.Priority, s.RunAt, s.Refresh)
 	}
-	if err := t.pool.SendBatch(ctx, batch).Close(); err != nil {
+	if err := conn.SendBatch(ctx, batch).Close(); err != nil {
 		return fmt.Errorf("store: upsert tasks: %w", err)
 	}
 	return nil
+}
+
+// PlanOnce ставит specs, только если проход kind за runDate ещё не выполнялся:
+// маркер planner_run и постановка — одна транзакция. false — уже выполнен.
+func (t *Tasks) PlanOnce(ctx context.Context, kind, runDate string, specs []TaskSpec) (bool, error) {
+	tx, err := t.pool.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("store: plan once begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `INSERT INTO planner_run (kind, run_date) VALUES ($1, $2) ON CONFLICT DO NOTHING`, kind, runDate)
+	if err != nil {
+		return false, fmt.Errorf("store: plan once marker: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	if len(specs) > 0 {
+		if err := sendUpserts(ctx, tx, specs); err != nil {
+			return false, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("store: plan once commit: %w", err)
+	}
+	return true, nil
 }
 
 // ClaimNext захватывает готовую задачу одного из connectionRefs (активный

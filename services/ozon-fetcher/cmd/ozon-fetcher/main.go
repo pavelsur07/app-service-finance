@@ -11,7 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Europe/Moscow без zoneinfo в рантайм-образе
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
@@ -24,6 +26,7 @@ func main() {
 }
 
 func run() error {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", "ozon-fetcher")))
 	migrate := flag.Bool("migrate", false, "apply database migrations and exit")
 	flag.Parse()
 
@@ -55,6 +58,20 @@ func run() error {
 		slog.Info("database connected")
 	} else {
 		slog.Info("database disabled: DB_DSN is empty")
+	}
+
+	// Загрузка — отдельным контекстом: при сигнале она останавливается первой
+	// (задачи возвращаются в очередь), HTTP — после неё.
+	ingestCtx, stopIngest := context.WithCancel(context.Background())
+	defer stopIngest()
+	var ingestion *app.Ingestion
+	if cfg.IngestionEnabled() {
+		ingestion, err = app.Start(ingestCtx, cfg, pool, slog.Default())
+		if err != nil {
+			return err
+		}
+	} else {
+		slog.Info("ingestion disabled: SYMFONY_INTERNAL_BASE_URL is empty")
 	}
 
 	mux := http.NewServeMux()
@@ -91,6 +108,10 @@ func run() error {
 
 	select {
 	case <-ctx.Done():
+		stopIngest()
+		if ingestion != nil {
+			ingestion.Wait()
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
