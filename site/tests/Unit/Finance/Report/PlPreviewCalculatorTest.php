@@ -190,6 +190,27 @@ final class PlPreviewCalculatorTest extends TestCase
         self::assertSame(30.0, $this->value($result, 'COGS', 'b'));
     }
 
+    public function testZeroOrAbsentTotalKeepsOffsettingSharesOpposite(): void
+    {
+        // Учёта нет, статистика 600 на теге: доля тега −600, остаток в «Общих» +600, итог 0.
+        $result = $this->calculator->calculate(
+            $this->company,
+            PlReportPeriod::forMonth(new \DateTimeImmutable('2026-01-01')),
+            [
+                new PlPreviewColumn('tag', [$this->id('COGS') => '-600.00', $this->id('REV_WB') => '40.00']),
+                new PlPreviewColumn('common', [$this->id('COGS') => '600.00']),
+                new PlPreviewColumn('total', [$this->id('COGS') => '0.00']),
+            ],
+            'total',
+        );
+
+        self::assertSame(-600.0, $this->value($result, 'COGS', 'tag'));
+        self::assertSame(600.0, $this->value($result, 'COGS', 'common'));
+        self::assertSame(0.0, $this->value($result, 'COGS', 'total'));
+        // Статьи нет в итоге вовсе — доля тоже со знаком документа.
+        self::assertSame(40.0, $this->value($result, 'REV_WB', 'tag'));
+    }
+
     public function testUnknownBaseColumnIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);

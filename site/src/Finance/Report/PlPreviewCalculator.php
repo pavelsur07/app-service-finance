@@ -156,10 +156,13 @@ final class PlPreviewCalculator
             return $direction * abs($amount);
         }
 
-        // Итог 0 или статьи нет в итоге: знак самой доли — как для отдельного документа.
+        // Итог 0 или статьи нет в итоге: модуля нет, доли сохраняют знак документа — так
+        // взаимно гасящие доли (−600 в теге, +600 в «Общих») остаются противоположными.
         $base = (float) ($baseAmount ?? '0');
-        $baseSign = $base > 0.0 ? 1.0 : ($base < 0.0 ? -1.0 : ($amount < 0.0 ? -1.0 : 1.0));
+        if (0.0 === $base) {
+            return $amount;
+        }
 
-        return $direction * $baseSign * $amount;
+        return $direction * ($base > 0.0 ? 1.0 : -1.0) * $amount;
     }
 }
