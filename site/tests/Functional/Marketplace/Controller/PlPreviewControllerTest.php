@@ -60,6 +60,11 @@ final class PlPreviewControllerTest extends WebTestCaseBase
 
         $tab = $crawler->filter('.card-header .nav-tabs a.active');
         self::assertStringContainsString('Предпросмотр ОПиУ', $tab->text());
+
+        // Боковое меню: свой подпункт в «Маркетплейсах» подсвечен, «Начисления» — нет.
+        $sidebar = $crawler->filter('.dropdown-menu-column a.dropdown-item.active');
+        self::assertSame(['Предпросмотр ОПиУ'], $sidebar->each(static fn ($a): string => trim($a->text())));
+        self::assertSame('/marketplace/pl-preview', $sidebar->attr('href'));
     }
 
     public function testOtherCompanySeesNothingOfThisOne(): void

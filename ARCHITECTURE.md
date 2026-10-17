@@ -660,7 +660,8 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   (`PlPreviewSalesCoverageQuery::fetchPartialRealizationPeriods()` — проведение берёт документ только
   целиком); маркетплейсы с данными, у SELLER-подключения которых нет проекта (`PLRegisterUpdater`
   пропускает операции без проекта; у затрат проект — только из подключения).
-- Экран — вкладка «Предпросмотр ОПиУ» раздела «Маркетплейсы»: `GET /marketplace/pl-preview`
+- Экран — вкладка «Предпросмотр ОПиУ» раздела «Маркетплейсы» и подпункт бокового меню
+  «Маркетплейсы → Предпросмотр ОПиУ» (`partials/_sidebar_marketplace`): `GET /marketplace/pl-preview`
   (`marketplace_pl_preview_index`, `PlPreviewController`, `MARKETPLACE_READ`). Параметры —
   `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
   текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги; `tags_set=1` без `tags[]` — ни одного), `empty=1`;
@@ -3935,6 +3936,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.13 | 2026-10-17 | Marketplace: подпункт бокового меню «Предпросмотр ОПиУ» |
 | 2.12 | 2026-10-17 | Marketplace: выгрузка предпросмотра ОПиУ в xlsx (`/marketplace/pl-preview/xlsx`, `PlPreviewXlsxExporter`) |
 | 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |
 | 2.10 | 2026-10-17 | Marketplace: `BuildMarketplacePlPreviewAction` — сборка предпросмотра ОПиУ по тегам (`MarketplacePlPreviewReport`, `PlPreviewColumnKind`, `MarketplacePlPreviewPeriodException`) |
