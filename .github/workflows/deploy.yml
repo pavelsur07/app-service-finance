@@ -733,6 +733,9 @@ jobs:
                     export OZON_FETCHER_S3_ACCESS_KEY_ID='${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}'
                     export OZON_FETCHER_S3_SECRET_ACCESS_KEY='${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}'
                     export OZON_FETCHER_CONNECTION_ALLOWLIST='${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}'
+                    # DSN GlitchTip сервиса (свой проект). Вне проверки алфавита ниже: содержит
+                    # ://@ — но одинарные кавычки, а в DSN их не бывает.
+                    export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
                     for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
                       eval "val=\${$v}"

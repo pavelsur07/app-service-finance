@@ -15,24 +15,37 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/httpapi"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/observability"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
 func main() {
-	if err := run(); err != nil {
+	flush := func() {}
+	err := run(func(f func()) { flush = f })
+	if err != nil {
 		slog.Error("ozon-fetcher stopped with error", "error", err)
+	}
+	flush() // события GlitchTip — до выхода процесса
+	if err != nil {
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", "ozon-fetcher")))
+func run(setFlush func(func())) error {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", observability.Service)))
 	migrate := flag.Bool("migrate", false, "apply database migrations and exit")
 	flag.Parse()
 
 	cfg, err := config.Load()
 	if err != nil {
 		return err
+	}
+	logger, flush, sentryErr := observability.Setup(os.Stdout, cfg.SentryDSN, cfg.SentryRelease, cfg.SentryEnvironment)
+	slog.SetDefault(logger)
+	setFlush(flush)
+	if sentryErr != nil {
+		// Сбой телеметрии не останавливает загрузку (services/AGENTS.md §6).
+		slog.Error("glitchtip disabled: bad SENTRY_DSN", "error", sentryErr.Error())
 	}
 
 	if *migrate {
