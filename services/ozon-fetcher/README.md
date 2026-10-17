@@ -30,6 +30,28 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 `services-ozon-fetcher-dev` как `DB_DSN`. Без `DB_DSN` сервис работает в
 режиме без БД (`/ready` отвечает `db: disabled`).
 
+## Схема БД
+
+Только техническое состояние (`services/AGENTS.md` §9). Миграции —
+`internal/store/migrations`, прогон — `make ozon-fetcher-migrate`.
+
+| Таблица | Назначение |
+|---|---|
+| `fetch_task` | Что должно быть загружено: `(connection_ref, resource_type, period_key)`, статус (`pending → running → done \| not_ready \| failed_retryable \| failed_permanent`), приоритет, попытки, `next_run_at`, lease, курсор и номер следующей страницы, `content_hash` + `revision` |
+| `fetch_attempt` | Журнал попыток (append-only): время, исход, HTTP-статус, страницы, байты |
+| `raw_object` | Объект S3 на страницу попытки: `storage_uri`, sha256 несжатых байтов, размеры |
+| `connection_state` | Кабинет: `last_served_at` (честная очередь), пауза после `auth` |
+| `connection_limit` | Пара (кабинет, endpoint): ручное `rps_override`, адаптированная `rps_current` |
+| `resource_stop` | Ресурс, снятый у Ozon (`obsolete_endpoint`), — не выдаётся никому |
+| `sync_job`, `checkpoint`, `outbox_batch` | `00001`, под выдачу фактов (позже) |
+
+Инварианты: у кабинета не больше одной `running`-задачи (частичный уникальный
+индекс); страница и курсор пишутся одной транзакцией; просроченный lease
+возвращает задачу в `pending` с сохранённым курсором.
+
+Интеграционные тесты `internal/store`: `TEST_DB_DSN` — пустая БД; без
+переменной тесты пропускаются.
+
 ## Переменные окружения
 
 Секреты — только env, значения не коммитятся (шаблон — `.env.example`).
