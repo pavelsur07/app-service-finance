@@ -33,7 +33,8 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Endpoints: map[string]EndpointLimit{
-			ozon.EndpointAccrualByDay:     {Start: 1, Floor: 0.1, Ceiling: 5, DefaultPause: 10 * time.Second},
+			// Реальный кабинет 17.10.2026: 429 уже при 0,3 запроса/с (docs/ozon-api.md).
+			ozon.EndpointAccrualByDay:     {Start: 0.3, Floor: 0.05, Ceiling: 2, DefaultPause: 10 * time.Second},
 			ozon.EndpointAccrualTypes:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointRealization:      {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 900 * time.Second},
 			ozon.EndpointMutualSettlement: {Start: 0.1, Floor: 0.02, Ceiling: 0.5, DefaultPause: 900 * time.Second},
