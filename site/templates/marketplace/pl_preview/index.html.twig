@@ -119,6 +119,12 @@
                 <span class="form-check-label">Показывать пустые строки</span>
             </label>
             <button type="submit" class="btn btn-primary">Показать</button>
+            {% if report is not null %}
+                <a class="btn btn-outline-secondary" href="{{ path('marketplace_pl_preview_xlsx', base_query) }}" data-testid="pl-preview-xlsx">
+                    <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                    Скачать xlsx
+                </a>
+            {% endif %}
         </form>
         {% include 'partials/_period_presets.html.twig' with {
             route: 'marketplace_pl_preview_index',

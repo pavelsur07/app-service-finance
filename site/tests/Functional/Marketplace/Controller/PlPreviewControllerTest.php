@@ -112,6 +112,82 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         self::assertSelectorNotExists('[data-testid="pl-preview-table"]');
     }
 
+    public function testXlsxMatchesTheScreen(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 471);
+        $tag = MarketplaceListingTagBuilder::aTag()->forCompanyId((string) $fixture->company->getId())->withName('Зима')->build();
+        $this->em()->persist($tag);
+        $this->em()->flush();
+        self::getContainer()->get(ListingTagAssignmentRepository::class)
+            ->assign((string) $fixture->company->getId(), [$fixture->wbA->getId()], $tag->getId());
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $crawler = $client->request('GET', self::URL);
+        $href = (string) $crawler->filter('[data-testid="pl-preview-xlsx"]')->attr('href');
+        self::assertStringStartsWith('/marketplace/pl-preview/xlsx?', $href);
+        self::assertStringContainsString('dateFrom=2026-01-01', $href);
+
+        $client->request('GET', $href);
+
+        self::assertResponseIsSuccessful();
+        $response = $client->getInternalResponse();
+        self::assertSame('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $client->getResponse()->headers->get('Content-Type'));
+        self::assertStringContainsString('pl-preview_2026-01-01_2026-01-31.xlsx', (string) $client->getResponse()->headers->get('Content-Disposition'));
+
+        $sheets = $this->readXlsx($response->getContent());
+        self::assertSame(['ОПиУ по тегам', 'Не попадёт в ОПиУ', 'Исключено', 'Сверка'], array_keys($sheets));
+
+        $report = $sheets['ОПиУ по тегам'];
+        self::assertContains(['Статья', 'Зима', 'Общие / без тега', 'Итого'], $report);
+        self::assertContains(['REV', 1000.0, 300.0, 1300.0], $report);
+        self::assertStringContainsString('wb_no_rule', json_encode($sheets['Не попадёт в ОПиУ'], \JSON_UNESCAPED_UNICODE) ?: '');
+        self::assertContains(['Всего в данных маркетплейсов', 1130.0], $sheets['Сверка']);
+    }
+
+    public function testXlsxWithWrongPeriodRedirectsToTheTab(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 481);
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $client->request('GET', '/marketplace/pl-preview/xlsx?dateFrom=2026-02-01&dateTo=2026-01-01');
+
+        self::assertResponseRedirects();
+        self::assertStringStartsWith('/marketplace/pl-preview?', (string) $client->getResponse()->headers->get('Location'));
+        $client->followRedirect();
+        self::assertSelectorTextContains('.alert-danger', 'Начало периода позже окончания');
+    }
+
+    /**
+     * @return array<string, list<list<mixed>>>
+     */
+    private function readXlsx(string $content): array
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'pl_preview_test_');
+        file_put_contents($path, $content);
+        $reader = new \OpenSpout\Reader\XLSX\Reader();
+        $reader->open($path);
+        $sheets = [];
+        try {
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $rows = [];
+                foreach ($sheet->getRowIterator() as $row) {
+                    // Целые числа OpenSpout читает как int — приводим к float для сравнения.
+                    $rows[] = array_map(static fn (mixed $v): mixed => \is_int($v) ? (float) $v : $v, $row->toArray());
+                }
+                $sheets[$sheet->getName()] = $rows;
+            }
+        } finally {
+            $reader->close();
+            unlink($path);
+        }
+
+        return $sheets;
+    }
+
     /**
      * @param list<string> $values
      *

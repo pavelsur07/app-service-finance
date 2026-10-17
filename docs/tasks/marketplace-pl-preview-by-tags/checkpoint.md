@@ -1,6 +1,6 @@
 ## Current checkpoint
 
-**Phase:** Stage 7
+**Phase:** handoff
 **Status:** planned
 **Stage base commit:** (после коммита Stage 1)
 
@@ -11,6 +11,7 @@
 - Stage 4 — покрытие затрат и продаж, сверка.
 - Stage 5 — `BuildMarketplacePlPreviewAction`.
 - Stage 6 — экран `/marketplace/pl-preview`.
+- Stage 7 — выгрузка xlsx.
 
 ### Checks and baseline
 - Baseline 26 tests OK; после Stage 1 — 35 tests OK. Тесты: своя пара asf9-pg/asf9-redis.
@@ -20,7 +21,7 @@
 - external: pending (handoff)
 
 ### Exact next action
-- Stage 7: план в `stages/stage-7.md`, выгрузка xlsx. Стенд asf9-fpm/asf9-nginx в asf9-net поднят — убрать на handoff.
+- Handoff: полные гейты, финальное ревью в свежей сессии, внешнее ревью Codex, `handoff.md`, push + PR. Стенд asf9-fpm/asf9-nginx и пару asf9-pg/asf9-redis убрать.
 
 ### Files to inspect first on resume
 - `docs/tasks/marketplace-pl-preview-by-tags/plan.md`, `stages/`

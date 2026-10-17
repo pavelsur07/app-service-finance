@@ -662,6 +662,10 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
   текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги), `empty=1`;
   мусор — значения по умолчанию. Ошибка периода — сообщение на странице, не 500.
+- Выгрузка — `GET /marketplace/pl-preview/xlsx` (`marketplace_pl_preview_xlsx`,
+  `PlPreviewXlsxController`, `Infrastructure\Export\PlPreviewXlsxExporter`): тот же фильтр и
+  тот же отчёт, листы «ОПиУ по тегам», «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
+  с форматом выгрузки ОПиУ. Ошибка периода — flash и redirect на вкладку.
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -3927,6 +3931,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.12 | 2026-10-17 | Marketplace: выгрузка предпросмотра ОПиУ в xlsx (`/marketplace/pl-preview/xlsx`, `PlPreviewXlsxExporter`) |
 | 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |
 | 2.10 | 2026-10-17 | Marketplace: `BuildMarketplacePlPreviewAction` — сборка предпросмотра ОПиУ по тегам (`MarketplacePlPreviewReport`, `PlPreviewColumnKind`, `MarketplacePlPreviewPeriodException`) |
 | 2.09 | 2026-10-17 | Marketplace: `PlPreviewCostCoverageQuery`, `PlPreviewSalesCoverageQuery` — «не размечено», «исключено» и сверка затрат предпросмотра ОПиУ |
