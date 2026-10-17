@@ -52,6 +52,11 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 Интеграционные тесты `internal/store`: `TEST_DB_DSN` — пустая БД; без
 переменной тесты пропускаются.
 
+**Raw в S3** (`internal/rawstore`): ключ
+`ozon/{connection_ref}/{resource_type}/{period_key}/{fetched_at}_{attempt}_p{NNN}_{sha8}.{ext}.gz`,
+gzip исходных байтов, `If-None-Match: *`, sha256 несжатых — в метаданных и
+`raw_object`. Интеграционный тест — `TEST_S3_ENDPOINT`, `TEST_S3_BUCKET`.
+
 ## Переменные окружения
 
 Секреты — только env, значения не коммитятся (шаблон — `.env.example`).

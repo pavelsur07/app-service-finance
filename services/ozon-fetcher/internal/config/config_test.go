@@ -79,3 +79,47 @@ func TestLoadConnectionsSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadS3Settings(t *testing.T) {
+	full := map[string]string{
+		"S3_ENDPOINT": "https://s3.twcstorage.ru", "S3_REGION": "ru-1", "S3_BUCKET": "vashfindir-services-raw",
+		"S3_ACCESS_KEY_ID": "key-id", "S3_SECRET_ACCESS_KEY": "secret-value",
+	}
+	tests := []struct {
+		name    string
+		drop    string
+		empty   bool
+		wantErr bool
+	}{
+		{name: "disabled", empty: true},
+		{name: "complete"},
+		{name: "no endpoint", drop: "S3_ENDPOINT", wantErr: true},
+		{name: "no region", drop: "S3_REGION", wantErr: true},
+		{name: "no secret", drop: "S3_SECRET_ACCESS_KEY", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range full {
+				if tt.empty || k == tt.drop {
+					v = ""
+				}
+				t.Setenv(k, v)
+			}
+			t.Setenv("SYMFONY_INTERNAL_BASE_URL", "")
+			t.Setenv("CONNECTIONS_POLL_INTERVAL", "")
+			cfg, err := Load()
+			if tt.wantErr {
+				if err == nil || strings.Contains(err.Error(), "secret-value") {
+					t.Fatalf("want error without secret, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tt.empty && cfg.S3Bucket != "vashfindir-services-raw" {
+				t.Errorf("bucket = %q", cfg.S3Bucket)
+			}
+		})
+	}
+}

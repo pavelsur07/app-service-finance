@@ -22,6 +22,13 @@ type Config struct {
 	SymfonyBaseURL          string
 	InternalAuthToken       string
 	ConnectionsPollInterval time.Duration
+
+	// S3Bucket пуст — запись raw выключена (режим scaffold).
+	S3Endpoint        string
+	S3Region          string
+	S3Bucket          string
+	S3AccessKeyID     string
+	S3SecretAccessKey string
 }
 
 func Load() (Config, error) {
@@ -31,6 +38,11 @@ func Load() (Config, error) {
 		SymfonyBaseURL:          os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
 		InternalAuthToken:       os.Getenv("INTERNAL_AUTH_TOKEN"),
 		ConnectionsPollInterval: defaultPollInterval,
+		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
+		S3Region:                os.Getenv("S3_REGION"),
+		S3Bucket:                os.Getenv("S3_BUCKET"),
+		S3AccessKeyID:           os.Getenv("S3_ACCESS_KEY_ID"),
+		S3SecretAccessKey:       os.Getenv("S3_SECRET_ACCESS_KEY"),
 	}
 	if cfg.ListenAddr == "" {
 		cfg.ListenAddr = ":8080"
@@ -51,6 +63,15 @@ func Load() (Config, error) {
 		}
 		if len(cfg.InternalAuthToken) < MinInternalTokenLength {
 			return Config{}, errors.New("config: INTERNAL_AUTH_TOKEN is required (at least 32 characters) with SYMFONY_INTERNAL_BASE_URL")
+		}
+	}
+	if cfg.S3Bucket != "" {
+		u, err := url.Parse(cfg.S3Endpoint)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return Config{}, errors.New("config: S3_ENDPOINT must be an http(s) URL with S3_BUCKET")
+		}
+		if cfg.S3Region == "" || cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
+			return Config{}, errors.New("config: S3_REGION, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required with S3_BUCKET")
 		}
 	}
 	return cfg, nil
