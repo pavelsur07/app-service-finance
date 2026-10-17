@@ -403,3 +403,24 @@ func TestSleepContextHonoursCancel(t *testing.T) {
 	assert.ErrorIs(t, SleepContext(ctx, time.Hour), context.Canceled)
 	assert.NoError(t, SleepContext(context.Background(), time.Millisecond))
 }
+
+func TestDownloadedZipIsLabelledXLSX(t *testing.T) {
+	xlsx := []byte("PK\x03\x04rest-of-xlsx")
+	srv, _ := mutualSettlementServer(t, msScript{infoStatuses: []string{"success"}, fileStatus: 200, fileBody: xlsx})
+	srv.Config.Handler = func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/file.xlsx" {
+				w.Header().Set("Content-Type", "application/octet-stream")
+				_, _ = w.Write(xlsx)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}(srv.Config.Handler)
+	client := NewClient(srv.URL, srv.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)), time.Now)
+
+	page, err := client.FetchMutualSettlement(context.Background(), testCreds, "conn-1", 2026, 9, fastPoll, noSleep)
+
+	require.NoError(t, err)
+	assert.Contains(t, page.ContentType, "spreadsheetml")
+}

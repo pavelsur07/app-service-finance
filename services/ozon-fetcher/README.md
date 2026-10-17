@@ -5,9 +5,9 @@ Go-сервис: загрузка финансовых данных Ozon Seller 
 контракту [source-fact-envelope](../_contracts/source-fact-envelope/v1/)
 (pull-модель, после первой волны).
 
-Статус: **scaffold + store** — health/ready endpoints, конфигурация, доступ к
-собственной БД (pgxpool + goose-миграции, таблицы `sync_job`/`checkpoint`/
-`outbox_batch`). План работ по этапам —
+Статус: **загрузка raw** — кабинеты из Symfony, планировщик, диспетчер,
+исполнитель, raw в S3, журнал в своей БД, `/internal/fetch-status`. Прод —
+`docs/maintenance/ozon-fetcher-prod.md`. План работ по этапам —
 [`docs/tasks/ozon-fetcher-ingestion/plan.md`](../../docs/tasks/ozon-fetcher-ingestion/plan.md);
 ресурсы и лимиты Ozon — [`docs/ozon-api.md`](docs/ozon-api.md).
 
@@ -66,7 +66,7 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | Переменная | Назначение | Обязательная |
 |---|---|---|
 | `LISTEN_ADDR` | Адрес HTTP, по умолчанию `:8080` | нет |
-| `DB_DSN` | PostgreSQL сервисной БД (`sslmode=require` в prod) | нет |
+| `DB_DSN` | PostgreSQL сервисной БД (на проде — общий инстанс в той же docker-сети, `sslmode=disable`, как у Symfony) | нет |
 | `S3_ENDPOINT` | `https://s3.twcstorage.ru` | этап 8 |
 | `S3_REGION` | `ru-1` | этап 8 |
 | `S3_BUCKET` | `vashfindir-services-raw` | этап 8 |
@@ -74,7 +74,10 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `SYMFONY_INTERNAL_BASE_URL` | Базовый URL внутреннего API Symfony (`/internal/marketplace-connections`) | этап 6 |
 | `INTERNAL_AUTH_TOKEN` | Внутренний static token для `/internal/*` (с обеих сторон) | этап 6 |
 | `CONNECTIONS_POLL_INTERVAL` | Интервал поллинга конфигурации, по умолчанию `5m` | этап 6 |
-| `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно | этап 10 |
+| `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно (по умолчанию 4, на проде 2) | этап 10 |
+| `CONNECTION_ALLOWLIST` | Только эти кабинеты: `connection_ref` или `company_id` через запятую; пусто — все | этап 14 |
+| `OZON_BASE_URL` | Seller API, по умолчанию `https://api-seller.ozon.ru` (на стенде — мок) | этап 11 |
+| `TAIL_DAYS`, `RECONCILE_WEEKDAY`, `FINAL_DAY`, `PLAN_EVERY` | Окна планировщика: 3, 1 (пн), 10, 1h | этап 11 |
 
 ## Внутренний API сервиса (контракты, к кодовым Stage'ам)
 

@@ -58,7 +58,7 @@
 - [x] mutual-settlement: ссылка не https → `invalid_response`; файл > лимита → `invalid_response`
 - [x] эталонные sha256 страниц в тестах совпадают с байтами фикстур
 - [x] `Limiter.Wait` вызывается до каждого запроса, `Observe` — после
-- [ ] mutual-settlement подтверждён на реальном ответе Ozon — **перенесено** на этапы 13/14 (нет разрешённого доступа)
+- [x] mutual-settlement подтверждён на реальном ответе Ozon — на этапе 13, 17.10.2026 (XLSX)
 - [x] `go vet`, `golangci-lint`, `go test -race` зелёные
 
 #### What was done

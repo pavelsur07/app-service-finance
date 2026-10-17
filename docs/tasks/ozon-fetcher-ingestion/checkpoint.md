@@ -1,28 +1,23 @@
 ## Current checkpoint
 
-**Phase:** Stage 10 — внешнее ревью; затем handoff PR-группы 4 (этапы 7–10)
-**Status:** Stage 0–9 done; Stage 10 — код, тесты, коммит `53f8f65b9`, ревью идёт
-**Branches / PR:**
-- #2706 `docs/ozon-fetcher-ingestion-stage0` — этап 0
-- #2707 `feat/ozon-fetcher-internal-api` — этапы 1–2 (база #2706)
-- #2708 `feat/ozon-fetcher-client` — этапы 3–6 (база #2707)
-- `feat/ozon-fetcher-store` — этапы 7–10, PR ещё не открыт (база — #2708)
-
-### Completed
-- Stage 0–9 — отчёты в `stages/`
-
-### Checks and baseline
-- PR-группа 2: полный PHPStan OK, cs/strict OK, unit 3830, полный phpunit 6612 OK
-- Go (этапы 3–10): vet, golangci-lint 0 issues, `-race` по пакетам OK, интеграция (PostgreSQL + S3) OK
-
-### Review status
-- Stage 1, 5, 7, 9, группа 3: IMPORTANT исправлены, fixed without re-run; Stage 2: REVIEW_GREEN
+**Phase:** handoff PR-группы 5; дальше — этап 14 (отдельная ветка) по решению Владельца
+**Status:** Stage 0–13 done (реальный кабинет пройден 17.10)
+**PR (цепочкой):** #2706 (0) → #2707 (1–2) → #2708 (3–6) → #2709 (7–10) → #2710 draft (11–13, `feat/ozon-fetcher-run`)
+**Этап 14:** отдельная ветка `infra/ozon-fetcher-deploy` (секреты, CI, прод) — решение Владельца 17.10, не начат
 
 ### Exact next action
-- прочитать `er10/review.txt` → исправить → отчёт этапа 10 → push `feat/ozon-fetcher-store` + PR (база #2708)
-- затем Stage 11 (планировщики + wiring `cmd/main.go`), 12, 13
+- Владелец кладёт ключи: `~/.config/ozon-fetcher/vumjoy.env` (`OZON_CLIENT_ID`, `OZON_API_KEY`, 0600)
+- запустить `<scratchpad>/real-run.sh`: мок отдаёт `cab-real` с ключами из env, сервис ходит в настоящий Ozon, лимит by-day 0,3 запроса/с, `MAX_PARALLEL_CONNECTIONS=1`
+- проверить `/internal/fetch-status`, форму by-day/справочника/реализации/взаиморасчётов, 429; затем удалить данные (`DROP DATABASE ozon_fetcher_real`, `docker rm -f -v asf9-s3`)
+- закрыть Stage 13, PR #2710 → ready
 
 ### Окружение (dev-машина)
-- тестовые контейнеры: `asf9-pg` (БД `app_test`, `ozon_fetcher_test`), `asf9-redis`, `asf9-s3` (seaweedfs в tmpfs) в сети `asf9-net`; удалить после handoff: `docker rm -f -v asf9-s3 asf9-pg asf9-redis; docker network rm asf9-net`
-- Go-тесты: контейнер с `--memory=1200m`, `GOMAXPROCS=2`, `-p=1`, по одному пакету — без этого exit 137 (OOM) при сборке AWS SDK с `-race`
-- никогда не запускать Go-тесты параллельно с PHP-гейтами
+- мои контейнеры: `asf9-pg`, `asf9-redis`, `asf9-s3` (seaweedfs, tmpfs 160m, тома 4 МБ ×24) в `asf9-net`; бинарники стенда — `<scratchpad>/bin`
+- Go-тесты: контейнер `--memory=1200m`, `GOMAXPROCS=2`, `-p=1`, по пакету (OOM)
+- стенд-БД `ozon_fetcher_stand` создана со старой `00003` — пересоздать перед использованием
+
+### GitHub (заведено 17.10.2026)
+- secrets: `INTERNAL_AUTH_TOKEN`, `OZON_FETCHER_DB_PASSWORD` (агент, случайные hex-48); S3-ключи — за Владельцем
+- variables: `OZON_FETCHER_CONNECTION_ALLOWLIST=90b72323-784a-4268-88aa-10778c3da78b` («Вумджой»), `OZON_FETCHER_ENABLED=true`
+- **после тестирования удалить обе переменные** (указание Владельца 17.10): без
+  `ALLOWLIST` — все кабинеты; без `ENABLED` деплой останавливает сервис

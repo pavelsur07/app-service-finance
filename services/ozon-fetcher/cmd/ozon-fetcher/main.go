@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"log/slog"
@@ -11,8 +10,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // Europe/Moscow без zoneinfo в рантайм-образе
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/httpapi"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
@@ -24,6 +26,7 @@ func main() {
 }
 
 func run() error {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", "ozon-fetcher")))
 	migrate := flag.Bool("migrate", false, "apply database migrations and exit")
 	flag.Parse()
 
@@ -57,27 +60,34 @@ func run() error {
 		slog.Info("database disabled: DB_DSN is empty")
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
-	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
-		if pool == nil {
-			writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "disabled"})
-			return
+	// Загрузка — отдельным контекстом: при сигнале она останавливается первой
+	// (задачи возвращаются в очередь), HTTP — после неё.
+	ingestCtx, stopIngest := context.WithCancel(context.Background())
+	defer stopIngest()
+	var ingestion *app.Ingestion
+	if cfg.IngestionEnabled() {
+		ingestion, err = app.Start(ingestCtx, cfg, pool, slog.Default())
+		if err != nil {
+			return err
 		}
-		pingCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := pool.Ping(pingCtx); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready", "db": "down"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "up"})
-	})
+	} else {
+		slog.Info("ingestion disabled: SYMFONY_INTERNAL_BASE_URL is empty")
+	}
+
+	deps := httpapi.Deps{Token: cfg.InternalAuthToken, Now: time.Now, Logger: slog.Default(), Location: time.UTC}
+	if pool != nil {
+		deps.DBPing = pool.Ping
+	}
+	if ingestion != nil {
+		deps.CabinetsReady = ingestion.Cabinets.Ready
+		deps.S3Ping = ingestion.Raw.Ping
+		deps.Status = ingestion.Tasks.Status
+		deps.Location = ingestion.Location
+	}
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           mux,
+		Handler:           httpapi.New(deps),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -91,16 +101,14 @@ func run() error {
 
 	select {
 	case <-ctx.Done():
+		stopIngest()
+		if ingestion != nil {
+			ingestion.Wait()
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
 	case err := <-errCh:
 		return err
 	}
-}
-
-func writeJSON(w http.ResponseWriter, code int, payload map[string]string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(payload)
 }

@@ -33,8 +33,9 @@ const (
 type TaskStore interface {
 	ExtendLease(ctx context.Context, key store.TaskKey, attemptID string, until time.Time) error
 	RecordPage(ctx context.Context, key store.TaskKey, attemptID string, obj store.RawObject, nextCursor string) error
+	FindObject(ctx context.Context, key store.TaskKey, sha256 string) (store.RawObject, bool, error)
 	FinishTask(ctx context.Context, key store.TaskKey, attemptID string, out store.Outcome, now time.Time) (int, error)
-	SuspendConnection(ctx context.Context, connectionRef, reason string, until time.Time) error
+	RecordAuthFailure(ctx context.Context, connectionRef string, now time.Time, pauseFor func(failures int) time.Duration) (int, error)
 	ResumeConnection(ctx context.Context, connectionRef string) error
 	StopResource(ctx context.Context, resourceType, reason string) error
 }
@@ -64,6 +65,7 @@ type Config struct {
 	BackoffBase     time.Duration // transient: base·2^(n−1)
 	BackoffMax      time.Duration
 	RateLimitPause  time.Duration // 429 без Retry-After
+	AuthRetryPause  time.Duration // пауза кабинета после первого auth: снимок с новым ключом успевает обновиться
 	AuthSuspend     time.Duration // пауза кабинета на втором auth подряд
 	NoCredentialsIn time.Duration // повтор задачи без ключа seller
 	NotReadyDelay   map[string]time.Duration
@@ -78,6 +80,7 @@ func DefaultConfig() Config {
 		BackoffBase:     time.Minute,
 		BackoffMax:      time.Hour,
 		RateLimitPause:  30 * time.Second,
+		AuthRetryPause:  time.Minute,
 		AuthSuspend:     time.Hour,
 		NoCredentialsIn: time.Hour,
 		NotReadyDelay: map[string]time.Duration{
@@ -172,7 +175,7 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 		level = slog.LevelWarn
 	}
 	attrs := []any{slog.String("stage", "fetch"), slog.String("outcome", result.Outcome), slog.String("error_class", out.ErrorClass),
-		slog.Int("pages", run.pages), slog.Int64("duration_ms", e.now().Sub(started).Milliseconds())}
+		slog.Int("pages", run.pages), slog.Int("pages_reused", run.reused), slog.Int64("duration_ms", e.now().Sub(started).Milliseconds())}
 	if fetchErr != nil {
 		attrs = append(attrs, slog.String("error", fetchErr.Error()))
 	}
@@ -223,6 +226,7 @@ type taskRun struct {
 	cursor   string
 	nextPage int
 	pages    int
+	reused   int // страниц без записи в S3: то же содержимое уже сохранено
 }
 
 // errNoCredentials — у кабинета нет ключа seller для финансового ресурса.
@@ -291,27 +295,38 @@ func (e *storeError) Error() string { return "executor: store page: " + e.err.Er
 func (e *storeError) Unwrap() error { return e.err }
 
 // store: S3 → журнал (страница, курсор, хеш) — до запроса следующей страницы.
+// Страница с тем же содержимым, уже сохранённая для этой задачи, в S3 не
+// пишется: журнал попытки ссылается на существующий объект.
 func (r *taskRun) store(ctx context.Context, p ozon.Page) error {
 	e := r.exec
-	stored, err := e.raw.Put(ctx, rawstore.Object{
-		Provider: "ozon", ConnectionRef: r.task.ConnectionRef, ResourceType: r.task.ResourceType,
-		PeriodKey: r.task.PeriodKey, AttemptID: r.task.AttemptID, PageNo: p.No, FetchedAt: e.now(),
-		ContentType: p.ContentType, Body: p.Body,
-	})
+	obj := store.RawObject{PageNo: p.No, SHA256: sha256Hex(p.Body), SizeBytes: int64(len(p.Body)), ContentType: p.ContentType}
+
+	existing, found, err := e.tasks.FindObject(ctx, r.task.TaskKey, obj.SHA256)
 	if err != nil {
 		return &storeError{err}
 	}
-	err = e.tasks.RecordPage(ctx, r.task.TaskKey, r.task.AttemptID, store.RawObject{
-		PageNo: p.No, StorageURI: stored.URI, SHA256: stored.SHA256, SizeBytes: stored.SizeBytes,
-		StoredBytes: stored.StoredBytes, ContentType: p.ContentType,
-	}, p.Cursor)
+	if found {
+		obj.StorageURI, obj.StoredBytes = existing.StorageURI, existing.StoredBytes
+		r.reused++
+	} else {
+		stored, err := e.raw.Put(ctx, rawstore.Object{
+			Provider: "ozon", ConnectionRef: r.task.ConnectionRef, ResourceType: r.task.ResourceType,
+			PeriodKey: r.task.PeriodKey, AttemptID: r.task.AttemptID, PageNo: p.No, FetchedAt: e.now(),
+			ContentType: p.ContentType, Body: p.Body,
+		})
+		if err != nil {
+			return &storeError{err}
+		}
+		obj.StorageURI, obj.StoredBytes = stored.URI, stored.StoredBytes
+	}
+	err = e.tasks.RecordPage(ctx, r.task.TaskKey, r.task.AttemptID, obj, p.Cursor)
 	if errors.Is(err, store.ErrLeaseLost) {
 		return err
 	}
 	if err != nil {
 		return &storeError{err}
 	}
-	r.hashes = append(r.hashes, stored.SHA256)
+	r.hashes = append(r.hashes, obj.SHA256)
 	r.cursor, r.nextPage = p.Cursor, p.No+1
 	r.pages++
 	return nil
@@ -320,6 +335,11 @@ func (r *taskRun) store(ctx context.Context, p ozon.Page) error {
 // contentHash — sha256 упорядоченного списка хешей страниц загрузки.
 func contentHash(hashes []string) string {
 	sum := sha256.Sum256([]byte(strings.Join(hashes, "\n")))
+	return hex.EncodeToString(sum[:])
+}
+
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
 

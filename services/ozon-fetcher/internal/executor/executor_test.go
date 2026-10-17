@@ -28,22 +28,25 @@ var t0 = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 // --- фейки ---
 
 type fakeTasks struct {
-	mu          sync.Mutex
-	pages       []store.RawObject
-	cursors     []string
-	finished    *store.Outcome
-	suspended   []string
-	resumed     []string
-	stopped     []string
-	extends     int
-	pageErr     error // ошибка RecordPage
-	extendErr   error
-	finishErr   error
-	revision    int
-	suspendErr  error
-	stopErr     error
-	controlHang bool // SuspendConnection/StopResource ждут отмены контекста
-	extendHang  bool // ExtendLease ждёт отмены контекста
+	mu           sync.Mutex
+	pages        []store.RawObject
+	cursors      []string
+	finished     *store.Outcome
+	suspended    []string
+	resumed      []string
+	stopped      []string
+	extends      int
+	pageErr      error // ошибка RecordPage
+	extendErr    error
+	finishErr    error
+	revision     int
+	known        []store.RawObject // объекты прежних попыток (для FindObject)
+	suspendErr   error
+	authFailures int             // счётчик отказов кабинета подряд
+	pauses       []time.Duration // паузы, выданные RecordAuthFailure
+	stopErr      error
+	controlHang  bool // SuspendConnection/StopResource ждут отмены контекста
+	extendHang   bool // ExtendLease ждёт отмены контекста
 }
 
 func (f *fakeTasks) ExtendLease(ctx context.Context, _ store.TaskKey, _ string, _ time.Time) error {
@@ -69,6 +72,17 @@ func (f *fakeTasks) RecordPage(_ context.Context, _ store.TaskKey, _ string, obj
 	return nil
 }
 
+func (f *fakeTasks) FindObject(_ context.Context, _ store.TaskKey, sha string) (store.RawObject, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range append(append([]store.RawObject(nil), f.known...), f.pages...) {
+		if p.SHA256 == sha {
+			return p, true, nil
+		}
+	}
+	return store.RawObject{}, false, nil
+}
+
 func (f *fakeTasks) FinishTask(_ context.Context, _ store.TaskKey, _ string, out store.Outcome, _ time.Time) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -76,16 +90,18 @@ func (f *fakeTasks) FinishTask(_ context.Context, _ store.TaskKey, _ string, out
 	return f.revision, f.finishErr
 }
 
-func (f *fakeTasks) SuspendConnection(ctx context.Context, ref, _ string, _ time.Time) error {
+func (f *fakeTasks) RecordAuthFailure(ctx context.Context, ref string, now time.Time, pauseFor func(int) time.Duration) (int, error) {
 	if f.controlHang {
 		<-ctx.Done()
-		return ctx.Err()
+		return 0, ctx.Err()
 	}
 	if f.suspendErr != nil {
-		return f.suspendErr
+		return 0, f.suspendErr
 	}
+	f.authFailures++
 	f.suspended = append(f.suspended, ref)
-	return nil
+	f.pauses = append(f.pauses, pauseFor(f.authFailures))
+	return f.authFailures, nil
 }
 
 func (f *fakeTasks) ResumeConnection(_ context.Context, ref string) error {
@@ -286,27 +302,29 @@ func TestOutcomeTable(t *testing.T) {
 		return &ozon.APIError{Class: class, Endpoint: "/v1/x", Status: 400, RetryAfter: retry}
 	}
 	tests := []struct {
-		name       string
-		err        error
-		lastClass  string
-		attempts   int
-		wantStatus string
-		wantLabel  string
-		wantKeep   bool
-		wantNext   time.Duration
-		check      func(t *testing.T, h *harness)
+		name         string
+		err          error
+		lastClass    string
+		authFailures int
+		attempts     int
+		wantStatus   string
+		wantLabel    string
+		wantKeep     bool
+		wantNext     time.Duration
+		check        func(t *testing.T, h *harness)
 	}{
 		{name: "rate limit with retry-after", err: apiErr(ozon.ClassRateLimit, 7*time.Second), wantStatus: store.StatusPending, wantLabel: "rate_limit", wantKeep: true, wantNext: 7 * time.Second},
 		{name: "rate limit default pause", err: apiErr(ozon.ClassRateLimit, 0), wantStatus: store.StatusPending, wantLabel: "rate_limit", wantKeep: true, wantNext: 30 * time.Second},
 		{name: "transient first", err: apiErr(ozon.ClassTransient, 0), attempts: 1, wantStatus: store.StatusFailedRetryable, wantLabel: "transient", wantKeep: true, wantNext: time.Minute},
 		{name: "transient third", err: apiErr(ozon.ClassTransient, 0), attempts: 3, wantStatus: store.StatusFailedRetryable, wantLabel: "transient", wantKeep: true, wantNext: 4 * time.Minute},
 		{name: "transient capped", err: apiErr(ozon.ClassTransient, 0), attempts: 30, wantStatus: store.StatusFailedRetryable, wantLabel: "transient", wantKeep: true, wantNext: time.Hour},
-		{name: "auth first", err: apiErr(ozon.ClassAuth, 0), wantStatus: store.StatusPending, wantLabel: "auth", wantKeep: true, check: func(t *testing.T, h *harness) {
+		{name: "auth first pauses cabinet briefly", err: apiErr(ozon.ClassAuth, 0), wantStatus: store.StatusPending, wantLabel: "auth", wantKeep: true, check: func(t *testing.T, h *harness) {
 			assert.Equal(t, 1, h.refresher.calls)
-			assert.Empty(t, h.tasks.suspended)
+			assert.Equal(t, []time.Duration{time.Minute}, h.tasks.pauses)
+			assert.NotContains(t, h.logs.String(), `"level":"ERROR"`)
 		}},
-		{name: "auth twice suspends cabinet", err: apiErr(ozon.ClassAuth, 0), lastClass: "auth", wantStatus: store.StatusPending, wantLabel: "auth", wantKeep: true, check: func(t *testing.T, h *harness) {
-			assert.Equal(t, []string{"ref-a"}, h.tasks.suspended)
+		{name: "auth again on cabinet suspends for long", err: apiErr(ozon.ClassAuth, 0), authFailures: 1, wantStatus: store.StatusPending, wantLabel: "auth", wantKeep: true, check: func(t *testing.T, h *harness) {
+			assert.Equal(t, []time.Duration{time.Hour}, h.tasks.pauses, "второй отказ кабинета — длинная пауза, даже если задача другая")
 			assert.Contains(t, h.logs.String(), `"level":"ERROR"`)
 		}},
 		{name: "obsolete stops resource", err: apiErr(ozon.ClassObsoleteEndpoint, 0), wantStatus: store.StatusFailedPermanent, wantLabel: "obsolete_endpoint", check: func(t *testing.T, h *harness) {
@@ -320,6 +338,7 @@ func TestOutcomeTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(&fakeOzon{singleErr: tt.err})
+			h.tasks.authFailures = tt.authFailures
 			tk := task(ResourceAccrualTypes, PeriodRef)
 			tk.LastErrorClass = tt.lastClass
 			if tt.attempts > 0 {
@@ -500,17 +519,15 @@ func TestHungLeaseRenewalDoesNotBlockFinish(t *testing.T) {
 }
 
 func TestFailedControlWritesKeepTaskRetryable(t *testing.T) {
-	t.Run("suspend", func(t *testing.T) {
+	t.Run("auth failure", func(t *testing.T) {
 		h := newHarness(&fakeOzon{singleErr: &ozon.APIError{Class: ozon.ClassAuth, Status: 401}})
 		h.tasks.suspendErr = errors.New("db down")
-		tk := task(ResourceAccrualTypes, PeriodRef)
-		tk.LastErrorClass = "auth"
 
-		h.exec.Run(context.Background(), tk, cabinet, "trace")
+		h.exec.Run(context.Background(), task(ResourceAccrualTypes, PeriodRef), cabinet, "trace")
 
 		assert.Equal(t, store.StatusFailedRetryable, h.tasks.finished.Status)
 		assert.Equal(t, t0.Add(time.Minute), h.tasks.finished.NextRunAt, "не сразу — backoff")
-		assert.NotContains(t, h.logs.String(), "cabinet suspended")
+		assert.Zero(t, h.refresher.calls)
 	})
 	t.Run("stop resource", func(t *testing.T) {
 		h := newHarness(&fakeOzon{singleErr: &ozon.APIError{Class: ozon.ClassObsoleteEndpoint, Status: 400}})
@@ -541,4 +558,26 @@ func TestHungControlWriteIsBoundedAndKeepsTaskRetryable(t *testing.T) {
 		t.Fatal("Run is stuck behind a hung control write")
 	}
 	require.NotNil(t, h.tasks.finished)
+}
+
+func TestUnchangedPagesAreNotUploadedAgain(t *testing.T) {
+	h := newHarness(&fakeOzon{pages: twoPageDay()})
+	h.tasks.known = []store.RawObject{{PageNo: 1, StorageURI: "s3://b/old-p1", SHA256: sha(`{"p":1}`), StoredBytes: 7}}
+
+	res := h.exec.Run(context.Background(), task(ResourceAccrualByDay, "2026-10-15"), cabinet, "trace")
+
+	assert.Equal(t, "done", res.Outcome)
+	require.Len(t, h.raw.puts, 1, "в S3 — только изменившаяся страница")
+	assert.Equal(t, 2, h.raw.puts[0].PageNo)
+	require.Len(t, h.tasks.pages, 2, "журнал попытки — обе страницы")
+	assert.Equal(t, "s3://b/old-p1", h.tasks.pages[0].StorageURI)
+	assert.Contains(t, h.logs.String(), `"pages_reused":1`)
+}
+
+func TestAnySuccessResetsCabinetAuthCounter(t *testing.T) {
+	h := newHarness(&fakeOzon{singlePage: page(`{"accrual_types":[]}`, "")})
+
+	h.exec.Run(context.Background(), task(ResourceAccrualTypes, PeriodRef), cabinet, "trace") // задача сама 401 не получала
+
+	assert.Equal(t, []string{"ref-a"}, h.tasks.resumed, "успех кабинета сбрасывает счётчик отказов ключа")
 }
