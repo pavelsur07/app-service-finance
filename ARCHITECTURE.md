@@ -648,6 +648,15 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   покрытие продаж, возвратов и реализации Ozon (`PlPreviewSalesKind`): строки, естественная сумма,
   есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
   одна продажа даёт несколько сумм по разным правилам.
+- Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
+  from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
+  `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
+  выбранных тега); `common` — факты без листинга и листингов без единого тега компании (не зависит
+  от фильтра тегов); `total` — факты без разреза по листингам. Дерево — один вызов
+  `FinanceFacade::calculatePlPreview()`. Теги листингов — `tagsForListings()` порциями по 5000.
+  Период: `from ≤ to`, не длиннее 366 дней, иначе `MarketplacePlPreviewPeriodException`
+  (`invalid_period`). Предупреждения: ошибки формул дерева и маркетплейсы с данными, у
+  SELLER-подключения которых нет проекта (`PLRegisterUpdater` пропускает операции без проекта).
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -3913,6 +3922,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.10 | 2026-10-17 | Marketplace: `BuildMarketplacePlPreviewAction` — сборка предпросмотра ОПиУ по тегам (`MarketplacePlPreviewReport`, `PlPreviewColumnKind`, `MarketplacePlPreviewPeriodException`) |
 | 2.09 | 2026-10-17 | Marketplace: `PlPreviewCostCoverageQuery`, `PlPreviewSalesCoverageQuery` — «не размечено», «исключено» и сверка затрат предпросмотра ОПиУ |
 | 2.08 | 2026-10-17 | Marketplace: `PlPreviewFactsQuery` — суммы предпросмотра ОПиУ по статьям и листингам (раздел «Marketplace: предпросмотр ОПиУ по тегам») |
 | 2.07 | 2026-10-17 | Finance: `FinanceFacade::calculatePlPreview()` — дерево ОПиУ по колонкам без записи (`PlPreviewCalculator`, `InMemoryFactsProvider`, `PlReportCalculator::withFacts()`, DTO `PlPreview*`, enum `PlPreviewUnplacedReason`) |
