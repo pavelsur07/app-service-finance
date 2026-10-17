@@ -7,8 +7,10 @@
 import { createListbox, createSearch, positionPortal } from './picker_core.js';
 
 const LOCAL_LIMIT = 20;
-// Окно browse не уже поповера пилюли: в узкой ячейке строки операции название не читалось бы.
+// Окно browse — по ширине близко к поповеру пилюли: в узкой ячейке название не читалось бы,
+// а в поле на всю строку формы ИНН уезжал бы от названия на тысячу пикселей.
 const BROWSE_MIN_WIDTH = 360;
+const BROWSE_MAX_WIDTH = 480;
 
 /**
  * @param {object} parts   select, input, searchWrap, clearButton — элементы поля
@@ -58,9 +60,9 @@ export function initPickerField(root, parts, options) {
 
     const isOpen = () => !portal.hidden;
 
-    // browse: окно по ширине всей группы поля (с кнопками), но не уже BROWSE_MIN_WIDTH.
+    // browse: окно по ширине всей группы поля (с кнопками) в пределах BROWSE_MIN_WIDTH…BROWSE_MAX_WIDTH.
     const place = () => (browse
-        ? positionPortal(portal, searchWrap, { minWidth: BROWSE_MIN_WIDTH })
+        ? positionPortal(portal, searchWrap, { minWidth: BROWSE_MIN_WIDTH, maxWidth: BROWSE_MAX_WIDTH })
         : positionPortal(portal, input));
 
     const show = () => {
