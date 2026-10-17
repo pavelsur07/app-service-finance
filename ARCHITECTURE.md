@@ -649,6 +649,13 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   покрытие продаж, возвратов и реализации Ozon (`PlPreviewSalesKind`): строки, естественная сумма,
   есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
   одна продажа даёт несколько сумм по разным правилам.
+- Реклама из статистики: учётные категории, которые покрывает рекламная статистика, —
+  `Domain\PlPreview\AdStatisticsCostCategories` (Ozon `ozon_cpc`, WB
+  `wb_okazanie_uslug_wb_prodvizhenie`; список в коде — свойство источника данных, не настройка
+  компании). Расход по листингам — порт `Facade\PlPreviewAdSpendProviderInterface`
+  (`PlPreviewAdSpendDTO`: по листингам, всего, `unallocated()`), реализация —
+  `MarketplaceAds\Facade\PlPreviewAdSpendProvider` поверх `MarketplaceAdsFacade`. Порт в
+  Marketplace, а не вызов `MarketplaceAdsFacade`: MarketplaceAds уже зависит от Marketplace.
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
   from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
   `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
@@ -3936,6 +3943,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.14 | 2026-10-17 | Marketplace: категории под рекламной статистикой и порт `PlPreviewAdSpendProviderInterface` (реализация в MarketplaceAds) |
 | 2.13 | 2026-10-17 | Marketplace: подпункт бокового меню «Предпросмотр ОПиУ» |
 | 2.12 | 2026-10-17 | Marketplace: выгрузка предпросмотра ОПиУ в xlsx (`/marketplace/pl-preview/xlsx`, `PlPreviewXlsxExporter`) |
 | 2.11 | 2026-10-17 | Marketplace: вкладка «Предпросмотр ОПиУ» (`/marketplace/pl-preview`, `PlPreviewController`, `PlPreviewFilter`) |
