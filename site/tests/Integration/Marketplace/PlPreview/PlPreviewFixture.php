@@ -40,8 +40,8 @@ use Ramsey\Uuid\Uuid;
  *
  * COST: начисления 100 (wbA) + 50 (wbB) + 70 (без листинга), сторно 30 (wbA).
  * Не попадают: продажа февраля, неактивное правило выручки с СПП, затрата исключённой из ОПиУ
- * категории (500), затрата категории без статьи (400), реализация Ozon декабрь–январь, продажа
- * другой компании.
+ * категории (500), затрата категории с правилом без статьи (400), затрата категории без правила (25),
+ * затрата без категории (15), реализация Ozon декабрь–январь, продажа другой компании.
  */
 final class PlPreviewFixture
 {
@@ -55,6 +55,7 @@ final class PlPreviewFixture
     public MarketplaceListing $ozA;
     public MarketplaceCostCategory $excludedCostCategory;
     public MarketplaceCostCategory $unmappedCostCategory;
+    public MarketplaceCostCategory $noRuleCostCategory;
 
     public function __construct(private readonly EntityManagerInterface $em, int $seed)
     {
@@ -101,6 +102,9 @@ final class PlPreviewFixture
         $this->cost($logistics, $this->wbA, '30.00', MarketplaceCostOperationType::STORNO);
         $this->cost($this->excludedCostCategory, $this->wbA, '500.00', MarketplaceCostOperationType::CHARGE);
         $this->cost($this->unmappedCostCategory, null, '400.00', MarketplaceCostOperationType::CHARGE);
+        $this->noRuleCostCategory = $this->costCategory('wb_no_rule');
+        $this->cost($this->noRuleCostCategory, $this->wbB, '25.00', MarketplaceCostOperationType::CHARGE);
+        $this->cost(null, null, '15.00', MarketplaceCostOperationType::CHARGE);
 
         $rawDocument = MarketplaceRawDocumentBuilder::aDocument()
             ->forCompany($this->company)
@@ -188,7 +192,7 @@ final class PlPreviewFixture
         return $category;
     }
 
-    private function cost(MarketplaceCostCategory $category, ?MarketplaceListing $listing, string $amount, MarketplaceCostOperationType $type): void
+    private function cost(?MarketplaceCostCategory $category, ?MarketplaceListing $listing, string $amount, MarketplaceCostOperationType $type): void
     {
         $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, MarketplaceType::WILDBERRIES, $category);
         $cost->setListing($listing);

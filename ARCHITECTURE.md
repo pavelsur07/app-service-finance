@@ -640,6 +640,14 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   применяются.
 - Модуль у затрат нелинеен, поэтому итог по статье — отдельный вызов с `byListing = false`; сумма
   по листингам с ним совпадает, только когда внутри группы нет сумм разного знака.
+- Что не попадёт в ОПиУ: `PlPreviewCostCoverageQuery::fetch()` — затраты по «маркетплейс × категория»
+  со статусом `PlPreviewCostStatus` (`mapped` / `excluded` — `include_in_pl = false` / `unmapped` —
+  условие гейта `PreflightCostsQuery::WITHOUT_PL_DECISION` или затрата без категории) и нетто-суммой
+  (начисления − сторно, модуль по группе, как у проведения). `fetchTotal()` — нетто всех затрат
+  без джойна правил: сверка `итог = mapped + excluded + unmapped`. `PlPreviewSalesCoverageQuery` —
+  покрытие продаж, возвратов и реализации Ozon (`PlPreviewSalesKind`): строки, естественная сумма,
+  есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
+  одна продажа даёт несколько сумм по разным правилам.
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -3905,6 +3913,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.09 | 2026-10-17 | Marketplace: `PlPreviewCostCoverageQuery`, `PlPreviewSalesCoverageQuery` — «не размечено», «исключено» и сверка затрат предпросмотра ОПиУ |
 | 2.08 | 2026-10-17 | Marketplace: `PlPreviewFactsQuery` — суммы предпросмотра ОПиУ по статьям и листингам (раздел «Marketplace: предпросмотр ОПиУ по тегам») |
 | 2.07 | 2026-10-17 | Finance: `FinanceFacade::calculatePlPreview()` — дерево ОПиУ по колонкам без записи (`PlPreviewCalculator`, `InMemoryFactsProvider`, `PlReportCalculator::withFacts()`, DTO `PlPreview*`, enum `PlPreviewUnplacedReason`) |
 | 2.06 | 2026-10-17 | Marketplace: формулы сумм продаж и возвратов по `amount_source` вынесены в `MarketplacePlAmountSql` (этап 1 предпросмотра ОПиУ по тегам), поведение проведения не меняется |
