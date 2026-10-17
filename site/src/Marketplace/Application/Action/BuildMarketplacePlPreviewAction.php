@@ -127,7 +127,7 @@ final readonly class BuildMarketplacePlPreviewAction
         $columns[] = new MarketplacePlPreviewColumn(self::TOTAL_KEY, 'Итого', PlPreviewColumnKind::TOTAL);
         $financeColumns[] = new PlPreviewColumn(self::TOTAL_KEY, $total);
 
-        $pl = $this->financeFacade->calculatePlPreview($companyId, $from, $to, $financeColumns);
+        $pl = $this->financeFacade->calculatePlPreview($companyId, $from, $to, $financeColumns, self::TOTAL_KEY);
 
         $costCoverage = $this->costCoverageQuery->fetch($companyId, $from, $to, $command->marketplace);
         $costTotal = $this->costCoverageQuery->fetchTotal($companyId, $from, $to, $command->marketplace);

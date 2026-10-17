@@ -1302,12 +1302,16 @@ calculatePlPreview(
     \DateTimeImmutable $from,
     \DateTimeImmutable $to,
     array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
+    ?string $natureBaseColumn = null, // колонка-итог: знак статьи по ней, остальные — линейные доли
 ): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
 ```
 
 Предпросмотр (`Report\PlPreviewCalculator`) переводит сумму статьи в факт так же, как
 `PLRegisterUpdater` для `marketplace_pl`: суммы статьи складываются со знаком, от итога берётся
-модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. Регистр берёт модуль в корзине
+модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. С `natureBaseColumn` (Marketplace передаёт `total`)
+направление берётся по сумме колонки-итога и применяется ко всем колонкам линейно: факт доли =
+`±знак(S_итога) × S_доли`, доли складываются в итог (доля с обратным итогу знаком не становится
+вторым расходом). Без него каждая колонка считается как отдельный документ. Регистр берёт модуль в корзине
 «день документа × проект», предпросмотр — по колонке за весь период. Дерево считает тот же
 `PlReportCalculator` через `withFacts(InMemoryFactsProvider)` — регистр не читается. Сумма на
 статье, которой нет в компании, которая не `LEAF_INPUT` или без `code`, в отчёт ОПиУ не попадает
@@ -3950,6 +3954,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.16 | 2026-10-17 | Finance: `calculatePlPreview(…, natureBaseColumn)` — колонки-доли берут знак статьи от итога и складываются в него |
 | 2.15 | 2026-10-17 | Marketplace: реклама Ozon (клики) и WB («Продвижение») в колонках тегов предпросмотра — из рекламной статистики, «Итого» — учёт |
 | 2.14 | 2026-10-17 | Marketplace: категории под рекламной статистикой и порт `PlPreviewAdSpendProviderInterface` (реализация в MarketplaceAds) |
 | 2.13 | 2026-10-17 | Marketplace: подпункт бокового меню «Предпросмотр ОПиУ» |

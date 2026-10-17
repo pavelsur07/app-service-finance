@@ -17,13 +17,4 @@ final class AdStatisticsCostCategoriesTest extends TestCase
         self::assertNull(AdStatisticsCostCategories::codeFor(MarketplaceType::YANDEX_MARKET));
         self::assertNull(AdStatisticsCostCategories::codeFor(MarketplaceType::SBER_MEGAMARKET));
     }
-
-    public function testCoversIsPerMarketplace(): void
-    {
-        self::assertTrue(AdStatisticsCostCategories::covers(MarketplaceType::OZON, 'ozon_cpc'));
-        self::assertFalse(AdStatisticsCostCategories::covers(MarketplaceType::WILDBERRIES, 'ozon_cpc'));
-        // Подписки и прочее продвижение статистикой не покрыты.
-        self::assertFalse(AdStatisticsCostCategories::covers(MarketplaceType::OZON, 'ozon_premium_promotion'));
-        self::assertFalse(AdStatisticsCostCategories::covers(MarketplaceType::WILDBERRIES, 'wb_okazanie_uslug_wb_media'));
-    }
 }

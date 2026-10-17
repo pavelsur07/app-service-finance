@@ -52,6 +52,7 @@ final class PlPreviewFixture
 {
     public Company $company;
     public User $owner;
+    public Company $foreign;
     private User $lastOwner;
     public PLCategory $revenue;
     public PLCategory $returns;
@@ -69,6 +70,7 @@ final class PlPreviewFixture
         $this->company = $this->company($seed, 'pl-preview');
         $this->owner = $this->lastOwner;
         $foreign = $this->company($seed + 1, 'pl-preview-foreign');
+        $this->foreign = $foreign;
 
         $this->revenue = $this->category('REV', PLFlow::INCOME);
         $this->returns = $this->category('RET', PLFlow::EXPENSE);
@@ -235,18 +237,26 @@ final class PlPreviewFixture
         return $realization;
     }
 
-    public function addWbPromotion(bool $includeInPl, string $ledger): void
+    /**
+     * Рекламная категория WB «Продвижение» с правилом на статью COST и учётными строками.
+     *
+     * @param list<array{0: string, 1: ?MarketplaceCostOperationType}> $extraRows ещё строки: сумма, тип операции
+     */
+    public function addWbPromotion(bool $includeInPl, string $ledger, array $extraRows = [], ?Company $company = null): void
     {
-        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->company, MarketplaceType::WILDBERRIES);
+        $company ??= $this->company;
+        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $company, MarketplaceType::WILDBERRIES);
         $category->setName('WB Продвижение');
         $category->setCode('wb_okazanie_uslug_wb_prodvizhenie');
         $this->em->persist($category);
-        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $this->company->getId(), $category, $this->costs->getId(), $includeInPl));
-        $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, MarketplaceType::WILDBERRIES, $category);
-        $cost->setAmount($ledger);
-        $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
-        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $this->em->persist($cost);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $company->getId(), $category, $this->costs->getId(), $includeInPl));
+        foreach ([[$ledger, MarketplaceCostOperationType::CHARGE], ...$extraRows] as [$amount, $type]) {
+            $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::WILDBERRIES, $category);
+            $cost->setAmount($amount);
+            $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
+            $cost->setOperationType($type);
+            $this->em->persist($cost);
+        }
         $this->em->flush();
     }
 

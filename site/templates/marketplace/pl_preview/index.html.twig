@@ -151,9 +151,11 @@
             {% endif %}
 
             {% if report.adReconciliation is not empty %}
+                {% set ad_labels = {ozon: 'Ozon (клики)', wildberries: 'WB («Продвижение»)'} %}
                 <p class="text-secondary small mb-2" data-testid="pl-preview-ads-note">
-                    Реклама Ozon (клики) и WB («Продвижение») в колонках тегов — по рекламной статистике;
-                    реклама без товара и разница с учётом — в «Общих». «Итого» — по учёту.
+                    Реклама {{ report.adReconciliation|map(a => ad_labels[a.marketplace.value] ?? a.marketplace.displayName)|join(' и ') }}
+                    в колонках тегов — по рекламной статистике; реклама без товара и разница с учётом — в «Общих».
+                    «Итого» — по учёту.
                 </p>
             {% endif %}
 

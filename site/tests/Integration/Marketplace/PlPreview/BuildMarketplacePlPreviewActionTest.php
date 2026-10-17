@@ -11,6 +11,7 @@ use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListingTag;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Enum\PlPreviewCostStatus;
@@ -164,6 +165,25 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         $ads = $report->adReconciliation[0];
         self::assertSame(MarketplaceType::WILDBERRIES, $ads->marketplace);
         self::assertSame(['1000.00', '950.00', '900.00', '50.00', '50.00'], [$ads->ledger, $ads->statistics, $ads->onListings, $ads->unallocated, $ads->difference]);
+    }
+
+    public function testColumnsAddUpToLedgerWithStornoNullTypeAndStatisticsAboveLedger(): void
+    {
+        // Учёт: начисление 1000, сторно 100, начисление без типа 50 → −950. Статистика 1500 > учёта.
+        $this->fixture->addWbPromotion(true, '1000.00', [['100.00', MarketplaceCostOperationType::STORNO], ['50.00', null]]);
+        $this->adStatistics(['wbA' => '1200.00', 'wbB' => '300.00'], unallocated: '0.00');
+        // Чужая компания с той же категорией и большими суммами ничего не меняет.
+        $this->fixture->addWbPromotion(true, '99999.00', [], $this->fixture->foreign);
+
+        $report = $this->build([$this->winter->getId()]);
+        $cost = $this->values($report)['COST'];
+
+        // Логистика −190 + реклама по учёту −950.
+        self::assertSame(-1140.0, $cost['total']);
+        // Колонки без пересечения складываются в «Итого»: остаток учёт − статистика (+550) — в «Общих».
+        self::assertEqualsWithDelta($cost['total'], $cost['tag:'.$this->winter->getId()] + $cost['common'], 0.001);
+        self::assertSame(-1270.0, $cost['tag:'.$this->winter->getId()]);
+        self::assertSame(['950.00', '1500.00', '-550.00'], [$report->adReconciliation[0]->ledger, $report->adReconciliation[0]->statistics, $report->adReconciliation[0]->difference]);
     }
 
     public function testWithoutStatisticsWholeLedgerStaysCommon(): void

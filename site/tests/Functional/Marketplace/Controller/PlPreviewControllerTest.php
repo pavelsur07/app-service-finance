@@ -170,7 +170,8 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', self::URL);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('[data-testid="pl-preview-ads-note"]');
+        self::assertSelectorTextContains('[data-testid="pl-preview-ads-note"]', 'Реклама WB («Продвижение»)');
+        self::assertSelectorTextNotContains('[data-testid="pl-preview-ads-note"]', 'Ozon');
         $cells = $crawler->filter('[data-testid="pl-preview-ads"] tr[data-marketplace="wildberries"] td')->each(static fn ($td): string => str_replace("\u{00A0}", ' ', trim($td->text())));
         self::assertSame(['Wildberries', '1 000,00', '950,00', '900,00', '50,00', '50,00'], $cells);
 

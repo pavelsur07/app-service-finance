@@ -147,6 +147,61 @@ final class PlPreviewCalculatorTest extends TestCase
         self::assertSame(100.0, $this->value($result, 'REV_TOTAL', 'a'));
     }
 
+    public function testShareColumnsFollowTheTotalAndAddUpToIt(): void
+    {
+        // Расход: итог −300, доли −400 и +100 (доля «Общих» с остатком в обратную сторону).
+        $result = $this->calculator->calculate(
+            $this->company,
+            PlReportPeriod::forMonth(new \DateTimeImmutable('2026-01-01')),
+            [
+                new PlPreviewColumn('a', [$this->id('COGS') => '-400.00', $this->id('REV_WB') => '700.00']),
+                new PlPreviewColumn('b', [$this->id('COGS') => '100.00', $this->id('REV_WB') => '-50.00']),
+                new PlPreviewColumn('total', [$this->id('COGS') => '-300.00', $this->id('REV_WB') => '650.00']),
+            ],
+            'total',
+        );
+
+        self::assertSame(-300.0, $this->value($result, 'COGS', 'total'));
+        self::assertSame(-400.0, $this->value($result, 'COGS', 'a'));
+        self::assertSame(100.0, $this->value($result, 'COGS', 'b'));
+        self::assertSame(-50.0, $this->value($result, 'REV_WB', 'b'));
+        self::assertSame(
+            $this->value($result, 'MARGIN', 'total'),
+            $this->value($result, 'MARGIN', 'a') + $this->value($result, 'MARGIN', 'b'),
+        );
+    }
+
+    public function testStornoDominatedTotalStaysExpenseAndSharesStayLinear(): void
+    {
+        $result = $this->calculator->calculate(
+            $this->company,
+            PlReportPeriod::forMonth(new \DateTimeImmutable('2026-01-01')),
+            [
+                new PlPreviewColumn('a', [$this->id('COGS') => '80.00']),
+                new PlPreviewColumn('b', [$this->id('COGS') => '-30.00']),
+                new PlPreviewColumn('total', [$this->id('COGS') => '50.00']),
+            ],
+            'total',
+        );
+
+        // Регистр: итог +50 на статье расхода — расход 50; доли: −80 и +30.
+        self::assertSame(-50.0, $this->value($result, 'COGS', 'total'));
+        self::assertSame(-80.0, $this->value($result, 'COGS', 'a'));
+        self::assertSame(30.0, $this->value($result, 'COGS', 'b'));
+    }
+
+    public function testUnknownBaseColumnIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->calculator->calculate(
+            $this->company,
+            PlReportPeriod::forMonth(new \DateTimeImmutable('2026-01-01')),
+            [new PlPreviewColumn('a', [])],
+            'total',
+        );
+    }
+
     public function testRequiresAtLeastOneColumn(): void
     {
         $this->expectException(\InvalidArgumentException::class);

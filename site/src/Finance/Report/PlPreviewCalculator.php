@@ -34,11 +34,30 @@ final class PlPreviewCalculator
 
     /**
      * @param list<PlPreviewColumn> $columns
+     * @param string|null $natureBaseColumn колонка-итог: модуль и знак статьи берутся по её
+     *                                      сумме и одинаково применяются ко всем колонкам —
+     *                                      колонки-доли складываются в итог; null — каждая
+     *                                      колонка как отдельный документ
      */
-    public function calculate(Company $company, PlReportPeriod $period, array $columns): PlPreviewResult
+    public function calculate(Company $company, PlReportPeriod $period, array $columns, ?string $natureBaseColumn = null): PlPreviewResult
     {
         if ([] === $columns) {
             throw new \InvalidArgumentException('Предпросмотр ОПиУ требует хотя бы одну колонку.');
+        }
+
+        // Регистр берёт модуль итога статьи. Колонки-доли (теги, «Общие») не должны получать
+        // свой модуль: доля с обратным знаком к итогу превратилась бы в ещё один расход.
+        /** @var array<string, string>|null $baseAmounts */
+        $baseAmounts = null;
+        if (null !== $natureBaseColumn) {
+            foreach ($columns as $column) {
+                if ($column->key === $natureBaseColumn) {
+                    $baseAmounts = $column->amountsByCategoryId;
+                }
+            }
+            if (null === $baseAmounts) {
+                throw new \InvalidArgumentException(sprintf('Колонки-итога «%s» нет среди колонок.', $natureBaseColumn));
+            }
         }
 
         /** @var list<PLCategory> $categories */
@@ -77,7 +96,7 @@ final class PlPreviewCalculator
 
                 /** @var PLCategory $category */
                 $code = (string) $category->getCode();
-                $facts[$code] = ($facts[$code] ?? 0.0) + self::factValue($category, $amount);
+                $facts[$code] = ($facts[$code] ?? 0.0) + self::factValue($category, $amount, $baseAmounts[$categoryId] ?? null, null !== $baseAmounts);
             }
 
             $result = $this->calculator->withFacts(new InMemoryFactsProvider($facts))->calculate($company, $period);
@@ -119,14 +138,28 @@ final class PlPreviewCalculator
         };
     }
 
-    private static function factValue(PLCategory $category, string $signedAmount): float
+    /**
+     * Факт статьи: модуль суммы, знак — по природе статьи (как PLRegisterUpdater для marketplace_pl).
+     * С колонкой-итогом направление берётся по итогу и применяется к доле линейно: доли
+     * складываются в факт итога.
+     */
+    private static function factValue(PLCategory $category, string $signedAmount, ?string $baseAmount, bool $hasBase): float
     {
         $amount = (float) $signedAmount;
+        $nature = $category->nature();
+        if (null === $nature) {
+            return $amount;
+        }
 
-        return match ($category->nature()) {
-            PlNature::INCOME => abs($amount),
-            PlNature::EXPENSE => -abs($amount),
-            null => $amount,
-        };
+        $direction = PlNature::INCOME === $nature ? 1.0 : -1.0;
+        if (!$hasBase) {
+            return $direction * abs($amount);
+        }
+
+        // Итог 0 или статьи нет в итоге: знак самой доли — как для отдельного документа.
+        $base = (float) ($baseAmount ?? '0');
+        $baseSign = $base > 0.0 ? 1.0 : ($base < 0.0 ? -1.0 : ($amount < 0.0 ? -1.0 : 1.0));
+
+        return $direction * $baseSign * $amount;
     }
 }

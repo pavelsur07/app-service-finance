@@ -28,9 +28,4 @@ final class AdStatisticsCostCategories
     {
         return self::CODES[$marketplace->value] ?? null;
     }
-
-    public static function covers(MarketplaceType $marketplace, string $costCategoryCode): bool
-    {
-        return self::codeFor($marketplace) === $costCategoryCode;
-    }
 }
