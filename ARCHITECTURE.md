@@ -1232,7 +1232,27 @@ createDocumentFromCashTransaction(
 
 // Обновить PL-регистр за день документа (вызывать после flush в Action)
 updatePLRegisterForDocument(string $documentId): void
+
+// Предпросмотр ОПиУ без записи: дерево статей компании со значениями по колонкам, как если
+// бы суммы колонок провели документом marketplace_pl. Суммы — в знаке строк документа
+// (после is_negative). Пустой список или повтор ключа колонки — InvalidArgumentException.
+calculatePlPreview(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
+): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
 ```
+
+Предпросмотр (`Report\PlPreviewCalculator`) переводит сумму статьи в факт так же, как
+`PLRegisterUpdater` для `marketplace_pl`: суммы статьи складываются со знаком, от итога берётся
+модуль; flow INCOME → `+|S|`, EXPENSE → `−|S|`, без flow → `S`. Регистр берёт модуль в корзине
+«день документа × проект», предпросмотр — по колонке за весь период. Дерево считает тот же
+`PlReportCalculator` через `withFacts(InMemoryFactsProvider)` — регистр не читается. Сумма на
+статье, которой нет в компании, которая не `LEAF_INPUT` или без `code`, в отчёт ОПиУ не попадает
+(калькулятор берёт факты только у листьев по коду) и возвращается в `unplaced` с причиной
+`PlPreviewUnplacedReason` (`category_not_found` / `not_leaf_input` / `no_code`); название чужой
+статьи не раскрывается.
 
 Ручное удаление на странице «Документы ОПиУ» является мягким: `Document` получает
 `deleted_at`, `deleted_by` и `delete_reason`, а основные списки, отчёты и JSON-выгрузки
@@ -3869,6 +3889,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.07 | 2026-10-17 | Finance: `FinanceFacade::calculatePlPreview()` — дерево ОПиУ по колонкам без записи (`PlPreviewCalculator`, `InMemoryFactsProvider`, `PlReportCalculator::withFacts()`, DTO `PlPreview*`, enum `PlPreviewUnplacedReason`) |
 | 2.06 | 2026-10-17 | Marketplace: формулы сумм продаж и возвратов по `amount_source` вынесены в `MarketplacePlAmountSql` (этап 1 предпросмотра ОПиУ по тегам), поведение проведения не меняется |
 | 2.05 | 2026-10-16 | Finance: инвариант «справочники документа ОПиУ и операций — своей компании» (`DocumentForeignReferenceException`), перехват в создании документа из операции ДДС |
 | 2.04 | 2026-10-16 | Finance: вкладка «Операции» раздела «Документы ОПиУ» (`document_operation_index`, `DocumentOperationRepository::paginateForList()` и итог), фильтры «Статья» и «Сумма» на обеих вкладках, `DocumentListDTO::fromQuery()`, `DocumentPlContribution::forOperation()` |
