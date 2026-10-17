@@ -56,6 +56,9 @@ type pair struct {
 	successes   int
 	pausedUntil time.Time
 	bucket      *rate.Limiter
+
+	floorHits   []time.Time // 429, пришедшие уже на минимальной скорости
+	stormSentAt time.Time
 }
 
 func (p *pair) ceiling() float64 {
@@ -78,12 +81,36 @@ func (p *pair) setCurrent(v float64) bool {
 	return true
 }
 
+// Storm — шторм 429: скорость пары уже на минимуме, а Ozon продолжает
+// отказывать. Замедляться дальше некуда — нужен человек.
+type Storm struct {
+	ConnectionRef string
+	Endpoint      string
+	Hits          int           // 429 на минимуме за окно
+	Window        time.Duration // окно подсчёта
+	Floor         float64       // текущая (минимальная) скорость, запросов/с
+}
+
+// StormAlert — порог сигнала о шторме.
+type StormAlert struct {
+	Threshold int // столько 429 на минимуме за Window — сигнал
+	Window    time.Duration
+	Cooldown  time.Duration // не чаще раза на пару
+	Notify    func(Storm)
+}
+
+// DefaultStormAlert — 3 отказа на минимуме за час, сигнал не чаще раза в час.
+func DefaultStormAlert(notify func(Storm)) StormAlert {
+	return StormAlert{Threshold: 3, Window: time.Hour, Cooldown: time.Hour, Notify: notify}
+}
+
 // Registry — лимиты всех пар. Безопасен для параллельного использования.
 type Registry struct {
 	cfg      Config
 	now      func() time.Time
 	sleep    func(context.Context, time.Duration) error
 	onChange func(ref, endpoint string, rps float64)
+	storm    StormAlert
 
 	mu    sync.Mutex
 	pairs map[key]*pair
@@ -114,6 +141,12 @@ func (r *Registry) get(ref, endpoint string) *pair {
 	p.bucket = rate.NewLimiter(rate.Limit(p.current), 1)
 	r.pairs[k] = p
 	return p
+}
+
+// WithStormAlert включает сигнал о шторме 429 (вызывать до использования).
+func (r *Registry) WithStormAlert(a StormAlert) *Registry {
+	r.storm = a
+	return r
 }
 
 // Seed — состояние пары из хранилища при старте: override (0 — нет) и
@@ -195,6 +228,7 @@ func (r *Registry) Observe(ref, endpoint string, apiErr *ozon.APIError) {
 	p := r.get(ref, endpoint)
 	p.mu.Lock()
 	changed := false
+	var storm *Storm
 	switch {
 	case apiErr == nil:
 		p.successes++
@@ -204,7 +238,9 @@ func (r *Registry) Observe(ref, endpoint string, apiErr *ozon.APIError) {
 		}
 	case apiErr.Class == ozon.ClassRateLimit:
 		p.successes = 0
+		atFloor := p.current <= p.limit.Floor
 		changed = p.setCurrent(p.current / 2)
+		storm = r.trackStorm(p, ref, endpoint, atFloor)
 		pause := apiErr.RetryAfter
 		if pause <= 0 {
 			pause = p.limit.DefaultPause
@@ -221,6 +257,38 @@ func (r *Registry) Observe(ref, endpoint string, apiErr *ozon.APIError) {
 	if changed {
 		r.onChange(ref, endpoint, current)
 	}
+	if storm != nil {
+		r.storm.Notify(*storm)
+	}
+}
+
+// trackStorm учитывает 429 на минимальной скорости; возвращает сигнал, когда
+// их за окно набралось Threshold и с прошлого сигнала прошло Cooldown.
+// Вызывается под p.mu.
+func (r *Registry) trackStorm(p *pair, ref, endpoint string, atFloor bool) *Storm {
+	if r.storm.Notify == nil || r.storm.Threshold <= 0 {
+		return nil
+	}
+	if !atFloor {
+		p.floorHits = p.floorHits[:0]
+		return nil
+	}
+	now := r.now()
+	kept := p.floorHits[:0]
+	for _, at := range p.floorHits {
+		if now.Sub(at) < r.storm.Window {
+			kept = append(kept, at)
+		}
+	}
+	p.floorHits = append(kept, now)
+	if len(p.floorHits) < r.storm.Threshold {
+		return nil
+	}
+	if !p.stormSentAt.IsZero() && now.Sub(p.stormSentAt) < r.storm.Cooldown {
+		return nil
+	}
+	p.stormSentAt = now
+	return &Storm{ConnectionRef: ref, Endpoint: endpoint, Hits: len(p.floorHits), Window: r.storm.Window, Floor: p.current}
 }
 
 var _ ozon.Limiter = (*Registry)(nil)

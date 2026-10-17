@@ -57,6 +57,15 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 			}
 		}()
 	})
+	// Шторм 429: скорость кабинета на минимуме, а Ozon продолжает отказывать —
+	// одна ошибка в GlitchTip (не чаще раза в час на пару кабинет + метод).
+	limits.WithStormAlert(ratelimit.DefaultStormAlert(func(s ratelimit.Storm) {
+		logger.Error("ozon rate limit storm: cabinet at minimum rate and still throttled",
+			slog.String("stage", "ratelimit"), slog.String("error_class", "rate_limit_storm"),
+			slog.String("connection_ref", s.ConnectionRef), slog.String("endpoint", s.Endpoint),
+			slog.Int("rate_limits_at_floor", s.Hits), slog.Int("window_minutes", int(s.Window.Minutes())),
+			slog.Float64("rps", s.Floor))
+	}))
 	saved, err := tasks.LoadLimits(ctx)
 	if err != nil {
 		return nil, err
