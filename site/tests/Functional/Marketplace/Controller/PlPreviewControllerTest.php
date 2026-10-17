@@ -158,6 +158,39 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         self::assertContains(['Всего в данных маркетплейсов', 1130.0], $sheets['Сверка']);
     }
 
+    public function testAdsFromStatisticsOnScreenAndInXlsx(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 491);
+        $fixture->addWbPromotion(true, '1000.00');
+        $fixture->addWbAdStatistics(['wbA' => '600.00', 'wbB' => '300.00'], '50.00');
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $crawler = $client->request('GET', self::URL);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-testid="pl-preview-ads-note"]');
+        $cells = $crawler->filter('[data-testid="pl-preview-ads"] tr[data-marketplace="wildberries"] td')->each(static fn ($td): string => str_replace("\u{00A0}", ' ', trim($td->text())));
+        self::assertSame(['Wildberries', '1 000,00', '950,00', '900,00', '50,00', '50,00'], $cells);
+
+        $client->request('GET', '/marketplace/pl-preview/xlsx?dateFrom=2026-01-01&dateTo=2026-01-31');
+        self::assertContains(['Wildberries', 1000.0, 950.0, 900.0, 50.0, 50.0], $this->readXlsx($client->getInternalResponse()->getContent())['Сверка']);
+    }
+
+    public function testNoAdsBlockWithoutAdCategories(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 501);
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $client->request('GET', self::URL);
+
+        self::assertSelectorNotExists('[data-testid="pl-preview-ads"]');
+        self::assertSelectorNotExists('[data-testid="pl-preview-ads-note"]');
+    }
+
     public function testXlsxWithWrongPeriodRedirectsToTheTab(): void
     {
         $client = static::createClient();

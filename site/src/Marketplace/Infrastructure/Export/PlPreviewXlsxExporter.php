@@ -132,7 +132,7 @@ final readonly class PlPreviewXlsxExporter
         $sheet = $writer->getCurrentSheet();
         $sheet->setName('Сверка');
         $sheet->setColumnWidth(45, 1);
-        $sheet->setColumnWidth(18, 2);
+        $sheet->setColumnWidthForRange(18, 2, 6);
 
         $money = (new Style())->setFormat(self::MONEY_FORMAT);
         $byStatus = $report->costTotalsByStatus();
@@ -146,6 +146,22 @@ final readonly class PlPreviewXlsxExporter
             'Расхождение' => $report->costReconciliationDelta,
         ] as $label => $amount) {
             $writer->addRow(new Row([self::text($label), Cell::fromValue((float) $amount, $money)]));
+        }
+
+        if ([] !== $report->adReconciliation) {
+            $writer->addRow(Row::fromValues([]));
+            $writer->addRow(new Row([self::text('Реклама: учёт и статистика (в колонках тегов — по статистике)')], (new Style())->setFontBold()));
+            $writer->addRow($this->headerRow(['Маркетплейс', 'Учёт, ₽', 'Статистика, ₽', 'На товарах, ₽', 'Без товара, ₽', 'Расхождение, ₽']));
+            foreach ($report->adReconciliation as $ads) {
+                $writer->addRow(new Row([
+                    self::text($ads->marketplace->getDisplayName()),
+                    Cell::fromValue((float) $ads->ledger, $money),
+                    Cell::fromValue((float) $ads->statistics, $money),
+                    Cell::fromValue((float) $ads->onListings, $money),
+                    Cell::fromValue((float) $ads->unallocated, $money),
+                    Cell::fromValue((float) $ads->difference, $money),
+                ]));
+            }
         }
 
         if ([] !== $report->warnings) {

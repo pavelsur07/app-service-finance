@@ -20,12 +20,16 @@ use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Entity\AdDocument;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
+use App\Tests\Builders\MarketplaceAds\AdDocumentBuilder;
+use App\Tests\Builders\MarketplaceAds\AdDocumentLineBuilder;
+use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -60,7 +64,7 @@ final class PlPreviewFixture
     public MarketplaceCostCategory $unmappedCostCategory;
     public MarketplaceCostCategory $noRuleCostCategory;
 
-    public function __construct(private readonly EntityManagerInterface $em, int $seed)
+    public function __construct(private readonly EntityManagerInterface $em, private readonly int $seed)
     {
         $this->company = $this->company($seed, 'pl-preview');
         $this->owner = $this->lastOwner;
@@ -229,5 +233,54 @@ final class PlPreviewFixture
         $this->em->persist($realization);
 
         return $realization;
+    }
+
+    public function addWbPromotion(bool $includeInPl, string $ledger): void
+    {
+        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->company, MarketplaceType::WILDBERRIES);
+        $category->setName('WB Продвижение');
+        $category->setCode('wb_okazanie_uslug_wb_prodvizhenie');
+        $this->em->persist($category);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $this->company->getId(), $category, $this->costs->getId(), $includeInPl));
+        $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, MarketplaceType::WILDBERRIES, $category);
+        $cost->setAmount($ledger);
+        $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
+        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+        $this->em->persist($cost);
+        $this->em->flush();
+    }
+
+    /**
+     * @param array<string, string> $byListing имя листинга фикстуры → расход
+     */
+    public function addWbAdStatistics(array $byListing, string $unallocated): void
+    {
+        $raw = AdRawDocumentBuilder::aRawDocument()->withIndex($this->seed)->withCompanyId((string) $this->company->getId())->withMarketplace(MarketplaceType::WILDBERRIES)->build();
+        $this->em->persist($raw);
+        $index = 0;
+        foreach ($byListing as $name => $amount) {
+            $document = $this->adDocument(++$index, $amount, $raw->getId());
+            $listing = 'wbA' === $name ? $this->wbA : $this->wbB;
+            $this->em->persist(AdDocumentLineBuilder::aLine()->withIndex($this->seed * 10 + $index)->withAdDocument($document)->withListingId($listing->getId())->withCost($amount)->build());
+        }
+        if (0 !== bccomp($unallocated, '0', 2)) {
+            $this->adDocument(++$index, $unallocated, $raw->getId());
+        }
+        $this->em->flush();
+    }
+
+    private function adDocument(int $index, string $cost, string $rawId): AdDocument
+    {
+        $document = AdDocumentBuilder::aDocument()
+            ->withIndex($this->seed * 10 + $index)
+            ->withCompanyId((string) $this->company->getId())
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withReportDate(new \DateTimeImmutable('2026-01-15'))
+            ->withTotalCost($cost)
+            ->withAdRawDocumentId($rawId)
+            ->build();
+        $this->em->persist($document);
+
+        return $document;
     }
 }

@@ -10,11 +10,7 @@ use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Entity\MarketplaceConnection;
-use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceCostCategory;
-use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Entity\MarketplaceListingTag;
-use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Enum\PlPreviewCostStatus;
@@ -26,13 +22,9 @@ use App\Marketplace\Infrastructure\Query\PlPreviewFactsQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewSalesCoverageQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingTagRepository;
-use App\MarketplaceAds\Entity\AdDocument;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAds\Facade\PlPreviewAdSpendProvider;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
-use App\Tests\Builders\MarketplaceAds\AdDocumentBuilder;
-use App\Tests\Builders\MarketplaceAds\AdDocumentLineBuilder;
-use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -253,17 +245,7 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
 
     private function wbPromotion(bool $includeInPl, string $ledger): void
     {
-        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::WILDBERRIES);
-        $category->setName('WB Продвижение');
-        $category->setCode('wb_okazanie_uslug_wb_prodvizhenie');
-        $this->em->persist($category);
-        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), $this->companyId(), $category, $this->fixture->costs->getId(), $includeInPl));
-        $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::WILDBERRIES, $category);
-        $cost->setAmount($ledger);
-        $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
-        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
-        $this->em->persist($cost);
-        $this->em->flush();
+        $this->fixture->addWbPromotion($includeInPl, $ledger);
     }
 
     /**
@@ -271,33 +253,7 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
      */
     private function adStatistics(array $byListing, string $unallocated): void
     {
-        $raw = AdRawDocumentBuilder::aRawDocument()->withIndex(421)->withCompanyId($this->companyId())->withMarketplace(MarketplaceType::WILDBERRIES)->build();
-        $this->em->persist($raw);
-        $index = 0;
-        foreach ($byListing as $name => $amount) {
-            $document = $this->adDocument(++$index, $amount, $raw->getId());
-            $listing = 'wbA' === $name ? $this->fixture->wbA : $this->fixture->wbB;
-            $this->em->persist(AdDocumentLineBuilder::aLine()->withIndex(420 + $index)->withAdDocument($document)->withListingId($listing->getId())->withCost($amount)->build());
-        }
-        if (0 !== bccomp($unallocated, '0', 2)) {
-            $this->adDocument(++$index, $unallocated, $raw->getId());
-        }
-        $this->em->flush();
-    }
-
-    private function adDocument(int $index, string $cost, string $rawId): AdDocument
-    {
-        $document = AdDocumentBuilder::aDocument()
-            ->withIndex(420 + $index)
-            ->withCompanyId($this->companyId())
-            ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withReportDate(new \DateTimeImmutable('2026-01-15'))
-            ->withTotalCost($cost)
-            ->withAdRawDocumentId($rawId)
-            ->build();
-        $this->em->persist($document);
-
-        return $document;
+        $this->fixture->addWbAdStatistics($byListing, $unallocated);
     }
 
     /**

@@ -662,6 +662,7 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   а остаток «учёт − статистика по листингам» (статистика без товара + расхождение) — на статье без
   листинга, то есть в «Общих». «Итого» — учёт, как было. Сверка — `PlPreviewAdReconciliationDTO`
   (учёт, статистика, на товарах, без товара, расхождение) в `MarketplacePlPreviewReport::$adReconciliation`.
+  На экране — пометка над таблицей и блок «Реклама: учёт и статистика», в xlsx — раздел листа «Сверка».
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
   from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
   `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
