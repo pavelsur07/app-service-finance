@@ -8,10 +8,10 @@ import (
 
 // Limit — сохранённый лимит пары (кабинет, endpoint); 0 — не задано.
 type Limit struct {
-	ConnectionRef string
-	Endpoint      string
-	Override      float64
-	Current       float64
+	ConnectionRef string  `json:"-"`
+	Endpoint      string  `json:"endpoint"`
+	Override      float64 `json:"rps_override"`
+	Current       float64 `json:"rps_current"`
 }
 
 // LoadLimits — все сохранённые лимиты (для ratelimit.Registry.Seed при старте).

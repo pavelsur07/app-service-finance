@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/httpapi"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
@@ -74,27 +74,20 @@ func run() error {
 		slog.Info("ingestion disabled: SYMFONY_INTERNAL_BASE_URL is empty")
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
-	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
-		if pool == nil {
-			writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "disabled"})
-			return
-		}
-		pingCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := pool.Ping(pingCtx); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not ready", "db": "down"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "up"})
-	})
+	deps := httpapi.Deps{Token: cfg.InternalAuthToken, Now: time.Now, Logger: slog.Default(), Location: time.UTC}
+	if pool != nil {
+		deps.DBPing = pool.Ping
+	}
+	if ingestion != nil {
+		deps.CabinetsReady = ingestion.Cabinets.Ready
+		deps.S3Ping = ingestion.Raw.Ping
+		deps.Status = ingestion.Tasks.Status
+		deps.Location = ingestion.Location
+	}
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           mux,
+		Handler:           httpapi.New(deps),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -118,10 +111,4 @@ func run() error {
 	case err := <-errCh:
 		return err
 	}
-}
-
-func writeJSON(w http.ResponseWriter, code int, payload map[string]string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(payload)
 }

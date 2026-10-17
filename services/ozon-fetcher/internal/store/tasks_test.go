@@ -392,3 +392,50 @@ func TestAuthFailuresAreCountedPerCabinet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, n, "успех после смены ключа сбрасывает счётчик")
 }
+
+func TestStatusReport(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("ref-a", "ozon.finance.accrual-by-day", "2026-10-01", 5), // захватится первым → done
+		spec("ref-a", "ozon.finance.accrual-by-day", "2026-10-02", 0),
+		spec("ref-a", "ozon.finance.accrual-types", "ref", 3),         // вторым → rate_limit
+		spec("ref-a", "ozon.finance.accrual-by-day", "2026-07-31", 0), // вне окна
+		spec("ref-a", "ozon.finance.realization", "2026-08", 0),       // месяц начала окна — в окне
+		spec("ref-a", "ozon.finance.realization", "2026-07", 0),       // вне окна
+	}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+	task, err = claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", ErrorClass: "rate_limit", NextRunAt: t0}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.SaveCurrentRate(ctx, "ref-a", "/v1/finance/accrual/by-day", 0.5))
+	_, err = tasks.RecordAuthFailure(ctx, "ref-b", t0, func(int) time.Duration { return time.Hour })
+	require.NoError(t, err)
+	require.NoError(t, tasks.StopResource(ctx, "ozon.finance.mutual-settlement", "obsolete"))
+
+	report, err := tasks.Status(ctx, t0.Add(time.Minute), "2026-08-01")
+	require.NoError(t, err)
+
+	require.Len(t, report.Cabinets, 2)
+	a, b := report.Cabinets[0], report.Cabinets[1]
+	assert.Equal(t, "ref-a", a.ConnectionRef)
+	require.Len(t, a.Resources, 3)
+	byDay := a.Resources[0]
+	assert.Equal(t, []string{"2026-08"}, a.Resources[2].MissingPeriods, "отчёт за месяц начала окна считается")
+	assert.Equal(t, "ozon.finance.accrual-by-day", byDay.ResourceType)
+	assert.Equal(t, 3, byDay.ByStatus[StatusPending]+byDay.ByStatus[StatusDone])
+	assert.Equal(t, 1, byDay.MissingCount, "только незагруженные дни окна")
+	assert.Equal(t, []string{"2026-10-02"}, byDay.MissingPeriods)
+	assert.Equal(t, map[string]int{"done": 1, "rate_limit": 1}, a.Outcomes24h)
+	assert.Equal(t, []Limit{{ConnectionRef: "ref-a", Endpoint: "/v1/finance/accrual/by-day", Current: 0.5}}, a.Limits)
+
+	assert.Equal(t, "ref-b", b.ConnectionRef)
+	require.NotNil(t, b.SuspendedUntil)
+	assert.Equal(t, "auth", b.SuspendReason)
+	assert.Equal(t, 1, b.AuthFailures)
+	assert.Equal(t, []string{"ozon.finance.mutual-settlement"}, report.StoppedResources)
+}

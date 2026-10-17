@@ -26,6 +26,9 @@ import (
 // Ingestion — запущенная цепочка; Wait возвращается после остановки всех частей.
 type Ingestion struct {
 	Cabinets *connections.Cache
+	Tasks    *store.Tasks
+	Raw      *rawstore.Store
+	Location *time.Location
 	wg       sync.WaitGroup
 }
 
@@ -79,7 +82,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 		Owner:        fmt.Sprintf("%s:%d", hostname, os.Getpid()),
 	}, tasks, cabinets, exec, logger, now, nil)
 
-	ing := &Ingestion{Cabinets: cabinets}
+	ing := &Ingestion{Cabinets: cabinets, Tasks: tasks, Raw: raw, Location: loc}
 	for _, run := range []func(context.Context){
 		func(c context.Context) { cabinets.Run(c, cfg.ConnectionsPollInterval) },
 		scheduler.Run,

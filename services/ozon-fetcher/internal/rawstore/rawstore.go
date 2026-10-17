@@ -23,6 +23,23 @@ type Putter interface {
 	PutObject(ctx context.Context, in *s3.PutObjectInput, opts ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 }
 
+// BucketChecker — проверка доступности бакета для /ready.
+type BucketChecker interface {
+	HeadBucket(ctx context.Context, in *s3.HeadBucketInput, opts ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+}
+
+// Ping — бакет доступен (HeadBucket); для клиента без HeadBucket — nil.
+func (s *Store) Ping(ctx context.Context) error {
+	checker, ok := s.client.(BucketChecker)
+	if !ok {
+		return nil
+	}
+	if _, err := checker.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)}); err != nil {
+		return fmt.Errorf("rawstore: head bucket: %w", err)
+	}
+	return nil
+}
+
 // Object — страница ответа источника.
 type Object struct {
 	Provider      string // ozon
