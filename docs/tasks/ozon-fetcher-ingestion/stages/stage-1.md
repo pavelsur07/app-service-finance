@@ -1,4 +1,4 @@
-### Stage 1: авторизация `/internal/*` в Symfony — IN PROGRESS
+### Stage 1: авторизация `/internal/*` в Symfony — DONE
 
 **Risk:** HIGH-LOCAL (auth-код, новый firewall)
 **Stage base commit:** `fd17daeb9`
@@ -46,16 +46,53 @@
 - **1.6** — гейты по изменённым файлам, внутреннее ревью, внешнее ревью, коммит.
 
 #### Definition of Done / чек-лист готовности
-- [ ] без `Authorization` → 401 `internal_auth_required`
-- [ ] неверный токен → 401 `internal_auth_required`
-- [ ] верный токен, IP вне allowlist → 403 `internal_ip_forbidden`
-- [ ] пустой token или allowlist → 403 `internal_api_disabled` при любом запросе
-- [ ] верный токен + IP → `GET /internal/ping` 200 `{"status":"ok"}`
-- [ ] сравнение токена — `hash_equals`; токен не логируется
-- [ ] пользовательская сессия `main` не даёт доступа к `/internal/*`
-- [ ] nginx: `/internal/` с `X-Forwarded-For` → 404, без — проходит в PHP
-- [ ] `site/.env` — пустые значения, `.env.test` — тестовые
-- [ ] unit-тесты политики на все ветки, functional-тесты firewall
-- [ ] PHPStan и CS по изменённым файлам; baseline не растёт
-- [ ] `ARCHITECTURE.md` обновлён
-- [ ] внутреннее ревью: BLOCKER/IMPORTANT нет; внешнее ревью — green
+- [x] без `Authorization` → 401 `internal_auth_required`
+- [x] неверный токен → 401 `internal_auth_required`
+- [x] верный токен, IP вне allowlist → 403 `internal_ip_forbidden`
+- [x] пустой token или allowlist → 403 `internal_api_disabled` при любом запросе
+- [x] верный токен + IP → `GET /internal/ping` 200 `{"status":"ok"}`
+- [x] сравнение токена — `hash_equals`; токен не логируется
+- [x] пользовательская сессия `main` не даёт доступа к `/internal/*`
+- [x] nginx: `/internal/` с `X-Forwarded-For` → 404, без — проходит в PHP
+- [x] `site/.env` — пустые значения, `.env.test` — тестовые
+- [x] unit-тесты политики на все ветки, functional-тесты firewall
+- [x] PHPStan и CS по изменённым файлам; baseline не растёт
+- [x] `ARCHITECTURE.md` обновлён
+- [x] внутреннее ревью: BLOCKER/IMPORTANT нет; внешнее ревью — green
+
+#### What was done
+- 1.1 — `InternalAccessPolicy` (token ≥ 32, `hash_equals`, CIDR через
+  `IpUtils`), `InternalAccessDecision`, `InternalServicePrincipal`,
+  `InternalServiceAuthenticator`, firewall `internal_api` + access_control,
+  env пустые в `.env`.
+- 1.2 — `GET /internal/ping` в `App\Shared\Controller\Internal\`.
+- 1.3 — nginx-guard: проверен в контейнере nginx (без XFF → fastcgi, с XFF → 404,
+  `/login` с XFF не затронут).
+- 1.4 — тесты: unit политики (15 веток), functional firewall (6), инвариант
+  маршрутов `Controller\Internal` ⇔ `/internal/`, `CommittedEnvTest` — токен в
+  `.env` пустой, `InternalApiPrivacySubscriberTest`.
+- **Находка по ходу:** `AuditContextProvider::getCompanyId()` отправлял любой
+  principal кроме `ApiPrincipal` в `ActiveCompanyService` → 500 на каждом
+  `/internal/*`. Теперь для не-`User` — `null`. Регрессия:
+  `InternalPingControllerTest::testServiceWithTokenFromAllowedNetworkGetsPong`
+  (красный до правки — 500, зелёный после).
+- **Находка по ходу:** модульный гейт закрывает неклассифицированные
+  контроллеры → `App\Shared\Controller\Internal\` в `EXEMPT_PREFIXES`;
+  обход гейта закрыт инвариантом маршрутов.
+- 1.5 — `ARCHITECTURE.md`: раздел «Внутренний API `/internal/*`», Changelog 2.17.
+
+#### Checks
+- targeted: Internal (unit+functional), ExternalAuthenticationTest, Sentry
+  scope, StatelessCompanyContext, ModuleAccessMap/ControllerAccessCoverage/
+  ModuleWriteGateCoverage/ModuleMixedRouteGate, CommittedEnvTest — OK
+- PHPStan по изменённым файлам — OK; php-cs-fixer (`.php-cs-fixer.php`, без кеша) — OK
+
+#### Internal review
+- iterations: 1; IMPORTANT fixed: обход модульного гейта (инвариант маршрутов)
+
+#### External review
+- round 1 (Codex, medium): IMPORTANT — токен в Symfony profiler (dev) →
+  `InternalApiPrivacySubscriber` + тест; **fixed without re-run** (§7.2)
+
+#### Next
+- Stage 2 автоматически
