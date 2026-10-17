@@ -210,6 +210,8 @@ func TestExpiredLeaseIsReleasedWithCursor(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "cursor-1", next.Cursor)
 	assert.Equal(t, 2, next.NextPageNo)
+	assert.Equal(t, []string{hash("p")}, next.PageHashes, "хеши страниц прежней попытки сохранены")
+	assert.Equal(t, "lease_expired", next.LastErrorClass)
 	assert.Equal(t, 2, next.Attempts)
 
 	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone}, t0)
@@ -294,6 +296,7 @@ func TestFinishTaskNotDoneKeepsOrResetsCursor(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, third.Cursor, "без KeepCursor загрузка дня начинается заново")
 	assert.Equal(t, 1, third.NextPageNo)
+	assert.Empty(t, third.PageHashes)
 }
 
 func TestLimitsRoundTrip(t *testing.T) {

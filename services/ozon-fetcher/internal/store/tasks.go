@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -45,13 +46,15 @@ type TaskSpec struct {
 // Task — захваченная задача.
 type Task struct {
 	TaskKey
-	AttemptID   string
-	Attempts    int
-	Cursor      string
-	NextPageNo  int
-	ContentHash string
-	Revision    int
-	LeaseUntil  time.Time
+	AttemptID      string
+	Attempts       int
+	Cursor         string
+	NextPageNo     int
+	PageHashes     []string // sha256 страниц текущей загрузки, включая прежние попытки
+	ContentHash    string
+	Revision       int
+	LastErrorClass string
+	LeaseUntil     time.Time
 }
 
 // Tasks — очередь fetch_task.
@@ -104,9 +107,11 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var task Task
+	var pageHashes string
 	err = tx.QueryRow(ctx, `
 		SELECT t.connection_ref, t.resource_type, t.period_key, t.attempts,
-		       COALESCE(t.cursor, ''), t.next_page_no, COALESCE(t.content_hash, ''), t.revision
+		       COALESCE(t.cursor, ''), t.next_page_no, t.page_hashes, COALESCE(t.content_hash, ''), t.revision,
+		       COALESCE(t.last_error_class, '')
 		FROM fetch_task t
 		LEFT JOIN connection_state cs ON cs.connection_ref = t.connection_ref
 		WHERE t.status IN ('pending', 'not_ready', 'failed_retryable')
@@ -120,7 +125,7 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 		FOR UPDATE OF t SKIP LOCKED`,
 		connectionRefs, now,
 	).Scan(&task.ConnectionRef, &task.ResourceType, &task.PeriodKey, &task.Attempts,
-		&task.Cursor, &task.NextPageNo, &task.ContentHash, &task.Revision)
+		&task.Cursor, &task.NextPageNo, &pageHashes, &task.ContentHash, &task.Revision, &task.LastErrorClass)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Task{}, ErrNoTask
 	}
@@ -128,6 +133,9 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 		return Task{}, fmt.Errorf("store: claim select: %w", err)
 	}
 
+	if pageHashes != "" {
+		task.PageHashes = strings.Split(pageHashes, ",")
+	}
 	task.AttemptID = attemptID
 	task.Attempts++
 	task.LeaseUntil = now.Add(lease)
@@ -200,9 +208,10 @@ func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, o
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	tag, err := tx.Exec(ctx, `
-		UPDATE fetch_task SET cursor = NULLIF($5, ''), next_page_no = $6, updated_at = now()
+		UPDATE fetch_task SET cursor = NULLIF($5, ''), next_page_no = $6,
+			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END, updated_at = now()
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4`,
-		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, nextCursor, obj.PageNo+1)
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, nextCursor, obj.PageNo+1, obj.SHA256)
 	if err != nil {
 		return fmt.Errorf("store: record page cursor: %w", err)
 	}
@@ -255,6 +264,7 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 			next_run_at  = CASE WHEN $5 = 'done' THEN next_run_at ELSE $6 END,
 			cursor       = CASE WHEN $7 THEN cursor ELSE NULL END,
 			next_page_no = CASE WHEN $7 THEN next_page_no ELSE 1 END,
+			page_hashes  = CASE WHEN $7 THEN page_hashes ELSE '' END,
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,

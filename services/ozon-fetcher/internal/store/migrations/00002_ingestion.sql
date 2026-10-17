@@ -17,6 +17,7 @@ CREATE TABLE fetch_task (
     attempt_id       UUID,                 -- текущая попытка (running)
     cursor           TEXT,                 -- курсор следующей страницы
     next_page_no     INTEGER     NOT NULL DEFAULT 1,
+    page_hashes      TEXT        NOT NULL DEFAULT '', -- sha256 страниц текущей загрузки через запятую
     content_hash     CHAR(64),             -- sha256 последней успешной загрузки
     revision         INTEGER     NOT NULL DEFAULT 0,
     last_error_class TEXT,

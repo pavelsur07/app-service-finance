@@ -173,7 +173,7 @@ func TestPutAgainstS3(t *testing.T) {
 	if endpoint == "" {
 		t.Skip("TEST_S3_ENDPOINT is not set")
 	}
-	client := NewS3Client(endpoint, "us-east-1", os.Getenv("TEST_S3_ACCESS_KEY"), os.Getenv("TEST_S3_SECRET_KEY"))
+	client := NewS3Client(endpoint, "us-east-1", envOr("TEST_S3_ACCESS_KEY", "test"), envOr("TEST_S3_SECRET_KEY", "test"))
 	bucket := os.Getenv("TEST_S3_BUCKET")
 	ctx := context.Background()
 	_, _ = client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(bucket)})
@@ -194,4 +194,12 @@ func TestPutAgainstS3(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, string(obj.Body), string(gunzip(t, raw)))
 	assert.Equal(t, stored.SHA256, got.Metadata["sha256"])
+}
+
+// envOr — локальный S3 (seaweedfs) принимает любые ключи.
+func envOr(name, fallback string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return fallback
 }
