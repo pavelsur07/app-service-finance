@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,16 +11,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
 )
 
 // Интеграционные тесты: TEST_DB_DSN — отдельная пустая БД; каждый тест
 // начинает с чистых таблиц. Без переменной — пропуск.
 func testTasks(t *testing.T) *Tasks {
 	t.Helper()
-	dsn := os.Getenv("TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DB_DSN is not set")
-	}
+	dsn := storetest.DSN(t, "store")
 	ctx := context.Background()
 	require.NoError(t, Migrate(ctx, dsn))
 	pool, err := Open(ctx, dsn, PoolSize(4))

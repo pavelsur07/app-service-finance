@@ -1,22 +1,28 @@
 ## Current checkpoint
 
-**Phase:** Stage 1
-**Status:** Stage 0 done; Stage 1 — планирование
-**Stage base commit:** 62c34c1f5 (Stage 0)
-**Branch:** docs/ozon-fetcher-ingestion-stage0
+**Phase:** Stage 10 — внешнее ревью; затем handoff PR-группы 4 (этапы 7–10)
+**Status:** Stage 0–9 done; Stage 10 — код, тесты, коммит `53f8f65b9`, ревью идёт
+**Branches / PR:**
+- #2706 `docs/ozon-fetcher-ingestion-stage0` — этап 0
+- #2707 `feat/ozon-fetcher-internal-api` — этапы 1–2 (база #2706)
+- #2708 `feat/ozon-fetcher-client` — этапы 3–6 (база #2707)
+- `feat/ozon-fetcher-store` — этапы 7–10, PR ещё не открыт (база — #2708)
 
 ### Completed
-- Stage 0 — документы и сверка API Ozon (`stages/stage-0.md`)
+- Stage 0–9 — отчёты в `stages/`
 
 ### Checks and baseline
-- Stage 0 docs-only; гейты кода не затрагивались
+- PR-группа 2: полный PHPStan OK, cs/strict OK, unit 3830, полный phpunit 6612 OK
+- Go (этапы 3–10): vet, golangci-lint 0 issues, `-race` по пакетам OK, интеграция (PostgreSQL + S3) OK
 
 ### Review status
-- internal: Stage 0 — 1 итерация, open: none; external: не требуется (LOW)
+- Stage 1, 5, 7, 9, группа 3: IMPORTANT исправлены, fixed without re-run; Stage 2: REVIEW_GREEN
 
 ### Exact next action
-- Stage 1: план и чек-лист в `stages/stage-1.md`, baseline site-гейтов по затрагиваемым файлам
+- прочитать `er10/review.txt` → исправить → отчёт этапа 10 → push `feat/ozon-fetcher-store` + PR (база #2708)
+- затем Stage 11 (планировщики + wiring `cmd/main.go`), 12, 13
 
-### Files to inspect first on resume
-- `docs/tasks/ozon-fetcher-ingestion/plan.md`
-- `docs/tasks/ozon-fetcher-ingestion/stages/stage-0.md`
+### Окружение (dev-машина)
+- тестовые контейнеры: `asf9-pg` (БД `app_test`, `ozon_fetcher_test`), `asf9-redis`, `asf9-s3` (seaweedfs в tmpfs) в сети `asf9-net`; удалить после handoff: `docker rm -f -v asf9-s3 asf9-pg asf9-redis; docker network rm asf9-net`
+- Go-тесты: контейнер с `--memory=1200m`, `GOMAXPROCS=2`, `-p=1`, по одному пакету — без этого exit 137 (OOM) при сборке AWS SDK с `-race`
+- никогда не запускать Go-тесты параллельно с PHP-гейтами

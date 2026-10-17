@@ -162,13 +162,22 @@ func runUntil(t *testing.T, d *Dispatcher, cond func() bool) {
 		d.Run(ctx)
 		close(done)
 	}()
-	require.Eventually(t, cond, 5*time.Second, time.Millisecond)
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Run did not return after cancel")
+	stopped := false
+	stop := func() {
+		if stopped {
+			return
+		}
+		stopped = true
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("Run did not return after cancel")
+		}
 	}
+	t.Cleanup(stop) // и при FailNow в Eventually
+	require.Eventually(t, cond, 5*time.Second, time.Millisecond)
+	stop()
 }
 
 func TestParallelismIsCappedAndCabinetsNeverOverlap(t *testing.T) {
@@ -262,6 +271,10 @@ func TestShutdownWaitsForWorkers(t *testing.T) {
 		d.Run(ctx)
 		close(done)
 	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
 	require.Eventually(t, func() bool { return q.remaining() == 0 }, time.Second, time.Millisecond)
 
 	cancel()

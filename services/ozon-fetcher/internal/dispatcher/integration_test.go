@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
 )
 
 // storeRunner завершает задачу в настоящей БД и следит, чтобы кабинет не вёлся дважды.
@@ -57,15 +57,12 @@ func (r *storeRunner) Run(ctx context.Context, task store.Task, _ connections.Ca
 }
 
 func TestTwoDispatchersOnOneDatabase(t *testing.T) {
-	dsn := os.Getenv("TEST_DB_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DB_DSN is not set")
-	}
+	dsn := storetest.DSN(t, "dispatcher")
 	ctx := context.Background()
 	require.NoError(t, store.Migrate(ctx, dsn))
 	pool, err := store.Open(ctx, dsn, store.PoolSize(4))
 	require.NoError(t, err)
-	defer pool.Close()
+	t.Cleanup(pool.Close) // Cleanup — LIFO: пул закроется после остановки диспетчеров
 	_, err = pool.Exec(ctx, `TRUNCATE raw_object, fetch_attempt, fetch_task, connection_state, connection_limit, resource_stop`)
 	require.NoError(t, err)
 	tasks := store.NewTasks(pool)
@@ -86,6 +83,12 @@ func TestTwoDispatchersOnOneDatabase(t *testing.T) {
 
 	runCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
+	// Остановка — до закрытия пула (defer pool.Close выше выполнится позже) и при FailNow.
+	stop := func() {
+		cancel()
+		wg.Wait()
+	}
+	t.Cleanup(stop)
 	for i := range 2 {
 		wg.Add(1)
 		c := cfg
@@ -102,8 +105,7 @@ func TestTwoDispatchersOnOneDatabase(t *testing.T) {
 		defer runner.mu.Unlock()
 		return runner.finished == 12
 	}, 10*time.Second, 5*time.Millisecond)
-	cancel()
-	wg.Wait()
+	stop()
 
 	assert.Empty(t, runner.violated, "кабинет ни разу не вёлся двумя воркерами")
 	var notDone, running int

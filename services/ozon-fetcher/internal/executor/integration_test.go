@@ -20,15 +20,17 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
 )
 
 // Интеграция: настоящие postgres (TEST_DB_DSN) и S3 (TEST_S3_ENDPOINT,
 // TEST_S3_BUCKET), Ozon — httptest. Без переменных — пропуск.
 func TestByDayFailureMidPaginationResumesWithoutDuplicates(t *testing.T) {
-	dsn, endpoint, bucket := os.Getenv("TEST_DB_DSN"), os.Getenv("TEST_S3_ENDPOINT"), os.Getenv("TEST_S3_BUCKET")
-	if dsn == "" || endpoint == "" || bucket == "" {
-		t.Skip("TEST_DB_DSN / TEST_S3_ENDPOINT / TEST_S3_BUCKET are not set")
+	endpoint, bucket := os.Getenv("TEST_S3_ENDPOINT"), os.Getenv("TEST_S3_BUCKET")
+	if endpoint == "" || bucket == "" {
+		t.Skip("TEST_S3_ENDPOINT / TEST_S3_BUCKET are not set")
 	}
+	dsn := storetest.DSN(t, "executor")
 	ctx := context.Background()
 	require.NoError(t, store.Migrate(ctx, dsn))
 	pool, err := store.Open(ctx, dsn, store.PoolSize(4))

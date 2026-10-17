@@ -1,4 +1,4 @@
-### Stage 10: параллельная обработка кабинетов — IN PROGRESS
+### Stage 10: параллельная обработка кабинетов — DONE
 
 **Risk:** HIGH-LOCAL (конкурентность)
 **Stage base commit:** `3ae814a11`
@@ -53,4 +53,29 @@
 - [x] нет утечки горутин (`goleak`)
 - [x] пул БД рассчитан на N воркеров
 - [x] `go vet`, `golangci-lint`, `go test -race` (+ интеграция) зелёные
-- [ ] внутреннее ревью: BLOCKER/IMPORTANT нет; внешнее ревью — green
+- [x] внутреннее ревью: BLOCKER/IMPORTANT нет; внешнее ревью — green
+
+#### What was done
+- 10.1 — `MAX_PARALLEL_CONNECTIONS` (по умолчанию 4, 1…64), `store.PoolSize`,
+  `store.Open(ctx, dsn, maxConns)`.
+- 10.2 — `Dispatcher.Run`: слоты, захват по активному снимку, пробуждение при
+  освобождении слота, фоновый `ReleaseExpired`, shutdown ждёт воркеров;
+  `NewUUID` (v4, `crypto/rand`).
+- 10.3 — unit-тесты на фейках (`goleak`): потолок параллельности,
+  непересечение кабинетов, медленный кабинет, ожидание снимка, ошибки
+  захвата, только активные кабинеты, shutdown, фоновое освобождение.
+- 10.4 — интеграционный тест: два диспетчера на одной БД, 3 кабинета × 4 дня.
+
+#### Checks
+- `go vet`, `golangci-lint`, `go test -race` по пакетам (+ интеграция) — OK;
+  пакеты с БД параллельно (`-p 3`, ×3) — OK
+
+#### External review
+- round 1 (Codex, medium): IMPORTANT — пакеты с `TEST_DB_DSN` делили таблицы
+  и при параллельном `go test ./...` стирали данные друг друга (касалось и
+  `store`/`executor`) → `storetest.DSN`: своя схема на пакет через
+  `search_path`; MINOR — остановка диспетчеров в тестах перенесена в
+  `t.Cleanup` (срабатывает и при `FailNow`). **Fixed without re-run** (§7.2)
+
+#### Next
+- handoff PR-группы 4 (этапы 7–10), затем Stage 11
