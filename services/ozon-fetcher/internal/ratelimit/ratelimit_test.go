@@ -264,3 +264,109 @@ func TestDefaultConfigMatchesApiDoc(t *testing.T) {
 		assert.Positive(t, l.DefaultPause, endpoint)
 	}
 }
+
+type storms struct {
+	mu   sync.Mutex
+	list []Storm
+}
+
+func (s *storms) notify(st Storm) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.list = append(s.list, st)
+}
+
+func stormRegistry() (*Registry, *fakeClock, *storms) {
+	r, clock, _ := newRegistry()
+	st := &storms{}
+	r.WithStormAlert(DefaultStormAlert(st.notify))
+	return r, clock, st
+}
+
+// toFloor — довести пару до минимальной скорости (1 → 0.5 → 0.25 → 0.125 → 0.1).
+func toFloor(r *Registry, ref string) {
+	for range 4 {
+		r.Observe(ref, ep, rateLimited(0))
+	}
+}
+
+func TestStormIsSignalledOnThirdRateLimitAtFloor(t *testing.T) {
+	r, clock, st := stormRegistry()
+	toFloor(r, refA)
+	require.InDelta(t, 0.1, r.Rate(refA, ep), 1e-9)
+	assert.Empty(t, st.list, "пока скорость снижается — не шторм")
+
+	r.Observe(refA, ep, rateLimited(0))
+	_ = clock.Sleep(context.Background(), 10*time.Minute)
+	r.Observe(refA, ep, rateLimited(0))
+	assert.Empty(t, st.list, "два отказа на минимуме — ниже порога")
+
+	r.Observe(refA, ep, rateLimited(0))
+	require.Len(t, st.list, 1)
+	assert.Equal(t, Storm{ConnectionRef: refA, Endpoint: ep, Hits: 3, Window: time.Hour, Floor: 0.1}, st.list[0])
+}
+
+func TestStormSignalIsRateLimitedPerPair(t *testing.T) {
+	r, clock, st := stormRegistry()
+	toFloor(r, refA)
+	for range 10 {
+		r.Observe(refA, ep, rateLimited(0))
+	}
+	assert.Len(t, st.list, 1, "не чаще раза в Cooldown")
+
+	_ = clock.Sleep(context.Background(), time.Hour)
+	for range 3 {
+		r.Observe(refA, ep, rateLimited(0))
+	}
+	assert.Len(t, st.list, 2, "через час — снова")
+}
+
+func TestOldFloorHitsExpireOutOfWindow(t *testing.T) {
+	r, clock, st := stormRegistry()
+	toFloor(r, refA)
+	r.Observe(refA, ep, rateLimited(0))
+	r.Observe(refA, ep, rateLimited(0))
+	_ = clock.Sleep(context.Background(), 2*time.Hour)
+	r.Observe(refA, ep, rateLimited(0))
+	assert.Empty(t, st.list, "отказы за пределами окна не считаются")
+}
+
+func TestRecoveryResetsStormCounter(t *testing.T) {
+	r, _, st := stormRegistry()
+	toFloor(r, refA)
+	r.Observe(refA, ep, rateLimited(0))
+	r.Observe(refA, ep, rateLimited(0))
+	for range 3 {
+		r.Observe(refA, ep, nil) // рост: 0.1 → 0.6
+	}
+	r.Observe(refA, ep, rateLimited(0)) // уже не на минимуме — счётчик сброшен
+	for r.Rate(refA, ep) > 0.1 {
+		r.Observe(refA, ep, rateLimited(0)) // снова вниз, без отказов на минимуме
+	}
+	r.Observe(refA, ep, rateLimited(0))
+	r.Observe(refA, ep, rateLimited(0))
+	assert.Empty(t, st.list, "после восстановления считаются только новые отказы на минимуме")
+	r.Observe(refA, ep, rateLimited(0))
+	assert.Len(t, st.list, 1)
+}
+
+func TestStormIsIsolatedPerCabinetAndEndpoint(t *testing.T) {
+	r, _, st := stormRegistry()
+	toFloor(r, refA)
+	for range 3 {
+		r.Observe(refA, ep, rateLimited(0))
+	}
+	toFloor(r, refB)
+	r.Observe(refB, ep, rateLimited(0))
+	require.Len(t, st.list, 1)
+	assert.Equal(t, refA, st.list[0].ConnectionRef)
+}
+
+func TestNoStormAlertConfiguredIsSilent(t *testing.T) {
+	r, _, _ := newRegistry()
+	toFloor(r, refA)
+	for range 10 {
+		r.Observe(refA, ep, rateLimited(0))
+	}
+	assert.InDelta(t, 0.1, r.Rate(refA, ep), 1e-9)
+}
