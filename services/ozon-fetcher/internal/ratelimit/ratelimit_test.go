@@ -257,7 +257,7 @@ func TestConcurrentUseIsRaceFree(t *testing.T) {
 
 func TestDefaultConfigMatchesApiDoc(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Equal(t, EndpointLimit{Start: 1, Floor: 0.1, Ceiling: 5, DefaultPause: 10 * time.Second}, cfg.Endpoints[ozon.EndpointAccrualByDay])
+	assert.Equal(t, EndpointLimit{Start: 0.3, Floor: 0.05, Ceiling: 2, DefaultPause: 10 * time.Second}, cfg.Endpoints[ozon.EndpointAccrualByDay])
 	for endpoint, l := range cfg.Endpoints {
 		assert.LessOrEqual(t, l.Floor, l.Start, endpoint)
 		assert.LessOrEqual(t, l.Start, l.Ceiling, endpoint)

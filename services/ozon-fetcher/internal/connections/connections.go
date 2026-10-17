@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -184,10 +185,27 @@ type Cache struct {
 	ready       bool
 	lastAttempt time.Time
 	refreshMu   sync.Mutex
+	allow       map[string]bool // пусто — все кабинеты
 }
 
 func NewCache(source Fetcher, logger *slog.Logger, now func() time.Time) *Cache {
 	return &Cache{source: source, logger: logger, now: now, byRef: map[string]Cabinet{}}
+}
+
+// WithAllowlist — грузить только кабинеты, чей connection_ref или company_id
+// в списке (поэтапное включение на проде); пустой список — все.
+func (c *Cache) WithAllowlist(ids []string) *Cache {
+	c.allow = map[string]bool{}
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			c.allow[id] = true
+		}
+	}
+	return c
+}
+
+func (c *Cache) allowed(cab Cabinet) bool {
+	return len(c.allow) == 0 || c.allow[cab.Ref] || c.allow[cab.CompanyID]
 }
 
 // Ready — есть хотя бы один успешный снимок.
@@ -249,6 +267,13 @@ func (c *Cache) refreshLocked(ctx context.Context) error {
 		return err
 	}
 
+	kept := cabinets[:0:0]
+	for _, cab := range cabinets {
+		if c.allowed(cab) {
+			kept = append(kept, cab)
+		}
+	}
+	cabinets = kept
 	byRef := make(map[string]Cabinet, len(cabinets))
 	for _, cab := range cabinets {
 		byRef[cab.Ref] = cab

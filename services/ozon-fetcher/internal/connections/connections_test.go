@@ -281,3 +281,26 @@ func TestCabinetCredentialsAreNotLogged(t *testing.T) {
 type fetcherFunc func(context.Context) ([]Cabinet, []string, error)
 
 func (f fetcherFunc) Fetch(ctx context.Context) ([]Cabinet, []string, error) { return f(ctx) }
+
+func TestAllowlistKeepsOnlyListedCabinets(t *testing.T) {
+	cabinets, _, err := parse([]byte(validSnapshot))
+	require.NoError(t, err)
+	for name, allow := range map[string][]string{
+		"by connection_ref": {"ref-a"},
+		"by company_id":     {" company-a ", ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache, _, _ := newCache(&scriptedFetcher{results: []fetchResult{{cabinets: cabinets}}})
+			require.NoError(t, cache.WithAllowlist(allow).Refresh(context.Background()))
+			list := cache.List()
+			require.Len(t, list, 1)
+			assert.Equal(t, "ref-a", list[0].Ref)
+			_, ok := cache.Get("ref-b")
+			assert.False(t, ok)
+		})
+	}
+
+	cache, _, _ := newCache(&scriptedFetcher{results: []fetchResult{{cabinets: cabinets}}})
+	require.NoError(t, cache.WithAllowlist(nil).Refresh(context.Background()))
+	assert.Len(t, cache.List(), 2, "пустой список — все кабинеты")
+}

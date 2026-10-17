@@ -1,6 +1,7 @@
 package ozon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -251,7 +252,13 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 	}
 
 	c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, "ok")
-	return Page{No: 1, Body: raw, ContentType: resp.Header.Get("Content-Type")}, nil
+	contentType := resp.Header.Get("Content-Type")
+	// Ozon отдаёт отчёт как application/octet-stream (замер 17.10.2026);
+	// отчёт взаиморасчётов — XLSX, узнаём по сигнатуре zip.
+	if !strings.Contains(contentType, "spreadsheetml") && bytes.HasPrefix(raw, []byte("PK\x03\x04")) {
+		contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	}
+	return Page{No: 1, Body: raw, ContentType: contentType}, nil
 }
 
 // withoutURL убирает из ошибки транспорта адрес запроса: pre-signed ссылка

@@ -6,13 +6,19 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
 // MinInternalTokenLength — как InternalAccessPolicy::MIN_TOKEN_LENGTH в Symfony.
 const MinInternalTokenLength = 32
 
-const defaultPollInterval = 5 * time.Minute
+const (
+	defaultPollInterval = 5 * time.Minute
+	defaultMaxParallel  = 4
+	maxMaxParallel      = 64
+)
 
 type Config struct {
 	ListenAddr string
@@ -22,6 +28,25 @@ type Config struct {
 	SymfonyBaseURL          string
 	InternalAuthToken       string
 	ConnectionsPollInterval time.Duration
+	// MaxParallelConnections — сколько кабинетов загружается одновременно.
+	MaxParallelConnections int
+	// ConnectionAllowlist — только эти кабинеты (connection_ref или company_id); пусто — все.
+	ConnectionAllowlist []string
+
+	// OzonBaseURL — Seller API (на стенде — мок).
+	OzonBaseURL string
+	// Планировщик (stage-11.md).
+	TailDays         int
+	ReconcileWeekday time.Weekday
+	FinalDay         int
+	PlanEvery        time.Duration
+
+	// S3Bucket пуст — запись raw выключена (режим scaffold).
+	S3Endpoint        string
+	S3Region          string
+	S3Bucket          string
+	S3AccessKeyID     string
+	S3SecretAccessKey string
 }
 
 func Load() (Config, error) {
@@ -31,6 +56,17 @@ func Load() (Config, error) {
 		SymfonyBaseURL:          os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
 		InternalAuthToken:       os.Getenv("INTERNAL_AUTH_TOKEN"),
 		ConnectionsPollInterval: defaultPollInterval,
+		MaxParallelConnections:  defaultMaxParallel,
+		OzonBaseURL:             envOr("OZON_BASE_URL", "https://api-seller.ozon.ru"),
+		TailDays:                3,
+		ReconcileWeekday:        time.Monday,
+		FinalDay:                10,
+		PlanEvery:               time.Hour,
+		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
+		S3Region:                os.Getenv("S3_REGION"),
+		S3Bucket:                os.Getenv("S3_BUCKET"),
+		S3AccessKeyID:           os.Getenv("S3_ACCESS_KEY_ID"),
+		S3SecretAccessKey:       os.Getenv("S3_SECRET_ACCESS_KEY"),
 	}
 	if cfg.ListenAddr == "" {
 		cfg.ListenAddr = ":8080"
@@ -44,6 +80,27 @@ func Load() (Config, error) {
 		cfg.ConnectionsPollInterval = d
 	}
 
+	if raw := os.Getenv("MAX_PARALLEL_CONNECTIONS"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > maxMaxParallel {
+			return Config{}, fmt.Errorf("config: MAX_PARALLEL_CONNECTIONS must be 1..%d, got %q", maxMaxParallel, raw)
+		}
+		cfg.MaxParallelConnections = n
+	}
+
+	for _, id := range strings.Split(os.Getenv("CONNECTION_ALLOWLIST"), ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			cfg.ConnectionAllowlist = append(cfg.ConnectionAllowlist, id)
+		}
+	}
+
+	if err := loadPlanner(&cfg); err != nil {
+		return Config{}, err
+	}
+	if u, err := url.Parse(cfg.OzonBaseURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return Config{}, errors.New("config: OZON_BASE_URL must be an http(s) URL")
+	}
+
 	if cfg.SymfonyBaseURL != "" {
 		u, err := url.Parse(cfg.SymfonyBaseURL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
@@ -53,5 +110,65 @@ func Load() (Config, error) {
 			return Config{}, errors.New("config: INTERNAL_AUTH_TOKEN is required (at least 32 characters) with SYMFONY_INTERNAL_BASE_URL")
 		}
 	}
+	if cfg.S3Bucket != "" {
+		u, err := url.Parse(cfg.S3Endpoint)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return Config{}, errors.New("config: S3_ENDPOINT must be an http(s) URL with S3_BUCKET")
+		}
+		if cfg.S3Region == "" || cfg.S3AccessKeyID == "" || cfg.S3SecretAccessKey == "" {
+			return Config{}, errors.New("config: S3_REGION, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required with S3_BUCKET")
+		}
+	}
+	if cfg.IngestionEnabled() && (cfg.DBDSN == "" || cfg.S3Bucket == "") {
+		return Config{}, errors.New("config: loading needs DB_DSN and S3_BUCKET together with SYMFONY_INTERNAL_BASE_URL")
+	}
 	return cfg, nil
+}
+
+// IngestionEnabled — загрузка включена: есть источник кабинетов (а с ним
+// обязательны БД и S3). Иначе сервис работает в режиме scaffold.
+func (c Config) IngestionEnabled() bool { return c.SymfonyBaseURL != "" }
+
+func loadPlanner(cfg *Config) error {
+	ints := []struct {
+		name     string
+		min, max int
+		dst      *int
+	}{
+		{"TAIL_DAYS", 0, 31, &cfg.TailDays},
+		{"FINAL_DAY", 1, 28, &cfg.FinalDay},
+	}
+	for _, v := range ints {
+		raw := os.Getenv(v.name)
+		if raw == "" {
+			continue
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < v.min || n > v.max {
+			return fmt.Errorf("config: %s must be %d..%d, got %q", v.name, v.min, v.max, raw)
+		}
+		*v.dst = n
+	}
+	if raw := os.Getenv("RECONCILE_WEEKDAY"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > 6 {
+			return fmt.Errorf("config: RECONCILE_WEEKDAY must be 0..6 (0 = Sunday), got %q", raw)
+		}
+		cfg.ReconcileWeekday = time.Weekday(n)
+	}
+	if raw := os.Getenv("PLAN_EVERY"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < time.Minute {
+			return fmt.Errorf("config: PLAN_EVERY must be a duration of at least 1m, got %q", raw)
+		}
+		cfg.PlanEvery = d
+	}
+	return nil
+}
+
+func envOr(name, fallback string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return fallback
 }
