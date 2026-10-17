@@ -218,6 +218,43 @@ func TestExpiredLeaseIsReleasedWithCursor(t *testing.T) {
 	assert.ErrorIs(t, tasks.ExtendLease(ctx, task.TaskKey, task.AttemptID, t0.Add(time.Hour)), ErrLeaseLost)
 }
 
+func TestReleaseRacingWithLeaseExtensionKeepsTaskAndAttemptConsistent(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	for i := range 40 {
+		key := spec(fmt.Sprintf("ref-%d", i), "r", "2026-10-01", 0)
+		require.NoError(t, tasks.Upsert(ctx, []TaskSpec{key}))
+		task, err := claim(t, tasks, []string{key.ConnectionRef}, t0)
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_ = tasks.ExtendLease(ctx, task.TaskKey, task.AttemptID, t0.Add(time.Hour))
+		}()
+		go func() {
+			defer wg.Done()
+			_, err := tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+			assert.NoError(t, err)
+		}()
+		wg.Wait()
+
+		var taskStatus string
+		var outcome *string
+		require.NoError(t, tasks.pool.QueryRow(ctx, `
+			SELECT t.status, a.outcome FROM fetch_task t JOIN fetch_attempt a ON a.attempt_id = $4
+			WHERE t.connection_ref = $1 AND t.resource_type = $2 AND t.period_key = $3`,
+			task.ConnectionRef, task.ResourceType, task.PeriodKey, task.AttemptID).Scan(&taskStatus, &outcome))
+		if taskStatus == StatusRunning {
+			assert.Nil(t, outcome, "задача продлена — попытка не закрыта")
+		} else {
+			require.NotNil(t, outcome)
+			assert.Equal(t, "lease_expired", *outcome, "задача освобождена — попытка закрыта")
+		}
+	}
+}
+
 func TestFinishTaskRevisionFollowsContentHash(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

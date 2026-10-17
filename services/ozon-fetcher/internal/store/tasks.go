@@ -285,30 +285,36 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 
 // ReleaseExpired возвращает в pending задачи с истёкшим lease; курсор
 // сохраняется — следующий воркер продолжит с той же страницы.
+//
+// Один запрос: строки задач блокируются первыми (тот же порядок, что у
+// RecordPage/FinishTask: задача → попытка), занятые воркером пропускаются
+// (SKIP LOCKED), и попытки закрываются ровно для освобождённого набора —
+// продление lease между выборками не может рассинхронизировать задачу и попытку.
 func (t *Tasks) ReleaseExpired(ctx context.Context, now time.Time) (int64, error) {
-	tx, err := t.pool.Begin(ctx)
+	var released int64
+	err := t.pool.QueryRow(ctx, `
+		WITH expired AS (
+			SELECT connection_ref, resource_type, period_key, attempt_id
+			FROM fetch_task
+			WHERE status = 'running' AND lease_until < $1
+			FOR UPDATE SKIP LOCKED
+		), released AS (
+			UPDATE fetch_task t SET status = 'pending', lease_owner = NULL, lease_until = NULL, attempt_id = NULL,
+				next_run_at = $1, last_error_class = 'lease_expired', updated_at = $1
+			FROM expired e
+			WHERE t.connection_ref = e.connection_ref AND t.resource_type = e.resource_type AND t.period_key = e.period_key
+			RETURNING e.attempt_id
+		), closed AS (
+			UPDATE fetch_attempt a SET finished_at = $1, outcome = 'lease_expired'
+			FROM released r
+			WHERE a.attempt_id = r.attempt_id
+			RETURNING 1
+		)
+		SELECT count(*) FROM released`, now).Scan(&released)
 	if err != nil {
-		return 0, fmt.Errorf("store: release begin: %w", err)
+		return 0, fmt.Errorf("store: release expired: %w", err)
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	if _, err := tx.Exec(ctx, `
-		UPDATE fetch_attempt a SET finished_at = $1, outcome = 'lease_expired'
-		FROM fetch_task t
-		WHERE t.attempt_id = a.attempt_id AND t.status = 'running' AND t.lease_until < $1`, now); err != nil {
-		return 0, fmt.Errorf("store: release attempts: %w", err)
-	}
-	tag, err := tx.Exec(ctx, `
-		UPDATE fetch_task SET status = 'pending', lease_owner = NULL, lease_until = NULL, attempt_id = NULL,
-			next_run_at = $1, last_error_class = 'lease_expired', updated_at = $1
-		WHERE status = 'running' AND lease_until < $1`, now)
-	if err != nil {
-		return 0, fmt.Errorf("store: release tasks: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("store: release commit: %w", err)
-	}
-	return tag.RowsAffected(), nil
+	return released, nil
 }
 
 func isUniqueViolation(err error) bool {
