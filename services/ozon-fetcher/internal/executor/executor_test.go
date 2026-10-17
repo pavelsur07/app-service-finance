@@ -28,25 +28,33 @@ var t0 = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
 // --- фейки ---
 
 type fakeTasks struct {
-	mu        sync.Mutex
-	pages     []store.RawObject
-	cursors   []string
-	finished  *store.Outcome
-	suspended []string
-	resumed   []string
-	stopped   []string
-	extends   int
-	pageErr   error // ошибка RecordPage
-	extendErr error
-	finishErr error
-	revision  int
+	mu         sync.Mutex
+	pages      []store.RawObject
+	cursors    []string
+	finished   *store.Outcome
+	suspended  []string
+	resumed    []string
+	stopped    []string
+	extends    int
+	pageErr    error // ошибка RecordPage
+	extendErr  error
+	finishErr  error
+	revision   int
+	suspendErr error
+	stopErr    error
+	extendHang bool // ExtendLease ждёт отмены контекста
 }
 
-func (f *fakeTasks) ExtendLease(context.Context, store.TaskKey, string, time.Time) error {
+func (f *fakeTasks) ExtendLease(ctx context.Context, _ store.TaskKey, _ string, _ time.Time) error {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.extends++
-	return f.extendErr
+	hang, err := f.extendHang, f.extendErr
+	f.mu.Unlock()
+	if hang {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return err
 }
 
 func (f *fakeTasks) RecordPage(_ context.Context, _ store.TaskKey, _ string, obj store.RawObject, next string) error {
@@ -68,6 +76,9 @@ func (f *fakeTasks) FinishTask(_ context.Context, _ store.TaskKey, _ string, out
 }
 
 func (f *fakeTasks) SuspendConnection(_ context.Context, ref, _ string, _ time.Time) error {
+	if f.suspendErr != nil {
+		return f.suspendErr
+	}
 	f.suspended = append(f.suspended, ref)
 	return nil
 }
@@ -78,6 +89,9 @@ func (f *fakeTasks) ResumeConnection(_ context.Context, ref string) error {
 }
 
 func (f *fakeTasks) StopResource(_ context.Context, resource, _ string) error {
+	if f.stopErr != nil {
+		return f.stopErr
+	}
 	f.stopped = append(f.stopped, resource)
 	return nil
 }
@@ -437,4 +451,69 @@ func TestDayFullySavedByPreviousAttemptIsNotReloaded(t *testing.T) {
 	assert.Empty(t, o.creds, "Ozon не вызывался")
 	assert.Empty(t, h.tasks.pages)
 	assert.Equal(t, contentHash(tk.PageHashes), h.tasks.finished.ContentHash)
+}
+
+func TestSinglePageSavedByPreviousAttemptIsNotReloaded(t *testing.T) {
+	for _, resource := range []string{ResourceAccrualTypes, ResourceRealization, ResourceMutualSettlement} {
+		t.Run(resource, func(t *testing.T) {
+			o := &fakeOzon{singlePage: page(`{"x":1}`, "")}
+			h := newHarness(o)
+			period := PeriodRef
+			if resource != ResourceAccrualTypes {
+				period = "2026-09"
+			}
+			tk := task(resource, period)
+			tk.PageHashes = []string{sha(`{"x":1}`)}
+			tk.NextPageNo = 2
+
+			res := h.exec.Run(context.Background(), tk, cabinet, "trace")
+
+			assert.Equal(t, "done", res.Outcome)
+			assert.Empty(t, h.tasks.pages, "страница не загружается и не журналируется повторно")
+			assert.Empty(t, h.raw.puts)
+			assert.Equal(t, contentHash(tk.PageHashes), h.tasks.finished.ContentHash)
+		})
+	}
+}
+
+func TestHungLeaseRenewalDoesNotBlockFinish(t *testing.T) {
+	h := newHarness(&fakeOzon{singlePage: page(`{}`, ""), block: make(chan struct{})})
+	h.tasks.extendHang = true
+	time.AfterFunc(25*time.Millisecond, func() { close(h.ozon.block) }) // продление (каждые 10 мс) уже висит
+
+	done := make(chan Result, 1)
+	go func() {
+		done <- h.exec.Run(context.Background(), task(ResourceAccrualTypes, PeriodRef), cabinet, "trace")
+	}()
+
+	select {
+	case res := <-done:
+		assert.Equal(t, "done", res.Outcome)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run is stuck behind a hung lease renewal")
+	}
+}
+
+func TestFailedControlWritesKeepTaskRetryable(t *testing.T) {
+	t.Run("suspend", func(t *testing.T) {
+		h := newHarness(&fakeOzon{singleErr: &ozon.APIError{Class: ozon.ClassAuth, Status: 401}})
+		h.tasks.suspendErr = errors.New("db down")
+		tk := task(ResourceAccrualTypes, PeriodRef)
+		tk.LastErrorClass = "auth"
+
+		h.exec.Run(context.Background(), tk, cabinet, "trace")
+
+		assert.Equal(t, store.StatusFailedRetryable, h.tasks.finished.Status)
+		assert.Equal(t, t0.Add(time.Minute), h.tasks.finished.NextRunAt, "не сразу — backoff")
+		assert.NotContains(t, h.logs.String(), "cabinet suspended")
+	})
+	t.Run("stop resource", func(t *testing.T) {
+		h := newHarness(&fakeOzon{singleErr: &ozon.APIError{Class: ozon.ClassObsoleteEndpoint, Status: 400}})
+		h.tasks.stopErr = errors.New("db down")
+
+		h.exec.Run(context.Background(), task(ResourceAccrualTypes, PeriodRef), cabinet, "trace")
+
+		assert.Equal(t, store.StatusFailedRetryable, h.tasks.finished.Status)
+		assert.NotContains(t, h.logs.String(), "resource stopped")
+	})
 }

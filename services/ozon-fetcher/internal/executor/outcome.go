@@ -71,14 +71,26 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		e.sideEffect(log, "refresh connections", refreshErr)
 		if task.LastErrorClass == string(ozon.ClassAuth) {
 			until := now.Add(e.cfg.AuthSuspend)
-			e.sideEffect(log, "suspend connection", e.tasks.SuspendConnection(side, task.ConnectionRef, string(apiErr.Class), until))
+			if err := e.tasks.SuspendConnection(side, task.ConnectionRef, string(apiErr.Class), until); err != nil {
+				// Пауза не записана — кабинет не должен сразу уйти в новый круг 401.
+				e.sideEffect(log, "suspend connection", err)
+				out := e.retryable(task, string(apiErr.Class), now, true)
+				out.HTTPStatus = apiErr.Status
+				return out
+			}
 			log.Error("ozon rejected cabinet keys twice, cabinet suspended",
 				slog.String("stage", "fetch"), slog.Int("http_status", apiErr.Status), slog.Time("suspended_until", until))
 		}
 		return store.Outcome{Status: store.StatusPending, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, KeepCursor: true, NextRunAt: now}
 
 	case ozon.ClassObsoleteEndpoint:
-		e.sideEffect(log, "stop resource", e.tasks.StopResource(side, task.ResourceType, apiErr.Endpoint))
+		if err := e.tasks.StopResource(side, task.ResourceType, apiErr.Endpoint); err != nil {
+			// Стоп не записан — задача повторится и попробует остановить ресурс снова.
+			e.sideEffect(log, "stop resource", err)
+			out := e.retryable(task, string(apiErr.Class), now, false)
+			out.HTTPStatus = apiErr.Status
+			return out
+		}
 		log.Error("ozon endpoint is obsolete, resource stopped for all cabinets",
 			slog.String("stage", "fetch"), slog.String("endpoint", apiErr.Endpoint), slog.Int("code", apiErr.Code))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now}

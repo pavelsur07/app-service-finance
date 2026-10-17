@@ -179,34 +179,36 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 }
 
 // keepLease продлевает lease раз в треть срока; потеря — отмена задачи.
+// У продления свой контекст: остановка прерывает и зависший вызов к БД,
+// каждый вызов ограничен третью срока lease.
 func (e *Executor) keepLease(ctx context.Context, cancel context.CancelCauseFunc, task store.Task, log *slog.Logger) func() {
-	done := make(chan struct{})
+	renewCtx, stopRenew := context.WithCancel(ctx)
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
 		interval := e.cfg.Lease / 3
 		for {
 			select {
-			case <-done:
-				return
-			case <-ctx.Done():
+			case <-renewCtx.Done():
 				return
 			case <-time.After(interval):
 			}
-			err := e.tasks.ExtendLease(ctx, task.TaskKey, task.AttemptID, e.now().Add(e.cfg.Lease))
+			callCtx, callCancel := context.WithTimeout(renewCtx, interval)
+			err := e.tasks.ExtendLease(callCtx, task.TaskKey, task.AttemptID, e.now().Add(e.cfg.Lease))
+			callCancel()
 			switch {
 			case errors.Is(err, store.ErrLeaseLost):
 				log.Warn("fetch task lease lost", slog.String("stage", "fetch"))
 				cancel(errLeaseLost)
 				return
-			case err != nil && ctx.Err() == nil:
+			case err != nil && renewCtx.Err() == nil:
 				// Сбой БД: lease ещё действует, пробуем на следующем тике.
 				log.Warn("fetch task lease extension failed", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 			}
 		}
 	}()
 	return func() {
-		close(done)
+		stopRenew()
 		<-stopped
 	}
 }
@@ -265,9 +267,13 @@ var (
 	errBadPeriod       = errors.New("executor: bad period key")
 )
 
-// single — ресурс одной страницей: загрузка всегда с начала.
+// single — ресурс одной страницей. Страница, сохранённая прежней попыткой
+// (упала запись итога или процесс), не загружается повторно.
 func (r *taskRun) single(ctx context.Context, fetch func() (ozon.Page, error)) error {
-	r.hashes, r.cursor, r.nextPage = nil, "", 1
+	if len(r.hashes) > 0 {
+		return nil
+	}
+	r.cursor, r.nextPage = "", 1
 	page, err := fetch()
 	if err != nil {
 		return err
