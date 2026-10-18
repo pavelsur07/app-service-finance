@@ -15,6 +15,9 @@ use App\ServiceGateway\Exception\ContractViolationException;
  * Библиотеки JSON Schema в проекте нет, поэтому схема повторена здесь
  * вручную; при изменении схемы — новая версия контракта и новый парсер.
  *
+ * Вход — JSON, декодированный объектами (`json_decode` без `associative`):
+ * только так объект `{}` отличим от массива `[]`.
+ *
  * Время приводится к часовому поясу приложения: БД хранит его без зоны.
  */
 final readonly class ServiceCoverageV1Parser
@@ -34,7 +37,7 @@ final readonly class ServiceCoverageV1Parser
         }
 
         $rows = $data['rows'];
-        if (!\is_array($rows) || !array_is_list($rows)) {
+        if (!\is_array($rows)) {
             throw $this->violation('$.rows', 'must be an array');
         }
         $parsed = [];
@@ -97,9 +100,10 @@ final readonly class ServiceCoverageV1Parser
      */
     private function object(mixed $value, string $path, array $keys): array
     {
-        if (!\is_array($value) || ([] !== $value && array_is_list($value))) {
+        if (!$value instanceof \stdClass) {
             throw $this->violation($path, 'must be an object');
         }
+        $value = get_object_vars($value);
         $actual = array_map('strval', array_keys($value));
         $missing = array_diff($keys, $actual);
         if ([] !== $missing) {
@@ -136,7 +140,7 @@ final readonly class ServiceCoverageV1Parser
     {
         $raw = $this->nonEmptyString($value, $path);
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
-        if (false === $date || $date->format('Y-m-d') !== $raw) {
+        if (false === $date || self::hasParseWarnings() || $date->format('Y-m-d') !== $raw) {
             throw $this->violation($path, 'must be a date YYYY-MM-DD');
         }
 
@@ -146,13 +150,24 @@ final readonly class ServiceCoverageV1Parser
     private function dateTime(mixed $value, string $path): \DateTimeImmutable
     {
         $raw = $this->nonEmptyString($value, $path);
-        $parsed = \DateTimeImmutable::createFromFormat(\DATE_RFC3339, $raw)
-            ?: \DateTimeImmutable::createFromFormat(\DATE_RFC3339_EXTENDED, $raw);
-        if (false === $parsed) {
+        // createFromFormat нормализует 30 февраля в март и сообщает об этом
+        // только предупреждением — такие значения контракт не допускает.
+        $parsed = \DateTimeImmutable::createFromFormat(\DATE_RFC3339, $raw);
+        if (false === $parsed || self::hasParseWarnings()) {
+            $parsed = \DateTimeImmutable::createFromFormat(\DATE_RFC3339_EXTENDED, $raw);
+        }
+        if (false === $parsed || self::hasParseWarnings()) {
             throw $this->violation($path, 'must be an RFC 3339 date-time');
         }
 
         return $parsed->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+    }
+
+    private static function hasParseWarnings(): bool
+    {
+        $errors = \DateTimeImmutable::getLastErrors();
+
+        return false !== $errors && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
     }
 
     private function violation(string $path, string $reason): ContractViolationException

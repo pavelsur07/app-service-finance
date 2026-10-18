@@ -95,6 +95,16 @@ final class OzonFetcherCoverageClientTest extends TestCase
         $this->client($http)->fetchCoverage();
     }
 
+    public function testRowsAsJsonObjectIsContractViolation(): void
+    {
+        $body = json_encode(['rows' => []] + ServiceCoverageV1ParserTest::fixture(), \JSON_THROW_ON_ERROR);
+        $http = new MockHttpClient(new MockResponse(str_replace('"rows":[]', '"rows":{}', $body), ['http_code' => 200]));
+
+        $this->expectException(ContractViolationException::class);
+        $this->expectExceptionMessage('$.rows');
+        $this->client($http)->fetchCoverage();
+    }
+
     public function testForeignServiceNameIsContractViolation(): void
     {
         $http = new MockHttpClient(new MockResponse(json_encode(['service' => 'wb-fetcher'] + ServiceCoverageV1ParserTest::fixture(), \JSON_THROW_ON_ERROR), ['http_code' => 200]));

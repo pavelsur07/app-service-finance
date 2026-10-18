@@ -10,7 +10,6 @@ use App\ServiceGateway\Exception\ServiceUnavailableException;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -72,9 +71,7 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
 
                 throw ServiceUnavailableException::status(self::SERVICE, $status);
             }
-            $data = $response->toArray(false);
-        } catch (DecodingExceptionInterface) {
-            throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$', 'response is not a JSON object');
+            $body = $response->getContent(false);
         } catch (ExceptionInterface $e) {
             $this->logger->warning('Service coverage request failed.', $context + [
                 'durationMs' => $this->elapsedMs($startedAt),
@@ -84,6 +81,12 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
             throw ServiceUnavailableException::transport(self::SERVICE, $e);
         }
 
+        try {
+            // Объектами, не массивами: иначе `"rows": {}` неотличим от `[]` (см. парсер).
+            $data = json_decode($body, false, 64, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$', 'response is not JSON');
+        }
         $report = $this->parser->parse($data);
         if (self::SERVICE !== $report->service) {
             throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$.service', sprintf('expected %s', self::SERVICE));

@@ -139,3 +139,19 @@ func TestCoverageDisabledAndErrors(t *testing.T) {
 	assert.Equal(t, "coverage_unavailable", body["error"].(map[string]any)["code"])
 	assert.NotContains(t, body["error"].(map[string]any)["message"], "db down")
 }
+
+func TestCoverageWaitsForCabinetSnapshot(t *testing.T) {
+	var call coverageCall
+	d := coverageDeps(t, &call)
+	ready := false
+	d.CabinetsReady = func() bool { return ready }
+
+	code, body := do(t, New(d), "/internal/coverage", "Bearer "+token)
+	assert.Equal(t, http.StatusServiceUnavailable, code)
+	assert.Equal(t, "cabinets_not_ready", body["error"].(map[string]any)["code"])
+	assert.Empty(t, call.from, "до снимка кабинетов в хранилище не ходим")
+
+	ready = true
+	code, _ = do(t, New(d), "/internal/coverage", "Bearer "+token)
+	assert.Equal(t, http.StatusOK, code)
+}

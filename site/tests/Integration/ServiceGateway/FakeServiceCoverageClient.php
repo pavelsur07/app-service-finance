@@ -42,6 +42,6 @@ final class FakeServiceCoverageClient implements ServiceCoverageClientInterface
             return $this->response;
         }
 
-        return (new ServiceCoverageV1Parser())->parse($this->response ?? ServiceCoverageV1ParserTest::fixture());
+        return (new ServiceCoverageV1Parser())->parse(ServiceCoverageV1ParserTest::decoded($this->response ?? ServiceCoverageV1ParserTest::fixture()));
     }
 }

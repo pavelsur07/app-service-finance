@@ -39,6 +39,12 @@ func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
 		writeError(w, http.StatusServiceUnavailable, "ingestion_disabled", "loading is disabled")
 		return
 	}
+	// До первого снимка кабинетов пустой ответ неотличим от «кабинетов нет» —
+	// шлюз заменил бы им витрину. Поэтому 503, а не 200 с пустыми строками.
+	if d.CabinetsReady != nil && !d.CabinetsReady() {
+		writeError(w, http.StatusServiceUnavailable, "cabinets_not_ready", "cabinet snapshot is not loaded yet")
+		return
+	}
 	now := d.Now()
 	from, to, ok := coverageWindow(r, now.In(d.Location), d.Location)
 	if !ok {

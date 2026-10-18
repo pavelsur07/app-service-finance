@@ -1,4 +1,4 @@
-### Stage 2: модуль `ServiceGateway` — клиент, витрина, обновление — IN PROGRESS
+### Stage 2: модуль `ServiceGateway` — клиент, витрина, обновление — DONE
 
 **Risk:** HIGH-LOCAL (новая миграция, вызов сервиса из Symfony) · **Base:** `536b8541c` · **Branch:** `feat/ozon-fetcher-coverage-admin`
 **Внешнее ревью:** да (Codex, по итогу этапа)
@@ -61,18 +61,36 @@
 
 ## 4. Чек-лист приёмки
 
-- [ ] модуль: `doctrine.yaml`, границы модулей (`ModuleBoundaryRules`) зелёные
-- [ ] env `OZON_FETCHER_BASE_URL`, `OZON_FETCHER_API_TOKEN` в `.env` (пусто), в `.env.test` — значения для тестов
-- [ ] клиент: таймауты, Bearer, `X-Trace-Id`, строгий разбор v1; unit-тесты на `MockHttpClient`: успех, 401, 5xx, таймаут/транспорт, нарушение контракта (лишний ключ, неверный `schema_version`, кривой `period_key`, отрицательный счётчик), выключен
-- [ ] фикстура ответа в тестах совпадает с примером контракта v1
-- [ ] миграция: обе таблицы, PK UUID, уникальный индекс; `down()` есть
-- [ ] Entity с инвариантами в конструкторе (`Assert`), Builder'ы в `tests/Builders/ServiceGateway/`
-- [ ] Action: замена снимка одной транзакцией; integration-тест — замена, пустой список строк, сбой посередине не меняет витрину
-- [ ] команда: выключено → exit 0; недоступен → WARNING, витрина прежняя; контракт → ERROR; lock; integration-тест команды
-- [ ] Query: одна выборка строк месяца, `ref` и `YYYY-MM` попадают; тест
-- [ ] cron-строка `*/10`
-- [ ] токен не попадает в лог (тест на логгер клиента/команды)
-- [ ] ручная проверка: команда против локального сервиса со стендовыми данными
-- [ ] `ARCHITECTURE.md`, `service-gateway.md` §4
-- [ ] PHPStan / CS / strict_types по изменённым файлам; baseline не растёт
-- [ ] внешнее ревью (Codex) этапа, замечания закрыты
+- [x] модуль: `doctrine.yaml`, границы модулей (`ModuleBoundaryRules`) зелёные
+- [x] env `OZON_FETCHER_BASE_URL`, `OZON_FETCHER_API_TOKEN` в `.env` (пусто), в `.env.test` — значения для тестов
+- [x] клиент: таймауты, Bearer, `X-Trace-Id`, строгий разбор v1; unit-тесты на `MockHttpClient`: успех, 401, 5xx, таймаут/транспорт, нарушение контракта (лишний ключ, неверный `schema_version`, кривой `period_key`, отрицательный счётчик), выключен
+- [x] фикстура ответа в тестах совпадает с примером контракта v1
+- [x] миграция: обе таблицы, PK UUID, уникальный индекс; `down()` есть
+- [x] Entity с инвариантами в конструкторе (`Assert`), Builder'ы в `tests/Builders/ServiceGateway/`
+- [x] Action: замена снимка одной транзакцией; integration-тест — замена, пустой список строк, сбой посередине не меняет витрину
+- [x] команда: выключено → exit 0; недоступен → WARNING, витрина прежняя; контракт → ERROR; lock; integration-тест команды
+- [x] Query: одна выборка строк месяца, `ref` и `YYYY-MM` попадают; тест
+- [x] cron-строка `*/10`
+- [x] токен не попадает в лог (тест на логгер клиента/команды)
+- [x] ручная проверка: команда против локального сервиса со стендовыми данными
+- [x] `ARCHITECTURE.md`, `service-gateway.md` §4
+- [x] PHPStan / CS / strict_types по изменённым файлам; baseline не растёт
+- [x] внешнее ревью (Codex) этапа, замечания закрыты
+
+## Итог
+
+- Модуль `site/src/ServiceGateway`: клиент `OzonFetcherCoverageClient`, парсер `ServiceCoverageV1Parser`,
+  Entity `ServiceCoverageSnapshot` / `ServiceCoverageRow`, миграция `Version20261018100000`,
+  `RefreshServiceCoverageAction`, команда `app:service-gateway:coverage:refresh`, `ServiceCoverageMonthQuery`,
+  cron `*/10`, env `OZON_FETCHER_BASE_URL` / `OZON_FETCHER_API_TOKEN` (пусто).
+- Тесты: 43 (unit парсера и клиента, integration Action, Query, команды); PHPStan 0 и CS 0 по файлам модуля;
+  `doctrine:schema:validate` — расхождений по новым таблицам нет (общий дрейф схемы — существующий, не наш).
+- Ручная проверка на стенде (сервис + мок Ozon, 3 кабинета): витрина 83 строки, с ответом сервиса
+  совпадает построчно (0 расхождений); неверный токен и остановленный сервис — витрина прежняя, токена в логах нет.
+- Отклонение от плана: недоступный сервис — exit 0, а не 1 (supercronic шлёт любой ненулевой exit в GlitchTip).
+- Внешнее ревью Codex, итерация 1 — три IMPORTANT, все исправлены:
+  1. сервис до первого снимка кабинетов отдавал 200 с пустыми строками и мог опустошить витрину → 503
+     `cabinets_not_ready` (Go, тест `TestCoverageWaitsForCabinetSnapshot`);
+  2. `"rows": {}` после ассоциативного декодирования проходил как `[]` → клиент декодирует объектами,
+     парсер требует `\stdClass` для объектов (тесты через парсер и клиент);
+  3. `2026-02-30` и `25:61` нормализовались `createFromFormat` → проверка предупреждений разбора (тесты).
