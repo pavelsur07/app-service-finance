@@ -16,9 +16,11 @@ use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\OzonAccrualTypeGroupStatus;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use App\Tests\Builders\Ingestion\OzonAccrualTypeBuilder;
+use App\Tests\Builders\Ingestion\OzonAccrualTypeGroupBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
@@ -187,6 +189,118 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
 
         self::assertTrue($transaction->sourceData['_ozon_category_known']);
         self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_ozon_category_group']);
+    }
+
+    public function testConfirmedOzonGroupOverridesCatalogGroupOnly(): void
+    {
+        $before = $this->mapNonItemFee(76, 'StockInsurance')[0];
+        $this->persistOzonGroup(76, 'partners', OzonAccrualTypeGroupStatus::CONFIRMED);
+
+        $after = $this->mapNonItemFee(76, 'StockInsurance')[0];
+
+        self::assertSame('Услуги партнёров', $after->sourceData['_ozon_category_group']);
+        self::assertSame($before->sourceData['_ozon_category_code'], $after->sourceData['_ozon_category_code']);
+        self::assertSame($before->sourceData['_ozon_category_label'], $after->sourceData['_ozon_category_label']);
+        self::assertTrue($after->sourceData['_ozon_category_known']);
+        self::assertSame($before->type, $after->type);
+    }
+
+    public function testConflictedOzonGroupIsIgnored(): void
+    {
+        $this->persistOzonGroup(76, 'partners', OzonAccrualTypeGroupStatus::CONFLICT);
+
+        $transaction = $this->mapNonItemFee(76, 'StockInsurance')[0];
+
+        self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_ozon_category_group']);
+    }
+
+    public function testOzonGroupDoesNotOverrideManualMapping(): void
+    {
+        $this->persistOzonGroup(999001, 'partners', OzonAccrualTypeGroupStatus::CONFIRMED);
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('CustomOzonFee');
+        self::assertNotNull($normalizedKey);
+        $category = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: $normalizedKey,
+            externalCode: 'CustomOzonFee',
+            status: ExternalCategoryStatus::MAPPED,
+        );
+        $this->em->persist($category);
+        $this->em->persist(new ExternalCategoryMapping(
+            externalCategory: $category,
+            canonicalCode: 'ozon_other_services',
+            canonicalLabel: 'Другие услуги',
+            canonicalGroup: 'Другие услуги и штрафы',
+            transactionType: TransactionType::FEE,
+            sortOrder: 1090,
+            updatedBy: Uuid::uuid7()->toString(),
+        ));
+        $this->em->flush();
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+        $transaction = $mapper->mapForCategoryMetadataRefresh($this->rawRecord(Uuid::uuid7()->toString()), [$this->customFeeRow()], recordUnknownCategories: false)[0];
+
+        self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_ozon_category_group']);
+    }
+
+    public function testOzonGroupOverridesAutomaticDefaultMappingButNotCompanyMapping(): void
+    {
+        $this->persistOzonGroup(999001, 'partners', OzonAccrualTypeGroupStatus::CONFIRMED);
+        $normalizedKey = OzonAccrualCategoryTaxonomyResolver::codeKey('CustomOzonFee');
+        self::assertNotNull($normalizedKey);
+        $category = new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: $normalizedKey,
+            externalCode: 'CustomOzonFee',
+            status: ExternalCategoryStatus::MAPPED,
+        );
+        $companyId = Uuid::uuid7()->toString();
+        $this->em->persist($category);
+        $this->em->persist(new ExternalCategoryMapping(
+            externalCategory: $category,
+            canonicalCode: 'ozon_other_services',
+            canonicalLabel: 'Другие услуги',
+            canonicalGroup: 'Другие услуги и штрафы',
+            transactionType: TransactionType::FEE,
+            sortOrder: 1090,
+        ));
+        $this->em->persist(new ExternalCategoryCompanyMapping(
+            externalCategory: $category,
+            companyId: $companyId,
+            canonicalCode: 'ozon_cpc',
+            canonicalLabel: 'Оплата за клик',
+            canonicalGroup: 'Продвижение и реклама',
+            transactionType: TransactionType::ADVERTISING,
+            sortOrder: 900,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->flush();
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+        $default = $mapper->mapForCategoryMetadataRefresh($this->rawRecord(Uuid::uuid7()->toString()), [$this->customFeeRow()], recordUnknownCategories: false)[0];
+        $company = $mapper->mapForCategoryMetadataRefresh($this->rawRecord($companyId), [$this->customFeeRow()], recordUnknownCategories: false)[0];
+
+        self::assertSame('ozon_other_services', $default->sourceData['_ozon_category_code']);
+        self::assertSame('Услуги партнёров', $default->sourceData['_ozon_category_group']);
+        self::assertSame('Продвижение и реклама', $company->sourceData['_ozon_category_group']);
+    }
+
+    public function testDictionaryCategoryTakesOzonGroupBeforeSuggestion(): void
+    {
+        $this->persistDictionaryType(127, 'AnalyticsPlus', null);
+        $this->persistOzonGroup(127, 'other', OzonAccrualTypeGroupStatus::CONFIRMED);
+
+        $transaction = $this->mapNonItemFee(127, null)[0];
+
+        self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_ozon_category_group']);
+        self::assertFalse($transaction->sourceData['_ozon_category_known']);
+        self::assertSame(TransactionType::OTHER, $transaction->type);
     }
 
     public function testDatabaseMappingWinsOverDictionary(): void
@@ -466,6 +580,12 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
     private function persistDictionaryType(int $typeId, string $name, ?string $description): void
     {
         $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId($typeId)->withName($name)->withDescription($description)->build());
+        $this->em->flush();
+    }
+
+    private function persistOzonGroup(int $typeId, string $groupCode, OzonAccrualTypeGroupStatus $status): void
+    {
+        $this->em->persist(OzonAccrualTypeGroupBuilder::aTypeGroup()->withTypeId($typeId)->withGroupCode($groupCode)->withStatus($status)->build());
         $this->em->flush();
     }
 

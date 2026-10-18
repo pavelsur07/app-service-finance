@@ -11,9 +11,11 @@ use App\Ingestion\Entity\OzonAccrualType;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Repository\CategoryGroupRepository;
 use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
+use App\Ingestion\Repository\OzonAccrualTypeGroupRepository;
 use App\Ingestion\Repository\OzonAccrualTypeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -49,6 +51,11 @@ final class OzonAccrualCategoryTaxonomyResolver
      */
     private ?array $dictionaryByTypeId = null;
 
+    /**
+     * @var array<int, string>|null type_id => метка подтверждённой группы Ozon
+     */
+    private ?array $ozonGroupLabelsByTypeId = null;
+
     public function __construct(
         private readonly ExternalCategoryRepository $categoryRepository,
         private readonly ExternalCategoryMappingRepository $mappingRepository,
@@ -58,6 +65,8 @@ final class OzonAccrualCategoryTaxonomyResolver
         private readonly OzonAccrualTypeRepository $typeRepository,
         private readonly OzonAccrualDictionaryCategoryFactory $dictionaryCategoryFactory,
         private readonly OzonAccrualGroupSuggester $groupSuggester,
+        private readonly OzonAccrualTypeGroupRepository $typeGroupRepository,
+        private readonly CategoryGroupRepository $groupRepository,
     ) {
     }
 
@@ -78,6 +87,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         $this->activeMappingCompanyId = $companyId;
         $this->recordedUnknowns = [];
         $this->dictionaryByTypeId = null;
+        $this->ozonGroupLabelsByTypeId = null;
         $this->groupSuggester->reset();
     }
 
@@ -91,15 +101,21 @@ final class OzonAccrualCategoryTaxonomyResolver
         bool $recordUnknown = false,
     ): OzonAccrualCategory {
         foreach ($this->candidateKeys($externalCode, $providerLabel ?? $typeName, $typeId) as $normalizedKey) {
-            $mapped = $this->categoryFromMapping($this->findTypedFeeMapping($scope, $normalizedKey));
+            $mapping = $this->findTypedFeeMapping($scope, $normalizedKey);
+            $mapped = $this->categoryFromMapping($mapping);
             if (null !== $mapped) {
-                return $mapped;
+                // Ручной маппинг и маппинг компании — решение человека: группу
+                // Ozon поверх него не кладём.
+                $manual = $mapping instanceof ExternalCategoryCompanyMapping
+                    || ($mapping instanceof ExternalCategoryMapping && null !== $mapping->getUpdatedBy());
+
+                return $manual ? $mapped : $this->withOzonGroup($mapped, $typeId);
             }
         }
 
         $static = $this->staticCategory($typeId, $typeName, $externalCode, $providerLabel, $fallbackType);
         if ($static->known) {
-            return $static;
+            return $this->withOzonGroup($static, $typeId);
         }
 
         // Ни маппинга, ни статьи в каталоге: название и код берём из справочника
@@ -228,13 +244,45 @@ final class OzonAccrualCategoryTaxonomyResolver
             return null;
         }
 
-        $suggestion = $this->groupSuggester->suggest($type->getName(), $type->getDescription());
+        $group = $this->ozonGroupLabel($typeId);
+        if (null === $group) {
+            $suggestion = $this->groupSuggester->suggest($type->getName(), $type->getDescription());
+            $group = null !== $suggestion && $suggestion->isHigh() ? $suggestion->groupLabel : OzonAccrualCategory::UNKNOWN_GROUP;
+        }
 
-        return $this->dictionaryCategoryFactory->create(
-            $type,
-            $fallbackType,
-            null !== $suggestion && $suggestion->isHigh() ? $suggestion->groupLabel : OzonAccrualCategory::UNKNOWN_GROUP,
-        );
+        return $this->dictionaryCategoryFactory->create($type, $fallbackType, $group);
+    }
+
+    /**
+     * Группа, подтверждённая отчётом кабинета Ozon, сильнее группы каталога и
+     * маппинга по умолчанию. Меняется только группа — ключ транзакции цел.
+     */
+    private function withOzonGroup(OzonAccrualCategory $category, ?string $typeId): OzonAccrualCategory
+    {
+        $group = $this->ozonGroupLabel($typeId);
+
+        return null !== $group ? $category->withGroup($group) : $category;
+    }
+
+    private function ozonGroupLabel(?string $typeId): ?string
+    {
+        $typeId = self::normalizeTypeId($typeId);
+        if (null === $typeId || !ctype_digit($typeId)) {
+            return null;
+        }
+
+        if (null === $this->ozonGroupLabelsByTypeId) {
+            $groups = $this->groupRepository->findBySourceIndexedByCode(IngestSource::OZON);
+            $this->ozonGroupLabelsByTypeId = [];
+            foreach ($this->typeGroupRepository->findAllIndexedByTypeId() as $id => $typeGroup) {
+                $code = $typeGroup->confirmedGroupCode();
+                if (null !== $code && isset($groups[$code])) {
+                    $this->ozonGroupLabelsByTypeId[$id] = $groups[$code]->getLabel();
+                }
+            }
+        }
+
+        return $this->ozonGroupLabelsByTypeId[(int) $typeId] ?? null;
     }
 
     private function dictionaryType(?string $typeId): ?OzonAccrualType

@@ -26,6 +26,19 @@ final readonly class OzonAccrualCategory
     }
 
     /**
+     * Та же статья в другой группе: код, название, тип транзакции и `known`
+     * не меняются.
+     */
+    public function withGroup(string $group): self
+    {
+        if ($group === $this->group) {
+            return $this;
+        }
+
+        return new self($this->code, $this->label, $group, $this->transactionType, $this->sortOrder, $this->parentLabel, $this->aliases, $this->known);
+    }
+
+    /**
      * @return list<self>
      */
     public static function all(): array
