@@ -1,4 +1,4 @@
-### Stage 4: прод — секрет, env, cron, миграция — DONE (приёмка на проде — после деплоя)
+### Stage 4: прод — секрет, env, cron, миграция — DONE
 
 **Risk:** HIGH-EXTERNAL (прод, секрет, миграция) · **Base:** `3bea43a91` · **Branch:** `feat/ozon-fetcher-coverage-admin`
 **Внешнее ревью:** в составе handoff задачи
@@ -52,7 +52,7 @@
 - [x] deploy.yml: экспорт, проверка алфавита, обязательность при `OZON_FETCHER_ENABLED=true`; YAML валиден
 - [x] `ozon-fetcher-prod.md`: витрина, cron, проверка новым токеном
 - [x] handoff: строка о миграции в запросе «merge and deploy»
-- [ ] после деплоя (на приёмке): миграция прошла; витрина наполнена; страница 200; данные = `/internal/coverage`; GlitchTip чист
+- [x] после деплоя (на приёмке): миграция прошла; витрина наполнена; страница 200; данные = `/internal/coverage`; GlitchTip чист
 
 ## Итог
 
@@ -64,3 +64,13 @@
 - Итерация 2 — BLOCKER: проверка `grep` построчная и пропускала перевод строки (значение с `\nEOF\n` закрыло бы
   heredoc и выполнило команду на раннере) → обе проверки (раннер и сервер) — `case` по всей строке. Проверено
   вручную на значениях: hex, кавычка, многострочное, пустое; allowlist с переводом строки отклоняется.
+
+## Приёмка на проде (18.10.2026)
+
+- PR #2715 влит (`d5d80d5c`); push-прогон: образы собраны, деплой остановлен гейтом схемы — как задумано.
+- `production_action=migrations` (run 39110038066): `Version20261018100000`, 1 миграция, 4 SQL.
+- `production_action=deploy` (run 39110293194): проверка секретов на раннере прошла; `site-php-fpm` и `ozon-fetcher` healthy.
+- Сервис: `fetch-status` и `coverage` по `SERVICE_API_TOKEN` отвечают; `INTERNAL_AUTH_TOKEN` → 401.
+- Cron 11:20 МСК — `job succeeded`; витрина: 4 кабинета, окно 01.08–31.10, 83 строки, done 332, failed_permanent 0 —
+  совпадает с `/internal/coverage` (83 / 332 / 0).
+- GlitchTip (Symfony) — новых событий после деплоя нет; WARN/ERROR в логах `ozon-fetcher` за 30 минут — 0.
