@@ -312,6 +312,11 @@
 # Минута 34 — свободный слот рядом с остальными утренними гейтами (:32 занята, :35 — заказы Ozon).
 34 7 * * * cd /app && php bin/console app:disk:healthcheck --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Каждые 10 минут: витрина покрытия ozon-fetcher (страница «Покрытие Сервис GO» читает только её).
+# GET /internal/coverage сервиса по внутренней сети, токен OZON_FETCHER_API_TOKEN; пусто — выключено (exit 0).
+# Сервис недоступен — WARNING и exit 0, витрина прежняя; нарушение контракта — ERROR и exit 1; повтор — следующий запуск (docs/architecture/service-gateway.md §2.6).
+*/10 * * * * cd /app && php bin/console app:service-gateway:coverage:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.

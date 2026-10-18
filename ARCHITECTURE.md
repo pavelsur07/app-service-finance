@@ -33,6 +33,7 @@
 | `Admin` | Административная панель (отдельный firewall) | — |
 | `Mcp` | MCP-сервер: инструменты для LLM-агентов над Cash-данными | — |
 | `Report` | Построители отчётов (ДДС cashflow) | — |
+| `ServiceGateway` | Шлюз к сервисам `services/`: клиенты, витрины их данных (`docs/architecture/service-gateway.md`) | — (данные сервисов без компаний) |
 
 **Legacy-зона** (пуста после миграции, новый код туда НЕ идёт):
 `src/Entity/` · `src/Service/` · `src/Repository/` · `src/Controller/`
@@ -360,6 +361,33 @@
 - The protected cashflow UI and JSON export support the opt-in reconciliation scope `reconcile=dashboard&activity=<operating|financing|investing|all>&currency=<FiatCurrency>`. It uses the dashboard period and gross split aggregator rules: one currency, no transfers, no deleted movements, no technical categories, and no unallocated category for a specific activity. Project/ЦФО filters are ignored in this scope. Account opening/closing balances keep the existing company-wide report semantics: archived accounts and all categorized movements in the selected currency, including transfers and technical categories, remain included, so balances may differ from both the filtered movement rows and the active-account dashboard balance. Public cashflow JSON/CSV ignore all three reconciliation parameters and keep their existing contract.
 - The expand migration performs no fact backfill, classification inference, or P&L rebuild. Existing rows remain `NULL` and later UI/report stages interpret that state as `Не распределено`.
 - Stage 7.5 originally left `pl_daily_totals` uniqueness unchanged; Stage 7.7.3 is the reviewed switch point. Stage 7.11 removed the temporary runtime old-schema detection after production migration acceptance, so the runtime writer now requires the Project × ЦФО indexes. `old code / new schema` is not a supported rollback mode after the switch migration because the old writer targets the removed project-only unique key; rollback requires a reviewed forward-fix or redeploying Stage 7.7.3-compatible code. The migration locks `pl_daily_totals` before duplicate guards and is forward-only because restoring the old project-only unique key can collapse separate ЦФО buckets.
+
+### ServiceGateway: витрина покрытия сервисов
+
+Правило — `docs/architecture/service-gateway.md` (§2.6: экран читает витрину, не сервис).
+
+- Источник — `GET /internal/coverage` сервиса по контракту
+  `services/_contracts/service-coverage/v1`. Клиент `OzonFetcherCoverageClient`:
+  `OZON_FETCHER_BASE_URL`, токен направления «Symfony → сервис»
+  `OZON_FETCHER_API_TOKEN` (не `INTERNAL_AUTH_TOKEN`), `timeout` 2 с,
+  `max_duration` 5 с, `X-Trace-Id`. Повторов внутри вызова нет — повтор
+  делает cron. Пустые адрес или токен — обновление выключено.
+- Разбор `ServiceCoverageV1Parser` строгий: лишний или недостающий ключ, тип,
+  формат, дубль строки → `ContractViolationException`. Транспорт, таймаут,
+  ответ не 200 → `ServiceUnavailableException`.
+- Витрина: `service_coverage_snapshot` (одна строка на сервис: `generated_at`,
+  `refreshed_at`, окно, `cabinets_total`) и `service_coverage_row`
+  (`service × resource_type × period_key` → `cabinets_expected` и шесть
+  счётчиков статусов, `last_success_at`; уникальный ключ по трём полям).
+  Данных компаний нет — методы Repository помечены `@companyScopeExempt`.
+- `RefreshServiceCoverageAction` вызывает сервис до транзакции и заменяет
+  снимок сервиса одной транзакцией (`wrapInTransaction`): сбой вызова или
+  контракта оставляет витрину прежней.
+- `app:service-gateway:coverage:refresh` (lock): выключено → INFO, exit 0;
+  недоступен → WARNING, exit 0 (supercronic шлёт ненулевой exit в GlitchTip);
+  нарушение контракта → ERROR, exit 1.
+- Чтение — `ServiceCoverageMonthQuery::fetch($service, 'YYYY-MM')`: снимок и
+  строки месяца (дни месяца, ключ месяца, `ref`), два запроса.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -3904,6 +3932,7 @@ config/
 | `app:ingestion:raw:prune --dry-run` | `50 5 * * *` | Retention сырья: СОЗНАТЕЛЬНО `--dry-run` — печатает, сколько записей и байт ушло бы; `--execute` — решение Владельца |
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | **Инфраструктура** | | |
+| `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
@@ -3984,6 +4013,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.19 | 2026-10-18 | ServiceGateway: новый модуль — клиент `GET /internal/coverage` ozon-fetcher (контракт `service-coverage/v1`), витрина `service_coverage_snapshot` / `service_coverage_row`, cron `app:service-gateway:coverage:refresh` каждые 10 минут |
 | 2.18 | 2026-10-17 | Marketplace: `GET /internal/marketplace-connections` — активные Ozon-кабинеты и ключи для сервисов `services/` (`ActiveConnectionCredentialsQuery`, `MarketplaceConnectionsSnapshotBuilder`, DTO `Application/DTO/Internal`) |
 | 2.17 | 2026-10-17 | Shared: firewall `internal_api` для `/internal/*` (static token + IP-allowlist, `InternalAccessPolicy`), `GET /internal/ping`; `AuditContextProvider::getCompanyId()` — `null` для principal без пользователя |
 | 2.16 | 2026-10-17 | Finance: `calculatePlPreview(…, natureBaseColumn)` — колонки-доли берут знак статьи от итога и складываются в него |
