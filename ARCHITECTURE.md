@@ -4045,6 +4045,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.27 | 2026-10-18 | Ingestion: `daily-maintenance` health-check — метрика `newOzonTypesAwaitingConfirmation` и WARNING, если тип справочника ждёт подтверждения в админке дольше 3 дней |
 | 2.26 | 2026-10-18 | Ingestion: `OzonAccrualTypesAdminFacadeInterface` — очередь новых типов Ozon, подтверждение, споры по группам, импорт отчёта из админки; группа маппинга — из закрытого списка `ingest_category_groups`; ручная правка маппинга в админке требует актора |
 | 2.25 | 2026-10-18 | Ingestion: группы Ozon из отчёта кабинета «Детализация начислений» — `ingest_ozon_accrual_type_groups`, команда `app:ingestion:ozon-accrual:import-details-xlsx`; подтверждённая группа сильнее группы каталога (кроме ручных маппингов) |
 | 2.24 | 2026-10-18 | Ingestion: закрытый список групп `ingest_category_groups` и правила подсказки группы `ingest_category_group_rules` (`OzonAccrualGroupSuggester`); статья из справочника получает группу при высокой уверенности правила |

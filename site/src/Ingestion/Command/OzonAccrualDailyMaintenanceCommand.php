@@ -7,6 +7,8 @@ namespace App\Ingestion\Command;
 use App\Ingestion\Application\Action\DiscoverExternalCategoriesAction;
 use App\Ingestion\Application\Action\RebuildMarketplaceCategoryIdentitiesAction;
 use App\Ingestion\Application\Action\SeedExternalCategoryMappingsAction;
+use App\Ingestion\Application\DTO\OzonAccrualTypeQueueItem;
+use App\Ingestion\Application\Service\OzonAccrualTypeQueue;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
@@ -31,6 +33,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
     use OzonAccrualCommandHelperTrait;
 
     private const BUSINESS_TIMEZONE = 'Europe/Moscow';
+    private const TYPE_CONFIRMATION_GRACE_DAYS = 3;
 
     public function __construct(
         private readonly ClockInterface $clock,
@@ -40,6 +43,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         private readonly RebuildMarketplaceCategoryIdentitiesAction $rebuildIdentities,
         private readonly ExternalCategoryAdminQuery $categoryAdminQuery,
         private readonly LoggerInterface $logger,
+        private readonly OzonAccrualTypeQueue $typeQueue,
     ) {
         parent::__construct();
     }
@@ -225,6 +229,8 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
             $io->warning('Ozon accrual categories are awaiting mapping; every unclassified row is queued for review.');
         }
 
+        $this->warnAboutStaleUnconfirmedTypes($io);
+
         if ($hasFailure) {
             $io->warning('Ozon accrual daily maintenance finished with failures. See logs/Sentry for details.');
 
@@ -310,7 +316,48 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
             'orphanedTransactions' => $unclassified['orphanTransactions'],
             'orphanedGroups' => $unclassified['orphanGroups'],
             'unmappedCategories' => $this->unmappedOzonAccrualCategories(),
+            'newOzonTypesAwaitingConfirmation' => \count($this->unconfirmedTypes()),
         ];
+    }
+
+    /**
+     * Новый тип Ozon сам получает статью из справочника, но остаётся
+     * неподтверждённым, пока админ не нажмёт «Подтвердить». Деньги при этом не
+     * теряются (строки в очереди), поэтому WARNING, а не ERROR — но и не молчание:
+     * тип, ждущий дольше трёх дней, называется по type_id.
+     */
+    private function warnAboutStaleUnconfirmedTypes(SymfonyStyle $io): void
+    {
+        $threshold = $this->clock->now()
+            ->setTimezone(new \DateTimeZone(self::BUSINESS_TIMEZONE))
+            ->modify(sprintf('-%d days', self::TYPE_CONFIRMATION_GRACE_DAYS))
+            ->format('Y-m-d');
+
+        $stale = array_values(array_filter(
+            $this->unconfirmedTypes(),
+            static fn (OzonAccrualTypeQueueItem $item): bool => $item->firstDate < $threshold,
+        ));
+        if ([] === $stale) {
+            return;
+        }
+
+        $typeIds = array_map(static fn (OzonAccrualTypeQueueItem $item): int => $item->typeId, $stale);
+        $this->logger->warning('Ozon accrual types await admin confirmation.', [
+            'typeIds' => $typeIds,
+            'graceDays' => self::TYPE_CONFIRMATION_GRACE_DAYS,
+        ]);
+        $io->warning(sprintf('Ozon accrual types await confirmation in admin for more than %d days: %s.', self::TYPE_CONFIRMATION_GRACE_DAYS, implode(', ', $typeIds)));
+    }
+
+    /**
+     * @return list<OzonAccrualTypeQueueItem>
+     */
+    private function unconfirmedTypes(): array
+    {
+        return array_values(array_filter(
+            $this->typeQueue->items(),
+            static fn (OzonAccrualTypeQueueItem $item): bool => !$item->awaitingRefresh,
+        ));
     }
 
     private function unmappedOzonAccrualCategories(): int

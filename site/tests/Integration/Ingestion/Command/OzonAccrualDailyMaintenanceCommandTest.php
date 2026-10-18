@@ -14,6 +14,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Shared\Domain\ValueObject\Money;
+use App\Tests\Builders\Ingestion\OzonAccrualTypeBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -199,6 +200,38 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
         self::assertStringContainsString('Ozon accrual daily maintenance finished.', $tester->getDisplay());
+    }
+
+    public function testWarnsWhenDictionaryTypeAwaitsConfirmationTooLong(): void
+    {
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, new FakeOzonAccrualCategoryMetadataBulkRunner());
+        $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId(999)->withName('NewOzonFee')->withDescription('Новая услуга')->build());
+        $this->em->persist(new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: 'type:999',
+            externalTypeId: '999',
+            status: ExternalCategoryStatus::NEW,
+        ));
+        $this->persistUnclassifiedTransaction('2026-01-15 00:00:00+03:00');
+
+        $tester = $this->tester();
+        $exit = $tester->execute(['--from' => '2026-06-01', '--to' => '2026-06-25', '--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertMatchesRegularExpression('/newOzonTypesAwaitingConfirmation\s+1/', $tester->getDisplay());
+        self::assertStringContainsString('await confirmation in admin for more than 3 days: 999', (string) preg_replace('/\s+/', ' ', $tester->getDisplay()));
+    }
+
+    public function testNoConfirmationWarningWithoutUnconfirmedTypes(): void
+    {
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, new FakeOzonAccrualCategoryMetadataBulkRunner());
+
+        $tester = $this->tester();
+        $tester->execute(['--from' => '2026-06-01', '--to' => '2026-06-25', '--execute' => true]);
+
+        self::assertStringNotContainsString('await confirmation', $tester->getDisplay());
     }
 
     public function testRejectsOutOfRangeIntegerOptions(): void
