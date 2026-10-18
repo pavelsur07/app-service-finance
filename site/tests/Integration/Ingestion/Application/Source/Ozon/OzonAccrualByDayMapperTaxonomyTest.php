@@ -141,11 +141,16 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
 
         self::assertSame('ozon_analytics_plus', $plus->sourceData['_ozon_category_code']);
         self::assertSame('AnalyticsPlus', $plus->sourceData['_ozon_category_label']);
+        // Правило «analytics» — средней уверенности: группу не ставит.
         self::assertSame('Требует классификации', $plus->sourceData['_ozon_category_group']);
         self::assertFalse($plus->sourceData['_ozon_category_known']);
         self::assertSame(TransactionType::OTHER, $plus->type);
         self::assertSame('ozon_customer_reviews_new', $reviews->sourceData['_ozon_category_code']);
         self::assertSame('Подписка Управление отзывами', $reviews->sourceData['_ozon_category_label']);
+        // Правило «отзыв» — высокой уверенности: группа из подсказки, тип всё равно неизвестен.
+        self::assertSame('Продвижение и реклама', $reviews->sourceData['_ozon_category_group']);
+        self::assertFalse($reviews->sourceData['_ozon_category_known']);
+        self::assertSame(TransactionType::OTHER, $reviews->type);
     }
 
     public function testDictionaryNeverMakesTypeKnownNorChangesTransactionType(): void
@@ -170,6 +175,18 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
 
         self::assertSame('ozon_delivery_to_pickup_partners', $transaction->sourceData['_ozon_category_code']);
         self::assertTrue($transaction->sourceData['_ozon_category_known']);
+    }
+
+    public function testCatalogTypeKeepsCatalogGroupDespiteRule(): void
+    {
+        // Правило «страхован» ведёт в «Услуги партнёров», но StockInsurance есть в
+        // каталоге — его группа не меняется: подсказка только для статей справочника.
+        $this->persistDictionaryType(76, 'StockInsurance', 'Страхование товара от массовых повреждений');
+
+        $transaction = $this->mapNonItemFee(76, 'StockInsurance')[0];
+
+        self::assertTrue($transaction->sourceData['_ozon_category_known']);
+        self::assertSame('Другие услуги и штрафы', $transaction->sourceData['_ozon_category_group']);
     }
 
     public function testDatabaseMappingWinsOverDictionary(): void

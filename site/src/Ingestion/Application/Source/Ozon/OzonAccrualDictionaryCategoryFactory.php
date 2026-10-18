@@ -13,8 +13,9 @@ use App\Ingestion\Enum\TransactionType;
  *
  * Код строится из `name` (у Ozon он уникален), название — из `description`
  * (русское название, как в кабинете; не уникально, поэтому в код не идёт).
- * Статья остаётся `known = false` и с группой «Требует классификации»: тип
- * по-прежнему стоит в очереди разбора, пока человек не подтвердит группу.
+ * Статья остаётся `known = false`: тип по-прежнему стоит в очереди разбора, пока
+ * человек не подтвердит его. Группу передаёт вызывающий — из подсказки правил
+ * с высокой уверенностью, иначе «Требует классификации».
  *
  * Тип транзакции — тот же запасной, что у `OzonAccrualCategory::unknown()`:
  * смена типа поменяла бы естественный ключ уже загруженных транзакций. По той же
@@ -25,8 +26,14 @@ final readonly class OzonAccrualDictionaryCategoryFactory
     public const CODE_PREFIX = 'ozon_';
     public const SORT_ORDER = 9000;
 
-    public function create(OzonAccrualType $type, TransactionType $fallbackType): OzonAccrualCategory
-    {
+    /**
+     * @param string $group группа из подсказки правил (Stage 3) или «Требует классификации»
+     */
+    public function create(
+        OzonAccrualType $type,
+        TransactionType $fallbackType,
+        string $group = OzonAccrualCategory::UNKNOWN_GROUP,
+    ): OzonAccrualCategory {
         $code = self::codeFor($type->getName());
 
         // Коды каталога семантические, а не выведенные из имени Ozon: совпадение
@@ -40,7 +47,7 @@ final readonly class OzonAccrualDictionaryCategoryFactory
         return new OzonAccrualCategory(
             code: $code,
             label: $type->getDescription() ?? $type->getName(),
-            group: OzonAccrualCategory::UNKNOWN_GROUP,
+            group: '' !== trim($group) ? $group : OzonAccrualCategory::UNKNOWN_GROUP,
             transactionType: $fallbackType,
             sortOrder: self::SORT_ORDER,
             aliases: [$type->getName()],

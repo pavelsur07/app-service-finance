@@ -50,6 +50,13 @@ snake_case(`name`) (`AnalyticsPlus` → `ozon_analytics_plus`, `Drop-Off Agent` 
 делает тип известным и не меняет естественный ключ транзакции; тип остаётся в очереди
 разбора. Имя по `type_id` берётся из сырья, как раньше.
 
+Группа статьи из справочника — подсказка `OzonAccrualGroupSuggester` по правилам
+`ingest_category_group_rules` (регулярное выражение по `name + description`, первое
+совпадение по `priority`). Ставится только при `confidence = high`, иначе «Требует
+классификации». Правила и список групп (`ingest_category_groups`) — данные: новое
+правило добавляется строкой в БД, без деплоя. Стартовый набор выверен по группам
+отчёта кабинета «Детализация начислений» (`docs/tasks/ozon-accrual-types-dictionary/stages/stage-0.md`).
+
 Словарь `accrual/types` отдаёт `{"id", "name", "description"}`; `description` —
 русское название услуги от Ozon. Алиас-код в каталоге обязан вести в статью,
 совпадающую с этим `description`; расхождение формулировок фиксируется явно в

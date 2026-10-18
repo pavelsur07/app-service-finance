@@ -57,6 +57,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         private readonly LoggerInterface $logger,
         private readonly OzonAccrualTypeRepository $typeRepository,
         private readonly OzonAccrualDictionaryCategoryFactory $dictionaryCategoryFactory,
+        private readonly OzonAccrualGroupSuggester $groupSuggester,
     ) {
     }
 
@@ -77,6 +78,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         $this->activeMappingCompanyId = $companyId;
         $this->recordedUnknowns = [];
         $this->dictionaryByTypeId = null;
+        $this->groupSuggester->reset();
     }
 
     public function forTypedFee(
@@ -222,8 +224,17 @@ final class OzonAccrualCategoryTaxonomyResolver
     private function dictionaryCategory(?string $typeId, TransactionType $fallbackType): ?OzonAccrualCategory
     {
         $type = $this->dictionaryType($typeId);
+        if (null === $type) {
+            return null;
+        }
 
-        return null !== $type ? $this->dictionaryCategoryFactory->create($type, $fallbackType) : null;
+        $suggestion = $this->groupSuggester->suggest($type->getName(), $type->getDescription());
+
+        return $this->dictionaryCategoryFactory->create(
+            $type,
+            $fallbackType,
+            null !== $suggestion && $suggestion->isHigh() ? $suggestion->groupLabel : OzonAccrualCategory::UNKNOWN_GROUP,
+        );
     }
 
     private function dictionaryType(?string $typeId): ?OzonAccrualType
