@@ -11,10 +11,9 @@ use PHPUnit\Framework\TestCase;
 
 final class OzonAccrualCategoryTest extends TestCase
 {
-    public function testRegistryHasUniqueCodesAndTypeIds(): void
+    public function testRegistryHasUniqueCodes(): void
     {
         $codes = [];
-        $typeIds = [];
 
         foreach (OzonAccrualCategory::all() as $category) {
             self::assertNotSame('', $category->code);
@@ -23,11 +22,6 @@ final class OzonAccrualCategoryTest extends TestCase
             self::assertGreaterThan(0, $category->sortOrder);
             self::assertArrayNotHasKey($category->code, $codes, sprintf('Duplicate Ozon accrual category code "%s".', $category->code));
             $codes[$category->code] = true;
-
-            foreach ($category->typeIds as $typeId) {
-                self::assertArrayNotHasKey($typeId, $typeIds, sprintf('Duplicate Ozon accrual type_id "%s".', $typeId));
-                $typeIds[$typeId] = $category->code;
-            }
 
             foreach (array_merge([$category->label], $category->aliases) as $alias) {
                 $resolved = OzonAccrualCategory::findByOzonName($alias);
@@ -42,9 +36,13 @@ final class OzonAccrualCategoryTest extends TestCase
         }
     }
 
-    public function testFindsCategoryByTypeIdAndAlias(): void
+    public function testFindsCategoryByAliasAndNeverByTypeId(): void
     {
-        $logistics = OzonAccrualCategory::findByTypeId('29');
+        // 29 в справочнике Ozon — LastMileCourier, а не Logistic (это 32):
+        // без имени услуги статья не угадывается по номеру.
+        self::assertFalse(OzonAccrualCategory::forTypedFee('29', null, TransactionType::FEE)->known);
+
+        $logistics = OzonAccrualCategory::findByOzonName('Logistic');
         self::assertNotNull($logistics);
         self::assertSame('ozon_logistics', $logistics->code);
         self::assertSame(TransactionType::LOGISTICS, $logistics->transactionType);
@@ -66,7 +64,7 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertTrue($warehouseExport->known);
         self::assertSame('ozon_warehouse_export', $warehouseExport->code);
 
-        $stockInsurance = OzonAccrualCategory::findByTypeId('76');
+        $stockInsurance = OzonAccrualCategory::findByOzonName('StockInsurance');
         self::assertNotNull($stockInsurance);
         self::assertSame('ozon_stock_insurance', $stockInsurance->code);
         self::assertSame(TransactionType::FEE, $stockInsurance->transactionType);
@@ -77,6 +75,69 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertSame('Начисления за отзывы клиентов', $customerReviews->label);
         self::assertSame('Продвижение и реклама', $customerReviews->group);
         self::assertSame(TransactionType::ADVERTISING, $customerReviews->transactionType);
+    }
+
+    /**
+     * Алиас-код Ozon обязан вести в статью, совпадающую с его `description` в
+     * справочнике `/v1/finance/accrual/types`. Расхождение допустимо только как
+     * проверенная формулировка — та же услуга, наше название. Так в июне в
+     * каталог попали SellerReturns («Вывоз товара со склада силами Ozon») в
+     * статье партнёров и ещё три подобных алиаса: новый алиас с чужим
+     * описанием теперь не пройдёт молча.
+     */
+    public function testAliasCodesMatchOzonDictionaryDescription(): void
+    {
+        $reviewedWording = [
+            'LastMileCourier' => ['ozon_delivery_to_pickup_partners', 'Доставка до места выдачи'],
+            'Placements' => ['ozon_warehouse_placement', 'Размещение товаров на складах Ozon'],
+            'SupplyInbound' => ['ozon_cargo_place_item_processing', 'Обработка товара'],
+            'CustomerReviews' => ['ozon_customer_reviews', 'Подписка Управление отзывами'],
+            'PushCampaign' => ['ozon_push_campaign', 'Рассылка пуш-уведомлений'],
+            'Promotion' => ['ozon_promotion', 'Продвижение товара'],
+            'Marketing' => ['ozon_marketing', 'Рекламные услуги'],
+            'InternetSiteAdvertising' => ['ozon_site_advertising', 'Реклама в сети Интернет на Сайте'],
+            'Drop-Off' => ['ozon_drop_off', 'Обработка отправления Drop-off'],
+            'ItemCompensation' => ['ozon_item_compensation', 'Товарная компенсация'],
+            'Disposal' => ['ozon_disposal', 'Утилизация'],
+            'PremiumSubscription' => ['ozon_premium_subscription', 'Подписка Premium'],
+            'LabelOriginal' => ['ozon_original_labeling', 'Бейдж Оригинал'],
+            'LabelBrandVerified' => ['ozon_brand_verification_labeling', 'Бейдж «Бренд проверен»'],
+            'StockInsurance' => ['ozon_stock_insurance', 'Страхование товара от массовых повреждений'],
+            'DefectFineComplaint' => ['ozon_defect_fine_complaint', 'Жалобы покупателей'],
+            'DefectFineShipmentDelayRate' => ['ozon_defect_fine_shipment_delay', 'Отгрузка в нерекомендованный слот'],
+            'DefectFineErrors' => ['ozon_other_services', 'Превышение индекса ошибок'],
+            'PremiumCashbackIndividualPoints' => ['ozon_other_services', 'Бонусы продавца'],
+            'PremiumMailingCommission' => ['ozon_other_services', 'Бонусы продавца - рассылка'],
+            'RfbsServiceFee' => ['ozon_other_services', 'Сервисный сбор за интеграцию с логистической платформой'],
+        ];
+
+        $json = file_get_contents(__DIR__.'/../../../../../Fixtures/Marketplace/Ozon/accrual_types.json');
+        self::assertIsString($json);
+        /** @var array{accrual_types: list<array{id: int, name: string, description: string}>} $dictionary */
+        $dictionary = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+
+        $normalize = static fn (string $value): string => str_replace('ё', 'е', mb_strtolower(trim($value)));
+        $checked = 0;
+        foreach ($dictionary['accrual_types'] as $type) {
+            $category = OzonAccrualCategory::findByOzonName($type['name']);
+            if (null === $category) {
+                continue;
+            }
+
+            ++$checked;
+            if (array_key_exists($type['name'], $reviewedWording)) {
+                self::assertSame($reviewedWording[$type['name']], [$category->code, $type['description']], sprintf('Reviewed wording for "%s" is stale.', $type['name']));
+                continue;
+            }
+
+            self::assertSame(
+                $normalize($type['description']),
+                $normalize($category->label),
+                sprintf('Ozon "%s" (%s) resolves to "%s" (%s).', $type['name'], $type['description'], $category->code, $category->label),
+            );
+        }
+
+        self::assertGreaterThanOrEqual(\count($reviewedWording), $checked);
     }
 
     public function testFindsObservedInternalOzonExternalCodes(): void
@@ -98,7 +159,7 @@ final class OzonAccrualCategoryTest extends TestCase
             'InternetSiteAdvertising' => 'ozon_site_advertising',
             'ItemCompensation' => 'ozon_item_compensation',
             'Installment' => 'ozon_installment',
-            'ItemPacking' => 'ozon_partner_packaging',
+            'ItemPacking' => 'ozon_warehouse_additional_packaging',
             'LabelBrandVerified' => 'ozon_brand_verification_labeling',
             'LabelOriginal' => 'ozon_original_labeling',
             'Logistic' => 'ozon_logistics',
@@ -106,7 +167,9 @@ final class OzonAccrualCategoryTest extends TestCase
             'PackageCost' => 'ozon_packaging_materials',
             'PackingFee' => 'ozon_partner_packaging',
             'PayPerClick' => 'ozon_cpc',
-            'Placements' => 'ozon_partner_placement',
+            'LastMileCourier' => 'ozon_delivery_to_pickup_partners',
+            'PickUpPointReturnAcceptance' => 'ozon_partner_return_processing',
+            'Placements' => 'ozon_warehouse_placement',
             'PremiumCashbackIndividualPoints' => 'ozon_other_services',
             'PremiumMailingCommission' => 'ozon_other_services',
             'PremiumSubscription' => 'ozon_premium_subscription',
@@ -114,10 +177,11 @@ final class OzonAccrualCategoryTest extends TestCase
             'PushCampaign' => 'ozon_push_campaign',
             'ReturnFlowLogistic' => 'ozon_reverse_logistics',
             'RfbsServiceFee' => 'ozon_other_services',
-            'SellerReturns' => 'ozon_partner_return_processing',
+            'SellerReturns' => 'ozon_warehouse_export',
             'StarsMembership' => 'ozon_stars_membership',
             'StockInsurance' => 'ozon_stock_insurance',
-            'TemporaryPlacement' => 'ozon_temporary_partner_storage',
+            'SupplyInbound' => 'ozon_cargo_place_item_processing',
+            'TemporaryPlacement' => 'ozon_fbs_return_short_placement',
             'TemporaryPlacementsAgent' => 'ozon_temporary_partner_storage',
         ];
 
@@ -190,6 +254,6 @@ final class OzonAccrualCategoryTest extends TestCase
         self::assertFalse($unknown->known);
         self::assertSame(TransactionType::FEE, $unknown->transactionType);
         self::assertSame('Требует классификации', $unknown->group);
-        self::assertSame(['999999'], $unknown->typeIds);
+        self::assertSame('ozon_unknown_999999', $unknown->code);
     }
 }

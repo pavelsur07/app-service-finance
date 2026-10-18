@@ -11,7 +11,6 @@ final readonly class OzonAccrualCategory
     private const UNKNOWN_GROUP = 'Требует классификации';
 
     /**
-     * @param list<string> $typeIds
      * @param list<string> $aliases
      */
     public function __construct(
@@ -21,7 +20,6 @@ final readonly class OzonAccrualCategory
         public TransactionType $transactionType,
         public int $sortOrder,
         public ?string $parentLabel = null,
-        public array $typeIds = [],
         public array $aliases = [],
         public bool $known = true,
     ) {
@@ -51,24 +49,26 @@ final readonly class OzonAccrualCategory
             new self('ozon_sale_commission', 'Вознаграждение за продажу', 'Вознаграждение Ozon', TransactionType::COMMISSION, 300),
             new self('ozon_commission_refund', 'Возврат вознаграждения', 'Вознаграждение Ozon', TransactionType::COMMISSION, 310),
 
-            new self('ozon_logistics', 'Логистика', 'Услуги доставки', TransactionType::LOGISTICS, 400, typeIds: ['29'], aliases: ['Логистика Ozon', 'Logistic']),
+            new self('ozon_logistics', 'Логистика', 'Услуги доставки', TransactionType::LOGISTICS, 400, aliases: ['Логистика Ozon', 'Logistic']),
             new self('ozon_reverse_logistics', 'Обратная логистика', 'Услуги доставки', TransactionType::LOGISTICS, 410, aliases: ['Обратная логистика Ozon', 'ReturnFlowLogistic']),
-            new self('ozon_delivery_to_pickup_ozon', 'Доставка до места выдачи силами Ozon', 'Услуги доставки', TransactionType::LAST_MILE, 420, typeIds: ['45'], aliases: ['Доставка до ПВЗ силами Ozon', 'DeliveryToHandoverPlaceByOzon']),
+            new self('ozon_delivery_to_pickup_ozon', 'Доставка до места выдачи силами Ozon', 'Услуги доставки', TransactionType::LAST_MILE, 420, aliases: ['Доставка до ПВЗ силами Ozon', 'DeliveryToHandoverPlaceByOzon']),
 
-            new self('ozon_partner_return_processing', 'Обработка возвратов, отмен и невыкупов партнёрами', 'Услуги партнёров', TransactionType::FEE, 500, aliases: ['Обработка возвратов, отмен и невыкупов партнерами', 'SellerReturns']),
+            new self('ozon_partner_return_processing', 'Обработка возвратов, отмен и невыкупов партнёрами', 'Услуги партнёров', TransactionType::FEE, 500, aliases: ['Обработка возвратов, отмен и невыкупов партнерами', 'PickUpPointReturnAcceptance']),
             new self('ozon_acquiring', 'Эквайринг', 'Услуги партнёров', TransactionType::ACQUIRING, 510, aliases: ['Эквайринг Ozon', 'Acquiring']),
-            new self('ozon_partner_packaging', 'Упаковка товара партнёрами', 'Услуги партнёров', TransactionType::FEE, 520, aliases: ['Упаковка товара партнерами', 'ItemPacking', 'PackingFee']),
-            new self('ozon_delivery_to_pickup_partners', 'Доставка до места выдачи партнёрами', 'Услуги партнёров', TransactionType::LAST_MILE, 530, aliases: ['Доставка до места выдачи партнерами']),
-            new self('ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 540, aliases: ['Временное размещение товара партнерами', 'TemporaryPlacement', 'TemporaryPlacementsAgent']),
-            new self('ozon_partner_placement', 'Размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 550, aliases: ['Placements']),
+            new self('ozon_partner_packaging', 'Упаковка товара партнёрами', 'Услуги партнёров', TransactionType::FEE, 520, aliases: ['Упаковка товара партнерами', 'PackingFee']),
+            new self('ozon_delivery_to_pickup_partners', 'Доставка до места выдачи партнёрами', 'Услуги партнёров', TransactionType::LAST_MILE, 530, aliases: ['Доставка до места выдачи партнерами', 'LastMileCourier']),
+            new self('ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 540, aliases: ['Временное размещение товара партнерами', 'TemporaryPlacementsAgent']),
+            new self('ozon_partner_placement', 'Размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 550),
 
             new self('ozon_cross_docking', 'Кросс-докинг', 'Услуги FBO', TransactionType::LOGISTICS, 600, parentLabel: 'Доставка до склада', aliases: ['Кросс-докинг Ozon', 'CrossDock']),
-            new self('ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE, 700, parentLabel: 'Складские услуги'),
-            new self('ozon_warehouse_placement', 'Размещение товаров на складах', 'Услуги FBO', TransactionType::STORAGE, 710, parentLabel: 'Складские услуги'),
+            new self('ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE, 700, parentLabel: 'Складские услуги', aliases: ['SellerReturns']),
+            new self('ozon_warehouse_placement', 'Размещение товаров на складах', 'Услуги FBO', TransactionType::STORAGE, 710, parentLabel: 'Складские услуги', aliases: ['Placements']),
             new self('ozon_warehouse_export_preparation', 'Подготовка товара к вывозу', 'Услуги FBO', TransactionType::STORAGE, 720, parentLabel: 'Складские услуги'),
+            new self('ozon_warehouse_additional_packaging', 'Дополнительная упаковка на складе Ozon', 'Услуги FBO', TransactionType::FEE, 730, parentLabel: 'Складские услуги', aliases: ['ItemPacking']),
+            new self('ozon_fbs_return_short_placement', 'Краткосрочное размещение возврата FBS', 'Услуги FBO', TransactionType::STORAGE, 740, parentLabel: 'Складские услуги', aliases: ['TemporaryPlacement']),
             new self('ozon_incomplete_supply_booking', 'Бронирование места и персонала для поставки с неполным составом', 'Услуги FBO', TransactionType::ACCEPTANCE, 800, parentLabel: 'Услуги приёмки', aliases: ['Бронирование места и персонала для поставки с неполным составом Ozon']),
             new self('ozon_identified_surplus_processing', 'Обработка опознанных излишков в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE, 810, parentLabel: 'Услуги приёмки'),
-            new self('ozon_cargo_place_item_processing', 'Обработка товара в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE, 820, parentLabel: 'Услуги приёмки', typeIds: ['77']),
+            new self('ozon_cargo_place_item_processing', 'Обработка товара в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE, 820, parentLabel: 'Услуги приёмки', aliases: ['SupplyInbound']),
 
             new self('ozon_cpc', 'Оплата за клик', 'Продвижение и реклама', TransactionType::ADVERTISING, 900, aliases: ['Оплата за клик Ozon', 'PayPerClick']),
             new self('ozon_accelerated_reviews', 'Ускоренный сбор отзывов', 'Продвижение и реклама', TransactionType::ADVERTISING, 910, aliases: ['Приобретение отзывов Ozon', 'Баллы за отзывы', 'AcceleratedReviewCollection']),
@@ -92,7 +92,7 @@ final readonly class OzonAccrualCategory
             new self('ozon_premium_subscription', 'Premium-подписка', 'Другие услуги и штрафы', TransactionType::FEE, 1030, aliases: ['PremiumSubscription']),
             new self('ozon_original_labeling', 'Маркировка оригинальности', 'Другие услуги и штрафы', TransactionType::FEE, 1040, aliases: ['LabelOriginal']),
             new self('ozon_brand_verification_labeling', 'Маркировка проверенного бренда', 'Другие услуги и штрафы', TransactionType::FEE, 1042, aliases: ['LabelBrandVerified']),
-            new self('ozon_stock_insurance', 'Страхование остатков', 'Другие услуги и штрафы', TransactionType::FEE, 1045, typeIds: ['76'], aliases: ['StockInsurance']),
+            new self('ozon_stock_insurance', 'Страхование остатков', 'Другие услуги и штрафы', TransactionType::FEE, 1045, aliases: ['StockInsurance']),
             new self('ozon_defect_fine_complaint', 'Штраф за жалобу', 'Другие услуги и штрафы', TransactionType::PENALTY, 1050, aliases: ['DefectFineComplaint']),
             new self('ozon_defect_fine_shipment_delay', 'Штраф за задержку отгрузки', 'Другие услуги и штрафы', TransactionType::PENALTY, 1060, aliases: ['DefectFineShipmentDelayRate']),
             new self('ozon_other_services', 'Другие услуги', 'Другие услуги и штрафы', TransactionType::FEE, 1090, aliases: ['DefectFineErrors', 'PremiumCashbackIndividualPoints', 'PremiumMailingCommission', 'RfbsServiceFee']),
@@ -104,16 +104,6 @@ final readonly class OzonAccrualCategory
     public static function findByCode(string $code): ?self
     {
         return self::byCode()[$code] ?? null;
-    }
-
-    public static function findByTypeId(?string $typeId): ?self
-    {
-        $typeId = self::normalizeTypeId($typeId);
-        if (null === $typeId) {
-            return null;
-        }
-
-        return self::byTypeId()[$typeId] ?? null;
     }
 
     public static function findByOzonName(?string $name): ?self
@@ -137,7 +127,6 @@ final readonly class OzonAccrualCategory
 
         return (null !== $externalCode ? self::findByCode($externalCode) : null)
             ?? self::findByOzonName($externalCode)
-            ?? self::findByTypeId($typeId)
             ?? self::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
     }
 
@@ -169,7 +158,6 @@ final readonly class OzonAccrualCategory
             group: self::UNKNOWN_GROUP,
             transactionType: $fallbackType,
             sortOrder: 9000,
-            typeIds: null !== $typeId ? [$typeId] : [],
             aliases: null !== $typeName ? [$typeName] : [],
             known: false,
         );
@@ -190,31 +178,6 @@ final readonly class OzonAccrualCategory
         $map = [];
         foreach (self::all() as $category) {
             $map[$category->code] = $category;
-        }
-
-        return $map;
-    }
-
-    /**
-     * @return array<string, self>
-     */
-    private static function byTypeId(): array
-    {
-        /** @var array<string, self>|null $map */
-        static $map = null;
-
-        if (null !== $map) {
-            return $map;
-        }
-
-        $map = [];
-        foreach (self::all() as $category) {
-            foreach ($category->typeIds as $typeId) {
-                $normalized = self::normalizeTypeId($typeId);
-                if (null !== $normalized) {
-                    $map[$normalized] = $category;
-                }
-            }
         }
 
         return $map;

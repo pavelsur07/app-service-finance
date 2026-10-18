@@ -105,8 +105,7 @@ final readonly class DiscoverExternalCategoriesAction
             }
 
             $mappedCategory = (null !== $externalCode ? OzonAccrualCategory::findByCode(OzonAccrualCategoryTaxonomyResolver::normalizeExternalCode($externalCode) ?? '') : null)
-                ?? (null !== $externalCode ? OzonAccrualCategory::findByOzonName($externalCode) : null)
-                ?? OzonAccrualCategory::findByTypeId($typeId);
+                ?? (null !== $externalCode ? OzonAccrualCategory::findByOzonName($externalCode) : null);
             $categoryId = $externalCategory->getId();
             $mappingKnownByCategoryId[$categoryId] ??= $this->mappingRepository->findByCategory($externalCategory) instanceof ExternalCategoryMapping;
 

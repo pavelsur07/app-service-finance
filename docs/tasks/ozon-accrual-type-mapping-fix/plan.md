@@ -27,7 +27,7 @@ Marketplace, Cash и их маппинги не трогаем.
 
 Часть алиасов каталога противоречит русскому `description` словаря Ozon.
 
-| Ozon: id, name, description | Сейчас | Должно быть (по `description` и `OzonCostCategory.xlsxGroup`) | Тип | Строк |
+| Ozon: id, name, description | Сейчас | Должно быть (по `description` и `OzonCostCategory.xlsxGroup`) | Тип статьи | Строк |
 |---|---|---|---|---|
 | 29 LastMileCourier «Доставка до места выдачи» | `ozon_logistics`, Услуги доставки | `ozon_delivery_to_pickup_partners`, Услуги партнёров | logistics → **last_mile** | 150 137 |
 | 45 PickUpPointReturnAcceptance «Обработка возвратов, отмен и невыкупов партнёрами» | `ozon_delivery_to_pickup_ozon`, Услуги доставки | `ozon_partner_return_processing`, Услуги партнёров | last_mile → **fee** | 10 452 |
@@ -41,22 +41,21 @@ Marketplace, Cash и их маппинги не трогаем.
 Строки — все транзакции by-day с 2026-05-17 по 2026-10-17 у 4 компаний.
 Суммы не теряются: искажены статья, группа и у трёх типов — `TransactionType`.
 
-## Решение Владельца, нужное до Stage 1
+## Решение Владельца (18.10.2026): вариант A
 
-`type` входит в естественный ключ транзакции
-(`findByNaturalKey(companyId, source, externalId, type)`) и в группировку
-ночной сверки. Урок `docs/tasks/ozon-accrual-retype-boundary/`: смена типа
-красит `verify-rolling-refresh` на 45 дней, `refresh-category-metadata` такие
-строки не находит, а чинить историю можно только `normalize-stored
---include-done` окнами полного владения снапшотов.
+Исправлять статью, группу и тип. Проверка в Stage 1 показала, что **ни у
+одной существующей транзакции тип не меняется**: тип берётся из статьи только у
+компонента `non_item_fee` (базовый тип `OTHER`), у `delivery` и `item_fee` он
+всегда `FEE`. На проде 29, 45 — `delivery`, 71, 78 — `item_fee`, все `fee`; у 46
+и 84 (`non_item_fee`) прежняя и новая статьи одного типа (storage / fee).
+Значит, естественный ключ `(companyId, source, externalId, type)` не
+меняется, ночная сверка не краснеет, и ремонт истории — это обновление
+`source_data` (`daily-maintenance --from --to --execute`), а не
+`normalize-stored --include-done`.
 
-| Вариант | Что | Ремонт истории | Риск |
-|---|---|---|---|
-| **A** (рекомендую) | Исправить статью, группу **и тип** (29, 45, 71) | `normalize-stored --include-done --execute-inline`, 4 магазина × 2026-05-17…сегодня, окнами снапшотов | Выше: процедура доказана, но в сентябре дала два инцидента, оба закрыты в коде. Гейт сверки красный от деплоя до конца ремонта |
-| B | Исправить статью и группу, тип оставить прежним (маппинги в БД несут свой `transaction_type`) | `daily-maintenance --from --to --execute` (меняет только `source_data`), cron сам чинит 45 дней | Ниже, но код статьи и тип расходятся (как уже у `ozon_drop_off`); тип чинить позже той же процедурой A |
-
-Почему A: Ingestion ещё в shadow, типы никто вне модуля не читает. Сейчас
-перетипизация дешевле всего, после переключения она станет дороже.
+Замечено, к задаче не относится: у 46 и 84 есть 136 и 256 живых строк с
+`type = 'other'` — остаток перетипизации `#2440` (`ozon-accrual-retype-boundary`).
+Refresh их не найдёт (тип в ключе другой); сверить в Stage 3 и вынести в FOLLOW-UP.
 
 ## Вне задачи
 
@@ -71,7 +70,7 @@ Baseline: записать перед Stage 1 — `make site-test-unit` по
 
 ## Stage 1: каталог и разбор без `type_id`
 Risk: HIGH-LOCAL (разнесение по категориям)
-stage_base_commit: <записать перед 1.1>
+stage_base_commit: fada74482ec9a09de6402516fc7334692b52e981
 Definition of Done:
 - `OzonAccrualCategory` без поля `typeIds` и `findByTypeId()`; seed и discover
   не создают ключей `type:*`; статический fallback резолвера не разбирает по id.
@@ -81,7 +80,6 @@ Definition of Done:
   `ozon_warehouse_placement`, `SupplyInbound` → `ozon_cargo_place_item_processing`;
   `ItemPacking`, `TemporaryPlacement` — две новые категории с label из
   `description` Ozon и группой «Услуги FBO». Неверные алиасы сняты с прежних категорий.
-- Вариант B: типы перечисленных категорий не меняются — см. 2.2.
 - Регрессионные тесты красные на старом коде: by-day строка `type_id=29,
   name=LastMileCourier` разбирается в `ozon_delivery_to_pickup_partners`; seed не
   создаёт `type:*`; сопоставление каждого исправленного алиаса.
@@ -113,12 +111,10 @@ Definition of Done:
     товара партнерами» и т. п.), не трогать.
 - `down()` восстанавливает прежние значения дословно (снимок 16 строк — `measurements/before-mappings.txt`).
 - Только строки с `updated_by IS NULL` (ручных правок нет, 0 на 18.10); иначе миграция падает, а не перезаписывает.
-- 2.2 (только вариант B): перенацеленные строки сохраняют прежний `transaction_type`.
 - Прогон на локальной БД со сценарием: все ключи из таблицы + контрольные ключи, которые меняться не должны.
 Work items:
 - 2.1 — миграция up/down + guard на ручные правки
-- 2.2 — (вариант B) сохранение типов
-- 2.3 — функциональный тест: после миграции резолвер разбирает 29/45/71/46/84/78 в целевые категории, контрольные ключи не изменились
+- 2.2 — функциональный тест: после миграции резолвер разбирает 29/45/71/46/84/78 в целевые категории, контрольные ключи не изменились
 Stage checks:
 - миграция up → down → up на локальной БД; `tests/Integration/Ingestion`
 Reviewer focus:
@@ -130,6 +126,10 @@ Reviewer focus:
 ревью Codex (Large), `handoff.md`, PR Ready. В запросе сразу три действия:
 merge+deploy, `production_action: migrations`, ремонт истории (§3.3).
 
+Follow-up вне модуля (по ограничению Владельца не трогаем): описание формы
+ответа `accrual/types` в `services/ozon-fetcher/docs/ozon-api.md` и мок
+fetcher'а не знают поля `description`.
+
 ## Stage 3: прод — миграция, ремонт истории, приёмка
 Risk: HIGH-EXTERNAL — только после одобрения Владельца
 Definition of Done:
@@ -138,12 +138,10 @@ Definition of Done:
   `(type_id, _ozon_category_code, type)`, max raw на день, погашенные строки;
   статус `verify-rolling-refresh`.
 - Миграция (dispatch), деплой.
-- Ремонт:
-  - A: `normalize-stored --company-id --shop-ref --from --to --include-done`
-    сначала `--dry-run`, затем `--execute-inline`, окна — полное владение
-    снапшота (урок retype-boundary), по одному магазину, сверка инвариантов между окнами;
-  - B: `daily-maintenance --from=2026-05-17 --to=<сегодня-46> --company-id --execute` по компаниям; последние 45 дней — ночной cron 05:15.
+- Ремонт: `daily-maintenance --from=2026-05-17 --to=<сегодня-46> --company-id=<uuid> --execute`
+  по каждой из 4 компаний, сначала `--dry-run`; последние 45 дней обновит ночной
+  cron 05:15 (тот же код), либо тем же запуском на всё окно.
 - Приёмка: число живых строк и сумма по магазину совпали с «до» (расхождение из-за правок Ozon задним числом объяснено);
   у 29/45/71/46/84/78 0 строк в прежних категориях; дублей 0; max raw на день = 1;
-  A — `verify-rolling-refresh` зелёный; новых `type:*` маппингов нет.
+  `verify-rolling-refresh` не изменил статус; новых `type:*` маппингов нет.
 - Итог дописан в `stages/stage-3.md`, память обновлена.

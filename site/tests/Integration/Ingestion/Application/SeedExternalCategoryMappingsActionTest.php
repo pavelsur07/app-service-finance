@@ -97,12 +97,18 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
             'LabelOriginal' => ['ozon_original_labeling', 'Маркировка оригинальности', 'Другие услуги и штрафы', TransactionType::FEE],
             'Marketing' => ['ozon_marketing', 'Маркетинг', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'PayPerClick' => ['ozon_cpc', 'Оплата за клик', 'Продвижение и реклама', TransactionType::ADVERTISING],
-            'Placements' => ['ozon_partner_placement', 'Размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE],
+            'ItemPacking' => ['ozon_warehouse_additional_packaging', 'Дополнительная упаковка на складе Ozon', 'Услуги FBO', TransactionType::FEE],
+            'LastMileCourier' => ['ozon_delivery_to_pickup_partners', 'Доставка до места выдачи партнёрами', 'Услуги партнёров', TransactionType::LAST_MILE],
+            'PickUpPointReturnAcceptance' => ['ozon_partner_return_processing', 'Обработка возвратов, отмен и невыкупов партнёрами', 'Услуги партнёров', TransactionType::FEE],
+            'Placements' => ['ozon_warehouse_placement', 'Размещение товаров на складах', 'Услуги FBO', TransactionType::STORAGE],
             'PremiumSubscription' => ['ozon_premium_subscription', 'Premium-подписка', 'Другие услуги и штрафы', TransactionType::FEE],
             'Promotion' => ['ozon_promotion', 'Продвижение', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'PushCampaign' => ['ozon_push_campaign', 'Push-кампании', 'Продвижение и реклама', TransactionType::ADVERTISING],
             'StarsMembership' => ['ozon_stars_membership', 'Звёздные товары', 'Продвижение и реклама', TransactionType::ADVERTISING],
-            'TemporaryPlacement' => ['ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE],
+            'SellerReturns' => ['ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE],
+            'SupplyInbound' => ['ozon_cargo_place_item_processing', 'Обработка товара в составе грузоместа', 'Услуги FBO', TransactionType::ACCEPTANCE],
+            'TemporaryPlacement' => ['ozon_fbs_return_short_placement', 'Краткосрочное размещение возврата FBS', 'Услуги FBO', TransactionType::STORAGE],
+            'TemporaryPlacementsAgent' => ['ozon_temporary_partner_storage', 'Временное размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE],
         ];
 
         foreach ($expectedMappings as $providerCategory => [$code, $label, $group, $type]) {

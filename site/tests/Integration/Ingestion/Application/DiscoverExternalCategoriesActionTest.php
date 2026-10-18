@@ -116,6 +116,46 @@ final class DiscoverExternalCategoriesActionTest extends IntegrationTestCase
         self::assertNull($mappingRepository->findByCategory($category));
     }
 
+    /**
+     * Регрессия: discover автомаппил строку только с `type_id=29` в «Логистику»
+     * по карте каталога, хотя 29 у Ozon — LastMileCourier. Без кода и имени
+     * услуга остаётся в очереди на разбор.
+     */
+    public function testTypeIdOnlyCategoryIsNotAutoMapped(): void
+    {
+        $this->em->persist($this->unknownOzonFeeTransaction(
+            companyId: Uuid::uuid7()->toString(),
+            rawRecordId: Uuid::uuid7()->toString(),
+            externalId: 'ozon:accrual-by-day:4:delivery:product-0:service-0:type-29',
+            component: 'delivery:product-0:service-0:type-29',
+            label: 'Неизвестный type_id Ozon: 29',
+        ));
+        $this->em->flush();
+
+        /** @var DiscoverExternalCategoriesAction $action */
+        $action = self::getContainer()->get(DiscoverExternalCategoriesAction::class);
+        $stats = $action(IngestSource::OZON, 10);
+
+        self::assertSame(1, $stats['categoriesCreated']);
+        self::assertSame(0, $stats['autoMapped']);
+        self::assertSame(1, $stats['unmapped']);
+
+        /** @var ExternalCategoryRepository $categoryRepository */
+        $categoryRepository = self::getContainer()->get(ExternalCategoryRepository::class);
+        $category = $categoryRepository->findByIdentity(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            OzonAccrualCategoryTaxonomyResolver::SCOPE_DELIVERY,
+            'type:29',
+        );
+
+        self::assertInstanceOf(ExternalCategory::class, $category);
+
+        /** @var ExternalCategoryMappingRepository $mappingRepository */
+        $mappingRepository = self::getContainer()->get(ExternalCategoryMappingRepository::class);
+        self::assertNull($mappingRepository->findByCategory($category));
+    }
+
     private function unknownOzonFeeTransaction(
         string $companyId,
         string $rawRecordId,

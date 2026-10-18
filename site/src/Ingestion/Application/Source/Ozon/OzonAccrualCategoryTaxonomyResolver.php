@@ -201,7 +201,6 @@ final class OzonAccrualCategoryTaxonomyResolver
             ?? OzonAccrualCategory::findByOzonName($externalCode)
             ?? OzonAccrualCategory::findByOzonName($providerLabel)
             ?? OzonAccrualCategory::findByOzonName($typeName)
-            ?? OzonAccrualCategory::findByTypeId($typeId)
             ?? OzonAccrualCategory::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
     }
 

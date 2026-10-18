@@ -970,10 +970,9 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 ```php
 // Разобрать услугу Ozon из /v1/finance/accrual/by-day в категорию затрат.
 // Read-only, без зависимостей: каталог категорий статический.
-// Разрешает ТОЛЬКО по имени из справочника /v1/finance/accrual/types.
-// Карта typeIds внутри каталога НЕ используется — она расходится со
-// справочником Ozon и на трёх известных значениях даёт неверную категорию
-// (29 LastMileCourier, 45 PickUpPointReturnAcceptance, 77 SupplyInbound).
+// Разрешает ТОЛЬКО по имени из справочника /v1/finance/accrual/types;
+// номер type_id статью не выбирает (в каталоге `OzonAccrualCategory` карты
+// type_id нет), алиасы сверены с `description` справочника Ozon.
 // Неразобранная услуга возвращается с known = false и группой
 // «Требует классификации» — видимая очередь на ручной разбор, не NULL и не «прочее».
 resolveByServiceType(?string $typeId, ?string $typeName): App\Ingestion\Application\DTO\OzonAccrualCategoryView
@@ -4020,6 +4019,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.21 | 2026-10-18 | Ingestion: каталог `OzonAccrualCategory` без карты `typeIds` — статья by-day выбирается только по коду услуги; 29 LastMileCourier, 45 PickUpPointReturnAcceptance, SellerReturns, Placements, ItemPacking, TemporaryPlacement разобраны по `description` справочника Ozon, две новые статьи «Услуг FBO» |
 | 2.20 | 2026-10-18 | ServiceGateway: страница админки «Покрытие Сервис GO» (`/admin/services/ozon-fetcher/coverage`) по витрине покрытия |
 | 2.19 | 2026-10-18 | ServiceGateway: новый модуль — клиент `GET /internal/coverage` ozon-fetcher (контракт `service-coverage/v1`), витрина `service_coverage_snapshot` / `service_coverage_row`, cron `app:service-gateway:coverage:refresh` каждые 10 минут |
 | 2.18 | 2026-10-17 | Marketplace: `GET /internal/marketplace-connections` — активные Ozon-кабинеты и ключи для сервисов `services/` (`ActiveConnectionCredentialsQuery`, `MarketplaceConnectionsSnapshotBuilder`, DTO `Application/DTO/Internal`) |

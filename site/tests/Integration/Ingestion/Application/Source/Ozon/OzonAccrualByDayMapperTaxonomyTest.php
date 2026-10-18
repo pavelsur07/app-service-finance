@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\Action\SeedExternalCategoryMappingsAction;
+use App\Ingestion\Application\DTO\MappedTransaction;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
@@ -18,6 +19,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Repository\ExternalCategoryRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
@@ -48,6 +50,84 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
         self::assertCount(1, $transactions);
         self::assertSame('ozon_cross_docking', $transactions[0]->sourceData['_ozon_category_code']);
         self::assertSame('Доставка до склада', $transactions[0]->sourceData['_ozon_category_parent']);
+    }
+
+    /**
+     * Регрессия: статья выбирается по имени услуги из справочника Ozon, а не по
+     * `type_id`. Ожидания сверены с `description` из `/v1/finance/accrual/types`
+     * (фикстура `tests/Fixtures/Marketplace/Ozon/accrual_types.json`). До
+     * исправления 29 уходил в «Логистику», 45 — в «Доставку силами Ozon», а
+     * четыре алиаса вели в статьи партнёров.
+     */
+    #[DataProvider('ozonServiceTypes')]
+    public function testSeededServiceResolvesByOzonNameNotByTypeId(
+        int $typeId,
+        string $name,
+        string $expectedCode,
+        string $expectedGroup,
+        TransactionType $expectedType,
+    ): void {
+        /** @var SeedExternalCategoryMappingsAction $seedAction */
+        $seedAction = self::getContainer()->get(SeedExternalCategoryMappingsAction::class);
+        $seedAction(IngestSource::OZON);
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+        $transactions = $mapper->mapForCategoryMetadataRefresh($this->rawRecord(Uuid::uuid7()->toString()), [[
+            'accrual_id' => 777100 + $typeId,
+            'date' => '2026-06-15',
+            'unit_number' => 'unit-1',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => [
+                'type_id' => $typeId,
+                'name' => $name,
+                'accrued' => ['amount' => '-10.00', 'currency' => 'RUB'],
+            ],
+        ]], recordUnknownCategories: false);
+
+        self::assertCount(1, $transactions);
+        self::assertSame($expectedCode, $transactions[0]->sourceData['_ozon_category_code']);
+        self::assertSame($expectedGroup, $transactions[0]->sourceData['_ozon_category_group']);
+        self::assertTrue($transactions[0]->sourceData['_ozon_category_known']);
+        self::assertSame($expectedType, $transactions[0]->type);
+    }
+
+    /**
+     * @return iterable<string, array{int, string, string, string, TransactionType}>
+     */
+    public static function ozonServiceTypes(): iterable
+    {
+        yield '29 LastMileCourier' => [29, 'LastMileCourier', 'ozon_delivery_to_pickup_partners', 'Услуги партнёров', TransactionType::LAST_MILE];
+        yield '45 PickUpPointReturnAcceptance' => [45, 'PickUpPointReturnAcceptance', 'ozon_partner_return_processing', 'Услуги партнёров', TransactionType::FEE];
+        yield '71 SellerReturns' => [71, 'SellerReturns', 'ozon_warehouse_export', 'Услуги FBO', TransactionType::STORAGE];
+        yield '46 Placements' => [46, 'Placements', 'ozon_warehouse_placement', 'Услуги FBO', TransactionType::STORAGE];
+        yield '84 ItemPacking' => [84, 'ItemPacking', 'ozon_warehouse_additional_packaging', 'Услуги FBO', TransactionType::FEE];
+        yield '78 TemporaryPlacement' => [78, 'TemporaryPlacement', 'ozon_fbs_return_short_placement', 'Услуги FBO', TransactionType::STORAGE];
+        yield '77 SupplyInbound' => [77, 'SupplyInbound', 'ozon_cargo_place_item_processing', 'Услуги FBO', TransactionType::ACCEPTANCE];
+        yield '76 StockInsurance' => [76, 'StockInsurance', 'ozon_stock_insurance', 'Другие услуги и штрафы', TransactionType::FEE];
+        yield '32 Logistic' => [32, 'Logistic', 'ozon_logistics', 'Услуги доставки', TransactionType::LOGISTICS];
+    }
+
+    public function testSeedCreatesNoTypeIdKeys(): void
+    {
+        /** @var SeedExternalCategoryMappingsAction $seedAction */
+        $seedAction = self::getContainer()->get(SeedExternalCategoryMappingsAction::class);
+        $seedAction(IngestSource::OZON);
+
+        $typeKeys = (int) $this->em->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM ingest_external_categories WHERE source = 'ozon' AND normalized_key LIKE 'type:%'",
+        );
+
+        self::assertSame(0, $typeKeys);
+    }
+
+    public function testServiceWithoutKnownNameStaysUnknownInsteadOfMatchingByTypeId(): void
+    {
+        $transactions = $this->mapNonItemFee(29, null);
+
+        self::assertCount(1, $transactions);
+        self::assertFalse($transactions[0]->sourceData['_ozon_category_known']);
+        self::assertSame('ozon_unknown_29', $transactions[0]->sourceData['_ozon_category_code']);
     }
 
     public function testMetadataRefreshCanMapUnknownFeeWithoutRecordingCategory(): void
@@ -283,6 +363,28 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
             fetchedAt: new \DateTimeImmutable('2026-06-20 20:35:35'),
             syncJobId: Uuid::uuid7()->toString(),
         );
+    }
+
+    /**
+     * @return list<MappedTransaction>
+     */
+    private function mapNonItemFee(int $typeId, ?string $name): array
+    {
+        $fee = ['type_id' => $typeId, 'accrued' => ['amount' => '-10.00', 'currency' => 'RUB']];
+        if (null !== $name) {
+            $fee['name'] = $name;
+        }
+
+        /** @var OzonAccrualByDayMapper $mapper */
+        $mapper = self::getContainer()->get(OzonAccrualByDayMapper::class);
+
+        return $mapper->mapForCategoryMetadataRefresh($this->rawRecord(Uuid::uuid7()->toString()), [[
+            'accrual_id' => 777200 + $typeId,
+            'date' => '2026-06-15',
+            'unit_number' => 'unit-1',
+            'accrued_category' => 'NON_ITEM',
+            'non_item_fee' => $fee,
+        ]], recordUnknownCategories: false);
     }
 
     /**
