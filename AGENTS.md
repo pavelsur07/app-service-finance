@@ -18,7 +18,8 @@ linked documents — read the one your task touches, not all of them:
 | `docs/workflow/new-module.md` | New module configuration and directory layout | creating `src/{Module}` |
 | `docs/maintenance/quality-gates.md` | PHPStan baseline, cs-check, branch protection: design and history | red gate, CI trouble |
 | `docs/maintenance/prod-access.md` | Production access: alias, wrappers, allowlists, log/backup paths | before touching production |
-| `services/AGENTS.md` | Go/Python services monorepo: boundaries, contracts, transport A (HTTP push + durable inbox) | task touching `services/` |
+| `services/AGENTS.md` | Go/Python services monorepo: boundaries, contracts, pull model (Symfony pulls results) | task touching `services/` |
+| `docs/architecture/service-gateway.md` | Symfony as the single gateway to services: registry, standard endpoints, timeouts, read models, async commands, tokens, new-service checklist | any task where Symfony, the frontend or the admin talks to `services/` |
 
 Main application: `site/` (Symfony 7.4, Doctrine, PostgreSQL, Redis, Messenger,
 Twig, React/Vite, Docker Compose, Makefile). Services monorepo: `services/`
