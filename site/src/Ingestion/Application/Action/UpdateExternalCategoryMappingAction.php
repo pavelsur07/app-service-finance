@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Application\Action;
 
+use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Entity\ExternalCategory;
 use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
@@ -11,6 +12,8 @@ use App\Ingestion\Entity\ExternalCategoryMappingAudit;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Exception\UnknownCategoryGroupException;
+use App\Ingestion\Repository\CategoryGroupRepository;
 use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
@@ -24,6 +27,7 @@ final readonly class UpdateExternalCategoryMappingAction
         private ExternalCategoryMappingRepository $mappingRepository,
         private ExternalCategoryCompanyMappingRepository $companyMappingRepository,
         private EntityManagerInterface $entityManager,
+        private CategoryGroupRepository $groupRepository,
     ) {
     }
 
@@ -50,6 +54,7 @@ final readonly class UpdateExternalCategoryMappingAction
         if (null !== $companyId) {
             Assert::uuid($companyId);
         }
+        $canonicalGroup = $this->allowedGroup($category, $canonicalGroup, $known);
 
         $this->entityManager->wrapInTransaction(function () use (
             $category,
@@ -188,6 +193,32 @@ final readonly class UpdateExternalCategoryMappingAction
             companyId: $companyId,
             updatedBy: $updatedBy,
         ));
+    }
+
+    /**
+     * Группа — из закрытого списка источника (`ingest_category_groups`), если он
+     * у источника заведён. Свободный текст уже дал на проде «Другие услуги и⏎штрафы».
+     */
+    private function allowedGroup(ExternalCategory $category, string $canonicalGroup, bool $known): string
+    {
+        $groups = $this->groupRepository->findBySourceIndexedByCode($category->getSource());
+        if ([] === $groups) {
+            return $canonicalGroup;
+        }
+
+        $normalized = trim((string) preg_replace('/\s+/u', ' ', $canonicalGroup));
+        foreach ($groups as $code => $group) {
+            if ($group->getLabel() !== $normalized) {
+                continue;
+            }
+            if ($known && OzonCategoryGroupSeed::UNCLASSIFIED_CODE === $code) {
+                throw new UnknownCategoryGroupException('Распознанная категория (known) не может быть в группе «Требует классификации».');
+            }
+
+            return $group->getLabel();
+        }
+
+        throw new UnknownCategoryGroupException(sprintf('Группа «%s» не входит в закрытый список групп источника.', $normalized));
     }
 
     private function optionalString(?string $value): ?string

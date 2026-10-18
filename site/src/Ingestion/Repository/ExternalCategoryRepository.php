@@ -73,4 +73,34 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
+     *
+     * @param list<string> $normalizedKeys
+     * @param list<ExternalCategoryStatus> $statuses
+     *
+     * @return list<ExternalCategory>
+     */
+    public function findByTypeIdOrKeys(
+        IngestSource $source,
+        string $resourceType,
+        string $externalTypeId,
+        array $normalizedKeys,
+        array $statuses,
+    ): array {
+        return $this->createQueryBuilder('category')
+            ->andWhere('category.source = :source')
+            ->andWhere('category.resourceType = :resourceType')
+            ->andWhere('category.externalTypeId = :externalTypeId OR category.normalizedKey IN (:normalizedKeys)')
+            ->andWhere('category.status IN (:statuses)')
+            ->setParameter('source', $source->value)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('externalTypeId', $externalTypeId)
+            ->setParameter('normalizedKeys', [] !== $normalizedKeys ? $normalizedKeys : ['-'])
+            ->setParameter('statuses', array_map(static fn (ExternalCategoryStatus $status): string => $status->value, $statuses))
+            ->orderBy('category.scope', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+    }
 }

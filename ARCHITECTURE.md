@@ -962,6 +962,29 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 > Используй **только** эти методы. Не выдумывай новые без обновления этого файла.
 > Нет нужного метода — спроси, не создавай самостоятельно.
 
+### `OzonAccrualTypesAdminFacadeInterface` (`src/Ingestion/Facade/OzonAccrualTypesAdminFacade.php`)
+
+Админский контракт справочника типов начислений Ozon; потребитель —
+`Admin\Controller\IngestionExternalCategoriesController` (`ROLE_ADMIN`). Решения
+глобальные — действуют для всех компаний; актор обязателен.
+
+```php
+// Очередь «Новые типы Ozon»: типы справочника с начислениями known = false и
+// предложение (код, название, группа и её источник: отчёт Ozon / правило / нет).
+typeQueue(int $limit = 100): list<App\Ingestion\Application\DTO\OzonAccrualTypeQueueItem>
+// Спорные группы: отчёт кабинета подтвердил другую группу, чем действующая.
+groupDisputes(): list<App\Ingestion\Application\DTO\OzonAccrualTypeDisputeView>
+// Закрытый список групп Ozon для форм.
+ozonGroups(): list<App\Ingestion\Application\DTO\CategoryGroupView>
+// Маппинг по умолчанию неразобранным внешним категориям типа: код из справочника,
+// название и группа админа, known = true, тип транзакции = текущий тип строк.
+confirmType(int $typeId, string $groupCode, string $label, string $actorUserId): int
+// Принять группу из спорного отчёта или оставить действующую.
+resolveGroupDispute(int $typeId, bool $accept, string $actorUserId): void
+// Импорт xlsx «Детализация начислений» (файл не сохраняется).
+importDetailsReport(string $companyId, string $path, bool $dryRun): App\Ingestion\Application\DTO\OzonAccrualDetailsImportResult
+```
+
 ### `OzonAccrualCategoryFacade` (`src/Ingestion/Facade/OzonAccrualCategoryFacade.php`)
 
 > Marketplace этим фасадом больше не пользуется: с 11.09.2026 услуги by-day
@@ -4022,6 +4045,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.26 | 2026-10-18 | Ingestion: `OzonAccrualTypesAdminFacadeInterface` — очередь новых типов Ozon, подтверждение, споры по группам, импорт отчёта из админки; группа маппинга — из закрытого списка `ingest_category_groups`; ручная правка маппинга в админке требует актора |
 | 2.25 | 2026-10-18 | Ingestion: группы Ozon из отчёта кабинета «Детализация начислений» — `ingest_ozon_accrual_type_groups`, команда `app:ingestion:ozon-accrual:import-details-xlsx`; подтверждённая группа сильнее группы каталога (кроме ручных маппингов) |
 | 2.24 | 2026-10-18 | Ingestion: закрытый список групп `ingest_category_groups` и правила подсказки группы `ingest_category_group_rules` (`OzonAccrualGroupSuggester`); статья из справочника получает группу при высокой уверенности правила |
 | 2.23 | 2026-10-18 | Ingestion: статья by-day для типа вне маппингов и каталога строится из справочника `ingest_ozon_accrual_types` (`OzonAccrualDictionaryCategoryFactory`), `known = false`, тип транзакции не меняется |

@@ -40,6 +40,128 @@
     </div>
   </div>
 
+  {% set group_source_labels = {
+    'ozon_report': 'отчёт Ozon',
+    'rule': 'правило',
+    'rule_medium': 'правило (подсказка)',
+    'none': 'нет',
+  } %}
+
+  <div class="card">
+    <div class="wz-sec-title">Новые типы Ozon</div>
+    <p class="field-helper">Типы из справочника Ozon с неразобранными начислениями. Подтверждение ставит маппинг по умолчанию: код из справочника, название и группа — ваши; тип операции не меняется. Строки обновит ночной refresh или refresh metadata за период.</p>
+    {% if ozon_type_queue is empty %}
+      <p style="color:var(--text-faint);">Неразобранных типов из справочника нет.</p>
+    {% else %}
+      <div class="t-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>type_id</th>
+              <th>Код Ozon / описание</th>
+              <th class="t-cell--right">Строк</th>
+              <th>Период</th>
+              <th>Тип операции</th>
+              <th>Предложение</th>
+              <th>Подтвердить</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in ozon_type_queue %}
+              <tr>
+                <td style="font-variant-numeric:tabular-nums;">{{ item.typeId }}{% if item.removed %} <span class="status status--neutral"><span class="dot"></span>убран Ozon</span>{% endif %}</td>
+                <td><code>{{ item.name }}</code><br>{{ item.description ?? '—' }}</td>
+                <td class="t-cell--right">{{ item.transactions }}</td>
+                <td style="font-variant-numeric:tabular-nums;">{{ item.firstDate|date('d.m.Y') }} — {{ item.lastDate|date('d.m.Y') }}</td>
+                <td>{{ item.transactionType }}</td>
+                <td><code>{{ item.proposal.code }}</code><br>{{ item.proposal.groupLabel ?? '—' }} <span style="color:var(--text-faint);">({{ group_source_labels[item.proposal.groupSource] ?? item.proposal.groupSource }})</span></td>
+                <td>
+                  {% if item.awaitingRefresh %}
+                    <span class="status status--pending"><span class="dot"></span>Подтверждён, ждёт refresh</span>
+                  {% else %}
+                  <form action="{{ path('admin_ingestion_external_categories_confirm_ozon_type', {typeId: item.typeId}) }}" method="POST" style="display:flex; flex-direction:column; gap:4px; min-width:240px;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_confirm_ozon_type_' ~ item.typeId) }}">
+                    <input class="input" name="label" value="{{ item.proposal.label }}" aria-label="Название статьи" required>
+                    <select class="select" name="group_code" aria-label="Группа" required>
+                      <option value="">— группа —</option>
+                      {% for group in ozon_groups %}
+                        <option value="{{ group.code }}" {% if group.code == item.proposal.groupCode %}selected{% endif %}>{{ group.label }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if ozon_type_disputes is not empty %}
+    <div class="card">
+      <div class="wz-sec-title">Спорные группы Ozon</div>
+      <p class="field-helper">Отчёт кабинета подтвердил другую группу, чем уже действующая. Действует прежняя, пока вы не решите. Решение касается всех компаний.</p>
+      <div class="t-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>type_id</th>
+              <th>Действует</th>
+              <th>Новый отчёт</th>
+              <th>Компания отчёта</th>
+              <th>Решение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for dispute in ozon_type_disputes %}
+              <tr>
+                <td>{{ dispute.typeId }}{% if dispute.typeName %} · <code>{{ dispute.typeName }}</code>{% endif %}</td>
+                <td>{{ dispute.currentGroupLabel }} <span style="color:var(--text-faint);">({{ dispute.currentVotes }} голосов)</span></td>
+                <td>{{ dispute.disputedGroupLabel }} <span style="color:var(--text-faint);">({{ dispute.disputedVotes }} голосов{% if dispute.disputedAt %}, {{ dispute.disputedAt }}{% endif %})</span></td>
+                <td><code>{{ dispute.disputedCompanyId ?? '—' }}</code></td>
+                <td>
+                  <form action="{{ path('admin_ingestion_external_categories_resolve_ozon_type_group_dispute', {typeId: dispute.typeId}) }}" method="POST" style="display:flex; gap:4px;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_resolve_dispute_' ~ dispute.typeId) }}">
+                    <button type="submit" name="decision" value="accept" class="btn btn-sm btn-primary">Принять новую</button>
+                    <button type="submit" name="decision" value="dismiss" class="btn btn-sm btn-secondary">Оставить</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if last_import %}
+    <div class="card">
+      <div class="wz-sec-title">{{ last_import.dryRun ? 'Dry-run импорта отчёта' : 'Импорт отчёта' }}: {{ last_import.periodFrom ?? '—' }} — {{ last_import.periodTo ?? '—' }}, строк {{ last_import.rows }}</div>
+      <div class="t-wrap">
+        <table class="t">
+          <thead>
+            <tr><th>Итог</th><th>type_id</th><th>Группа</th><th class="t-cell--right">Голоса / строки</th><th>Группа в отчёте</th><th>Тип в отчёте</th></tr>
+          </thead>
+          <tbody>
+            {% for type in last_import.types %}
+              <tr>
+                <td>{{ type.outcome }}</td>
+                <td>{{ type.typeId ?? '—' }}</td>
+                <td>{{ type.groupCode ?? '—' }}</td>
+                <td class="t-cell--right">{{ type.votes }} / {{ type.rowsTotal }}</td>
+                <td>{{ type.xlsxGroupLabel }}</td>
+                <td>{{ type.xlsxTypeName }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
   <div class="wz-row">
     <div class="card u-flex-1 u-min-w-200">
       <div class="wz-sec-title">Операции</div>
@@ -57,6 +179,24 @@
         </div>
         <div class="wz-form-actions">
           <button type="submit" class="btn btn-md btn-primary">Найти новые категории</button>
+        </div>
+      </form>
+
+      <form action="{{ path('admin_ingestion_external_categories_import_ozon_details') }}" method="POST" enctype="multipart/form-data" style="margin-top:var(--s-5);">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_import_ozon_details') }}">
+        <div class="wz-sec-title">Отчёт Ozon «Детализация начислений»</div>
+        <div class="field">
+          <label class="field-label" for="details_company_id">Компания, из кабинета которой отчёт<span class="req">*</span></label>
+          <input type="text" class="input" id="details_company_id" name="company_id" placeholder="UUID компании" required>
+        </div>
+        <div class="field">
+          <label class="field-label" for="details_report">Файл xlsx<span class="req">*</span></label>
+          <input type="file" class="input" id="details_report" name="report" accept=".xlsx" required>
+          <span class="field-helper">Файл не сохраняется: в базу попадают только группы по типам.</span>
+        </div>
+        <div class="wz-form-actions">
+          <button type="submit" name="mode" value="dry-run" class="btn btn-md btn-secondary">Dry-run</button>
+          <button type="submit" name="mode" value="execute" class="btn btn-md btn-primary">Импортировать</button>
         </div>
       </form>
     </div>
@@ -270,7 +410,16 @@
               </div>
               <div class="field">
                 <label class="field-label" for="canonical_group_{{ row.id }}">Canonical group<span class="req">*</span></label>
-                <input class="input" id="canonical_group_{{ row.id }}" name="canonical_group" value="{{ row.canonical_group ?? '' }}" required>
+                <select class="select" id="canonical_group_{{ row.id }}" name="canonical_group" required>
+                  <option value="">— группа —</option>
+                  {% set current_group = (row.canonical_group ?? '')|replace({"\n": ' ', "\r": ' '})|split(' ')|filter(part => part != '')|join(' ') %}
+                  {% for group in ozon_groups %}
+                    <option value="{{ group.label }}" {% if current_group == group.label %}selected{% endif %}>{{ group.label }}</option>
+                  {% endfor %}
+                </select>
+                {% if row.canonical_group and current_group not in ozon_groups|map(group => group.label) %}
+                  <span class="field-helper">Текущая группа «{{ row.canonical_group }}» вне закрытого списка — выберите группу.</span>
+                {% endif %}
               </div>
               <div class="field wz-span-all">
                 <label class="field-label" for="canonical_label_{{ row.id }}">Canonical label<span class="req">*</span></label>

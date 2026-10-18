@@ -26,6 +26,8 @@ final readonly class OzonAccrualDetailsXlsxReader
     private const COLUMN_TYPE = 'Тип начисления';
     private const COLUMN_SKU = 'SKU';
     private const COLUMN_AMOUNT = 'Сумма итого, руб.';
+    // Отчёт за месяц у крупного кабинета — десятки тысяч строк; больше — явно не тот файл.
+    private const MAX_ROWS = 300000;
 
     public function read(string $path): OzonAccrualDetailsReport
     {
@@ -59,6 +61,9 @@ final readonly class OzonAccrualDetailsXlsxReader
 
         foreach ($rowIterator as $row) {
             ++$rowIndex;
+            if ($rowIndex > self::MAX_ROWS) {
+                throw new OzonAccrualDetailsFileException(sprintf('Ozon accrual details report has more than %d rows.', self::MAX_ROWS));
+            }
             $values = array_map(static fn ($cell): mixed => $cell->getValue(), $row->getCells());
 
             if (null === $columns) {

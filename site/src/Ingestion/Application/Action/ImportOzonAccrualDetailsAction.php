@@ -40,6 +40,7 @@ final readonly class ImportOzonAccrualDetailsAction
     private const MIN_SHARE = 0.8;
     private const MIN_VOTES_ABSOLUTE = 2;
     private const MIN_VOTES = 3;
+    private const LOCK_KEY = 'ingest_ozon_accrual_type_groups_import';
 
     public function __construct(
         private OzonAccrualByDayTypeLookupQuery $lookupQuery,
@@ -53,9 +54,12 @@ final readonly class ImportOzonAccrualDetailsAction
     /**
      * @param list<OzonAccrualDetailsRow> $rows
      */
-    public function __invoke(string $companyId, array $rows, bool $dryRun = false): OzonAccrualDetailsImportResult
+    public function __invoke(string $companyId, array $rows, bool $dryRun = false, ?string $actorUserId = null): OzonAccrualDetailsImportResult
     {
         Assert::uuid($companyId);
+        if (null !== $actorUserId) {
+            Assert::uuid($actorUserId);
+        }
         if ([] === $rows) {
             return new OzonAccrualDetailsImportResult(0, null, null, [], $dryRun);
         }
@@ -103,15 +107,37 @@ final readonly class ImportOzonAccrualDetailsAction
             ];
         }
 
-        $existing = $this->typeGroupRepository->findAllIndexedByTypeId();
-        foreach ($byTypeId as $typeId => $typePairs) {
-            array_push($results, ...$this->decide($companyId, $typeId, $typePairs, $existing[$typeId] ?? null, $periodFrom, $periodTo, $dryRun));
+        $decide = function () use ($companyId, $byTypeId, $periodFrom, $periodTo, $dryRun): array {
+            $decided = [];
+            $existing = $this->typeGroupRepository->findAllIndexedByTypeId();
+            foreach ($byTypeId as $typeId => $typePairs) {
+                array_push($decided, ...$this->decide($companyId, $typeId, $typePairs, $existing[$typeId] ?? null, $periodFrom, $periodTo, $dryRun));
+            }
+
+            return $decided;
+        };
+
+        if ($dryRun) {
+            array_push($results, ...$decide());
+        } else {
+            // Две загрузки сразу вставили бы один type_id дважды; блокировка
+            // сериализует их, и вторая видит решение первой.
+            /** @var list<OzonAccrualDetailsTypeResult> $decided */
+            $decided = $this->entityManager->wrapInTransaction(function () use ($decide): array {
+                $this->entityManager->getConnection()->executeStatement(
+                    'SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))',
+                    ['lockKey' => self::LOCK_KEY],
+                );
+
+                return $decide();
+            });
+            array_push($results, ...$decided);
         }
 
         if (!$dryRun) {
-            $this->entityManager->flush();
             $this->logger->info('Ozon accrual details report imported.', [
                 'companyId' => $companyId,
+                'actorUserId' => $actorUserId,
                 'rows' => \count($rows),
                 'periodFrom' => $periodFrom->format('Y-m-d'),
                 'periodTo' => $periodTo->format('Y-m-d'),

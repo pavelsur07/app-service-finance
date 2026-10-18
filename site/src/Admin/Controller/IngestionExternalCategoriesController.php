@@ -9,12 +9,18 @@ use App\Ingestion\Application\Action\DiscoverExternalCategoriesAction;
 use App\Ingestion\Application\Action\RefreshOzonAccrualCategoryMetadataAction;
 use App\Ingestion\Application\Action\SeedExternalCategoryMappingsAction;
 use App\Ingestion\Application\Action\UpdateExternalCategoryMappingAction;
+use App\Ingestion\Application\DTO\OzonAccrualDetailsImportResult;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
+use App\Ingestion\Exception\OzonAccrualDetailsFileException;
+use App\Ingestion\Exception\OzonAccrualTypeNotConfirmableException;
+use App\Ingestion\Exception\UnknownCategoryGroupException;
+use App\Ingestion\Facade\OzonAccrualTypesAdminFacadeInterface;
 use App\Ingestion\Infrastructure\Query\ExternalCategoryAdminQuery;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -25,18 +31,97 @@ use Webmozart\Assert\Assert;
 #[IsGranted('ROLE_ADMIN')]
 final class IngestionExternalCategoriesController extends AbstractController
 {
+    private const DETAILS_REPORT_MAX_BYTES = 20 * 1024 * 1024;
+    private const DETAILS_REPORT_MIME_TYPES = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/zip',
+        'application/octet-stream',
+    ];
+
+    public function __construct(
+        private readonly ExternalCategoryAdminQuery $query,
+        private readonly OzonAccrualTypesAdminFacadeInterface $ozonTypes,
+    ) {
+    }
+
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(ExternalCategoryAdminQuery $query): Response
+    public function index(): Response
     {
-        return $this->render('admin/ingestion/external_categories/index.html.twig', [
-            'status_summary' => $query->statusSummary(),
-            'unclassified' => $query->unclassifiedOzonAccrualTransactions(),
-            'latest_categories' => $query->latestCategories(),
-            'transaction_types' => TransactionType::cases(),
-            'mapping_statuses' => ExternalCategoryMappingStatus::cases(),
-            'category_statuses' => ExternalCategoryStatus::cases(),
-            'last_refresh' => null,
-        ]);
+        return $this->renderIndex();
+    }
+
+    #[Route('/ozon-types/{typeId}/confirm', name: 'confirm_ozon_type', requirements: ['typeId' => '\\d+'], methods: ['POST'])]
+    public function confirmOzonType(int $typeId, Request $request): Response
+    {
+        $this->validateCsrf($request, sprintf('admin_ingestion_external_categories_confirm_ozon_type_%d', $typeId));
+
+        try {
+            $categories = $this->ozonTypes->confirmType(
+                typeId: $typeId,
+                groupCode: (string) $request->request->get('group_code', ''),
+                label: (string) $request->request->get('label', ''),
+                actorUserId: $this->requiredActorUserId(),
+            );
+            $this->addFlash('success', sprintf('Тип %d подтверждён: маппинг у %d категорий. Строки обновит ночной refresh или refresh metadata за период.', $typeId, $categories));
+        } catch (OzonAccrualTypeNotConfirmableException|UnknownCategoryGroupException|\InvalidArgumentException $exception) {
+            $this->addFlash('error', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('admin_ingestion_external_categories_index');
+    }
+
+    #[Route('/ozon-type-groups/{typeId}/dispute', name: 'resolve_ozon_type_group_dispute', requirements: ['typeId' => '\\d+'], methods: ['POST'])]
+    public function resolveOzonTypeGroupDispute(int $typeId, Request $request): Response
+    {
+        $this->validateCsrf($request, sprintf('admin_ingestion_external_categories_resolve_dispute_%d', $typeId));
+
+        try {
+            $decision = (string) $request->request->get('decision');
+            Assert::inArray($decision, ['accept', 'dismiss'], 'Некорректное решение по спору.');
+            $accept = 'accept' === $decision;
+            $this->ozonTypes->resolveGroupDispute($typeId, $accept, $this->requiredActorUserId());
+            $this->addFlash('success', $accept ? sprintf('Тип %d: принята группа из нового отчёта.', $typeId) : sprintf('Тип %d: оставлена прежняя группа.', $typeId));
+        } catch (OzonAccrualTypeNotConfirmableException|\InvalidArgumentException $exception) {
+            $this->addFlash('error', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('admin_ingestion_external_categories_index');
+    }
+
+    #[Route('/ozon-details-report', name: 'import_ozon_details', methods: ['POST'])]
+    public function importOzonDetails(Request $request): Response
+    {
+        $this->validateCsrf($request, 'admin_ingestion_external_categories_import_ozon_details');
+
+        try {
+            $companyId = trim((string) $request->request->get('company_id', ''));
+            Assert::uuid($companyId, 'Company ID должен быть UUID.');
+            $actorUserId = $this->requiredActorUserId();
+            $mode = (string) $request->request->get('mode', 'dry-run');
+            Assert::inArray($mode, ['dry-run', 'execute'], 'Некорректный режим импорта.');
+            $file = $request->files->get('report');
+            if (!$file instanceof UploadedFile) {
+                throw new \InvalidArgumentException('Приложите xlsx «Детализация начислений».');
+            }
+            if (!$file->isValid()) {
+                throw new \InvalidArgumentException($file->getErrorMessage());
+            }
+            if ($file->getSize() > self::DETAILS_REPORT_MAX_BYTES) {
+                throw new \InvalidArgumentException(sprintf('Файл больше %d МБ.', intdiv(self::DETAILS_REPORT_MAX_BYTES, 1024 * 1024)));
+            }
+            if ('xlsx' !== strtolower($file->getClientOriginalExtension()) || !in_array($file->getMimeType(), self::DETAILS_REPORT_MIME_TYPES, true)) {
+                throw new \InvalidArgumentException('Нужен файл xlsx.');
+            }
+
+            $result = $this->ozonTypes->importDetailsReport($companyId, $file->getPathname(), 'dry-run' === $mode, $actorUserId);
+            $this->addFlash('success', sprintf('%s: строк %d (пропущено %d).', 'dry-run' === $mode ? 'Dry-run импорта' : 'Импорт отчёта', $result->rows, $result->skippedRows));
+
+            return $this->renderIndex(lastImport: $result);
+        } catch (OzonAccrualDetailsFileException|\InvalidArgumentException $exception) {
+            $this->addFlash('error', $exception->getMessage());
+
+            return $this->redirectToRoute('admin_ingestion_external_categories_index');
+        }
     }
 
     #[Route('/seed-defaults', name: 'seed_defaults', methods: ['POST'])]
@@ -87,7 +172,6 @@ final class IngestionExternalCategoriesController extends AbstractController
     #[Route('/refresh-ozon-metadata', name: 'refresh_ozon_metadata', methods: ['POST'])]
     public function refreshOzonMetadata(
         Request $request,
-        ExternalCategoryAdminQuery $query,
         RefreshOzonAccrualCategoryMetadataAction $refreshMetadata,
     ): Response {
         $this->validateCsrf($request, 'admin_ingestion_external_categories_refresh_ozon_metadata');
@@ -129,15 +213,7 @@ final class IngestionExternalCategoriesController extends AbstractController
                 ),
             );
 
-            return $this->render('admin/ingestion/external_categories/index.html.twig', [
-                'status_summary' => $query->statusSummary(),
-                'unclassified' => $query->unclassifiedOzonAccrualTransactions(),
-                'latest_categories' => $query->latestCategories(),
-                'transaction_types' => TransactionType::cases(),
-                'mapping_statuses' => ExternalCategoryMappingStatus::cases(),
-                'category_statuses' => ExternalCategoryStatus::cases(),
-                'last_refresh' => $result + ['mode' => $mode],
-            ]);
+            return $this->renderIndex(lastRefresh: $result + ['mode' => $mode]);
         } catch (\Throwable $exception) {
             $this->addFlash('error', $exception->getMessage());
 
@@ -165,11 +241,11 @@ final class IngestionExternalCategoriesController extends AbstractController
                 status: ExternalCategoryMappingStatus::from((string) $request->request->get('mapping_status')),
                 known: '1' === (string) $request->request->get('known', '0'),
                 displayLabel: $this->optionalString($request->request->get('display_label')),
-                updatedBy: $this->actorUserId(),
+                updatedBy: $this->requiredActorUserId(),
                 companyId: (string) $request->request->get('company_id', ''),
             );
             $this->addFlash('success', 'Маппинг категории сохранен. Запустите refresh metadata для нужного периода.');
-        } catch (\Throwable $exception) {
+        } catch (UnknownCategoryGroupException|\InvalidArgumentException|\ValueError $exception) {
             $this->addFlash('error', $exception->getMessage());
         }
 
@@ -209,10 +285,38 @@ final class IngestionExternalCategoriesController extends AbstractController
         return '' === $value ? null : $value;
     }
 
-    private function actorUserId(): ?string
+    /**
+     * Ручная правка без актора выглядела бы автоматической, и группа из отчёта
+     * Ozon перекрыла бы решение человека — поэтому без пользователя не сохраняем.
+     */
+    private function requiredActorUserId(): string
     {
         $user = $this->getUser();
+        $userId = $user instanceof User ? $user->getId() : null;
+        if (null === $userId) {
+            throw new \InvalidArgumentException('Действие требует авторизованного пользователя.');
+        }
 
-        return $user instanceof User ? $user->getId() : null;
+        return $userId;
+    }
+
+    /**
+     * @param array<string, mixed>|null $lastRefresh
+     */
+    private function renderIndex(?array $lastRefresh = null, ?OzonAccrualDetailsImportResult $lastImport = null): Response
+    {
+        return $this->render('admin/ingestion/external_categories/index.html.twig', [
+            'status_summary' => $this->query->statusSummary(),
+            'unclassified' => $this->query->unclassifiedOzonAccrualTransactions(),
+            'latest_categories' => $this->query->latestCategories(),
+            'ozon_type_queue' => $this->ozonTypes->typeQueue(),
+            'ozon_type_disputes' => $this->ozonTypes->groupDisputes(),
+            'ozon_groups' => $this->ozonTypes->ozonGroups(),
+            'transaction_types' => TransactionType::cases(),
+            'mapping_statuses' => ExternalCategoryMappingStatus::cases(),
+            'category_statuses' => ExternalCategoryStatus::cases(),
+            'last_refresh' => $lastRefresh,
+            'last_import' => $lastImport,
+        ]);
     }
 }

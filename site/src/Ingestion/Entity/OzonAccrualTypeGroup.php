@@ -143,6 +143,36 @@ class OzonAccrualTypeGroup
         $this->updatedAt = $this->disputedAt;
     }
 
+    /**
+     * Админ принял группу из спорного отчёта.
+     */
+    public function acceptDispute(): void
+    {
+        Assert::true($this->isDisputed(), 'No dispute to accept.');
+
+        $this->groupCode = $this->disputedGroupCode;
+        $this->status = OzonAccrualTypeGroupStatus::CONFIRMED;
+        // Доказательство — голоса спорного отчёта; строки и период прежнего отчёта
+        // к ним не относятся, поэтому строки = голоса, а метки отчёта помечены.
+        $this->votes = (int) $this->disputedVotes;
+        $this->rowsTotal = $this->votes;
+        $this->xlsxGroupLabel = 'принято админом из спорного отчёта';
+        $this->evidenceCompanyId = (string) $this->disputedCompanyId;
+        $this->clearDispute();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Админ оставил прежнюю группу.
+     */
+    public function dismissDispute(): void
+    {
+        Assert::true($this->isDisputed(), 'No dispute to dismiss.');
+
+        $this->clearDispute();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function isDisputed(): bool
     {
         return null !== $this->disputedGroupCode;

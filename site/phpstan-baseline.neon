@@ -39,7 +39,7 @@ parameters:
 		-
 			message: '#^testModuleInternalsAreClosedToOtherModulesIngestion\: App\\Admin\\Controller\\IngestionExternalCategoriesController should not depend on App\\Ingestion\\Infrastructure\\Query\\ExternalCategoryAdminQuery$#'
 			identifier: phpat.testModuleInternalsAreClosedToOtherModulesIngestion
-			count: 2
+			count: 1
 			path: src/Admin/Controller/IngestionExternalCategoriesController.php
 
 		-

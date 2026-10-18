@@ -15,7 +15,13 @@ final readonly class OzonAccrualDetailsImportResult
         public ?string $periodTo,
         public array $types,
         public bool $dryRun,
+        public int $skippedRows = 0,
     ) {
+    }
+
+    public function withSkippedRows(int $skippedRows): self
+    {
+        return new self($this->rows, $this->periodFrom, $this->periodTo, $this->types, $this->dryRun, $skippedRows);
     }
 
     /**

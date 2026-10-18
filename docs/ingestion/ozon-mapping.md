@@ -77,7 +77,15 @@ snake_case(`name`) (`AnalyticsPlus` → `ozon_analytics_plus`, `Drop-Off Agent` 
 совпадающую с этим `description`; расхождение формулировок фиксируется явно в
 `OzonAccrualCategoryTest::testAliasCodesMatchOzonDictionaryDescription`.
 
-Для расширения справочника:
+Новый тип в админке (`/admin/ingestion/external-categories`, `ROLE_ADMIN`):
+блок «Новые типы Ozon» показывает типы справочника с неразобранными начислениями и
+предложение статьи; «Подтвердить» ставит маппинг по умолчанию (код из справочника,
+название и группа из закрытого списка, `known = true`, тип транзакции — текущий тип
+строк, актор записывается). Там же — загрузка отчёта «Детализация начислений»
+(dry-run / импорт) и «Спорные группы». Группа ручного маппинга выбирается только из
+закрытого списка. Правка кода (`OzonAccrualCategory`) нужна только для исключений.
+
+Для расширения справочника вручную (исключения, старые коды):
 
 1. Загрузить справочник:
    `app:ingestion:ozon-accrual:load-types --company-id=<uuid> --connection-ref=<uuid> --execute-inline`.
