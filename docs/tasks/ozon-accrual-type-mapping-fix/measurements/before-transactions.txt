@@ -1,0 +1,27 @@
+# Снято 2026-10-18 12:35 MSK через codex-psql-ro, ozon by-day, все даты
+## Итоги по компании (живые = amount_minor <> 0)
+              company_id              |  live  | zero |  sum_minor  |    min     |    max     
+--------------------------------------+--------+------+-------------+------------+------------
+ 19621cff-b028-45d9-9193-11f47ad9a8b2 |  69859 |  420 |  3169811050 | 2026-05-17 | 2026-10-17
+ 3f4d87cc-a967-43a7-9b5e-8a9113c0a910 |  17760 |  168 |  2278609788 | 2026-06-03 | 2026-10-17
+ 78f0cc9f-b72c-4706-82ae-05dbf96361fe | 158831 |  333 | 13064715321 | 2026-05-17 | 2026-10-17
+ b57d7682-505f-4b74-86f8-953d32d59874 | 914412 |  945 | 20416869171 | 2026-05-17 | 2026-10-17
+(4 rows)
+
+## Затронутые типы: статья и тип
+ tid |               code               |    type    |  live  | sum_minor 
+-----+----------------------------------+------------+--------+-----------
+ 29  | ozon_logistics                   | fee        | 150137 | 126615602
+ 45  | ozon_delivery_to_pickup_ozon     | fee        |  10452 |  15678000
+ 46  | ozon_partner_placement           | other      |    136 |  13260120
+ 46  | ozon_partner_placement           | storage    |    373 |  30271188
+ 71  | ozon_partner_return_processing   | fee        |    464 |   5344260
+ 76  | ozon_stock_insurance             | fee        |    191 |  27201568
+ 76  | ozon_stock_insurance             | other      |      8 |    659977
+ 77  | ozon_cargo_place_item_processing | acceptance |    308 |  11826700
+ 77  | ozon_cargo_place_item_processing | other      |    244 |  12595400
+ 78  | ozon_temporary_partner_storage   | fee        |     11 |    309600
+ 84  | ozon_partner_packaging           | fee        |    230 |    600600
+ 84  | ozon_partner_packaging           | other      |    256 |    454200
+(12 rows)
+
