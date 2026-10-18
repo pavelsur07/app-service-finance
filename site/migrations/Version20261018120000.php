@@ -22,9 +22,11 @@ use Doctrine\Migrations\AbstractMigration;
  *    TemporaryPlacement на статьи по `description` справочника Ozon.
  *
  * Трогает только строки без ручной правки (`updated_by IS NULL`) и только с
- * ожидаемыми прежними значениями; ручная правка затронутого ключа останавливает
- * миграцию. Каждое изменение пишется в аудит с меткой задачи. Обратима: down()
- * возвращает прежние значения и удаляет свои записи аудита.
+ * ожидаемыми прежними значениями; ручная правка или маппинг компании по
+ * затронутому ключу останавливает миграцию, строки с неожиданными значениями
+ * перечисляются в выводе. Каждое изменение пишется в аудит с меткой задачи.
+ * Обратима: down() возвращает прежние значения только у строк со своим аудитом
+ * и удаляет эти записи аудита.
  */
 final class Version20261018120000 extends AbstractMigration
 {
@@ -91,6 +93,20 @@ final class Version20261018120000 extends AbstractMigration
             sprintf('%d affected Ozon mapping(s) were edited manually; resolve them in the admin before this migration.', $manualEdits),
         );
 
+        $companyOverrides = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM ingest_external_category_company_mappings m
+             JOIN ingest_external_categories c ON c.id = m.external_category_id
+             WHERE '.self::OZON_BY_DAY.' AND c.normalized_key IN (:keys)',
+            ['keys' => $this->affectedKeys()],
+            ['keys' => ArrayParameterType::STRING],
+        );
+        $this->abortIf(
+            $companyOverrides > 0,
+            sprintf('%d company override(s) exist for affected Ozon keys; review them in the admin before this migration.', $companyOverrides),
+        );
+
+        $this->reportUnexpectedRetargetRows();
+
         foreach (self::DISABLED_TYPE_KEYS as $key) {
             $where = self::OZON_BY_DAY." AND c.normalized_key = :key AND m.status = 'active' AND m.updated_by IS NULL";
             $this->auditThenUpdate(
@@ -145,11 +161,14 @@ final class Version20261018120000 extends AbstractMigration
                      WHERE c.id = m.external_category_id AND ".self::OZON_BY_DAY." AND c.normalized_key = :key
                        AND m.updated_by IS NULL
                        AND m.canonical_code = :newCode AND m.canonical_label = :newLabel AND m.canonical_group = :newGroup
-                       AND m.transaction_type = :newType AND m.sort_order = :newSort",
+                       AND m.transaction_type = :newType AND m.sort_order = :newSort
+                       AND EXISTS (SELECT 1 FROM ingest_external_category_mapping_audit a
+                                   WHERE a.external_category_id = c.id AND a.company_id IS NULL AND a.new_values->>'reason' = :reason)",
                     [
                         'key' => $prefix.$service,
                         'oldCode' => $old[0], 'oldLabel' => $old[1], 'oldGroup' => $old[2], 'oldType' => $old[3], 'oldSort' => $old[4],
                         'newCode' => $new[0], 'newLabel' => $new[1], 'newGroup' => $new[2], 'newType' => $new[3], 'newSort' => $new[4],
+                        'reason' => self::REASON,
                     ],
                 );
             }
@@ -186,6 +205,27 @@ final class Version20261018120000 extends AbstractMigration
              WHERE c.id = m.external_category_id AND ".$where,
             $whereParams + $setParams,
         );
+    }
+
+    /**
+     * Строка ключа услуги без ручной правки, но и не с ожидаемыми прежними
+     * значениями, не меняется — о ней сообщаем, а не молчим.
+     */
+    private function reportUnexpectedRetargetRows(): void
+    {
+        foreach (self::RETARGETS as $service => [$old, $new]) {
+            $unexpected = (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM ingest_external_category_mappings m
+                 JOIN ingest_external_categories c ON c.id = m.external_category_id
+                 WHERE '.self::OZON_BY_DAY.' AND c.normalized_key IN (:keys) AND m.updated_by IS NULL
+                   AND m.canonical_code NOT IN (:codes)',
+                ['keys' => ['code:'.$service, 'name:'.$service], 'codes' => [$old[0], $new[0]]],
+                ['keys' => ArrayParameterType::STRING, 'codes' => ArrayParameterType::STRING],
+            );
+            if ($unexpected > 0) {
+                $this->write(sprintf('Skipped %d Ozon mapping(s) for "%s" with unexpected values; review them in the admin.', $unexpected, $service));
+            }
+        }
     }
 
     /**

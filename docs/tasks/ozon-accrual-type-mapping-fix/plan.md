@@ -72,8 +72,10 @@ Baseline: записать перед Stage 1 — `make site-test-unit` по
 Risk: HIGH-LOCAL (разнесение по категориям)
 stage_base_commit: fada74482ec9a09de6402516fc7334692b52e981
 Definition of Done:
-- `OzonAccrualCategory` без поля `typeIds` и `findByTypeId()`; seed и discover
-  не создают ключей `type:*`; статический fallback резолвера не разбирает по id.
+- `OzonAccrualCategory` без поля `typeIds` и `findByTypeId()`; seed не создаёт
+  ключей `type:*`, discover не автомаппит по id (ключ `type:<id>` для строки без
+  кода и имени остаётся — только ручной маппинг в админке); статический fallback
+  резолвера не разбирает по id.
 - Алиасы: `LastMileCourier` → `ozon_delivery_to_pickup_partners`,
   `PickUpPointReturnAcceptance` → `ozon_partner_return_processing`,
   `SellerReturns` → `ozon_warehouse_export`, `Placements` →

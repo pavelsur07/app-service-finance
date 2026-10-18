@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Ingestion\Migration;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualByDayMapper;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
 use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
@@ -17,6 +18,7 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\Exception\AbortMigration;
 use DoctrineMigrations\Version20261018120000;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
@@ -79,6 +81,61 @@ final class OzonAccrualTypeMappingMigrationTest extends IntegrationTestCase
         $this->expectException(AbortMigration::class);
 
         $this->applyMigration(static fn (Version20261018120000 $m) => $m->up(new Schema()));
+    }
+
+    /**
+     * Строка, которая уже вела в верную статью до миграции (или которую позже
+     * создал исправленный seed), не откатывается в старую статью партнёров:
+     * down() трогает только строки со своим аудитом.
+     */
+    public function testRollbackKeepsMappingThatWasAlreadyCorrect(): void
+    {
+        $alreadyCorrect = $this->mapping('non_item', 'code:sellerreturns', 'ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE, 700);
+        $this->em->flush();
+
+        $this->applyMigration(static fn (Version20261018120000 $m) => $m->up(new Schema()));
+        $this->applyMigration(static fn (Version20261018120000 $m) => $m->down(new Schema()));
+
+        self::assertSame(['ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', 'storage', 700, 'active'], array_values($this->row($alreadyCorrect)));
+    }
+
+    public function testCompanyOverrideOfAffectedKeyStopsMigration(): void
+    {
+        $mapping = $this->mapping('any', 'code:placements', 'ozon_partner_placement', 'Размещение товара партнёрами', 'Услуги партнёров', TransactionType::STORAGE, 550);
+        $this->em->persist(new ExternalCategoryCompanyMapping(
+            externalCategory: $mapping->getExternalCategory(),
+            companyId: Uuid::uuid7()->toString(),
+            canonicalCode: 'ozon_partner_placement',
+            canonicalLabel: 'Размещение товара партнёрами',
+            canonicalGroup: 'Услуги партнёров',
+            transactionType: TransactionType::STORAGE,
+            sortOrder: 550,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+        ));
+        $this->em->flush();
+
+        $this->expectException(AbortMigration::class);
+
+        $this->applyMigration(static fn (Version20261018120000 $m) => $m->up(new Schema()));
+    }
+
+    public function testReportsSkippedRowsWithUnexpectedValues(): void
+    {
+        $this->mapping('non_item', 'code:placements', 'ozon_other_services', 'Другие услуги', 'Другие услуги и штрафы', TransactionType::FEE, 1090);
+        $this->em->flush();
+
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+        (new Version20261018120000($this->connection, $logger))->up(new Schema());
+
+        self::assertStringContainsString('Skipped 1 Ozon mapping(s) for "placements"', implode("\n", $logger->messages));
     }
 
     /**
