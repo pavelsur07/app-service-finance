@@ -386,6 +386,12 @@
 - `app:service-gateway:coverage:refresh` (lock): выключено → INFO, exit 0;
   недоступен → WARNING, exit 0 (supercronic шлёт ненулевой exit в GlitchTip);
   нарушение контракта → ERROR, exit 1.
+- Страница «Покрытие Сервис GO» — `OzonFetcherCoverageController`,
+  `admin_service_gateway_ozon_fetcher_coverage` → `GET /admin/services/ozon-fetcher/coverage?month=YYYY-MM`,
+  `ROLE_ADMIN`, exempt в `ModuleAccessMap`. Месяцы — только M, M-1, M-2 (МСК), иначе redirect с flash.
+  Сетку строит `CoverageHeatmapBuilder` (без БД): начисления по дням — ячейка на день, реализация,
+  взаиморасчёты и справочник — одна ячейка; цвета `ok`/`partial`/`err`/`empty`/`future`
+  (`kit/components/coverage.css`); «устарело» — снимок старше 30 минут.
 - Чтение — `ServiceCoverageMonthQuery::fetch($service, 'YYYY-MM')`: снимок и
   строки месяца (дни месяца, ключ месяца, `ref`) одним запросом —
   согласованный снимок при параллельной замене.
@@ -4014,6 +4020,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.20 | 2026-10-18 | ServiceGateway: страница админки «Покрытие Сервис GO» (`/admin/services/ozon-fetcher/coverage`) по витрине покрытия |
 | 2.19 | 2026-10-18 | ServiceGateway: новый модуль — клиент `GET /internal/coverage` ozon-fetcher (контракт `service-coverage/v1`), витрина `service_coverage_snapshot` / `service_coverage_row`, cron `app:service-gateway:coverage:refresh` каждые 10 минут |
 | 2.18 | 2026-10-17 | Marketplace: `GET /internal/marketplace-connections` — активные Ozon-кабинеты и ключи для сервисов `services/` (`ActiveConnectionCredentialsQuery`, `MarketplaceConnectionsSnapshotBuilder`, DTO `Application/DTO/Internal`) |
 | 2.17 | 2026-10-17 | Shared: firewall `internal_api` для `/internal/*` (static token + IP-allowlist, `InternalAccessPolicy`), `GET /internal/ping`; `AuditContextProvider::getCompanyId()` — `null` для principal без пользователя |
