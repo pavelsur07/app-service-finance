@@ -14,7 +14,8 @@
 
    | Имя | Значение |
    |---|---|
-   | `INTERNAL_AUTH_TOKEN` | случайная строка ≥ 32 символов |
+   | `INTERNAL_AUTH_TOKEN` | случайная строка ≥ 32 символов — токен «сервис → Symfony» |
+   | `OZON_FETCHER_API_TOKEN` | случайная строка ≥ 32 символов — токен «Symfony → сервис» (`SERVICE_API_TOKEN` сервиса, `/internal/*` сервиса); не совпадает с `INTERNAL_AUTH_TOKEN` |
    | `OZON_FETCHER_DB_PASSWORD` | случайный пароль |
    | `OZON_FETCHER_S3_ACCESS_KEY_ID` | Access Key из п. 1 |
    | `OZON_FETCHER_S3_SECRET_ACCESS_KEY` | Secret Key из п. 1 |
@@ -34,7 +35,7 @@
 ## Проверка после деплоя
 
 - `docker ps` — `ozon-fetcher` `healthy`.
-- Статус: `docker exec ozon-fetcher wget -qO- --header "Authorization: Bearer $INTERNAL_AUTH_TOKEN" http://127.0.0.1:8080/internal/fetch-status`
+- Статус: `docker exec ozon-fetcher sh -c 'wget -qO- --header "Authorization: Bearer $SERVICE_API_TOKEN" http://127.0.0.1:8080/internal/fetch-status'`
   — кабинет «Вумджой», задачи идут в `done`, пауз нет.
 - Прод-синк Symfony: `app:marketplace:perf-report` — повторы `SyncOzonAccrualByDayMessage` не выросли.
 
@@ -48,6 +49,9 @@
 `OZON_FETCHER_ENABLED=false` и деплой — контейнер останавливается. Загрузка
 Symfony от сервиса не зависит. Быстро без деплоя: `docker stop ozon-fetcher`.
 
-## Ротация `INTERNAL_AUTH_TOKEN`
+- Покрытие: то же с `/internal/coverage` (контракт `services/_contracts/service-coverage/v1`).
 
-Сменить секрет и задеплоить: Symfony и сервис получают новое значение одним деплоем.
+## Ротация токенов
+
+`INTERNAL_AUTH_TOKEN` и `OZON_FETCHER_API_TOKEN` меняются независимо: сменить
+секрет и задеплоить — Symfony и сервис получают новое значение одним деплоем.

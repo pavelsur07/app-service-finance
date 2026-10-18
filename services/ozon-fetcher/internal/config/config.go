@@ -25,8 +25,11 @@ type Config struct {
 	DBDSN      string
 
 	// SymfonyBaseURL пуст — получение кабинетов выключено (режим scaffold).
-	SymfonyBaseURL          string
-	InternalAuthToken       string
+	SymfonyBaseURL    string
+	InternalAuthToken string
+	// ServiceAPIToken — токен направления «Symfony → сервис» для /internal/*
+	// сервиса (service-gateway.md §2.9); пусто — /internal/* закрыт.
+	ServiceAPIToken         string
 	ConnectionsPollInterval time.Duration
 	// MaxParallelConnections — сколько кабинетов загружается одновременно.
 	MaxParallelConnections int
@@ -60,6 +63,7 @@ func Load() (Config, error) {
 		DBDSN:                   os.Getenv("DB_DSN"),
 		SymfonyBaseURL:          os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
 		InternalAuthToken:       os.Getenv("INTERNAL_AUTH_TOKEN"),
+		ServiceAPIToken:         os.Getenv("SERVICE_API_TOKEN"),
 		ConnectionsPollInterval: defaultPollInterval,
 		MaxParallelConnections:  defaultMaxParallel,
 		OzonBaseURL:             envOr("OZON_BASE_URL", "https://api-seller.ozon.ru"),
@@ -117,6 +121,9 @@ func Load() (Config, error) {
 		if len(cfg.InternalAuthToken) < MinInternalTokenLength {
 			return Config{}, errors.New("config: INTERNAL_AUTH_TOKEN is required (at least 32 characters) with SYMFONY_INTERNAL_BASE_URL")
 		}
+	}
+	if cfg.ServiceAPIToken != "" && len(cfg.ServiceAPIToken) < MinInternalTokenLength {
+		return Config{}, errors.New("config: SERVICE_API_TOKEN must be at least 32 characters")
 	}
 	if cfg.S3Bucket != "" {
 		u, err := url.Parse(cfg.S3Endpoint)

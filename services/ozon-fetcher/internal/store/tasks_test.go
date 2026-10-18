@@ -524,3 +524,39 @@ func TestRefreshPendingSurvivesLeaseExpiryAsFullReload(t *testing.T) {
 	assert.Empty(t, again.Cursor)
 	assert.Empty(t, again.PageHashes)
 }
+
+func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("ref-a", "by-day", "2026-10-15", 9),
+		spec("ref-b", "by-day", "2026-10-15", 0),
+		spec("ref-gone", "by-day", "2026-10-15", 0), // неактивный кабинет
+		spec("ref-a", "by-day", "2026-07-31", 0),    // вне окна
+		spec("ref-a", "realization", "2026-09", 0),
+		spec("ref-a", "realization", "2026-07", 0), // вне окна
+		spec("ref-a", "types", "ref", 0),
+	}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.Equal(t, "2026-10-15", task.PeriodKey, "приоритет 9 — первым")
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+
+	rows, err := tasks.Coverage(ctx, []string{"ref-a", "ref-b"}, "2026-08-01", "2026-10-31")
+	require.NoError(t, err)
+
+	require.Len(t, rows, 3)
+	assert.Equal(t, "by-day", rows[0].ResourceType)
+	assert.Equal(t, "2026-10-15", rows[0].PeriodKey)
+	assert.Equal(t, 1, rows[0].ByStatus[StatusDone])
+	assert.Equal(t, 1, rows[0].ByStatus[StatusPending], "ref-gone не считается")
+	assert.Equal(t, 0, rows[0].ByStatus[StatusFailedPermanent], "все статусы контракта присутствуют")
+	require.NotNil(t, rows[0].LastSuccessAt)
+	assert.Equal(t, CoverageRow{ResourceType: "realization", PeriodKey: "2026-09", ByStatus: map[string]int{"done": 0, "running": 0, "pending": 1, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0}}, rows[1])
+	assert.Equal(t, "ref", rows[2].PeriodKey)
+
+	empty, err := tasks.Coverage(ctx, nil, "2026-08-01", "2026-10-31")
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+}

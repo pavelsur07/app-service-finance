@@ -87,7 +87,7 @@ func run(setFlush func(func())) error {
 		slog.Info("ingestion disabled: SYMFONY_INTERNAL_BASE_URL is empty")
 	}
 
-	deps := httpapi.Deps{Token: cfg.InternalAuthToken, Now: time.Now, Logger: slog.Default(), Location: time.UTC}
+	deps := httpapi.Deps{Token: cfg.ServiceAPIToken, Now: time.Now, Logger: slog.Default(), Location: time.UTC}
 	if pool != nil {
 		deps.DBPing = pool.Ping
 	}
@@ -95,6 +95,8 @@ func run(setFlush func(func())) error {
 		deps.CabinetsReady = ingestion.Cabinets.Ready
 		deps.S3Ping = ingestion.Raw.Ping
 		deps.Status = ingestion.Tasks.Status
+		deps.Cabinets = ingestion.Cabinets.List
+		deps.Coverage = ingestion.Tasks.Coverage
 		deps.Location = ingestion.Location
 	}
 

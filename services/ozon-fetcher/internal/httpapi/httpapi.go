@@ -1,5 +1,6 @@
-// Package httpapi — HTTP сервиса: /health, /ready, /internal/fetch-status.
-// Наружу сервис не публикуется; /internal/* — по внутреннему токену.
+// Package httpapi — HTTP сервиса: /health, /ready, /internal/fetch-status,
+// /internal/coverage. Наружу сервис не публикуется; /internal/* — по токену
+// направления «Symfony → сервис» (SERVICE_API_TOKEN).
 package httpapi
 
 import (
@@ -12,16 +13,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
 // Deps — источники состояния; nil — часть выключена (режим scaffold).
 type Deps struct {
+	// Token — SERVICE_API_TOKEN; пусто — /internal/* закрыт.
 	Token         string
 	DBPing        func(ctx context.Context) error
 	CabinetsReady func() bool
 	S3Ping        func(ctx context.Context) error
 	Status        func(ctx context.Context, now time.Time, windowFrom string) (store.StatusReport, error)
+	Cabinets      func() []connections.Cabinet
+	Coverage      func(ctx context.Context, refs []string, from, to string) ([]store.CoverageRow, error)
 	Location      *time.Location
 	Now           func() time.Time
 	Logger        *slog.Logger
@@ -68,9 +73,7 @@ func New(d Deps) http.Handler {
 	})
 
 	mux.HandleFunc("GET /internal/fetch-status", func(w http.ResponseWriter, r *http.Request) {
-		if !authorized(r, d.Token) {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": map[string]string{"code": "internal_auth_required", "message": "internal token required"}})
+		if !requireToken(w, r, d.Token) {
 			return
 		}
 		if d.Status == nil {
@@ -88,7 +91,26 @@ func New(d Deps) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"generated_at": now.Format(time.RFC3339), "window_from": windowFrom, "report": report})
 	})
+
+	mux.HandleFunc("GET /internal/coverage", func(w http.ResponseWriter, r *http.Request) {
+		if requireToken(w, r, d.Token) {
+			coverage(w, r, d)
+		}
+	})
 	return mux
+}
+
+func requireToken(w http.ResponseWriter, r *http.Request, token string) bool {
+	if authorized(r, token) {
+		return true
+	}
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	writeError(w, http.StatusUnauthorized, "internal_auth_required", "internal token required")
+	return false
+}
+
+func writeError(w http.ResponseWriter, code int, errCode, message string) {
+	writeJSON(w, code, map[string]any{"error": map[string]string{"code": errCode, "message": message}})
 }
 
 func authorized(r *http.Request, token string) bool {
