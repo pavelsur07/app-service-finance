@@ -387,7 +387,8 @@
   недоступен → WARNING, exit 0 (supercronic шлёт ненулевой exit в GlitchTip);
   нарушение контракта → ERROR, exit 1.
 - Чтение — `ServiceCoverageMonthQuery::fetch($service, 'YYYY-MM')`: снимок и
-  строки месяца (дни месяца, ключ месяца, `ref`), два запроса.
+  строки месяца (дни месяца, ключ месяца, `ref`) одним запросом —
+  согласованный снимок при параллельной замене.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 

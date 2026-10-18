@@ -12,7 +12,7 @@ use Doctrine\DBAL\Connection;
 use Webmozart\Assert\Assert;
 
 /**
- * Витрина покрытия сервиса за месяц: два запроса (снимок и строки), без N+1.
+ * Витрина покрытия сервиса за месяц: один запрос (снимок + строки), без N+1.
  * Данные не принадлежат компании — сводка без кабинетов, страница ROLE_ADMIN.
  */
 final readonly class ServiceCoverageMonthQuery
@@ -29,22 +29,23 @@ final readonly class ServiceCoverageMonthQuery
     {
         Assert::regex($month, '/^\d{4}-\d{2}$/D');
 
-        $snapshot = $this->connection->fetchAssociative(
-            'SELECT generated_at, refreshed_at, period_from, period_to, cabinets_total
-               FROM service_coverage_snapshot
-              WHERE service = :service',
-            ['service' => $service],
-        );
-
-        $rows = $this->connection->fetchAllAssociative(
-            "SELECT resource_type, period_key, cabinets_expected, done, running, pending, not_ready,
-                    failed_retryable, failed_permanent, last_success_at
-               FROM service_coverage_row
-              WHERE service = :service
-                AND (period_key = 'ref' OR period_key = :month OR (length(period_key) = 10 AND left(period_key, 7) = :month))
-              ORDER BY resource_type, period_key",
+        // Один запрос, не два: отдельные SELECT снимка и строк при READ COMMITTED
+        // могли бы увидеть разные стороны замены снимка cron'ом. Строки без
+        // снимка не бывает — Action пишет их одной транзакцией.
+        $joined = $this->connection->fetchAllAssociative(
+            "SELECT s.generated_at, s.refreshed_at, s.period_from, s.period_to, s.cabinets_total,
+                    r.resource_type, r.period_key, r.cabinets_expected, r.done, r.running, r.pending, r.not_ready,
+                    r.failed_retryable, r.failed_permanent, r.last_success_at
+               FROM service_coverage_snapshot s
+               LEFT JOIN service_coverage_row r
+                      ON r.service = s.service
+                     AND (r.period_key = 'ref' OR r.period_key = :month OR (length(r.period_key) = 10 AND left(r.period_key, 7) = :month))
+              WHERE s.service = :service
+              ORDER BY r.resource_type, r.period_key",
             ['service' => $service, 'month' => $month],
         );
+        $snapshot = $joined[0] ?? false;
+        $rows = array_values(array_filter($joined, static fn (array $row): bool => null !== $row['resource_type']));
 
         $cells = array_map(static fn (array $row): ServiceCoverageMonthCell => new ServiceCoverageMonthCell(
             resourceType: (string) $row['resource_type'],
