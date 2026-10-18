@@ -35,30 +35,35 @@ final class OzonAccrualCategoryFacadeTest extends TestCase
     }
 
     /**
-     * Регрессия. Карта typeIds внутри Ingestion расходится со справочником
-     * Ozon: она считает 29 логистикой, тогда как 29 — LastMileCourier, а
-     * Logistic это 32. Разрешение по type_id молча поставило бы курьеру
-     * последней мили категорию логистики. Такие услуги обязаны попадать в
-     * видимую очередь на разбор, а не в правдоподобную чужую категорию.
+     * Регрессия. Прежняя карта typeIds внутри Ingestion считала 29 логистикой,
+     * тогда как 29 — LastMileCourier, а Logistic это 32. Статья выбирается по
+     * имени услуги из справочника Ozon и сверена с его `description`.
      */
-    public function testDoesNotFallBackToTypeIdMapWhenDictionaryNameIsUnmapped(): void
+    public function testLastMileCourierResolvesToPartnerLastMileNotLogistics(): void
     {
         $view = $this->facade()->resolveByServiceType('29', 'LastMileCourier');
 
-        self::assertNotSame('ozon_logistics', $view->code);
-        self::assertFalse($view->known);
-        self::assertSame('Требует классификации', $view->group);
-        self::assertStringContainsString('LastMileCourier', $view->label);
+        self::assertSame('ozon_delivery_to_pickup_partners', $view->code);
+        self::assertTrue($view->known);
+        self::assertSame('Услуги партнёров', $view->group);
     }
 
-    public function testUnmappedReturnAcceptanceGoesToQueueNotToDelivery(): void
+    public function testReturnAcceptanceResolvesToPartnerReturnsNotDelivery(): void
     {
-        // 45 в справочнике — PickUpPointReturnAcceptance (приёмка возвратов),
-        // а карта Ingestion выдала бы «Доставка до места выдачи силами Ozon».
+        // 45 в справочнике — PickUpPointReturnAcceptance, «Обработка возвратов,
+        // отмен и невыкупов партнёрами»; прежняя карта давала «Доставку силами Ozon».
         $view = $this->facade()->resolveByServiceType('45', 'PickUpPointReturnAcceptance');
 
-        self::assertNotSame('ozon_delivery_to_pickup_ozon', $view->code);
+        self::assertSame('ozon_partner_return_processing', $view->code);
+        self::assertTrue($view->known);
+    }
+
+    public function testTypeIdAloneNeverPicksCategory(): void
+    {
+        $view = $this->facade()->resolveByServiceType('29', null);
+
         self::assertFalse($view->known);
+        self::assertSame('Требует классификации', $view->group);
     }
 
     public function testUnknownServiceCarriesTypeIdForManualMapping(): void

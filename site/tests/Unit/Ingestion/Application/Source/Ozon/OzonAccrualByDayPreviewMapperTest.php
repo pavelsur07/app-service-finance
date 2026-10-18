@@ -31,7 +31,7 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
                             'name' => 'Ozon Product 1',
                             'delivery' => [
                                 'services' => [
-                                    ['type_id' => 29, 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
+                                    ['type_id' => 29, 'name' => 'LastMileCourier', 'accrued' => ['amount' => '-7.86', 'currency' => 'RUB']],
                                     ['type_id' => 45, 'accrued' => ['amount' => '-15', 'currency' => 'RUB']],
                                 ],
                             ],
@@ -71,7 +71,7 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
                     'accrued_category' => 'CONTAINER',
                     'container_fees' => [
                         'fees' => [
-                            ['type_id' => 77, 'accrued' => ['amount' => '-3.50', 'currency' => 'RUB']],
+                            ['type_id' => 77, 'name' => 'SupplyInbound', 'accrued' => ['amount' => '-3.50', 'currency' => 'RUB']],
                         ],
                     ],
                 ],
@@ -115,8 +115,8 @@ final class OzonAccrualByDayPreviewMapperTest extends TestCase
         self::assertSame(TransactionDirection::OUT, $delivery->direction);
         self::assertSame(786, $delivery->amountMinor);
         self::assertSame('29', $delivery->typeId);
-        self::assertSame('ozon_logistics', $delivery->ozonCategoryCode);
-        self::assertSame('Логистика', $delivery->ozonCategoryLabel);
+        self::assertSame('ozon_delivery_to_pickup_partners', $delivery->ozonCategoryCode);
+        self::assertSame('Доставка до места выдачи партнёрами', $delivery->ozonCategoryLabel);
 
         $item = $this->row($rows, 'item_fee:group-0:fee-0:type-1');
         self::assertSame(TransactionType::FEE, $item->type);

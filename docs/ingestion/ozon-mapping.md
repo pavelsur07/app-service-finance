@@ -30,18 +30,31 @@ Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`, `/v3/finance/tr
 | `_ozon_category_group` | группа как в кабинете Ozon |
 | `_ozon_category_parent` | родительская строка, если у Ozon есть подгруппа |
 | `_ozon_category_sort_order` | порядок строки внутри стандартного Ozon-справочника |
-| `_ozon_category_known` | `false`, если `type_id` пока не добавлен в справочник |
+| `_ozon_category_known` | `false`, если код услуги пока не добавлен в справочник |
+
+Статья выбирается **только по коду услуги** (`name` из by-day или, если его нет,
+имя из сохранённого словаря `accrual/types` по `type_id`) и по маппингам в БД.
+Номер `type_id` сам статью не выбирает: карта `typeIds` в каталоге расходилась
+со словарём Ozon (29 — это `LastMileCourier`, а не `Logistic`) и удалена
+(задача `docs/tasks/ozon-accrual-type-mapping-fix/`). Без имени услуга остаётся
+в `ozon_unknown_<type_id>` и попадает в очередь на разбор.
+
+Словарь `accrual/types` отдаёт `{"id", "name", "description"}`; `description` —
+русское название услуги от Ozon. Алиас-код в каталоге обязан вести в статью,
+совпадающую с этим `description`; расхождение формулировок фиксируется явно в
+`OzonAccrualCategoryTest::testAliasCodesMatchOzonDictionaryDescription`.
 
 Для расширения справочника:
 
 1. Загрузить справочник:
    `app:ingestion:ozon-accrual:load-types --company-id=<uuid> --connection-ref=<uuid> --execute-inline`.
-2. Проверить сохранённый raw record `ozon_finance_accrual_types` и напечатанный список `type_id`/названий Ozon.
-3. Сравнить названия Ozon с `OzonAccrualCategory::all()`.
-4. Добавить alias или новый `type_id` в существующую строку; новую строку создавать только если в стандартном списке Ozon появилась новая статья.
-5. Добавить/обновить unit-тест справочника и mapper-а.
+2. Проверить сохранённый raw record `ozon_finance_accrual_types` и напечатанный список `type_id`/кодов Ozon.
+3. Сравнить `description` услуги с `OzonAccrualCategory::all()`: статья выбирается по смыслу описания, а не по похожему коду.
+4. Добавить код услуги alias-ом в существующую строку; новую строку создавать только если в стандартном списке Ozon появилась новая статья. `type_id` в каталог не вносить.
+5. Обновить фикстуру `tests/Fixtures/Marketplace/Ozon/accrual_types.json`, unit-тест справочника и mapper-а.
+6. Маппинги в БД (`ingest_external_category_mappings`) имеют приоритет над каталогом и применяются, даже если сама категория `deprecated`: при переносе алиаса проверить и их.
 
-Исчезнувшие у Ozon `type_id` сразу не удаляются: старые нормализованные данные
+Исчезнувшие у Ozon коды сразу не удаляются: старые нормализованные данные
 должны оставаться читаемыми.
 
 ---
