@@ -6,8 +6,12 @@ namespace App\Ingestion\MessageHandler;
 
 use App\Ingestion\Application\Action\NormalizeOrderRawRecordAction;
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
+use App\Ingestion\Application\Action\SyncOzonAccrualTypesAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
+use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Domain\Service\OrderMapperRegistry;
+use App\Ingestion\Enum\IngestSource;
+use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
 use Psr\Log\LoggerInterface;
@@ -20,6 +24,7 @@ final readonly class NormalizeRawRecordHandler
         private NormalizeRawRecordAction $action,
         private NormalizeOrderRawRecordAction $orderAction,
         private OrderMapperRegistry $orderMapperRegistry,
+        private SyncOzonAccrualTypesAction $syncOzonAccrualTypesAction,
         private IngestRawRecordRepository $rawRecordRepository,
         private LoggerInterface $logger,
     ) {
@@ -32,6 +37,7 @@ final readonly class NormalizeRawRecordHandler
             'rawRecordId' => $message->rawRecordId,
         ]);
 
+        $rawRecord = null;
         try {
             // Маршрутизация по наличию маппера заказов, а не по списку
             // resourceType в условии: новый заказный ресурс регистрирует себя
@@ -60,6 +66,31 @@ final readonly class NormalizeRawRecordHandler
             ]);
 
             throw $exception;
+        }
+
+        // Справочник Ozon транзакций не даёт, но его версия раскладывается в
+        // таблицу `ingest_ozon_accrual_types`. Отдельным шагом после
+        // нормализации, как и ветка заказов, и вне её catch: сбой здесь —
+        // не сбой нормализации, она уже закоммичена. Ретрай сообщения
+        // безопасен: DONE-запись нормализация пропускает, синхронизация
+        // идемпотентна.
+        if (null !== $rawRecord
+            && IngestSource::OZON === $rawRecord->getSource()
+            && OzonResourceType::ACCRUAL_TYPES === $rawRecord->getResourceType()
+            && RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus()
+        ) {
+            try {
+                ($this->syncOzonAccrualTypesAction)($message->companyId, $message->rawRecordId);
+            } catch (\Throwable $exception) {
+                $this->logger->error('Ozon accrual types dictionary sync failed after normalization.', [
+                    'companyId' => $message->companyId,
+                    'rawRecordId' => $message->rawRecordId,
+                    'exceptionClass' => $exception::class,
+                    'errorMessage' => $exception->getMessage(),
+                ]);
+
+                throw $exception;
+            }
         }
     }
 }

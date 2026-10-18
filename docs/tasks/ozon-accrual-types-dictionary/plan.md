@@ -33,7 +33,7 @@ Ozon из 126 в справочнике. Пока каталог не попра
 ```json
 { "accrual_types": [
   { "id": 1,  "name": "Acquiring",       "description": "Эквайринг" },
-  { "id": 29, "name": "LastMileCourier", "description": "Доставка до места выдачи партнерами" }
+  { "id": 29, "name": "LastMileCourier", "description": "Доставка до места выдачи" }
 ]}
 ```
 

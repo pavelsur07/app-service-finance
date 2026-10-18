@@ -48,7 +48,13 @@ Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`, `/v3/finance/tr
 
 1. Загрузить справочник:
    `app:ingestion:ozon-accrual:load-types --company-id=<uuid> --connection-ref=<uuid> --execute-inline`.
-2. Проверить сохранённый raw record `ozon_finance_accrual_types` и напечатанный список `type_id`/кодов Ozon.
+2. Проверить таблицу `ingest_ozon_accrual_types`: нормализация версии раскладывает справочник туда сама
+   (`SyncOzonAccrualTypesAction`); новые типы — с `first_seen_at` последней версии, пропавшие — с `removed_at`.
+   Неизменная версия новой сырой записи не создаёт; заполнить таблицу из уже загруженных версий —
+   `app:ingestion:ozon-accrual:sync-types [--company-id=<uuid>] [--dry-run]`.
+   Ограничения: версия, где часть строк не разобралась, пропавших не помечает (WARNING);
+   возврат Ozon к прежней версии (V1 → V2 → V1) таблица не увидит — дедупликация сырья по
+   hash новой записи не создаст, а `sync-types` берёт самую позднюю запись (V2).
 3. Сравнить `description` услуги с `OzonAccrualCategory::all()`: статья выбирается по смыслу описания, а не по похожему коду.
 4. Добавить код услуги alias-ом в существующую строку; новую строку создавать только если в стандартном списке Ozon появилась новая статья. `type_id` в каталог не вносить.
 5. Обновить фикстуру `tests/Fixtures/Marketplace/Ozon/accrual_types.json`, unit-тест справочника и mapper-а.
