@@ -87,22 +87,37 @@ final readonly class CoverageHeatmapBuilder
             [$title, $step] = self::RESOURCES[$resourceType] ?? [$resourceType, $this->guessStep($cells)];
             $perDay = self::STEP_DAY === $step;
             $built = [];
+            /** @var list<ServiceCoverageMonthCell|null> $periods наступившие периоды строки */
+            $periods = [];
             if ($perDay) {
                 foreach ($days as $day) {
                     $key = sprintf('%s-%02d', $month->month, $day->day);
                     $isFuture = $key >= $today;
                     $built[] = $this->cell($title, $this->dayLabel($key), $cells[$key] ?? null, $isFuture);
+                    if (!$isFuture) {
+                        $periods[] = $cells[$key] ?? null;
+                    }
                 }
             } else {
                 $isRef = self::STEP_REF === $step;
                 $key = $isRef ? 'ref' : $month->month;
                 $period = $isRef ? 'справочник' : 'месяц '.$month->month;
                 // Месячный отчёт за текущий месяц источник ещё не формирует; справочник от месяца не зависит.
-                $built[] = $this->cell($title, $period, $cells[$key] ?? null, $currentMonth && !$isRef);
+                $isFuture = $currentMonth && !$isRef;
+                $built[] = $this->cell($title, $period, $cells[$key] ?? null, $isFuture);
+                if (!$isFuture) {
+                    $periods[] = $cells[$key] ?? null;
+                }
             }
-            foreach ($cells as $cell) {
-                $done += min($cell->byStatus->done, $cell->cabinetsExpected);
-                $expected += $cell->cabinetsExpected;
+
+            // Процент — по всем наступившим периодам строки: период без задачи — пропуск
+            // (0 из ожидаемых), иначе одна загруженная ячейка дала бы 100 % при дырах в сетке.
+            // Ожидаемое для пропуска — как у соседних ячеек отчёта, иначе все кабинеты снимка.
+            $fallback = [] === $cells ? ($month->snapshot->cabinetsTotal ?? 0) : max(array_map(static fn (ServiceCoverageMonthCell $c): int => $c->cabinetsExpected, $cells));
+            foreach ($periods as $cell) {
+                $cellExpected = $cell->cabinetsExpected ?? $fallback;
+                $expected += $cellExpected;
+                $done += null === $cell ? 0 : min($cell->byStatus->done, $cellExpected);
             }
 
             $rows[] = new CoverageHeatmapRow(

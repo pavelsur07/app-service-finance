@@ -101,7 +101,7 @@ final class CoverageHeatmapBuilderTest extends TestCase
 
         self::assertSame(CoverageHeatmapCell::FUTURE, $heatmap->rows[1]->cells[0]->state, 'реализацию за текущий месяц Ozon ещё не формирует');
         self::assertSame(CoverageHeatmapCell::EMPTY, $heatmap->rows[3]->cells[0]->state, 'справочник от месяца не зависит');
-        self::assertNull($heatmap->coveragePercent);
+        self::assertSame(0, $heatmap->coveragePercent, 'наступившие дни без задач — пропуски, не «нет данных»');
     }
 
     public function testUnknownResourceIsShownNotDropped(): void
@@ -122,13 +122,31 @@ final class CoverageHeatmapBuilderTest extends TestCase
         $builder = new CoverageHeatmapBuilder();
 
         $fresh = $builder->build(self::month('2026-10', $cells, self::now('2026-10-18 08:40:00')), self::now());
-        self::assertSame(83, $fresh->coveragePercent, '(4 + 2 + 4) / 12, done сверх ожидаемого не завышает');
+        // Наступившие периоды: 17 дней начислений (3 с задачами, 14 пропусков по 4 кабинета),
+        // реализация и взаиморасчёты за текущий месяц — ещё не наступили, справочник без задач — 4.
+        // done: 4 + 2 + 4 (сверх ожидаемого не завышает) = 10; ожидаемо: 17 × 4 + 4 = 72.
+        self::assertSame(13, $fresh->coveragePercent);
         self::assertFalse($fresh->stale, 'ровно 30 минут — ещё не устарело');
         self::assertSame(4, $fresh->cabinetsTotal);
         self::assertFalse($fresh->isEmpty());
 
         $stale = $builder->build(self::month('2026-10', $cells, self::now('2026-10-18 08:39:59')), self::now());
         self::assertTrue($stale->stale);
+    }
+
+    public function testMissingPastPeriodsLowerCoverage(): void
+    {
+        $full = [
+            self::cell(self::BY_DAY, '2026-09-01', 4, 4),
+            self::cell('ozon.finance.realization', '2026-09', 4, 4),
+            self::cell('ozon.finance.mutual-settlement', '2026-09', 4, 4),
+            self::cell('ozon.finance.accrual-types', 'ref', 4, 4),
+        ];
+
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-09', $full), self::now());
+
+        // Сентябрь прошёл целиком: 30 дней × 4 + три месячные ячейки × 4 = 132 ожидаемо, загружено 16.
+        self::assertSame(12, $heatmap->coveragePercent, 'один загруженный день не даёт 100 % при 29 пропусках');
     }
 
     public function testEmptyReadModel(): void
