@@ -1,6 +1,6 @@
 # ozon-accrual-type-mapping-fix — handoff
 
-**Branch:** `fix/ozon-accrual-type-mapping` · **PR:** см. описание PR · **CI:** после push
+**Branch:** `fix/ozon-accrual-type-mapping` · **PR:** https://github.com/pavelsur07/app-service-finance/pull/2717 · **CI:** после push
 
 ## Summary of stages
 - Stage 1 — каталог `OzonAccrualCategory` без карты `typeIds`: статья by-day
@@ -72,7 +72,7 @@
   таблица словаря, закрытый список групп Ozon — следующая задача.
 
 ## Owner decision
-Ready: PR #<n> — миграция `Version20261018120000` (данные маппингов, обратима,
+Ready: PR #2717 — миграция `Version20261018120000` (данные маппингов, обратима,
 бэкап не нужен) + деплой + обновление метаданных истории (`daily-maintenance
 --from --to --execute` по 4 компаниям, только `source_data`).
-Reply: "run the migration and deploy #<n>"
+Reply: "run the migration and deploy #2717"
