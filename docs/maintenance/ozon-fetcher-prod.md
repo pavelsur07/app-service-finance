@@ -39,6 +39,15 @@
   — кабинет «Вумджой», задачи идут в `done`, пауз нет.
 - Прод-синк Symfony: `app:marketplace:perf-report` — повторы `SyncOzonAccrualByDayMessage` не выросли.
 
+## Витрина покрытия и страница «Покрытие Сервис GO»
+
+- Scheduler раз в 10 минут: `app:service-gateway:coverage:refresh` → `GET http://ozon-fetcher:8080/internal/coverage`
+  с `OZON_FETCHER_API_TOKEN` → таблицы `service_coverage_snapshot` / `service_coverage_row` (БД Symfony).
+- Страница `/admin/services/ozon-fetcher/coverage` (ROLE_ADMIN) читает только витрину; при остановленном
+  сервисе показывает прежние данные и «устарело» через 30 минут.
+- Сервис недоступен → WARNING, exit 0, витрина прежняя; нарушение контракта → ERROR, exit 1 (GlitchTip).
+- Ручной прогон: `docker exec scheduler php /app/bin/console app:service-gateway:coverage:refresh`.
+
 ## Все кабинеты
 
 После 1–2 дней на «Вумджой» без ошибок — очистить
