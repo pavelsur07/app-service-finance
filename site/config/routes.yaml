@@ -95,6 +95,12 @@ ingestion_controllers:
         namespace: App\Ingestion\Controller
     type: attribute
 
+servicegateway_controllers:
+    resource:
+        path: ../src/ServiceGateway/Controller/
+        namespace: App\ServiceGateway\Controller
+    type: attribute
+
 
 shared_controllers:
     resource:

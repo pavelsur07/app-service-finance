@@ -89,11 +89,11 @@ Symfony обращается к сервисам по внутренней се�
 
 | Целевое | Факт |
 |---|---|
-| модуль `ServiceGateway`, реестр сервисов | нет; единственный сервис (ozon-fetcher) связан напрямую: Symfony отдаёт `/internal/marketplace-connections`, сервис забирает |
-| `/internal/status`, `/internal/coverage` | нет; у ozon-fetcher есть `/internal/fetch-status` (своя схема) |
-| витрина `data_coverage`, экран «Сервисы» | нет |
+| модуль `ServiceGateway`, реестр сервисов | модуль есть: клиент покрытия ozon-fetcher и витрина (`ARCHITECTURE.md`, «ServiceGateway»); реестра нет — адрес и токен в env `OZON_FETCHER_*`. Кабинеты сервис по-прежнему забирает сам из `/internal/marketplace-connections` |
+| `/internal/status`, `/internal/coverage` | `/internal/coverage` у ozon-fetcher — по контракту `service-coverage/v1`; `/internal/status` нет, вместо него `/internal/fetch-status` (своя схема) |
+| витрина `data_coverage`, экран «Сервисы» | общей витрины нет; витрина покрытия сервисов `service_coverage_*` (ozon-fetcher, обновление cron каждые 10 минут); экрана «Сервисы» нет |
 | circuit breaker, `trace_id` между Symfony и сервисом | нет |
-| токен на направление | один общий `INTERNAL_AUTH_TOKEN` для обоих направлений ozon-fetcher |
+| токен на направление | ozon-fetcher: «сервис → Symfony» — `INTERNAL_AUTH_TOKEN`, «Symfony → сервис» — `SERVICE_API_TOKEN` (секрет `OZON_FETCHER_API_TOKEN`) |
 | сервис только во внутренней сети, свой GlitchTip, переключатель, bootstrap БД в деплое | **есть** (ozon-fetcher, PR #2706–#2713) |
 
 Не выдавать целевое за существующее. Новый код со сервисами пишется по §2;

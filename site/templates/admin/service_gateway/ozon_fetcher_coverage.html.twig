@@ -1,0 +1,99 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Покрытие Сервис GO{% endblock %}
+
+{% block admin_styles %}
+  {# Только раскладка: цвета и состояния — классы кита coverage.css. #}
+  <style>
+    .sgw-cov-span { grid-column: span var(--cov-days); justify-content: flex-start; padding-left: var(--s-1); }
+    .sgw-cov-cell-wide { max-width: 96px; }
+    .sgw-cov-tabs-gap { margin-bottom: var(--s-4); }
+    .sgw-cov-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin: var(--s-4) 0 var(--s-3); }
+  </style>
+{% endblock %}
+
+{% block body %}
+  {% set month_names = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'] %}
+  {% set state_labels = {'ok': 'загружено всё', 'partial': 'загружено частично', 'err': 'есть ошибки', 'empty': 'задач нет'} %}
+
+  <div class="wz-head">
+    <h1 class="wz-title">Покрытие Сервис GO <span class="wz-sub">ozon-fetcher · все кабинеты сводно</span></h1>
+  </div>
+
+  {% set month_tabs = [] %}
+  {% for m in months|reverse %}
+    {% set parts = m|split('-') %}
+    {% set month_tabs = month_tabs|merge([{label: month_names[parts[1] - 1] ~ ' ' ~ parts[0], href: path('admin_service_gateway_ozon_fetcher_coverage', {month: m}), active: m == heatmap.month}]) %}
+  {% endfor %}
+  <div class="sgw-cov-tabs-gap">
+    {% include 'app/_ui/_tabs.html.twig' with {label: 'Месяц', tabs: month_tabs} only %}
+  </div>
+
+  {% if heatmap.empty %}
+    <div class="empty" data-coverage-empty>
+      <div class="empty-title">Данных о покрытии ещё нет</div>
+      <p class="empty-text">Витрина обновляется из сервиса раз в 10 минут. Если пусто дольше — проверьте, что ozon-fetcher запущен и задан OZON_FETCHER_API_TOKEN.</p>
+    </div>
+  {% else %}
+    <div class="wz-kpi-row">
+      <div class="kpi u-flex-1 u-min-w-200">
+        <div class="kpi-label">Покрытие месяца</div>
+        <div class="kpi-value">{{ heatmap.coveragePercent is null ? '—' : heatmap.coveragePercent|vf_number ~ ' %' }}</div>
+      </div>
+      <div class="kpi u-flex-1 u-min-w-200">
+        <div class="kpi-label">Кабинетов в загрузке</div>
+        <div class="kpi-value">{{ heatmap.cabinetsTotal|vf_number }}</div>
+      </div>
+      <div class="kpi u-flex-1 u-min-w-200">
+        <div class="kpi-label">Данные на</div>
+        <div class="kpi-value" data-coverage-refreshed>{{ heatmap.refreshedAt|date('d.m.Y H:i') }}</div>
+        {% if heatmap.stale %}
+          <span class="status status--warning" data-coverage-stale><span class="dot"></span>Устарело: обновления не было больше {{ stale_minutes }} минут</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="sgw-cov-meta">
+      <div class="cov-legend">
+        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--ok">4/4</span>{{ state_labels.ok }}</span>
+        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--partial">3/4</span>{{ state_labels.partial }}</span>
+        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--err">3/4</span>{{ state_labels.err }}</span>
+        <span class="cov-legend-item"><span class="cov-legend-sw cov-legend-sw--empty">—</span>{{ state_labels.empty }}</span>
+      </div>
+      <span class="cov-legend">Ячейка — загружено кабинетов из ожидаемых; подробности при наведении.</span>
+    </div>
+
+    <div class="coverage">
+      <div class="coverage-scroll">
+        <div class="coverage-grid" style="--cov-days: {{ heatmap.days|length }}" role="table" aria-label="Покрытие ozon-fetcher за {{ heatmap.month }}">
+          <div class="cov-corner" role="columnheader">Отчёт</div>
+          {% for day in heatmap.days %}
+            <div class="cov-day{% if day.weekend %} cov-day--weekend{% endif %}{% if day.today %} cov-day--today{% endif %}" role="columnheader">{{ day.day }}</div>
+          {% endfor %}
+
+          {% for row in heatmap.rows %}
+            <div class="cov-label" role="rowheader" data-coverage-row="{{ row.resourceType }}">
+              <div class="cov-label-text">
+                <div class="cov-label-title">{{ row.title }}</div>
+                <div class="cov-label-tech">{{ row.resourceType }}</div>
+              </div>
+              <div class="cov-label-counts">
+                {% if row.errCount > 0 %}<span class="cov-count cov-count--err" title="Ячеек с ошибкой">{{ row.errCount }}</span>{% endif %}
+                {% if row.partialCount > 0 %}<span class="cov-count cov-count--warn" title="Ячеек загружено частично">{{ row.partialCount }}</span>{% endif %}
+              </div>
+            </div>
+            {% for cell in row.cells %}
+              <div class="cov-cellwrap{% if not row.perDay %} sgw-cov-span{% endif %}" role="cell">
+                <span class="cov-cell cov-cell--{{ cell.state }}{% if not row.perDay %} sgw-cov-cell-wide{% endif %}" title="{{ cell.hint }}" data-coverage-cell="{{ cell.state }}">
+                  {#- Месячный отчёт текущего месяца: пустая широкая ячейка выглядела бы как пропуск строки. -#}
+                  {{- cell.state == 'future' and not row.perDay ? 'ещё нет' : cell.label -}}
+                  {% if cell.state == 'err' %}<span class="cov-cell-dot cov-cell-dot--err"></span>{% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -207,3 +207,29 @@ func TestLoadConnectionAllowlist(t *testing.T) {
 		t.Errorf("allowlist = %q", cfg.ConnectionAllowlist)
 	}
 }
+
+func TestLoadServiceAPIToken(t *testing.T) {
+	t.Setenv("SERVICE_API_TOKEN", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ServiceAPIToken != "" {
+		t.Errorf("ServiceAPIToken = %q, want empty", cfg.ServiceAPIToken)
+	}
+
+	t.Setenv("SERVICE_API_TOKEN", "short")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SERVICE_API_TOKEN") {
+		t.Errorf("short token: err = %v, want SERVICE_API_TOKEN error", err)
+	}
+
+	long := strings.Repeat("s", MinInternalTokenLength)
+	t.Setenv("SERVICE_API_TOKEN", long)
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ServiceAPIToken != long {
+		t.Error("ServiceAPIToken is not taken from env")
+	}
+}

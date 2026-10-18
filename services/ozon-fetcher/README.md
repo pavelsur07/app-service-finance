@@ -72,7 +72,8 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `S3_BUCKET` | `vashfindir-services-raw` | этап 8 |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Пара доп. пользователя бакета | этап 8 |
 | `SYMFONY_INTERNAL_BASE_URL` | Базовый URL внутреннего API Symfony (`/internal/marketplace-connections`) | этап 6 |
-| `INTERNAL_AUTH_TOKEN` | Внутренний static token для `/internal/*` (с обеих сторон) | этап 6 |
+| `INTERNAL_AUTH_TOKEN` | Токен направления «сервис → Symfony» (`/internal/marketplace-connections`) | этап 6 |
+| `SERVICE_API_TOKEN` | Токен направления «Symfony → сервис» для `/internal/*` сервиса, ≥ 32 символов (`docs/architecture/service-gateway.md` §2.9); пусто — `/internal/*` закрыт (401). На проде — секрет `OZON_FETCHER_API_TOKEN` | нет |
 | `CONNECTIONS_POLL_INTERVAL` | Интервал поллинга конфигурации, по умолчанию `5m` | этап 6 |
 | `MAX_PARALLEL_CONNECTIONS` | Сколько кабинетов загружается одновременно (по умолчанию 4, на проде 2) | этап 10 |
 | `SENTRY_DSN`, `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | GlitchTip (на проде — свой проект, секрет `OZON_FETCHER_SENTRY_DSN`): записи ERROR уходят событием (теги `service`, `stage`, `error_class`, `connection_ref`, `resource_type`); пустой DSN — только лог | нет |
@@ -91,6 +92,7 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `POST /internal/source-facts/ack` | `{batch_ids}` → батчи в `acked`, payload purge (retention) |
 | `POST /internal/fetch-requests` | Загрузка по запросу (отложено): `{request_id, connection_ref, resource_type, period_from, period_to}` → 202 после записи; повтор сливается в активный запрос |
 | `GET /internal/fetch-status` | Состояние загрузки по кабинетам и ресурсам: пропуски, последняя успешная загрузка, текущий лимит, 429, пауза (этап 12) |
+| `GET /internal/coverage?from=YYYY-MM-DD&to=YYYY-MM-DD` | Покрытие «ресурс × период → кабинетов по статусам», контракт `services/_contracts/service-coverage/v1`. По умолчанию окно M-2…конец M (МСК); окно шире 93 дней, `from > to`, кривая дата — 422 `invalid_period`. До первого снимка кабинетов — 503 `cabinets_not_ready`. Считаются только активные кабинеты с ключом Seller; без `connection_ref`, `company_id`, сумм |
 | `GET /internal/fetch-requests/{id}` | `{status: queued\|fetching\|ready\|failed, progress: {periods_done, periods_total}, error_class}` |
 
 Мапа статусов для UI Symfony: queued → «В очереди»; fetching → «Загружаем:

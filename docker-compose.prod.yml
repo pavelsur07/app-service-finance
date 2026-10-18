@@ -466,6 +466,11 @@ services:
             # Heartbeat-монитор GlitchTip (dead man's switch для supercronic).
             # Пусто = мониторинг молчания scheduler выключен.
             GLITCHTIP_SCHEDULER_HEARTBEAT_URL: ${GLITCHTIP_SCHEDULER_HEARTBEAT_URL:-}
+            # Витрина покрытия ozon-fetcher (cron app:service-gateway:coverage:refresh).
+            # Только здесь: страница читает витрину, сервис зовёт одна cron-команда.
+            # Пустой токен — обновление выключено (exit 0).
+            OZON_FETCHER_BASE_URL: http://ozon-fetcher:8080
+            OZON_FETCHER_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
             APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
             APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
@@ -532,6 +537,9 @@ services:
             DB_DSN: postgres://svc_ozon_fetcher:${OZON_FETCHER_DB_PASSWORD:-}@site-postgres:5432/ozon_fetcher?sslmode=disable
             SYMFONY_INTERNAL_BASE_URL: http://site-nginx
             INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-}
+            # Токен направления «Symfony → сервис» для /internal/* сервиса (service-gateway.md §2.9).
+            # Пусто — /internal/* сервиса закрыт.
+            SERVICE_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
             CONNECTIONS_POLL_INTERVAL: 5m
             MAX_PARALLEL_CONNECTIONS: "2"
             CONNECTION_ALLOWLIST: ${OZON_FETCHER_CONNECTION_ALLOWLIST:-}

@@ -691,6 +691,34 @@ jobs:
               run: |
                   scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
 
+            # Секреты сервисов подставляются ниже в текст удалённого скрипта ('…'): кавычка в
+            # значении выполнилась бы на сервере раньше проверки внутри скрипта. Здесь они —
+            # переменные окружения раннера (данные, не код), проверка до SSH.
+            - name: 🔎 Check service secrets alphabet
+              env:
+                  INTERNAL_AUTH_TOKEN: ${{ secrets.INTERNAL_AUTH_TOKEN }}
+                  OZON_FETCHER_API_TOKEN: ${{ secrets.OZON_FETCHER_API_TOKEN }}
+                  OZON_FETCHER_DB_PASSWORD: ${{ secrets.OZON_FETCHER_DB_PASSWORD }}
+                  OZON_FETCHER_S3_ACCESS_KEY_ID: ${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}
+                  OZON_FETCHER_S3_SECRET_ACCESS_KEY: ${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}
+                  OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
+              run: |
+                  # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
+                  # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
+                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                    case "${!v}" in
+                      *[!A-Za-z0-9._~-]*)
+                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                        exit 1 ;;
+                    esac
+                  done
+                  # Allowlist: id кабинетов/компаний через запятую.
+                  case "$OZON_FETCHER_CONNECTION_ALLOWLIST" in
+                    *[!A-Za-z0-9,_-]*)
+                      echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
+                      exit 1 ;;
+                  esac
+
             - name: 🚀 Deploy application (rolling update)
               run: |
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
@@ -729,6 +757,8 @@ jobs:
                     # Одинарные кавычки + алфавит A-Za-z0-9._~- (проверка ниже): значение не
                     # исполняется удалённым shell и безопасно в userinfo DSN без URL-кодирования.
                     export INTERNAL_AUTH_TOKEN='${{ secrets.INTERNAL_AUTH_TOKEN }}'
+                    # Токен «Symfony → сервис» (scheduler → ozon-fetcher /internal/*), не INTERNAL_AUTH_TOKEN.
+                    export OZON_FETCHER_API_TOKEN='${{ secrets.OZON_FETCHER_API_TOKEN }}'
                     export OZON_FETCHER_DB_PASSWORD='${{ secrets.OZON_FETCHER_DB_PASSWORD }}'
                     export OZON_FETCHER_S3_ACCESS_KEY_ID='${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}'
                     export OZON_FETCHER_S3_SECRET_ACCESS_KEY='${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}'
@@ -737,12 +767,13 @@ jobs:
                     # ://@ — но одинарные кавычки, а в DSN их не бывает.
                     export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
-                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
                       eval "val=\${$v}"
-                      if printf '%s' "$val" | grep -q '[^A-Za-z0-9._~-]'; then
-                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
-                        exit 1
-                      fi
+                      case "$val" in
+                        *[!A-Za-z0-9._~-]*)
+                          echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                          exit 1 ;;
+                      esac
                     done
 
                     printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
@@ -775,8 +806,8 @@ jobs:
                     if [ "$OZON_FETCHER_ENABLED" = "true" ]; then
                       export COMPOSE_PROFILES=ozon-fetcher
                       echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
-                      if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ]; then
-                        echo "❌ OZON_FETCHER_ENABLED=true, но не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN"
+                      if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$OZON_FETCHER_API_TOKEN" ]; then
+                        echo "❌ OZON_FETCHER_ENABLED=true, но не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / OZON_FETCHER_API_TOKEN"
                         exit 1
                       fi
                       # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).

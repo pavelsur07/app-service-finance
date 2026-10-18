@@ -129,6 +129,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MarketplaceAnalytics/Entity'
                 prefix: 'App\MarketplaceAnalytics\Entity'
                 alias: MarketplaceAnalytics
+            ServiceGateway:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/ServiceGateway/Entity'
+                prefix: 'App\ServiceGateway\Entity'
+                alias: ServiceGateway
             MarketplaceAds:
                 type: attribute
                 is_bundle: false

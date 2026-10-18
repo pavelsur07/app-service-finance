@@ -1,0 +1,31 @@
+{
+  "schema_version": "1",
+  "service": "ozon-fetcher",
+  "generated_at": "2026-10-18T06:00:00Z",
+  "from": "2026-08-01",
+  "to": "2026-10-31",
+  "cabinets_total": 4,
+  "rows": [
+    {
+      "resource_type": "ozon.finance.accrual-by-day",
+      "period_key": "2026-10-17",
+      "cabinets_expected": 4,
+      "by_status": {"done": 3, "running": 1, "pending": 0, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0},
+      "last_success_at": "2026-10-17T21:05:12Z"
+    },
+    {
+      "resource_type": "ozon.finance.realization",
+      "period_key": "2026-09",
+      "cabinets_expected": 4,
+      "by_status": {"done": 4, "running": 0, "pending": 0, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0},
+      "last_success_at": "2026-10-05T07:00:00+03:00"
+    },
+    {
+      "resource_type": "ozon.finance.accrual-types",
+      "period_key": "ref",
+      "cabinets_expected": 4,
+      "by_status": {"done": 3, "running": 0, "pending": 0, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 1},
+      "last_success_at": null
+    }
+  ]
+}
