@@ -39,6 +39,17 @@ Legacy-пайплайн Ozon (`app:marketplace:ozon-daily-sync`, `/v3/finance/tr
 (задача `docs/tasks/ozon-accrual-type-mapping-fix/`). Без имени услуга остаётся
 в `ozon_unknown_<type_id>` и попадает в очередь на разбор.
 
+Порядок разбора услуги: маппинг компании → маппинг по умолчанию в БД → каталог
+`OzonAccrualCategory` → **справочник** `ingest_ozon_accrual_types` → `ozon_unknown_<type_id>`.
+Статья из справочника (`OzonAccrualDictionaryCategoryFactory`): код `ozon_` +
+snake_case(`name`) (`AnalyticsPlus` → `ozon_analytics_plus`, `Drop-Off Agent` →
+`ozon_drop_off_agent`); если код занят каталогом — с суффиксом `_<type_id>`
+(`SaleCommission` → `ozon_sale_commission_69`: коды каталога семантические, совпадение
+не значит «та же услуга»). Название — `description` или `name`, группа «Требует
+классификации». Всегда `known = false` и запасной тип транзакции: справочник не
+делает тип известным и не меняет естественный ключ транзакции; тип остаётся в очереди
+разбора. Имя по `type_id` берётся из сырья, как раньше.
+
 Словарь `accrual/types` отдаёт `{"id", "name", "description"}`; `description` —
 русское название услуги от Ozon. Алиас-код в каталоге обязан вести в статью,
 совпадающую с этим `description`; расхождение формулировок фиксируется явно в

@@ -7,12 +7,14 @@ namespace App\Ingestion\Application\Source\Ozon;
 use App\Ingestion\Entity\ExternalCategory;
 use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
+use App\Ingestion\Entity\OzonAccrualType;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Repository\ExternalCategoryCompanyMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryMappingRepository;
 use App\Ingestion\Repository\ExternalCategoryRepository;
+use App\Ingestion\Repository\OzonAccrualTypeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -42,12 +44,19 @@ final class OzonAccrualCategoryTaxonomyResolver
 
     private ?string $activeMappingCompanyId = null;
 
+    /**
+     * @var array<int, OzonAccrualType>|null
+     */
+    private ?array $dictionaryByTypeId = null;
+
     public function __construct(
         private readonly ExternalCategoryRepository $categoryRepository,
         private readonly ExternalCategoryMappingRepository $mappingRepository,
         private readonly ExternalCategoryCompanyMappingRepository $companyMappingRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly OzonAccrualTypeRepository $typeRepository,
+        private readonly OzonAccrualDictionaryCategoryFactory $dictionaryCategoryFactory,
     ) {
     }
 
@@ -67,6 +76,7 @@ final class OzonAccrualCategoryTaxonomyResolver
         $this->activeCompanyMappingsByIdentity = null;
         $this->activeMappingCompanyId = $companyId;
         $this->recordedUnknowns = [];
+        $this->dictionaryByTypeId = null;
     }
 
     public function forTypedFee(
@@ -89,6 +99,11 @@ final class OzonAccrualCategoryTaxonomyResolver
         if ($static->known) {
             return $static;
         }
+
+        // Ни маппинга, ни статьи в каталоге: название и код берём из справочника
+        // Ozon. Статья остаётся неизвестной (known = false, запасной тип
+        // транзакции): тип уходит в очередь, естественный ключ не меняется.
+        $static = $this->dictionaryCategory($typeId, $fallbackType) ?? $static;
 
         if ($recordUnknown) {
             $this->recordUnknown($scope, $typeId, $typeName, $externalCode, $providerLabel);
@@ -202,6 +217,25 @@ final class OzonAccrualCategoryTaxonomyResolver
             ?? OzonAccrualCategory::findByOzonName($providerLabel)
             ?? OzonAccrualCategory::findByOzonName($typeName)
             ?? OzonAccrualCategory::unknown($typeId, $providerLabel ?? $externalCode ?? $typeName, $fallbackType);
+    }
+
+    private function dictionaryCategory(?string $typeId, TransactionType $fallbackType): ?OzonAccrualCategory
+    {
+        $type = $this->dictionaryType($typeId);
+
+        return null !== $type ? $this->dictionaryCategoryFactory->create($type, $fallbackType) : null;
+    }
+
+    private function dictionaryType(?string $typeId): ?OzonAccrualType
+    {
+        $typeId = self::normalizeTypeId($typeId);
+        if (null === $typeId || !ctype_digit($typeId)) {
+            return null;
+        }
+
+        $this->dictionaryByTypeId ??= $this->typeRepository->findAllIndexedByTypeId();
+
+        return $this->dictionaryByTypeId[(int) $typeId] ?? null;
     }
 
     private function findMapping(string $scope, string $normalizedKey): ExternalCategoryMapping|ExternalCategoryCompanyMapping|null

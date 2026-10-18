@@ -8,7 +8,7 @@ use App\Ingestion\Enum\TransactionType;
 
 final readonly class OzonAccrualCategory
 {
-    private const UNKNOWN_GROUP = 'Требует классификации';
+    public const UNKNOWN_GROUP = 'Требует классификации';
 
     /**
      * @param list<string> $aliases
