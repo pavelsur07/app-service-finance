@@ -47,11 +47,11 @@
 
 ## 4. Чек-лист приёмки
 
-- [ ] секрет `OZON_FETCHER_API_TOKEN` заведён (`gh secret list` показывает имя), значение нигде не выведено
-- [ ] compose: `ozon-fetcher` и `scheduler` получают переменные; `docker compose -f docker-compose.prod.yml --profile ozon-fetcher config -q` — OK
-- [ ] deploy.yml: экспорт, проверка алфавита, обязательность при `OZON_FETCHER_ENABLED=true`; YAML валиден
-- [ ] `ozon-fetcher-prod.md`: витрина, cron, проверка новым токеном
-- [ ] handoff: строка о миграции в запросе «merge and deploy»
+- [x] секрет `OZON_FETCHER_API_TOKEN` заведён (`gh secret list` показывает имя), значение нигде не выведено
+- [x] compose: `ozon-fetcher` и `scheduler` получают переменные; `docker compose -f docker-compose.prod.yml --profile ozon-fetcher config -q` — OK
+- [x] deploy.yml: экспорт, проверка алфавита, обязательность при `OZON_FETCHER_ENABLED=true`; YAML валиден
+- [x] `ozon-fetcher-prod.md`: витрина, cron, проверка новым токеном
+- [x] handoff: строка о миграции в запросе «merge and deploy»
 - [ ] после деплоя (на приёмке): миграция прошла; витрина наполнена; страница 200; данные = `/internal/coverage`; GlitchTip чист
 
 ## Итог
@@ -61,3 +61,6 @@
   шаг деплоя и до задачи), и кавычка в значении выполнилась бы на сервере раньше проверки алфавита → добавлен
   шаг раннера `🔎 Check service secrets alphabet` до SSH: секреты сервисов и allowlist проверяются как данные.
   Переделка передачи всех секретов в деплой — отдельная задача.
+- Итерация 2 — BLOCKER: проверка `grep` построчная и пропускала перевод строки (значение с `\nEOF\n` закрыло бы
+  heredoc и выполнило команду на раннере) → обе проверки (раннер и сервер) — `case` по всей строке. Проверено
+  вручную на значениях: hex, кавычка, многострочное, пустое; allowlist с переводом строки отклоняется.

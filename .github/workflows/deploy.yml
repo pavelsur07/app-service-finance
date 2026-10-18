@@ -703,17 +703,21 @@ jobs:
                   OZON_FETCHER_S3_SECRET_ACCESS_KEY: ${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}
                   OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
               run: |
+                  # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
+                  # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
                   for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
-                    if printf '%s' "${!v}" | grep -q '[^A-Za-z0-9._~-]'; then
-                      echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
-                      exit 1
-                    fi
+                    case "${!v}" in
+                      *[!A-Za-z0-9._~-]*)
+                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                        exit 1 ;;
+                    esac
                   done
                   # Allowlist: id кабинетов/компаний через запятую.
-                  if printf '%s' "$OZON_FETCHER_CONNECTION_ALLOWLIST" | grep -q '[^A-Za-z0-9,_-]'; then
-                    echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
-                    exit 1
-                  fi
+                  case "$OZON_FETCHER_CONNECTION_ALLOWLIST" in
+                    *[!A-Za-z0-9,_-]*)
+                      echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
+                      exit 1 ;;
+                  esac
 
             - name: 🚀 Deploy application (rolling update)
               run: |
@@ -765,10 +769,11 @@ jobs:
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
                     for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
                       eval "val=\${$v}"
-                      if printf '%s' "$val" | grep -q '[^A-Za-z0-9._~-]'; then
-                        echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
-                        exit 1
-                      fi
+                      case "$val" in
+                        *[!A-Za-z0-9._~-]*)
+                          echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                          exit 1 ;;
+                      esac
                     done
 
                     printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
