@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Marketplace\Controller;
 
+use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -130,12 +131,12 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         $form = $crawler->filter('#listings-filter-form');
-        self::assertSame('unmapped', $form->filter('input[name="filter"]')->attr('value'));
+        self::assertSame('unmapped', $form->filter('select[name="filter"] option[selected]')->attr('value'));
         self::assertSame('навол', $form->filter('input[name="q"]')->attr('value'));
         self::assertSame('ozon', $form->filter('select[name="marketplace"] option[selected]')->attr('value'));
 
         self::assertStringContainsString('Найдено: 3', $crawler->filter('[data-testid="listings-found"]')->text());
-        self::assertCount(1, $crawler->filter('[data-testid="listings-reset"]'));
+        self::assertSame('/marketplace/listings', $crawler->filter('[data-testid="listings-reset"]')->attr('href'));
 
         $panel = $crawler->filter('#bulk-tag-panel');
         self::assertSame(
@@ -144,6 +145,43 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
         );
         self::assertSame('3', $panel->attr('data-nb-results'));
         self::assertSame('поиск «навол», маркетплейс OZON, без привязки', $panel->attr('data-filter-summary'));
+    }
+
+    /**
+     * Карточки-счётчики «Всего / Привязаны / Без привязки» убраны; выборку по
+     * привязке переключает список «Привязка» в форме фильтров.
+     */
+    public function testMappingSelectReplacesCounterCards(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany();
+        $this->listing($company, 'Наволочки без товара', 'wb-unmapped');
+        $product = new Product('44444444-4444-4444-8444-000000000913', $company);
+        $product->setSku('PILLOW-1');
+        $product->setName('Наволочка');
+        $this->em()->persist($product);
+        $this->listing($company, 'Наволочки с товаром', 'wb-mapped')->setProduct($product);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/listings');
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('Без привязки</div>', (string) $client->getResponse()->getContent());
+        self::assertSame(
+            ['all', 'mapped', 'unmapped'],
+            $crawler->filter('#listings-filter-form select[name="filter"] option')->each(
+                static fn ($option): string => (string) $option->attr('value'),
+            ),
+        );
+        self::assertSame('all', $crawler->filter('select[name="filter"] option[selected]')->attr('value'));
+
+        $crawler = $client->request('GET', '/marketplace/listings?filter=unmapped&q=навол');
+        $rows = $crawler->filter('tbody input.row-select');
+        self::assertCount(1, $rows);
+        self::assertSame('Листинги без привязки', trim($crawler->filter('.card-title')->first()->text()));
+        self::assertStringContainsString('без привязки', $crawler->filter('[data-testid="listings-found"]')->text());
     }
 
     public function testEmptySearchResultSaysNothingFound(): void

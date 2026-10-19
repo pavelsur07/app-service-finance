@@ -100,39 +100,4 @@ final class MarketplaceListingsQuery
 
         return $qb;
     }
-
-    public function countAll(string $companyId): int
-    {
-        return (int) $this->em->createQueryBuilder()
-            ->select('COUNT(l.id)')
-            ->from(MarketplaceListing::class, 'l')
-            ->where('IDENTITY(l.company) = :companyId')
-            ->setParameter('companyId', $companyId)
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-    public function countMapped(string $companyId): int
-    {
-        return (int) $this->em->createQueryBuilder()
-            ->select('COUNT(l.id)')
-            ->from(MarketplaceListing::class, 'l')
-            ->where('IDENTITY(l.company) = :companyId')
-            ->andWhere('l.product IS NOT NULL')
-            ->setParameter('companyId', $companyId)
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-    public function countUnmapped(string $companyId): int
-    {
-        return (int) $this->em->createQueryBuilder()
-            ->select('COUNT(l.id)')
-            ->from(MarketplaceListing::class, 'l')
-            ->where('IDENTITY(l.company) = :companyId')
-            ->andWhere('l.product IS NULL')
-            ->setParameter('companyId', $companyId)
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
 }

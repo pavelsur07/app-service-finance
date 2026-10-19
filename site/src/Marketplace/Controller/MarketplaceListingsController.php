@@ -47,9 +47,6 @@ class MarketplaceListingsController extends AbstractController
         $page = max(1, (int) $request->query->get('page', 1));
 
         $pager = $this->listingsQuery->paginate($companyId, $listingsFilter, $page, self::PER_PAGE);
-        $countAll = $this->listingsQuery->countAll($companyId);
-        $countMapped = $this->listingsQuery->countMapped($companyId);
-        $countUnmapped = $this->listingsQuery->countUnmapped($companyId);
 
         // Теги страницы — два запроса на всю страницу, независимо от числа строк.
         $listingIds = array_map(
@@ -66,14 +63,11 @@ class MarketplaceListingsController extends AbstractController
             ),
             'listings_filter' => $listingsFilter,
             'filter_params' => $filterParams,
-            // Карточки сверху и шаблон исторически читают filter/marketplace строками.
+            // Шаблон читает привязку и маркетплейс строками: select'ы формы и заголовок таблицы.
             'filter' => $filterParams['filter'],
             'marketplace' => $listingsFilter->marketplace?->value,
             'available_marketplaces' => MarketplaceType::cases(),
             'max_filter_match' => AssignListingTagAction::DEFAULT_MAX_FILTER_MATCH,
-            'count_all' => $countAll,
-            'count_mapped' => $countMapped,
-            'count_unmapped' => $countUnmapped,
             'active_tab' => 'listings',
             // Итог последнего прогона каталога Ozon: кнопка без обратной связи
             // работает вслепую.
