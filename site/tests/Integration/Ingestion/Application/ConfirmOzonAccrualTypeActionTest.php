@@ -64,6 +64,38 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         self::assertTrue($queue[0]->awaitingRefresh);
     }
 
+    /**
+     * Ручной маппинг с known = false переводит категорию в MAPPED, но refresh
+     * строки известными не сделает: тип не «ждёт refresh», а остаётся
+     * неподтверждённым, и подтверждение доступно.
+     */
+    public function testMappingWithKnownFalseKeepsTypeUnconfirmed(): void
+    {
+        $category = $this->unknownType127();
+        /** @var UpdateExternalCategoryMappingAction $updateMapping */
+        $updateMapping = self::getContainer()->get(UpdateExternalCategoryMappingAction::class);
+        $updateMapping(
+            categoryId: $category->getId(),
+            canonicalCode: 'ozon_analytics_plus',
+            canonicalLabel: 'Аналитика Plus',
+            canonicalGroup: 'Продвижение и реклама',
+            transactionType: TransactionType::OTHER,
+            sortOrder: 9000,
+            status: ExternalCategoryMappingStatus::ACTIVE,
+            known: false,
+            updatedBy: Uuid::uuid7()->toString(),
+        );
+        $this->em->flush();
+
+        $queue = $this->queue()->items();
+        self::assertCount(1, $queue);
+        self::assertFalse($queue[0]->awaitingRefresh);
+
+        self::assertSame(1, $this->confirm()(127, 'promotion', 'Аналитика Plus', Uuid::uuid7()->toString()));
+        self::assertTrue($this->connection->fetchOne('SELECT known FROM ingest_external_category_mappings WHERE external_category_id = :id', ['id' => $category->getId()]));
+        self::assertTrue($this->queue()->items()[0]->awaitingRefresh);
+    }
+
     public function testQueueSkipsTypeWithoutUnknownRows(): void
     {
         $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId(29)->withName('LastMileCourier')->build());

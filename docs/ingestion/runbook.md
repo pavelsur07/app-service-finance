@@ -553,8 +553,9 @@ ERROR `Ozon accrual types are not confirmed in admin for too long.` в GlitchTip
    `daily-maintenance --from --to --company-id --execute` (долго на крупных кабинетах,
    см. `docs/tasks/ozon-accrual-refresh-perf/plan.md`). Тип с пометкой «подтверждён,
    ждёт refresh», у которого неразобранные строки старше 45 дней, сам из очереди не
-   уйдёт (в health-check он не считается) — нужен этот ремонт за его период. То же
-   для категории, вручную сопоставленной с `known = false`.
+   уйдёт (в health-check он не считается) — нужен этот ремонт за его период.
+   Категория, вручную сопоставленная с `known = false`, подтверждённой не считается:
+   тип остаётся в очереди с кнопкой «Подтвердить» и в health-check.
 6. В ОПиУ новая услуга идёт через Marketplace (`OzonCostCategory`,
    `default_cost_mapping.yaml`) — подтверждение в Ingestion его не меняет.
 

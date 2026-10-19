@@ -8,7 +8,6 @@ use App\Ingestion\Application\DTO\OzonAccrualTypeQueueItem;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualCategoryTaxonomyResolver;
 use App\Ingestion\Application\Source\Ozon\OzonAccrualTypeProposer;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
-use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Infrastructure\Query\OzonAccrualTypeQueueQuery;
 use App\Ingestion\Repository\ExternalCategoryRepository;
@@ -58,12 +57,13 @@ final readonly class OzonAccrualTypeQueue
                 OzonAccrualCategoryTaxonomyResolver::nameKey($type->getName()),
             ]));
         }
-        $pending = $this->categoryRepository->findByTypeIdsOrKeys(
+        // «Подтверждён, ждёт refresh» — только когда неподтверждённых категорий
+        // нет: MAPPED с маппингом known = false refresh не исправит.
+        $pending = $this->categoryRepository->findUnconfirmedByTypeIdsOrKeys(
             IngestSource::OZON,
             OzonResourceType::ACCRUAL_BY_DAY,
             array_map('strval', array_keys($keysByType)),
             array_values(array_unique(array_merge([], ...array_values($keysByType)))),
-            [ExternalCategoryStatus::NEW, ExternalCategoryStatus::NEEDS_IDENTIFICATION],
         );
         // Числовой external_type_id PHP хранит целым ключом — сравнение по int.
         /** @var array<int|string, true> $pendingTypeIds */

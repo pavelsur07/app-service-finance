@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryMapping;
+use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -75,68 +77,49 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
     }
 
     /**
-     * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
-     *
-     * @param list<string> $normalizedKeys
-     * @param list<ExternalCategoryStatus> $statuses
-     *
-     * @return list<ExternalCategory>
-     */
-    public function findByTypeIdOrKeys(
-        IngestSource $source,
-        string $resourceType,
-        string $externalTypeId,
-        array $normalizedKeys,
-        array $statuses,
-    ): array {
-        return $this->createQueryBuilder('category')
-            ->andWhere('category.source = :source')
-            ->andWhere('category.resourceType = :resourceType')
-            ->andWhere('category.externalTypeId = :externalTypeId OR category.normalizedKey IN (:normalizedKeys)')
-            ->andWhere('category.status IN (:statuses)')
-            ->setParameter('source', $source->value)
-            ->setParameter('resourceType', $resourceType)
-            ->setParameter('externalTypeId', $externalTypeId)
-            ->setParameter('normalizedKeys', [] !== $normalizedKeys ? $normalizedKeys : ['-'])
-            ->setParameter('statuses', array_map(static fn (ExternalCategoryStatus $status): string => $status->value, $statuses))
-            ->orderBy('category.scope', \SortDirection::Ascending)
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
-     * Пакетный вариант findByTypeIdOrKeys: категории для нескольких типов одним
-     * запросом, сопоставление с типом — у вызывающего кода.
+     * Категории типов Ozon, которые ещё не подтверждены: в очереди разбора
+     * (NEW, NEEDS_IDENTIFICATION) либо MAPPED без действующего маппинга с
+     * known = true — refresh такую категорию известной не сделает. Сопоставление
+     * категории с типом — у вызывающего кода.
      *
      * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
      *
      * @param list<string> $externalTypeIds
      * @param list<string> $normalizedKeys
-     * @param list<ExternalCategoryStatus> $statuses
      *
      * @return list<ExternalCategory>
      */
-    public function findByTypeIdsOrKeys(
+    public function findUnconfirmedByTypeIdsOrKeys(
         IngestSource $source,
         string $resourceType,
         array $externalTypeIds,
         array $normalizedKeys,
-        array $statuses,
     ): array {
         if ([] === $externalTypeIds && [] === $normalizedKeys) {
             return [];
         }
 
+        $confirmedMapping = $this->getEntityManager()->createQueryBuilder()
+            ->select('1')
+            ->from(ExternalCategoryMapping::class, 'mapping')
+            ->andWhere('mapping.externalCategory = category')
+            ->andWhere('mapping.status = :activeMapping')
+            ->andWhere('mapping.known = true')
+            ->getDQL();
+
         return $this->createQueryBuilder('category')
             ->andWhere('category.source = :source')
             ->andWhere('category.resourceType = :resourceType')
             ->andWhere('category.externalTypeId IN (:externalTypeIds) OR category.normalizedKey IN (:normalizedKeys)')
-            ->andWhere('category.status IN (:statuses)')
+            ->andWhere(sprintf('category.status IN (:pending) OR (category.status = :mapped AND NOT EXISTS (%s))', $confirmedMapping))
             ->setParameter('source', $source->value)
             ->setParameter('resourceType', $resourceType)
             ->setParameter('externalTypeIds', [] !== $externalTypeIds ? $externalTypeIds : ['-'])
             ->setParameter('normalizedKeys', [] !== $normalizedKeys ? $normalizedKeys : ['-'])
-            ->setParameter('statuses', array_map(static fn (ExternalCategoryStatus $status): string => $status->value, $statuses))
+            ->setParameter('pending', [ExternalCategoryStatus::NEW->value, ExternalCategoryStatus::NEEDS_IDENTIFICATION->value])
+            ->setParameter('mapped', ExternalCategoryStatus::MAPPED->value)
+            ->setParameter('activeMapping', ExternalCategoryMappingStatus::ACTIVE->value)
+            ->orderBy('category.scope', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

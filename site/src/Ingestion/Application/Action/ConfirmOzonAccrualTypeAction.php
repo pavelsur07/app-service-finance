@@ -10,7 +10,6 @@ use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Entity\ExternalCategory;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
-use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionType;
 use App\Ingestion\Exception\OzonAccrualTypeNotConfirmableException;
@@ -84,15 +83,15 @@ final readonly class ConfirmOzonAccrualTypeAction
             OzonAccrualCategoryTaxonomyResolver::codeKey($type->getName()),
             OzonAccrualCategoryTaxonomyResolver::nameKey($type->getName()),
         ]));
-        $categories = $this->categoryRepository->findByTypeIdOrKeys(
+        // Неразобранные категории и MAPPED с маппингом known = false.
+        $categories = $this->categoryRepository->findUnconfirmedByTypeIdsOrKeys(
             IngestSource::OZON,
             OzonResourceType::ACCRUAL_BY_DAY,
-            (string) $typeId,
+            [(string) $typeId],
             $keys,
-            [ExternalCategoryStatus::NEW, ExternalCategoryStatus::NEEDS_IDENTIFICATION],
         );
         if ([] === $categories) {
-            throw new OzonAccrualTypeNotConfirmableException(sprintf('У типа %d нет неразобранных внешних категорий: запустите discovery.', $typeId));
+            throw new OzonAccrualTypeNotConfirmableException(sprintf('У типа %d нет неподтверждённых внешних категорий: запустите discovery.', $typeId));
         }
 
         $code = $this->categoryFactory->create($type, $nonItemType)->code;
