@@ -12,6 +12,9 @@ use Ramsey\Uuid\Uuid;
  * Разбор тела запросов assign/detach. Один класс на оба endpoint'а: список
  * listingIds валидируется одинаково, разъехавшиеся копии этой проверки —
  * прямой путь к дыре в скоупе компании.
+ *
+ * Назначение выбирает листинги либо списком listingIds, либо фильтром реестра
+ * (filter) — тогда listingIds пуст, а листинги находит сервер.
  */
 final readonly class ListingTagPayload
 {
@@ -24,13 +27,24 @@ final readonly class ListingTagPayload
         public array $listingIds,
         public ?string $tagId,
         public ?string $tagName,
+        public ?ListingsFilter $filter = null,
     ) {
     }
 
     public static function forAssign(mixed $data): self
     {
         $data = self::asArray($data);
-        $listingIds = self::parseListingIds($data);
+
+        $filter = null;
+        $listingIds = [];
+        if (array_key_exists('filter', $data)) {
+            if (array_key_exists('listingIds', $data)) {
+                throw new InvalidListingTagPayloadException('listing_selection_required', 'Укажите ровно одно из полей: listingIds или filter.');
+            }
+            $filter = ListingsFilter::fromPayload($data['filter']);
+        } else {
+            $listingIds = self::parseListingIds($data);
+        }
 
         $tagId = self::parseOptionalString($data, 'tagId');
         $tagName = self::parseOptionalString($data, 'name');
@@ -50,7 +64,7 @@ final readonly class ListingTagPayload
             }
         }
 
-        return new self($listingIds, $tagId, $tagName);
+        return new self($listingIds, $tagId, $tagName, $filter);
     }
 
     public static function forDetach(mixed $data): self

@@ -55,6 +55,33 @@ final readonly class ListingTagAssignmentRepository
     }
 
     /**
+     * Сколько листингов из списка принадлежат компании — «выбрано» для итога
+     * назначения: чужие и несуществующие id не считаются.
+     *
+     * @param list<string> $listingIds
+     */
+    public function countCompanyListings(string $companyId, array $listingIds): int
+    {
+        if ([] === $listingIds) {
+            return 0;
+        }
+
+        return (int) $this->connection->fetchOne(
+            <<<'SQL'
+            SELECT COUNT(*)
+            FROM marketplace_listings
+            WHERE company_id = :companyId
+              AND id IN (:listingIds)
+            SQL,
+            [
+                'companyId' => $companyId,
+                'listingIds' => $listingIds,
+            ],
+            ['listingIds' => ArrayParameterType::STRING],
+        );
+    }
+
+    /**
      * @param list<string> $listingIds
      *
      * @return int сколько связей реально снято
@@ -123,6 +150,26 @@ final readonly class ListingTagAssignmentRepository
 
         /** @var list<string> $ids */
         $ids = $this->connection->fetchFirstColumn($sql, $params, $types);
+
+        return $ids;
+    }
+
+    /**
+     * Листинги компании, у которых есть хотя бы один тег (фильтр «Без тегов»).
+     *
+     * @return list<string> listingId
+     */
+    public function taggedListingIds(string $companyId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn(
+            <<<'SQL'
+            SELECT DISTINCT listing_id
+            FROM marketplace_listing_tag_assignments
+            WHERE company_id = :companyId
+            SQL,
+            ['companyId' => $companyId],
+        );
 
         return $ids;
     }

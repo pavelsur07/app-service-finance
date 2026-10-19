@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Marketplace\Controller;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Company\Security\AccessLevel;
+use App\Company\Security\Module;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
@@ -239,6 +244,126 @@ final class ListingTagsApiTest extends WebTestCaseBase
     }
 
     /**
+     * «Выбрать все N по фильтру»: тег получают все совпавшие листинги компании,
+     * а не только 25 строк страницы, которые знает браузер.
+     */
+    public function testAssignsTagToEveryListingMatchingFilter(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(30, 'Наволочки 50х70');
+        $this->seedForeignCompanyWithListing('Наволочки чужие');
+        $this->em()->clear();
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::ASSIGN_URL, ['filter' => ['q' => 'НАВОЛ'], 'name' => 'Склад 1']);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->jsonResponse($client);
+        self::assertSame(30, $payload['matched']);
+        self::assertSame(30, $payload['assigned']);
+        self::assertSame(30, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tag_assignments WHERE tag_id = ? AND company_id = ?',
+            [$payload['tagId'], self::COMPANY_ID],
+        ));
+        self::assertSame(0, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tag_assignments WHERE company_id = ?',
+            [self::OTHER_COMPANY_ID],
+        ));
+
+        $this->postJson($client, self::ASSIGN_URL, ['filter' => ['q' => 'навол'], 'tagId' => $payload['tagId']]);
+
+        self::assertResponseIsSuccessful();
+        $repeat = $this->jsonResponse($client);
+        self::assertSame(30, $repeat['matched']);
+        self::assertSame(0, $repeat['assigned']);
+    }
+
+    public function testFilterMatchingNothingAssignsNothing(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(2, 'Плед');
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::ASSIGN_URL, ['filter' => ['q' => 'навол'], 'name' => 'Склад 1']);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->jsonResponse($client);
+        self::assertSame(0, $payload['matched']);
+        self::assertSame(0, $payload['assigned']);
+    }
+
+    public function testFilterModeRejectsTagOfAnotherCompany(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(2, 'Наволочки');
+        $this->seedForeignCompanyWithListing();
+        $foreignTag = $this->seedTag(self::OTHER_COMPANY_ID, 'Чужой');
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::ASSIGN_URL, ['filter' => ['q' => 'навол'], 'tagId' => $foreignTag]);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame(0, (int) $this->fetchOne('SELECT COUNT(*) FROM marketplace_listing_tag_assignments', []));
+    }
+
+    public function testListingIdsModeCountsOnlyOwnListingsAsMatched(): void
+    {
+        $client = static::createClient();
+        [$owner, $company, $listings] = $this->seedCompanyWithListings(2);
+        $foreignListingId = $this->seedForeignCompanyWithListing();
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::ASSIGN_URL, [
+            'listingIds' => [$listings[0]->getId(), $listings[1]->getId(), $foreignListingId],
+            'name' => 'Зима',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->jsonResponse($client);
+        self::assertSame(2, $payload['matched']);
+        self::assertSame(2, $payload['assigned']);
+    }
+
+    public function testReadOnlyMemberCannotAssignByFilter(): void
+    {
+        $client = static::createClient();
+        [, $company] = $this->seedCompanyWithListings(2, 'Наволочки');
+
+        $role = new CompanyRole(
+            Uuid::uuid4()->toString(),
+            'Только чтение маркетплейса',
+            [Module::MARKETPLACE->value => AccessLevel::READ->value],
+            $company,
+        );
+        $member = UserBuilder::aUser()
+            ->withIndex(79)
+            ->withEmail('listing-tags-api-readonly@example.test')
+            ->withRoles(['ROLE_COMPANY_USER'])
+            ->build();
+
+        $em = $this->em();
+        $em->persist($role);
+        $em->persist($member);
+        $em->persist(
+            CompanyMemberBuilder::aMember()
+                ->withId(Uuid::uuid4()->toString())
+                ->withCompany($company)
+                ->withUser($member)
+                ->withRole(CompanyMember::ROLE_OPERATOR)
+                ->withStatus(CompanyMember::STATUS_ACTIVE)
+                ->withAccessRole($role)
+                ->build(),
+        );
+        $em->flush();
+        $this->login($client, $member, $company);
+
+        $this->postJson($client, self::ASSIGN_URL, ['filter' => ['q' => 'навол'], 'name' => 'Склад 1']);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame(0, (int) $this->fetchOne('SELECT COUNT(*) FROM marketplace_listing_tag_assignments', []));
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     #[DataProvider('invalidPayloads')]
@@ -279,12 +404,21 @@ final class ListingTagsApiTest extends WebTestCaseBase
             'tag_name_invalid',
         ];
         yield 'tag id not uuid' => [['listingIds' => [$validId], 'tagId' => 'nope'], 'tag_id_invalid'];
+        yield 'listing ids and filter' => [
+            ['listingIds' => [$validId], 'filter' => ['q' => 'навол'], 'name' => 'Зима'],
+            'listing_selection_required',
+        ];
+        yield 'filter with unknown marketplace' => [
+            ['filter' => ['marketplace' => 'amazon'], 'name' => 'Зима'],
+            'filter_invalid',
+        ];
+        yield 'filter not an object' => [['filter' => 'навол', 'name' => 'Зима'], 'filter_invalid'];
     }
 
     /**
      * @return array{0: User, 1: Company, 2: list<MarketplaceListing>}
      */
-    private function seedCompanyWithListings(int $count): array
+    private function seedCompanyWithListings(int $count, ?string $name = null): array
     {
         $owner = UserBuilder::aUser()
             ->withEmail('listing-tags@example.test')
@@ -306,6 +440,7 @@ final class ListingTagsApiTest extends WebTestCaseBase
                 ->forCompany($company)
                 ->withMarketplace(MarketplaceType::WILDBERRIES)
                 ->withMarketplaceSku('wb-tag-sku-'.$i)
+                ->withName(null === $name ? null : $name.' '.$i)
                 ->build();
             $em->persist($listing);
             $listings[] = $listing;
@@ -316,7 +451,7 @@ final class ListingTagsApiTest extends WebTestCaseBase
         return [$owner, $company, $listings];
     }
 
-    private function seedForeignCompanyWithListing(): string
+    private function seedForeignCompanyWithListing(?string $name = null): string
     {
         $owner = UserBuilder::aUser()
             ->withIndex(902)
@@ -333,6 +468,7 @@ final class ListingTagsApiTest extends WebTestCaseBase
             ->forCompany($company)
             ->withMarketplace(MarketplaceType::OZON)
             ->withMarketplaceSku('ozon-foreign-1')
+            ->withName($name)
             ->build();
 
         $em = $this->em();

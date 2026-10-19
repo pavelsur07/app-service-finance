@@ -8,6 +8,7 @@ use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\AssignListingTagAction;
 use App\Marketplace\Application\DTO\ListingTagPayload;
 use App\Marketplace\Exception\InvalidListingTagPayloadException;
+use App\Marketplace\Exception\ListingFilterTooBroadException;
 use App\Marketplace\Exception\ListingTagNotFoundException;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -46,11 +47,14 @@ final class ListingTagAssignController extends AbstractController
             $result = ($this->assignListingTag)((string) $company->getId(), $payload);
         } catch (ListingTagNotFoundException $e) {
             return $this->error('tag_not_found', $e->getMessage(), Response::HTTP_NOT_FOUND);
+        } catch (ListingFilterTooBroadException $e) {
+            return $this->error('filter_too_broad', $e->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         return $this->json([
             'tagId' => $result->tagId,
             'tagName' => $result->tagName,
+            'matched' => $result->matched,
             'assigned' => $result->assigned,
         ]);
     }
