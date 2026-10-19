@@ -57,6 +57,36 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
         );
     }
 
+    public function testIndexShowsPlDocumentFlagColumnForEveryLevel(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+
+        $root = $this->category('44444444-4444-4444-8444-444444444444', $company, 'Продажи');
+        $this->category('55555555-5555-4555-8555-555555555555', $company, 'Wildberries', $root)
+            ->setAllowPlDocument(true);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cashflow-categories/');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('ОПиУ', trim($crawler->filter('.cashflow-category-head .cashflow-category-col--pl')->text()));
+        self::assertSame(
+            ['Продажи' => '—', 'Wildberries' => '✓'],
+            array_combine(
+                $crawler->filter('.cashflow-category-item .cashflow-category-link')->each(static fn ($link): string => trim($link->text())),
+                $crawler->filter('.cashflow-category-item .cashflow-category-col--pl [aria-hidden]')->each(static fn ($cell): string => trim($cell->text())),
+            ),
+        );
+        self::assertSame(
+            ['ОПиУ: можно создавать документ'],
+            $crawler->filter('.cashflow-category-children .cashflow-category-col--pl .visually-hidden')->each(static fn ($cell): string => trim($cell->text())),
+        );
+    }
+
     public function testEditDetachesCategoryAndChangesFlowKindInOneSubmit(): void
     {
         $client = static::createClient();
