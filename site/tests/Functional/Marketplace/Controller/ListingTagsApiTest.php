@@ -13,7 +13,10 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Events;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class ListingTagsApiTest extends WebTestCaseBase
@@ -84,6 +87,61 @@ final class ListingTagsApiTest extends WebTestCaseBase
         self::assertSame(2, (int) $this->fetchOne(
             'SELECT COUNT(*) FROM marketplace_listing_tag_assignments WHERE tag_id = ?',
             [$tagId],
+        ));
+    }
+
+    /**
+     * Параллельный запрос создаёт одноимённый тег между findBySlug() и вставкой:
+     * назначение — это «найти или создать», поэтому листинги получают уже
+     * существующий тег, а не 500 на uniq_listing_tag_company_slug.
+     */
+    public function testConcurrentCreateOfSameNameAssignsExistingTag(): void
+    {
+        $client = static::createClient();
+        [$owner, $company, $listings] = $this->seedCompanyWithListings(2);
+        $this->login($client, $owner, $company);
+
+        $concurrentTagId = Uuid::uuid7()->toString();
+        $listener = new class($this->em()->getConnection(), self::COMPANY_ID, $concurrentTagId) {
+            private bool $done = false;
+
+            public function __construct(
+                private readonly Connection $connection,
+                private readonly string $companyId,
+                private readonly string $tagId,
+            ) {
+            }
+
+            public function preFlush(): void
+            {
+                if ($this->done) {
+                    return;
+                }
+                $this->done = true;
+                $this->connection->executeStatement(
+                    'INSERT INTO marketplace_listing_tags (id, company_id, name, slug, created_at)
+                     VALUES (?, ?, ?, ?, NOW()) ON CONFLICT (company_id, slug) DO NOTHING',
+                    [$this->tagId, $this->companyId, 'зима', 'зима'],
+                );
+            }
+        };
+        $this->em()->getEventManager()->addEventListener([Events::preFlush], $listener);
+
+        $this->postJson($client, self::ASSIGN_URL, [
+            'listingIds' => array_map(static fn (MarketplaceListing $l): string => $l->getId(), $listings),
+            'name' => 'Зима',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->jsonResponse($client);
+        self::assertSame(2, $payload['assigned']);
+        self::assertSame(1, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
+        self::assertSame(2, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tag_assignments WHERE tag_id = ?',
+            [$payload['tagId']],
         ));
     }
 

@@ -634,7 +634,7 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   `App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository` (DBAL). FK на `marketplace_listings` и `marketplace_listing_tags` — с `ON DELETE CASCADE`.
 - Скоуп компании обеспечивается внутри SQL (`INSERT … SELECT … WHERE l.company_id = :companyId`), а не проверкой в PHP.
 - Кросс-модульный доступ — только через `ListingTagFacade` (см. раздел Facade). Внутри модуля Marketplace контроллеры реестра листингов ходят в репозитории напрямую.
-- Создание тега: на лету при назначении (`AssignListingTagAction`, реестр листингов) или без назначений — кнопка «Добавить» на странице `/marketplace/listings/tags` → `POST /api/marketplace/listings/tags/create` (`CreateListingTagAction`, `MARKETPLACE_WRITE`; 201 `{id, name}`, 409 `tag_name_conflict` при совпадении slug, 422 `tag_name_invalid`). Переименование, слияние и удаление — там же.
+- Создание тега: на лету при назначении (`AssignListingTagAction`, реестр листингов; вставка `MarketplaceListingTagRepository::insertIfAbsent()` — `ON CONFLICT (company_id, slug) DO NOTHING`, одноимённый тег параллельного запроса переиспользуется) или без назначений — кнопка «Добавить» на странице `/marketplace/listings/tags` → `POST /api/marketplace/listings/tags/create` (`CreateListingTagAction`, `MARKETPLACE_WRITE`; 201 `{id, name}`, 409 `tag_name_conflict` при совпадении slug, 422 `tag_name_invalid`). Переименование, слияние и удаление — там же.
 
 ### Marketplace: базовый (автоматический) маппинг в ОПиУ
 
