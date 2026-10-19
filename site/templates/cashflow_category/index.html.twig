@@ -111,8 +111,16 @@
                 <div class="col">
                     <h2 class="page-title">Статьи ДДС</h2>
                 </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="d-flex gap-2">
+                <div class="col-12 col-xl-auto ms-xl-auto d-print-none">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if is_granted('module.finance.write') %}
+                            <form method="post" action="{{ path('cashflow_category_disable_pl_documents') }}"
+                                  data-confirm="{{ ('Отключить создание документов ОПиУ у всех категорий компании «' ~ activeCompany.name ~ '»?')|e('html_attr') }}"
+                                  onsubmit="return confirm(this.dataset.confirm);">
+                                <input type="hidden" name="_token" value="{{ csrf_token('disable_cashflow_pl_documents') }}">
+                                <button type="submit" class="btn btn-outline-warning text-wrap">Отключить создание ОПиУ у всех категорий</button>
+                            </form>
+                        {% endif %}
                         <a href="{{ path('cashflow_category_export_json') }}" class="btn btn-outline-primary">Выгрузить справочник ДДС (JSON)</a>
                         <a href="{{ path('cashflow_category_new') }}" class="btn btn-primary">+ Добавить статью</a>
                     </div>
