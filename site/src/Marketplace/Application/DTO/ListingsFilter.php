@@ -48,7 +48,7 @@ final readonly class ListingsFilter
         return new self(
             mapped: self::mappedFromString($string('filter')),
             marketplace: MarketplaceType::tryFrom($string('marketplace')),
-            search: '' === $search ? null : mb_substr($search, 0, self::SEARCH_MAX_LENGTH),
+            search: '' === $search ? null : trim(mb_substr($search, 0, self::SEARCH_MAX_LENGTH)),
             tagId: Uuid::isValid($tag) ? $tag : null,
             withoutTags: self::TAG_NONE === $tag,
         );

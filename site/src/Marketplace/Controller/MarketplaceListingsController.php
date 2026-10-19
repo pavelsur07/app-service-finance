@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\AssignListingTagAction;
 use App\Marketplace\Application\DTO\ListingsFilter;
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -69,6 +70,7 @@ class MarketplaceListingsController extends AbstractController
             'filter' => $filterParams['filter'],
             'marketplace' => $listingsFilter->marketplace?->value,
             'available_marketplaces' => MarketplaceType::cases(),
+            'max_filter_match' => AssignListingTagAction::DEFAULT_MAX_FILTER_MATCH,
             'count_all' => $countAll,
             'count_mapped' => $countMapped,
             'count_unmapped' => $countUnmapped,

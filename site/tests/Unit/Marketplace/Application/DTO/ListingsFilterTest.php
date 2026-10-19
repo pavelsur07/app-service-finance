@@ -51,6 +51,16 @@ final class ListingsFilterTest extends TestCase
         self::assertSame(str_repeat('я', ListingsFilter::SEARCH_MAX_LENGTH), $filter->search);
     }
 
+    public function testTruncatedSearchMatchesWhatPayloadWouldAccept(): void
+    {
+        // Пробел на границе обрезки: страница и назначение по фильтру должны
+        // искать одну и ту же строку.
+        $filter = ListingsFilter::fromQuery(['q' => str_repeat('я', 99).' хвост']);
+
+        self::assertSame(str_repeat('я', 99), $filter->search);
+        self::assertEquals($filter, ListingsFilter::fromPayload($filter->toQueryParams()));
+    }
+
     public function testFromQueryIgnoresArrayValues(): void
     {
         self::assertTrue(ListingsFilter::fromQuery(['q' => ['навол'], 'tag' => ['none']])->isEmpty());

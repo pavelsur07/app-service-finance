@@ -171,9 +171,16 @@
                         <span class="text-muted small"><span id="bulk-count">0</span> выбрано</span>
                         <span class="small d-none" id="bulk-scope-offer">
                             Выбраны все на странице.
-                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-select-filter">
-                                Выбрать все {{ pager.nbResults|vf_number }} по текущему фильтру
-                            </button>
+                            {% if pager.nbResults <= max_filter_match %}
+                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-select-filter">
+                                    Выбрать все {{ pager.nbResults|vf_number }} по текущему фильтру
+                                </button>
+                            {% else %}
+                                {# Сервер отклонит назначение больше лимита (filter_too_broad). #}
+                                <span class="text-secondary">
+                                    Тег сразу всем можно присвоить, если под фильтр попадает не больше {{ max_filter_match|vf_number }} листингов — сузьте фильтр.
+                                </span>
+                            {% endif %}
                         </span>
                         <span class="small d-none" id="bulk-scope-filter">
                             Выбраны все {{ pager.nbResults|vf_number }} по фильтру.
@@ -505,7 +512,8 @@
                 try {
                     sessionStorage.setItem(FLASH_KEY, text);
                 } catch {
-                    // хранилище недоступно — итог не покажем, назначение уже выполнено
+                    // Хранилище недоступно (приватный режим) — показываем итог до перезагрузки.
+                    window.alert(text);
                 }
             }
 
