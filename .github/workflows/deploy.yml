@@ -329,8 +329,8 @@ jobs:
                   path: |
                       site/var/cache/.php-cs-fixer.cache
                       site/var/cache/.php-cs-fixer.strict-types.cache
-                  key: cs-fixer-${{ hashFiles('site/.php-cs-fixer.php', 'site/.php-cs-fixer.strict-types.php') }}-${{ github.sha }}
-                  restore-keys: cs-fixer-${{ hashFiles('site/.php-cs-fixer.php', 'site/.php-cs-fixer.strict-types.php') }}-
+                  key: cs-fixer-${{ hashFiles('site/.php-cs-fixer.dist.php', 'site/composer.lock') }}-${{ github.sha }}
+                  restore-keys: cs-fixer-${{ hashFiles('site/.php-cs-fixer.dist.php', 'site/composer.lock') }}-
 
             - name: 🎨 Check PHP code style
               run: |
