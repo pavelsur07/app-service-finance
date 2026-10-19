@@ -317,7 +317,7 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
 
     /**
      * @param array<string, mixed> $row
-     * @param array<string, true> $selectedDates
+     * @param array<string, true>  $selectedDates
      */
     private function rowDateInWindow(array $row, \DateTimeImmutable $from, \DateTimeImmutable $to, array $selectedDates): bool
     {
@@ -399,7 +399,7 @@ final class OzonAccrualVerifyRollingRefreshCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      *
      * @return list<array{countDelta: int, totalDeltaMinor: int}>

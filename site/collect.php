@@ -1,4 +1,5 @@
 <?php
+
 // collect.php
 // docker-compose run --rm site-php-cli php collect.php
 $excludeDirs = ['vendor', 'var', 'node_modules', '.git', 'public/bundles', 'tests', 'migrations'];
@@ -12,13 +13,13 @@ $iterator = new RecursiveIteratorIterator(
 $handle = fopen($outputFile, 'w');
 
 if (!$handle) {
-    die("Не удалось создать файл $outputFile");
+    exit("Не удалось создать файл $outputFile");
 }
 
 foreach ($iterator as $file) {
     $path = $file->getPathname();
     // Исправлено: убраны лишние пробелы в названии переменной
-    $relativePath = str_replace($rootPath . DIRECTORY_SEPARATOR, '', $path);
+    $relativePath = str_replace($rootPath.DIRECTORY_SEPARATOR, '', $path);
 
     $pathParts = explode(DIRECTORY_SEPARATOR, $relativePath);
     if (array_intersect($pathParts, $excludeDirs)) {
@@ -29,7 +30,7 @@ foreach ($iterator as $file) {
         continue;
     }
 
-    if ($file->getFilename() === 'collect.php' || $file->getFilename() === $outputFile) {
+    if ('collect.php' === $file->getFilename() || $file->getFilename() === $outputFile) {
         continue;
     }
 

@@ -278,7 +278,7 @@ final class SyncOzonRealizationHandler
      * Сохраняет документ отчёта за месяц; повторная загрузка перезаписывает прежний (данные могли измениться).
      *
      * @param array<string, mixed> $rawData
-     * @param array<mixed> $rows
+     * @param array<mixed>         $rows
      */
     private function storeDocument(Company $company, array $rawData, array $rows, int $year, int $month): string
     {

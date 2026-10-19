@@ -659,7 +659,7 @@ final readonly class MarketplaceFacade
      *
      * Используется при парсинге raw snapshot'ов остатков в нормализованные StockSnapshot записи.
      *
-     * @param string $companyId UUID компании
+     * @param string        $companyId  UUID компании
      * @param array<string> $listingIds массив UUID листингов (max 5000)
      *
      * @return array<string, string|null> map listingId → productId|null

@@ -16,9 +16,9 @@ namespace App\Inventory\Application\DTO;
 final readonly class StockOnDateResult
 {
     /**
-     * @param array<string, float> $qtyByListingId listingId => остаток, шт
+     * @param array<string, float>  $qtyByListingId       listingId => остаток, шт
      * @param array<string, string> $snapshotDateBySource marketplace => дата снапшота (Y-m-d), из которого взяты данные
-     * @param array<string, string> $staleSources marketplace => дата последнего снапшота (Y-m-d), отброшенного как протухший
+     * @param array<string, string> $staleSources         marketplace => дата последнего снапшота (Y-m-d), отброшенного как протухший
      */
     public function __construct(
         public array $qtyByListingId,

@@ -220,9 +220,9 @@ final class DashboardSnapshotService
     }
 
     /**
-     * @param array<string, mixed> $freeCash
-     * @param array<string, mixed> $inflow
-     * @param array<string, mixed> $outflow
+     * @param array<string, mixed>                                                                  $freeCash
+     * @param array<string, mixed>                                                                  $inflow
+     * @param array<string, mixed>                                                                  $outflow
      * @param array{widget: \App\Analytics\Api\Response\RevenueWidgetResponse, registryEmpty: bool} $revenue
      *
      * @return list<array{code: string, message: string}>

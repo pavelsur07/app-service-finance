@@ -42,7 +42,7 @@ final class Version20251212160000 extends AbstractMigration
                 ],
             );
 
-            if ($projectId === false || $projectId === null) {
+            if (false === $projectId || null === $projectId) {
                 $projectId = Uuid::uuid4()->toString();
 
                 $this->connection->insert(

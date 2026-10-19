@@ -58,7 +58,7 @@ final readonly class BalanceFacade
 
     /**
      * @param array<string, array{id: string, name: string, level: int, type: string, children: list<mixed>}> $byId
-     * @param list<string> $ids
+     * @param list<string>                                                                                    $ids
      *
      * @return list<array{id: string, name: string, level: int, type: string, children: list<mixed>}>
      */

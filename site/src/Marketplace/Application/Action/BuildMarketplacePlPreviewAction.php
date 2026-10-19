@@ -271,7 +271,7 @@ final readonly class BuildMarketplacePlPreviewAction
     /**
      * Регистр ОПиУ пропускает операции без проекта; у затрат проект — только из подключения.
      *
-     * @param list<PlPreviewCostCoverageDTO> $costCoverage
+     * @param list<PlPreviewCostCoverageDTO>  $costCoverage
      * @param list<PlPreviewSalesCoverageDTO> $salesCoverage
      *
      * @return list<string>

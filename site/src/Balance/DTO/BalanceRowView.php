@@ -8,7 +8,7 @@ final class BalanceRowView
 {
     /**
      * @param array<string, string> $amountsByCurrency currency => decimal string
-     * @param list<self> $children
+     * @param list<self>            $children
      */
     public function __construct(
         public string $id,

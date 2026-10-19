@@ -92,7 +92,7 @@ final class OzonFinancialReportsFreshnessCheckCommandTest extends TestCase
     /**
      * @param list<array<string, mixed>> $connections
      * @param list<array<string, mixed>> $documents
-     * @param array<string, mixed> $capturedParams
+     * @param array<string, mixed>       $capturedParams
      */
     private function command(array $connections, array $documents, array &$capturedParams = []): OzonFinancialReportsFreshnessCheckCommand
     {

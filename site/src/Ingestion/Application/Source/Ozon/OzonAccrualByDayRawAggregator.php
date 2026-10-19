@@ -52,7 +52,7 @@ final readonly class OzonAccrualByDayRawAggregator
     }
 
     /**
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>                     $row
      * @param array<string, array<string, int|string>> $deliveryServices
      * @param array<string, array<string, int|string>> $commissions
      */
@@ -205,8 +205,8 @@ final readonly class OzonAccrualByDayRawAggregator
 
     /**
      * @param array<string, array<string, int|string>> $bucket
-     * @param list<string> $keyParts
-     * @param array<string, string> $dimensions
+     * @param list<string>                             $keyParts
+     * @param array<string, string>                    $dimensions
      */
     private function add(array &$bucket, array $keyParts, array $dimensions, int $amountMinor): void
     {

@@ -267,7 +267,7 @@ final readonly class NormalizeRawRecordAction
      * обязан записать лишь те дни, для которых он авторитет.
      *
      * @param list<array<string, mixed>> $rows
-     * @param list<string> $dates
+     * @param list<string>               $dates
      *
      * @return list<array<string, mixed>>
      */

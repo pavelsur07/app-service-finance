@@ -499,7 +499,7 @@ final class OzonAccrualCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * @param list<string> $existingIds
+     * @param list<string>              $existingIds
      * @param array<string, mixed>|null $payloadOverride
      */
     private function processor(array $existingIds, ?array $payloadOverride = null, ?\DateTimeImmutable $lockBefore = null, ?int &$deletes = null): OzonAccrualCostsRawProcessor

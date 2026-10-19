@@ -41,7 +41,7 @@ final class Version20260902140000 extends AbstractMigration
     public function down(Schema $schema): void
     {
         $this->addSql('ALTER TABLE ingest_orders DROP partial_observed_at');
-        $this->addSql("UPDATE ingest_orders SET status_observed_at = COALESCE(status_observed_at, created_at)");
+        $this->addSql('UPDATE ingest_orders SET status_observed_at = COALESCE(status_observed_at, created_at)');
         $this->addSql('ALTER TABLE ingest_orders ALTER status_observed_at SET NOT NULL');
     }
 }

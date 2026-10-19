@@ -10,9 +10,9 @@ final readonly class ImportPLCategoryTreeCommand
 {
     /**
      * @param list<PLCategoryTreeNode> $sourceNodes дерево-источник в DFS pre-order
-     * @param bool $onlyCreate только добавить недостающие категории: совпавшие
-     *                         не меняются (базовый шаблон не перетирает
-     *                         настройки компании), а служат родителями новым
+     * @param bool                     $onlyCreate  только добавить недостающие категории: совпавшие
+     *                                              не меняются (базовый шаблон не перетирает
+     *                                              настройки компании), а служат родителями новым
      */
     public function __construct(
         public array $sourceNodes,

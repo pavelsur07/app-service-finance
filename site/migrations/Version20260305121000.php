@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Migrations\AbstractMigration;
 use Ramsey\Uuid\Uuid;
@@ -51,7 +51,7 @@ final class Version20260305121000 extends AbstractMigration
                     ],
                 );
 
-                if ($exists !== false) {
+                if (false !== $exists) {
                     continue;
                 }
 

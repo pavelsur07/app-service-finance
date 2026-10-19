@@ -32,7 +32,7 @@ final readonly class OzonAccrualStaleProjectionPruner
      * как при обычной нормализации.
      *
      * @param list<MappedTransaction> $mappedTransactions
-     * @param list<string> $restrictToDates дни в формате Y-m-d
+     * @param list<string>            $restrictToDates    дни в формате Y-m-d
      */
     public function prune(IngestRawRecord $rawRecord, array $mappedTransactions, bool $execute, bool $includeRows = false, array $restrictToDates = []): OzonAccrualStaleProjectionPruneResult
     {

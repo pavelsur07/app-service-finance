@@ -18,7 +18,7 @@ final class Version20251108100000 extends AbstractMigration
     {
         $this->addSql("ALTER TABLE wildberries_report_details ADD COLUMN import_id UUID DEFAULT '00000000-0000-0000-0000-000000000000' NOT NULL");
         $this->addSql('CREATE INDEX idx_wb_report_detail_import_id ON wildberries_report_details (import_id)');
-        $this->addSql("ALTER TABLE wildberries_report_details ALTER COLUMN import_id DROP DEFAULT");
+        $this->addSql('ALTER TABLE wildberries_report_details ALTER COLUMN import_id DROP DEFAULT');
     }
 
     public function down(Schema $schema): void

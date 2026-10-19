@@ -221,7 +221,7 @@ final class SyncOzonAccrualByDayHandler
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, string> $serviceTypes
+     * @param array<string, string>      $serviceTypes
      */
     private function storeDocument(
         Company $company,

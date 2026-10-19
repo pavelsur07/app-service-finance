@@ -736,7 +736,7 @@ final readonly class RefreshOrderStatusesAction
 
     /**
      * @param list<IngestOrder> $orders
-     * @param list<string> $duplicateExternalOrderIds номера, встречающиеся у нескольких заказов подключения
+     * @param list<string>      $duplicateExternalOrderIds номера, встречающиеся у нескольких заказов подключения
      *
      * @return array{rows: list<array<string, mixed>>, observations: list<array{orderId: string, rawStatus: string, rawSubstatus: ?string, statusAttributes: array<string, mixed>, observedAt: \DateTimeImmutable}>, attempts: array<string, \DateTimeImmutable>, requested: int, missing: int, invalid: int, failure: \Throwable|null, expected: array<string, string>}
      */
@@ -1007,7 +1007,7 @@ final readonly class RefreshOrderStatusesAction
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param list<string> $writtenPaths пути записанных объектов, заполняется по ссылке
+     * @param list<string>               $writtenPaths пути записанных объектов, заполняется по ссылке
      */
     private function storeAudit(
         IngestSource $source,

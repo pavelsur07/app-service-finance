@@ -10,9 +10,9 @@ use App\Shared\Domain\ValueObject\Money;
 final class BalanceReport
 {
     /**
-     * @param list<string> $currencies
-     * @param list<BalanceRowView> $roots
-     * @param array<string, string> $totals currency => asset decimal string
+     * @param list<string>          $currencies
+     * @param list<BalanceRowView>  $roots
+     * @param array<string, string> $totals        currency => asset decimal string
      * @param array<string, string> $passiveTotals
      * @param array<string, string> $differences
      */

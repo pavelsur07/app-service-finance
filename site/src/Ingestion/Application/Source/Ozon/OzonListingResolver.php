@@ -204,7 +204,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
     }
 
     /**
-     * @param array<string, mixed> $sourceData
+     * @param array<string, mixed>                       $sourceData
      * @param array{sku: string|null, name: string|null} $itemContext
      */
     private function marketplaceSku(array $sourceData, array $itemContext): ?string
@@ -226,7 +226,7 @@ final class OzonListingResolver implements BulkListingResolverInterface
     }
 
     /**
-     * @param array<string, mixed> $sourceData
+     * @param array<string, mixed>                       $sourceData
      * @param array{sku: string|null, name: string|null} $itemContext
      */
     private function listingName(array $sourceData, array $itemContext): ?string

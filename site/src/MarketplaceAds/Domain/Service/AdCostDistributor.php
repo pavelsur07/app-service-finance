@@ -21,7 +21,7 @@ final readonly class AdCostDistributor
      * Контроль округления: разница прибавляется к строке с наибольшей долей.
      *
      * @param array{id: string, parentSku: string}[] $listings
-     * @param array<string, int> $salesByListing listingId => quantity (отсутствующие = 0)
+     * @param array<string, int>                     $salesByListing listingId => quantity (отсутствующие = 0)
      *
      * @return CostDistributionResult[]
      */

@@ -19,7 +19,7 @@ final class Version20260602120000 extends AbstractMigration
     {
         $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $this->abortIf(
-            $platform !== 'postgresql',
+            'postgresql' !== $platform,
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform),
         );
 
@@ -75,7 +75,7 @@ final class Version20260602120000 extends AbstractMigration
     {
         $platform = ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform ? 'postgresql' : get_debug_type($this->connection->getDatabasePlatform()));
         $this->abortIf(
-            $platform !== 'postgresql',
+            'postgresql' !== $platform,
             sprintf('Migration %s supports only PostgreSQL; got platform "%s".', self::class, $platform),
         );
 

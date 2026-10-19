@@ -13,7 +13,7 @@ final readonly class DefaultCostMappingApplyResult
      * @param list<string> $updatedCostCodes
      * @param list<string> $skippedCostCodes
      * @param list<string> $blockedCostCodes
-     * @param list<string> $inferredCostCodes созданные/заполненные по образцу компании (подмножество created + updated)
+     * @param list<string> $inferredCostCodes         созданные/заполненные по образцу компании (подмножество created + updated)
      * @param list<string> $crossMarketplaceCostCodes выведенные по образцу другого маркетплейса (подмножество inferred)
      */
     public function __construct(

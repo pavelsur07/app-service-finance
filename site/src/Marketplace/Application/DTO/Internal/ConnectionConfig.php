@@ -8,9 +8,9 @@ namespace App\Marketplace\Application\DTO\Internal;
 final readonly class ConnectionConfig
 {
     /**
-     * @param array{client_id: string, api_key: string}|null $seller
+     * @param array{client_id: string, api_key: string}|null       $seller
      * @param array{client_id: string, client_secret: string}|null $performance
-     * @param list<string> $resourceTypes
+     * @param list<string>                                         $resourceTypes
      */
     public function __construct(
         public string $connectionRef,

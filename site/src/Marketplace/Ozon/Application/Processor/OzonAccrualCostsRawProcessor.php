@@ -250,7 +250,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
     }
 
     /**
-     * @param array<string, mixed> $accrual
+     * @param array<string, mixed>  $accrual
      * @param array<string, string> $serviceTypes
      *
      * @return list<array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}>
@@ -352,7 +352,7 @@ final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInter
     }
 
     /**
-     * @param array<string, mixed> $service
+     * @param array<string, mixed>  $service
      * @param array<string, string> $serviceTypes
      *
      * @return array{externalId: string, categoryCode: string, categoryName: string, amount: string, operationType: MarketplaceCostOperationType, description: string, date: \DateTimeImmutable, sku: string|null, unknownService: string|null}|null

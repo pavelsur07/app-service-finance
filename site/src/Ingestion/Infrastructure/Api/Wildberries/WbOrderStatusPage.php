@@ -31,10 +31,10 @@ namespace App\Ingestion\Infrastructure\Api\Wildberries;
 final readonly class WbOrderStatusPage
 {
     /**
-     * @param array<int, array<string, mixed>> $statuses номер заказа => строка ответа с нормализованными осями
-     * @param list<int> $rejectedIds номера отбракованных строк, которые мы спрашивали
-     * @param array<string, mixed>|null $evidence разобранный ответ целиком, если что-то отбраковано
-     * @param list<array<string, mixed>> $auditRows строки ответа БЕЗ нормализации — для сырья
+     * @param array<int, array<string, mixed>> $statuses    номер заказа => строка ответа с нормализованными осями
+     * @param list<int>                        $rejectedIds номера отбракованных строк, которые мы спрашивали
+     * @param array<string, mixed>|null        $evidence    разобранный ответ целиком, если что-то отбраковано
+     * @param list<array<string, mixed>>       $auditRows   строки ответа БЕЗ нормализации — для сырья
      */
     public function __construct(
         public array $statuses = [],

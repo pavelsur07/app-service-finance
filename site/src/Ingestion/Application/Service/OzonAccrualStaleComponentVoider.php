@@ -29,7 +29,7 @@ final readonly class OzonAccrualStaleComponentVoider
      * целиком, и всё, чего в наборе нет, действительно устарело.
      *
      * @param list<MappedTransaction> $mappedTransactions
-     * @param list<string> $restrictToDates дни в формате Y-m-d
+     * @param list<string>            $restrictToDates    дни в формате Y-m-d
      */
     public function void(IngestRawRecord $rawRecord, array $mappedTransactions, array $restrictToDates = []): void
     {

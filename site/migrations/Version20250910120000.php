@@ -17,8 +17,8 @@ final class Version20250910120000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->addSql("ALTER TABLE auto_category_template ADD scope VARCHAR(255) NOT NULL DEFAULT 'cashflow'");
-        $this->addSql("CREATE INDEX IDX_AC_TEMPLATE_COMPANY_SCOPE_ACTIVE ON auto_category_template (company_id, scope, is_active)");
-        $this->addSql("CREATE INDEX IDX_AC_TEMPLATE_PRIORITY ON auto_category_template (priority)");
+        $this->addSql('CREATE INDEX IDX_AC_TEMPLATE_COMPANY_SCOPE_ACTIVE ON auto_category_template (company_id, scope, is_active)');
+        $this->addSql('CREATE INDEX IDX_AC_TEMPLATE_PRIORITY ON auto_category_template (priority)');
         $this->addSql('CREATE INDEX IDX_AC_CONDITION_TEMPLATE_POSITION ON auto_category_condition (template_id, position)');
     }
 

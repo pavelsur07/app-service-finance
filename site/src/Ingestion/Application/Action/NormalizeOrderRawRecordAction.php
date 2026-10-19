@@ -308,15 +308,15 @@ final readonly class NormalizeOrderRawRecordAction
     }
 
     /**
-     * @param array<string, IngestOrder> $known externalId => заказ
-     * @param array<string, array<string, IngestOrderItem>> $knownItems пул сущностей для
-     *                                                                  переиспользования, не сжимается
+     * @param array<string, IngestOrder>                    $known        externalId => заказ
+     * @param array<string, array<string, IngestOrderItem>> $knownItems   пул сущностей для
+     *                                                                    переиспользования, не сжимается
      * @param array<string, array<string, IngestOrderItem>> $currentItems набор последнего снимка заказа
-     * @param array<string, int> $occurrences последний номер наблюдения на заказ,
-     *                                        изменяется по ссылке
-     * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
-     * @param bool $isReplay сырьё уже разбирали: наблюдений больше нет, есть пересчёт
-     * @param list<RecordNormalizationIssueCommand> $issues копилка проблем партии, пишется одной пачкой
+     * @param array<string, int>                            $occurrences  последний номер наблюдения на заказ,
+     *                                                                    изменяется по ссылке
+     * @param array<array-key, ListingResolution|null>      $resolutions  «индекс заказа:индекс позиции»
+     * @param bool                                          $isReplay     сырьё уже разбирали: наблюдений больше нет, есть пересчёт
+     * @param list<RecordNormalizationIssueCommand>         $issues       копилка проблем партии, пишется одной пачкой
      */
     private function applyOrder(
         IngestRawRecord $rawRecord,
@@ -575,7 +575,7 @@ final readonly class NormalizeOrderRawRecordAction
      * Возвращает набор позиций ЭТОГО снимка (не объединённый с прежними):
      * вызывающий по нему решает, какие старые позиции удалить после батча.
      *
-     * @param array<string, IngestOrderItem> $existing lineKey => позиция
+     * @param array<string, IngestOrderItem>           $existing    lineKey => позиция
      * @param array<array-key, ListingResolution|null> $resolutions «индекс заказа:индекс позиции»
      *
      * @return array<string, IngestOrderItem>

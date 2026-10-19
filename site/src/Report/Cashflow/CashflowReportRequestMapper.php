@@ -25,7 +25,7 @@ final class CashflowReportRequestMapper
     }
 
     /**
-     * @param list<ProjectDirection>|null $projectDirections
+     * @param list<ProjectDirection>|null                 $projectDirections
      * @param list<FinancialResponsibilityCenterDTO>|null $responsibilityCenters
      */
     public function fromRequest(
@@ -150,7 +150,7 @@ final class CashflowReportRequestMapper
     }
 
     /**
-     * @param list<mixed> $requestedIds
+     * @param list<mixed>  $requestedIds
      * @param list<string> $availableIds
      *
      * @return list<string>|null null means no restriction (all choices)

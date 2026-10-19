@@ -72,7 +72,7 @@ class PLCategoryRepository extends ServiceEntityRepository
 
     /**
      * @param array<string, PLCategory[]> $childrenByParentId
-     * @param PLCategory[] $result
+     * @param PLCategory[]                $result
      */
     private function collectTree(PLCategory $category, array $childrenByParentId, array &$result): void
     {

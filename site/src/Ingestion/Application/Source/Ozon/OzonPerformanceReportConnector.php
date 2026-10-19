@@ -388,7 +388,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>       $metadata
      */
     private function rawResult(
         PullRequest $request,
@@ -590,7 +590,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>       $metadata
      *
      * @return list<array<string, mixed>>
      */

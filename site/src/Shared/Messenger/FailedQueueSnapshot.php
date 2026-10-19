@@ -12,11 +12,11 @@ namespace App\Shared\Messenger;
 final readonly class FailedQueueSnapshot
 {
     /**
-     * @param int $count сколько сообщений в очереди (глубина)
-     * @param int|null $oldestAgeSeconds возраст самого старого от created_at (момент отправки в failed), null — очередь пуста
-     * @param \DateTimeImmutable|null $oldestCreatedAt created_at самого старого, UTC
-     * @param list<array{message_class: string, original_transport: string, count: int}> $breakdown разбивка по классу и исходному транспорту
-     * @param int $breakdownSampled по скольким сообщениям посчитана разбивка (выборка, а не вся очередь)
+     * @param int                                                                        $count            сколько сообщений в очереди (глубина)
+     * @param int|null                                                                   $oldestAgeSeconds возраст самого старого от created_at (момент отправки в failed), null — очередь пуста
+     * @param \DateTimeImmutable|null                                                    $oldestCreatedAt  created_at самого старого, UTC
+     * @param list<array{message_class: string, original_transport: string, count: int}> $breakdown        разбивка по классу и исходному транспорту
+     * @param int                                                                        $breakdownSampled по скольким сообщениям посчитана разбивка (выборка, а не вся очередь)
      */
     public function __construct(
         public int $count,

@@ -307,7 +307,7 @@ final class PerformanceRecorder
 
     /**
      * @param array{job: string, provider: string, companyId: ?string, transport: ?string, trace: ?string, retryCount: ?int, startedAt: int, memoryBase: int} $scope
-     * @param array<string, scalar|null> $fields
+     * @param array<string, scalar|null>                                                                                                                      $fields
      */
     private function write(array $scope, array $fields): void
     {

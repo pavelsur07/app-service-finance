@@ -432,7 +432,7 @@ final readonly class UnitExtendedQuery
 
     /**
      * @param array<string, array<string, mixed>> $buckets
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>                $row
      */
     private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
     {

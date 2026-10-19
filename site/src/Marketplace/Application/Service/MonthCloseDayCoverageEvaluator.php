@@ -24,9 +24,9 @@ use App\Marketplace\Enum\FinancialReportSyncStatus;
 final class MonthCloseDayCoverageEvaluator
 {
     /**
-     * @param list<\DateTimeImmutable> $expectedDays
-     * @param array<string, FinancialReportSyncStatus> $statusByDay ключ Y-m-d
-     * @param list<array{0: string, 1: string}> $legacyCoverage [from, to] завершённых легаси-документов, Y-m-d
+     * @param list<\DateTimeImmutable>                 $expectedDays
+     * @param array<string, FinancialReportSyncStatus> $statusByDay    ключ Y-m-d
+     * @param list<array{0: string, 1: string}>        $legacyCoverage [from, to] завершённых легаси-документов, Y-m-d
      *
      * @return list<MonthCloseDayViolation>
      */

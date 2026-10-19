@@ -149,11 +149,7 @@ foreach (preg_split('/(?<=\n)/', $base) ?: [] as $line) {
 }
 
 if ([] !== $collisions) {
-    throw new RuntimeException(sprintf(
-        "Переписывание склеило разные записи базы в один ключ (%d): рост одной из них был бы неотличим от переноса.\nПервая: %s\nПроведите PR с меткой [baseline-grow] и объяснением в описании.",
-        count($collisions),
-        $collisions[0],
-    ));
+    throw new RuntimeException(sprintf("Переписывание склеило разные записи базы в один ключ (%d): рост одной из них был бы неотличим от переноса.\nПервая: %s\nПроведите PR с меткой [baseline-grow] и объяснением в описании.", count($collisions), $collisions[0]));
 }
 
 fwrite(STDOUT, implode('', $out));

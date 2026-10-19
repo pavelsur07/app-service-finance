@@ -265,7 +265,7 @@ final readonly class WbOrdersClient implements WbOrdersClientInterface
      * уже принятое, и снять его — часть того же решения.
      *
      * @param array<string, mixed> $row
-     * @param array<int, int> $requested спрошенные номера
+     * @param array<int, int>      $requested спрошенные номера
      *
      * @return array<string, mixed>|null
      */

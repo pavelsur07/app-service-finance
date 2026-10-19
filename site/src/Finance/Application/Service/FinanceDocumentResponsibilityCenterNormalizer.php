@@ -50,7 +50,7 @@ final readonly class FinanceDocumentResponsibilityCenterNormalizer
     }
 
     /**
-     * @param array{projectDirectionId: ?string, responsibilityCenterId: ?string} $documentSnapshot
+     * @param array{projectDirectionId: ?string, responsibilityCenterId: ?string}                $documentSnapshot
      * @param array<string, array{projectDirectionId: ?string, responsibilityCenterId: ?string}> $operationSnapshots
      */
     public function prepareExistingManualDocument(
@@ -84,7 +84,7 @@ final readonly class FinanceDocumentResponsibilityCenterNormalizer
     }
 
     /**
-     * @param array{projectDirectionId: ?string, responsibilityCenterId: ?string}|null $documentSnapshot
+     * @param array{projectDirectionId: ?string, responsibilityCenterId: ?string}|null           $documentSnapshot
      * @param array<string, array{projectDirectionId: ?string, responsibilityCenterId: ?string}> $operationSnapshots
      */
     private function prepareManualDocument(

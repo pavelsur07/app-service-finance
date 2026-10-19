@@ -267,7 +267,7 @@ final class FinancialSummaryQuery
     }
 
     /**
-     * @param list<string> $conditions
+     * @param list<string>         $conditions
      * @param array<string, mixed> $params
      */
     private function addShopFilter(array &$conditions, array &$params, ?string $shopRef): void

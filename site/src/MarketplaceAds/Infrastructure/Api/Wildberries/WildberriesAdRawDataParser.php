@@ -101,7 +101,7 @@ final class WildberriesAdRawDataParser implements AdRawDataParserInterface
     }
 
     /**
-     * @param list<array<string, mixed>> $statistics
+     * @param list<array<string, mixed>>                                     $statistics
      * @param array<string, array{id: string, name: string, actual: string}> $campaigns
      *
      * @return array<string, array<string, array{weight: string, impressions: int, clicks: int}>>

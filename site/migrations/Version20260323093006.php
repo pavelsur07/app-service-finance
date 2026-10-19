@@ -17,7 +17,7 @@ final class Version20260323093006 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // Оставляем первую привязку (по created_at), остальные дубли отвязываем
-        $this->addSql("
+        $this->addSql('
             UPDATE marketplace_listings SET product_id = NULL
             WHERE id NOT IN (
                 SELECT DISTINCT ON (company_id, marketplace, product_id) id
@@ -26,7 +26,7 @@ final class Version20260323093006 extends AbstractMigration
                 ORDER BY company_id, marketplace, product_id, created_at ASC
             )
             AND product_id IS NOT NULL
-        ");
+        ');
 
         $this->addSql('
             CREATE UNIQUE INDEX uniq_company_marketplace_product

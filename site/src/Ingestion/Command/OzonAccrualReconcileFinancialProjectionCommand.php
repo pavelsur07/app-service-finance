@@ -715,11 +715,11 @@ final class OzonAccrualReconcileFinancialProjectionCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param list<array<string, mixed>> $rawRows
-     * @param list<array<string, mixed>> $normalizationRows
+     * @param array<string, mixed>            $payload
+     * @param list<array<string, mixed>>      $rawRows
+     * @param list<array<string, mixed>>      $normalizationRows
      * @param list<array<string, string|int>> $naturalProjectionAttributionRows
-     * @param list<array<string, mixed>> $relinkRows
+     * @param list<array<string, mixed>>      $relinkRows
      */
     private function printReport(
         SymfonyStyle $io,

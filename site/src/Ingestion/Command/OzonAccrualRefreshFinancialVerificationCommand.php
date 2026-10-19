@@ -553,7 +553,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param list<array<string, mixed>>                                           $rows
      * @param array<string, \App\Ingestion\Application\DTO\ListingResolution|null> $resolutions
      *
      * @return array<string, FinancialTransaction>
@@ -585,7 +585,7 @@ final class OzonAccrualRefreshFinancialVerificationCommand extends Command
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, string> $ids
+     * @param array<string, string>      $ids
      *
      * @return array<string, array<string, string>>
      */

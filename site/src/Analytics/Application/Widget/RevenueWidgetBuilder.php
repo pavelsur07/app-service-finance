@@ -111,7 +111,7 @@ final readonly class RevenueWidgetBuilder
     }
 
     /**
-     * @param list<string> $incomeRootIds
+     * @param list<string>                      $incomeRootIds
      * @param array<string,array<string,float>> $rawValues
      */
     private function sumByRootIds(array $incomeRootIds, array $rawValues): float
@@ -128,8 +128,8 @@ final readonly class RevenueWidgetBuilder
     }
 
     /**
-     * @param list<string> $incomeRootIds
-     * @param list<PlReportPeriod> $periods
+     * @param list<string>                      $incomeRootIds
+     * @param list<PlReportPeriod>              $periods
      * @param array<string,array<string,float>> $rawValues
      *
      * @return list<array{date:string,value:float}>

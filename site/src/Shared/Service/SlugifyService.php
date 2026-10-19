@@ -9,7 +9,7 @@ class SlugifyService
     /**
      * Генерирует slug из строки.
      *
-     * @param string $text Исходный текст
+     * @param string $text   Исходный текст
      * @param string $prefix Префикс для slug (например, 'wb_')
      */
     public function slugify(string $text, string $prefix = ''): string

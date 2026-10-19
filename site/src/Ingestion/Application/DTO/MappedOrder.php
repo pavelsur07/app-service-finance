@@ -39,10 +39,10 @@ final readonly class MappedOrder
 {
     /**
      * @param list<MappedOrderItem> $items
-     * @param array<string, mixed> $attributes атрибуты снимка: описывают заказ как таковой
-     * @param array<string, mixed> $statusAttributes атрибуты статусной оси: меняются во времени
-     * @param bool $itemsAuthoritative несёт ли наблюдение ПОЛНЫЙ состав заказа
-     * @param bool $statusObserved сообщил ли источник статус вообще
+     * @param array<string, mixed>  $attributes         атрибуты снимка: описывают заказ как таковой
+     * @param array<string, mixed>  $statusAttributes   атрибуты статусной оси: меняются во времени
+     * @param bool                  $itemsAuthoritative несёт ли наблюдение ПОЛНЫЙ состав заказа
+     * @param bool                  $statusObserved     сообщил ли источник статус вообще
      */
     public function __construct(
         public string $externalId,

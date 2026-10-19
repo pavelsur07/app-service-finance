@@ -318,8 +318,8 @@ final class OzonAccrualSalesRawProcessorTest extends TestCase
     }
 
     /**
-     * @param list<string> $existingIds ключи записей, созданных этим же начислением (фикстура, 2026-06-01)
-     * @param array<string, array{accrualId: ?string, date: string, amount: string}> $stamps явные метки существующих записей
+     * @param list<string>                                                           $existingIds ключи записей, созданных этим же начислением (фикстура, 2026-06-01)
+     * @param array<string, array{accrualId: ?string, date: string, amount: string}> $stamps      явные метки существующих записей
      */
     private function processor(array $existingIds = [], array $stamps = []): OzonAccrualSalesRawProcessor
     {

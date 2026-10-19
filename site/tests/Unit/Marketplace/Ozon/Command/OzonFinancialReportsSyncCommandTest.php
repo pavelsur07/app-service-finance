@@ -130,8 +130,8 @@ final class OzonFinancialReportsSyncCommandTest extends TestCase
 
     /**
      * @param list<array<string, mixed>> $connections
-     * @param list<object> $messages
-     * @param array<string, mixed> $capturedParams
+     * @param list<object>               $messages
+     * @param array<string, mixed>       $capturedParams
      */
     private function command(array $connections, array &$messages, array &$capturedParams = []): OzonFinancialReportsSyncCommand
     {

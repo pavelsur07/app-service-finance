@@ -49,7 +49,7 @@ final readonly class DocumentListTotalsDTO
      * регистра ОПиУ вызывающим: списание −X и сторно +X взаимно гасятся внутри статьи.
      *
      * @param list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain
-     * @param list<array{currency: string, bucket: string, amount: string}> $marketplace
+     * @param list<array{currency: string, bucket: string, amount: string}>                                                                     $marketplace
      */
     public static function fromAggregates(array $plain, array $marketplace): self
     {

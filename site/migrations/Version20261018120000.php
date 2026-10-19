@@ -190,7 +190,7 @@ final class Version20261018120000 extends AbstractMigration
             "INSERT INTO ingest_external_category_mapping_audit
                 (id, external_category_id, company_id, scope, action, old_values, new_values, updated_by, created_at)
              SELECT gen_random_uuid(), c.id, NULL, 'default', 'update', ".self::MAPPING_SNAPSHOT.',
-                    '.self::MAPPING_SNAPSHOT." || jsonb_build_object(".$newValuesPairs.", 'reason', CAST(:reason AS text)),
+                    '.self::MAPPING_SNAPSHOT.' || jsonb_build_object('.$newValuesPairs.", 'reason', CAST(:reason AS text)),
                     NULL, (now() AT TIME ZONE 'Europe/Moscow')
              FROM ingest_external_category_mappings AS m
              JOIN ingest_external_categories AS c ON c.id = m.external_category_id

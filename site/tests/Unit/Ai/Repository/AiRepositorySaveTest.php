@@ -79,7 +79,7 @@ final class AiRepositorySaveTest extends TestCase
      * @template T of object
      *
      * @param class-string<T> $repositoryClass
-     * @param class-string $entityClass
+     * @param class-string    $entityClass
      *
      * @return T
      */

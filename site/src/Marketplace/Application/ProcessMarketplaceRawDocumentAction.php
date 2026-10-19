@@ -298,7 +298,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
      * уже привязаны к документу ОПиУ (`document IS NULL` в условии), — закрытый
      * период правке не подлежит.
      *
-     * @param array<int|string, mixed> $rows
+     * @param array<int|string, mixed>                  $rows
      * @param array<string, list<array<string, mixed>>> $buckets
      */
     private function replaceRowsOfDocument(
@@ -350,7 +350,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
     }
 
     /**
-     * @param array<int|string, mixed> $rows
+     * @param array<int|string, mixed>                  $rows
      * @param array<string, list<array<string, mixed>>> $buckets
      */
     private function processRows(

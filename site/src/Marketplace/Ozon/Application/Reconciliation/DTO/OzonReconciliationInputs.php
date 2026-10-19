@@ -10,7 +10,7 @@ namespace App\Marketplace\Ozon\Application\Reconciliation\DTO;
 final readonly class OzonReconciliationInputs
 {
     /**
-     * @param array<string, CostBucket> $rawCosts код категории → нетто-расход по сырью
+     * @param array<string, CostBucket> $rawCosts    код категории → нетто-расход по сырью
      * @param array<string, CostBucket> $ledgerCosts код категории → нетто-расход в учёте
      */
     public function __construct(

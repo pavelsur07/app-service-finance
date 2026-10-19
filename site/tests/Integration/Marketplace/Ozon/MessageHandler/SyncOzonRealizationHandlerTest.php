@@ -328,7 +328,7 @@ final class SyncOzonRealizationHandlerTest extends IntegrationTestCase
     {
         return new class($this->bus, $this->busControl) implements MessageBusInterface {
             /**
-             * @param \ArrayObject<int, object> $dispatched
+             * @param \ArrayObject<int, object>  $dispatched
              * @param \ArrayObject<string, bool> $control
              */
             public function __construct(private readonly \ArrayObject $dispatched, private readonly \ArrayObject $control)

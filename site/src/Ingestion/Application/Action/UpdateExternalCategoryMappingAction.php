@@ -173,7 +173,7 @@ final readonly class UpdateExternalCategoryMappingAction
 
     /**
      * @param array<string, mixed>|null $oldValues
-     * @param array<string, mixed> $newValues
+     * @param array<string, mixed>      $newValues
      */
     private function audit(
         ExternalCategory $category,

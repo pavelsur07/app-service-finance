@@ -207,7 +207,7 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param list<string> $selectedIds
+     * @param list<string>                $selectedIds
      * @param list<ProjectDirection>|null $availableProjectDirections
      *
      * @return list<string>
@@ -322,7 +322,7 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param list<array<string,mixed>> $rows
+     * @param list<array<string,mixed>>                                                 $rows
      * @param list<array{label:string,start:\DateTimeInterface,end:\DateTimeInterface}> $periods
      *
      * @return array{
@@ -461,7 +461,7 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param list<CashflowCategoryNode> $allCategories // список в порядке обхода дерева
+     * @param list<CashflowCategoryNode>                                                              $allCategories // список в порядке обхода дерева
      * @param array<string,array{entity:CashflowCategoryNode, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>

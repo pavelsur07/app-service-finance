@@ -226,9 +226,9 @@ final readonly class WbRawFinancialReportProductEnricher
     }
 
     /**
-     * @param array<string, mixed> $source
+     * @param array<string, mixed>           $source
      * @param 'mapped'|'unmapped'|'conflict' $mappingStatus
-     * @param array<string, mixed>|null $listing
+     * @param array<string, mixed>|null      $listing
      *
      * @return array<string, mixed>
      */
@@ -318,7 +318,7 @@ final readonly class WbRawFinancialReportProductEnricher
     }
 
     /**
-     * @param array<string, mixed> $product
+     * @param array<string, mixed>                                 $product
      * @param array{listings: array<string, array<string, mixed>>} $context
      *
      * @return array<string, mixed>
@@ -390,7 +390,7 @@ final readonly class WbRawFinancialReportProductEnricher
 
     /**
      * @param list<array<string, mixed>> $costs
-     * @param array<string, int> $buckets
+     * @param array<string, int>         $buckets
      *
      * @return array{minor: int, covered: int, missing: int, fallback: int}
      */
@@ -589,7 +589,7 @@ final readonly class WbRawFinancialReportProductEnricher
     }
 
     /**
-     * @param array<string, mixed> $source
+     * @param array<string, mixed>      $source
      * @param array<string, mixed>|null $listing
      */
     private function productName(array $source, ?array $listing): string

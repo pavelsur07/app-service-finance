@@ -180,7 +180,7 @@ final class ByDayRowReplacementTest extends TestCase
 
     /**
      * @param array<string, bool> $preliminary
-     * @param list<string>|null $costDocumentIds
+     * @param list<string>|null   $costDocumentIds
      */
     private function monthClose(
         array $preliminary,

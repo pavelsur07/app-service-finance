@@ -7,7 +7,7 @@ namespace App\Ingestion\Application\Service;
 final readonly class OzonAccrualStaleProjectionPruneResult
 {
     /**
-     * @param list<string> $affectedDates
+     * @param list<string>               $affectedDates
      * @param list<array<string, mixed>> $rows
      */
     public function __construct(

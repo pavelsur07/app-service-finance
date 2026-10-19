@@ -19,8 +19,8 @@ namespace App\Marketplace\Ozon\Domain;
 final readonly class OzonCostCategory
 {
     /**
-     * @param string[] $serviceNames Имена сервисов из services[].name в API Ozon
-     * @param string[] $operationTypes Коды operation_type / operation_type_name для операций без services[]
+     * @param string[] $serviceNames     Имена сервисов из services[].name в API Ozon
+     * @param string[] $operationTypes   Коды operation_type / operation_type_name для операций без services[]
      * @param string[] $accrualTypeNames Имена из справочника /v1/finance/accrual/types
      */
     public function __construct(

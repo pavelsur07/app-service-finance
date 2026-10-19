@@ -26,7 +26,7 @@ final class MapListingToProductAction
 
     /**
      * @throws \InvalidArgumentException если листинг или продукт не найдены или не принадлежат компании
-     * @throws \LogicException если нарушено бизнес-правило уникальности
+     * @throws \LogicException           если нарушено бизнес-правило уникальности
      */
     public function __invoke(MapListingToProductCommand $cmd): void
     {

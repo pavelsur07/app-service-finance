@@ -17,12 +17,12 @@ use App\Marketplace\Enum\PlPreviewCostStatus;
 final readonly class MarketplacePlPreviewReport
 {
     /**
-     * @param list<MarketplacePlPreviewColumn> $columns
-     * @param list<PlPreviewRow> $rows дерево ОПиУ компании
-     * @param list<PlPreviewUnplacedAmount> $unplaced суммы на статьях, которые не попадут в отчёт
-     * @param list<PlPreviewCostCoverageDTO> $costCoverage затраты периода по категориям и статусам
-     * @param list<PlPreviewSalesCoverageDTO> $salesCoverage
-     * @param list<string> $warnings
+     * @param list<MarketplacePlPreviewColumn>   $columns
+     * @param list<PlPreviewRow>                 $rows             дерево ОПиУ компании
+     * @param list<PlPreviewUnplacedAmount>      $unplaced         суммы на статьях, которые не попадут в отчёт
+     * @param list<PlPreviewCostCoverageDTO>     $costCoverage     затраты периода по категориям и статусам
+     * @param list<PlPreviewSalesCoverageDTO>    $salesCoverage
+     * @param list<string>                       $warnings
      * @param list<PlPreviewAdReconciliationDTO> $adReconciliation реклама: учёт против статистики
      */
     public function __construct(

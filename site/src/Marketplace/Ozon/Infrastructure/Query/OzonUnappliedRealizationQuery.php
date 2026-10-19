@@ -22,8 +22,8 @@ final readonly class OzonUnappliedRealizationQuery
     }
 
     /**
-     * @param \DateTimeImmutable $monthFrom первый день самого раннего месяца
-     * @param \DateTimeImmutable $monthTo первый день самого позднего месяца
+     * @param \DateTimeImmutable      $monthFrom    первый день самого раннего месяца
+     * @param \DateTimeImmutable      $monthTo      первый день самого позднего месяца
      * @param \DateTimeImmutable|null $loadedBefore только документы, загруженные не позже этого момента (для гейта «висит больше суток»)
      *
      * @return list<array{documentId: string, companyId: string, connectionId: string, year: int, month: int, status: ?string, syncedAt: string}>

@@ -124,7 +124,7 @@ final readonly class OzonAccrualDetailsXlsxReader
     }
 
     /**
-     * @param array<int, mixed> $values
+     * @param array<int, mixed>                                               $values
      * @param array{date: int, group: int, type: int, sku: ?int, amount: int} $columns
      */
     private function parseRow(array $values, array $columns): ?OzonAccrualDetailsRow

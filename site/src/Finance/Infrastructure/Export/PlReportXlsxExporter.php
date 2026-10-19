@@ -18,10 +18,10 @@ final readonly class PlReportXlsxExporter
     private const HEADER_BG_COLOR = '2563EB';
 
     /**
-     * @param list<array{id: string, label: string}> $columns
+     * @param list<array{id: string, label: string}>                                         $columns
      * @param list<array{id: string, code: ?string, name: string, level: int, type: string}> $rows
-     * @param array<string, array<string, float>> $rawValues
-     * @param array<string, PLValueFormat> $formats
+     * @param array<string, array<string, float>>                                            $rawValues
+     * @param array<string, PLValueFormat>                                                   $formats
      */
     public function export(
         string $sheetName,
@@ -91,8 +91,8 @@ final readonly class PlReportXlsxExporter
 
     /**
      * @param array{id: string, code: ?string, name: string, level: int, type: string} $row
-     * @param list<array{id: string, label: string}> $columns
-     * @param array<string, float> $rawValues
+     * @param list<array{id: string, label: string}>                                   $columns
+     * @param array<string, float>                                                     $rawValues
      */
     private function buildDataRow(
         array $row,

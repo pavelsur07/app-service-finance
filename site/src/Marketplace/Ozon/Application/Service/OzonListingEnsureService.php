@@ -38,8 +38,8 @@ final class OzonListingEnsureService
      * 2. Для отсутствующих делаем INSERT ... ON CONFLICT DO NOTHING — атомарно и без гонок.
      * 3. Повторно запрашиваем все SKU, получая и только что вставленные, и созданные конкурентным процессом.
      *
-     * @param array<string, string|null> $skusWithNames [sku => name|null]
-     * @param array<string, string> $supplierSkusBySku
+     * @param array<string, string|null> $skusWithNames     [sku => name|null]
+     * @param array<string, string>      $supplierSkusBySku
      *
      * @return array<string, MarketplaceListing>
      */

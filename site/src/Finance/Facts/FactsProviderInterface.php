@@ -12,7 +12,7 @@ interface FactsProviderInterface
 {
     /**
      * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
-     * @param string|list<string>|null $responsibilityCenterId
+     * @param string|list<string>|null                     $responsibilityCenterId
      */
     public function value(
         Company $company,

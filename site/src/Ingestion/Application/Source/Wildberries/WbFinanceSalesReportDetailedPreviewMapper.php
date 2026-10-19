@@ -102,7 +102,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function collectSaleRefundComponents(
         array &$transactions,
@@ -208,7 +208,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function collectCostComponents(
         array &$transactions,
@@ -303,7 +303,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function addCostField(
         array &$transactions,
@@ -347,7 +347,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function collectDeduction(
         array &$transactions,
@@ -395,7 +395,7 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>              $row
      */
     private function addCost(
         array &$transactions,
@@ -440,8 +440,8 @@ final readonly class WbFinanceSalesReportDetailedPreviewMapper
 
     /**
      * @param list<WbFinancePreviewTransaction> $transactions
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $additionalSourceData
+     * @param array<string, mixed>              $row
+     * @param array<string, mixed>              $additionalSourceData
      */
     private function add(
         array &$transactions,

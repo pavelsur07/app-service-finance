@@ -55,7 +55,7 @@ final class RefreshOrderStatusesLockingTest extends PostgresResetTestCase
 
         $probe = new class($observer, $orderId, $rawRecordId, $rawLocked, $orderStillFree) extends AbstractLogger {
             /**
-             * @param ?bool $rawLocked держит ли прогон блокировку сырья
+             * @param ?bool $rawLocked      держит ли прогон блокировку сырья
              * @param ?bool $orderStillFree свободен ли ещё заказ
              */
             public function __construct(

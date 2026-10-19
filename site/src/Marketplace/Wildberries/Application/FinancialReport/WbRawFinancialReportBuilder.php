@@ -447,11 +447,11 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, array<string, int|string>> $articles
-     * @param array<string, array<string, mixed>> $productSources
-     * @param array<string, mixed> $row
-     * @param array<string, int> $amounts
-     * @param array<string, true> $invalidMoneyFields
-     * @param array<string, int> $quality
+     * @param array<string, array<string, mixed>>      $productSources
+     * @param array<string, mixed>                     $row
+     * @param array<string, int>                       $amounts
+     * @param array<string, true>                      $invalidMoneyFields
+     * @param array<string, int>                       $quality
      */
     private function collectProductArticles(
         array &$articles,
@@ -541,8 +541,8 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, array<string, mixed>> $products
-     * @param array<string, mixed> $row
-     * @param array<string, int> $quality
+     * @param array<string, mixed>                $row
+     * @param array<string, int>                  $quality
      */
     private function addProductSourceRow(
         array &$products,
@@ -667,8 +667,8 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, array<string, int|string>> $articles
-     * @param array<string, int> $amounts
-     * @param array<string, int> $quality
+     * @param array<string, int>                       $amounts
+     * @param array<string, int>                       $quality
      */
     private function collectOtherArticles(
         array &$articles,
@@ -906,8 +906,8 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, mixed> $row
-     * @param array<string, int> $quality
-     * @param array<string, true> $invalidFields
+     * @param array<string, int>   $quality
+     * @param array<string, true>  $invalidFields
      *
      * @return array<string, int>
      */
@@ -953,8 +953,8 @@ final class WbRawFinancialReportBuilder
 
     /**
      * @param array<string, mixed> $row
-     * @param array<string, int> $amounts
-     * @param array<string, int> $quality
+     * @param array<string, int>   $amounts
+     * @param array<string, int>   $quality
      */
     private function quantity(
         array $row,

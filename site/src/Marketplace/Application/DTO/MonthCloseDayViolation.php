@@ -15,7 +15,7 @@ final readonly class MonthCloseDayViolation
 
     /**
      * @param self::STATE_* $state
-     * @param ?string $status значение FinancialReportSyncStatus; null — строки статуса нет
+     * @param ?string       $status значение FinancialReportSyncStatus; null — строки статуса нет
      */
     public function __construct(
         public string $businessDate,

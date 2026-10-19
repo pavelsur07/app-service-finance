@@ -187,7 +187,7 @@ final readonly class PruneRawRecordsAction
 
     /**
      * @param list<IngestRawRecord> $pending
-     * @param array<string, int> $pendingHeld
+     * @param array<string, int>    $pendingHeld
      * @param list<IngestRawRecord> $records
      */
     private function execute(
@@ -287,7 +287,7 @@ final readonly class PruneRawRecordsAction
      * фазе, потому что внутри транзакции идут сетевые вызовы, и держать
      * блокировку сотнями удалений незачем.
      *
-     * @param list<string> $chunk
+     * @param list<string>       $chunk
      * @param array<string, int> $knownHolds удержания, которые план уже посчитал
      */
     private function deleteChunk(PruneRawRecordsResult $result, array $chunk, array $knownHolds = []): PruneRawRecordsResult

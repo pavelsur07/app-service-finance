@@ -275,8 +275,8 @@ final class OzonAccrualReturnsRawProcessorTest extends TestCase
     }
 
     /**
-     * @param list<string> $existingIds ключи возвратов, созданных этим же начислением (фикстура, 2026-06-01)
-     * @param array<string, array{accrualId: ?string, date: string}> $stamps явные метки существующих возвратов
+     * @param list<string>                                           $existingIds ключи возвратов, созданных этим же начислением (фикстура, 2026-06-01)
+     * @param array<string, array{accrualId: ?string, date: string}> $stamps      явные метки существующих возвратов
      */
     private function processor(array $existingIds = [], ?string &$lookedUpSaleId = null, ?MarketplaceSale $sale = null, array $stamps = []): OzonAccrualReturnsRawProcessor
     {

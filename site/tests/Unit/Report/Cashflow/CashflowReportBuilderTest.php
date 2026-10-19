@@ -216,8 +216,8 @@ final class CashflowReportBuilderTest extends TestCase
     }
 
     /**
-     * @param list<CashflowCategoryNode> $categories
-     * @param list<list<CashflowReportRow>> $rowsPerCall по вызову listCashflowReportRows
+     * @param list<CashflowCategoryNode>       $categories
+     * @param list<list<CashflowReportRow>>    $rowsPerCall по вызову listCashflowReportRows
      * @param list<MoneyAccountOpeningBalance> $openings
      */
     private function facade(array $categories, array $rowsPerCall, array $openings, ?string $expectedOpeningCurrency = null): MockObject

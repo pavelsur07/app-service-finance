@@ -41,7 +41,7 @@ interface AdRawDocumentRepositoryInterface
      *  - сравнивать `report_date` включительно по обеим границам `[$from, $to]`;
      *  - при переданном `$statusFilter` добавлять условие `status = :status`.
      *
-     * @param string $marketplace значение {@see \App\Marketplace\Enum\MarketplaceType::value}
+     * @param string                   $marketplace  значение {@see \App\Marketplace\Enum\MarketplaceType::value}
      * @param AdRawDocumentStatus|null $statusFilter null — считать во всех статусах
      */
     public function countByCompanyMarketplaceAndDateRange(

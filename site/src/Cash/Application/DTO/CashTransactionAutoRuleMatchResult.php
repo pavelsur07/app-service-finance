@@ -9,9 +9,9 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 final readonly class CashTransactionAutoRuleMatchResult
 {
     /**
-     * @param list<CashTransactionAutoRule> $conflictingRules
-     * @param list<CashTransactionAutoRule> $matchingRules
-     * @param array<string, CashTransactionAutoRule> $winners
+     * @param list<CashTransactionAutoRule>                $conflictingRules
+     * @param list<CashTransactionAutoRule>                $matchingRules
+     * @param array<string, CashTransactionAutoRule>       $winners
      * @param array<string, list<CashTransactionAutoRule>> $conflicts
      */
     public function __construct(

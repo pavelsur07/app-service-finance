@@ -12,8 +12,8 @@ use App\Company\Entity\ProjectDirection;
 final class CashflowReportParams
 {
     /**
-     * @param list<string>|null $projectDirectionIds
-     * @param list<string>|null $responsibilityCenterIds
+     * @param list<string>|null           $projectDirectionIds
+     * @param list<string>|null           $responsibilityCenterIds
      * @param list<ProjectDirection>|null $availableProjectDirections
      */
     public function __construct(

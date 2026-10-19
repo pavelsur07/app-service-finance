@@ -355,7 +355,7 @@ final class OzonPerformanceCsvParser implements AdRawDataParserInterface
 
     /**
      * @param array<string, string> $row
-     * @param list<string> $keys
+     * @param list<string>          $keys
      */
     private function pickColumn(array $row, array $keys): string
     {

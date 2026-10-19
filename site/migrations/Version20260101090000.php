@@ -17,13 +17,13 @@ final class Version20260101090000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         if (!$schema->hasTable('balance_categories')) {
-            $this->addSql("CREATE TABLE balance_categories (id UUID NOT NULL, company_id UUID NOT NULL, name VARCHAR(255) NOT NULL, code VARCHAR(64) DEFAULT NULL, type VARCHAR(32) NOT NULL, parent_id UUID DEFAULT NULL, level INT NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0, is_visible BOOLEAN NOT NULL DEFAULT true, PRIMARY KEY(id))");
+            $this->addSql('CREATE TABLE balance_categories (id UUID NOT NULL, company_id UUID NOT NULL, name VARCHAR(255) NOT NULL, code VARCHAR(64) DEFAULT NULL, type VARCHAR(32) NOT NULL, parent_id UUID DEFAULT NULL, level INT NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0, is_visible BOOLEAN NOT NULL DEFAULT true, PRIMARY KEY(id))');
         }
 
         if ($schema->hasTable('balance_categories')) {
-            $this->addSql("CREATE INDEX IF NOT EXISTS idx_balance_cat_company ON balance_categories (company_id)");
-            $this->addSql("CREATE INDEX IF NOT EXISTS idx_balance_cat_company_parent ON balance_categories (company_id, parent_id)");
-            $this->addSql("CREATE UNIQUE INDEX IF NOT EXISTS uniq_balance_cat_company_code ON balance_categories (company_id, code)");
+            $this->addSql('CREATE INDEX IF NOT EXISTS idx_balance_cat_company ON balance_categories (company_id)');
+            $this->addSql('CREATE INDEX IF NOT EXISTS idx_balance_cat_company_parent ON balance_categories (company_id, parent_id)');
+            $this->addSql('CREATE UNIQUE INDEX IF NOT EXISTS uniq_balance_cat_company_code ON balance_categories (company_id, code)');
             $this->addSql("COMMENT ON COLUMN balance_categories.id IS '(DC2Type:guid)'");
             $this->addSql("COMMENT ON COLUMN balance_categories.company_id IS '(DC2Type:guid)'");
             $this->addSql("COMMENT ON COLUMN balance_categories.parent_id IS '(DC2Type:guid)'");
@@ -32,13 +32,13 @@ final class Version20260101090000 extends AbstractMigration
         }
 
         if (!$schema->hasTable('balance_category_links')) {
-            $this->addSql("CREATE TABLE balance_category_links (id UUID NOT NULL, company_id UUID NOT NULL, category_id UUID NOT NULL, source_type VARCHAR(64) NOT NULL, source_id UUID DEFAULT NULL, sign INT NOT NULL DEFAULT 1, position INT NOT NULL DEFAULT 0, PRIMARY KEY(id))");
+            $this->addSql('CREATE TABLE balance_category_links (id UUID NOT NULL, company_id UUID NOT NULL, category_id UUID NOT NULL, source_type VARCHAR(64) NOT NULL, source_id UUID DEFAULT NULL, sign INT NOT NULL DEFAULT 1, position INT NOT NULL DEFAULT 0, PRIMARY KEY(id))');
         }
 
         if ($schema->hasTable('balance_category_links')) {
-            $this->addSql("CREATE INDEX IF NOT EXISTS idx_balance_link_company ON balance_category_links (company_id)");
-            $this->addSql("CREATE INDEX IF NOT EXISTS idx_balance_link_company_category ON balance_category_links (company_id, category_id)");
-            $this->addSql("CREATE UNIQUE INDEX IF NOT EXISTS uniq_balance_link ON balance_category_links (company_id, category_id, source_type, source_id)");
+            $this->addSql('CREATE INDEX IF NOT EXISTS idx_balance_link_company ON balance_category_links (company_id)');
+            $this->addSql('CREATE INDEX IF NOT EXISTS idx_balance_link_company_category ON balance_category_links (company_id, category_id)');
+            $this->addSql('CREATE UNIQUE INDEX IF NOT EXISTS uniq_balance_link ON balance_category_links (company_id, category_id, source_type, source_id)');
             $this->addSql("COMMENT ON COLUMN balance_category_links.id IS '(DC2Type:guid)'");
             $this->addSql("COMMENT ON COLUMN balance_category_links.company_id IS '(DC2Type:guid)'");
             $this->addSql("COMMENT ON COLUMN balance_category_links.category_id IS '(DC2Type:guid)'");

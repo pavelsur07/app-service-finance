@@ -59,7 +59,7 @@ final class OzonAccrualRecordKey
 
     /**
      * @param array<string, array{accrualId: ?string, date: string, amount: string}> $stamps метки уже существующих и добавленных в этом прогоне записей
-     * @param string $amount сумма начисления, положительная, два знака
+     * @param string                                                                 $amount сумма начисления, положительная, два знака
      *
      * @return array{action: string, key: string} действие и ключ записи (для `skip` — базовый)
      */

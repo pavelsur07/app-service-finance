@@ -76,12 +76,12 @@ final class Version20260511130000 extends AbstractMigration
               AND rl.rn > 1
         SQL);
 
-        $this->addSql("CREATE UNIQUE INDEX uniq_inventory_location_company_external ON inventory_locations (company_id, external_system, external_id) WHERE external_id IS NOT NULL");
+        $this->addSql('CREATE UNIQUE INDEX uniq_inventory_location_company_external ON inventory_locations (company_id, external_system, external_id) WHERE external_id IS NOT NULL');
     }
 
     public function down(Schema $schema): void
     {
         $this->addSql('DROP INDEX IF EXISTS uniq_inventory_location_company_external');
-        $this->addSql("CREATE UNIQUE INDEX uniq_inventory_locations_external ON inventory_locations (company_id, external_system, external_id) WHERE external_id IS NOT NULL");
+        $this->addSql('CREATE UNIQUE INDEX uniq_inventory_locations_external ON inventory_locations (company_id, external_system, external_id) WHERE external_id IS NOT NULL');
     }
 }

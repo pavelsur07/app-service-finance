@@ -413,7 +413,7 @@ final class OzonAccrualCompareCommand extends Command
     }
 
     /**
-     * @param list<string> $headers
+     * @param list<string>                    $headers
      * @param list<array<string, int|string>> $rows
      */
     private function printMinorRows(SymfonyStyle $io, string $title, array $headers, array $rows): void
@@ -429,7 +429,7 @@ final class OzonAccrualCompareCommand extends Command
     }
 
     /**
-     * @param list<string> $headers
+     * @param list<string>              $headers
      * @param array<string, int|string> $row
      *
      * @return list<string>

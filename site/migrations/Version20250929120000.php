@@ -68,7 +68,7 @@ SQL);
 
         foreach ($rows as $row) {
             $current = $row['type'];
-            $normalized = $current === null || '' === trim((string) $current)
+            $normalized = null === $current || '' === trim((string) $current)
                 ? 'OTHER'
                 : $this->mapLegacyType((string) $current);
 
@@ -77,6 +77,7 @@ SQL);
             }
         }
     }
+
     private function mapLegacyType(string $value): string
     {
         $normalized = strtoupper(trim($value));

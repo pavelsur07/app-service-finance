@@ -17,7 +17,7 @@ interface MarketplaceRawProcessorInterface
      * runtime-поведения. Параметр $format добавлен опциональным: вызывающий,
      * который его не передаёт, получает ровно прежний результат.
      *
-     * @param string $kind корзина записей: sales / costs / returns / other
+     * @param string                    $kind   корзина записей: sales / costs / returns / other
      * @param MarketplaceRawFormat|null $format поколение API, из которого получен
      *                                          документ; null означает «формат не
      *                                          определён» и сохраняет прежнее

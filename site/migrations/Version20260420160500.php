@@ -49,7 +49,7 @@ final class Version20260420160500 extends AbstractMigration
             $orphanCount,
         ));
 
-        if ($orphanCount === 0) {
+        if (0 === $orphanCount) {
             return;
         }
 

@@ -21,7 +21,7 @@ final class RowClassifierService
 
     /**
      * @param array<int, array<string, mixed>> $rows
-     * @param array<string, string> $baseSignMap Map<typeName, baseSign>
+     * @param array<string, string>            $baseSignMap Map<typeName, baseSign>
      *
      * @return array<int, array<string, mixed>> rows with added 'class' field
      */

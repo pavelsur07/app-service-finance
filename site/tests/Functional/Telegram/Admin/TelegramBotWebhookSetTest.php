@@ -81,7 +81,7 @@ final class TelegramBotWebhookSetTest extends WebTestCaseBase
 
     /**
      * @param list<array{method: string, url: string, options: array<string, mixed>}> $captured
-     * @param list<MockResponse> $responses
+     * @param list<MockResponse>                                                      $responses
      */
     private function setHttpClient(KernelBrowser $client, array &$captured, array $responses): void
     {

@@ -61,7 +61,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
      * @return list<array<string, mixed>>
      *
      * @throws MarketplaceRateLimitException лимит запросов, вызывающему следует повторить
-     * @throws \RuntimeException отсутствуют credentials либо неустранимая ошибка API
+     * @throws \RuntimeException             отсутствуют credentials либо неустранимая ошибка API
      */
     public function fetchDay(string $companyId, \DateTimeImmutable $date): array
     {
@@ -167,7 +167,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
 
     /**
      * @param array<string, string> $headers
-     * @param array<string, mixed> $json
+     * @param array<string, mixed>  $json
      *
      * @return array<string, mixed>
      */
@@ -183,7 +183,7 @@ final readonly class OzonAccrualByDayClient implements OzonAccrualByDayClientInt
 
     /**
      * @param array<string, string> $headers
-     * @param array<string, mixed> $json
+     * @param array<string, mixed>  $json
      *
      * @return array<string, mixed>
      */

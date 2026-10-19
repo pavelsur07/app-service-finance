@@ -27,7 +27,7 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
      * SUM(amountIncome) - SUM(amountExpense) из PLDailyTotal по company + category + date ∈ [from; to]
      *
      * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
-     * @param string|list<string>|null $responsibilityCenterId
+     * @param string|list<string>|null                     $responsibilityCenterId
      */
     public function value(
         Company $company,

@@ -217,7 +217,7 @@ final readonly class OzonAccrualProjectionHealthQuery
 
     /**
      * @param list<array<string, mixed>> $rawRows
-     * @param array<string, mixed> $params
+     * @param array<string, mixed>       $params
      */
     private function rawDateValues(array $rawRows, array &$params): string
     {

@@ -16,11 +16,11 @@ final class Version20251206130000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql("ALTER TABLE wildberries_report_detail_mappings ADD sign_multiplier SMALLINT NOT NULL DEFAULT 1");
+        $this->addSql('ALTER TABLE wildberries_report_detail_mappings ADD sign_multiplier SMALLINT NOT NULL DEFAULT 1');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql("ALTER TABLE wildberries_report_detail_mappings DROP COLUMN sign_multiplier");
+        $this->addSql('ALTER TABLE wildberries_report_detail_mappings DROP COLUMN sign_multiplier');
     }
 }

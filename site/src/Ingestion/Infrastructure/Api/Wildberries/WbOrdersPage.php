@@ -8,8 +8,8 @@ final readonly class WbOrdersPage
 {
     /**
      * @param list<array<string, mixed>> $rows
-     * @param int|null $nextToken курсор постраничности WB (`next`), не отметка времени
-     * @param array<string, mixed> $metadata
+     * @param int|null                   $nextToken курсор постраничности WB (`next`), не отметка времени
+     * @param array<string, mixed>       $metadata
      */
     public function __construct(
         public array $rows,

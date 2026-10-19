@@ -22,11 +22,11 @@ namespace App\Marketplace\Application\Service;
 final readonly class DefaultCostMappingSiblingResolver
 {
     /**
-     * @param string $marketplace маркетплейс, для которого ищутся статьи
-     * @param array<string, array<string, string>> $templatePlCodes маркетплейс => код затраты => pl_code шаблона
-     * @param array<string, array<string, string|null>> $companyMapping маркетплейс => код затраты => статья ОПиУ
-     *                                                                  (включённое правило со статьёй LEAF_INPUT)
-     *                                                                  либо null (решение без статьи-образца)
+     * @param string                                    $marketplace     маркетплейс, для которого ищутся статьи
+     * @param array<string, array<string, string>>      $templatePlCodes маркетплейс => код затраты => pl_code шаблона
+     * @param array<string, array<string, string|null>> $companyMapping  маркетплейс => код затраты => статья ОПиУ
+     *                                                                   (включённое правило со статьёй LEAF_INPUT)
+     *                                                                   либо null (решение без статьи-образца)
      *
      * @return array<string, array{pl_category_id: string, cross_marketplace: bool}> pl_code шаблона => статья ОПиУ компании
      */

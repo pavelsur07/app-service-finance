@@ -83,7 +83,7 @@ final readonly class OzonAccrualByDayPreviewMapper
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $transactions
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>                $row
      */
     private function collectPosting(
         array &$transactions,
@@ -137,7 +137,7 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectSaleOrRefund(
@@ -182,8 +182,8 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
-     * @param list<string> $fields
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
+     * @param list<string>                                                        $fields
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectCommissionField(
@@ -234,7 +234,7 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectCommission(
@@ -277,7 +277,7 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectDeliveryServices(
@@ -463,7 +463,7 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function collectTypedFee(
@@ -525,7 +525,7 @@ final readonly class OzonAccrualByDayPreviewMapper
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $transactions
+     * @param list<OzonAccrualPreviewTransaction>                                 $transactions
      * @param array{marketplaceSku: ?string, supplierSku: ?string, name: ?string} $listingContext
      */
     private function add(
@@ -677,7 +677,7 @@ final readonly class OzonAccrualByDayPreviewMapper
 
     /**
      * @param array<string, mixed> $values
-     * @param list<string> $fields
+     * @param list<string>         $fields
      *
      * @return array{field: string, amountMinor: int}|null
      */

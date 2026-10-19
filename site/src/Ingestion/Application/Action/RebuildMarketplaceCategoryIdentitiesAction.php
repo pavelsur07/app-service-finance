@@ -239,7 +239,7 @@ final readonly class RebuildMarketplaceCategoryIdentitiesAction
     }
 
     /**
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>                                                                               $row
      * @param array{normalizedKey: string, externalCode: ?string, providerLabel: ?string, displayLabel: ?string} $identity
      */
     private function hasMissingSemanticFields(array $row, array $identity): bool

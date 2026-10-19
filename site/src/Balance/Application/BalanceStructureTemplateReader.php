@@ -68,7 +68,7 @@ final readonly class BalanceStructureTemplateReader
     }
 
     /**
-     * @param array<mixed> $items
+     * @param array<mixed>        $items
      * @param array<string, true> $seen
      *
      * @return list<BalanceStructureTemplateNode>

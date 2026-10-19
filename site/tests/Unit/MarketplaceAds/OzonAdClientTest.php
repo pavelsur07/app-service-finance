@@ -2095,7 +2095,7 @@ final class OzonAdClientTest extends TestCase
      * for every request in order. Returns a callable compatible with MockHttpClient.
      *
      * @param list<array{method: string, url: string, auth: ?string}> $log
-     * @param list<MockResponse> $responses
+     * @param list<MockResponse>                                      $responses
      */
     private function scriptedResponsesWithRecording(array &$log, array $responses): callable
     {

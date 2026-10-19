@@ -18,7 +18,7 @@ final class Version20251205120000 extends AbstractMigration
     {
         $this->addSql('ALTER TABLE finance_loan ADD pl_category_interest_id UUID DEFAULT NULL');
         $this->addSql('ALTER TABLE finance_loan ADD pl_category_fee_id UUID DEFAULT NULL');
-        $this->addSql("ALTER TABLE finance_loan ADD include_principal_in_pnl BOOLEAN DEFAULT false NOT NULL");
+        $this->addSql('ALTER TABLE finance_loan ADD include_principal_in_pnl BOOLEAN DEFAULT false NOT NULL');
         $this->addSql('ALTER TABLE finance_loan ADD CONSTRAINT FK_FINANCE_LOAN_PL_CATEGORY_INTEREST FOREIGN KEY (pl_category_interest_id) REFERENCES pl_categories (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE finance_loan ADD CONSTRAINT FK_FINANCE_LOAN_PL_CATEGORY_FEE FOREIGN KEY (pl_category_fee_id) REFERENCES pl_categories (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
     }

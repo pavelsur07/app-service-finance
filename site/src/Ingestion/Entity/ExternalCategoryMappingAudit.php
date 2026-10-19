@@ -52,7 +52,7 @@ class ExternalCategoryMappingAudit
 
     /**
      * @param array<string, mixed>|null $oldValues
-     * @param array<string, mixed> $newValues
+     * @param array<string, mixed>      $newValues
      */
     public function __construct(
         ExternalCategory $externalCategory,

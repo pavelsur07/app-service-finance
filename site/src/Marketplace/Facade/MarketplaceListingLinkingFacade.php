@@ -292,7 +292,7 @@ final readonly class MarketplaceListingLinkingFacade
     }
 
     /**
-     * @param list<MarketplaceListing> $listings
+     * @param list<MarketplaceListing>              $listings
      * @param callable(MarketplaceListing): ?string $keyExtractor
      *
      * @return array<string, list<MarketplaceListing>>

@@ -34,10 +34,10 @@ final class PlPreviewCalculator
 
     /**
      * @param list<PlPreviewColumn> $columns
-     * @param string|null $natureBaseColumn колонка-итог: модуль и знак статьи берутся по её
-     *                                      сумме и одинаково применяются ко всем колонкам —
-     *                                      колонки-доли складываются в итог; null — каждая
-     *                                      колонка как отдельный документ
+     * @param string|null           $natureBaseColumn колонка-итог: модуль и знак статьи берутся по её
+     *                                                сумме и одинаково применяются ко всем колонкам —
+     *                                                колонки-доли складываются в итог; null — каждая
+     *                                                колонка как отдельный документ
      */
     public function calculate(Company $company, PlReportPeriod $period, array $columns, ?string $natureBaseColumn = null): PlPreviewResult
     {

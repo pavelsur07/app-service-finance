@@ -311,8 +311,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param array<string, int>                  $exactMatches
+     * @param array<string, int>                  $sameAmountCandidates
      */
     private function printSummary(SymfonyStyle $io, array $previewRows, array $exactMatches, array $sameAmountCandidates): void
     {
@@ -348,8 +348,8 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
 
     /**
      * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param array<string, int>                  $exactMatches
+     * @param array<string, int>                  $sameAmountCandidates
      */
     private function printPreviewSamples(
         SymfonyStyle $io,
@@ -457,7 +457,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      *
      * @return list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}>
@@ -521,11 +521,11 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
-     * @param array<string, int> $exactMatches
-     * @param array<string, int> $sameAmountCandidates
+     * @param list<OzonAccrualPreviewTransaction>                                                                                                                                                         $previewRows
+     * @param array<string, int>                                                                                                                                                                          $exactMatches
+     * @param array<string, int>                                                                                                                                                                          $sameAmountCandidates
      * @param list<array{date: string, type: string, direction: string, previewCount: int, canonicalCount: int, previewTotalMinor: int, canonicalTotalMinor: int, countDelta: int, totalDeltaMinor: int}> $parityRows
-     * @param list<string> $omittedTypes
+     * @param list<string>                                                                                                                                                                                $omittedTypes
      */
     private function printParityDecision(
         SymfonyStyle $io,
@@ -611,7 +611,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printGroupComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void
@@ -651,7 +651,7 @@ final class OzonAccrualPreviewNormalizationCommand extends Command
     }
 
     /**
-     * @param list<OzonAccrualPreviewTransaction> $previewRows
+     * @param list<OzonAccrualPreviewTransaction>               $previewRows
      * @param array<string, array{count: int, totalMinor: int}> $canonicalGroups
      */
     private function printDailyNetComparison(SymfonyStyle $io, array $previewRows, array $canonicalGroups): void

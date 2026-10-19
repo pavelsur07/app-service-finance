@@ -89,8 +89,8 @@ final class Version20260413130000 extends AbstractMigration
     {
         $this->throwIrreversibleMigrationException(
             'Data migration is irreversible: original NULL state of operation_type is not '
-            . 'recoverable (and semantically meaningless — all WB rows are CHARGE). '
-            . 'Restore marketplace_costs from backup if needed.',
+            .'recoverable (and semantically meaningless — all WB rows are CHARGE). '
+            .'Restore marketplace_costs from backup if needed.',
         );
     }
 }

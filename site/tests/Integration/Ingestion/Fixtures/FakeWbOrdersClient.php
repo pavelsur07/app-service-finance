@@ -123,7 +123,7 @@ final class FakeWbOrdersClient implements WbOrdersClientInterface
     }
 
     /**
-     * @param list<int> $rejectedIds
+     * @param list<int>                 $rejectedIds
      * @param array<string, mixed>|null $evidence
      */
     public function rejectRows(int $rejected, array $rejectedIds = [], ?array $evidence = null): void

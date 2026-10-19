@@ -16,8 +16,8 @@ namespace App\Marketplace\Ozon\Application\DTO;
 final readonly class OzonCatalogItemDTO
 {
     /**
-     * @param list<string> $marketplaceSkus
-     * @param list<string> $barcodes
+     * @param list<string>         $marketplaceSkus
+     * @param list<string>         $barcodes
      * @param array<string, mixed> $marketplaceData
      */
     public function __construct(

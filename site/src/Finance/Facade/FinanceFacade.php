@@ -57,13 +57,13 @@ final class FinanceFacade
     /**
      * Создаёт документ ОПиУ с набором строк.
      *
-     * @param string $companyId UUID компании
-     * @param PLDocumentSource $source Источник данных (WB, Ozon, manual...)
-     * @param PLDocumentStream $stream Поток (revenue, costs, storno)
-     * @param string $periodFrom Начало периода (Y-m-d)
-     * @param string $periodTo Конец периода (Y-m-d)
-     * @param array $entries Массив PLEntryDTO[]
-     * @param string|null $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
+     * @param string           $companyId          UUID компании
+     * @param PLDocumentSource $source             Источник данных (WB, Ozon, manual...)
+     * @param PLDocumentStream $stream             Поток (revenue, costs, storno)
+     * @param string           $periodFrom         Начало периода (Y-m-d)
+     * @param string           $periodTo           Конец периода (Y-m-d)
+     * @param array            $entries            Массив PLEntryDTO[]
+     * @param string|null      $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
      *
      * @return string documentId (UUID созданного документа)
      */
@@ -131,8 +131,8 @@ final class FinanceFacade
      * PlPreviewResult::$unplaced.
      *
      * @param list<PlPreviewColumn> $columns
-     * @param string|null $natureBaseColumn колонка-итог: знак статьи по ней, остальные колонки —
-     *                                      линейные доли, складываются в итог
+     * @param string|null           $natureBaseColumn колонка-итог: знак статьи по ней, остальные колонки —
+     *                                                линейные доли, складываются в итог
      */
     public function calculatePlPreview(
         string $companyId,

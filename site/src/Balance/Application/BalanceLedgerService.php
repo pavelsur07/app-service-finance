@@ -199,7 +199,7 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
     }
 
     /**
-     * @param array<string, mixed> $book
+     * @param array<string, mixed>                                              $book
      * @param list<array{accountId: string, direction: string, amount: string}> $otherLines
      */
     private function targetDraftLocked(string $companyId, string $actorId, array $book, string $requestKey, string $accountId, string $date, string $target, string $reason, int $journalVersion, array $otherLines, ?string $id = null, ?int $version = null): string
@@ -250,7 +250,7 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
     }
 
     /**
-     * @param array<string, mixed> $book
+     * @param array<string, mixed>                                              $book
      * @param list<array{accountId: string, direction: string, amount: string}> $lines
      */
     private function writeDraft(string $companyId, string $actorId, array $book, string $requestKey, string $kind, string $date, string $reason, array $lines, ?string $id = null, ?int $version = null, ?string $originalId = null, ?string $requestHash = null): string

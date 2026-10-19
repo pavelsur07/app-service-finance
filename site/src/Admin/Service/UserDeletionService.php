@@ -13,7 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final class UserDeletionService
 {
     /**
-     * @param Connection $connection Doctrine connection for executing bulk deletes
+     * @param Connection             $connection    Doctrine connection for executing bulk deletes
      * @param EntityManagerInterface $entityManager Doctrine entity manager for transactional removal
      */
     public function __construct(

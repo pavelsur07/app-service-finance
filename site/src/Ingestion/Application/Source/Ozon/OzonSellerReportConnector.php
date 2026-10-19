@@ -295,7 +295,7 @@ final readonly class OzonSellerReportConnector implements SourceConnectorInterfa
 
     /**
      * @param list<array<string, mixed>> $rows
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>       $metadata
      *
      * @return list<array<string, mixed>>
      */

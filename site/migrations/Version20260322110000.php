@@ -52,7 +52,7 @@ final class Version20260322110000 extends AbstractMigration
             $paymentPlan = $schema->getTable('payment_plan');
 
             if ($paymentPlan->hasColumn('expected_at') && !$paymentPlan->getColumn('expected_at')->getNotnull()) {
-                $this->addSql("UPDATE payment_plan SET expected_at = document_date WHERE expected_at IS NULL");
+                $this->addSql('UPDATE payment_plan SET expected_at = document_date WHERE expected_at IS NULL');
                 $this->addSql('ALTER TABLE payment_plan ALTER COLUMN expected_at SET NOT NULL');
             }
 

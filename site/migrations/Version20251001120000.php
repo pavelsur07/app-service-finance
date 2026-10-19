@@ -25,15 +25,15 @@ final class Version20251001120000 extends AbstractMigration
     ADD formula TEXT DEFAULT NULL,
     ADD calc_order INT DEFAULT NULL
 ");
-        $this->addSql("CREATE UNIQUE INDEX IF NOT EXISTS uniq_plcat_company_code ON pl_categories (company_id, code)");
-        $this->addSql("CREATE INDEX IF NOT EXISTS idx_plcat_company_parent_sort ON pl_categories (company_id, parent_id, sort_order)");
+        $this->addSql('CREATE UNIQUE INDEX IF NOT EXISTS uniq_plcat_company_code ON pl_categories (company_id, code)');
+        $this->addSql('CREATE INDEX IF NOT EXISTS idx_plcat_company_parent_sort ON pl_categories (company_id, parent_id, sort_order)');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql("DROP INDEX IF EXISTS idx_plcat_company_parent_sort");
-        $this->addSql("DROP INDEX IF EXISTS uniq_plcat_company_code");
-        $this->addSql("ALTER TABLE pl_categories
+        $this->addSql('DROP INDEX IF EXISTS idx_plcat_company_parent_sort');
+        $this->addSql('DROP INDEX IF EXISTS uniq_plcat_company_code');
+        $this->addSql('ALTER TABLE pl_categories
     DROP COLUMN code,
     DROP COLUMN type,
     DROP COLUMN format,
@@ -41,6 +41,6 @@ final class Version20251001120000 extends AbstractMigration
     DROP COLUMN is_visible,
     DROP COLUMN formula,
     DROP COLUMN calc_order
-");
+');
     }
 }

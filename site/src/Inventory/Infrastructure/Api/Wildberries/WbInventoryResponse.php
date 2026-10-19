@@ -7,7 +7,7 @@ namespace App\Inventory\Infrastructure\Api\Wildberries;
 final readonly class WbInventoryResponse
 {
     /**
-     * @param array<string, mixed> $raw
+     * @param array<string, mixed>       $raw
      * @param list<array<string, mixed>> $items
      */
     public function __construct(

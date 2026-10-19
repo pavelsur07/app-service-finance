@@ -191,7 +191,7 @@ final class Version20260413120000 extends AbstractMigration
     {
         $this->throwIrreversibleMigrationException(
             'Data migration is irreversible: original sign of amount and original category_id '
-            . 'of compensation→decompensation rows are not recoverable. Restore marketplace_costs from backup.',
+            .'of compensation→decompensation rows are not recoverable. Restore marketplace_costs from backup.',
         );
     }
 }

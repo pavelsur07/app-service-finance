@@ -136,7 +136,7 @@ final readonly class LegacyXlsConverter
      * @template T
      *
      * @param callable(string $readablePath): T $consumer
-     * @param string|null $formatHint расширение, если путь его не несёт
+     * @param string|null                       $formatHint расширение, если путь его не несёт
      *
      * @return T
      */

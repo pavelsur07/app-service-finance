@@ -441,7 +441,7 @@ final class WbRawFinancialReportController extends AbstractController
     }
 
     /**
-     * @param resource $stream
+     * @param resource     $stream
      * @param list<string> $fields
      */
     private function writeCsvRow($stream, array $fields): void

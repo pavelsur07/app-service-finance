@@ -7,9 +7,9 @@ namespace App\Ingestion\Application\Source\Wildberries;
 final readonly class WbFinancePreviewResult
 {
     /**
-     * @param list<WbFinancePreviewTransaction> $transactions
-     * @param list<WbFinancePreviewRowCheck> $rowChecks
-     * @param list<WbFinancePreviewUnknownRow> $unknownRows
+     * @param list<WbFinancePreviewTransaction>     $transactions
+     * @param list<WbFinancePreviewRowCheck>        $rowChecks
+     * @param list<WbFinancePreviewUnknownRow>      $unknownRows
      * @param list<WbFinancePreviewValidationIssue> $validationIssues
      */
     public function __construct(
