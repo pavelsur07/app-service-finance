@@ -19,6 +19,8 @@ final class MarketplaceListingBuilder
     private string $marketplaceSku = 'sku-test-1';
     private ?string $marketplaceVariantId = null;
     private string $price = '1000.00';
+    private ?string $name = null;
+    private ?string $supplierSku = null;
 
     private function __construct()
     {
@@ -86,6 +88,22 @@ final class MarketplaceListingBuilder
         return $clone;
     }
 
+    public function withName(?string $name): self
+    {
+        $clone = clone $this;
+        $clone->name = $name;
+
+        return $clone;
+    }
+
+    public function withSupplierSku(?string $supplierSku): self
+    {
+        $clone = clone $this;
+        $clone->supplierSku = $supplierSku;
+
+        return $clone;
+    }
+
     public function build(): MarketplaceListing
     {
         if (null === $this->company) {
@@ -101,6 +119,8 @@ final class MarketplaceListingBuilder
         $listing->setMarketplaceSku($this->marketplaceSku);
         $listing->setMarketplaceVariantId($this->marketplaceVariantId);
         $listing->setPrice($this->price);
+        $listing->setName($this->name);
+        $listing->setSupplierSku($this->supplierSku);
 
         return $listing;
     }

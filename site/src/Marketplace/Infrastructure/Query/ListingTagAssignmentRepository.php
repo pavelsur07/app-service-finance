@@ -128,6 +128,26 @@ final readonly class ListingTagAssignmentRepository
     }
 
     /**
+     * Листинги компании, у которых есть хотя бы один тег (фильтр «Без тегов»).
+     *
+     * @return list<string> listingId
+     */
+    public function taggedListingIds(string $companyId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn(
+            <<<'SQL'
+            SELECT DISTINCT listing_id
+            FROM marketplace_listing_tag_assignments
+            WHERE company_id = :companyId
+            SQL,
+            ['companyId' => $companyId],
+        );
+
+        return $ids;
+    }
+
+    /**
      * Число листингов под каждым тегом компании (для справочника управления).
      *
      * @return array<string, int> ключ — tagId, значение — число листингов

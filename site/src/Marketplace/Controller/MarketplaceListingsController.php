@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\DTO\ListingsFilter;
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\JobType;
@@ -40,26 +41,11 @@ class MarketplaceListingsController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $filter = $request->query->get('filter', 'all');
+        $listingsFilter = ListingsFilter::fromQuery($request->query->all());
+        $filterParams = $listingsFilter->toQueryParams();
         $page = max(1, (int) $request->query->get('page', 1));
-        $marketplace = $request->query->get('marketplace');
 
-        // Валидируем marketplace из enum
-        $marketplaceType = null;
-        if (null !== $marketplace) {
-            $marketplaceType = MarketplaceType::tryFrom($marketplace);
-            if (null === $marketplaceType) {
-                $marketplace = null;
-            }
-        }
-
-        $mapped = match ($filter) {
-            'mapped' => true,
-            'unmapped' => false,
-            default => null,
-        };
-
-        $pager = $this->listingsQuery->paginate($companyId, $mapped, $page, self::PER_PAGE, $marketplaceType);
+        $pager = $this->listingsQuery->paginate($companyId, $listingsFilter, $page, self::PER_PAGE);
         $countAll = $this->listingsQuery->countAll($companyId);
         $countMapped = $this->listingsQuery->countMapped($companyId);
         $countUnmapped = $this->listingsQuery->countUnmapped($companyId);
@@ -77,8 +63,11 @@ class MarketplaceListingsController extends AbstractController
                 static fn (ListingTagDTO $tag): array => $tag->toArray(),
                 $this->tagRepository->listForCompany($companyId),
             ),
-            'filter' => $filter,
-            'marketplace' => $marketplace,
+            'listings_filter' => $listingsFilter,
+            'filter_params' => $filterParams,
+            // Карточки сверху и шаблон исторически читают filter/marketplace строками.
+            'filter' => $filterParams['filter'],
+            'marketplace' => $listingsFilter->marketplace?->value,
             'available_marketplaces' => MarketplaceType::cases(),
             'count_all' => $countAll,
             'count_mapped' => $countMapped,
