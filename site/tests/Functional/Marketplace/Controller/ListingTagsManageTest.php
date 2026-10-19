@@ -18,6 +18,9 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\ORM\Events;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -94,6 +97,44 @@ final class ListingTagsManageTest extends WebTestCaseBase
         $this->login($client, $owner, $company);
 
         $this->postJson($client, self::CREATE_URL, ['name' => ' ЗИМА ']);
+
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('tag_name_conflict', $this->jsonResponse($client)['error']['code']);
+        self::assertSame(1, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
+    }
+
+    public function testConcurrentCreateOfSameNameReturnsConflict(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->login($client, $owner, $company);
+
+        // Параллельный запрос вставляет одноимённый тег между findBySlug() и flush().
+        $listener = new class($this->em()->getConnection(), self::COMPANY_ID) {
+            private bool $done = false;
+
+            public function __construct(private readonly Connection $connection, private readonly string $companyId)
+            {
+            }
+
+            public function preFlush(PreFlushEventArgs $args): void
+            {
+                if ($this->done || [] === $args->getObjectManager()->getUnitOfWork()->getScheduledEntityInsertions()) {
+                    return;
+                }
+                $this->done = true;
+                $this->connection->executeStatement(
+                    'INSERT INTO marketplace_listing_tags (id, company_id, name, slug, created_at) VALUES (?, ?, ?, ?, NOW())',
+                    [Uuid::uuid7()->toString(), $this->companyId, 'зима', 'зима'],
+                );
+            }
+        };
+        $this->em()->getEventManager()->addEventListener([Events::preFlush], $listener);
+
+        $this->postJson($client, self::CREATE_URL, ['name' => 'Зима']);
 
         self::assertResponseStatusCodeSame(409);
         self::assertSame('tag_name_conflict', $this->jsonResponse($client)['error']['code']);

@@ -101,4 +101,4 @@
 ### Этап 3 — выполнен
 - `ARCHITECTURE.md`: раздел «Marketplace: теги листингов» + Changelog 2.29.
 - Гейты: `site-cs-check` 0, `site-cs-strict-types` 0, `site-stan` — No errors, `site-test-unit` 3912/3912, полный `phpunit` 6817/6817.
-- Независимое ревью: BLOCKER/IMPORTANT нет. FOLLOW-UP: одновременное создание одноимённого тега → 500 вместо 409 (как в `AssignListingTagAction`, данные целы). MINOR без правки: slug не схлопывает пробелы внутри названия — существующее поведение rename/assign.
+- Независимое ревью: BLOCKER/IMPORTANT нет. FOLLOW-UP: одновременное создание одноимённого тега → 500 вместо 409 — исправлено отдельным PR (`fix/listing-tag-create-race`). MINOR без правки: slug не схлопывает пробелы внутри названия — существующее поведение rename/assign.
