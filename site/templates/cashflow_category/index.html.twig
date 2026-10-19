@@ -25,11 +25,22 @@
                 {% else %}
                     <span class="cashflow-category-toggle-placeholder me-2"></span>
                 {% endif %}
-                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none flex-grow-1">{{ item.name }}</a>
-                {% if item.code %}
-                    <span class="badge bg-secondary-lt me-2">{{ item.code }}</span>
-                {% endif %}
-                <span class="ms-auto d-inline-flex gap-1">
+                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none" title="{{ item.name }}">{{ item.name }}</a>
+                <span class="cashflow-category-col cashflow-category-col--code">
+                    {% if item.code %}
+                        <span class="badge bg-secondary-lt" title="{{ item.code }}">{{ item.code }}</span>
+                    {% endif %}
+                </span>
+                <span class="cashflow-category-col cashflow-category-col--pl">
+                    {% if item.allowPlDocument %}
+                        <span class="cashflow-category-pl-yes" title="Можно создавать документ ОПиУ" aria-hidden="true">✓</span>
+                        <span class="visually-hidden">ОПиУ: можно создавать документ</span>
+                    {% else %}
+                        <span class="cashflow-category-pl-no" title="Нельзя создавать документ ОПиУ" aria-hidden="true">—</span>
+                        <span class="visually-hidden">ОПиУ: нельзя создавать документ</span>
+                    {% endif %}
+                </span>
+                <span class="cashflow-category-col cashflow-category-col--actions">
                     {% if not item.system %}
                     <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
@@ -65,6 +76,71 @@
 
         .cashflow-category-link {
             display: inline-block;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Колонки справа фиксированной ширины: отступ вложенности сужает только
+           название, поэтому «ОПиУ» стоит на одной вертикали на любом уровне. */
+        .cashflow-category-col {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            margin-left: .5rem;
+        }
+
+        .cashflow-category-col--code {
+            width: 10rem;
+            justify-content: flex-end;
+        }
+
+        .cashflow-category-col--code .badge {
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cashflow-category-col--pl {
+            width: 3.5rem;
+            justify-content: center;
+        }
+
+        .cashflow-category-col--actions {
+            width: 2.5rem;
+            justify-content: flex-end;
+        }
+
+        .cashflow-category-pl-yes {
+            color: var(--vf-ok-text);
+            font-weight: var(--vf-weight-bold);
+        }
+
+        .cashflow-category-pl-no {
+            color: var(--vf-text-muted);
+        }
+
+        /* Шапка списка (DS-Table): Navy 50 · 11/16 · 700 · +5% · Muted. */
+        .cashflow-category-head {
+            border-radius: .5rem;
+            padding: .625rem .75rem;
+            margin-bottom: .25rem;
+            background: var(--vf-navy-50);
+            color: var(--vf-text-muted);
+            font-size: .6875rem;
+            line-height: 1rem;
+            font-weight: var(--vf-weight-bold);
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .cashflow-category-head-name {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding-left: 2rem; /* стрелка 1.5rem + me-2 */
         }
 
         .cashflow-category-toggle {
@@ -101,6 +177,17 @@
         .cashflow-category-children {
             margin-left: 1.5rem;
         }
+
+        /* Узкий экран: код статьи виден в карточке статьи, место отдаём названию. */
+        @media (max-width: 575.98px) {
+            .cashflow-category-col--code {
+                display: none;
+            }
+
+            .cashflow-category-children {
+                margin-left: 1rem;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -123,6 +210,12 @@
     <div class="container-xl mt-3">
             <div class="card">
             <div class="card-body">
+                <div class="cashflow-category-head d-flex align-items-center" aria-hidden="true">
+                    <span class="cashflow-category-head-name">Статья</span>
+                    <span class="cashflow-category-col cashflow-category-col--code"></span>
+                    <span class="cashflow-category-col cashflow-category-col--pl">ОПиУ</span>
+                    <span class="cashflow-category-col cashflow-category-col--actions"></span>
+                </div>
                 {{ macros.render_items(items) }}
             </div>
         </div>
