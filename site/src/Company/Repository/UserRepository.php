@@ -41,14 +41,43 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /**
+     * Админский список (cross-company, вызывается только под ROLE_ADMIN).
+     *
+     * @param ?string $companyId      только пользователи этого кабинета (владелец или активный участник)
+     * @param bool    $withoutCompany только пользователи без кабинета
+     * @param bool    $ownersOnly     только владельцы кабинетов (companies.user_id)
+     *
      * @return Pagerfanta<User>
      */
-    public function getRegisteredUsers(int $page, int $limit = 20): Pagerfanta
+    public function getRegisteredUsers(int $page, int $limit = 20, ?string $companyId = null, bool $withoutCompany = false, bool $ownersOnly = false): Pagerfanta
     {
         $page = max(1, $page);
 
         $queryBuilder = $this->createQueryBuilder('user')
             ->orderBy('user.createdAt', \SortDirection::Descending);
+
+        if (null !== $companyId) {
+            $queryBuilder->andWhere(
+                'EXISTS (SELECT 1 FROM '.Company::class.' filterOwnedCompany WHERE filterOwnedCompany.user = user AND filterOwnedCompany.id = :filterCompanyId)'
+                .' OR EXISTS (SELECT 1 FROM '.CompanyMember::class.' filterMembership WHERE filterMembership.user = user AND IDENTITY(filterMembership.company) = :filterCompanyId AND filterMembership.status = :filterActiveStatus)',
+            )
+                ->setParameter('filterCompanyId', $companyId)
+                ->setParameter('filterActiveStatus', CompanyMember::STATUS_ACTIVE);
+        }
+
+        if ($withoutCompany) {
+            $queryBuilder->andWhere(
+                'NOT EXISTS (SELECT 1 FROM '.Company::class.' filterOwnedNone WHERE filterOwnedNone.user = user)'
+                .' AND NOT EXISTS (SELECT 1 FROM '.CompanyMember::class.' filterMembershipNone WHERE filterMembershipNone.user = user AND filterMembershipNone.status = :filterActiveStatus)',
+            )
+                ->setParameter('filterActiveStatus', CompanyMember::STATUS_ACTIVE);
+        }
+
+        if ($ownersOnly) {
+            $queryBuilder->andWhere(
+                'EXISTS (SELECT 1 FROM '.Company::class.' filterOwnedOwners WHERE filterOwnedOwners.user = user)',
+            );
+        }
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($limit);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Admin\Controller;
 
 use App\Admin\Form\AdminAccountCreateType;
+use App\Admin\Infrastructure\Query\UserAdminQuery;
 use App\Admin\Service\UserDeletionService;
 use App\Company\Entity\User;
 use App\Company\Repository\UserRepository;
@@ -34,11 +35,12 @@ final class UserController extends AbstractController
     public function index(
         Request $request,
         UserRepository $userRepository,
+        UserAdminQuery $userAdminQuery,
     ): Response {
         $account = new User(id: Uuid::uuid7()->toString());
         $accountForm = $this->createAccountForm($account);
 
-        return $this->renderUserIndex($request, $userRepository, $accountForm, false);
+        return $this->renderUserIndex($request, $userRepository, $userAdminQuery, $accountForm, false);
     }
 
     private function createAccountForm(User $account): FormInterface
@@ -49,13 +51,29 @@ final class UserController extends AbstractController
     private function renderUserIndex(
         Request $request,
         UserRepository $userRepository,
+        UserAdminQuery $userAdminQuery,
         FormInterface $accountForm,
         bool $showAccountModal,
     ): Response {
         $lastWeek = new \DateTimeImmutable('-7 days');
         $page = max(1, (int) $request->query->get('page', 1));
-        $pager = $userRepository->getRegisteredUsers($page);
+
+        $companyFilter = $request->query->get('company');
+        $companyId = null;
+        $withoutCompany = false;
+        if (is_string($companyFilter)) {
+            if ('none' === $companyFilter) {
+                $withoutCompany = true;
+            } elseif (Uuid::isValid($companyFilter)) {
+                $companyId = $companyFilter;
+            }
+        }
+        $ownersOnly = '1' === $request->query->get('owners');
+
+        $pager = $userRepository->getRegisteredUsers($page, companyId: $companyId, withoutCompany: $withoutCompany, ownersOnly: $ownersOnly);
         $users = iterator_to_array($pager->getCurrentPageResults());
+
+        $userIds = array_map(static fn (User $user): string => (string) $user->getId(), $users);
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
@@ -66,6 +84,11 @@ final class UserController extends AbstractController
             'accountForm' => $accountForm,
             'showAccountModal' => $showAccountModal,
             'roleLabels' => self::ROLE_LABELS,
+            'userCabinets' => $userAdminQuery->cabinetsByUserIds($userIds),
+            'cabinetChoices' => $userAdminQuery->cabinetChoices(),
+            'filterCompany' => $companyId,
+            'filterWithoutCompany' => $withoutCompany,
+            'filterOwnersOnly' => $ownersOnly,
         ]);
     }
 
