@@ -118,7 +118,7 @@ final readonly class SyncOzonAccrualTypesAction
 
         $latestApplied = $this->typeRepository->findLatestVersionFetchedAt();
         $stale = null !== $latestApplied && $fetchedAt < $latestApplied;
-        $existing = $this->typeRepository->findAllIndexedByTypeId();
+        $existing = $this->typeRepository->findAllIndexedByTypeId(refresh: !$dryRun);
 
         $created = [];
         $updated = [];

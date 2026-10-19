@@ -109,6 +109,27 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         self::assertNull($this->typeRow(2)['removed_at']);
     }
 
+    /**
+     * Команда применяет версии одним EntityManager без clear(): пока она держит
+     * тип в UnitOfWork, другой воркер помечает его удалённым. Новая версия с тем
+     * же содержимым обязана восстановить тип, а не довериться кэшу.
+     */
+    public function testWriteOfAnotherWorkerIsNotHiddenByCachedEntities(): void
+    {
+        $both = [['id' => 1, 'name' => 'Acquiring', 'description' => 'Эквайринг'], ['id' => 2, 'name' => 'BackwardShipment', 'description' => 'Обратная магистраль']];
+        $this->sync($this->storeVersion($both, '2026-10-01 02:30:00'), clear: false);
+
+        // Другой воркер применил версию без типа 2 (своим EntityManager).
+        $this->connection->executeStatement(
+            "UPDATE ingest_ozon_accrual_types SET removed_at = '2026-10-08 02:30:00', version_fetched_at = '2026-10-08 02:30:00' WHERE type_id = 2",
+        );
+
+        $restored = $this->sync($this->storeVersion($both, '2026-10-15 02:30:00'), clear: false);
+
+        self::assertSame([2], $restored->updatedTypeIds);
+        self::assertNull($this->typeRow(2)['removed_at']);
+    }
+
     public function testOlderVersionOnlyAddsUnknownTypes(): void
     {
         $this->sync($this->storeVersion([['id' => 1, 'name' => 'Acquiring', 'description' => 'Эквайринг']], '2026-10-08 02:30:00'));
@@ -199,12 +220,14 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         $this->sync($raw, Uuid::uuid7()->toString());
     }
 
-    private function sync(IngestRawRecord $raw, ?string $companyId = null, bool $dryRun = false): OzonAccrualTypesSyncResult
+    private function sync(IngestRawRecord $raw, ?string $companyId = null, bool $dryRun = false, bool $clear = true): OzonAccrualTypesSyncResult
     {
         /** @var SyncOzonAccrualTypesAction $action */
         $action = self::getContainer()->get(SyncOzonAccrualTypesAction::class);
         $result = $action($companyId ?? $raw->getCompanyId(), $raw->getId(), $dryRun);
-        $this->em->clear();
+        if ($clear) {
+            $this->em->clear();
+        }
 
         return $result;
     }

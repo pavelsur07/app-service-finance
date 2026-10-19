@@ -6,6 +6,7 @@ namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\OzonAccrualType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -21,15 +22,23 @@ final class OzonAccrualTypeRepository extends ServiceEntityRepository
     /**
      * @companyScopeExempt справочник Ozon общий для всех продавцов, у сущности нет companyId
      *
+     * @param bool $refresh перечитать уже загруженные сущности (вызов под блокировкой)
+     *
      * @return array<int, OzonAccrualType> type_id => тип
      */
-    public function findAllIndexedByTypeId(): array
+    public function findAllIndexedByTypeId(bool $refresh = false): array
     {
-        /** @var list<OzonAccrualType> $types */
-        $types = $this->createQueryBuilder('type')
+        $query = $this->createQueryBuilder('type')
             ->orderBy('type.typeId', \SortDirection::Ascending)
-            ->getQuery()
-            ->getResult();
+            ->getQuery();
+        // Под advisory-блокировкой уже загруженные сущности перечитываются из БД:
+        // иначе запись другого воркера затёрлась бы кэшем UnitOfWork. Hint ставится
+        // только при true — гидратор проверяет его через isset().
+        if ($refresh) {
+            $query->setHint(Query::HINT_REFRESH, true);
+        }
+        /** @var list<OzonAccrualType> $types */
+        $types = $query->getResult();
 
         $indexed = [];
         foreach ($types as $type) {

@@ -38,11 +38,7 @@ final readonly class ResolveOzonAccrualTypeGroupDisputeAction
                 ['lockKey' => ImportOzonAccrualDetailsAction::LOCK_KEY],
             );
 
-            $typeGroup = $this->typeGroupRepository->findAllIndexedByTypeId()[$typeId] ?? null;
-            if (null !== $typeGroup) {
-                // Сущность могла быть загружена до блокировки — перечитать.
-                $this->entityManager->refresh($typeGroup);
-            }
+            $typeGroup = $this->typeGroupRepository->findAllIndexedByTypeId(refresh: true)[$typeId] ?? null;
             if (null === $typeGroup || !$typeGroup->isDisputed()) {
                 throw new OzonAccrualTypeNotConfirmableException(sprintf('У типа %d нет спорной группы.', $typeId));
             }

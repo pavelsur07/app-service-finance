@@ -112,7 +112,7 @@ final readonly class ImportOzonAccrualDetailsAction
 
         $decide = function () use ($companyId, $byTypeId, $periodFrom, $periodTo, $dryRun): array {
             $decided = [];
-            $existing = $this->typeGroupRepository->findAllIndexedByTypeId();
+            $existing = $this->typeGroupRepository->findAllIndexedByTypeId(refresh: !$dryRun);
             foreach ($byTypeId as $typeId => $typePairs) {
                 array_push($decided, ...$this->decide($companyId, $typeId, $typePairs, $existing[$typeId] ?? null, $periodFrom, $periodTo, $dryRun));
             }
