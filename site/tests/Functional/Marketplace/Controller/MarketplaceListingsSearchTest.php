@@ -168,7 +168,8 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', '/marketplace/listings');
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('Без привязки</div>', (string) $client->getResponse()->getContent());
+        // Карточки-счётчики были ссылками card-sm на вкладки привязки.
+        self::assertCount(0, $crawler->filter('a.card-sm[href*="filter="]'));
         self::assertSame(
             ['all', 'mapped', 'unmapped'],
             $crawler->filter('#listings-filter-form select[name="filter"] option')->each(
