@@ -28,7 +28,7 @@ final class AssignListingTagAction
 
     public function __invoke(string $companyId, ListingTagPayload $payload): ListingTagAssignResult
     {
-        // Транзакция на весь write-path: создание тега (flush) + вставка назначений (DBAL)
+        // Транзакция на весь write-path: создание тега + вставка назначений (оба DBAL)
         // атомарны — сбой между ними не оставляет тег-сироту без назначений.
         return $this->em->wrapInTransaction(function () use ($companyId, $payload): ListingTagAssignResult {
             $tag = null !== $payload->tagId
@@ -54,20 +54,19 @@ final class AssignListingTagAction
 
     private function findOrCreate(string $companyId, string $name): MarketplaceListingTag
     {
-        $existing = $this->tagRepository->findBySlug($companyId, MarketplaceListingTag::slugify($name));
+        $slug = MarketplaceListingTag::slugify($name);
+        $existing = $this->tagRepository->findBySlug($companyId, $slug);
 
         if (null !== $existing) {
             return $existing;
         }
 
-        $tag = new MarketplaceListingTag(Uuid::uuid7()->toString(), $companyId, $name);
+        // Не persist + flush: одноимённый тег, созданный параллельным запросом между
+        // findBySlug() и вставкой, уронил бы flush на uniq_listing_tag_company_slug (500).
+        // ON CONFLICT DO NOTHING оставляет тот тег, и листинги получают его.
+        $this->tagRepository->insertIfAbsent(new MarketplaceListingTag(Uuid::uuid7()->toString(), $companyId, $name));
 
-        // ponytail: одновременное создание одноимённого тега двумя запросами упрётся
-        // в uniq_listing_tag_company_slug и вернёт 500 — данные при этом целы, повтор
-        // запроса находит уже созданный тег. Ловить гонку здесь дороже, чем она стоит.
-        $this->tagRepository->add($tag);
-        $this->em->flush();
-
-        return $tag;
+        return $this->tagRepository->findBySlug($companyId, $slug)
+            ?? throw new ListingTagNotFoundException($slug);
     }
 }

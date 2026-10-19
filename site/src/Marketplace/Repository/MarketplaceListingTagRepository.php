@@ -6,6 +6,7 @@ namespace App\Marketplace\Repository;
 
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListingTag;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class MarketplaceListingTagRepository
@@ -65,6 +66,28 @@ final class MarketplaceListingTagRepository
     public function add(MarketplaceListingTag $tag): void
     {
         $this->em->persist($tag);
+    }
+
+    /**
+     * Вставляет тег, если в его компании ещё нет тега с тем же slug. Одновременную
+     * вставку одноимённого тега решает uniq_listing_tag_company_slug без исключения:
+     * транзакция вызывающего не обрывается. Сам $tag в UnitOfWork не попадает.
+     */
+    public function insertIfAbsent(MarketplaceListingTag $tag): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'INSERT INTO marketplace_listing_tags (id, company_id, name, slug, created_at)
+             VALUES (:id, :companyId, :name, :slug, :createdAt)
+             ON CONFLICT (company_id, slug) DO NOTHING',
+            [
+                'id' => $tag->getId(),
+                'companyId' => $tag->getCompanyId(),
+                'name' => $tag->getName(),
+                'slug' => $tag->getSlug(),
+                'createdAt' => $tag->getCreatedAt(),
+            ],
+            ['createdAt' => Types::DATETIME_IMMUTABLE],
+        );
     }
 
     public function remove(MarketplaceListingTag $tag): void
