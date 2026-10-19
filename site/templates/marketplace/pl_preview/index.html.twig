@@ -97,7 +97,14 @@
             outline: 2px solid var(--tblr-primary);
             outline-offset: -2px;
         }
-        .pl-preview-tags { max-height: 16rem; overflow-y: auto; }
+        .pl-preview-tags { min-width: 16rem; max-width: 22rem; max-height: 16rem; overflow-y: auto; }
+        /* Отступ dropdown-item перебивал место form-check под чекбокс: чекбокс уезжал за край меню
+           и срезался прокруткой. Длинное название переносится. */
+        .pl-preview-tags .form-check.dropdown-item {
+            padding-left: 2.75rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
         /* Узкий экран: две закреплённые колонки закрыли бы колонки тегов целиком. */
         @media (max-width: 767.98px) {
             .table.pl-preview-table { --pl-col-name: 160px; --pl-col-value: 120px; }
