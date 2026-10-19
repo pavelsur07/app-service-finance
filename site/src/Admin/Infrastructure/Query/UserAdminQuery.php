@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Admin\Infrastructure\Query;
 
+use App\Admin\Application\DTO\CabinetChoiceView;
+use App\Admin\Application\DTO\UserCabinetView;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
@@ -26,7 +28,7 @@ final readonly class UserAdminQuery
      *
      * @param list<string> $userIds
      *
-     * @return array<string, list<array{id: string, name: string, inn: ?string, owner: bool}>> ключ — user id
+     * @return array<string, list<UserCabinetView>> ключ — user id
      */
     public function cabinetsByUserIds(array $userIds): array
     {
@@ -57,12 +59,12 @@ final readonly class UserAdminQuery
         $byUser = [];
 
         foreach ($ownedRows as $row) {
-            $byUser[(string) $row['user_id']][(string) $row['id']] = [
-                'id' => (string) $row['id'],
-                'name' => (string) $row['name'],
-                'inn' => null !== $row['inn'] ? (string) $row['inn'] : null,
-                'owner' => true,
-            ];
+            $byUser[(string) $row['user_id']][(string) $row['id']] = new UserCabinetView(
+                id: (string) $row['id'],
+                name: (string) $row['name'],
+                inn: null !== $row['inn'] ? (string) $row['inn'] : null,
+                owner: true,
+            );
         }
 
         foreach ($memberRows as $row) {
@@ -71,17 +73,17 @@ final readonly class UserAdminQuery
             if (isset($byUser[$userId][$companyId])) {
                 continue;
             }
-            $byUser[$userId][$companyId] = [
-                'id' => $companyId,
-                'name' => (string) $row['name'],
-                'inn' => null !== $row['inn'] ? (string) $row['inn'] : null,
-                'owner' => false,
-            ];
+            $byUser[$userId][$companyId] = new UserCabinetView(
+                id: $companyId,
+                name: (string) $row['name'],
+                inn: null !== $row['inn'] ? (string) $row['inn'] : null,
+                owner: false,
+            );
         }
 
         foreach ($byUser as $userId => $cabinets) {
             $cabinets = array_values($cabinets);
-            usort($cabinets, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+            usort($cabinets, static fn (UserCabinetView $a, UserCabinetView $b): int => $a->name <=> $b->name);
             $byUser[$userId] = $cabinets;
         }
 
@@ -91,7 +93,7 @@ final readonly class UserAdminQuery
     /**
      * Справочник кабинетов для фильтра страницы.
      *
-     * @return list<array{id: string, name: string, inn: ?string}>
+     * @return list<CabinetChoiceView>
      */
     public function cabinetChoices(): array
     {
@@ -100,11 +102,11 @@ final readonly class UserAdminQuery
         );
 
         return array_map(
-            static fn (array $row): array => [
-                'id' => (string) $row['id'],
-                'name' => (string) $row['name'],
-                'inn' => null !== $row['inn'] ? (string) $row['inn'] : null,
-            ],
+            static fn (array $row): CabinetChoiceView => new CabinetChoiceView(
+                id: (string) $row['id'],
+                name: (string) $row['name'],
+                inn: null !== $row['inn'] ? (string) $row['inn'] : null,
+            ),
             $rows,
         );
     }

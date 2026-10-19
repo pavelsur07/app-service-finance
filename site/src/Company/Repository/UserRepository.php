@@ -43,9 +43,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     /**
      * Админский список (cross-company, вызывается только под ROLE_ADMIN).
      *
-     * @param ?string $companyId      только пользователи этого кабинета (владелец или активный участник)
-     * @param bool    $withoutCompany только пользователи без кабинета
-     * @param bool    $ownersOnly     только владельцы кабинетов (companies.user_id)
+     * @param ?string $companyId только пользователи этого кабинета (владелец или активный участник)
+     * @param bool $withoutCompany только пользователи без кабинета
+     * @param bool $ownersOnly только владельцы кабинетов (companies.user_id)
      *
      * @return Pagerfanta<User>
      */

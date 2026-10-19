@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Admin\Controller;
 
 use App\Admin\Application\CreateAccountAction;
+use App\Admin\Application\DTO\UserListFilter;
 use App\Admin\Form\AdminAccountCreateType;
 use App\Admin\Infrastructure\Query\UserAdminQuery;
 use App\Company\Entity\User;
@@ -55,19 +56,14 @@ final class CreateAccountController extends AbstractController
         $lastWeek = new \DateTimeImmutable('-7 days');
         $page = max(1, (int) $request->query->get('page', 1));
 
-        $companyFilter = $request->query->get('company');
-        $companyId = null;
-        $withoutCompany = false;
-        if (is_string($companyFilter)) {
-            if ('none' === $companyFilter) {
-                $withoutCompany = true;
-            } elseif (Uuid::isValid($companyFilter)) {
-                $companyId = $companyFilter;
-            }
-        }
-        $ownersOnly = '1' === $request->query->get('owners');
+        $filter = UserListFilter::fromQuery($request->query->get('company'), $request->query->get('owners'));
 
-        $pager = $userRepository->getRegisteredUsers($page, companyId: $companyId, withoutCompany: $withoutCompany, ownersOnly: $ownersOnly);
+        $pager = $userRepository->getRegisteredUsers(
+            $page,
+            companyId: $filter->companyId,
+            withoutCompany: $filter->withoutCompany,
+            ownersOnly: $filter->ownersOnly,
+        );
         $users = iterator_to_array($pager->getCurrentPageResults());
 
         $userIds = array_values(array_map(static fn (User $user): string => (string) $user->getId(), $users));
@@ -83,9 +79,7 @@ final class CreateAccountController extends AbstractController
             'roleLabels' => UserController::ROLE_LABELS,
             'userCabinets' => $userAdminQuery->cabinetsByUserIds($userIds),
             'cabinetChoices' => $userAdminQuery->cabinetChoices(),
-            'filterCompany' => $companyId,
-            'filterWithoutCompany' => $withoutCompany,
-            'filterOwnersOnly' => $ownersOnly,
+            'filter' => $filter,
         ], new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY));
     }
 }
