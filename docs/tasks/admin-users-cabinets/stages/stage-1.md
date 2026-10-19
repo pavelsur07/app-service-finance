@@ -46,22 +46,29 @@ PR #2720 нельзя влить: красный обязательный гей
 
 ## 4. Чек-лист приёмки
 
-- [ ] `php-cs-fixer fix --dry-run --diff --using-cache=no` с конфигом
+- [x] `php-cs-fixer fix --dry-run --diff --using-cache=no` с конфигом
       `.php-cs-fixer.php` по изменённым файлам — 0 исправлений
-- [ ] `make site-cs-strict-types` (или его конфиг) по изменённым файлам — зелёный
-- [ ] PHPStan level 8 по `src/Admin`, `src/Company/Repository/UserRepository.php`,
+- [x] `make site-cs-strict-types` (или его конфиг) по изменённым файлам — зелёный
+- [x] PHPStan level 8 по `src/Admin`, `src/Company/Repository/UserRepository.php`,
       новым тестам — без новых ошибок, baseline не вырос
-- [ ] `UserAdminQuery` не возвращает нетипизированных массивов; DTO —
+- [x] `UserAdminQuery` не возвращает нетипизированных массивов; DTO —
       `final readonly class`
-- [ ] Разбор фильтров в одном месте; в контроллерах — только HTTP in/out
-- [ ] Unit-тест `UserListFilter`: пусто, `none`, валидный UUID, мусор, `owners=1`,
+- [x] Разбор фильтров в одном месте; в контроллерах — только HTTP in/out
+- [x] Unit-тест `UserListFilter`: пусто, `none`, валидный UUID, мусор, `owners=1`,
       `owners` ≠ `1`, нестроковый параметр
-- [ ] `tests/Functional/Admin/` полностью зелёный локально (сеть
+- [x] `tests/Functional/Admin/` полностью зелёный локально (сеть
       `app-service-finance_default`)
-- [ ] В коммитах только файлы задачи (`git status` / `git show --stat`)
-- [ ] CI PR #2720 зелёный, `mergeable` ≠ `CONFLICTING`
-- [ ] Итог этапа дописан ниже и сверен с этим чек-листом
+- [x] В коммитах только файлы задачи (`git status` / `git show --stat`)
+- [x] CI PR #2720 зелёный, `mergeable` ≠ `CONFLICTING`
+- [x] Итог этапа дописан ниже и сверен с этим чек-листом
 
 ## Итог
 
-_заполняется по завершении_
+2026-10-19. Коммиты `a6e72eca8` (код) и `4e71a2d40` (документы).
+
+- CS по `.php-cs-fixer.php` и strict-types по 9 изменённым файлам — 0 исправлений.
+- PHPStan (level 8, baseline) по `src/Admin`, `UserRepository`, новым тестам — `[OK] No errors`.
+- `tests/Unit/Admin` + `tests/Functional/Admin` локально — OK (38 тестов, 226 assertions).
+- CI PR #2720 зелёный, включая «🎨 PHP code style»; `mergeable: MERGEABLE`,
+  вливать `master` не потребовалось.
+- Вне scope, отмечено: `cabinetChoices()` грузит все кабинеты без ограничения.
