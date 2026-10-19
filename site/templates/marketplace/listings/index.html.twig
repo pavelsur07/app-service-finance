@@ -626,9 +626,18 @@
                 }
             }
 
+            // После назначения или снятия тега выборка по тегу может сжаться, и текущая
+            // страница окажется за её концом (OutOfRangeCurrentPage). Фильтры сохраняем,
+            // страницу — нет.
+            function reloadFromFirstPage() {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('page');
+                window.location.assign(url.toString());
+            }
+
             function finishAssign(data) {
                 rememberFlash(resultText(data));
-                window.location.reload();
+                reloadFromFirstPage();
             }
 
             // ---- Подтверждение назначения по фильтру ----
@@ -754,7 +763,7 @@
                         tagId: this.dataset.tagId,
                     });
                     if (data) {
-                        window.location.reload();
+                        reloadFromFirstPage();
                     }
                 });
             });
