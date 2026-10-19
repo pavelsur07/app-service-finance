@@ -19,13 +19,15 @@ PR смержен, workflow деплоя завершился успешно, `S
 
 ## Чек-лист готовности этапа
 
-- [ ] Ветка содержит только файлы задачи (`git diff --stat origin/master`), посторонние untracked не попали
-- [ ] PR создан, тело — что/зачем/проверка/после деплоя, атрибуция
-- [ ] CI: все обязательные job'ы зелёные (`gh pr checks`)
-- [ ] `mergeable = MERGEABLE`, без влития master без нужды
-- [ ] Merge выполнен, деплой (workflow по merge-коммиту) — success
-- [ ] Прод: контейнеры `healthy`, релиз = merge-коммит
+- [x] Ветка содержит только файлы задачи (`git diff --stat origin/master`), посторонние untracked не попали
+- [x] PR создан, тело — что/зачем/проверка/после деплоя, атрибуция
+- [x] CI: все обязательные job'ы зелёные (`gh pr checks`)
+- [x] `mergeable = MERGEABLE`, без влития master без нужды
+- [x] Merge выполнен, деплой (workflow по merge-коммиту) — success
+- [x] Прод: контейнеры `healthy`, релиз = merge-коммит
 
 ## Итог этапа
 
-_заполняется по завершении_
+Выполнено 19.10.2026. PR #2724, merge-коммит `5be32e0c`, CI зелёный (unit, integration,
+functional 3/3, static analysis, CS), workflow «Deploy to Production» (run 39222757675) — success.
+Прод: `site-php-fpm`, `site-nginx`, `site-php-cli` на образах `5be32e0c`, `healthy`.
