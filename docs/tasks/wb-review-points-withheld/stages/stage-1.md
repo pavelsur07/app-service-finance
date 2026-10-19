@@ -39,17 +39,29 @@
 
 ## Чек-лист готовности этапа
 
-- [ ] Новый калькулятор оформлен как соседние (`class` без `final` — так у всех WB-калькуляторов), `declare(strict_types=1)`
-- [ ] Unit-тест калькулятора покрывает все кейсы выше
-- [ ] Регрессия: на `master` образец с прода не поддерживается ни одним калькулятором (тест красный), на ветке — ровно одним
-- [ ] `DefaultMappingConfigTest` (каждый код каталога имеет правило, `pl_code` из стандартного дерева) — зелёный
-- [ ] `CostCategoryCatalogFacadeTest`, `WbCostCategoryTest` — зелёные
-- [ ] `make site-cs-check`, `make site-cs-strict-types` — зелёные (прогон без кеша перед handoff)
-- [ ] `make site-stan` — baseline не вырос
-- [ ] `make site-test-unit` — зелёный; integration-тесты маппинга (`SyncDefaultCostMappingCommandTest`, `ApplyDefaultCostMappingConsoleCommandTest`, `PreviewDefaultCostMappingActionTest`) — зелёные
-- [ ] Внешнее ревью Codex — `REVIEW_GREEN` или находки закрыты
-- [ ] `ARCHITECTURE.md` Changelog обновлён
+- [x] Новый калькулятор оформлен как соседние (`class` без `final` — так у всех WB-калькуляторов), `declare(strict_types=1)`
+- [x] Unit-тест калькулятора покрывает все кейсы выше
+- [x] Регрессия: на `master` образец с прода не поддерживается ни одним калькулятором (тест красный), на ветке — ровно одним
+- [x] `DefaultMappingConfigTest` (каждый код каталога имеет правило, `pl_code` из стандартного дерева) — зелёный
+- [x] `CostCategoryCatalogFacadeTest`, `WbCostCategoryTest` — зелёные
+- [x] `make site-cs-check`, `make site-cs-strict-types` — зелёные (прогон без кеша перед handoff)
+- [x] `make site-stan` — baseline не вырос
+- [x] `make site-test-unit` — зелёный; integration-тесты маппинга (`SyncDefaultCostMappingCommandTest`, `ApplyDefaultCostMappingConsoleCommandTest`, `PreviewDefaultCostMappingActionTest`) — зелёные
+- [x] Внешнее ревью Codex — `REVIEW_GREEN` или находки закрыты
+- [x] `ARCHITECTURE.md` Changelog обновлён
 
 ## Итог этапа
 
-_заполняется по завершении_
+Выполнено 19.10.2026, коммит `bd1687548`.
+
+- Калькулятор `WbReviewPointsWithheldCalculator`, `cashbackAmount()` в нормализаторе,
+  категория в `WbCostCategory`, правило → `PROMO_GIVEAWAYS` с `note`, регистрация priority 98.
+- Отступления от плана: шаг 6 (фикстуры) не нужен — в dev-фикстурах нет статьи «Раздачи…».
+  `PROMO_GIVEAWAYS` добавлен в `ALLOWED_PL_CODES` `DefaultMappingConfigTest` (статья есть в
+  `default_pl_tree.json`). Ключ `product` = `null` — процессоры его не читают, а
+  `Product|null` не проходит форму интерфейса; в тесте процессора — полное имя класса вместо
+  `use`, чтобы не сдвигать номера строк анонимных классов в baseline.
+- Регрессия: без нового калькулятора тест падает (`actual size 0 matches expected size 1`), с ним — зелёный.
+- Гейты: CS (без кеша) — 0 файлов; strict_types — 0; PHPStan — `No errors`, baseline не тронут;
+  unit — 3912 OK; integration Marketplace — 510 OK (локальный redis с алиасом `site-redis`, удалён).
+- Внешнее ревью Codex (medium) — `REVIEW_GREEN` с первого раунда.
