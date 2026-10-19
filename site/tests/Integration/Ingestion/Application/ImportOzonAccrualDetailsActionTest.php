@@ -154,6 +154,27 @@ final class ImportOzonAccrualDetailsActionTest extends IntegrationTestCase
         self::assertSame(['delivery', 'confirmed', 3, 3], $this->stored(32));
     }
 
+    /**
+     * Продажа без type_id на том же ключе (дата, SKU, сумма), что и услуга: строки
+     * продаж из отчёта не должны голосовать за тип услуги.
+     */
+    public function testUntypedComponentOnSameKeyMakesMatchAmbiguous(): void
+    {
+        foreach (['2026-08-01', '2026-08-02', '2026-08-03'] as $date) {
+            $this->byDay($date, '1', 100, 74);
+            $this->byDay($date, '1', 100, null);
+        }
+
+        $result = $this->import([
+            $this->row('2026-08-01', '1', 100, 'Услуги партнёров', 'Продажа'),
+            $this->row('2026-08-02', '1', 100, 'Услуги партнёров', 'Продажа'),
+            $this->row('2026-08-03', '1', 100, 'Услуги партнёров', 'Продажа'),
+        ]);
+
+        self::assertSame(OzonAccrualDetailsTypeResult::UNMATCHED, $this->single($result)->outcome);
+        self::assertFalse($this->connection->fetchOne('SELECT 1 FROM ingest_ozon_accrual_type_groups WHERE type_id = 74'));
+    }
+
     public function testSingleRowIsNotEnoughToConfirm(): void
     {
         $this->byDay('2026-08-01', '1', 100, 76);
@@ -243,12 +264,12 @@ final class ImportOzonAccrualDetailsActionTest extends IntegrationTestCase
         return [$row['group_code'], (string) $row['status'], (int) $row['votes'], (int) $row['rows_total']];
     }
 
-    private function byDay(string $date, ?string $sku, int $amountMinor, int $typeId): void
+    private function byDay(string $date, ?string $sku, int $amountMinor, ?int $typeId): void
     {
-        $sourceData = [
-            '_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY,
-            '_ingestion_type_id' => (string) $typeId,
-        ];
+        $sourceData = ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY];
+        if (null !== $typeId) {
+            $sourceData['_ingestion_type_id'] = (string) $typeId;
+        }
         if (null !== $sku) {
             $sourceData['sku'] = $sku;
         }
@@ -258,7 +279,7 @@ final class ImportOzonAccrualDetailsActionTest extends IntegrationTestCase
             connectionRef: $this->companyId,
             shopRef: $this->companyId,
             source: IngestSource::OZON,
-            externalId: sprintf('ozon:accrual-by-day:%s:%s:%d:%d', $date, $sku ?? '-', $amountMinor, $typeId),
+            externalId: sprintf('ozon:accrual-by-day:%s:%s:%d:%s', $date, $sku ?? '-', $amountMinor, $typeId ?? 'sale'),
             externalUpdatedAt: new \DateTimeImmutable('2026-09-01 03:00:00'),
             operationGroupId: Uuid::uuid7()->toString(),
             type: TransactionType::FEE,

@@ -110,7 +110,7 @@ final readonly class OzonAccrualTypeQueueQuery
     public function disputes(): array
     {
         $rows = $this->connection->fetchAllAssociative(
-            "SELECT g.type_id, t.name AS type_name,
+            "SELECT g.type_id, t.name AS type_name, g.group_code, g.disputed_group_code,
                     COALESCE(cur.label, g.group_code) AS current_label,
                     COALESCE(dis.label, g.disputed_group_code) AS disputed_label,
                     g.votes, g.disputed_votes, g.disputed_company_id,
@@ -128,6 +128,8 @@ final readonly class OzonAccrualTypeQueueQuery
             static fn (array $row): OzonAccrualTypeDisputeView => new OzonAccrualTypeDisputeView(
                 typeId: (int) $row['type_id'],
                 typeName: null !== $row['type_name'] ? (string) $row['type_name'] : null,
+                currentGroupCode: (string) $row['group_code'],
+                disputedGroupCode: (string) $row['disputed_group_code'],
                 currentGroupLabel: (string) $row['current_label'],
                 disputedGroupLabel: (string) $row['disputed_label'],
                 currentVotes: (int) $row['votes'],

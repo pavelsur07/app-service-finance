@@ -51,9 +51,9 @@ final class OzonAccrualTypesAdminFacade implements OzonAccrualTypesAdminFacadeIn
         return ($this->confirmType)($typeId, $groupCode, $label, $actorUserId);
     }
 
-    public function resolveGroupDispute(int $typeId, bool $accept, string $actorUserId): void
+    public function resolveGroupDispute(int $typeId, string $expectedGroupCode, string $expectedDisputedGroupCode, bool $accept, string $actorUserId): void
     {
-        ($this->resolveDispute)($typeId, $accept, $actorUserId);
+        ($this->resolveDispute)($typeId, $expectedGroupCode, $expectedDisputedGroupCode, $accept, $actorUserId);
     }
 
     public function importDetailsReport(string $companyId, string $path, bool $dryRun, string $actorUserId): OzonAccrualDetailsImportResult

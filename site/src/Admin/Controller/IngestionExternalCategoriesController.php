@@ -79,7 +79,13 @@ final class IngestionExternalCategoriesController extends AbstractController
             $decision = (string) $request->request->get('decision');
             Assert::inArray($decision, ['accept', 'dismiss'], 'Некорректное решение по спору.');
             $accept = 'accept' === $decision;
-            $this->ozonTypes->resolveGroupDispute($typeId, $accept, $this->requiredActorUserId());
+            $this->ozonTypes->resolveGroupDispute(
+                $typeId,
+                (string) $request->request->get('group_code'),
+                (string) $request->request->get('disputed_group_code'),
+                $accept,
+                $this->requiredActorUserId(),
+            );
             $this->addFlash('success', $accept ? sprintf('Тип %d: принята группа из нового отчёта.', $typeId) : sprintf('Тип %d: оставлена прежняя группа.', $typeId));
         } catch (OzonAccrualTypeNotConfirmableException|\InvalidArgumentException $exception) {
             $this->addFlash('error', $exception->getMessage());

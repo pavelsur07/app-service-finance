@@ -40,9 +40,11 @@ interface OzonAccrualTypesAdminFacadeInterface
     public function confirmType(int $typeId, string $groupCode, string $label, string $actorUserId): int;
 
     /**
+     * Коды групп — те, что админ видел на странице; устаревшее решение отклоняется.
+     *
      * @throws \App\Ingestion\Exception\OzonAccrualTypeNotConfirmableException
      */
-    public function resolveGroupDispute(int $typeId, bool $accept, string $actorUserId): void;
+    public function resolveGroupDispute(int $typeId, string $expectedGroupCode, string $expectedDisputedGroupCode, bool $accept, string $actorUserId): void;
 
     /**
      * @throws \App\Ingestion\Exception\OzonAccrualDetailsFileException

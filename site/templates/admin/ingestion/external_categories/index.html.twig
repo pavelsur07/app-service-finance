@@ -125,6 +125,8 @@
                 <td>
                   <form action="{{ path('admin_ingestion_external_categories_resolve_ozon_type_group_dispute', {typeId: dispute.typeId}) }}" method="POST" style="display:flex; gap:4px;">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_resolve_dispute_' ~ dispute.typeId) }}">
+                    <input type="hidden" name="group_code" value="{{ dispute.currentGroupCode }}">
+                    <input type="hidden" name="disputed_group_code" value="{{ dispute.disputedGroupCode }}">
                     <button type="submit" name="decision" value="accept" class="btn btn-sm btn-primary">Принять новую</button>
                     <button type="submit" name="decision" value="dismiss" class="btn btn-sm btn-secondary">Оставить</button>
                   </form>

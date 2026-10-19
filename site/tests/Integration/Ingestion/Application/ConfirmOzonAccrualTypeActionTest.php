@@ -166,8 +166,8 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
 
         /** @var ResolveOzonAccrualTypeGroupDisputeAction $resolve */
         $resolve = self::getContainer()->get(ResolveOzonAccrualTypeGroupDisputeAction::class);
-        $resolve(74, true, Uuid::uuid7()->toString());
-        $resolve(52, false, Uuid::uuid7()->toString());
+        $resolve(74, 'promotion', 'partners', true, Uuid::uuid7()->toString());
+        $resolve(52, 'promotion', 'other', false, Uuid::uuid7()->toString());
 
         self::assertSame(
             [[52, 'promotion', null], [74, 'partners', null]],
@@ -178,7 +178,34 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         );
 
         $this->expectException(OzonAccrualTypeNotConfirmableException::class);
-        $resolve(74, true, Uuid::uuid7()->toString());
+        $resolve(74, 'partners', 'partners', true, Uuid::uuid7()->toString());
+    }
+
+    /**
+     * Админ видел спор «promotion → partners», но импорт успел заменить его на
+     * «delivery»: старая кнопка «Принять новую» не должна принять невиданную группу.
+     */
+    public function testStaleDisputeDecisionIsRejected(): void
+    {
+        $typeGroup = OzonAccrualTypeGroupBuilder::aTypeGroup()->withTypeId(74)->withGroupCode('promotion')->build();
+        $typeGroup->recordDispute('delivery', 5, Uuid::uuid7()->toString());
+        $this->em->persist($typeGroup);
+        $this->em->flush();
+
+        /** @var ResolveOzonAccrualTypeGroupDisputeAction $resolve */
+        $resolve = self::getContainer()->get(ResolveOzonAccrualTypeGroupDisputeAction::class);
+
+        try {
+            $resolve(74, 'promotion', 'partners', true, Uuid::uuid7()->toString());
+            self::fail('Stale decision must be rejected.');
+        } catch (OzonAccrualTypeNotConfirmableException $exception) {
+            self::assertStringContainsString('изменился', $exception->getMessage());
+        }
+
+        self::assertSame(
+            ['group_code' => 'promotion', 'disputed_group_code' => 'delivery'],
+            $this->connection->fetchAssociative('SELECT group_code, disputed_group_code FROM ingest_ozon_accrual_type_groups WHERE type_id = 74'),
+        );
     }
 
     private function unknownType127(): ExternalCategory

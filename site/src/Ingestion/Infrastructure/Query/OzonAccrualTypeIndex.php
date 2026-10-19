@@ -13,6 +13,11 @@ namespace App\Ingestion\Infrastructure\Query;
 final class OzonAccrualTypeIndex
 {
     /**
+     * Компонент без `type_id` (продажа, комиссия) на том же ключе.
+     */
+    public const UNTYPED = 0;
+
+    /**
      * @var array<string, list<int>>
      */
     private array $bySku = [];
@@ -48,6 +53,17 @@ final class OzonAccrualTypeIndex
         return null !== $sku && '' !== $sku
             ? ($this->bySku[self::key($date, $sku, $amountMinor)] ?? [])
             : ($this->byAmount[self::key($date, '', $amountMinor)] ?? []);
+    }
+
+    /**
+     * Единственный `type_id` ключа или null: ключа нет, кандидатов несколько или
+     * на ключе есть компонент без `type_id`.
+     */
+    public function uniqueTypeId(string $date, ?string $sku, int $amountMinor): ?int
+    {
+        $candidates = $this->typeIds($date, $sku, $amountMinor);
+
+        return 1 === \count($candidates) && self::UNTYPED !== $candidates[0] ? $candidates[0] : null;
     }
 
     private static function key(string $date, string $sku, int $amountMinor): string

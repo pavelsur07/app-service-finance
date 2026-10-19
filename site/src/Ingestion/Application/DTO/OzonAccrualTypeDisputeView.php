@@ -12,6 +12,8 @@ final readonly class OzonAccrualTypeDisputeView
     public function __construct(
         public int $typeId,
         public ?string $typeName,
+        public string $currentGroupCode,
+        public string $disputedGroupCode,
         public string $currentGroupLabel,
         public string $disputedGroupLabel,
         public int $currentVotes,

@@ -11,8 +11,10 @@ use Doctrine\DBAL\Connection;
 use Webmozart\Assert\Assert;
 
 /**
- * Начисления by-day компании с `type_id` за период — индекс для связи строк
- * отчёта кабинета Ozon с типами начислений.
+ * Начисления by-day компании за период — индекс для связи строк отчёта кабинета
+ * Ozon с типами начислений. Компоненты без `type_id` (продажи, комиссия) тоже
+ * учитываются: ключ, на котором они совпали с услугой, неоднозначен, а ключ из
+ * одних таких компонентов голоса не даёт.
  *
  * Агрегируется в SQL и только по суммам, которые есть в отчёте: у крупного
  * кабинета ~180 тыс. строк by-day в месяц, тянуть их в PHP поштучно незачем.
@@ -42,7 +44,9 @@ final readonly class OzonAccrualByDayTypeLookupQuery
                 "SELECT TO_CHAR(t.occurred_at, 'YYYY-MM-DD') AS d,
                         COALESCE(t.source_data->>'sku', '') AS sku,
                         ABS(t.amount_minor) AS amount,
-                        STRING_AGG(DISTINCT t.source_data->>'_ingestion_type_id', ',') AS type_ids
+                        STRING_AGG(DISTINCT t.source_data->>'_ingestion_type_id', ',')
+                            FILTER (WHERE t.source_data->>'_ingestion_type_id' ~ '^[0-9]+$') AS type_ids,
+                        BOOL_OR(COALESCE(t.source_data->>'_ingestion_type_id' ~ '^[0-9]+$', FALSE) IS FALSE) AS has_untyped
                  FROM ingest_financial_transactions t
                  WHERE t.company_id = :companyId
                    AND t.source = :source
@@ -51,7 +55,6 @@ final readonly class OzonAccrualByDayTypeLookupQuery
                    AND t.occurred_at < :toExclusive
                    AND t.amount_minor <> 0
                    AND ABS(t.amount_minor) IN (:amounts)
-                   AND t.source_data->>'_ingestion_type_id' ~ '^[0-9]+$'
                  GROUP BY 1, 2, 3",
                 [
                     'companyId' => $companyId,
@@ -65,7 +68,12 @@ final readonly class OzonAccrualByDayTypeLookupQuery
             );
 
             foreach ($rows as $row) {
-                $typeIds = array_map('intval', explode(',', (string) $row['type_ids']));
+                $typeIds = null !== $row['type_ids'] && '' !== $row['type_ids']
+                    ? array_map('intval', explode(',', (string) $row['type_ids']))
+                    : [];
+                if (true === $row['has_untyped'] || 't' === $row['has_untyped']) {
+                    $typeIds[] = OzonAccrualTypeIndex::UNTYPED;
+                }
                 $date = (string) $row['d'];
                 $amount = (int) $row['amount'];
                 if ('' !== $row['sku']) {

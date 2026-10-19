@@ -980,7 +980,7 @@ ozonGroups(): list<App\Ingestion\Application\DTO\CategoryGroupView>
 // название и группа админа, known = true, тип транзакции = текущий тип строк.
 confirmType(int $typeId, string $groupCode, string $label, string $actorUserId): int
 // Принять группу из спорного отчёта или оставить действующую.
-resolveGroupDispute(int $typeId, bool $accept, string $actorUserId): void
+resolveGroupDispute(int $typeId, string $expectedGroupCode, string $expectedDisputedGroupCode, bool $accept, string $actorUserId): void
 // Импорт xlsx «Детализация начислений» (файл не сохраняется).
 importDetailsReport(string $companyId, string $path, bool $dryRun, string $actorUserId): App\Ingestion\Application\DTO\OzonAccrualDetailsImportResult
 ```

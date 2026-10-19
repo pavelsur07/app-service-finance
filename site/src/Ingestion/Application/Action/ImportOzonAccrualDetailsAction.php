@@ -40,7 +40,10 @@ final readonly class ImportOzonAccrualDetailsAction
     private const MIN_SHARE = 0.8;
     private const MIN_VOTES_ABSOLUTE = 2;
     private const MIN_VOTES = 3;
-    private const LOCK_KEY = 'ingest_ozon_accrual_type_groups_import';
+    /**
+     * Общая блокировка записи в `ingest_ozon_accrual_type_groups`: импорт и решение спора.
+     */
+    public const LOCK_KEY = 'ingest_ozon_accrual_type_groups_import';
 
     public function __construct(
         private OzonAccrualByDayTypeLookupQuery $lookupQuery,
@@ -236,9 +239,9 @@ final readonly class ImportOzonAccrualDetailsAction
             $pairs[$key] ??= ['group' => $row->groupLabel, 'type' => $row->typeName, 'rows' => 0, 'votes' => []];
             ++$pairs[$key]['rows'];
 
-            $candidates = $index->typeIds($row->date, $row->sku, $row->amountMinor);
-            if (1 === \count($candidates)) {
-                $pairs[$key]['votes'][$candidates[0]] = ($pairs[$key]['votes'][$candidates[0]] ?? 0) + 1;
+            $typeId = $index->uniqueTypeId($row->date, $row->sku, $row->amountMinor);
+            if (null !== $typeId) {
+                $pairs[$key]['votes'][$typeId] = ($pairs[$key]['votes'][$typeId] ?? 0) + 1;
             }
         }
 
