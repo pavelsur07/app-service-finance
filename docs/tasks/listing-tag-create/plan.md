@@ -32,7 +32,7 @@
 2. `ListingTagCreateController`: `POST /api/marketplace/listings/tags/create`,
    `ROLE_USER` + `MARKETPLACE_WRITE`, тело `{name}`; 422 `tag_name_invalid`,
    409 `tag_name_conflict`, 201 `{id, name}`. Формат как у rename.
-3. Тесты в `ListingTagsApiTest`: создание (201, тег в БД нужной компании),
+3. Тесты в `ListingTagsManageTest` (там же тесты rename/merge/delete): создание (201, тег в БД нужной компании),
    дубль по slug (409), пустое и > 50 символов (422), тег с тем же именем в
    чужой компании не мешает созданию.
 
@@ -101,3 +101,4 @@
 ### Этап 3 — выполнен
 - `ARCHITECTURE.md`: раздел «Marketplace: теги листингов» + Changelog 2.29.
 - Гейты: `site-cs-check` 0, `site-cs-strict-types` 0, `site-stan` — No errors, `site-test-unit` 3912/3912, полный `phpunit` 6817/6817.
+- Независимое ревью: BLOCKER/IMPORTANT нет. FOLLOW-UP: одновременное создание одноимённого тега → 500 вместо 409 (как в `AssignListingTagAction`, данные целы). MINOR без правки: slug не схлопывает пробелы внутри названия — существующее поведение rename/assign.
