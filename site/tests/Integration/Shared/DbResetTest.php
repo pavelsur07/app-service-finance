@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Shared;
 
 use App\Company\Security\SystemCompanyRoles;
+use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Domain\SystemCounterparties;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -51,6 +52,14 @@ final class DbResetTest extends IntegrationTestCase
             \count(SystemCounterparties::definitions()),
             (int) $this->connection->fetchOne('SELECT COUNT(*) FROM system_counterparties'),
         );
+        self::assertSame(
+            \count(OzonCategoryGroupSeed::groups()),
+            (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_category_groups'),
+        );
+        self::assertSame(
+            \count(OzonCategoryGroupSeed::rules()),
+            (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_category_group_rules'),
+        );
     }
 
     /**
@@ -64,7 +73,7 @@ final class DbResetTest extends IntegrationTestCase
      */
     public function testEveryMigrationSeededTableIsRestored(): void
     {
-        $restored = ['company_role', 'system_counterparties'];
+        $restored = ['company_role', 'system_counterparties', 'ingest_category_groups', 'ingest_category_group_rules'];
 
         $files = glob(\dirname(__DIR__, 3).'/migrations/*.php');
         self::assertNotEmpty($files, 'Миграции не найдены — проверь путь.');

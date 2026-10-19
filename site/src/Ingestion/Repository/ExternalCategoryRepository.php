@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
+use App\Ingestion\Entity\ExternalCategoryMapping;
+use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
 use App\Ingestion\Enum\IngestSource;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -70,6 +73,68 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
             ->orderBy('category.lastSeenAt', \SortDirection::Descending)
             ->addOrderBy('category.createdAt', \SortDirection::Descending)
             ->setMaxResults(max(1, min(500, $limit)))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Категории типов Ozon, которые ещё не подтверждены: в очереди разбора
+     * (NEW, NEEDS_IDENTIFICATION) либо MAPPED без действующего маппинга с
+     * known = true или с активным маппингом компании known = false — refresh
+     * такую категорию известной не сделает. Сопоставление
+     * категории с типом — у вызывающего кода.
+     *
+     * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
+     *
+     * @param list<string> $externalTypeIds
+     * @param list<string> $normalizedKeys
+     *
+     * @return list<ExternalCategory>
+     */
+    public function findUnconfirmedByTypeIdsOrKeys(
+        IngestSource $source,
+        string $resourceType,
+        array $externalTypeIds,
+        array $normalizedKeys,
+    ): array {
+        if ([] === $externalTypeIds && [] === $normalizedKeys) {
+            return [];
+        }
+
+        $confirmedMapping = $this->getEntityManager()->createQueryBuilder()
+            ->select('1')
+            ->from(ExternalCategoryMapping::class, 'mapping')
+            ->andWhere('mapping.externalCategory = category')
+            ->andWhere('mapping.status = :activeMapping')
+            ->andWhere('mapping.known = true')
+            ->getDQL();
+        // Маппинг компании сильнее маппинга по умолчанию: активный override с
+        // known = false оставляет строки этой компании неизвестными.
+        $blockingCompanyMapping = $this->getEntityManager()->createQueryBuilder()
+            ->select('1')
+            ->from(ExternalCategoryCompanyMapping::class, 'company_mapping')
+            ->andWhere('company_mapping.externalCategory = category')
+            ->andWhere('company_mapping.status = :activeMapping')
+            ->andWhere('company_mapping.known = false')
+            ->getDQL();
+
+        return $this->createQueryBuilder('category')
+            ->andWhere('category.source = :source')
+            ->andWhere('category.resourceType = :resourceType')
+            ->andWhere('category.externalTypeId IN (:externalTypeIds) OR category.normalizedKey IN (:normalizedKeys)')
+            ->andWhere(sprintf(
+                'category.status IN (:pending) OR (category.status = :mapped AND (NOT EXISTS (%s) OR EXISTS (%s)))',
+                $confirmedMapping,
+                $blockingCompanyMapping,
+            ))
+            ->setParameter('source', $source->value)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('externalTypeIds', [] !== $externalTypeIds ? $externalTypeIds : ['-'])
+            ->setParameter('normalizedKeys', [] !== $normalizedKeys ? $normalizedKeys : ['-'])
+            ->setParameter('pending', [ExternalCategoryStatus::NEW->value, ExternalCategoryStatus::NEEDS_IDENTIFICATION->value])
+            ->setParameter('mapped', ExternalCategoryStatus::MAPPED->value)
+            ->setParameter('activeMapping', ExternalCategoryMappingStatus::ACTIVE->value)
+            ->orderBy('category.scope', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

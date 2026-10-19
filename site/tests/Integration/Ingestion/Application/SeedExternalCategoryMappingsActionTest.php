@@ -198,7 +198,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
             categoryId: $category->getId(),
             canonicalCode: 'ozon_custom_acquiring',
             canonicalLabel: 'Эквайринг Ozon custom',
-            canonicalGroup: 'Услуги партнёров custom',
+            canonicalGroup: 'Услуги партнёров',
             transactionType: TransactionType::FEE,
             sortOrder: 777,
             status: ExternalCategoryMappingStatus::ACTIVE,
@@ -217,7 +217,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
         self::assertInstanceOf(ExternalCategoryMapping::class, $mapping);
         self::assertSame('ozon_custom_acquiring', $mapping->getCanonicalCode());
         self::assertSame('Эквайринг Ozon custom', $mapping->getCanonicalLabel());
-        self::assertSame('Услуги партнёров custom', $mapping->getCanonicalGroup());
+        self::assertSame('Услуги партнёров', $mapping->getCanonicalGroup());
         self::assertSame(TransactionType::FEE, $mapping->getTransactionType());
         self::assertSame(777, $mapping->getSortOrder());
 
@@ -258,7 +258,7 @@ final class SeedExternalCategoryMappingsActionTest extends IntegrationTestCase
             categoryId: $category->getId(),
             canonicalCode: 'ozon_company_cpc',
             canonicalLabel: 'Оплата за клик company',
-            canonicalGroup: 'Company group',
+            canonicalGroup: 'Продвижение и реклама',
             transactionType: TransactionType::ADVERTISING,
             sortOrder: 1234,
             status: ExternalCategoryMappingStatus::ACTIVE,

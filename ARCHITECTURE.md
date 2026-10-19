@@ -170,6 +170,9 @@
 - `operationGroupId` groups decomposed transactions from one source operation for audit and sum-control checks.
 - `SystemCounterparty` is a global source dictionary (`source`, `name`, optional `inn`) for marketplace/system counterparties. It is not tenant-owned and is resolved by source during normalization; missing source rows leave `FinancialTransaction.counterpartyId = null` and are logged.
 - `ExternalCategory` and `ExternalCategoryMapping` are global Ingestion dictionaries for marketplace source categories (`source`, `resourceType`, `scope`, normalized external key). They are intentionally not tenant-owned: Ozon/WB category names and base mappings are source-level semantics, while admin changes affect future normalization and metadata refresh across companies.
+- `OzonAccrualType` (`ingest_ozon_accrual_types`) — глобальный справочник типов начислений Ozon `/v1/finance/accrual/types`: `type_id`, `name`, `description`, `first_seen_at`, `removed_at`. Не tenant-owned: версия у Ozon одна на всех продавцов. Заполняет `SyncOzonAccrualTypesAction` — `NormalizeRawRecordHandler` вызывает его после нормализации сырой записи `ozon_finance_accrual_types`; первичное заполнение и ручной прогон — `app:ingestion:ozon-accrual:sync-types [--company-id] [--dry-run]`. Пропавший тип помечается `removed_at`, не удаляется; время версии — `last_seen_at` сырой записи (повторно полученная прежняя версия дедуплицируется в DONE-запись, загрузчик всё равно отдаёт её на синхронизацию); версия старше применённой только добавляет новые типы; версия без валидных строк ничего не меняет. Разбор by-day: тип вне маппингов БД и каталога получает статью из справочника (`OzonAccrualDictionaryCategoryFactory` в `OzonAccrualCategoryTaxonomyResolver`): код `ozon_` + snake_case(`name`), при совпадении с кодом каталога — с суффиксом `_<type_id>`; название — `description` или `name`; группа — подтверждённая группа Ozon из отчёта кабинета, иначе правило подсказки с уверенностью `high`, иначе «Требует классификации»; всегда `known = false` и тот же запасной тип транзакции, что у `unknown()`, — естественный ключ транзакции не меняется, тип остаётся в очереди разбора. `ozon_unknown_<type_id>` — только для типа вне справочника. Имя по `type_id` по-прежнему берётся из сырья (`StoredOzonAccrualTypeNameResolver`).
+- `CategoryGroup` (`ingest_category_groups`) — закрытый список групп статей источника (`code`, `label` как в маппингах, `ozon_label` — имя в отчёте кабинета, если иное); `CategoryGroupRule` (`ingest_category_group_rules`) — правила подсказки группы по `name + description` справочника (регулярное выражение без учёта регистра, `priority`, `confidence` high|medium, `active`). Оба глобальные, стартовый сид — `App\Ingestion\Domain\OzonCategoryGroupSeed` (миграция `Version20261018160000` вставляет те же UUID). `OzonAccrualGroupSuggester` применяет активные правила Ozon по `priority`, затем `id` (невалидное выражение или группа вне списка — пропуск с WARNING; ошибка PCRE во время работы — правило выключается до `reset()` с WARNING; результат кэшируется по тексту); статья из справочника получает группу подсказки только при `confidence = high`, `known` остаётся `false`.
+- `OzonAccrualTypeGroup` (`ingest_ozon_accrual_type_groups`) — группа Ozon по `type_id` из отчёта кабинета «Детализация начислений» (xlsx). `app:ingestion:ozon-accrual:import-details-xlsx --company-id= --file= [--dry-run]` → `OzonAccrualDetailsXlsxReader` (колонки по названию) → `ImportOzonAccrualDetailsAction`: строки связываются с by-day той же компании по (дата, SKU, |сумма|) через `OzonAccrualByDayTypeLookupQuery`, однозначные совпадения голосуют за `type_id` пары «группа / тип отчёта»; пара подтверждена при ≥ 80% однозначных голосов у победителя, не менее 2 и не менее `min(3, строк пары)`; решение одно на `type_id` (подтверждённые пары одной группы — `confirmed`, разных — `conflict`, слабые пары не понижают). Таблица общая для всех компаний: прежнее подтверждение не перезаписывается ни конфликтом, ни другой группой — другая группа пишется спором (`disputed_*`) для админа. Индекс by-day агрегируется в SQL и только по суммам отчёта. Файл не сохраняется, в таблицу идут только агрегаты. В резолвере подтверждённая группа Ozon сильнее группы каталога, маппинга по умолчанию и подсказки; не применяется к ручному маппингу (`updated_by`) и маппингу компании; меняет только группу (`OzonAccrualCategory::withGroup`).
 - `FinancialTransaction.listingId` and `listingSku` are nullable marketplace listing attribution fields. Missing or ambiguous listing matches must not block normalization.
 - `ListingResolverInterface` resolves source-specific listing attribution from `MappedTransaction.sourceData`; implementations are registered with `app.ingestion.listing_resolver`. `OzonListingResolver` uses supplier SKU (`offer_id`/`item_code`) and marketplace SKU fallbacks. `WbListingResolver` резолвит по `nm_id`, затем по `supplier_article`, и намеренно ничего не создаёт — см. раздел «Ingestion: orders».
 - `MarketplaceListingFacade` is the Ingestion-facing boundary to legacy Marketplace listing repositories. Ingestion must not query Marketplace entities directly outside this facade.
@@ -958,6 +961,29 @@ Dead code на Task-11.2: Repository ещё никем не вызывается
 
 > Используй **только** эти методы. Не выдумывай новые без обновления этого файла.
 > Нет нужного метода — спроси, не создавай самостоятельно.
+
+### `OzonAccrualTypesAdminFacadeInterface` (`src/Ingestion/Facade/OzonAccrualTypesAdminFacade.php`)
+
+Админский контракт справочника типов начислений Ozon; потребитель —
+`Admin\Controller\IngestionExternalCategoriesController` (`ROLE_ADMIN`). Решения
+глобальные — действуют для всех компаний; актор обязателен.
+
+```php
+// Очередь «Новые типы Ozon»: типы справочника с начислениями known = false и
+// предложение (код, название, группа и её источник: отчёт Ozon / правило / нет).
+typeQueue(int $limit = 100): list<App\Ingestion\Application\DTO\OzonAccrualTypeQueueItem>
+// Спорные группы: отчёт кабинета подтвердил другую группу, чем действующая.
+groupDisputes(): list<App\Ingestion\Application\DTO\OzonAccrualTypeDisputeView>
+// Закрытый список групп Ozon для форм.
+ozonGroups(): list<App\Ingestion\Application\DTO\CategoryGroupView>
+// Маппинг по умолчанию неразобранным внешним категориям типа: код из справочника,
+// название и группа админа, known = true, тип транзакции = текущий тип строк.
+confirmType(int $typeId, string $groupCode, string $label, string $actorUserId): int
+// Принять группу из спорного отчёта или оставить действующую.
+resolveGroupDispute(int $typeId, string $expectedGroupCode, string $expectedDisputedGroupCode, bool $accept, string $actorUserId): void
+// Импорт xlsx «Детализация начислений» (файл не сохраняется).
+importDetailsReport(string $companyId, string $path, bool $dryRun, string $actorUserId): App\Ingestion\Application\DTO\OzonAccrualDetailsImportResult
+```
 
 ### `OzonAccrualCategoryFacade` (`src/Ingestion/Facade/OzonAccrualCategoryFacade.php`)
 
@@ -4019,6 +4045,12 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.27 | 2026-10-18 | Ingestion: `daily-maintenance` health-check — метрика `newOzonTypesAwaitingConfirmation` и WARNING, если тип справочника ждёт подтверждения в админке дольше 3 дней; ERROR, если дольше 14 дней (cron с `--quiet`) |
+| 2.26 | 2026-10-18 | Ingestion: `OzonAccrualTypesAdminFacadeInterface` — очередь новых типов Ozon, подтверждение, споры по группам, импорт отчёта из админки; группа маппинга — из закрытого списка `ingest_category_groups`; ручная правка маппинга в админке требует актора |
+| 2.25 | 2026-10-18 | Ingestion: группы Ozon из отчёта кабинета «Детализация начислений» — `ingest_ozon_accrual_type_groups`, команда `app:ingestion:ozon-accrual:import-details-xlsx`; подтверждённая группа сильнее группы каталога (кроме ручных маппингов) |
+| 2.24 | 2026-10-18 | Ingestion: закрытый список групп `ingest_category_groups` и правила подсказки группы `ingest_category_group_rules` (`OzonAccrualGroupSuggester`); статья из справочника получает группу при высокой уверенности правила |
+| 2.23 | 2026-10-18 | Ingestion: статья by-day для типа вне маппингов и каталога строится из справочника `ingest_ozon_accrual_types` (`OzonAccrualDictionaryCategoryFactory`), `known = false`, тип транзакции не меняется |
+| 2.22 | 2026-10-18 | Ingestion: справочник типов начислений Ozon в таблице `ingest_ozon_accrual_types` (`OzonAccrualType`, `SyncOzonAccrualTypesAction`, команда `app:ingestion:ozon-accrual:sync-types`), синхронизация после нормализации версии `accrual/types` |
 | 2.21 | 2026-10-18 | Ingestion: каталог `OzonAccrualCategory` без карты `typeIds` — статья by-day выбирается только по коду услуги; 29 LastMileCourier, 45 PickUpPointReturnAcceptance, SellerReturns, Placements, ItemPacking, TemporaryPlacement разобраны по `description` справочника Ozon, две новые статьи «Услуг FBO» |
 | 2.20 | 2026-10-18 | ServiceGateway: страница админки «Покрытие Сервис GO» (`/admin/services/ozon-fetcher/coverage`) по витрине покрытия |
 | 2.19 | 2026-10-18 | ServiceGateway: новый модуль — клиент `GET /internal/coverage` ozon-fetcher (контракт `service-coverage/v1`), витрина `service_coverage_snapshot` / `service_coverage_row`, cron `app:service-gateway:coverage:refresh` каждые 10 минут |

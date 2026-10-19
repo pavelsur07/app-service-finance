@@ -14,7 +14,9 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\TransactionDirection;
 use App\Ingestion\Enum\TransactionType;
 use App\Shared\Domain\ValueObject\Money;
+use App\Tests\Builders\Ingestion\OzonAccrualTypeBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Psr\Log\AbstractLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -201,6 +203,72 @@ final class OzonAccrualDailyMaintenanceCommandTest extends IntegrationTestCase
         self::assertStringContainsString('Ozon accrual daily maintenance finished.', $tester->getDisplay());
     }
 
+    public function testWarnsWhenDictionaryTypeAwaitsConfirmationTooLong(): void
+    {
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, new FakeOzonAccrualCategoryMetadataBulkRunner());
+        $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId(999)->withName('NewOzonFee')->withDescription('Новая услуга')->build());
+        $this->em->persist(new ExternalCategory(
+            source: IngestSource::OZON,
+            resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+            scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+            normalizedKey: 'type:999',
+            externalTypeId: '999',
+            status: ExternalCategoryStatus::NEW,
+        ));
+        $this->persistUnclassifiedTransaction('2026-01-15 00:00:00+03:00');
+
+        $tester = $this->tester();
+        $exit = $tester->execute(['--from' => '2026-06-01', '--to' => '2026-06-25', '--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertMatchesRegularExpression('/newOzonTypesAwaitingConfirmation\s+1/', $tester->getDisplay());
+        self::assertStringContainsString('await confirmation in admin for more than 3 days: 999', (string) preg_replace('/\s+/', ' ', $tester->getDisplay()));
+    }
+
+    /**
+     * Cron запускает команду с --quiet, а WARNING в GlitchTip не попадает: тип,
+     * забытый дольше двух недель, обязан дать ERROR, свежий — только WARNING.
+     */
+    public function testEscalatesToErrorOnlyForTypeForgottenLongerThanTwoWeeks(): void
+    {
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, new FakeOzonAccrualCategoryMetadataBulkRunner());
+        $logger = new RecordingLogger();
+        self::getContainer()->set('logger', $logger);
+        foreach ([997 => 'FreshOzonFee', 998 => 'ForgottenOzonFee'] as $typeId => $name) {
+            $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId($typeId)->withName($name)->withDescription($name)->build());
+            $this->em->persist(new ExternalCategory(
+                source: IngestSource::OZON,
+                resourceType: OzonResourceType::ACCRUAL_BY_DAY,
+                scope: OzonAccrualCategoryTaxonomyResolver::SCOPE_NON_ITEM,
+                normalizedKey: 'type:'.$typeId,
+                externalTypeId: (string) $typeId,
+                status: ExternalCategoryStatus::NEW,
+            ));
+        }
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('Europe/Moscow'));
+        $this->persistUnclassifiedTransaction($now->modify('-5 days')->format('Y-m-d 12:00:00P'), typeId: '997');
+        $this->persistUnclassifiedTransaction($now->modify('-20 days')->format('Y-m-d 12:00:00P'), typeId: '998');
+
+        $tester = $this->tester();
+        $exit = $tester->execute(['--from' => '2026-06-01', '--to' => '2026-06-25', '--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $exit, $tester->getDisplay());
+        self::assertSame([[998]], $logger->contexts('error', 'Ozon accrual types are not confirmed in admin for too long.', 'typeIds'));
+        $warned = $logger->contexts('warning', 'Ozon accrual types await admin confirmation.', 'typeIds');
+        self::assertCount(1, $warned);
+        self::assertEqualsCanonicalizing([997, 998], $warned[0]);
+    }
+
+    public function testNoConfirmationWarningWithoutUnconfirmedTypes(): void
+    {
+        self::getContainer()->set(OzonAccrualCategoryMetadataBulkRunnerInterface::class, new FakeOzonAccrualCategoryMetadataBulkRunner());
+
+        $tester = $this->tester();
+        $tester->execute(['--from' => '2026-06-01', '--to' => '2026-06-25', '--execute' => true]);
+
+        self::assertStringNotContainsString('await confirmation', $tester->getDisplay());
+    }
+
     public function testRejectsOutOfRangeIntegerOptions(): void
     {
         $runner = new FakeOzonAccrualCategoryMetadataBulkRunner();
@@ -318,5 +386,33 @@ final class FakeOzonAccrualCategoryMetadataBulkRunner implements OzonAccrualCate
             'failedRawRecords' => [],
             'failedTargets' => [],
         ];
+    }
+}
+
+final class RecordingLogger extends AbstractLogger
+{
+    /**
+     * @var list<array{level: string, message: string, context: array<mixed>}>
+     */
+    private array $records = [];
+
+    public function log($level, string|\Stringable $message, array $context = []): void
+    {
+        $this->records[] = ['level' => (string) $level, 'message' => (string) $message, 'context' => $context];
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    public function contexts(string $level, string $message, string $key): array
+    {
+        $values = [];
+        foreach ($this->records as $record) {
+            if ($level === $record['level'] && $message === $record['message']) {
+                $values[] = $record['context'][$key] ?? null;
+            }
+        }
+
+        return $values;
     }
 }

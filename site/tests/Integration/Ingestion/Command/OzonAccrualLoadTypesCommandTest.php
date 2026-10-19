@@ -121,6 +121,9 @@ final class OzonAccrualLoadTypesCommandTest extends IntegrationTestCase
         $normalizeMessages = $normalizeTransport->getSent();
         self::assertCount(1, $normalizeMessages);
         self::assertInstanceOf(NormalizeRawRecordMessage::class, $normalizeMessages[0]->getMessage());
+
+        $types = $this->connection->fetchAllAssociative('SELECT type_id, name, description FROM ingest_ozon_accrual_types');
+        self::assertSame([['type_id' => 29, 'name' => 'Логистика', 'description' => null]], $types);
     }
 
     public function testExecuteInlineFailureMarksAccrualTypesJobFailed(): void

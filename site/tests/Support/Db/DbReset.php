@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Support\Db;
 
 use App\Company\Security\SystemCompanyRoles;
+use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Domain\SystemCounterparties;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -90,6 +91,20 @@ final class DbReset
             $connection->executeStatement(
                 'INSERT INTO system_counterparties (id, source, name, inn, created_at) VALUES (?, ?, ?, NULL, ?)',
                 [$id, $definition['source']->value, $definition['name'], $now],
+            );
+        }
+
+        foreach (OzonCategoryGroupSeed::groups() as $id => $group) {
+            $connection->executeStatement(
+                'INSERT INTO ingest_category_groups (id, source, code, label, ozon_label, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+                [$id, 'ozon', $group['code'], $group['label'], $group['ozonLabel'], $group['sortOrder']],
+            );
+        }
+
+        foreach (OzonCategoryGroupSeed::rules() as $id => $rule) {
+            $connection->executeStatement(
+                'INSERT INTO ingest_category_group_rules (id, source, priority, pattern, group_code, confidence, active, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, true, ?, ?, ?)',
+                [$id, 'ozon', $rule['priority'], $rule['pattern'], $rule['groupCode'], $rule['confidence'], $rule['note'], $now, $now],
             );
         }
     }
