@@ -1,6 +1,6 @@
 # listings-server-search-bulk-tag — handoff
 
-**Branch:** `feat/listings-server-search-bulk-tag` · **PR:** см. описание PR · **CI:** см. PR
+**Branch:** `feat/listings-server-search-bulk-tag` · **PR:** https://github.com/pavelsur07/app-service-finance/pull/2735 · **CI:** см. PR
 
 ## Summary of stages
 - Stage 1 — серверный поиск `?q=` (название, артикул продавца, SKU маркетплейса,
@@ -90,5 +90,5 @@
 5. GlitchTip: нет новых ошибок по `/marketplace/listings` и `tags/assign`.
 
 ## Owner decision
-Ready: PR — merge into master with automatic production deploy?
-Reply: "merge and deploy #<n>"
+Ready: PR #2735 "feat(marketplace): поиск по всем листингам и тег на все результаты" — merge into master with automatic production deploy?
+Reply: "merge and deploy #2735"
