@@ -455,6 +455,10 @@ marketplaces:
       - cost_code: wb_avans_za_uslugu_bally_za_otzyvy
         pl_code: PROMO_INTERNAL
         include_in_pl: true
+      - cost_code: wb_review_points_withheld
+        pl_code: PROMO_GIVEAWAYS
+        include_in_pl: true
+        note: "Удержание внутри маркетплейса, по сути реклама/маркетинг"
       - cost_code: wb_predostavlenie_uslug_po_podpiske_dzhem
         pl_code: PROMO_INTERNAL
         include_in_pl: true

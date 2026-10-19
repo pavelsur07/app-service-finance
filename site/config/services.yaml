@@ -363,6 +363,10 @@ services:
         tags:
             - { name: 'app.marketplace.cost_calculator', priority: 99 }
 
+    App\Marketplace\Wildberries\CostCalculator\WbReviewPointsWithheldCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 98 }
+
     App\Marketplace\Wildberries\Application\Action\ProcessWbCostsAction:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator

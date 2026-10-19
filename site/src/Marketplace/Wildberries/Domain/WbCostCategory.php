@@ -45,6 +45,7 @@ final readonly class WbCostCategory
             new self('wb_okazanie_uslug_wb_media', 'Оказание услуг «WB Медиа»', 'Продвижение и реклама', 'Продвижение и реклама', 'other'),
             new self('wb_predostavlenie_uslug_po_podpiske_dzhem', 'Предоставление услуг по подписке «Джем»', 'Продвижение и реклама', 'Продвижение и реклама', 'other'),
             new self('wb_avans_za_uslugu_bally_za_otzyvy', 'Аванс за услугу "Баллы за отзывы"', 'Продвижение и реклама', 'Продвижение и реклама', 'other'),
+            new self('wb_review_points_withheld', 'Баллы за отзывы (удержание)', 'Продвижение и реклама', 'Продвижение и реклама', 'other'),
             new self('wb_loyalty_discount_compensation', 'Компенсация скидки по программе лояльности WB', 'Другие услуги и штрафы', 'Компенсации и декомпенсации', 'other'),
             new self('wb_dobrovolnaya_vyplata_za_tovary', 'Добровольная выплата за товары', 'Другие услуги и штрафы', 'Компенсации и декомпенсации', 'other'),
             new self('wb_warehouse_disposal', 'Утилизация товара на складе WB', 'Другие услуги и штрафы', 'Другие услуги и штрафы', 'other'),
