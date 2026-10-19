@@ -84,6 +84,22 @@ class CashflowCategoryRepository extends ServiceEntityRepository
         ]);
     }
 
+    public function disablePlDocuments(string $companyId): int
+    {
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('c')
+            ->update()
+            ->set('c.allowPlDocument', ':disabled')
+            ->andWhere('IDENTITY(c.company) = :companyId')
+            ->andWhere('c.allowPlDocument = :enabled')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('disabled', false)
+            ->setParameter('enabled', true)
+            ->getQuery()
+            ->execute();
+    }
+
     private function collectTree(CashflowCategory $category, array &$result): void
     {
         $result[] = $category;
