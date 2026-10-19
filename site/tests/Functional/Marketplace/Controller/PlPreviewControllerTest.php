@@ -9,6 +9,7 @@ use App\Company\Entity\User;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Integration\Marketplace\PlPreview\PlPreviewFixture;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -108,6 +109,35 @@ final class PlPreviewControllerTest extends WebTestCaseBase
 
         $client->request('GET', '/marketplace/pl-preview?dateFrom=2026-05-01&dateTo=2026-05-31&empty=1');
         self::assertSelectorExists('tr[data-row-code="REV"]');
+    }
+
+    public function testTreeRowsCarryLevelAndToggleForParents(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 455);
+        $parent = PLCategoryBuilder::aPLCategory()->forCompany($fixture->company)->withName('Группа')->withCode('GRP')->build();
+        $child = PLCategoryBuilder::aPLCategory()->forCompany($fixture->company)->withName('Подстатья')->withCode('SUB')->withParent($parent)->build();
+        $this->em()->persist($parent);
+        $this->em()->persist($child);
+        $this->em()->flush();
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $crawler = $client->request('GET', self::URL.'&empty=1');
+
+        self::assertResponseIsSuccessful();
+        $parentRow = $crawler->filter('tr[data-row-code="GRP"]');
+        self::assertSame('1', $parentRow->attr('data-level'));
+        self::assertSame('Группа', trim($parentRow->filter('button.pl-toggle')->text()));
+        self::assertSame($parentRow->attr('data-row-id'), $parentRow->filter('button.pl-toggle')->attr('data-target'));
+
+        $childRow = $crawler->filter('tr[data-row-code="SUB"]');
+        self::assertSame('2', $childRow->attr('data-level'));
+        self::assertCount(0, $childRow->filter('.pl-toggle'));
+        self::assertSame('Подстатья', trim($childRow->filter('.pl-name')->text()));
+
+        self::assertSelectorExists('[data-testid="pl-preview-tree-controls"] [data-pl-expand-all]');
+        self::assertSelectorExists('[data-testid="pl-preview-tree-controls"] [data-pl-collapse-all]');
     }
 
     public function testReversedPeriodShowsMessageInsteadOfError(): void
