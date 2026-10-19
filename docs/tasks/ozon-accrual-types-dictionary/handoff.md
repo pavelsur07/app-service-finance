@@ -1,6 +1,6 @@
 # ozon-accrual-types-dictionary — handoff
 
-**Branch:** `feat/ozon-accrual-types-dictionary` · **PR:** после push · **CI:** после push
+**Branch:** `feat/ozon-accrual-types-dictionary` · **PR:** https://github.com/pavelsur07/app-service-finance/pull/2719 · **CI:** см. PR
 
 ## Summary of stages
 - Stage 0 — разведка прода: справочник `accrual/types` у 4 кабинетов одинаков (12
@@ -124,4 +124,4 @@ Marketplace и ОПиУ не менялись (ограничение Владе
 ## Owner decision
 Ready: PR — 3 миграции (новые таблицы и сид, обратимы, бэкап не нужен; **до деплоя**) +
 деплой; затем `sync-types` и загрузка отчётов 3f4d87cc через Владельца.
-Reply: "run the migration and deploy #N"
+Reply: "run the migration and deploy #2719"
