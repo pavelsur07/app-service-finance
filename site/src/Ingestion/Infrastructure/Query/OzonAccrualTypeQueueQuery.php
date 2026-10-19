@@ -20,6 +20,12 @@ use Doctrine\DBAL\ParameterType;
  */
 final readonly class OzonAccrualTypeQueueQuery
 {
+    /**
+     * Погашенная при реплее строка (`voidForReplay()`) не живая: ни в очередь, ни
+     * в проверку типа операции при подтверждении она не идёт.
+     */
+    private const NOT_VOIDED = "COALESCE(ft.source_data->>'_ingestion_voided', 'false') <> 'true'";
+
     public function __construct(
         private Connection $connection,
     ) {
@@ -39,6 +45,7 @@ final readonly class OzonAccrualTypeQueueQuery
              FROM ingest_financial_transactions ft
              WHERE ft.source = :source
                AND ft.source_data->>'_ingestion_resource' = :resource
+               AND ".self::NOT_VOIDED."
                AND ft.source_data->>'_ozon_category_known' = 'false'
                AND ft.source_data->>'_ingestion_type_id' ~ '^[0-9]+$'
              GROUP BY 1
@@ -70,6 +77,7 @@ final readonly class OzonAccrualTypeQueueQuery
              FROM ingest_financial_transactions ft
              WHERE ft.source = :source
                AND ft.source_data->>'_ingestion_resource' = :resource
+               AND ".self::NOT_VOIDED."
                AND ft.source_data->>'_ozon_category_known' = 'false'
                AND ft.source_data->>'_ingestion_type_id' = :typeId",
             ['source' => IngestSource::OZON->value, 'resource' => OzonResourceType::ACCRUAL_BY_DAY, 'typeId' => (string) $typeId],
@@ -95,6 +103,7 @@ final readonly class OzonAccrualTypeQueueQuery
              FROM ingest_financial_transactions ft
              WHERE ft.source = :source
                AND ft.source_data->>'_ingestion_resource' = :resource
+               AND ".self::NOT_VOIDED."
                AND ft.source_data->>'_ingestion_type_id' = :typeId
                AND COALESCE(ft.source_data->>'_ingestion_component', '') LIKE 'non_item_fee%'
              ORDER BY 1",

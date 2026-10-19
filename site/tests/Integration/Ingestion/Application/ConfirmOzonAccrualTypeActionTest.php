@@ -105,6 +105,23 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         self::assertSame([], $this->queue()->items());
     }
 
+    /**
+     * Погашенная при перетипизации строка `fee` рядом с живой неизвестной `other`
+     * не мешает подтверждению, а одни погашенные строки в очередь не попадают.
+     */
+    public function testVoidedRowsDoNotBlockConfirmationOrFillQueue(): void
+    {
+        $category = $this->unknownType127();
+        $this->persistTransaction(127, 'non_item_fee:old-key', TransactionType::FEE, false, voided: true);
+        $this->em->persist(OzonAccrualTypeBuilder::aType()->withTypeId(128)->withName('VoidedOnly')->build());
+        $this->persistTransaction(128, 'non_item_fee:voided-only', TransactionType::OTHER, false, voided: true);
+        $this->em->flush();
+
+        self::assertSame([127], array_map(static fn ($item): int => $item->typeId, $this->queue()->items()));
+        self::assertSame(1, $this->confirm()(127, 'promotion', 'Аналитика Plus', Uuid::uuid7()->toString()));
+        self::assertSame('other', $this->connection->fetchOne('SELECT transaction_type FROM ingest_external_category_mappings WHERE external_category_id = :id', ['id' => $category->getId()]));
+    }
+
     public function testCategoryTypesFollowScopeAndMixedNonItemTypesAreRefused(): void
     {
         $this->unknownType127();
@@ -272,8 +289,12 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         return $category;
     }
 
-    private function persistTransaction(int $typeId, string $component, TransactionType $type, bool $known, string $suffix = ''): void
+    private function persistTransaction(int $typeId, string $component, TransactionType $type, bool $known, string $suffix = '', bool $voided = false): void
     {
+        $sourceData = ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY, '_ingestion_type_id' => (string) $typeId, '_ingestion_component' => $component, '_ozon_category_known' => $known];
+        if ($voided) {
+            $sourceData['_ingestion_voided'] = true;
+        }
         $companyId = Uuid::uuid7()->toString();
         $this->em->persist(new FinancialTransaction(
             companyId: $companyId,
@@ -288,7 +309,7 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
             money: Money::fromMinor(-5600000, 'RUB'),
             occurredAt: new \DateTimeImmutable('2026-10-01 00:00:00'),
             rawRecordId: Uuid::uuid7()->toString(),
-            sourceData: ['_ingestion_resource' => OzonResourceType::ACCRUAL_BY_DAY, '_ingestion_type_id' => (string) $typeId, '_ingestion_component' => $component, '_ozon_category_known' => $known],
+            sourceData: $sourceData,
         ));
     }
 
