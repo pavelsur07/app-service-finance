@@ -57,6 +57,7 @@ final readonly class ConfirmOzonAccrualTypeAction
         Assert::uuid($actorUserId, 'Подтверждение требует пользователя-актора.');
         $label = trim($label);
         Assert::notEmpty($label, 'Название статьи не может быть пустым.');
+        Assert::maxLength($label, OzonAccrualDictionaryCategoryFactory::LABEL_MAX_LENGTH, sprintf('Название статьи длиннее %d символов.', OzonAccrualDictionaryCategoryFactory::LABEL_MAX_LENGTH));
 
         $type = $this->typeRepository->findAllIndexedByTypeId()[$typeId] ?? null;
         if (null === $type) {

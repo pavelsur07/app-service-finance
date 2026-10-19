@@ -12,7 +12,8 @@ final readonly class OzonAccrualTypesRawVersion
     public function __construct(
         public string $companyId,
         public string $rawRecordId,
-        public \DateTimeImmutable $fetchedAt,
+        /** Когда Ozon отдал это содержимое последний раз (`last_seen_at`). */
+        public \DateTimeImmutable $seenAt,
     ) {
     }
 }

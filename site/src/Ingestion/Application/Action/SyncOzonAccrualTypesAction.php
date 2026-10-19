@@ -6,6 +6,7 @@ namespace App\Ingestion\Application\Action;
 
 use App\Ingestion\Application\DTO\OzonAccrualTypesSyncResult;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
+use App\Ingestion\Entity\IngestRawRecord;
 use App\Ingestion\Entity\OzonAccrualType;
 use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Exception\NotOzonAccrualTypesRawRecordException;
@@ -48,6 +49,16 @@ final readonly class SyncOzonAccrualTypesAction
     ) {
     }
 
+    /**
+     * Сырая запись — версия справочника типов Ozon. Её синхронизация идёт и для
+     * DONE-записи: повторно полученная прежняя версия дедуплицируется в неё.
+     */
+    public static function appliesTo(IngestRawRecord $rawRecord): bool
+    {
+        return IngestSource::OZON === $rawRecord->getSource()
+            && OzonResourceType::ACCRUAL_TYPES === $rawRecord->getResourceType();
+    }
+
     public function __invoke(string $companyId, string $rawRecordId, bool $dryRun = false): OzonAccrualTypesSyncResult
     {
         Assert::uuid($companyId);
@@ -57,12 +68,15 @@ final readonly class SyncOzonAccrualTypesAction
         if (null === $rawRecord) {
             throw new RawRecordNotFoundException('Raw record not found for requested company.');
         }
-        if (IngestSource::OZON !== $rawRecord->getSource() || OzonResourceType::ACCRUAL_TYPES !== $rawRecord->getResourceType()) {
+        if (!self::appliesTo($rawRecord)) {
             throw new NotOzonAccrualTypesRawRecordException(sprintf('Raw record %s is not an Ozon accrual types dictionary.', $rawRecordId));
         }
 
         [$rows, $skippedRows] = $this->parseRows($this->rawStorageFacade->read($rawRecordId, $companyId));
-        $fetchedAt = $rawRecord->getFetchedAt();
+        // Время версии — когда Ozon отдал это содержимое последний раз, а не когда
+        // его впервые сохранили: одинаковое сырьё дедуплицируется по hash, и при
+        // A → B → A вернувшаяся версия A иначе считалась бы старше B.
+        $fetchedAt = $rawRecord->getLastSeenAt();
 
         if ($dryRun) {
             return $this->apply($companyId, $rawRecordId, $fetchedAt, $rows, $skippedRows, true);

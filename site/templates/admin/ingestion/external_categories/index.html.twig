@@ -81,7 +81,7 @@
                   {% else %}
                   <form action="{{ path('admin_ingestion_external_categories_confirm_ozon_type', {typeId: item.typeId}) }}" method="POST" style="display:flex; flex-direction:column; gap:4px; min-width:240px;">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_confirm_ozon_type_' ~ item.typeId) }}">
-                    <input class="input" name="label" value="{{ item.proposal.label }}" aria-label="Название статьи" required>
+                    <input class="input" name="label" value="{{ item.proposal.label }}" aria-label="Название статьи" maxlength="255" required>
                     <select class="select" name="group_code" aria-label="Группа" required>
                       <option value="">— группа —</option>
                       {% for group in ozon_groups %}

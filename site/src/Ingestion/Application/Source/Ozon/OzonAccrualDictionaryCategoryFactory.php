@@ -26,6 +26,13 @@ final readonly class OzonAccrualDictionaryCategoryFactory
     public const CODE_PREFIX = 'ozon_';
     public const SORT_ORDER = 9000;
 
+    /** Длины колонок маппинга: `canonical_code` VARCHAR(100), `canonical_label` VARCHAR(255). */
+    public const CODE_MAX_LENGTH = 100;
+    public const LABEL_MAX_LENGTH = 255;
+
+    /** Запас под суффикс `_<type_id>` при совпадении с кодом каталога. */
+    private const TYPE_SUFFIX_RESERVE = 12;
+
     /**
      * @param string $group группа из подсказки правил (Stage 3) или «Требует классификации»
      */
@@ -46,7 +53,7 @@ final readonly class OzonAccrualDictionaryCategoryFactory
 
         return new OzonAccrualCategory(
             code: $code,
-            label: $type->getDescription() ?? $type->getName(),
+            label: mb_substr($type->getDescription() ?? $type->getName(), 0, self::LABEL_MAX_LENGTH),
             group: '' !== trim($group) ? $group : OzonAccrualCategory::UNKNOWN_GROUP,
             transactionType: $fallbackType,
             sortOrder: self::SORT_ORDER,
@@ -65,6 +72,15 @@ final readonly class OzonAccrualDictionaryCategoryFactory
         $snake = strtolower($snake);
         $snake = trim((string) preg_replace('/[^a-z\d]+/', '_', $snake), '_');
 
-        return self::CODE_PREFIX.('' !== $snake ? $snake : substr(hash('sha256', $name), 0, 8));
+        $code = self::CODE_PREFIX.('' !== $snake ? $snake : substr(hash('sha256', $name), 0, 8));
+
+        // Длинное имя усекается с хвостом из хэша полного имени: код влезает в
+        // колонку маппинга вместе с суффиксом `_<type_id>` и остаётся различимым.
+        $limit = self::CODE_MAX_LENGTH - self::TYPE_SUFFIX_RESERVE;
+        if (\strlen($code) > $limit) {
+            $code = rtrim(substr($code, 0, $limit - 9), '_').'_'.substr(hash('sha256', $name), 0, 8);
+        }
+
+        return $code;
     }
 }

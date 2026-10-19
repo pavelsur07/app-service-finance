@@ -8,9 +8,7 @@ use App\Ingestion\Application\Action\NormalizeOrderRawRecordAction;
 use App\Ingestion\Application\Action\NormalizeRawRecordAction;
 use App\Ingestion\Application\Action\SyncOzonAccrualTypesAction;
 use App\Ingestion\Application\Command\NormalizeRawRecordCommand;
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Domain\Service\OrderMapperRegistry;
-use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Enum\RawNormalizationStatus;
 use App\Ingestion\Message\NormalizeRawRecordMessage;
 use App\Ingestion\Repository\IngestRawRecordRepository;
@@ -75,8 +73,7 @@ final readonly class NormalizeRawRecordHandler
         // безопасен: DONE-запись нормализация пропускает, синхронизация
         // идемпотентна.
         if (null !== $rawRecord
-            && IngestSource::OZON === $rawRecord->getSource()
-            && OzonResourceType::ACCRUAL_TYPES === $rawRecord->getResourceType()
+            && SyncOzonAccrualTypesAction::appliesTo($rawRecord)
             && RawNormalizationStatus::DONE === $rawRecord->getNormalizationStatus()
         ) {
             try {

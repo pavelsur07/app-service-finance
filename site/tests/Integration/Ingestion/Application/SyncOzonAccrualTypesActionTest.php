@@ -82,12 +82,30 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         self::assertNotNull($this->typeRow(2)['removed_at']);
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_ozon_accrual_types'));
 
-        // Тот же набор у той же компании вернул бы прежнюю сырую запись
-        // (дедупликация по hash), поэтому новая версия — у другого кабинета.
         $otherCompany = Uuid::uuid7()->toString();
         $restored = $this->sync($this->storeVersion($both, '2026-10-15 02:30:00', $otherCompany), $otherCompany);
 
         self::assertSame([2], $restored->updatedTypeIds);
+        self::assertNull($this->typeRow(2)['removed_at']);
+    }
+
+    /**
+     * A → B → A у одной компании: вернувшаяся версия A дедуплицируется в прежнюю
+     * сырую запись, но применяется как самая новая — тип восстанавливается.
+     */
+    public function testReturningVersionOfSameCompanyIsAppliedAsNewest(): void
+    {
+        $both = [['id' => 1, 'name' => 'Acquiring', 'description' => 'Эквайринг'], ['id' => 2, 'name' => 'BackwardShipment', 'description' => 'Обратная магистраль']];
+        $versionA = $this->storeVersion($both, '2026-10-01 02:30:00');
+        $this->sync($versionA);
+        $this->sync($this->storeVersion([$both[0]], '2026-10-08 02:30:00'));
+        self::assertNotNull($this->typeRow(2)['removed_at']);
+
+        $again = $this->storeVersion($both, '2026-10-15 02:30:00');
+        self::assertSame($versionA->getId(), $again->getId(), 'same content is deduplicated');
+        $restored = $this->sync($again);
+
+        self::assertFalse($restored->stale);
         self::assertNull($this->typeRow(2)['removed_at']);
     }
 
@@ -201,7 +219,7 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         /** @var RawStorageFacade $storage */
         $storage = self::getContainer()->get(RawStorageFacade::class);
 
-        return $storage->store(new RawBatch(
+        $record = $storage->store(new RawBatch(
             companyId: $companyId,
             connectionRef: $companyId,
             shopRef: $companyId,
@@ -212,6 +230,16 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
             fetchedAt: new \DateTimeImmutable($fetchedAt),
             rows: $rows,
         ))[0];
+
+        // Время версии — last_seen_at: в проде это момент получения от Ozon,
+        // в тесте — указанное время (store() ставит «сейчас»).
+        $this->connection->executeStatement(
+            'UPDATE ingest_raw_records SET last_seen_at = :seenAt WHERE id = :id',
+            ['seenAt' => $fetchedAt, 'id' => $record->getId()],
+        );
+        $this->em->refresh($record);
+
+        return $record;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\MessageHandler;
 
+use App\Ingestion\Application\Action\SyncOzonAccrualTypesAction;
 use App\Ingestion\Application\Command\MarkJobCompletedCommand;
 use App\Ingestion\Application\Command\MarkJobFailedCommand;
 use App\Ingestion\Application\Command\MarkJobRunningCommand;
@@ -102,7 +103,14 @@ final readonly class RunSyncChunkHandler
                     $records = $this->rawStorageFacade->store($result->rawBatch);
                     if ($result->normalizeRawRecords) {
                         foreach ($records as $record) {
-                            if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()) {
+                            // Справочник типов Ozon — исключение: повторно полученная
+                            // прежняя версия (A → B → A) дедуплицируется в DONE-запись,
+                            // а применить её заново обязан шаг синхронизации справочника
+                            // в NormalizeRawRecordHandler. Нормализацию DONE-записи
+                            // действие само пропускает.
+                            if (RawNormalizationStatus::DONE === $record->getNormalizationStatus()
+                                && !SyncOzonAccrualTypesAction::appliesTo($record)
+                            ) {
                                 continue;
                             }
 

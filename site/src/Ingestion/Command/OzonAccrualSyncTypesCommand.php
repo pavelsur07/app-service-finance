@@ -74,7 +74,7 @@ final class OzonAccrualSyncTypesCommand extends Command
             $rows[] = [
                 $version->companyId,
                 $version->rawRecordId,
-                $version->fetchedAt->format('Y-m-d H:i'),
+                $version->seenAt->format('Y-m-d H:i'),
                 $result->rows,
                 $this->typeIds($result->createdTypeIds),
                 $this->typeIds($result->updatedTypeIds),

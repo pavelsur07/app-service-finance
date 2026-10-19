@@ -141,6 +141,20 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         $this->confirm()(127, 'promotion', 'Аналитика', 'not-a-uuid');
     }
 
+    public function testTooLongLabelIsRejectedBeforeWrite(): void
+    {
+        $this->unknownType127();
+
+        try {
+            $this->confirm()(127, 'promotion', str_repeat('я', 256), Uuid::uuid7()->toString());
+            self::fail('Label longer than the mapping column must be rejected.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertStringContainsString('длиннее 255', $exception->getMessage());
+        }
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_external_category_mappings WHERE canonical_code LIKE :code', ['code' => 'ozon_analytics%']));
+    }
+
     public function testMappingGroupMustBeFromClosedListButWhitespaceIsRepaired(): void
     {
         $category = $this->unknownType127();

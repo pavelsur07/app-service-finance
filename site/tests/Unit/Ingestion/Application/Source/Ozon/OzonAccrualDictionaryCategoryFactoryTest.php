@@ -91,4 +91,27 @@ final class OzonAccrualDictionaryCategoryFactoryTest extends TestCase
         self::assertFalse($category->known);
         self::assertSame(TransactionType::FEE, $category->transactionType);
     }
+
+    /**
+     * Имя до 255 и описание до 500 символов в справочнике не должны давать код
+     * и название длиннее колонок маппинга (100 и 255) — иначе подтверждение падает.
+     */
+    public function testLongNameAndDescriptionFitMappingColumns(): void
+    {
+        $factory = new OzonAccrualDictionaryCategoryFactory();
+        $first = $factory->create(
+            OzonAccrualTypeBuilder::aType()->withTypeId(4000000001)->withName(str_repeat('A', 254).'B')->withDescription(str_repeat('я', 500))->build(),
+            TransactionType::FEE,
+        );
+        $second = $factory->create(
+            OzonAccrualTypeBuilder::aType()->withTypeId(4000000002)->withName(str_repeat('A', 254).'C')->withDescription(null)->build(),
+            TransactionType::FEE,
+        );
+
+        self::assertLessThanOrEqual(OzonAccrualDictionaryCategoryFactory::CODE_MAX_LENGTH - 12, \strlen($first->code));
+        self::assertNotSame($first->code, $second->code);
+        self::assertSame(OzonAccrualDictionaryCategoryFactory::LABEL_MAX_LENGTH, mb_strlen($first->label));
+        self::assertSame(OzonAccrualDictionaryCategoryFactory::LABEL_MAX_LENGTH, mb_strlen($second->label));
+        self::assertLessThanOrEqual(OzonAccrualDictionaryCategoryFactory::CODE_MAX_LENGTH, \strlen($first->code.'_4000000001'));
+    }
 }

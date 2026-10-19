@@ -35,14 +35,14 @@ final readonly class OzonAccrualTypesRawVersionQuery
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT DISTINCT ON (r.company_id) r.company_id, r.id, r.fetched_at
+            'SELECT DISTINCT ON (r.company_id) r.company_id, r.id, r.last_seen_at
              FROM ingest_raw_records r
              WHERE r.source = :source
                AND r.resource_type = :resourceType
                AND r.normalization_status = :doneStatus
                AND r.payload_deleted_at IS NULL
                AND (CAST(:companyId AS UUID) IS NULL OR r.company_id = CAST(:companyId AS UUID))
-             ORDER BY r.company_id, r.fetched_at DESC, r.created_at DESC',
+             ORDER BY r.company_id, r.last_seen_at DESC, r.created_at DESC',
             [
                 'source' => IngestSource::OZON->value,
                 'resourceType' => OzonResourceType::ACCRUAL_TYPES,
@@ -55,12 +55,12 @@ final readonly class OzonAccrualTypesRawVersionQuery
             static fn (array $row): OzonAccrualTypesRawVersion => new OzonAccrualTypesRawVersion(
                 companyId: (string) $row['company_id'],
                 rawRecordId: (string) $row['id'],
-                fetchedAt: new \DateTimeImmutable((string) $row['fetched_at']),
+                seenAt: new \DateTimeImmutable((string) $row['last_seen_at']),
             ),
             $rows,
         );
 
-        usort($versions, static fn (OzonAccrualTypesRawVersion $a, OzonAccrualTypesRawVersion $b): int => $a->fetchedAt <=> $b->fetchedAt);
+        usort($versions, static fn (OzonAccrualTypesRawVersion $a, OzonAccrualTypesRawVersion $b): int => $a->seenAt <=> $b->seenAt);
 
         return $versions;
     }
