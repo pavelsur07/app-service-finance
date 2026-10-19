@@ -74,42 +74,116 @@
                     </svg>
                     Управление тегами
                 </a>
-                <select class="form-select w-auto" id="marketplace-filter"
-                        onchange="window.location.href = this.value">
-                    <option value="{{ path('marketplace_listings_index', {filter: filter}) }}"
-                        {{ marketplace is null ? 'selected' : '' }}>Все маркетплейсы</option>
-                    {% for mp in available_marketplaces %}
-                        <option value="{{ path('marketplace_listings_index', {filter: filter, marketplace: mp.value}) }}"
-                            {{ marketplace == mp.value ? 'selected' : '' }}>{{ mp.value|upper }}</option>
-                    {% endfor %}
-                </select>
-                <div class="input-icon">
-                    <input type="text" class="form-control" placeholder="Поиск на странице..." id="search-input">
-                    <span class="input-icon-addon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
-                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <circle cx="10" cy="10" r="7"></circle>
-                            <line x1="21" y1="21" x2="15" y2="15"></line>
-                        </svg>
-                    </span>
-                </div>
+                <form method="get" action="{{ path('marketplace_listings_index') }}"
+                      class="d-flex align-items-center gap-2 flex-wrap" id="listings-filter-form" role="search">
+                    <input type="hidden" name="filter" value="{{ filter }}">
+                    <select class="form-select w-auto" name="marketplace" aria-label="Маркетплейс" data-autosubmit>
+                        <option value="">Все маркетплейсы</option>
+                        {% for mp in available_marketplaces %}
+                            <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>{{ mp.value|upper }}</option>
+                        {% endfor %}
+                    </select>
+                    <select class="form-select w-auto" name="tag" aria-label="Тег" data-autosubmit>
+                        <option value="">Все теги</option>
+                        <option value="none" {{ listings_filter.withoutTags ? 'selected' : '' }}>Без тегов</option>
+                        {% for tag in all_tags %}
+                            <option value="{{ tag.id }}" {{ listings_filter.tagId == tag.id ? 'selected' : '' }}>{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="input-icon">
+                        <input type="search" class="form-control" name="q" value="{{ listings_filter.search }}"
+                               maxlength="100" placeholder="Поиск по названию, артикулу, SKU"
+                               aria-label="Поиск по названию, артикулу, SKU">
+                        <span class="input-icon-addon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <circle cx="10" cy="10" r="7"></circle>
+                                <line x1="21" y1="21" x2="15" y2="15"></line>
+                            </svg>
+                        </span>
+                    </div>
+                </form>
+            </div>
+
+            {# Описание фильтра — для строки «Найдено» и диалога подтверждения. #}
+            {% set has_filters = listings_filter.search is not null or listings_filter.tagId is not null
+                or listings_filter.withoutTags or listings_filter.marketplace is not null %}
+            {% set filter_summary_parts = [] %}
+            {% if listings_filter.search is not null %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['поиск «' ~ listings_filter.search ~ '»']) %}
+            {% endif %}
+            {% if listings_filter.marketplace is not null %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['маркетплейс ' ~ listings_filter.marketplace.value|upper]) %}
+            {% endif %}
+            {% if filter == 'mapped' %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['привязанные']) %}
+            {% elseif filter == 'unmapped' %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['без привязки']) %}
+            {% endif %}
+            {% if listings_filter.withoutTags %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['без тегов']) %}
+            {% elseif listings_filter.tagId is not null %}
+                {% for tag in all_tags|filter(t => t.id == listings_filter.tagId) %}
+                    {% set filter_summary_parts = filter_summary_parts|merge(['тег «' ~ tag.name ~ '»']) %}
+                {% endfor %}
+            {% endif %}
+            {% set filter_summary = filter_summary_parts is empty ? 'все листинги' : filter_summary_parts|join(', ') %}
+
+            <div class="card-body border-bottom py-2 d-flex align-items-center gap-3 flex-wrap">
+                <span class="text-secondary small" data-testid="listings-found">
+                    Найдено: {{ pager.nbResults|vf_number }}{% if has_filters %} · {{ filter_summary }}{% endif %}
+                </span>
+                {% if has_filters %}
+                    <a href="{{ path('marketplace_listings_index', {filter: filter}) }}" class="small"
+                       data-testid="listings-reset">Сбросить</a>
+                {% endif %}
+            </div>
+
+            <div class="card-body border-bottom py-2 d-none" id="listings-flash">
+                <div class="alert alert-success mb-0" role="status" id="listings-flash-text"></div>
+            </div>
+            <div class="card-body border-bottom py-2 d-none" id="listings-error">
+                <div class="alert alert-danger mb-0" role="alert" id="listings-error-text"></div>
             </div>
 
             {% if pager.nbResults == 0 %}
                 <div class="card-body">
                     <div class="empty">
-                        <p class="empty-title">Нет листингов</p>
-                        <p class="empty-subtitle text-muted">Измените фильтр или загрузите данные из маркетплейса.</p>
+                        {% if has_filters %}
+                            <p class="empty-title">Ничего не найдено</p>
+                            <p class="empty-subtitle text-muted">Измените запрос или сбросьте фильтры.</p>
+                        {% else %}
+                            <p class="empty-title">Нет листингов</p>
+                            <p class="empty-subtitle text-muted">Измените фильтр или загрузите данные из маркетплейса.</p>
+                        {% endif %}
                     </div>
                 </div>
             {% else %}
+                {# data-applied-filter — фильтр, который применил сервер: назначение «все N» уходит
+                   по нему, а не по тексту в поле поиска, изменённому без Enter. #}
                 <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel"
-                     data-all-tags="{{ all_tags|json_encode|e('html_attr') }}">
+                     data-all-tags="{{ all_tags|json_encode|e('html_attr') }}"
+                     data-applied-filter="{{ filter_params|json_encode|e('html_attr') }}"
+                     data-filter-summary="{{ filter_summary }}"
+                     data-nb-results="{{ pager.nbResults }}">
                     <div class="d-flex align-items-center gap-3 flex-wrap">
                         <span class="text-muted small"><span id="bulk-count">0</span> выбрано</span>
+                        <span class="small d-none" id="bulk-scope-offer">
+                            Выбраны все на странице.
+                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-select-filter">
+                                Выбрать все {{ pager.nbResults|vf_number }} по текущему фильтру
+                            </button>
+                        </span>
+                        <span class="small d-none" id="bulk-scope-filter">
+                            Выбраны все {{ pager.nbResults|vf_number }} по фильтру.
+                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-clear-filter">
+                                Снять выбор
+                            </button>
+                        </span>
                         <div class="tags-input" id="bulk-tag-input" style="max-width:320px">
-                            <input type="text" placeholder="Тег…" autocomplete="off" id="bulk-tag-name">
+                            <input type="text" placeholder="Тег…" autocomplete="off" id="bulk-tag-name"
+                                   aria-label="Тег для выбранных листингов">
                             <div class="suggest d-none" id="bulk-tag-suggest"></div>
                         </div>
                     </div>
@@ -261,6 +335,24 @@
         </div>
     </div>
 
+    {# Подтверждение назначения тега по фильтру: разметка DS-Feedback (vf-confirm).
+       _confirm_modal не подходит — он отправляет форму с CSRF, здесь JSON-запрос. #}
+    <div class="modal fade vf-confirm" id="bulk-tag-confirm" tabindex="-1" aria-hidden="true"
+         aria-labelledby="bulk-tag-confirm-title" aria-describedby="bulk-tag-confirm-body">
+        <div class="modal-dialog modal-dialog-centered vf-confirm__dialog" role="document">
+            <div class="modal-content">
+                <div class="vf-confirm__head">
+                    <h2 class="vf-confirm__title" id="bulk-tag-confirm-title">Присвоить тег?</h2>
+                </div>
+                <p class="vf-confirm__body" id="bulk-tag-confirm-body"></p>
+                <div class="vf-confirm__footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="bulk-tag-confirm-submit">Присвоить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             let currentListingId = null;
@@ -377,22 +469,105 @@
                 }
             });
 
-            document.getElementById('search-input')?.addEventListener('input', function () {
-                const term = this.value.toLowerCase();
-                document.querySelectorAll('tbody tr').forEach(row => {
-                    row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+            // ---- Форма фильтров ----
+            const filterForm = document.getElementById('listings-filter-form');
+            filterForm?.querySelectorAll('[data-autosubmit]').forEach(el => {
+                el.addEventListener('change', () => filterForm.requestSubmit());
+            });
+            // Пустые поля не попадают в адрес: ?q=&tag= ничего не значат.
+            filterForm?.addEventListener('submit', () => {
+                filterForm.querySelectorAll('input[name], select[name]').forEach(el => {
+                    el.disabled = el.value === '';
+                });
+            });
+            // Возврат «Назад» берёт страницу из bfcache вместе с отключёнными полями.
+            window.addEventListener('pageshow', () => {
+                filterForm?.querySelectorAll('input[name], select[name]').forEach(el => {
+                    el.disabled = false;
                 });
             });
 
+            // ---- Сообщения ----
+            const FLASH_KEY = 'vf.listings.tagResult';
+
+            function showMessage(boxId, textId, text) {
+                document.getElementById(textId).textContent = text;
+                document.getElementById(boxId).classList.remove('d-none');
+            }
+
+            function hideError() {
+                document.getElementById('listings-error').classList.add('d-none');
+            }
+
+            // Итог назначения переживает перезагрузку через sessionStorage;
+            // без хранилища (приватный режим) страница просто перезагрузится.
+            function rememberFlash(text) {
+                try {
+                    sessionStorage.setItem(FLASH_KEY, text);
+                } catch {
+                    // хранилище недоступно — итог не покажем, назначение уже выполнено
+                }
+            }
+
+            function showRememberedFlash() {
+                let text = null;
+                try {
+                    text = sessionStorage.getItem(FLASH_KEY);
+                    sessionStorage.removeItem(FLASH_KEY);
+                } catch {
+                    text = null;
+                }
+                if (text) {
+                    showMessage('listings-flash', 'listings-flash-text', text);
+                }
+            }
+
+            function formatCount(n) {
+                return Number(n).toLocaleString('ru-RU').replace(/\s/g, '\u00A0');
+            }
+
+            function listingsDative(n) {
+                return n % 10 === 1 && n % 100 !== 11 ? 'листингу' : 'листингам';
+            }
+
+            function listingsGenitive(n) {
+                return n % 10 === 1 && n % 100 !== 11 ? 'листинга' : 'листингов';
+            }
+
+            function resultText(data) {
+                const already = data.matched - data.assigned;
+                if (data.assigned === 0 && already > 0) {
+                    return `Тег «${data.tagName}» уже был у всех ${formatCount(already)} ${listingsGenitive(already)}.`;
+                }
+                let text = `Тег «${data.tagName}»: назначен ${formatCount(data.assigned)} ${listingsDative(data.assigned)}`;
+                if (already > 0) {
+                    text += `, у ${formatCount(already)} уже был`;
+                }
+
+                return text + '.';
+            }
+
             // ---- Теги листингов ----
+            const ASSIGN_URL = '/api/marketplace/listings/tags/assign';
             const bulkPanel = document.getElementById('bulk-tag-panel');
             const allTags = bulkPanel ? JSON.parse(bulkPanel.dataset.allTags || '[]') : [];
+            const appliedFilter = bulkPanel ? JSON.parse(bulkPanel.dataset.appliedFilter || '{}') : {};
+            const nbResults = bulkPanel ? Number(bulkPanel.dataset.nbResults || 0) : 0;
+            const rowBoxes = Array.from(document.querySelectorAll('.row-select'));
+            const selectAll = document.getElementById('select-all');
             const tagInput = document.getElementById('bulk-tag-name');
             const tagInputWrap = document.getElementById('bulk-tag-input');
             const suggestBox = document.getElementById('bulk-tag-suggest');
 
+            // page — отмеченные строки страницы; filter — все листинги по применённому фильтру.
+            let scope = 'page';
+
             function selectedListingIds() {
-                return Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+                return rowBoxes.filter(cb => cb.checked).map(cb => cb.value);
+            }
+
+            function allOnPageChecked() {
+                return rowBoxes.length > 0 && rowBoxes.every(cb => cb.checked);
             }
 
             function hideSuggest() {
@@ -403,15 +578,28 @@
                 if (!bulkPanel) {
                     return;
                 }
-                const count = selectedListingIds().length;
-                document.getElementById('bulk-count').textContent = String(count);
+                if (scope === 'filter' && !allOnPageChecked()) {
+                    scope = 'page';
+                }
+                const count = scope === 'filter' ? nbResults : selectedListingIds().length;
+                document.getElementById('bulk-count').textContent = formatCount(count);
+                document.getElementById('bulk-scope-offer').classList.toggle(
+                    'd-none',
+                    !(scope === 'page' && allOnPageChecked() && nbResults > rowBoxes.length),
+                );
+                document.getElementById('bulk-scope-filter').classList.toggle('d-none', scope !== 'filter');
+                if (selectAll) {
+                    selectAll.checked = allOnPageChecked();
+                }
                 bulkPanel.classList.toggle('d-none', count === 0);
                 if (count === 0) {
                     hideSuggest();
                 }
             }
 
+            // Ответ API или null; ошибка — видимым текстом над таблицей.
             async function postTagRequest(url, body) {
+                hideError();
                 try {
                     const res = await fetch(url, {
                         method: 'POST',
@@ -420,25 +608,71 @@
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) {
-                        alert(data.error?.message || 'Не удалось выполнить операцию');
-                        return false;
+                        showMessage('listings-error', 'listings-error-text', data.error?.message || 'Не удалось выполнить операцию');
+                        return null;
                     }
-                    return true;
+                    return data;
                 } catch {
-                    alert('Ошибка сети');
-                    return false;
+                    showMessage('listings-error', 'listings-error-text', 'Ошибка сети. Проверьте соединение и повторите.');
+                    return null;
                 }
             }
 
-            // Перезагрузка вместо точечного обновления DOM — страница и так
-            // перезагружается после привязки товара.
-            async function assignTag(tagRef) {
+            function finishAssign(data) {
+                rememberFlash(resultText(data));
+                window.location.reload();
+            }
+
+            // ---- Подтверждение назначения по фильтру ----
+            const confirmEl = document.getElementById('bulk-tag-confirm');
+            const confirmTitle = document.getElementById('bulk-tag-confirm-title');
+            const confirmBody = document.getElementById('bulk-tag-confirm-body');
+            const confirmSubmit = document.getElementById('bulk-tag-confirm-submit');
+            let pendingTagRef = null;
+
+            async function submitFilterAssign() {
+                if (!pendingTagRef) {
+                    return;
+                }
+                confirmSubmit.disabled = true;
+                const data = await postTagRequest(ASSIGN_URL, {filter: appliedFilter, ...pendingTagRef});
+                if (data) {
+                    finishAssign(data);
+                    return;
+                }
+                getBootstrapModal()?.getOrCreateInstance(confirmEl).hide();
+                confirmSubmit.disabled = false;
+            }
+
+            function openFilterConfirm(tagRef, tagLabel) {
+                pendingTagRef = tagRef;
+                confirmTitle.textContent = `Присвоить тег «${tagLabel}» ${formatCount(nbResults)} ${listingsDative(nbResults)}?`;
+                confirmBody.textContent = `Выборка: ${bulkPanel.dataset.filterSummary}. `
+                    + 'Тег получат все листинги по этому фильтру, а не только строки текущей страницы.';
+                confirmSubmit.disabled = false;
+                const BootstrapModal = getBootstrapModal();
+                if (BootstrapModal) {
+                    BootstrapModal.getOrCreateInstance(confirmEl).show();
+                } else if (window.confirm(confirmTitle.textContent)) {
+                    submitFilterAssign();
+                }
+            }
+
+            confirmSubmit?.addEventListener('click', submitFilterAssign);
+
+            async function assignTag(tagRef, tagLabel) {
+                hideSuggest();
+                if (scope === 'filter') {
+                    openFilterConfirm(tagRef, tagLabel);
+                    return;
+                }
                 const listingIds = selectedListingIds();
                 if (listingIds.length === 0) {
                     return;
                 }
-                if (await postTagRequest('/api/marketplace/listings/tags/assign', {listingIds, ...tagRef})) {
-                    window.location.reload();
+                const data = await postTagRequest(ASSIGN_URL, {listingIds, ...tagRef});
+                if (data) {
+                    finishAssign(data);
                 }
             }
 
@@ -457,7 +691,7 @@
                     const item = document.createElement('div');
                     item.className = 'suggest-item';
                     item.textContent = tag.name;
-                    item.addEventListener('click', () => assignTag({tagId: tag.id}));
+                    item.addEventListener('click', () => assignTag({tagId: tag.id}, tag.name));
                     suggestBox.appendChild(item);
                 });
 
@@ -465,22 +699,35 @@
                     const create = document.createElement('div');
                     create.className = 'suggest-create';
                     create.textContent = 'Создать «' + raw + '»';
-                    create.addEventListener('click', () => assignTag({name: raw}));
+                    create.addEventListener('click', () => assignTag({name: raw}, raw));
                     suggestBox.appendChild(create);
                 }
 
                 suggestBox.classList.toggle('d-none', suggestBox.childElementCount === 0);
             }
 
-            document.getElementById('select-all')?.addEventListener('change', function () {
-                document.querySelectorAll('.row-select').forEach(cb => {
+            selectAll?.addEventListener('change', function () {
+                rowBoxes.forEach(cb => {
                     cb.checked = this.checked;
                 });
                 refreshBulkPanel();
             });
 
-            document.querySelectorAll('.row-select').forEach(cb => {
+            rowBoxes.forEach(cb => {
                 cb.addEventListener('change', refreshBulkPanel);
+            });
+
+            document.getElementById('bulk-select-filter')?.addEventListener('click', () => {
+                scope = 'filter';
+                refreshBulkPanel();
+            });
+
+            document.getElementById('bulk-clear-filter')?.addEventListener('click', () => {
+                scope = 'page';
+                rowBoxes.forEach(cb => {
+                    cb.checked = false;
+                });
+                refreshBulkPanel();
             });
 
             tagInput?.addEventListener('input', renderSuggest);
@@ -494,16 +741,17 @@
 
             document.querySelectorAll('.detach-tag-btn').forEach(btn => {
                 btn.addEventListener('click', async function () {
-                    const ok = await postTagRequest('/api/marketplace/listings/tags/detach', {
+                    const data = await postTagRequest('/api/marketplace/listings/tags/detach', {
                         listingIds: [this.dataset.listingId],
                         tagId: this.dataset.tagId,
                     });
-                    if (ok) {
+                    if (data) {
                         window.location.reload();
                     }
                 });
             });
 
+            showRememberedFlash();
             refreshBulkPanel();
         });
     </script>

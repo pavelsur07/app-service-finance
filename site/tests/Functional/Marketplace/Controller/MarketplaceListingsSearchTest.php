@@ -114,6 +114,70 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
         self::assertSame($tagged->getId(), $rows->first()->attr('value'));
     }
 
+    public function testFilterFormAndAppliedFilterReflectServerState(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany();
+        for ($i = 0; $i < 3; ++$i) {
+            $this->listing($company, 'Наволочки '.$i, 'ozon-pillow-'.$i, MarketplaceType::OZON);
+        }
+        $this->listing($company, 'Наволочки WB', 'wb-pillow');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/marketplace/listings?filter=unmapped&marketplace=ozon&q=навол');
+
+        self::assertResponseIsSuccessful();
+        $form = $crawler->filter('#listings-filter-form');
+        self::assertSame('unmapped', $form->filter('input[name="filter"]')->attr('value'));
+        self::assertSame('навол', $form->filter('input[name="q"]')->attr('value'));
+        self::assertSame('ozon', $form->filter('select[name="marketplace"] option[selected]')->attr('value'));
+
+        self::assertStringContainsString('Найдено: 3', $crawler->filter('[data-testid="listings-found"]')->text());
+        self::assertCount(1, $crawler->filter('[data-testid="listings-reset"]'));
+
+        $panel = $crawler->filter('#bulk-tag-panel');
+        self::assertSame(
+            ['filter' => 'unmapped', 'marketplace' => 'ozon', 'q' => 'навол'],
+            json_decode((string) $panel->attr('data-applied-filter'), true),
+        );
+        self::assertSame('3', $panel->attr('data-nb-results'));
+        self::assertSame('поиск «навол», маркетплейс OZON, без привязки', $panel->attr('data-filter-summary'));
+    }
+
+    public function testEmptySearchResultSaysNothingFound(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany();
+        $this->listing($company, 'Плед', 'wb-plaid');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/marketplace/listings?q=навол');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Ничего не найдено', $crawler->filter('.empty-title')->text());
+        self::assertCount(0, $crawler->filter('#bulk-tag-panel'));
+    }
+
+    public function testPageWithoutFiltersHasNoResetLink(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany();
+        $this->listing($company, 'Плед', 'wb-plaid');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/marketplace/listings');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('Найдено: 1', trim($crawler->filter('[data-testid="listings-found"]')->text()));
+        self::assertCount(0, $crawler->filter('[data-testid="listings-reset"]'));
+    }
+
     /**
      * @return array{User, Company}
      */
@@ -135,12 +199,16 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
         return [$owner, $company];
     }
 
-    private function listing(Company $company, string $name, string $sku): MarketplaceListing
-    {
+    private function listing(
+        Company $company,
+        string $name,
+        string $sku,
+        MarketplaceType $marketplace = MarketplaceType::WILDBERRIES,
+    ): MarketplaceListing {
         $listing = MarketplaceListingBuilder::aListing()
             ->withIndex(++$this->seq)
             ->forCompany($company)
-            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withMarketplace($marketplace)
             ->withMarketplaceSku($sku)
             ->withName($name)
             ->build();
