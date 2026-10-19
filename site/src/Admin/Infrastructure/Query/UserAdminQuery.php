@@ -46,10 +46,10 @@ final readonly class UserAdminQuery
         );
 
         $memberRows = $this->connection->fetchAllAssociative(
-            "SELECT c.id, c.name, c.inn, m.user_id
+            'SELECT c.id, c.name, c.inn, m.user_id
              FROM company_members m
              INNER JOIN companies c ON c.id = m.company_id
-             WHERE m.user_id IN (:userIds) AND m.status = 'ACTIVE'",
+             WHERE m.user_id IN (:userIds) AND m.status = \'ACTIVE\'',
             ['userIds' => $userIds],
             $types,
         );
@@ -79,10 +79,11 @@ final readonly class UserAdminQuery
             ];
         }
 
-        foreach ($byUser as &$cabinets) {
+        foreach ($byUser as $userId => $cabinets) {
+            $cabinets = array_values($cabinets);
             usort($cabinets, static fn (array $a, array $b): int => $a['name'] <=> $b['name']);
+            $byUser[$userId] = $cabinets;
         }
-        unset($cabinets);
 
         return $byUser;
     }

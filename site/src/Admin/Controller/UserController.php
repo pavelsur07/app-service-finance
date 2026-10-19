@@ -73,7 +73,7 @@ final class UserController extends AbstractController
         $pager = $userRepository->getRegisteredUsers($page, companyId: $companyId, withoutCompany: $withoutCompany, ownersOnly: $ownersOnly);
         $users = iterator_to_array($pager->getCurrentPageResults());
 
-        $userIds = array_map(static fn (User $user): string => (string) $user->getId(), $users);
+        $userIds = array_values(array_map(static fn (User $user): string => (string) $user->getId(), $users));
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
