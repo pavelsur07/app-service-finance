@@ -35,7 +35,6 @@ class CashflowCategoryController extends AbstractController
 
         return $this->render('cashflow_category/index.html.twig', [
             'items' => $items,
-            'activeCompany' => $company,
         ]);
     }
 
