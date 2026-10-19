@@ -23,12 +23,43 @@
     </div>
   </div>
 
+  <form method="get" action="{{ path('admin_user_index') }}" class="card u-p-3" style="display:flex;gap:var(--s-3);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s-3);">
+    <div class="form-field" style="margin:0;min-width:300px;">
+      <label class="form-label" for="filter-company">Кабинет</label>
+      <select id="filter-company" name="company" class="select">
+        <option value="" {% if filter.companyId is null and not filter.withoutCompany %}selected{% endif %}>Все кабинеты</option>
+        <option value="none" {% if filter.withoutCompany %}selected{% endif %}>— Без кабинета —</option>
+        {% for cabinet in cabinetChoices %}
+          <option value="{{ cabinet.id }}" {% if filter.companyId == cabinet.id %}selected{% endif %}>{{ cabinet.name }}{% if cabinet.inn %} · ИНН {{ cabinet.inn }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-md btn-primary">Применить</button>
+    {% if filter.active %}
+      <a href="{{ path('admin_user_index') }}" class="btn btn-md btn-ghost">Сбросить</a>
+    {% endif %}
+    {# тоггл сохраняет фильтр кабинета; page не передаём — пагинация сбрасывается #}
+    {% set ownersToggleParams = {} %}
+    {% if filter.withoutCompany %}
+      {% set ownersToggleParams = ownersToggleParams|merge({company: 'none'}) %}
+    {% elseif filter.companyId is not null %}
+      {% set ownersToggleParams = ownersToggleParams|merge({company: filter.companyId}) %}
+    {% endif %}
+    {% if not filter.ownersOnly %}
+      {% set ownersToggleParams = ownersToggleParams|merge({owners: 1}) %}
+    {% endif %}
+    <a href="{{ path('admin_user_index', ownersToggleParams) }}" class="btn btn-md {% if filter.ownersOnly %}btn-primary{% else %}btn-secondary{% endif %}">
+      Только владельцы{% if filter.ownersOnly %} ✓{% endif %}
+    </a>
+  </form>
+
   {% if users is not empty %}
     <div class="card u-p-0" style="overflow-x:auto;">
       <table class="t-table">
         <thead>
           <tr>
             <th>Email</th>
+            <th>Кабинеты</th>
             <th style="width:160px">Дата регистрации</th>
             <th>Роли</th>
             <th class="t-cell--right" style="width:160px">Действия</th>
@@ -40,6 +71,24 @@
             {% set userRoleLabels = user.roles|filter(role => role != 'ROLE_USER')|map(role => roleLabels[role] ?? role) %}
             <tr>
               <td>{{ user.email }}</td>
+              <td>
+                {% set cabinets = userCabinets[user.id] ?? [] %}
+                {% if cabinets is not empty %}
+                  {% for cabinet in cabinets %}
+                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);{% if not loop.last %}margin-bottom:var(--s-2);{% endif %}">
+                      <span>{{ cabinet.name }}</span>
+                      {% if cabinet.inn %}<span style="color:var(--text-muted);font-size:12px;">ИНН {{ cabinet.inn }}</span>{% endif %}
+                      {% if cabinet.owner %}
+                        <span class="status status--success"><span class="dot"></span>Владелец</span>
+                      {% else %}
+                        <span class="status status--neutral"><span class="dot"></span>Участник</span>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <span style="color:var(--text-faint);">Без кабинета</span>
+                {% endif %}
+              </td>
               <td style="font-variant-numeric:tabular-nums;">{{ user.createdAt|date('d.m.Y') }}</td>
               <td>
                 {% if userRoleLabels is not empty %}

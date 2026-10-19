@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Admin\Controller;
 
 use App\Admin\Application\CreateAccountAction;
+use App\Admin\Application\DTO\UserListFilter;
 use App\Admin\Form\AdminAccountCreateType;
+use App\Admin\Infrastructure\Query\UserAdminQuery;
 use App\Company\Entity\User;
 use App\Company\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
@@ -23,6 +25,7 @@ final class CreateAccountController extends AbstractController
     public function __invoke(
         Request $request,
         UserRepository $userRepository,
+        UserAdminQuery $userAdminQuery,
         CreateAccountAction $createAccount,
     ): Response {
         $account = new User(id: Uuid::uuid7()->toString());
@@ -30,7 +33,7 @@ final class CreateAccountController extends AbstractController
         $accountForm->handleRequest($request);
 
         if (!$accountForm->isSubmitted() || !$accountForm->isValid()) {
-            return $this->renderUserIndex($request, $userRepository, $accountForm);
+            return $this->renderUserIndex($request, $userRepository, $userAdminQuery, $accountForm);
         }
 
         /** @var string $plainPassword */
@@ -47,12 +50,23 @@ final class CreateAccountController extends AbstractController
     private function renderUserIndex(
         Request $request,
         UserRepository $userRepository,
+        UserAdminQuery $userAdminQuery,
         FormInterface $accountForm,
     ): Response {
         $lastWeek = new \DateTimeImmutable('-7 days');
         $page = max(1, (int) $request->query->get('page', 1));
-        $pager = $userRepository->getRegisteredUsers($page);
+
+        $filter = UserListFilter::fromQuery($request->query->get('company'), $request->query->get('owners'));
+
+        $pager = $userRepository->getRegisteredUsers(
+            $page,
+            companyId: $filter->companyId,
+            withoutCompany: $filter->withoutCompany,
+            ownersOnly: $filter->ownersOnly,
+        );
         $users = iterator_to_array($pager->getCurrentPageResults());
+
+        $userIds = array_values(array_map(static fn (User $user): string => (string) $user->getId(), $users));
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
@@ -63,6 +77,9 @@ final class CreateAccountController extends AbstractController
             'accountForm' => $accountForm,
             'showAccountModal' => true,
             'roleLabels' => UserController::ROLE_LABELS,
+            'userCabinets' => $userAdminQuery->cabinetsByUserIds($userIds),
+            'cabinetChoices' => $userAdminQuery->cabinetChoices(),
+            'filter' => $filter,
         ], new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY));
     }
 }
