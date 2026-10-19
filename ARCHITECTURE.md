@@ -4045,6 +4045,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.28 | 2026-10-19 | Marketplace: калькулятор `WbReviewPointsWithheldCalculator` (priority 98) — операция WB «Сумма баллов, удержанных в рамках акции "Баллы за отзывы"», сумма из `cashbackAmount` (`> 0` CHARGE, `< 0` STORNO); категория `wb_review_points_withheld` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` («Раздачи / самовыкупы / отзывы»); GlitchTip #387 |
 | 2.27 | 2026-10-18 | Ingestion: `daily-maintenance` health-check — метрика `newOzonTypesAwaitingConfirmation` и WARNING, если тип справочника ждёт подтверждения в админке дольше 3 дней; ERROR, если дольше 14 дней (cron с `--quiet`) |
 | 2.26 | 2026-10-18 | Ingestion: `OzonAccrualTypesAdminFacadeInterface` — очередь новых типов Ozon, подтверждение, споры по группам, импорт отчёта из админки; группа маппинга — из закрытого списка `ingest_category_groups`; ручная правка маппинга в админке требует актора |
 | 2.25 | 2026-10-18 | Ingestion: группы Ozon из отчёта кабинета «Детализация начислений» — `ingest_ozon_accrual_type_groups`, команда `app:ingestion:ozon-accrual:import-details-xlsx`; подтверждённая группа сильнее группы каталога (кроме ручных маппингов) |

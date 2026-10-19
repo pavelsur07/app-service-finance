@@ -158,6 +158,14 @@ final readonly class WbSalesReportRowNormalizer
         return $this->float($row, 'cashbackDiscount', 'cashback_discount');
     }
 
+    /**
+     * @param array<string, mixed> $row
+     */
+    public function cashbackAmount(array $row): float
+    {
+        return $this->float($row, 'cashbackAmount', 'cashback_amount');
+    }
+
     public function reportDate(array $row): \DateTimeImmutable
     {
         $date = $this->nullableString($row, 'rrDate', 'rr_dt');

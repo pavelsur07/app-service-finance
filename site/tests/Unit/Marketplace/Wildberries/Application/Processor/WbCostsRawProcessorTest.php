@@ -1787,6 +1787,7 @@ final class WbCostsRawProcessorTest extends TestCase
             new WbProductProcessingCalculator(),
             new WbDeductionCalculator(new SlugifyService()),
             new WbLoyaltyDiscountCalculator(),
+            new \App\Marketplace\Wildberries\CostCalculator\WbReviewPointsWithheldCalculator(),
         ];
 
         return $calculators;
@@ -1823,5 +1824,38 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame('wb:3135822946485:product_processing', $entries[0]['external_id']);
         self::assertCount(1, $camelEntries);
         self::assertSame('wb:3135822946486:product_processing', $camelEntries[0]['external_id']);
+    }
+
+    /**
+     * GlitchTip #387: с 13.10.2026 WB отдаёт удержание баллов за отзывы отдельной
+     * операцией; ни один калькулятор её не поддерживал, строки уходили в
+     * unprocessed_cost_types и краснили гейт wb-costs:unrecognized-check.
+     */
+    public function testWbReviewPointsWithheldRowIsRecognizedByExactlyOneCalculator(): void
+    {
+        $row = [
+            'sellerOperName' => 'Сумма баллов, удержанных в рамках акции "Баллы за отзывы"',
+            'rrdId' => 3136817525011,
+            'rrDate' => '2026-10-18',
+            'saleDt' => '2026-10-18T09:45:31Z',
+            'nmId' => 687862798,
+            'docTypeName' => '',
+            'cashbackAmount' => '350',
+            'deduction' => '0',
+            'forPay' => '0',
+        ];
+
+        $supporting = array_values(array_filter(
+            $this->allWbCostCalculators(),
+            static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($row),
+        ));
+
+        self::assertCount(1, $supporting);
+        $entries = $supporting[0]->calculate($row, null);
+        self::assertCount(1, $entries);
+        self::assertSame('wb_review_points_withheld', $entries[0]['category_code']);
+        self::assertSame('350', $entries[0]['amount']);
+        self::assertArrayHasKey('operation_type', $entries[0]);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
     }
 }

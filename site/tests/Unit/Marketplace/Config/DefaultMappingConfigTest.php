@@ -38,6 +38,7 @@ final class DefaultMappingConfigTest extends TestCase
         'OVERHEAD_ADMIN_BANK',
         'OVERHEAD_PROD_CERT',
         'PRODUCT_INFRA_FF_SERVICES',
+        'PROMO_GIVEAWAYS',
         'PROMO_INTERNAL',
         'REV_NOT_SPP',
         'REV_RETURNS',
