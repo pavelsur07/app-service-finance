@@ -556,6 +556,9 @@ ERROR `Ozon accrual types are not confirmed in admin for too long.` в GlitchTip
    уйдёт (в health-check он не считается) — нужен этот ремонт за его период.
    Категория, вручную сопоставленная с `known = false`, подтверждённой не считается:
    тип остаётся в очереди с кнопкой «Подтвердить» и в health-check.
+   Так же считается активный маппинг компании с `known = false`: если тип после
+   «Подтвердить» снова в очереди без пометки «ждёт refresh», проверить маппинги
+   компаний этой категории.
 6. В ОПиУ новая услуга идёт через Marketplace (`OzonCostCategory`,
    `default_cost_mapping.yaml`) — подтверждение в Ingestion его не меняет.
 

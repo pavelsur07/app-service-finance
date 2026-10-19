@@ -10,6 +10,7 @@ use App\Ingestion\Application\Action\UpdateExternalCategoryMappingAction;
 use App\Ingestion\Application\Service\OzonAccrualTypeQueue;
 use App\Ingestion\Application\Source\Ozon\OzonResourceType;
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\FinancialTransaction;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
@@ -94,6 +95,34 @@ final class ConfirmOzonAccrualTypeActionTest extends IntegrationTestCase
         self::assertSame(1, $this->confirm()(127, 'promotion', 'Аналитика Plus', Uuid::uuid7()->toString()));
         self::assertTrue($this->connection->fetchOne('SELECT known FROM ingest_external_category_mappings WHERE external_category_id = :id', ['id' => $category->getId()]));
         self::assertTrue($this->queue()->items()[0]->awaitingRefresh);
+    }
+
+    /**
+     * Маппинг компании сильнее маппинга по умолчанию: override с known = false
+     * оставит строки компании неизвестными и после refresh, поэтому тип не «ждёт
+     * refresh» и остаётся в мониторинге.
+     */
+    public function testCompanyOverrideWithKnownFalseKeepsTypeOutOfAwaitingRefresh(): void
+    {
+        $category = $this->unknownType127();
+        $this->confirm()(127, 'promotion', 'Аналитика Plus', Uuid::uuid7()->toString());
+        self::assertTrue($this->queue()->items()[0]->awaitingRefresh);
+
+        $category = $this->em->find(ExternalCategory::class, $category->getId());
+        self::assertInstanceOf(ExternalCategory::class, $category);
+        $this->em->persist(new ExternalCategoryCompanyMapping(
+            externalCategory: $category,
+            companyId: Uuid::uuid7()->toString(),
+            canonicalCode: 'ozon_analytics_plus',
+            canonicalLabel: 'Аналитика Plus',
+            canonicalGroup: 'Продвижение и реклама',
+            transactionType: TransactionType::OTHER,
+            sortOrder: 9000,
+            known: false,
+        ));
+        $this->em->flush();
+
+        self::assertFalse($this->queue()->items()[0]->awaitingRefresh);
     }
 
     public function testQueueSkipsTypeWithoutUnknownRows(): void

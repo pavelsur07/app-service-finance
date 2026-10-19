@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ingestion\Repository;
 
 use App\Ingestion\Entity\ExternalCategory;
+use App\Ingestion\Entity\ExternalCategoryCompanyMapping;
 use App\Ingestion\Entity\ExternalCategoryMapping;
 use App\Ingestion\Enum\ExternalCategoryMappingStatus;
 use App\Ingestion\Enum\ExternalCategoryStatus;
@@ -79,7 +80,8 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
     /**
      * Категории типов Ozon, которые ещё не подтверждены: в очереди разбора
      * (NEW, NEEDS_IDENTIFICATION) либо MAPPED без действующего маппинга с
-     * known = true — refresh такую категорию известной не сделает. Сопоставление
+     * known = true или с активным маппингом компании known = false — refresh
+     * такую категорию известной не сделает. Сопоставление
      * категории с типом — у вызывающего кода.
      *
      * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
@@ -106,12 +108,25 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
             ->andWhere('mapping.status = :activeMapping')
             ->andWhere('mapping.known = true')
             ->getDQL();
+        // Маппинг компании сильнее маппинга по умолчанию: активный override с
+        // known = false оставляет строки этой компании неизвестными.
+        $blockingCompanyMapping = $this->getEntityManager()->createQueryBuilder()
+            ->select('1')
+            ->from(ExternalCategoryCompanyMapping::class, 'company_mapping')
+            ->andWhere('company_mapping.externalCategory = category')
+            ->andWhere('company_mapping.status = :activeMapping')
+            ->andWhere('company_mapping.known = false')
+            ->getDQL();
 
         return $this->createQueryBuilder('category')
             ->andWhere('category.source = :source')
             ->andWhere('category.resourceType = :resourceType')
             ->andWhere('category.externalTypeId IN (:externalTypeIds) OR category.normalizedKey IN (:normalizedKeys)')
-            ->andWhere(sprintf('category.status IN (:pending) OR (category.status = :mapped AND NOT EXISTS (%s))', $confirmedMapping))
+            ->andWhere(sprintf(
+                'category.status IN (:pending) OR (category.status = :mapped AND (NOT EXISTS (%s) OR EXISTS (%s)))',
+                $confirmedMapping,
+                $blockingCompanyMapping,
+            ))
             ->setParameter('source', $source->value)
             ->setParameter('resourceType', $resourceType)
             ->setParameter('externalTypeIds', [] !== $externalTypeIds ? $externalTypeIds : ['-'])
