@@ -6,9 +6,9 @@ namespace App\Tests\Integration\Ingestion\Application\Source\Ozon;
 
 use App\Ingestion\Application\Source\Ozon\OzonAccrualGroupSuggester;
 use App\Ingestion\Domain\OzonCategoryGroupSeed;
-use App\Ingestion\Entity\CategoryGroupRule;
 use App\Ingestion\Enum\CategoryGroupRuleConfidence;
-use App\Ingestion\Enum\IngestSource;
+use App\Tests\Builders\Ingestion\CategoryGroupBuilder;
+use App\Tests\Builders\Ingestion\CategoryGroupRuleBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 
 final class OzonAccrualGroupSuggesterTest extends IntegrationTestCase
@@ -84,10 +84,10 @@ final class OzonAccrualGroupSuggesterTest extends IntegrationTestCase
 
     public function testBrokenAndInactiveRulesAreSkipped(): void
     {
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 1, 'данные(', 'other', CategoryGroupRuleConfidence::HIGH));
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 2, 'данные', 'missing_group', CategoryGroupRuleConfidence::HIGH));
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 3, 'данные', 'other', CategoryGroupRuleConfidence::HIGH, active: false));
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 4, 'эквайринг', 'fbo', CategoryGroupRuleConfidence::HIGH));
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(1)->withPattern('данные(')->withGroupCode('other')->build());
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(2)->withPattern('данные')->withGroupCode('missing_group')->build());
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(3)->withPattern('данные')->withGroupCode('other')->inactive()->build());
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(4)->withPattern('эквайринг')->withGroupCode('fbo')->build());
         $this->em->flush();
 
         $suggester = $this->suggester();
@@ -98,7 +98,7 @@ final class OzonAccrualGroupSuggesterTest extends IntegrationTestCase
 
     public function testRuleFailingAtRuntimeIsSkippedAndNextRuleStillWorks(): void
     {
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 1, '(a+)+$', 'other', CategoryGroupRuleConfidence::HIGH));
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(1)->withPattern('(a+)+$')->withGroupCode('other')->build());
         $this->em->flush();
         $suggester = $this->suggester();
 
@@ -106,12 +106,24 @@ final class OzonAccrualGroupSuggesterTest extends IntegrationTestCase
         self::assertSame('Услуги партнёров', $suggester->suggest('Acquiring', 'Эквайринг')?->groupLabel);
     }
 
+    /**
+     * Новая группа и правило заводятся строками в таблицах, без правки кода.
+     */
+    public function testRuleCanPointToGroupAddedAsRow(): void
+    {
+        $this->em->persist(CategoryGroupBuilder::aGroup()->withCode('data_services')->withLabel('Услуги данных')->build());
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPattern('данные')->withGroupCode('data_services')->build());
+        $this->em->flush();
+
+        self::assertSame('Услуги данных', $this->suggester()->suggest('OzonData', 'Данные')?->groupLabel);
+    }
+
     public function testResetPicksUpChangedRules(): void
     {
         $suggester = $this->suggester();
         self::assertNull($suggester->suggest('OzonData', 'Данные'));
 
-        $this->em->persist(new CategoryGroupRule(IngestSource::OZON, 1, 'данные', 'other', CategoryGroupRuleConfidence::HIGH));
+        $this->em->persist(CategoryGroupRuleBuilder::aRule()->withPriority(1)->withPattern('данные')->withGroupCode('other')->build());
         $this->em->flush();
 
         self::assertNull($suggester->suggest('OzonData', 'Данные'), 'cached until reset');

@@ -120,10 +120,15 @@ class OzonAccrualTypeGroup
     ): bool {
         $previous = $this->confirmedGroupCode();
         $this->apply($groupCode, $status, $xlsxTypeName, $xlsxGroupLabel, $votes, $rowsTotal, $evidenceCompanyId, $periodFrom, $periodTo);
-        $this->clearDispute();
+        $changed = $previous !== $this->confirmedGroupCode();
+        // Повторное подтверждение той же группы отчётом другой компании не решает
+        // открытый спор: решение за админом.
+        if ($changed) {
+            $this->clearDispute();
+        }
         $this->updatedAt = new \DateTimeImmutable();
 
-        return $previous !== $this->confirmedGroupCode();
+        return $changed;
     }
 
     /**

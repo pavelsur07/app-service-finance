@@ -112,7 +112,11 @@ final class ImportOzonAccrualDetailsActionTest extends IntegrationTestCase
         self::assertSame('partners', $this->connection->fetchOne('SELECT disputed_group_code FROM ingest_ozon_accrual_type_groups WHERE type_id = 74'));
     }
 
-    public function testSameGroupAgainRefreshesEvidenceAndClearsDispute(): void
+    /**
+     * Повторное подтверждение той же группы обновляет доказательства, но открытый
+     * спор не снимает: другой отчёт по-прежнему противоречит, решает админ.
+     */
+    public function testSameGroupAgainRefreshesEvidenceAndKeepsOpenDispute(): void
     {
         $this->byDay('2026-08-01', '1', 100, 74);
         $this->byDay('2026-08-02', '1', 200, 74);
@@ -127,7 +131,7 @@ final class ImportOzonAccrualDetailsActionTest extends IntegrationTestCase
         $this->import([$partners('2026-08-01', 100), $partners('2026-08-02', 200), $partners('2026-08-03', 300)]);
 
         self::assertSame(['partners', 'confirmed', 3, 3], $this->stored(74));
-        self::assertNull($this->connection->fetchOne('SELECT disputed_group_code FROM ingest_ozon_accrual_type_groups WHERE type_id = 74'));
+        self::assertSame('promotion', $this->connection->fetchOne('SELECT disputed_group_code FROM ingest_ozon_accrual_type_groups WHERE type_id = 74'));
     }
 
     public function testWeakPairDoesNotDowngradeStrongConfirmationOfSameType(): void

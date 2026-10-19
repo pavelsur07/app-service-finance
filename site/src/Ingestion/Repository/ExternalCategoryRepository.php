@@ -103,4 +103,41 @@ final class ExternalCategoryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Пакетный вариант findByTypeIdOrKeys: категории для нескольких типов одним
+     * запросом, сопоставление с типом — у вызывающего кода.
+     *
+     * @companyScopeExempt внешние категории источника глобальные (см. ARCHITECTURE «canonical finance layer»), companyId у сущности нет
+     *
+     * @param list<string> $externalTypeIds
+     * @param list<string> $normalizedKeys
+     * @param list<ExternalCategoryStatus> $statuses
+     *
+     * @return list<ExternalCategory>
+     */
+    public function findByTypeIdsOrKeys(
+        IngestSource $source,
+        string $resourceType,
+        array $externalTypeIds,
+        array $normalizedKeys,
+        array $statuses,
+    ): array {
+        if ([] === $externalTypeIds && [] === $normalizedKeys) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('category')
+            ->andWhere('category.source = :source')
+            ->andWhere('category.resourceType = :resourceType')
+            ->andWhere('category.externalTypeId IN (:externalTypeIds) OR category.normalizedKey IN (:normalizedKeys)')
+            ->andWhere('category.status IN (:statuses)')
+            ->setParameter('source', $source->value)
+            ->setParameter('resourceType', $resourceType)
+            ->setParameter('externalTypeIds', [] !== $externalTypeIds ? $externalTypeIds : ['-'])
+            ->setParameter('normalizedKeys', [] !== $normalizedKeys ? $normalizedKeys : ['-'])
+            ->setParameter('statuses', array_map(static fn (ExternalCategoryStatus $status): string => $status->value, $statuses))
+            ->getQuery()
+            ->getResult();
+    }
 }

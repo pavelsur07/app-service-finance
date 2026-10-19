@@ -113,7 +113,7 @@ Ozon из 126 в справочнике. Пока каталог не попра
 
    | Поле | Правило |
    |---|---|
-   | canonical code | есть статья в каталоге с этим `name` в `aliases` → её код (обратная совместимость); иначе `ozon_` + snake_case(`name`), пробелы и дефисы → `_`: `AnalyticsPlus` → `ozon_analytics_plus`, `Drop-Off Agent` → `ozon_drop_off_agent`. Выдаётся один раз и не меняется |
+   | canonical code | есть статья в каталоге с этим `name` в `aliases` → её код (обратная совместимость); иначе `ozon_` + snake_case(`name`), пробелы и дефисы → `_`: `AnalyticsPlus` → `ozon_analytics_plus`, `Drop-Off Agent` → `ozon_drop_off_agent`. Пока тип не подтверждён, код вычисляется из текущего `name` при каждом разборе: если Ozon переименует тип, код у его строк сменится (ключ транзакции — нет). После подтверждения код закреплён маппингом |
    | canonical label | `description`; пусто → `name` |
    | canonical group | закрытый список групп (п. 4); без уверенной подсказки — «Требует классификации» |
    | transaction type | по блоку: `delivery`/`item_fee` → `FEE` (как сейчас); `non_item_fee` → `FEE`, если подсказка группы не говорит иное |

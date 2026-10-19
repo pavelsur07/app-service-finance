@@ -48,11 +48,44 @@ final readonly class OzonAccrualTypeQueue
         }
         $proposals = $this->proposer->proposeAll($types);
 
+        // Неразобранные категории всех типов очереди — одним запросом, а не по
+        // запросу на тип.
+        $keysByType = [];
+        foreach ($types as $type) {
+            $keysByType[$type->getTypeId()] = array_values(array_filter([
+                OzonAccrualCategoryTaxonomyResolver::typeKey((string) $type->getTypeId()),
+                OzonAccrualCategoryTaxonomyResolver::codeKey($type->getName()),
+                OzonAccrualCategoryTaxonomyResolver::nameKey($type->getName()),
+            ]));
+        }
+        $pending = $this->categoryRepository->findByTypeIdsOrKeys(
+            IngestSource::OZON,
+            OzonResourceType::ACCRUAL_BY_DAY,
+            array_map('strval', array_keys($keysByType)),
+            array_values(array_unique(array_merge([], ...array_values($keysByType)))),
+            [ExternalCategoryStatus::NEW, ExternalCategoryStatus::NEEDS_IDENTIFICATION],
+        );
+        // Числовой external_type_id PHP хранит целым ключом — сравнение по int.
+        /** @var array<int|string, true> $pendingTypeIds */
+        $pendingTypeIds = [];
+        $pendingKeys = [];
+        foreach ($pending as $category) {
+            if (null !== $category->getExternalTypeId()) {
+                $pendingTypeIds[$category->getExternalTypeId()] = true;
+            }
+            $pendingKeys[$category->getNormalizedKey()] = true;
+        }
+
         $items = [];
         foreach ($usage as $row) {
             $type = $dictionary[$row->typeId] ?? null;
             if (null === $type) {
                 continue;
+            }
+
+            $hasPendingCategory = isset($pendingTypeIds[$row->typeId]);
+            foreach ($keysByType[$row->typeId] ?? [] as $key) {
+                $hasPendingCategory = $hasPendingCategory || isset($pendingKeys[$key]);
             }
 
             $items[] = new OzonAccrualTypeQueueItem(
@@ -65,17 +98,7 @@ final readonly class OzonAccrualTypeQueue
                 lastDate: $row->lastDate,
                 transactionType: $row->transactionType,
                 proposal: $proposals[$row->typeId],
-                awaitingRefresh: [] === $this->categoryRepository->findByTypeIdOrKeys(
-                    IngestSource::OZON,
-                    OzonResourceType::ACCRUAL_BY_DAY,
-                    (string) $row->typeId,
-                    array_values(array_filter([
-                        OzonAccrualCategoryTaxonomyResolver::typeKey((string) $row->typeId),
-                        OzonAccrualCategoryTaxonomyResolver::codeKey($type->getName()),
-                        OzonAccrualCategoryTaxonomyResolver::nameKey($type->getName()),
-                    ])),
-                    [ExternalCategoryStatus::NEW, ExternalCategoryStatus::NEEDS_IDENTIFICATION],
-                ),
+                awaitingRefresh: !$hasPendingCategory,
             );
         }
 

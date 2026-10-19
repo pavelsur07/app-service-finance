@@ -532,7 +532,9 @@ ORDER BY 1, 7;
 
 Сигнал: в ночном `daily-maintenance` (05:15) метрика
 `newOzonTypesAwaitingConfirmation` > 0 и WARNING `Ozon accrual types await admin
-confirmation` с `type_id` (тип ждёт дольше 3 дней). Деньги не теряются: строки уже
+confirmation` с `type_id` (тип ждёт дольше 3 дней). Тип, забытый дольше 14 дней, —
+ERROR `Ozon accrual types are not confirmed in admin for too long.` в GlitchTip
+(cron идёт с `--quiet`, WARNING туда не попадает); exit code не меняется. Деньги не теряются: строки уже
 размечены статьёй из справочника (`known = false`) и стоят в очереди.
 
 1. Справочник: `ingest_ozon_accrual_types` обновляется сам при новой версии Ozon.
@@ -549,7 +551,10 @@ confirmation` с `type_id` (тип ждёт дольше 3 дней). Деньг
    «Принять новую» или «Оставить». Решение действует для всех компаний.
 5. История: строки последних 45 дней обновит ночной `daily-maintenance`. Старше —
    `daily-maintenance --from --to --company-id --execute` (долго на крупных кабинетах,
-   см. `docs/tasks/ozon-accrual-refresh-perf/plan.md`).
+   см. `docs/tasks/ozon-accrual-refresh-perf/plan.md`). Тип с пометкой «подтверждён,
+   ждёт refresh», у которого неразобранные строки старше 45 дней, сам из очереди не
+   уйдёт (в health-check он не считается) — нужен этот ремонт за его период. То же
+   для категории, вручную сопоставленной с `known = false`.
 6. В ОПиУ новая услуга идёт через Marketplace (`OzonCostCategory`,
    `default_cost_mapping.yaml`) — подтверждение в Ingestion его не меняет.
 

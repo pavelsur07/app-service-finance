@@ -34,6 +34,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
 
     private const BUSINESS_TIMEZONE = 'Europe/Moscow';
     private const TYPE_CONFIRMATION_GRACE_DAYS = 3;
+    private const TYPE_CONFIRMATION_ESCALATION_DAYS = 14;
 
     public function __construct(
         private readonly ClockInterface $clock,
@@ -161,7 +162,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
 
         if ($dryRun) {
             $io->note('Dry-run only. No canonical transactions or taxonomy rows were changed.');
-            $this->printHealth($io, scoped: null !== $companyId || null !== $shopRef, from: $from, to: $to);
+            $this->printHealth($io, scoped: null !== $companyId || null !== $shopRef, from: $from, to: $to, unconfirmedTypes: $this->unconfirmedTypes());
 
             return $hasFailure ? Command::FAILURE : Command::SUCCESS;
         }
@@ -193,7 +194,9 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         );
 
         $scopedRun = null !== $companyId || null !== $shopRef;
-        $health = $this->health($from, $to);
+        // Очередь считается один раз: запрос сканирует все транзакции Ozon.
+        $unconfirmedTypes = $this->unconfirmedTypes();
+        $health = $this->health($from, $to, $unconfirmedTypes);
         $io->section('Health check');
         $this->printMetrics($io, $health);
 
@@ -229,7 +232,7 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
             $io->warning('Ozon accrual categories are awaiting mapping; every unclassified row is queued for review.');
         }
 
-        $this->warnAboutStaleUnconfirmedTypes($io);
+        $this->reportStaleUnconfirmedTypes($io, $unconfirmedTypes);
 
         if ($hasFailure) {
             $io->warning('Ozon accrual daily maintenance finished with failures. See logs/Sentry for details.');
@@ -287,19 +290,24 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
         return $modes[0];
     }
 
-    private function printHealth(SymfonyStyle $io, bool $scoped, \DateTimeImmutable $from, \DateTimeImmutable $to): void
+    /**
+     * @param list<OzonAccrualTypeQueueItem> $unconfirmedTypes
+     */
+    private function printHealth(SymfonyStyle $io, bool $scoped, \DateTimeImmutable $from, \DateTimeImmutable $to, array $unconfirmedTypes): void
     {
         $io->section('Health check');
-        $this->printMetrics($io, $this->health($from, $to));
+        $this->printMetrics($io, $this->health($from, $to, $unconfirmedTypes));
         if ($scoped) {
             $io->note('Scoped run: taxonomy health is informational and does not affect exit code.');
         }
     }
 
     /**
+     * @param list<OzonAccrualTypeQueueItem> $unconfirmedTypes
+     *
      * @return array<string, int>
      */
-    private function health(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    private function health(\DateTimeImmutable $from, \DateTimeImmutable $to, array $unconfirmedTypes): array
     {
         // The gate is windowed to the repair range: rows older than the window
         // can never be rewritten by this run, so counting them globally made
@@ -316,37 +324,63 @@ final class OzonAccrualDailyMaintenanceCommand extends Command
             'orphanedTransactions' => $unclassified['orphanTransactions'],
             'orphanedGroups' => $unclassified['orphanGroups'],
             'unmappedCategories' => $this->unmappedOzonAccrualCategories(),
-            'newOzonTypesAwaitingConfirmation' => \count($this->unconfirmedTypes()),
+            'newOzonTypesAwaitingConfirmation' => \count($unconfirmedTypes),
         ];
     }
 
     /**
      * Новый тип Ozon сам получает статью из справочника, но остаётся
      * неподтверждённым, пока админ не нажмёт «Подтвердить». Деньги при этом не
-     * теряются (строки в очереди), поэтому WARNING, а не ERROR — но и не молчание:
-     * тип, ждущий дольше трёх дней, называется по type_id.
+     * теряются (строки в очереди), поэтому первые дни — WARNING с перечнем
+     * type_id. Cron запускает команду с --quiet, а WARNING в GlitchTip не идёт,
+     * поэтому забытый тип (дольше двух недель) — один агрегированный ERROR со
+     * стабильным текстом: починка есть и делается человеком в админке, как у
+     * гейта очереди failed Messenger. Exit code не меняется.
+     *
+     * @param list<OzonAccrualTypeQueueItem> $unconfirmedTypes
      */
-    private function warnAboutStaleUnconfirmedTypes(SymfonyStyle $io): void
+    private function reportStaleUnconfirmedTypes(SymfonyStyle $io, array $unconfirmedTypes): void
     {
-        $threshold = $this->clock->now()
-            ->setTimezone(new \DateTimeZone(self::BUSINESS_TIMEZONE))
-            ->modify(sprintf('-%d days', self::TYPE_CONFIRMATION_GRACE_DAYS))
-            ->format('Y-m-d');
+        $forgotten = $this->typeIdsWaitingLongerThan($unconfirmedTypes, self::TYPE_CONFIRMATION_ESCALATION_DAYS);
+        if ([] !== $forgotten) {
+            $this->logger->error('Ozon accrual types are not confirmed in admin for too long.', [
+                'typeIds' => $forgotten,
+                'escalationDays' => self::TYPE_CONFIRMATION_ESCALATION_DAYS,
+            ]);
+        }
 
-        $stale = array_values(array_filter(
-            $this->unconfirmedTypes(),
-            static fn (OzonAccrualTypeQueueItem $item): bool => $item->firstDate < $threshold,
-        ));
+        $stale = $this->typeIdsWaitingLongerThan($unconfirmedTypes, self::TYPE_CONFIRMATION_GRACE_DAYS);
         if ([] === $stale) {
             return;
         }
 
-        $typeIds = array_map(static fn (OzonAccrualTypeQueueItem $item): int => $item->typeId, $stale);
         $this->logger->warning('Ozon accrual types await admin confirmation.', [
-            'typeIds' => $typeIds,
+            'typeIds' => $stale,
             'graceDays' => self::TYPE_CONFIRMATION_GRACE_DAYS,
         ]);
-        $io->warning(sprintf('Ozon accrual types await confirmation in admin for more than %d days: %s.', self::TYPE_CONFIRMATION_GRACE_DAYS, implode(', ', $typeIds)));
+        $io->warning(sprintf('Ozon accrual types await confirmation in admin for more than %d days: %s.', self::TYPE_CONFIRMATION_GRACE_DAYS, implode(', ', $stale)));
+    }
+
+    /**
+     * @param list<OzonAccrualTypeQueueItem> $unconfirmedTypes
+     *
+     * @return list<int>
+     */
+    private function typeIdsWaitingLongerThan(array $unconfirmedTypes, int $days): array
+    {
+        $threshold = $this->clock->now()
+            ->setTimezone(new \DateTimeZone(self::BUSINESS_TIMEZONE))
+            ->modify(sprintf('-%d days', $days))
+            ->format('Y-m-d');
+
+        $typeIds = [];
+        foreach ($unconfirmedTypes as $item) {
+            if ($item->firstDate < $threshold) {
+                $typeIds[] = $item->typeId;
+            }
+        }
+
+        return $typeIds;
     }
 
     /**
