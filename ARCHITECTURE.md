@@ -634,6 +634,7 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   `App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository` (DBAL). FK на `marketplace_listings` и `marketplace_listing_tags` — с `ON DELETE CASCADE`.
 - Скоуп компании обеспечивается внутри SQL (`INSERT … SELECT … WHERE l.company_id = :companyId`), а не проверкой в PHP.
 - Кросс-модульный доступ — только через `ListingTagFacade` (см. раздел Facade). Внутри модуля Marketplace контроллеры реестра листингов ходят в репозитории напрямую.
+- Создание тега: на лету при назначении (`AssignListingTagAction`, реестр листингов) или без назначений — кнопка «Добавить» на странице `/marketplace/listings/tags` → `POST /api/marketplace/listings/tags/create` (`CreateListingTagAction`, `MARKETPLACE_WRITE`; 201 `{id, name}`, 409 `tag_name_conflict` при совпадении slug, 422 `tag_name_invalid`). Переименование, слияние и удаление — там же.
 
 ### Marketplace: базовый (автоматический) маппинг в ОПиУ
 
@@ -4045,6 +4046,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.29 | 2026-10-19 | Marketplace: создание тега листингов без назначений — `CreateListingTagAction`, `POST /api/marketplace/listings/tags/create`, кнопка «Добавить» на странице управления тегами |
 | 2.28 | 2026-10-19 | Marketplace: калькулятор `WbReviewPointsWithheldCalculator` (priority 98) — операция WB «Сумма баллов, удержанных в рамках акции "Баллы за отзывы"», сумма из `cashbackAmount` (`> 0` CHARGE, `< 0` STORNO); категория `wb_review_points_withheld` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` («Раздачи / самовыкупы / отзывы»); GlitchTip #387 |
 | 2.27 | 2026-10-18 | Ingestion: `daily-maintenance` health-check — метрика `newOzonTypesAwaitingConfirmation` и WARNING, если тип справочника ждёт подтверждения в админке дольше 3 дней; ERROR, если дольше 14 дней (cron с `--quiet`) |
 | 2.26 | 2026-10-18 | Ingestion: `OzonAccrualTypesAdminFacadeInterface` — очередь новых типов Ozon, подтверждение, споры по группам, импорт отчёта из админки; группа маппинга — из закрытого списка `ingest_category_groups`; ручная правка маппинга в админке требует актора |

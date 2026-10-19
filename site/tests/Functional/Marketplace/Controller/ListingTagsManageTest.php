@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Marketplace\Controller;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Company\Security\AccessLevel;
+use App\Company\Security\Module;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class ListingTagsManageTest extends WebTestCaseBase
@@ -22,6 +29,7 @@ final class ListingTagsManageTest extends WebTestCaseBase
 
     private const PAGE_URL = '/marketplace/listings/tags';
     private const MERGE_URL = '/api/marketplace/listings/tags/merge';
+    private const CREATE_URL = '/api/marketplace/listings/tags/create';
 
     public function testPageRendersTagsWithCounts(): void
     {
@@ -38,6 +46,150 @@ final class ListingTagsManageTest extends WebTestCaseBase
         self::assertStringContainsString('Зима', (string) $client->getResponse()->getContent());
         // Счётчик листингов под тегом = 2.
         self::assertStringContainsString('2', $crawler->filter('tbody tr td.text-end')->first()->text());
+    }
+
+    public function testPageShowsAddButtonEvenWithoutTags(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', self::PAGE_URL);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-bs-target="#createTagModal"]');
+        self::assertSelectorExists('#createTagModal input[name="name"]');
+    }
+
+    public function testCreateAddsTagWithoutAssignments(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::CREATE_URL, ['name' => '  Новинки  ']);
+
+        self::assertResponseStatusCodeSame(201);
+        $payload = $this->jsonResponse($client);
+        self::assertSame('Новинки', $payload['name']);
+        self::assertSame(self::COMPANY_ID, $this->fetchOne(
+            'SELECT company_id FROM marketplace_listing_tags WHERE id = ?',
+            [$payload['id']],
+        ));
+        self::assertSame(0, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tag_assignments WHERE tag_id = ?',
+            [$payload['id']],
+        ));
+
+        // Новый тег виден на странице управления.
+        $client->request('GET', self::PAGE_URL);
+        self::assertSelectorTextContains('tbody', 'Новинки');
+    }
+
+    public function testCreateExistingNameConflicts(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->seedTag(self::COMPANY_ID, 'Зима');
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::CREATE_URL, ['name' => ' ЗИМА ']);
+
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('tag_name_conflict', $this->jsonResponse($client)['error']['code']);
+        self::assertSame(1, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
+    }
+
+    public function testCreateIgnoresSameNameInAnotherCompany(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->seedTag(self::OTHER_COMPANY_ID, 'Зима');
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::CREATE_URL, ['name' => 'Зима']);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame(1, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    #[DataProvider('invalidCreatePayloads')]
+    public function testCreateRejectsInvalidName(array $body): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompanyWithListings(0);
+        $this->login($client, $owner, $company);
+
+        $this->postJson($client, self::CREATE_URL, $body);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame('tag_name_invalid', $this->jsonResponse($client)['error']['code']);
+        self::assertSame(0, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function invalidCreatePayloads(): iterable
+    {
+        yield 'нет поля' => [[]];
+        yield 'пробелы' => [['name' => '   ']];
+        yield 'не строка' => [['name' => 42]];
+        yield 'длиннее 50' => [['name' => str_repeat('я', 51)]];
+    }
+
+    public function testCreateRequiresMarketplaceWriteAccess(): void
+    {
+        $client = static::createClient();
+        [, $company] = $this->seedCompanyWithListings(0);
+
+        $role = new CompanyRole(
+            Uuid::uuid4()->toString(),
+            'Только чтение маркетплейса',
+            [Module::MARKETPLACE->value => AccessLevel::READ->value],
+            $company,
+        );
+        $member = UserBuilder::aUser()
+            ->withIndex(78)
+            ->withEmail('listing-tags-readonly@example.test')
+            ->withRoles(['ROLE_COMPANY_USER'])
+            ->build();
+
+        $em = $this->em();
+        $em->persist($role);
+        $em->persist($member);
+        $em->persist(
+            CompanyMemberBuilder::aMember()
+                ->withId(Uuid::uuid4()->toString())
+                ->withCompany($company)
+                ->withUser($member)
+                ->withRole(CompanyMember::ROLE_OPERATOR)
+                ->withStatus(CompanyMember::STATUS_ACTIVE)
+                ->withAccessRole($role)
+                ->build(),
+        );
+        $em->flush();
+        $this->login($client, $member, $company);
+
+        $this->postJson($client, self::CREATE_URL, ['name' => 'Зима']);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame(0, (int) $this->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_listing_tags WHERE company_id = ?',
+            [self::COMPANY_ID],
+        ));
     }
 
     public function testRenameChangesName(): void
