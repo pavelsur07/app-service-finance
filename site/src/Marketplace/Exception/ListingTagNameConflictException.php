@@ -6,8 +6,8 @@ namespace App\Marketplace\Exception;
 
 final class ListingTagNameConflictException extends \RuntimeException
 {
-    public function __construct(string $name)
+    public function __construct(string $name, ?\Throwable $previous = null)
     {
-        parent::__construct(sprintf('Тег «%s» уже существует — воспользуйтесь слиянием.', $name));
+        parent::__construct(sprintf('Тег «%s» уже существует — воспользуйтесь слиянием.', $name), 0, $previous);
     }
 }
