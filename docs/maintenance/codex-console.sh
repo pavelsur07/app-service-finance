@@ -155,6 +155,26 @@ case "$cmd" in
       esac
     done
     ;;
+  app:finance:pl-tree:apply-default)
+    # Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json) для одной
+    # компании — то же, что экран /pl-categories/import?source=template.
+    # Без --execute read-only план; с --execute пишет pl_categories (только
+    # недостающие узлы, существующие не трогает), поэтому запуск с --execute —
+    # отдельное одобрение Владельца (AGENTS.md §3.3). Компания — ровно один
+    # позиционный UUID: без него команда сама вернёт ошибку, обхода всех
+    # компаний нет.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then seen_company=$((seen_company + 1))
+      elif [[ "$arg" =~ ^(--execute|--no-interaction|-n|--quiet|-q)$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then
+      echo "Usage for $cmd: <companyId> [--execute]" >&2
+      exit 2
+    fi
+    ;;
   app:marketplace:reprocess)
     # Мутирующая: переобрабатывает raw-документы WB за период тем же
     # ReprocessMarketplacePeriodAction, что и кнопка UI — sales, returns и

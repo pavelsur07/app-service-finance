@@ -230,6 +230,18 @@ Read-only проверки можно выполнять после запрос
   служебные флаги. Предпросмотр — без отдельного одобрения; запуск с
   `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
 
+- `app:finance:pl-tree:apply-default <companyId> [--execute]` — базовый шаблон
+  дерева ОПиУ (`config/finance/default_pl_tree.json`) для одной компании, тот же
+  `ImportPLCategoryTreeAction`, что у экрана `/pl-categories/import?source=template`.
+  Без `--execute` — read-only план (`create …` по узлам и итог
+  `plan (dry run): create N, keep existing M`), рутинная проверка; с
+  `--execute` пишет `pl_categories`: создаёт недостающие узлы, существующие не
+  меняет. Конфликт с деревом компании (например, код шаблонной группы у её
+  листа) блокирует запись целиком, exit 1. Wrapper пропускает ровно один
+  позиционный UUID компании, `--execute` и служебные флаги. Предпросмотр — без
+  отдельного одобрения; запуск с `--execute` — отдельное одобрение Владельца по
+  AGENTS.md §3.3.
+
 - `app:marketplace:reprocess <companyId> wildberries|ozon <periodFrom> <periodTo> [--only=all|sales_report|realization] [--dry-run]` —
   переобработка raw-документов WB за период, тот же
   `ReprocessMarketplacePeriodAction`, что у кнопки UI: sales, returns и costs
