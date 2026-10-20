@@ -55,6 +55,34 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
         self::assertSame(BusinessProfile::MARKETPLACE, $this->companyNamed('No Profile LLC')->getBusinessProfile());
     }
 
+    /**
+     * Регрессия: пустое значение проходило валидацию как null и роняло регистрацию в 500
+     * (TypeError в CreateCompanyOwnerAccountAction), в `/company/new` — на setBusinessProfile(null).
+     */
+    public function testEmptyProfileValueUsesDefault(): void
+    {
+        $client = $this->registrationClient();
+        $crawler = $client->request('GET', '/register');
+        $values = $crawler->selectButton('Создать аккаунт')->form($this->registrationFields('empty-profile@example.test', 'Empty Profile LLC'))->getPhpValues();
+        $values['registration_form']['businessProfile'] = '';
+        $client->request('POST', '/register', $values);
+
+        self::assertTrue($client->getResponse()->isRedirect(), (string) $client->getResponse()->getStatusCode());
+        self::assertSame(BusinessProfile::MARKETPLACE, $this->companyNamed('Empty Profile LLC')->getBusinessProfile());
+
+        $owner = UserBuilder::aUser()->withEmail('empty-profile-owner@example.test')->withRoles(['ROLE_COMPANY_OWNER'])->build();
+        $this->em()->persist($owner);
+        $this->em()->flush();
+        $client->loginUser($owner);
+        $crawler = $client->request('GET', '/company/new');
+        $values = $crawler->selectButton('Создать')->form(['company[name]' => 'Empty Profile Co'])->getPhpValues();
+        $values['company']['businessProfile'] = '';
+        $client->request('POST', '/company/new', $values);
+
+        self::assertResponseRedirects('/company/');
+        self::assertSame(BusinessProfile::MARKETPLACE, $this->companyNamed('Empty Profile Co')->getBusinessProfile());
+    }
+
     public function testUnknownProfileIsRejected(): void
     {
         $client = $this->registrationClient();

@@ -13,7 +13,7 @@ use App\Finance\Exception\DefaultPLTreeTemplateNotFoundException;
  * Стартовые шаблоны дерева ОПиУ по профилю бизнеса. Реестр «профиль → файл» — параметр
  * `finance.pl_templates` в config/services.yaml; файлы — config/finance/pl_templates/.
  *
- * Коды статей одинаковы во всех шаблонах (TemplateCodeDictionaryTest) и совпадают с
+ * Коды статей одинаковы во всех шаблонах (TemplateRegistryTest) и совпадают с
  * кодами шаблонов маппинга затрат и продаж маркетплейсов
  * (config/marketplace/default_*_mapping.yaml): компания с маркетплейсным деревом получает
  * правила ночным sync-default без ручной настройки. Файл — в формате выгрузки

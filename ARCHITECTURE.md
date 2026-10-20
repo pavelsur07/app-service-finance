@@ -1440,8 +1440,9 @@ seedDefaultStructure(string $companyId): bool
 
 Стартовая структура новой компании: шаблон профиля бизнеса — реестр `balance.structure_templates`
 (`config/services.yaml`), файлы `site/config/balance/templates/<profile>.yaml`, поле `profile` в файле;
-профиль приходит из `CompanyCreatedEvent`, остальные пути (ленивый сид, `seedDefaultStructure()`,
-бэкфилл, фикстуры) берут его через `CompanyFacade::getBusinessProfile()`; аудит сида пишет
+профиль приходит из `CompanyCreatedEvent` и `CompanyOnboardingBackfillEvent`, фикстуры передают его
+явно, остальные пути (ленивый сид, `seedDefaultStructure()`, `app:balance:seed-missing-structure`)
+берут его через `CompanyFacade::getBusinessProfile()`; аудит сида пишет
 `{template, version}`. Маркетплейсный шаблон
 (версия 3 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
 маркетплейсами, склады, налоги, кредиты; `code` — стабильный контракт статьи, порядок задаёт
@@ -1684,7 +1685,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 `companies.business_profile`, у компаний до появления профиля — `MARKETPLACE`). Выбирается
 при создании: вопрос «Как вы продаёте?» при регистрации (не по приглашению), в `/company/new`
 и в создании аккаунта в админке — общий тип поля `Company\Form\BusinessProfileType`; без
-значения — `DEFAULT`, неизвестное значение — ошибка формы. В редактировании компании профиля
+значения или с пустым — `DEFAULT`, неизвестное значение — ошибка формы. В редактировании компании профиля
 нет.
 
 | Кто | Что создаёт | Правило повторного запуска |

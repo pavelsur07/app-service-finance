@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Balance\Application;
 
 use App\Balance\Infrastructure\Query\CompaniesWithoutBalanceStructureQuery;
+use App\Company\Enum\BusinessProfile;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -25,7 +26,10 @@ final readonly class EnsureBalanceStructureAction
     /**
      * @return bool true, если структура была создана сейчас
      */
-    public function __invoke(string $companyId): bool
+    /**
+     * @param BusinessProfile|null $profile профиль, если вызывающий его уже знает; иначе — профиль компании
+     */
+    public function __invoke(string $companyId, ?BusinessProfile $profile = null): bool
     {
         if ([] === ($this->missing)([$companyId])) {
             return false;
@@ -34,11 +38,11 @@ final readonly class EnsureBalanceStructureAction
         // Системный сид (actor = null): права чтения уже проверены контроллером, аудит — system_seed.
         // Как у новой компании: вместе со структурой — базовые учётные счета шаблона, в одной
         // транзакции, иначе сбой счетов оставил бы структуру, которую ленивый путь уже не повторит.
-        return $this->db->transactional(function () use ($companyId): bool {
-            if (!($this->seed)($companyId)) {
+        return $this->db->transactional(function () use ($companyId, $profile): bool {
+            if (!($this->seed)($companyId, profile: $profile)) {
                 return false;
             }
-            ($this->accounts)($companyId);
+            ($this->accounts)($companyId, profile: $profile);
 
             return true;
         });

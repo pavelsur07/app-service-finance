@@ -31,7 +31,7 @@ final readonly class BackfillBalanceSetup
             $event->report('balance_structure', 1);
             $event->report('balance_accounts', $this->accounts->templateAccountCount($event->businessProfile));
             if ($event->execute) {
-                ($this->structure)($event->companyId);
+                ($this->structure)($event->companyId, $event->businessProfile);
             }
 
             return;

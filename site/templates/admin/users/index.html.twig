@@ -177,8 +177,8 @@
           </div>
 
           <div class="form-field">
-            <span class="form-label">Профиль бизнеса</span>
-            <div class="radio-group">
+            <span class="form-label" id="adminBusinessProfileLabel">Профиль бизнеса</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="adminBusinessProfileLabel">
               {% for choice in accountForm.businessProfile %}
                 <label class="radio-label">
                   <input type="radio" class="radio" id="{{ choice.vars.id }}" name="{{ choice.vars.full_name }}" value="{{ choice.vars.value }}" {{ choice.vars.checked ? 'checked' }}>
