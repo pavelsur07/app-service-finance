@@ -155,6 +155,23 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:sale-mapping:apply-default)
+    # Базовый маппинг продаж и возвратов в ОПиУ — то же, что кнопка «Настроить
+    # автоматически» на вкладке «Маппинг ОПиУ». Одна компания (--company-id) или
+    # все активные SELLER-подключения (--all). Без --execute read-only
+    # предпросмотр; с --execute пишет marketplace_sale_mappings (только
+    # недостающие правила, существующие не трогает), поэтому запуск с --execute —
+    # отдельное одобрение Владельца (AGENTS.md §3.3). Сочетание опций проверяет
+    # сама команда (exit 2).
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q|--execute|--all) ;;
+        --marketplace=ozon|--marketplace=wildberries) ;;
+        --company-id=[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   app:finance:pl-tree:apply-default)
     # Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json) для одной
     # компании — то же, что экран /pl-categories/import?source=template.

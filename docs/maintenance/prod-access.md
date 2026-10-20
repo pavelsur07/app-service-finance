@@ -219,6 +219,16 @@ Read-only проверки можно выполнять после запрос
   гейт — калькулятор и `app:marketplace:reprocess` по компании и периоду.
   Документы старше окна гейт не краснят.
 
+- `app:marketplace:sale-mapping:apply-default --company-id=<uuid>|--all [--marketplace=ozon|wildberries] [--execute]` —
+  базовый маппинг продаж и возвратов в ОПиУ, те же экшены, что у кнопки «Настроить
+  автоматически» (`/marketplace/pl-mappings/default/apply`). `--all` — все активные
+  SELLER-подключения Ozon и WB; без `--marketplace` — маркетплейсы подключений компании.
+  Без `--execute` — read-only предпросмотр; с `--execute` пишет `marketplace_sale_mappings`:
+  создаёт только недостающие правила, существующие (в т. ч. отключённые) не трогает.
+  Отсутствующая или не-`LEAF_INPUT` статья ОПиУ блокирует свою пару «компания × маркетплейс»,
+  остальные пары применяются; exit 1, если заблокирована хоть одна. Предпросмотр — без
+  отдельного одобрения; запуск с `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
+
 - `app:marketplace:cost-pl-mapping:apply-default --company-id=<uuid> --marketplace=ozon|wildberries [--execute]` —
   базовый маппинг затрат в ОПиУ для одной компании, те же экшены, что у кнопки
   `/marketplace/cost-pl-mapping/default/apply`. Без `--execute` — read-only
