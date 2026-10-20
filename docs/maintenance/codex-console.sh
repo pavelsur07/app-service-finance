@@ -155,19 +155,6 @@ case "$cmd" in
       esac
     done
     ;;
-  app:marketplace:repair-pl-mapping-19621cff)
-    # Одноразовый ремонт ОПиУ компании 19621cff (20.10.2026): коды трёх строк
-    # ввода, перенос правил продаж WB с итоговых строк, правила возвратов. Без
-    # --execute — предпросмотр с откатом транзакции; с --execute пишет
-    # pl_categories.code и marketplace_sale_mappings — отдельное одобрение
-    # Владельца (AGENTS.md §3.3). Удалить блок вместе с командой.
-    for arg in "$@"; do
-      case "$arg" in
-        --no-interaction|-n|--quiet|-q|--execute) ;;
-        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
-      esac
-    done
-    ;;
   app:marketplace:sale-mapping:apply-default)
     # Базовый маппинг продаж и возвратов в ОПиУ — то же, что кнопка «Настроить
     # автоматически» на вкладке «Маппинг ОПиУ». Одна компания (--company-id) или
