@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 6
-**Status:** in progress
+**Phase:** handoff
+**Status:** ready for merge and deploy
 **Stage base commit:** f47d1760e
 
 ### Completed
@@ -11,16 +11,17 @@
 - Stage 3 — «Покрытие», «Реклама», «Предупреждения» (49 tests OK).
 - Stage 4 — Controller `/marketplace/pl-preview/rows-xlsx`.
 - Stage 5 — меню «Скачать xlsx» с двумя форматами.
+- Stage 6 — ARCHITECTURE, гейты, ревью (внутреннее + Codex REVIEW_GREEN).
 
 ### Checks and baseline
 - Baseline 2026-10-20: `phpunit tests/Integration/Marketplace/PlPreview tests/Functional/Marketplace/Controller/PlPreviewControllerTest.php` — OK, 35 tests / 128 assertions. БД `app_test_rowsx`, сеть `app-service-finance_default`.
 
 ### Review status
-- internal: Stage 1–5 — open: none
-- external: —
+- internal: финальное (свежая сессия) — open: none
+- external: Codex round 1 — REVIEW_GREEN
 
 ### Exact next action
-- Stage 6: ARCHITECTURE.md, приёмка, handoff.
+- Ждём «merge and deploy». Миграций нет. После деплоя — критерий ТЗ 7.
 
 ### Files to inspect first on resume
 - `plan.md`, `stages/stage-1.md`

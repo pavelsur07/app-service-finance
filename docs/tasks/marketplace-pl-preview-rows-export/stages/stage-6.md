@@ -25,11 +25,27 @@ stage_base_commit: `7250cf80f`. Risk: LOW.
 
 ## 4. Чек-лист приёмки
 
-- [ ] `ARCHITECTURE.md` описывает текущее состояние, Changelog — строка 2.33.
-- [ ] `make site-stan` — OK.
-- [ ] `make site-cs-check`, `make site-cs-strict-types` — OK.
-- [ ] Полный `phpunit` — OK (или не связанные с задачей падения с объяснением).
-- [ ] Финальное ревью в свежей сессии: BLOCKER/IMPORTANT закрыты.
-- [ ] Внешнее ревью Codex (класс Large — один раунд на handoff).
-- [ ] TZ (`docs/plan/TZ_vygruzka_plan_fakt.md`) — в PR вместе с задачей; `.secret/`, `docs/integrations/` и прочее чужое не попало.
-- [ ] `handoff.md`, push, PR Ready, вопрос «merge and deploy».
+- [x] `ARCHITECTURE.md` описывает текущее состояние, Changelog — строка 2.33.
+- [x] `make site-stan` — OK.
+- [x] `make site-cs-check`, `make site-cs-strict-types` — OK.
+- [x] Полный `phpunit` — OK (или не связанные с задачей падения с объяснением).
+- [x] Финальное ревью в свежей сессии: BLOCKER/IMPORTANT закрыты.
+- [x] Внешнее ревью Codex (класс Large — один раунд на handoff).
+- [x] TZ (`docs/plan/TZ_vygruzka_plan_fakt.md`) — в PR вместе с задачей; `.secret/`, `docs/integrations/` и прочее чужое не попало.
+- [x] `handoff.md`, push, PR Ready, вопрос «merge and deploy».
+
+## Итог этапа
+
+- `ARCHITECTURE.md` обновлён (раздел + Changelog 2.33).
+- `make site-stan` — `[OK] No errors` (3145 файлов); `make site-cs-check` — 0 из 3181; `make site-cs-strict-types` — 0 из 3181.
+- Полный `phpunit` (своя БД `app_test_rowsx`) — OK, 6909 tests / 39157 assertions, 8:03. Прогон шёл до
+  правок по ревью; правки затронули только `PlPreviewRowsXlsxExporter` и его unit-тест — после них
+  модульный набор OK, 58 tests / 269 assertions, PHPStan и CS по файлам чистые.
+- Финальное ревью в свежей сессии: BLOCKER 0, IMPORTANT 1 (незакоммиченные ARCHITECTURE и ТЗ —
+  закрыто коммитом `812185ec1`). Исправлены MINOR: id статьи в `category_code` у `unplaced`,
+  подпись формата `tags`, тест «нет каналов»; FOLLOW-UP «потеря предупреждения общего отчёта» —
+  исправлен сразу (пустой `marketplace`). Оставлено: порядок каналов — по алфавиту `value`
+  (записано в ARCHITECTURE и PR); нагрузка — до 5 расчётов на годовой период (ТЗ §5.6 допускает),
+  замерить после деплоя.
+- Внешнее ревью Codex (`site/bin/external-review.sh f47d1760e --effort medium`) — `REVIEW_GREEN`, 1 раунд.
+- Критерий ТЗ 7 — после деплоя (см. §3).
