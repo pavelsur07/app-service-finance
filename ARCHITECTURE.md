@@ -1383,6 +1383,11 @@ calculatePlPreview(
     array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
     ?string $natureBaseColumn = null, // колонка-итог: знак статьи по ней, остальные — линейные доли
 ): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
+
+// Код строке ввода без кода (только persist, flush — у вызывающего). Отчёт ОПиУ берёт суммы по
+// коду: у листа без кода регистр есть, в отчёте — ноль. false — у статьи уже этот код.
+// PLCategoryCodeAssignmentException: статьи нет у компании, не LEAF_INPUT, другой код, код занят.
+assignPlCategoryCode(string $companyId, string $categoryId, string $code): bool
 ```
 
 Предпросмотр (`Report\PlPreviewCalculator`) переводит сумму статьи в факт так же, как
@@ -4064,6 +4069,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.35 | 2026-10-20 | Finance: `FinanceFacade::assignPlCategoryCode()`; Marketplace: одноразовая `app:marketplace:repair-pl-mapping-19621cff` (коды строк ОПиУ, перенос правил продаж WB с итоговых строк, правила возвратов), `SaleMappingRetargetWriter` |
 | 2.34 | 2026-10-20 | Marketplace: консольная команда `app:marketplace:sale-mapping:apply-default` — базовый маппинг продаж и возвратов по компании или по всем SELLER-подключениям |
 | 2.33 | 2026-10-20 | Marketplace: выгрузка предпросмотра ОПиУ строками для план-факта (`/marketplace/pl-preview/rows-xlsx`, `BuildPlPreviewRowsExportAction`, `PlPreviewRowsXlsxExporter`, формат 1.0); меню «Скачать xlsx» с двумя форматами |
 | 2.32 | 2026-10-20 | Company: удалена одноразовая команда `app:company:prune-spam-accounts` (`SpamAccountCandidatesQuery`, `SpamAccountPurger`) — 1326 спам-аккаунтов 14–15.01.2026 удалены на проде 20.10; ограничения названия компании и письмо без названия остаются |
