@@ -148,7 +148,7 @@ final readonly class PlPreviewRowsXlsxExporter
         $add('period_key', self::text(self::periodKey($export)), self::DATA_FIELDS['period_key']);
         $add('iso_week', self::text(self::isoWeek($export)), self::DATA_FIELDS['iso_week']);
         $add('marketplaces', self::text(implode(';', array_keys($rowsByChannel))), 'Каналы в файле');
-        $add('tags', self::text(implode(';', $tags)), 'Теги в файле: id=название');
+        $add('tags', self::text(implode(';', $tags)), 'Теги в файле: <id>=<название> через «;»; название может содержать «;» — делить перед UUID');
         $add('tags_overlap', new NumericCell($tagsOverlap ? 1 : 0, null), 'Листинг с несколькими тегами входит в каждый полной суммой: сумма тегов и «Общих» не равна «Итого»');
         $add('rows_count', new NumericCell(array_sum($rowsByChannel), null), 'Строк в листе «Данные»');
         foreach ($rowsByChannel as $marketplace => $count) {
@@ -204,8 +204,9 @@ final readonly class PlPreviewRowsXlsxExporter
             }
             foreach ($report->unplaced as $item) {
                 $writer->addRow(new Row([
+                    // Кода у такой статьи может не быть, а удалённые неразличимы по названию — пишем id статьи.
                     $periodKey, $marketplace, self::text('unplaced'), self::text($item->reason->value),
-                    self::text(''), self::text($item->categoryName ?? 'Статья удалена или недоступна'),
+                    self::text($item->categoryId), self::text($item->categoryName ?? 'Статья удалена или недоступна'),
                     $empty, self::money($item->values[BuildMarketplacePlPreviewAction::TOTAL_KEY] ?? '0'), $empty,
                 ]));
             }
@@ -235,9 +236,18 @@ final readonly class PlPreviewRowsXlsxExporter
     {
         $this->startSheet($writer, 'Предупреждения', ['period_key', 'marketplace', 'text']);
 
+        $byChannel = [];
         foreach ($export->channels as $report) {
             foreach ($report->warnings as $warning) {
+                $byChannel[$warning] = true;
                 $writer->addRow(new Row([self::text(self::periodKey($export)), self::text(self::marketplace($report)), self::text($warning)]));
+            }
+        }
+        // Предупреждение общего расчёта без своего канала в файле (например, «Реализация» Ozon у
+        // компании без подключения Ozon) не теряется: канал пустой.
+        foreach ($export->all->warnings ?? [] as $warning) {
+            if (!isset($byChannel[$warning])) {
+                $writer->addRow(new Row([self::text(self::periodKey($export)), self::text(''), self::text($warning)]));
             }
         }
     }

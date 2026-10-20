@@ -178,7 +178,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         self::assertCount(5, $coverage);
         self::assertEquals(['2026-10-12_2026-10-18', 'wildberries', 'cost', 'mapped', 'wb_log', 'Логистика', 3, -100.0], self::values(array_slice($coverage[1], 0, 8)));
         self::assertEquals(['sales', 'return', '', 'Возвраты', 2, -300.0, 0], self::values(array_slice($coverage[3], 2)));
-        self::assertSame(['unplaced', 'category_not_found', '', 'Статья удалена или недоступна', ''], self::values(array_slice($coverage[4], 2, 5)));
+        self::assertSame(['unplaced', 'category_not_found', self::COST_ID, 'Статья удалена или недоступна', ''], self::values(array_slice($coverage[4], 2, 5)));
         self::assertEqualsWithDelta(-15.5, self::v($coverage[4][7]), 1e-9);
         self::assertInstanceOf(NumericCell::class, $coverage[1][7]);
 
@@ -187,6 +187,55 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
 
         self::assertSame([['period_key', 'marketplace', 'text'], ['2026-10-12_2026-10-18', 'wildberries', '=Нет проекта у подключения']], array_map(self::values(...), $sheets['Предупреждения']));
         self::assertStringNotContainsString('<f>', $this->sheetXml(5));
+    }
+
+    public function testNoChannelsGivesHeaderOnlyDataAndKeepsAllWarnings(): void
+    {
+        $base = $this->twoChannels();
+        $all = $base->all;
+        self::assertNotNull($all);
+        $all = new MarketplacePlPreviewReport(
+            from: $all->from,
+            to: $all->to,
+            marketplace: null,
+            columns: $all->columns,
+            rows: $all->rows,
+            tagsOverlap: false,
+            unplaced: [],
+            costCoverage: [],
+            costTotal: '0.00',
+            costReconciliationDelta: '0.00',
+            salesCoverage: [],
+            warnings: ['Реализация Ozon за 01.10.2026 — 31.10.2026 входит в период не целиком'],
+        );
+
+        $sheets = $this->export(new PlPreviewRowsExport($base->from, $base->to, [], $all));
+
+        self::assertCount(1, $sheets['Данные']);
+        $passport = [];
+        foreach (array_slice($sheets['Паспорт'], 1) as $row) {
+            $passport[self::v($row[0])] = self::v($row[1]);
+        }
+        self::assertSame(0, $passport['rows_count']);
+        self::assertSame('', $passport['marketplaces']);
+        self::assertSame('', $passport['tags']);
+        self::assertEqualsWithDelta(-300.1, $passport['check_channels_vs_all_REV'], 1e-9);
+        self::assertSame(['2026-10-12_2026-10-18', '', 'Реализация Ozon за 01.10.2026 — 31.10.2026 входит в период не целиком'], self::values($sheets['Предупреждения'][1]));
+    }
+
+    public function testWarningOfChannelIsNotRepeatedFromAll(): void
+    {
+        $base = $this->twoChannels();
+        $ozon = $base->channels[0];
+        $withWarning = static fn (MarketplacePlPreviewReport $r): MarketplacePlPreviewReport => new MarketplacePlPreviewReport(
+            from: $r->from, to: $r->to, marketplace: $r->marketplace, columns: $r->columns, rows: $r->rows, tagsOverlap: $r->tagsOverlap,
+            unplaced: [], costCoverage: [], costTotal: '0.00', costReconciliationDelta: '0.00', salesCoverage: [], warnings: ['Ошибка формулы'],
+        );
+        self::assertNotNull($base->all);
+
+        $sheets = $this->export(new PlPreviewRowsExport($base->from, $base->to, [$withWarning($ozon)], $withWarning($base->all)));
+
+        self::assertSame([['2026-10-12_2026-10-18', 'ozon', 'Ошибка формулы']], array_map(self::values(...), array_slice($sheets['Предупреждения'], 1)));
     }
 
     public function testEmptyBlocksGiveHeaderOnlySheets(): void
