@@ -1,0 +1,164 @@
+# Шаблон структуры баланса для новой компании профиля UNIVERSAL — бизнес без маркетплейсов (онбординг).
+# Реестр «профиль → файл» — параметр balance.structure_templates в config/services.yaml.
+# Читается BalanceStructureTemplateReader; статьи применяет SeedBalanceStructureAction,
+# счета — EnsureBalanceAccountsAction.
+#
+# Версия 3 (2026-10): структура маркетплейсного шаблона без расчётов с маркетплейсами и
+# складов маркетплейсов; коды статей те же (единый словарь кодов, TemplateRegistryTest).
+#
+# Контракт:
+#   - code — стабильный идентификатор статьи (A-Z, 0-9, _), уникален в файле;
+#     по нему статьи связываются со счетами и фондами, менять его в уже
+#     выданных компаниях нельзя;
+#   - type — asset | passive; дочерние статьи наследуют сторону родителя;
+#   - kind — group (может иметь children) | article (конечная, без children);
+#     счета привязываются только к article;
+#   - accounts — необязательный список учётных счетов конечной статьи:
+#     code (A-Z, 0-9, _, уникален среди счетов файла), name, allow_negative
+#     (по умолчанию false); создаются, только если у компании нет ни одного счёта;
+#   - порядок сортировки задаётся позицией в списке;
+#   - profile — профиль бизнеса, для которого написан шаблон; согласие с реестром
+#     держит TemplateRegistryTest;
+#   - идентификаторы компании и статей в файле не хранятся.
+version: 3
+profile: UNIVERSAL
+articles:
+    - code: CURRENT_ASSETS
+      name: Оборотные активы
+      type: asset
+      kind: group
+      children:
+          - code: MONEY
+            name: Денежные средства
+            type: asset
+            kind: group
+            children:
+                - code: CASH_BANK
+                  name: Расчётные счета
+                  type: asset
+                  kind: article
+                  accounts:
+                      - code: ACC_MAIN_BANK
+                        name: Расчётный счёт (основной)
+                - code: CASH_REGISTER
+                  name: Касса
+                  type: asset
+                  kind: article
+                  accounts:
+                      - code: ACC_MAIN_REGISTER
+                        name: Касса (основная)
+                - code: CASH_PAYMENT_SYSTEMS
+                  name: Платёжные системы и эквайринг
+                  type: asset
+                  kind: article
+          - code: RECEIVABLES
+            name: Дебиторская задолженность
+            type: asset
+            kind: group
+            children:
+                - code: AR_BUYERS
+                  name: Покупатели и заказчики
+                  type: asset
+                  kind: article
+                - code: ADVANCES_PAID
+                  name: Авансы поставщикам
+                  type: asset
+                  kind: article
+                - code: AR_OTHER
+                  name: Прочая дебиторская
+                  type: asset
+                  kind: article
+          - code: INVENTORY
+            name: Запасы
+            type: asset
+            kind: group
+            children:
+                - code: INV_WAREHOUSE
+                  name: Склад
+                  type: asset
+                  kind: article
+                - code: INV_IN_TRANSIT
+                  name: Товар в пути
+                  type: asset
+                  kind: article
+          - code: TAX_RECEIVABLE
+            name: Налоги к возмещению
+            type: asset
+            kind: article
+    - code: NON_CURRENT_ASSETS
+      name: Внеоборотные активы
+      type: asset
+      kind: group
+      children:
+          - code: FIXED_ASSETS
+            name: Основные средства
+            type: asset
+            kind: article
+          - code: INTANGIBLES
+            name: Нематериальные активы
+            type: asset
+            kind: article
+          - code: LONG_INVESTMENTS
+            name: Долгосрочные вложения и выданные займы
+            type: asset
+            kind: article
+    - code: EQUITY
+      name: Капитал
+      type: passive
+      kind: group
+      children:
+          - code: CONTRIBUTED_CAPITAL
+            name: Внесённый капитал
+            type: passive
+            kind: article
+          - code: RETAINED_RESULT
+            name: Накопленный финансовый результат
+            type: passive
+            kind: article
+    - code: LIABILITIES
+      name: Обязательства
+      type: passive
+      kind: group
+      children:
+          - code: CURRENT_LIABILITIES
+            name: Краткосрочные обязательства
+            type: passive
+            kind: group
+            children:
+                - code: AP_SUPPLIERS
+                  name: Поставщики
+                  type: passive
+                  kind: article
+                - code: ADVANCES_RECEIVED
+                  name: Авансы от покупателей
+                  type: passive
+                  kind: article
+                - code: TAX_PAYABLE
+                  name: Налоги и взносы
+                  type: passive
+                  kind: article
+                - code: PAYROLL_PAYABLE
+                  name: Зарплата сотрудникам
+                  type: passive
+                  kind: article
+                - code: SHORT_LOANS
+                  name: Кредиты и займы до года
+                  type: passive
+                  kind: article
+                - code: AP_OTHER
+                  name: Прочая кредиторская
+                  type: passive
+                  kind: article
+          - code: LONG_LIABILITIES
+            name: Долгосрочные обязательства
+            type: passive
+            kind: group
+            children:
+                - code: LONG_LOANS
+                  name: Кредиты и займы свыше года
+                  type: passive
+                  kind: article
+                - code: LONG_OTHER
+                  name: Прочие долгосрочные
+                  type: passive
+                  kind: article
