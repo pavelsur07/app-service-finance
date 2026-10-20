@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Form;
 
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
@@ -29,6 +30,11 @@ class RegistrationFormType extends AbstractType
                     'placeholder' => 'ООО Ромашка',
                 ],
                 'constraints' => self::companyNameConstraints(),
+            ]);
+            // По приглашению компания не создаётся — профиль не нужен.
+            $builder->add('businessProfile', BusinessProfileType::class, [
+                'mapped' => false,
+                'data' => BusinessProfile::DEFAULT,
             ]);
         }
 

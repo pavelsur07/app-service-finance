@@ -103,7 +103,7 @@ class PLCategoryController extends AbstractController
             $sourceCompanyId = null;
             try {
                 $preview = $importAction(new ImportPLCategoryTreeCommand(
-                    $this->defaultTree->nodes(),
+                    $this->defaultTree->nodes($targetCompany->getBusinessProfile()),
                     (string) $targetCompany->getId(),
                     true,
                     true,
@@ -250,7 +250,7 @@ class PLCategoryController extends AbstractController
 
         try {
             $sourceNodes = match (true) {
-                'template' === $mode => $this->defaultTree->nodes(),
+                'template' === $mode => $this->defaultTree->nodes($targetCompany->getBusinessProfile()),
                 null === $sourceCompanyId => $this->fileReader->read($this->submittedJson($request)),
                 default => $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
             };

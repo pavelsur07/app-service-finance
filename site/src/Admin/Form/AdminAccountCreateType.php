@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Admin\Form;
 
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Form\BusinessProfileType;
 use App\Company\Form\RegistrationFormType;
 use App\Company\Form\UserEmailType;
 use Symfony\Component\Form\AbstractType;
@@ -27,6 +29,10 @@ final class AdminAccountCreateType extends AbstractType
                     'placeholder' => 'ООО Ромашка',
                 ],
                 'constraints' => RegistrationFormType::companyNameConstraints(),
+            ])
+            ->add('businessProfile', BusinessProfileType::class, [
+                'mapped' => false,
+                'data' => BusinessProfile::DEFAULT,
             ])
             ->add('plainPassword', PasswordType::class, [
                 'mapped' => false,

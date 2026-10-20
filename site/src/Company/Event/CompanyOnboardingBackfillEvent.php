@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Company\Event;
 
+use App\Company\Enum\BusinessProfile;
+
 /**
  * Дозаполнение стартовых данных существующей компании (`app:company:onboarding-backfill`).
  * Модули, которые заводят данные по `CompanyCreatedEvent`, подписываются и сюда: в dry-run
@@ -17,6 +19,7 @@ final class CompanyOnboardingBackfillEvent
 
     public function __construct(
         public readonly string $companyId,
+        public readonly BusinessProfile $businessProfile,
         public readonly bool $execute,
     ) {
     }

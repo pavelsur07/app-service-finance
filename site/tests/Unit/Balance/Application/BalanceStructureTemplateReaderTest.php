@@ -9,16 +9,17 @@ use App\Balance\DTO\BalanceStructureTemplateAccount;
 use App\Balance\DTO\BalanceStructureTemplateNode;
 use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Exception\BalanceStructureTemplateException;
+use App\Company\Enum\BusinessProfile;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class BalanceStructureTemplateReaderTest extends TestCase
 {
-    private const DEFAULT_FILE = __DIR__.'/../../../../config/balance/default_structure.yaml';
+    private const DEFAULT_FILE = __DIR__.'/../../../../config/balance/templates/marketplace.yaml';
 
     public function testDefaultTemplateFileIsValidAndBalanced(): void
     {
-        $nodes = (new BalanceStructureTemplateReader(self::DEFAULT_FILE))->read();
+        $nodes = (new BalanceStructureTemplateReader(['MARKETPLACE' => self::DEFAULT_FILE]))->read(BusinessProfile::MARKETPLACE);
 
         self::assertSame(['CURRENT_ASSETS', 'NON_CURRENT_ASSETS', 'EQUITY', 'LIABILITIES'], array_map(static fn (BalanceStructureTemplateNode $n): string => $n->code, $nodes));
         self::assertSame([10, 20, 30, 40], array_map(static fn (BalanceStructureTemplateNode $n): int => $n->sortOrder, $nodes));
@@ -60,18 +61,25 @@ final class BalanceStructureTemplateReaderTest extends TestCase
 
     public function testAccountOptionsAreRead(): void
     {
-        $nodes = (new BalanceStructureTemplateReader('unused'))->parse(
+        $nodes = (new BalanceStructureTemplateReader([]))->parse(
             "version: 3\narticles:\n  - code: A\n    name: A\n    type: asset\n    kind: article\n    accounts:\n      - {code: ACC_A, name: ' Счёт А ', allow_negative: true}",
         );
 
         self::assertEquals([new BalanceStructureTemplateAccount('ACC_A', 'Счёт А', true)], $nodes[0]->accounts);
     }
 
+    public function testProfileMissingFromRegistryIsRejected(): void
+    {
+        $this->expectException(BalanceStructureTemplateException::class);
+
+        (new BalanceStructureTemplateReader([]))->read(BusinessProfile::MARKETPLACE);
+    }
+
     public function testMissingFileIsRejected(): void
     {
         $this->expectException(BalanceStructureTemplateException::class);
 
-        (new BalanceStructureTemplateReader('/nonexistent/balance.yaml'))->read();
+        (new BalanceStructureTemplateReader(['MARKETPLACE' => '/nonexistent/balance.yaml']))->read(BusinessProfile::MARKETPLACE);
     }
 
     /**
@@ -119,6 +127,6 @@ final class BalanceStructureTemplateReaderTest extends TestCase
         $this->expectException(BalanceStructureTemplateException::class);
         $this->expectExceptionMessage($expectedMessagePart);
 
-        (new BalanceStructureTemplateReader('unused'))->parse($yaml);
+        (new BalanceStructureTemplateReader([]))->parse($yaml);
     }
 }

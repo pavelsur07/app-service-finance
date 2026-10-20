@@ -20,6 +20,6 @@ final readonly class BackfillDefaultPLTree
 
     public function __invoke(CompanyOnboardingBackfillEvent $event): void
     {
-        $event->report('pl_categories', ($this->ensure)($event->companyId, dryRun: !$event->execute));
+        $event->report('pl_categories', ($this->ensure)($event->companyId, dryRun: !$event->execute, profile: $event->businessProfile));
     }
 }

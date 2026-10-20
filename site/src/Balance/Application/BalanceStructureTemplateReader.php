@@ -8,6 +8,7 @@ use App\Balance\DTO\BalanceStructureTemplateAccount;
 use App\Balance\DTO\BalanceStructureTemplateNode;
 use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Exception\BalanceStructureTemplateException;
+use App\Company\Enum\BusinessProfile;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
@@ -25,18 +26,22 @@ final readonly class BalanceStructureTemplateReader
     private const MAX_NAME_LENGTH = 255;
     private const CODE_PATTERN = '/^[A-Z][A-Z0-9_]{0,63}$/';
 
+    /**
+     * @param array<string, string> $paths значение BusinessProfile → путь к шаблону (реестр `balance.structure_templates`)
+     */
     public function __construct(
-        #[Autowire('%kernel.project_dir%/config/balance/default_structure.yaml')]
-        private string $path,
+        #[Autowire('%balance.structure_templates%')]
+        private array $paths,
     ) {
     }
 
     /**
      * @return list<BalanceStructureTemplateNode>
      */
-    public function read(): array
+    public function read(BusinessProfile $profile): array
     {
-        $content = @file_get_contents($this->path);
+        $path = $this->paths[$profile->value] ?? throw new BalanceStructureTemplateException(sprintf('Для профиля %s шаблон структуры баланса не задан.', $profile->value));
+        $content = @file_get_contents($path);
         if (false === $content) {
             throw new BalanceStructureTemplateException('Файл шаблона структуры баланса не найден.');
         }

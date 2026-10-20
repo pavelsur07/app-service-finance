@@ -6,6 +6,8 @@ namespace App\Balance\Application;
 
 use App\Balance\DTO\BalanceStructureTemplateAccount;
 use App\Balance\DTO\BalanceStructureTemplateNode;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
@@ -25,19 +27,21 @@ final readonly class EnsureBalanceAccountsAction
         private Connection $db,
         private BalanceStructureTemplateReader $template,
         private LoggerInterface $logger,
+        private CompanyFacade $companies,
     ) {
     }
 
     /**
      * @param bool $dryRun только посчитать: без записи и без блокировки книги
+     * @param BusinessProfile|null $profile профиль, если вызывающий его уже знает; иначе — профиль компании
      *
      * @return int число созданных (в dry-run — недостающих) счетов
      */
-    public function __invoke(string $companyId, bool $dryRun = false): int
+    public function __invoke(string $companyId, bool $dryRun = false, ?BusinessProfile $profile = null): int
     {
         Assert::uuid($companyId);
         // Шаблон читаем до транзакции: битый файл не должен оставить половину счетов.
-        $accountsByArticle = $this->templateAccounts($this->template->read());
+        $accountsByArticle = $this->templateAccounts($this->template->read($profile ?? $this->companies->getBusinessProfile($companyId)));
         if ([] === $accountsByArticle) {
             return 0;
         }
@@ -90,9 +94,9 @@ final readonly class EnsureBalanceAccountsAction
     /**
      * Сколько счетов шаблон заводит компании без счетов — для отчёта dry-run, пока структуры ещё нет.
      */
-    public function templateAccountCount(): int
+    public function templateAccountCount(BusinessProfile $profile): int
     {
-        return array_sum(array_map(\count(...), $this->templateAccounts($this->template->read())));
+        return array_sum(array_map(\count(...), $this->templateAccounts($this->template->read($profile))));
     }
 
     private function insert(string $companyId, string $articleId, BalanceStructureTemplateAccount $account): void

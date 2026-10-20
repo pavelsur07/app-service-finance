@@ -17,6 +17,9 @@
                     {{ form_errors(form.inn) }}
                 </div>
                 <div class="mb-3">
+                    {{ form_row(form.businessProfile, {help: 'От профиля зависят стартовые статьи ОПиУ и Баланса'}) }}
+                </div>
+                <div class="mb-3">
                     {{ form_row(form.taxSystem) }}
                 </div>
                 <div class="mb-3">

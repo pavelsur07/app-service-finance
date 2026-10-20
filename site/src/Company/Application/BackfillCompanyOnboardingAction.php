@@ -36,16 +36,17 @@ final readonly class BackfillCompanyOnboardingAction
     {
         if (null !== $companyId) {
             Assert::uuid($companyId);
-            if (null === $this->companies->findById($companyId)) {
-                throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
-            }
+            $company = $this->companies->findById($companyId)
+                ?? throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
+            $profiles = [$companyId => $company->getBusinessProfile()];
+        } else {
+            $profiles = $this->companies->getAllActiveCompanyProfiles();
         }
-        $companyIds = null === $companyId ? $this->companies->getAllActiveCompanyIds() : [$companyId];
 
         $result = new CompanyOnboardingBackfillResult();
-        $result->companies = \count($companyIds);
-        foreach ($companyIds as $id) {
-            $event = new CompanyOnboardingBackfillEvent($id, execute: false);
+        $result->companies = \count($profiles);
+        foreach ($profiles as $id => $profile) {
+            $event = new CompanyOnboardingBackfillEvent($id, $profile, execute: false);
             $this->dispatcher->dispatch($event);
             if ([] !== $event->gaps()) {
                 $result->candidates[$id] = $event->gaps();
@@ -73,8 +74,8 @@ final readonly class BackfillCompanyOnboardingAction
         foreach (array_keys($result->candidates) as $id) {
             try {
                 // Компания — своя транзакция: сбой одного модуля не оставляет её дозаполненной наполовину.
-                $this->entityManager->wrapInTransaction(function () use ($id): void {
-                    $this->dispatcher->dispatch(new CompanyOnboardingBackfillEvent($id, execute: true));
+                $this->entityManager->wrapInTransaction(function () use ($id, $profiles): void {
+                    $this->dispatcher->dispatch(new CompanyOnboardingBackfillEvent($id, $profiles[$id], execute: true));
                 });
                 ++$result->completed;
                 $this->entityManager->clear();

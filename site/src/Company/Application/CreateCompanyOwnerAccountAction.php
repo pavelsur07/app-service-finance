@@ -7,6 +7,7 @@ namespace App\Company\Application;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Event\CompanyCreatedEvent;
 use App\Company\Message\SendRegistrationEmailMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,19 +31,21 @@ final readonly class CreateCompanyOwnerAccountAction
         string $plainPassword,
         string $companyName,
         bool $sendRegistrationEmail = true,
+        BusinessProfile $businessProfile = BusinessProfile::DEFAULT,
     ): Company {
         $user->setPassword($this->userPasswordHasher->hashPassword($user, $plainPassword));
         $user->setRoles(['ROLE_COMPANY_OWNER']);
 
         $this->entityManager->persist($user);
         $company = $this->companyOwnerMembershipCreator->createCompany($user, $companyName);
+        $company->setBusinessProfile($businessProfile);
 
         // Подписчики (Balance, системные статьи Cash) ищут данные через SQL, поэтому компания
         // сохраняется до события. Транзакция — чтобы сбой подписчика не оставил компанию без
         // их данных: так же, как в CompanyController::new.
         $this->entityManager->wrapInTransaction(function () use ($company): void {
             $this->entityManager->flush();
-            $this->eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
+            $this->eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId(), $company->getBusinessProfile()));
         });
 
         if ($sendRegistrationEmail) {

@@ -42,12 +42,20 @@ class CompanyType extends AbstractType
                 'attr' => ['class' => 'form-control'],
             ])
             ->add('minimumBalance', MoneyValueType::class);
+
+        // Профиль выбирается при создании: от него зависят стартовые шаблоны. Смена в
+        // настройках справочники не перестраивает и в эту форму не входит.
+        if ($options['with_business_profile']) {
+            $builder->add('businessProfile', BusinessProfileType::class);
+        }
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Company::class,
+            'with_business_profile' => false,
         ]);
+        $resolver->setAllowedTypes('with_business_profile', 'bool');
     }
 }

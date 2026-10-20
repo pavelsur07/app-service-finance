@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Company\Entity;
 
+use App\Company\Enum\BusinessProfile;
 use App\Company\Enum\CompanyTaxSystem;
 use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\Mapping as ORM;
@@ -35,6 +36,9 @@ class Company
 
     #[ORM\Column(nullable: true, enumType: CompanyTaxSystem::class)]
     private ?CompanyTaxSystem $taxSystem = null;
+
+    #[ORM\Column(length: 32, enumType: BusinessProfile::class, options: ['default' => 'MARKETPLACE'])]
+    private BusinessProfile $businessProfile = BusinessProfile::DEFAULT;
 
     #[ORM\Embedded(class: Money::class, columnPrefix: 'minimum_balance_')]
     private Money $minimumBalance;
@@ -113,6 +117,18 @@ class Company
     public function setTaxSystem(?CompanyTaxSystem $taxSystem): self
     {
         $this->taxSystem = $taxSystem;
+
+        return $this;
+    }
+
+    public function getBusinessProfile(): BusinessProfile
+    {
+        return $this->businessProfile;
+    }
+
+    public function setBusinessProfile(BusinessProfile $businessProfile): self
+    {
+        $this->businessProfile = $businessProfile;
 
         return $this;
     }

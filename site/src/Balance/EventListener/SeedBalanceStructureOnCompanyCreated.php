@@ -10,7 +10,7 @@ use App\Company\Event\CompanyCreatedEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
 /**
- * Стартовая структура Баланса новой компании: статьи шаблона, затем базовые учётные счета
+ * Стартовая структура Баланса новой компании по её профилю: статьи шаблона, затем базовые учётные счета
  * на них. Книга не инициализируется — дату начала и остатки задаёт пользователь.
  */
 #[AsEventListener]
@@ -24,7 +24,7 @@ final readonly class SeedBalanceStructureOnCompanyCreated
 
     public function __invoke(CompanyCreatedEvent $event): void
     {
-        ($this->seed)($event->companyId);
-        ($this->accounts)($event->companyId);
+        ($this->seed)($event->companyId, profile: $event->businessProfile);
+        ($this->accounts)($event->companyId, profile: $event->businessProfile);
     }
 }

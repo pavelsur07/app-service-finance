@@ -10,6 +10,8 @@ use App\Company\Entity\CompanyMember;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Exception\CompanyNotFoundException;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
@@ -38,6 +40,16 @@ final class CompanyFacade
     public function findById(string $companyId): ?Company
     {
         return $this->repository->findById($companyId);
+    }
+
+    /**
+     * Профиль бизнеса компании — по нему модули выбирают стартовые шаблоны.
+     *
+     * @throws CompanyNotFoundException
+     */
+    public function getBusinessProfile(string $companyId): BusinessProfile
+    {
+        return ($this->repository->findById($companyId) ?? throw new CompanyNotFoundException($companyId))->getBusinessProfile();
     }
 
     /**
@@ -114,12 +126,12 @@ final class CompanyFacade
     /**
      * Создаёт пользователя-владельца, компанию и активного CompanyMember OWNER.
      */
-    public function createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
+    public function createOwnerAccount(string $email, string $plainPassword, string $companyName, BusinessProfile $businessProfile = BusinessProfile::DEFAULT): Company
     {
         $user = new User(Uuid::uuid7()->toString());
         $user->setEmail($email);
 
-        return ($this->accountCreator)($user, $plainPassword, $companyName);
+        return ($this->accountCreator)($user, $plainPassword, $companyName, businessProfile: $businessProfile);
     }
 
     /**

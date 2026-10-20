@@ -6,6 +6,7 @@ namespace App\Company\Controller;
 
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Form\RegistrationFormType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Security\PublicAccess;
@@ -87,11 +88,14 @@ final class RegistrationController extends AbstractController
                 $inviteManager->acceptInvite($inviteToken, $user);
                 $request->getSession()->set('active_company_id', $companyId);
             } else {
+                /** @var BusinessProfile $businessProfile */
+                $businessProfile = $form->get('businessProfile')->getData();
                 ($companyOwnerAccountCreator)(
                     user: $user,
                     plainPassword: $plainPassword,
                     companyName: (string) $form->get('companyName')->getData(),
                     sendRegistrationEmail: true,
+                    businessProfile: $businessProfile,
                 );
             }
 

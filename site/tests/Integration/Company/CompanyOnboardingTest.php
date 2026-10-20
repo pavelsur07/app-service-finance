@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Company;
 use App\Admin\Application\CreateAccountAction;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Event\CompanyCreatedEvent;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
@@ -38,11 +39,35 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
     }
 
+    public function testUniversalProfileGetsTheSameSetupUntilItHasOwnTemplates(): void
+    {
+        // Реестр шаблонов: UNIVERSAL пока указывает на маркетплейсные файлы (Stage 3 — свои).
+        $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Setup Co', false, BusinessProfile::UNIVERSAL);
+
+        self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
+    }
+
     public function testAdminAccountCreationCreatesFullSetup(): void
     {
         $company = (self::getContainer()->get(CreateAccountAction::class))($this->newUser(), 'plain-password', 'Admin Onboarding Co');
 
         self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
+    }
+
+    public function testEventCarriesChosenProfile(): void
+    {
+        $profiles = [];
+        self::getContainer()->get(EventDispatcherInterface::class)->addListener(
+            CompanyCreatedEvent::class,
+            static function (CompanyCreatedEvent $event) use (&$profiles): void {
+                $profiles[] = $event->businessProfile;
+            },
+        );
+
+        $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Event Co', false, BusinessProfile::UNIVERSAL);
+
+        self::assertSame([BusinessProfile::UNIVERSAL], $profiles);
+        self::assertSame('UNIVERSAL', $this->connection->fetchOne('SELECT business_profile FROM companies WHERE id = ?', [(string) $company->getId()]));
     }
 
     public function testRepeatedEventDoesNotDuplicateAnything(): void
@@ -51,7 +76,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         $companyId = (string) $company->getId();
 
         $this->em->clear();
-        self::getContainer()->get(EventDispatcherInterface::class)->dispatch(new CompanyCreatedEvent($companyId));
+        self::getContainer()->get(EventDispatcherInterface::class)->dispatch(new CompanyCreatedEvent($companyId, $company->getBusinessProfile()));
 
         self::assertSame(self::FULL_SETUP, $this->onboardingOf($companyId));
     }
@@ -61,7 +86,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         // Битый шаблон ОПиУ: подписчик Finance падает уже после того, как компания, счета и
         // статьи ДДС записаны в той же транзакции.
         self::getContainer()->set(DefaultPLCategoryTreeProvider::class, new DefaultPLCategoryTreeProvider(
-            '/nonexistent/default_pl_tree.json',
+            ['MARKETPLACE' => '/nonexistent/default_pl_tree.json'],
             self::getContainer()->get(PLCategoryTreeFileReader::class),
         ));
 
