@@ -73,7 +73,7 @@ class CompanyController extends AbstractController
         $company = new Company(id: Uuid::uuid7()->toString(), user: $user);
         $company->setUser($user); // Автоматически проставляем владельца
 
-        $form = $this->createForm(CompanyType::class, $company);
+        $form = $this->createForm(CompanyType::class, $company, ['with_business_profile' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -82,7 +82,7 @@ class CompanyController extends AbstractController
             $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator): void {
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
                 $em->flush();
-                $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId()));
+                $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId(), $company->getBusinessProfile()));
             });
 
             return $this->redirectToRoute('company_index');

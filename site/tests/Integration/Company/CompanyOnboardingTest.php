@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Company;
 use App\Admin\Application\CreateAccountAction;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Event\CompanyCreatedEvent;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
@@ -45,13 +46,29 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
     }
 
+    public function testEventCarriesChosenProfile(): void
+    {
+        $profiles = [];
+        self::getContainer()->get(EventDispatcherInterface::class)->addListener(
+            CompanyCreatedEvent::class,
+            static function (CompanyCreatedEvent $event) use (&$profiles): void {
+                $profiles[] = $event->businessProfile;
+            },
+        );
+
+        $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Event Co', false, BusinessProfile::UNIVERSAL);
+
+        self::assertSame([BusinessProfile::UNIVERSAL], $profiles);
+        self::assertSame('UNIVERSAL', $this->connection->fetchOne('SELECT business_profile FROM companies WHERE id = ?', [(string) $company->getId()]));
+    }
+
     public function testRepeatedEventDoesNotDuplicateAnything(): void
     {
         $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Repeat Co', false);
         $companyId = (string) $company->getId();
 
         $this->em->clear();
-        self::getContainer()->get(EventDispatcherInterface::class)->dispatch(new CompanyCreatedEvent($companyId));
+        self::getContainer()->get(EventDispatcherInterface::class)->dispatch(new CompanyCreatedEvent($companyId, $company->getBusinessProfile()));
 
         self::assertSame(self::FULL_SETUP, $this->onboardingOf($companyId));
     }

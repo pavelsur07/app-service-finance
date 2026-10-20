@@ -6,6 +6,7 @@ namespace App\Admin\Application;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Facade\CompanyFacade;
 
 final readonly class CreateAccountAction
@@ -15,8 +16,8 @@ final readonly class CreateAccountAction
     ) {
     }
 
-    public function __invoke(User $account, string $plainPassword, string $companyName): Company
+    public function __invoke(User $account, string $plainPassword, string $companyName, BusinessProfile $businessProfile = BusinessProfile::DEFAULT): Company
     {
-        return $this->companyFacade->createOwnerAccount((string) $account->getEmail(), $plainPassword, $companyName);
+        return $this->companyFacade->createOwnerAccount((string) $account->getEmail(), $plainPassword, $companyName, $businessProfile);
     }
 }

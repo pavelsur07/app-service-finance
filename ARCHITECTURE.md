@@ -1087,7 +1087,7 @@ Ozon-путь ходил через `FetchMarketplaceDataCommand` на `/v2/fina
 ```php
 // Создать пользователя-владельца, компанию и активного CompanyMember OWNER.
 // Используется внешними модулями, включая Admin, вместо прямого вызова Company Service/Application.
-createOwnerAccount(string $email, string $plainPassword, string $companyName): Company
+createOwnerAccount(string $email, string $plainPassword, string $companyName, BusinessProfile $businessProfile = BusinessProfile::DEFAULT): Company
 
 // Найти компанию по внутреннему UUID
 findById(string $companyId): ?Company
@@ -1453,7 +1453,7 @@ seedDefaultStructure(string $companyId): bool
 статья отсутствует, архивна или не конечная — счёт пропускается с одним warning. Книга не
 инициализируется. Оба запускает слушатель
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
-`App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
+`App\Company\Event\CompanyCreatedEvent(companyId, businessProfile)` — его диспатчат оба пути создания
 компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
 транзакции.
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
@@ -1665,9 +1665,17 @@ manage — только владелец. Новые права автомати
 ### Онбординг компании: `CompanyCreatedEvent` и дозаполнение
 
 Стартовые данные новой компании заводят модули-подписчики; Company о них не знает.
-`App\Company\Event\CompanyCreatedEvent(companyId)` диспатчат оба пути создания
+`App\Company\Event\CompanyCreatedEvent(companyId, businessProfile)` диспатчат оба пути создания
 (`CompanyController::new` и `CreateCompanyOwnerAccountAction` — регистрация и админка) после
 flush внутри `wrapInTransaction`: сбой любого подписчика откатывает компанию целиком.
+
+Профиль бизнеса — `Company::$businessProfile`, enum `App\Company\Enum\BusinessProfile`
+(`MARKETPLACE` «Маркетплейсы и e-com», `UNIVERSAL` «Базовый»; `DEFAULT = MARKETPLACE`, колонка
+`companies.business_profile`, у компаний до появления профиля — `MARKETPLACE`). Выбирается
+при создании: вопрос «Как вы продаёте?» при регистрации (не по приглашению), в `/company/new`
+и в создании аккаунта в админке — общий тип поля `Company\Form\BusinessProfileType`; без
+значения — `DEFAULT`, неизвестное значение — ошибка формы. В редактировании компании профиля
+нет.
 
 | Кто | Что создаёт | Правило повторного запуска |
 |---|---|---|
@@ -4109,6 +4117,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.42 | 2026-10-20 | Company: профиль бизнеса `BusinessProfile` (`MARKETPLACE`, `UNIVERSAL`) — колонка `companies.business_profile`, выбор при регистрации, в `/company/new` и в админке; `CompanyCreatedEvent` несёт профиль; `CompanyFacade::createOwnerAccount()` принимает профиль |
 | 2.41 | 2026-10-20 | Company: раздел «Онбординг компании»; `app:company:onboarding-backfill` и `CompanyOnboardingBackfillEvent` — дозаполнение кассы, дерева ОПиУ, структуры и счетов Баланса у существующих компаний |
 | 2.40 | 2026-10-20 | Balance: шаблон структуры версии 3 — `accounts` у конечных статей; базовые учётные счета новой компании (`ACC_MAIN_BANK`, `ACC_MAIN_REGISTER`) создаёт `EnsureBalanceAccountsAction` по `CompanyCreatedEvent` |
 | 2.39 | 2026-10-20 | Finance: базовое дерево ОПиУ новой компании — `EnsureDefaultPLTreeAction` по `CompanyCreatedEvent`, только компании без статей; `PLCategoryRepository::existsByCompanyId()` |

@@ -28,6 +28,10 @@
         .section-title{font-weight:800;letter-spacing:-.01em}
         .password-meter{height:6px;background:#e9ecef;border-radius:8px;overflow:hidden}
         .password-meter>div{height:100%;width:0;transition:width .25s}
+        .profile-card{display:block;height:100%;padding:.85rem 1rem;border:1px solid #e7eaf3;border-radius:.75rem;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+        .profile-card:hover{border-color:#c9cfe2}
+        .btn-check:checked + .profile-card{border-color:var(--brand-primary);box-shadow:0 0 0 2px rgba(10,21,72,.12);background:var(--bg-soft)}
+        .btn-check:focus-visible + .profile-card{outline:2px solid var(--brand-primary);outline-offset:2px}
     </style>
 </head>
 <body>
@@ -64,6 +68,28 @@
                             <div class="invalid-feedback">Введите имя компании</div>
                             {% endif %}
                             {{ form_errors(registrationForm.companyName) }}
+                        </div>
+                        {% endif %}
+
+                        {% if registrationForm.businessProfile is defined %}
+                        <div class="col-12">
+                            <div class="form-label small" id="businessProfileLabel">Как вы продаёте?</div>
+                            <div class="row g-2" role="radiogroup" aria-labelledby="businessProfileLabel">
+                                {% for choice in registrationForm.businessProfile %}
+                                <div class="col-12 col-sm-6">
+                                    <input type="radio" class="btn-check" autocomplete="off"
+                                           id="{{ choice.vars.id }}" name="{{ choice.vars.full_name }}" value="{{ choice.vars.value }}"
+                                           {{ choice.vars.checked ? 'checked' }}>
+                                    <label class="profile-card" for="{{ choice.vars.id }}">
+                                        <span class="d-block fw-semibold">{{ choice.vars.label }}</span>
+                                        <span class="d-block small text-muted">{{ choice.vars.attr['data-description'] }}</span>
+                                    </label>
+                                </div>
+                                {% do choice.setRendered %}
+                                {% endfor %}
+                            </div>
+                            <div class="form-text">От ответа зависят стартовые статьи учёта, их можно поменять позже</div>
+                            {{ form_errors(registrationForm.businessProfile) }}
                         </div>
                         {% endif %}
 

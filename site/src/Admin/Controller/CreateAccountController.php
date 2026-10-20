@@ -9,6 +9,7 @@ use App\Admin\Application\DTO\UserListFilter;
 use App\Admin\Form\AdminAccountCreateType;
 use App\Admin\Infrastructure\Query\UserAdminQuery;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Repository\UserRepository;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -39,8 +40,10 @@ final class CreateAccountController extends AbstractController
         /** @var string $plainPassword */
         $plainPassword = (string) $accountForm->get('plainPassword')->getData();
         $companyName = (string) $accountForm->get('companyName')->getData();
+        /** @var BusinessProfile $businessProfile */
+        $businessProfile = $accountForm->get('businessProfile')->getData();
 
-        $createAccount($account, $plainPassword, $companyName);
+        $createAccount($account, $plainPassword, $companyName, $businessProfile);
 
         $this->addFlash('success', 'Аккаунт и компания успешно созданы.');
 

@@ -175,6 +175,20 @@
             }) }}
             {{ form_errors(accountForm.companyName) }}
           </div>
+
+          <div class="form-field">
+            <span class="form-label">Профиль бизнеса</span>
+            <div class="radio-group">
+              {% for choice in accountForm.businessProfile %}
+                <label class="radio-label">
+                  <input type="radio" class="radio" id="{{ choice.vars.id }}" name="{{ choice.vars.full_name }}" value="{{ choice.vars.value }}" {{ choice.vars.checked ? 'checked' }}>
+                  {{ choice.vars.label }}
+                </label>
+                {% do choice.setRendered %}
+              {% endfor %}
+            </div>
+            {{ form_errors(accountForm.businessProfile) }}
+          </div>
         </div>
         <div class="mdl-foot">
           <button type="button" class="btn btn-md btn-secondary" data-admin-dialog-close>Отмена</button>
