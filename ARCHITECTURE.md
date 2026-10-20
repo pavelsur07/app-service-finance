@@ -652,7 +652,7 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 | Writer | `DefaultCostMappingWriter` | `DefaultSaleMappingWriter` |
 | Таблица | `marketplace_cost_pl_mappings` | `marketplace_sale_mappings` |
 | Маршруты | `/marketplace/cost-pl-mapping/default/{preview,apply}` | `/marketplace/pl-mappings/default/{preview,apply}` |
-| Консоль | `app:marketplace:cost-pl-mapping:apply-default` (без `--execute` — предпросмотр); ночной `app:marketplace:cost-pl-mapping:sync-default` (частичный режим, все активные SELLER-подключения) | — |
+| Консоль | `app:marketplace:cost-pl-mapping:apply-default` (без `--execute` — предпросмотр); ночной `app:marketplace:cost-pl-mapping:sync-default` (частичный режим, все активные SELLER-подключения) | `app:marketplace:sale-mapping:apply-default` (`--company-id` или `--all`; без `--execute` — предпросмотр) |
 | Гейт | `app:marketplace:cost-pl-mapping:unmapped-check` (`UnmappedCostsQuery`, условие `PreflightCostsQuery::WITHOUT_PL_DECISION`) | — |
 
 Общие правила:
@@ -4064,6 +4064,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.34 | 2026-10-20 | Marketplace: консольная команда `app:marketplace:sale-mapping:apply-default` — базовый маппинг продаж и возвратов по компании или по всем SELLER-подключениям |
 | 2.33 | 2026-10-20 | Marketplace: выгрузка предпросмотра ОПиУ строками для план-факта (`/marketplace/pl-preview/rows-xlsx`, `BuildPlPreviewRowsExportAction`, `PlPreviewRowsXlsxExporter`, формат 1.0); меню «Скачать xlsx» с двумя форматами |
 | 2.32 | 2026-10-20 | Company: удалена одноразовая команда `app:company:prune-spam-accounts` (`SpamAccountCandidatesQuery`, `SpamAccountPurger`) — 1326 спам-аккаунтов 14–15.01.2026 удалены на проде 20.10; ограничения названия компании и письмо без названия остаются |
 | 2.31 | 2026-10-20 | Company: `app:company:prune-spam-accounts` — удаление аккаунтов окна регистрации без данных (`SpamAccountCandidatesQuery`, `SpamAccountPurger`); название компании при регистрации — не длиннее 120 символов и без ссылок, письмо «Регистрация завершена» его не выводит |
