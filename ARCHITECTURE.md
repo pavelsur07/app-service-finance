@@ -1654,12 +1654,19 @@ manage — только владелец. Новые права автомати
   chart-зависимости и подключает переиспользуемые стили
   `assets/styles/components/financial-chart.css`.
 
-### Company → Cash: системные статьи ДДС по `CompanyCreatedEvent`
+### Company → Cash: системные статьи ДДС и денежные счета по `CompanyCreatedEvent`
 
 - `Cash\EventListener\EnsureCashflowSystemCategoriesOnCompanyCreated` на
   `App\Company\Event\CompanyCreatedEvent` вызывает `EnsureCashflowSystemCategoriesAction`:
   7 системных статей (`CF_OP`, `CF_FIN`, `CF_INV`, `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`,
   `CF_UNALLOC`), идемпотентно, с `flush`. Company больше не вызывает сервис Cash.
+- `Cash\EventListener\EnsureDefaultMoneyAccountsOnCompanyCreated` вызывает
+  `EnsureDefaultMoneyAccountsAction`: «Основной счет» (BANK, RUB) и касса «Основная»
+  (CASH, RUB), `isDefault = false`. Счёт создаётся, только если у компании нет ни одного
+  счёта этого типа (включая неактивные), — переименованный счёт не дублируется. Имя
+  уникально в компании (`uniq_company_name`): занятое счётом другого типа — пропуск с
+  warning. Company (`CompanyOwnerMembershipCreator`) сущности Cash не создаёт; ID новых
+  компании, участника и проекта — UUID v7.
 - Оба пути создания компании — `CompanyController::new` и
   `Company\Application\CreateCompanyOwnerAccountAction` (регистрация и админка через
   `CompanyFacade::createOwnerAccount`) — диспатчат событие после flush внутри
@@ -4069,6 +4076,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.38 | 2026-10-20 | Cash: денежные счета новой компании («Основной счет» BANK и касса «Основная» CASH, RUB) создаёт `EnsureDefaultMoneyAccountsAction` по `CompanyCreatedEvent`, а не Company; ID новой компании — UUID v7 |
 | 2.37 | 2026-10-20 | Marketplace: `app:marketplace:month-preliminary-rebuild` получила ручной режим — один этап одной компании за указанный месяц (предпросмотр / `--execute`) |
 | 2.36 | 2026-10-20 | Marketplace: удалены одноразовая `app:marketplace:repair-pl-mapping-19621cff` и `SaleMappingRetargetWriter` — применены на проде 20.10; `FinanceFacade::assignPlCategoryCode()` остаётся |
 | 2.35 | 2026-10-20 | Finance: `FinanceFacade::assignPlCategoryCode()`; Marketplace: одноразовая `app:marketplace:repair-pl-mapping-19621cff` (коды строк ОПиУ, перенос правил продаж WB с итоговых строк, правила возвратов), `SaleMappingRetargetWriter` |

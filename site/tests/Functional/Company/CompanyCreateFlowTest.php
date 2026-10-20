@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Company;
 
 use App\Balance\Facade\BalanceFacade;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
@@ -95,6 +96,12 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         )));
         sort($systemCodes);
         self::assertSame(['CF_FIN', 'CF_INV', 'CF_OP', 'CF_TECH', 'CF_TECH_IN', 'CF_TECH_OUT', 'CF_UNALLOC'], $systemCodes);
+
+        // Денежные счета тоже создаёт Cash по CompanyCreatedEvent.
+        self::assertSame(['bank:Основной счет:RUB', 'cash:Основная:RUB'], array_map(
+            static fn (MoneyAccount $account): string => sprintf('%s:%s:%s', $account->getType()->value, $account->getName(), $account->getCurrency()),
+            $em->getRepository(MoneyAccount::class)->findBy(['company' => $company], ['type' => 'ASC']),
+        ));
     }
 
     public function testInvalidMinimumBalanceShowsValidationError(): void

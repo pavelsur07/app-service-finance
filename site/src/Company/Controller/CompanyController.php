@@ -70,7 +70,7 @@ class CompanyController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        $company = new Company(id: Uuid::uuid4()->toString(), user: $user);
+        $company = new Company(id: Uuid::uuid7()->toString(), user: $user);
         $company->setUser($user); // Автоматически проставляем владельца
 
         $form = $this->createForm(CompanyType::class, $company);
