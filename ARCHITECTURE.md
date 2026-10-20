@@ -1234,6 +1234,17 @@ setManualDisplayName(string $name): void  // правка пользовател
 // CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50, только с --dry-run]
 __invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
 
+// src/Company/Infrastructure/Query/SpamAccountCandidatesQuery.php — DBAL, кросс-компанийный, только CLI
+// Кандидат: пользователь окна регистрации, не ROLE_ADMIN/ROLE_SUPER_ADMIN, на него ссылается
+// только companies.user_id, а у его кабинетов есть строки лишь в AUTO_SEED_TABLES
+// (financial_responsibility_center_projects, financial_responsibility_centers, project_directions).
+// Ссылающиеся таблицы — из схемы во время запуска (FK + колонки user_id / company_id).
+scan(\DateTimeImmutable $registeredFrom, \DateTimeImmutable $registeredTo): SpamAccountScan
+// SpamAccountPurger::purge(list<SpamAccountCandidate>) — DELETE автосид → companies → user,
+// транзакция у вызывающей команды.
+// CLI: app:company:prune-spam-accounts --registered-from=YYYY-MM-DD --registered-to=YYYY-MM-DD
+//      [--execute --expected-count=N] — без --execute отчёт; порции по 100
+
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры
 // Цифры → префикс по inn; иначе nameCore префикс + similarity(nameCore) > 0.3.
 // Всегда company_id и is_archived = false, LIMIT 20.
@@ -4049,6 +4060,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.31 | 2026-10-20 | Company: `app:company:prune-spam-accounts` — удаление аккаунтов окна регистрации без данных (`SpamAccountCandidatesQuery`, `SpamAccountPurger`); название компании при регистрации — не длиннее 120 символов и без ссылок, письмо «Регистрация завершена» его не выводит |
 | 2.30 | 2026-10-19 | Marketplace: серверный поиск и фильтр по тегу в реестре листингов (`ListingsFilter`, `?q=`, `?tag=`); назначение тега по фильтру — `filter` в `POST /api/marketplace/listings/tags/assign`, `matched` в ответе, `filter_too_broad` |
 | 2.29 | 2026-10-19 | Marketplace: создание тега листингов без назначений — `CreateListingTagAction`, `POST /api/marketplace/listings/tags/create`, кнопка «Добавить» на странице управления тегами |
 | 2.28 | 2026-10-19 | Marketplace: калькулятор `WbReviewPointsWithheldCalculator` (priority 98) — операция WB «Сумма баллов, удержанных в рамках акции "Баллы за отзывы"», сумма из `cashbackAmount` (`> 0` CHARGE, `< 0` STORNO); категория `wb_review_points_withheld` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` («Раздачи / самовыкупы / отзывы»); GlitchTip #387 |

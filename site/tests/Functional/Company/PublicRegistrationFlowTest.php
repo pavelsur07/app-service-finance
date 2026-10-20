@@ -125,6 +125,41 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
     }
 
     /**
+     * Регрессия: 14–15.01.2026 боты регистрировали чужие адреса со спамом и ссылкой
+     * в названии компании, а письмо «Регистрация завершена» доставляло его жертве.
+     */
+    public function testCompanyNameWithLinkOrTooLongIsRejected(): void
+    {
+        $client = static::createClient();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+
+        $names = [
+            'link' => '🏆 Поздравляем! Заберите приз на https://example.invalid/prize',
+            'domain' => 'Выигрыш ждёт вас на prize-win.online',
+            'www' => 'Акция www.example',
+            'long' => str_repeat('Очень длинное имя ', 8),
+        ];
+        foreach ($names as $case => $name) {
+            $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+            $crawler = $client->request('GET', '/register');
+
+            $form = $crawler->selectButton('Создать аккаунт')->form([
+                'registration_form[companyName]' => $name,
+                'registration_form[email]' => sprintf('spam-%s@example.test', $case),
+                'registration_form[plainPassword]' => 'password123',
+                'registration_form[agreeTerms]' => 1,
+                'registration_form[website]' => '',
+            ]);
+            $crawler = $client->submit($form);
+
+            self::assertSame(422, $client->getResponse()->getStatusCode(), $case);
+            self::assertCount(1, $crawler->filter('#registration_form_companyName_error1'), $case);
+        }
+
+        self::assertSame(0, $this->em()->getRepository(User::class)->count([]));
+    }
+
+    /**
      * Клиентский гейт не должен быть строже серверного предиката: Assert::email() с
      * FILTER_FLAG_EMAIL_UNICODE принимает unicode в локальной части, а HTML5-валидация
      * type="email" — нет. BrowserKit HTML5 не исполняет, поэтому тип поля проверяем явно.
