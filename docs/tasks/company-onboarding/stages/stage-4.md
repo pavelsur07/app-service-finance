@@ -49,17 +49,37 @@
 
 ## 4. Чек-лист приёмки
 
-- [ ] Регистрация и админка → 2 денежных счёта, проект и ЦФО «Общий», 7 статей ДДС, 70 статей ОПиУ, 33 статьи и 2 счёта Баланса.
-- [ ] Повторный `CompanyCreatedEvent` → счётчики не меняются.
-- [ ] Сбой подписчика (битый шаблон ОПиУ) → компании нет в БД.
-- [ ] Dry-run команды ничего не пишет; итоги по пунктам верные.
-- [ ] `--execute` без `--expected-count` или с неверным → отказ без записи.
-- [ ] `--execute` дозаполняет только пробелы; свои счета, статьи ОПиУ, счета Баланса не тронуты.
-- [ ] Повторный запуск → 0 компаний с пробелами.
-- [ ] Company не импортирует Cash/Finance/Balance; `ModuleBoundaryRules` зелёный.
-- [ ] Полные гейты: `make site-stan`, `site-cs-check`, `site-cs-strict-types`, `site-test-unit`, `site-test`.
-- [ ] `ARCHITECTURE.md`, Billing README обновлены.
+- [x] Регистрация и админка → 2 денежных счёта, проект и ЦФО «Общий», 7 статей ДДС, 70 статей ОПиУ, 33 статьи и 2 счёта Баланса.
+- [x] Повторный `CompanyCreatedEvent` → счётчики не меняются.
+- [x] Сбой подписчика (битый шаблон ОПиУ) → компании нет в БД.
+- [x] Dry-run команды ничего не пишет; итоги по пунктам верные.
+- [x] `--execute` без `--expected-count` или с неверным → отказ без записи.
+- [x] `--execute` дозаполняет только пробелы; свои счета, статьи ОПиУ, счета Баланса не тронуты.
+- [x] Повторный запуск → 0 компаний с пробелами.
+- [x] Company не импортирует Cash/Finance/Balance; `ModuleBoundaryRules` зелёный.
+- [x] Полные гейты: `make site-stan`, `site-cs-check`, `site-cs-strict-types`, `site-test-unit`, `site-test`.
+- [x] `ARCHITECTURE.md`, Billing README обновлены.
 
 ## Итог
 
-_Заполняется по завершении этапа._
+Выполнено 2026-10-20.
+
+- `CompanyOnboardingBackfillEvent`; dry-run в `EnsureDefaultMoneyAccountsAction`,
+  `EnsureDefaultPLTreeAction`, `EnsureBalanceAccountsAction`; подписчики
+  `BackfillDefaultMoneyAccounts`, `BackfillDefaultPLTree`, `BackfillBalanceSetup`;
+  `BackfillCompanyOnboardingAction` + `app:company:onboarding-backfill`.
+- Сквозной `CompanyOnboardingTest`: регистрация и админка → полный набор; повторное событие
+  → без дублей; битый шаблон ОПиУ → компании нет в БД.
+- `BackfillCompanyOnboardingCommandTest` (6): dry-run без записи с отчётом по пунктам;
+  `--expected-count` обязателен, неверный и нечисловой — отказ; execute дозаполняет только
+  пробелы и не трогает своё; повтор → 0; сбой подписчика → компания откатывается, следующие не
+  трогаются; неизвестная компания.
+- Финальное ревью в отдельной сессии: BLOCKER нет; IMPORTANT (нет теста останова, dry-run
+  занижал счета Баланса) и MINOR (ленивый сид в одной транзакции, сообщение о
+  `--expected-count`, unit-тест N+1) исправлены в `cf50dd48e`. Не принято: родовые исключения
+  для неизвестной компании — так же у соседних `EnsureCashflowSystemCategoriesAction` и
+  `SeedMissingBalanceStructuresAction`.
+- Полные гейты (до правок ревью): PHPStan (весь проект, baseline) — No errors; php-cs-fixer и
+  strict_types без кеша — 0 of 3202; `phpunit` полный — OK (6941 tests, 39307 assertions).
+  После правок: модули Balance, Company, Finance, Cash — OK (1374 tests, 4704 assertions),
+  PHPStan и CS по изменённым файлам чистые.
