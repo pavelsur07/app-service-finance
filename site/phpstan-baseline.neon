@@ -12524,17 +12524,7 @@ parameters:
 			count: 1
 			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlannerTest.php
 
-		-
-			message: '#^Access to an undefined property object\:\:\$companyId\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Unit/Marketplace/Command/MonthPreliminaryRebuildCommandTest.php
 
-		-
-			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'
-			identifier: method.unresolvableReturnType
-			count: 3
-			path: tests/Unit/Marketplace/Command/MonthPreliminaryRebuildCommandTest.php
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'

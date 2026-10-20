@@ -229,6 +229,15 @@ Read-only проверки можно выполнять после запрос
   остальные пары применяются; exit 1, если заблокирована хоть одна. Предпросмотр — без
   отдельного одобрения; запуск с `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
 
+- `app:marketplace:month-preliminary-rebuild --company-id=<uuid> --marketplace=ozon|wildberries --month=YYYY-MM --stage=sales_returns|costs [--execute]` —
+  предварительное закрытие одного этапа за любой прошедший или текущий месяц, тот же
+  `RebuildPreliminaryForPeriodAction`, что у ночного cron (тот берёт только текущий месяц).
+  Без `--execute` — read-only preflight и что сделает пересборка, exit 1 при блокирующих
+  ошибках; с `--execute` выполняется синхронно, без очереди: предварительно закрытый этап
+  переоткрывается, документ ОПиУ пересоздаётся, итоговый статус печатается. Финально
+  закрытый этап не трогается (exit 1). Запуск без опций через wrapper запрещён. Предпросмотр —
+  без отдельного одобрения; `--execute` — отдельное одобрение Владельца по AGENTS.md §3.3.
+
 - `app:marketplace:cost-pl-mapping:apply-default --company-id=<uuid> --marketplace=ozon|wildberries [--execute]` —
   базовый маппинг затрат в ОПиУ для одной компании, те же экшены, что у кнопки
   `/marketplace/cost-pl-mapping/default/apply`. Без `--execute` — read-only
