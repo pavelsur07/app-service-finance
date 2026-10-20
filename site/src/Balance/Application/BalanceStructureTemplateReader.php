@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Application;
 
+use App\Balance\DTO\BalanceStructureTemplateAccount;
 use App\Balance\DTO\BalanceStructureTemplateNode;
 use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Exception\BalanceStructureTemplateException;
@@ -18,7 +19,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class BalanceStructureTemplateReader
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
     private const MAX_LEVEL = 4;
     private const MAX_NODES = 200;
     private const MAX_NAME_LENGTH = 255;
@@ -63,17 +64,19 @@ final readonly class BalanceStructureTemplateReader
         }
 
         $seen = [];
+        $seenAccounts = [];
 
-        return $this->nodes($articles, null, 1, 'articles', $seen);
+        return $this->nodes($articles, null, 1, 'articles', $seen, $seenAccounts);
     }
 
     /**
      * @param array<mixed> $items
      * @param array<string, true> $seen
+     * @param array<string, true> $seenAccounts
      *
      * @return list<BalanceStructureTemplateNode>
      */
-    private function nodes(array $items, ?BalanceCategoryType $parentType, int $level, string $path, array &$seen): array
+    private function nodes(array $items, ?BalanceCategoryType $parentType, int $level, string $path, array &$seen, array &$seenAccounts): array
     {
         if ($level > self::MAX_LEVEL) {
             throw new BalanceStructureTemplateException(sprintf('%s: глубина больше %d уровней.', $path, self::MAX_LEVEL));
@@ -124,16 +127,65 @@ final readonly class BalanceStructureTemplateReader
                 throw new BalanceStructureTemplateException(sprintf('%s (%s): у конечной статьи не бывает children.', $nodePath, $code));
             }
 
+            $accountItems = $item['accounts'] ?? [];
+            if (!\is_array($accountItems) || ([] !== $accountItems && !array_is_list($accountItems))) {
+                throw new BalanceStructureTemplateException(sprintf('%s (%s): accounts должен быть списком.', $nodePath, $code));
+            }
+            if ('article' !== $kind && [] !== $accountItems) {
+                throw new BalanceStructureTemplateException(sprintf('%s (%s): счета бывают только у конечной статьи.', $nodePath, $code));
+            }
+
             $nodes[] = new BalanceStructureTemplateNode(
                 code: $code,
                 name: trim($name),
                 type: $type,
                 kind: $kind,
                 sortOrder: ($index + 1) * 10,
-                children: $this->nodes($childItems, $type, $level + 1, $nodePath.'.children', $seen),
+                children: $this->nodes($childItems, $type, $level + 1, $nodePath.'.children', $seen, $seenAccounts),
+                accounts: $this->accounts($accountItems, $nodePath.'.accounts', $seenAccounts),
             );
         }
 
         return $nodes;
+    }
+
+    /**
+     * @param list<mixed> $items
+     * @param array<string, true> $seen
+     *
+     * @return list<BalanceStructureTemplateAccount>
+     */
+    private function accounts(array $items, string $path, array &$seen): array
+    {
+        $accounts = [];
+        foreach ($items as $index => $item) {
+            $accountPath = sprintf('%s[%d]', $path, $index);
+            if (!\is_array($item)) {
+                throw new BalanceStructureTemplateException($accountPath.': счёт должен быть объектом.');
+            }
+
+            $code = $item['code'] ?? null;
+            if (!\is_string($code) || 1 !== preg_match(self::CODE_PATTERN, $code)) {
+                throw new BalanceStructureTemplateException($accountPath.': code счёта обязателен, формат A-Z, 0-9, _, до 64 символов.');
+            }
+            if (isset($seen[$code])) {
+                throw new BalanceStructureTemplateException(sprintf('%s: code счёта %s повторяется.', $accountPath, $code));
+            }
+            $seen[$code] = true;
+
+            $name = $item['name'] ?? null;
+            if (!\is_string($name) || '' === trim($name) || mb_strlen($name) > self::MAX_NAME_LENGTH) {
+                throw new BalanceStructureTemplateException(sprintf('%s (%s): name счёта обязателен, до %d символов.', $accountPath, $code, self::MAX_NAME_LENGTH));
+            }
+
+            $allowNegative = $item['allow_negative'] ?? false;
+            if (!\is_bool($allowNegative)) {
+                throw new BalanceStructureTemplateException(sprintf('%s (%s): allow_negative должен быть true или false.', $accountPath, $code));
+            }
+
+            $accounts[] = new BalanceStructureTemplateAccount($code, trim($name), $allowNegative);
+        }
+
+        return $accounts;
     }
 }

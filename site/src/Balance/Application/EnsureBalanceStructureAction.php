@@ -16,6 +16,7 @@ final readonly class EnsureBalanceStructureAction
     public function __construct(
         private CompaniesWithoutBalanceStructureQuery $missing,
         private SeedBalanceStructureAction $seed,
+        private EnsureBalanceAccountsAction $accounts,
     ) {
     }
 
@@ -29,6 +30,12 @@ final readonly class EnsureBalanceStructureAction
         }
 
         // Системный сид (actor = null): права чтения уже проверены контроллером, аудит — system_seed.
-        return ($this->seed)($companyId);
+        if (!($this->seed)($companyId)) {
+            return false;
+        }
+        // Как у новой компании: вместе со структурой — базовые учётные счета шаблона.
+        ($this->accounts)($companyId);
+
+        return true;
     }
 }

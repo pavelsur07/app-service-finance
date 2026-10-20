@@ -1439,12 +1439,19 @@ seedDefaultStructure(string $companyId): bool
 Дерево и суммы строятся из одного снимка. Архив/видимость не исключают остатки из итогов.
 
 Стартовая структура новой компании: шаблон `site/config/balance/default_structure.yaml`
-(версия 2 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
+(версия 3 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
 маркетплейсами, склады, налоги, кредиты; `code` — стабильный контракт статьи, порядок задаёт
-позиция, id в файле нет; компании со структурой версии 1 не меняются),
-читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code`,
-`article` без `children`, сторона наследуется от родителя), применяется
-`SeedBalanceStructureAction` (идемпотентно). Запускает его слушатель
+позиция, id в файле нет; компании со структурой версии 1 не меняются; у конечной статьи —
+необязательный список `accounts: [{code, name, allow_negative}]`, в шаблоне два счёта:
+`ACC_MAIN_BANK` «Расчётный счёт (основной)» на `CASH_BANK` и `ACC_MAIN_REGISTER` «Касса (основная)»
+на `CASH_REGISTER`),
+читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code` статей и
+отдельно счетов, `article` без `children`, `accounts` только у `article`, сторона наследуется от
+родителя), статьи применяет `SeedBalanceStructureAction` (идемпотентно), счета —
+`EnsureBalanceAccountsAction`: только компании без единого учётного счёта, под блокировкой книги,
+запись как у ручного создания (счёт, нулевое `balance_account_states`, аудит `system_seed`);
+статья отсутствует, архивна или не конечная — счёт пропускается с одним warning. Книга не
+инициализируется. Оба запускает слушатель
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
 `App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
 компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
@@ -1452,7 +1459,7 @@ seedDefaultStructure(string $companyId): bool
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
 структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController` и
 `BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
-не инициализирована), потом системный сид (`system_seed`). Бэкфилл для компаний без структуры —
+не инициализирована), потом системный сид (`system_seed`) и, если структура создана сейчас, базовые счета шаблона. Бэкфилл для компаний без структуры —
 `app:balance:seed-missing-structure` (`SeedMissingBalanceStructuresAction`): по умолчанию dry-run,
 запись только с `--execute --expected-count=<из dry-run>`; кандидат — компания без статей и с
 неинициализированной книгой; останов на первой ошибке, повторный запуск продолжает.
@@ -4077,6 +4084,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.40 | 2026-10-20 | Balance: шаблон структуры версии 3 — `accounts` у конечных статей; базовые учётные счета новой компании (`ACC_MAIN_BANK`, `ACC_MAIN_REGISTER`) создаёт `EnsureBalanceAccountsAction` по `CompanyCreatedEvent` |
 | 2.39 | 2026-10-20 | Finance: базовое дерево ОПиУ новой компании — `EnsureDefaultPLTreeAction` по `CompanyCreatedEvent`, только компании без статей; `PLCategoryRepository::existsByCompanyId()` |
 | 2.38 | 2026-10-20 | Cash: денежные счета новой компании («Основной счет» BANK и касса «Основная» CASH, RUB) создаёт `EnsureDefaultMoneyAccountsAction` по `CompanyCreatedEvent`, а не Company; ID новой компании — UUID v7 |
 | 2.37 | 2026-10-20 | Marketplace: `app:marketplace:month-preliminary-rebuild` получила ручной режим — один этап одной компании за указанный месяц (предпросмотр / `--execute`) |

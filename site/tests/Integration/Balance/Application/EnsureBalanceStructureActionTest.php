@@ -21,7 +21,8 @@ final class EnsureBalanceStructureActionTest extends IntegrationTestCase
         self::assertSame(33, $this->articleCount($companyId));
         self::assertFalse($ensure($companyId));
         self::assertSame(33, $this->articleCount($companyId));
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND action='system_seed'", [$companyId]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [$companyId]));
+        self::assertSame(['ACC_MAIN_BANK', 'ACC_MAIN_REGISTER'], $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [$companyId]));
     }
 
     public function testDoesNotTouchCompanyWithInitializedBook(): void
