@@ -44,10 +44,10 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Setup Co', false, BusinessProfile::UNIVERSAL);
         $companyId = (string) $company->getId();
 
-        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 41, 'balance_articles' => 31]), $this->onboardingOf($companyId));
+        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 42, 'balance_articles' => 31]), $this->onboardingOf($companyId));
         // Ни одной статьи маркетплейса: ни в ОПиУ, ни в Балансе.
         self::assertSame([], $this->connection->fetchFirstColumn(
-            "SELECT code FROM pl_categories WHERE company_id = ? AND (code LIKE '%SPP%' OR code LIKE 'COGS_MP%' OR code LIKE 'CM_%' OR code LIKE 'PRODUCT_INFRA%' OR code LIKE 'OPEX_WH%' OR code LIKE 'PROMO%')",
+            "SELECT code FROM pl_categories WHERE company_id = ? AND (code LIKE '%SPP%' OR code LIKE 'COGS_MP%' OR code ~ '^CM[0-9]' OR code LIKE 'PRODUCT_INFRA%' OR code LIKE 'OPEX_WH%' OR code LIKE 'PROMO%')",
             [$companyId],
         ));
         self::assertSame([], $this->connection->fetchFirstColumn("SELECT code FROM balance_articles WHERE company_id = ? AND code IN ('AR_MARKETPLACES', 'INV_MARKETPLACE')", [$companyId]));

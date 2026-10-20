@@ -13,15 +13,15 @@
       "flow": "NONE",
       "expenseType": "other",
       "weightInParent": "1.0000",
-      "isVisible": true,
-      "formula": "REV_SALES + REV_SALES_RETURNS",
+      "isVisible": false,
+      "formula": "REV_SALES_TOTAL",
       "calcOrder": 10,
       "sortOrder": 10,
       "children": [
         {
-          "name": "Выручка от продаж",
-          "code": "REV_SALES",
-          "type": "LEAF_INPUT",
+          "name": "Выручка",
+          "code": "REV_SALES_TOTAL",
+          "type": "SUBTOTAL",
           "format": "MONEY",
           "flow": "INCOME",
           "expenseType": "other",
@@ -29,20 +29,35 @@
           "isVisible": true,
           "formula": null,
           "calcOrder": null,
-          "sortOrder": 10
-        },
-        {
-          "name": "Возвраты и скидки покупателям (−)",
-          "code": "REV_SALES_RETURNS",
-          "type": "LEAF_INPUT",
-          "format": "MONEY",
-          "flow": "EXPENSE",
-          "expenseType": "other",
-          "weightInParent": "1.0000",
-          "isVisible": true,
-          "formula": null,
-          "calcOrder": null,
-          "sortOrder": 20
+          "sortOrder": 10,
+          "children": [
+            {
+              "name": "Выручка от продаж",
+              "code": "REV_SALES",
+              "type": "LEAF_INPUT",
+              "format": "MONEY",
+              "flow": "INCOME",
+              "expenseType": "other",
+              "weightInParent": "1.0000",
+              "isVisible": true,
+              "formula": null,
+              "calcOrder": null,
+              "sortOrder": 10
+            },
+            {
+              "name": "Возвраты и скидки покупателям (−)",
+              "code": "REV_SALES_RETURNS",
+              "type": "LEAF_INPUT",
+              "format": "MONEY",
+              "flow": "EXPENSE",
+              "expenseType": "other",
+              "weightInParent": "1.0000",
+              "isVisible": true,
+              "formula": null,
+              "calcOrder": null,
+              "sortOrder": 20
+            }
+          ]
         }
       ]
     },
@@ -300,7 +315,7 @@
               "sortOrder": 50
             },
             {
-              "name": "Банковские комиссии и (РКО)",
+              "name": "Банковские комиссии и РКО",
               "code": "OVERHEAD_ADMIN_BANK",
               "type": "LEAF_INPUT",
               "format": "MONEY",
@@ -397,7 +412,7 @@
       ]
     },
     {
-      "name": "EBITDA (операционная прибыль)",
+      "name": "EBITDA",
       "code": "EBITDA",
       "type": "KPI",
       "format": "MONEY",
@@ -410,7 +425,7 @@
       "sortOrder": 60
     },
     {
-      "name": "Операционная рентабельность (EBITDA)%",
+      "name": "Рентабельность по EBITDA, %",
       "code": "EBITDAK",
       "type": "KPI",
       "format": "PERCENT",
@@ -449,7 +464,7 @@
           "sortOrder": 10
         },
         {
-          "name": "УСН / АУСН  (Д−Р)",
+          "name": "УСН / АУСН",
           "code": "BELOW_EBITDA_USN",
           "type": "LEAF_INPUT",
           "format": "MONEY",

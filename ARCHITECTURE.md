@@ -1677,7 +1677,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 Шаблоны выбираются по профилю через реестры `finance.pl_templates` и `balance.structure_templates`
 (`config/services.yaml`): у каждого профиля запись, профиль без своего шаблона указывает на
 маркетплейсный явно. Шаблоны: `MARKETPLACE` — `pl_templates/marketplace.json` (70 статей, CM1–CM4, ДРР),
-`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (41 статья: выручка,
+`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (42 статьи: выручка,
 себестоимость, валовая прибыль и маржа, операционные расходы, EBITDA, чистая прибыль),
 `templates/universal.yaml` (31 статья — без расчётов и складов маркетплейсов). Код статьи значит одно и то же во всех шаблонах:
 ОПиУ — тип, поток, формат, код родителя; Баланс — сторона, вид, код родителя, статья счёта.
@@ -4131,7 +4131,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.44 | 2026-10-20 | Finance, Balance: универсальные стартовые шаблоны профиля `UNIVERSAL` — `pl_templates/universal.json` (41 статья, валовая прибыль/маржа, EBITDA, чистая прибыль), `templates/universal.yaml` (31 статья) |
+| 2.44 | 2026-10-20 | Finance, Balance: универсальные стартовые шаблоны профиля `UNIVERSAL` — `pl_templates/universal.json` (42 статьи, валовая прибыль/маржа, EBITDA, чистая прибыль), `templates/universal.yaml` (31 статья) |
 | 2.43 | 2026-10-20 | Finance, Balance: стартовые шаблоны по профилю бизнеса — реестры `finance.pl_templates`, `balance.structure_templates`, файлы `config/finance/pl_templates/`, `config/balance/templates/` (`UNIVERSAL` пока на маркетплейсных); `CompanyFacade::getBusinessProfile()`, `CompanyNotFoundException`; словарь кодов `TemplateRegistryTest` |
 | 2.42 | 2026-10-20 | Company: профиль бизнеса `BusinessProfile` (`MARKETPLACE`, `UNIVERSAL`) — колонка `companies.business_profile`, выбор при регистрации, в `/company/new` и в админке; `CompanyCreatedEvent` несёт профиль; `CompanyFacade::createOwnerAccount()` принимает профиль |
 | 2.41 | 2026-10-20 | Company: раздел «Онбординг компании»; `app:company:onboarding-backfill` и `CompanyOnboardingBackfillEvent` — дозаполнение кассы, дерева ОПиУ, структуры и счетов Баланса у существующих компаний |
