@@ -103,6 +103,52 @@ final class PlPreviewRowsXlsxControllerTest extends WebTestCaseBase
         self::assertSame(0.0, $passport['check_channels_vs_all_REV']);
     }
 
+    public function testExportMenuOffersBothFormatsWithCurrentFilter(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 551);
+        $tag = MarketplaceListingTagBuilder::aTag()->forCompanyId((string) $fixture->company->getId())->withName('Зима')->build();
+        $this->em()->persist($tag);
+        $this->em()->flush();
+        $tagId = $tag->getId();
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $crawler = $client->request('GET', '/marketplace/pl-preview?dateFrom=2026-01-01&dateTo=2026-01-31&marketplace=wildberries&tags_set=1&tags[]='.$tagId);
+
+        self::assertResponseIsSuccessful();
+        $menu = $crawler->filter('[data-testid="pl-preview-export"]');
+        self::assertSame('Скачать xlsx', trim($menu->filter('button.dropdown-toggle')->text()));
+        self::assertSame(['Таблица как на экране', 'Строками для план-факта'], $menu->filter('.dropdown-item > span')->each(static fn ($s): string => trim($s->text())));
+
+        $files = [];
+        foreach (['pl-preview-xlsx' => '/marketplace/pl-preview/xlsx?', 'pl-preview-rows-xlsx' => '/marketplace/pl-preview/rows-xlsx?'] as $testId => $prefix) {
+            $href = (string) $menu->filter('[data-testid="'.$testId.'"]')->attr('href');
+            self::assertStringStartsWith($prefix, $href);
+            parse_str((string) parse_url($href, \PHP_URL_QUERY), $query);
+            self::assertSame(['dateFrom' => '2026-01-01', 'dateTo' => '2026-01-31', 'marketplace' => 'wildberries', 'tags_set' => '1', 'tags' => [$tagId]], $query);
+
+            $client->request('GET', $href);
+            self::assertResponseIsSuccessful();
+            $files[] = (string) $client->getResponse()->headers->get('Content-Disposition');
+        }
+        self::assertStringContainsString('pl-preview_2026-01-01_2026-01-31.xlsx', $files[0]);
+        self::assertStringContainsString('pl-rows_2026-01-01_2026-01-31.xlsx', $files[1]);
+    }
+
+    public function testNoExportMenuWhenPeriodIsWrong(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 561);
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $client->request('GET', '/marketplace/pl-preview?dateFrom=2026-02-01&dateTo=2026-01-01');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('[data-testid="pl-preview-export"]');
+    }
+
     public function testOtherCompanyGetsNothingOfThisOne(): void
     {
         $client = static::createClient();

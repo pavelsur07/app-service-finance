@@ -1,6 +1,6 @@
 ## Current checkpoint
 
-**Phase:** Stage 5
+**Phase:** Stage 6
 **Status:** in progress
 **Stage base commit:** f47d1760e
 
@@ -10,16 +10,17 @@
 - Stage 2 — Exporter: «Данные», «Паспорт».
 - Stage 3 — «Покрытие», «Реклама», «Предупреждения» (49 tests OK).
 - Stage 4 — Controller `/marketplace/pl-preview/rows-xlsx`.
+- Stage 5 — меню «Скачать xlsx» с двумя форматами.
 
 ### Checks and baseline
 - Baseline 2026-10-20: `phpunit tests/Integration/Marketplace/PlPreview tests/Functional/Marketplace/Controller/PlPreviewControllerTest.php` — OK, 35 tests / 128 assertions. БД `app_test_rowsx`, сеть `app-service-finance_default`.
 
 ### Review status
-- internal: Stage 1–4 — open: none
+- internal: Stage 1–5 — open: none
 - external: —
 
 ### Exact next action
-- Stage 5: UI — меню «Скачать xlsx» с двумя форматами.
+- Stage 6: ARCHITECTURE.md, приёмка, handoff.
 
 ### Files to inspect first on resume
 - `plan.md`, `stages/stage-1.md`
