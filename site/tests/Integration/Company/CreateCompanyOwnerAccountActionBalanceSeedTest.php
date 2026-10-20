@@ -26,6 +26,9 @@ final class CreateCompanyOwnerAccountActionBalanceSeedTest extends IntegrationTe
         foreach (['MONEY', 'CASH_BANK', 'CASH_PAYMENT_SYSTEMS', 'AR_MARKETPLACES', 'INV_MARKETPLACE', 'TAX_RECEIVABLE', 'EQUITY', 'LONG_LOANS'] as $code) {
             self::assertContains($code, $codes);
         }
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND action='system_seed'", [(string) $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [(string) $company->getId()]));
+        // Базовые учётные счета шаблона — с записью аудита на каждый.
+        self::assertSame(['ACC_MAIN_BANK', 'ACC_MAIN_REGISTER'], $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [(string) $company->getId()]));
+        self::assertSame(2, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='account' AND action='system_seed'", [(string) $company->getId()]));
     }
 }

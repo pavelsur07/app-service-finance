@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Webmozart\Assert\Assert;
 
 class PLCategoryRepository extends ServiceEntityRepository
 {
@@ -16,6 +17,23 @@ class PLCategoryRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, PLCategory::class);
+    }
+
+    /**
+     * Есть ли у компании хотя бы одна статья ОПиУ: базовое дерево получает только
+     * компания без своих статей.
+     */
+    public function existsByCompanyId(string $companyId): bool
+    {
+        Assert::uuid($companyId);
+
+        return null !== $this->createQueryBuilder('c')
+            ->select('1')
+            ->andWhere('IDENTITY(c.company) = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

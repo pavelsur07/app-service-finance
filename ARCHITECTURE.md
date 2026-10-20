@@ -319,6 +319,7 @@
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
 - Базовый шаблон дерева — `config/finance/default_pl_tree.json` (формат v1, `DefaultPLCategoryTreeProvider`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
+- Новая компания получает базовый шаблон автоматически: `Finance\EventListener\ApplyDefaultPLTreeOnCompanyCreated` на `CompanyCreatedEvent` вызывает `EnsureDefaultPLTreeAction(companyId)` — шаблон применяется тем же импортом в режиме `onlyCreate`, только если у компании нет ни одной статьи ОПиУ (`PLCategoryRepository::existsByCompanyId()`); настроенное дерево не дополняется. Ошибка шаблона или импорта откатывает создание компании. Импорт в компанию без статей не ищет совпадения по каждому узлу — искать нечего.
 
 ### Finance: уровень строки отчёта ОПиУ
 
@@ -1438,12 +1439,19 @@ seedDefaultStructure(string $companyId): bool
 Дерево и суммы строятся из одного снимка. Архив/видимость не исключают остатки из итогов.
 
 Стартовая структура новой компании: шаблон `site/config/balance/default_structure.yaml`
-(версия 2 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
+(версия 3 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
 маркетплейсами, склады, налоги, кредиты; `code` — стабильный контракт статьи, порядок задаёт
-позиция, id в файле нет; компании со структурой версии 1 не меняются),
-читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code`,
-`article` без `children`, сторона наследуется от родителя), применяется
-`SeedBalanceStructureAction` (идемпотентно). Запускает его слушатель
+позиция, id в файле нет; компании со структурой версии 1 не меняются; у конечной статьи —
+необязательный список `accounts: [{code, name, allow_negative}]`, в шаблоне два счёта:
+`ACC_MAIN_BANK` «Расчётный счёт (основной)» на `CASH_BANK` и `ACC_MAIN_REGISTER` «Касса (основная)»
+на `CASH_REGISTER`),
+читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code` статей и
+отдельно счетов, `article` без `children`, `accounts` только у `article`, сторона наследуется от
+родителя), статьи применяет `SeedBalanceStructureAction` (идемпотентно), счета —
+`EnsureBalanceAccountsAction`: только компании без единого учётного счёта, под блокировкой книги,
+запись как у ручного создания (счёт, нулевое `balance_account_states`, аудит `system_seed`);
+статья отсутствует, архивна или не конечная — счёт пропускается с одним warning. Книга не
+инициализируется. Оба запускает слушатель
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
 `App\Company\Event\CompanyCreatedEvent(companyId)` — его диспатчат оба пути создания
 компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
@@ -1451,7 +1459,7 @@ seedDefaultStructure(string $companyId): bool
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
 структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController` и
 `BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
-не инициализирована), потом системный сид (`system_seed`). Бэкфилл для компаний без структуры —
+не инициализирована), потом системный сид (`system_seed`) и, если структура создана сейчас, базовые счета шаблона. Бэкфилл для компаний без структуры —
 `app:balance:seed-missing-structure` (`SeedMissingBalanceStructuresAction`): по умолчанию dry-run,
 запись только с `--execute --expected-count=<из dry-run>`; кандидат — компания без статей и с
 неинициализированной книгой; останов на первой ошибке, повторный запуск продолжает.
@@ -1654,12 +1662,44 @@ manage — только владелец. Новые права автомати
   chart-зависимости и подключает переиспользуемые стили
   `assets/styles/components/financial-chart.css`.
 
-### Company → Cash: системные статьи ДДС по `CompanyCreatedEvent`
+### Онбординг компании: `CompanyCreatedEvent` и дозаполнение
+
+Стартовые данные новой компании заводят модули-подписчики; Company о них не знает.
+`App\Company\Event\CompanyCreatedEvent(companyId)` диспатчат оба пути создания
+(`CompanyController::new` и `CreateCompanyOwnerAccountAction` — регистрация и админка) после
+flush внутри `wrapInTransaction`: сбой любого подписчика откатывает компанию целиком.
+
+| Кто | Что создаёт | Правило повторного запуска |
+|---|---|---|
+| Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
+| Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
+| Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет счёта этого типа |
+| Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ из `config/finance/default_pl_tree.json` | нет ни одной статьи ОПиУ |
+| Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета из `config/balance/default_structure.yaml` | статьи — нет статей; счета — нет ни одного счёта |
+
+Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
+[--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
+по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, execute)`; подписчики
+Cash (`BackfillDefaultMoneyAccounts`), Finance (`BackfillDefaultPLTree`), Balance
+(`BackfillBalanceSetup`: нет структуры — структура и счета, иначе только счета) теми же
+правилами считают (dry-run, по умолчанию) или создают недостающее и пишут итог в
+`report()`. `--execute` — только с `--expected-count`, равным числу компаний с пробелами из
+dry-run; каждая компания — своя транзакция; останов на первой ошибке, повторный запуск
+продолжает. ДДС не дозаполняется: системные статьи у существующих компаний уже есть.
+
+### Company → Cash: системные статьи ДДС и денежные счета по `CompanyCreatedEvent`
 
 - `Cash\EventListener\EnsureCashflowSystemCategoriesOnCompanyCreated` на
   `App\Company\Event\CompanyCreatedEvent` вызывает `EnsureCashflowSystemCategoriesAction`:
   7 системных статей (`CF_OP`, `CF_FIN`, `CF_INV`, `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`,
   `CF_UNALLOC`), идемпотентно, с `flush`. Company больше не вызывает сервис Cash.
+- `Cash\EventListener\EnsureDefaultMoneyAccountsOnCompanyCreated` вызывает
+  `EnsureDefaultMoneyAccountsAction`: «Основной счет» (BANK, RUB) и касса «Основная»
+  (CASH, RUB), `isDefault = false`. Счёт создаётся, только если у компании нет ни одного
+  счёта этого типа (включая неактивные), — переименованный счёт не дублируется. Имя
+  уникально в компании (`uniq_company_name`): занятое счётом другого типа — пропуск с
+  warning. Company (`CompanyOwnerMembershipCreator`) сущности Cash не создаёт; ID новых
+  компании, участника и проекта — UUID v7.
 - Оба пути создания компании — `CompanyController::new` и
   `Company\Application\CreateCompanyOwnerAccountAction` (регистрация и админка через
   `CompanyFacade::createOwnerAccount`) — диспатчат событие после flush внутри
@@ -4069,6 +4109,10 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.41 | 2026-10-20 | Company: раздел «Онбординг компании»; `app:company:onboarding-backfill` и `CompanyOnboardingBackfillEvent` — дозаполнение кассы, дерева ОПиУ, структуры и счетов Баланса у существующих компаний |
+| 2.40 | 2026-10-20 | Balance: шаблон структуры версии 3 — `accounts` у конечных статей; базовые учётные счета новой компании (`ACC_MAIN_BANK`, `ACC_MAIN_REGISTER`) создаёт `EnsureBalanceAccountsAction` по `CompanyCreatedEvent` |
+| 2.39 | 2026-10-20 | Finance: базовое дерево ОПиУ новой компании — `EnsureDefaultPLTreeAction` по `CompanyCreatedEvent`, только компании без статей; `PLCategoryRepository::existsByCompanyId()` |
+| 2.38 | 2026-10-20 | Cash: денежные счета новой компании («Основной счет» BANK и касса «Основная» CASH, RUB) создаёт `EnsureDefaultMoneyAccountsAction` по `CompanyCreatedEvent`, а не Company; ID новой компании — UUID v7 |
 | 2.37 | 2026-10-20 | Marketplace: `app:marketplace:month-preliminary-rebuild` получила ручной режим — один этап одной компании за указанный месяц (предпросмотр / `--execute`) |
 | 2.36 | 2026-10-20 | Marketplace: удалены одноразовая `app:marketplace:repair-pl-mapping-19621cff` и `SaleMappingRetargetWriter` — применены на проде 20.10; `FinanceFacade::assignPlCategoryCode()` остаётся |
 | 2.35 | 2026-10-20 | Finance: `FinanceFacade::assignPlCategoryCode()`; Marketplace: одноразовая `app:marketplace:repair-pl-mapping-19621cff` (коды строк ОПиУ, перенос правил продаж WB с итоговых строк, правила возвратов), `SaleMappingRetargetWriter` |

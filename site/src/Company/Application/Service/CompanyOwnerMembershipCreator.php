@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Company\Application\Service;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
@@ -28,7 +26,7 @@ final readonly class CompanyOwnerMembershipCreator
 
     public function createCompany(User $owner, string $companyName): Company
     {
-        $company = new Company(Uuid::uuid4()->toString(), $owner);
+        $company = new Company(Uuid::uuid7()->toString(), $owner);
         $company->setName(\trim($companyName));
 
         return $this->persistCompanyWithOwnerMembership($company, $owner);
@@ -40,7 +38,7 @@ final readonly class CompanyOwnerMembershipCreator
         $owner->addCompany($company);
 
         $generalProject = new ProjectDirection(
-            id: Uuid::uuid4()->toString(),
+            id: Uuid::uuid7()->toString(),
             company: $company,
             name: 'Общий',
             systemCode: ProjectDirection::CODE_GENERAL,
@@ -53,7 +51,7 @@ final readonly class CompanyOwnerMembershipCreator
 
         $this->entityManager->persist($company);
         $ownerMember = new CompanyMember(
-            id: Uuid::uuid4()->toString(),
+            id: Uuid::uuid7()->toString(),
             company: $company,
             user: $owner,
             role: CompanyMember::ROLE_OWNER,
@@ -71,13 +69,6 @@ final readonly class CompanyOwnerMembershipCreator
             companyId: (string) $company->getId(),
             projectDirection: $generalProject,
             responsibilityCenter: $generalCenter,
-        ));
-        $this->entityManager->persist(new MoneyAccount(
-            id: Uuid::uuid4()->toString(),
-            company: $company,
-            type: MoneyAccountType::BANK,
-            name: 'Основной счет',
-            currency: 'RUB',
         ));
 
         return $company;

@@ -10,6 +10,7 @@ final readonly class BalanceStructureTemplateNode
 {
     /**
      * @param list<self> $children
+     * @param list<BalanceStructureTemplateAccount> $accounts счета статьи (только у kind = article)
      */
     public function __construct(
         public string $code,
@@ -18,6 +19,7 @@ final readonly class BalanceStructureTemplateNode
         public string $kind,
         public int $sortOrder,
         public array $children = [],
+        public array $accounts = [],
     ) {
     }
 }

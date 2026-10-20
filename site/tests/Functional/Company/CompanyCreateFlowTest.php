@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Company;
 
 use App\Balance\Facade\BalanceFacade;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
@@ -15,6 +16,7 @@ use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Entity\PLCategory;
 use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -95,6 +97,21 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         )));
         sort($systemCodes);
         self::assertSame(['CF_FIN', 'CF_INV', 'CF_OP', 'CF_TECH', 'CF_TECH_IN', 'CF_TECH_OUT', 'CF_UNALLOC'], $systemCodes);
+
+        // Денежные счета тоже создаёт Cash по CompanyCreatedEvent.
+        self::assertSame(['bank:Основной счет:RUB', 'cash:Основная:RUB'], array_map(
+            static fn (MoneyAccount $account): string => sprintf('%s:%s:%s', $account->getType()->value, $account->getName(), $account->getCurrency()),
+            $em->getRepository(MoneyAccount::class)->findBy(['company' => $company], ['type' => 'ASC']),
+        ));
+
+        // Базовое дерево ОПиУ создаёт Finance по CompanyCreatedEvent.
+        self::assertSame(70, $em->getRepository(PLCategory::class)->count(['company' => $company]));
+
+        // Базовые учётные счета Баланса — на статьях банка и кассы.
+        self::assertSame(['CASH_BANK:ACC_MAIN_BANK', 'CASH_REGISTER:ACC_MAIN_REGISTER'], $em->getConnection()->fetchFirstColumn(
+            "SELECT ar.code || ':' || a.code FROM balance_accounts a JOIN balance_articles ar ON ar.id = a.article_id WHERE a.company_id = ? ORDER BY a.code",
+            [(string) $company->getId()],
+        ));
     }
 
     public function testInvalidMinimumBalanceShowsValidationError(): void

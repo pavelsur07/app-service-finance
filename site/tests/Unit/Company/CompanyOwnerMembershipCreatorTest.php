@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -29,7 +27,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(6))
+            ->expects(self::exactly(5))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -45,7 +43,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertSame('Acme LLC', $company->getName());
         self::assertSame($owner, $company->getUser());
         self::assertTrue($owner->getCompanies()->contains($company));
-        self::assertCount(6, $persisted);
+        self::assertCount(5, $persisted);
         self::assertSame($company, $persisted[0]);
         self::assertInstanceOf(CompanyMember::class, $persisted[1]);
         self::assertSame($company, $persisted[1]->getCompany());
@@ -68,13 +66,8 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[4]);
         self::assertSame($persisted[2], $persisted[4]->getProjectDirection());
         self::assertSame($persisted[3], $persisted[4]->getResponsibilityCenter());
-        self::assertInstanceOf(MoneyAccount::class, $persisted[5]);
-        self::assertSame($company, $persisted[5]->getCompany());
-        self::assertSame('Основной счет', $persisted[5]->getName());
-        self::assertSame(MoneyAccountType::BANK, $persisted[5]->getType());
-        self::assertSame('RUB', $persisted[5]->getCurrency());
-        self::assertTrue($persisted[5]->isActive());
-        self::assertFalse($persisted[5]->isDefault());
+        // Денежные счета создаёт Cash по CompanyCreatedEvent, не Company.
+        self::assertSame('7', ((string) $company->getId())[14], 'ID компании — UUID v7');
     }
 
     public function testPersistCompanyWithOwnerMembershipKeepsExistingCompanyFields(): void
@@ -87,7 +80,7 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         $persisted = [];
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
-            ->expects(self::exactly(6))
+            ->expects(self::exactly(5))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -108,7 +101,6 @@ final class CompanyOwnerMembershipCreatorTest extends TestCase
         self::assertInstanceOf(ProjectDirection::class, $persisted[2]);
         self::assertInstanceOf(FinancialResponsibilityCenter::class, $persisted[3]);
         self::assertInstanceOf(FinancialResponsibilityCenterProject::class, $persisted[4]);
-        self::assertInstanceOf(MoneyAccount::class, $persisted[5]);
     }
 
     public function testOwnerMembershipGetsSystemOwnerRoleWhenTemplateExists(): void
