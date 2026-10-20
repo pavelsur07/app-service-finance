@@ -16,6 +16,7 @@ use App\Finance\Repository\PLCategoryRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class ImportPLCategoryTreeActionTest extends TestCase
@@ -28,7 +29,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $root = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
         $child = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маркетинг')->withParent($root)->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -61,7 +62,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)
             ->withName('Старое имя')->withCode('EXP')->withFlow(PLFlow::INCOME)->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -99,7 +100,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
             ->withName('Маркетинг')->withParent($existingRoot)->build();
         $existingChild->setIsVisible(false); // отличается от источника — должно обновиться
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -140,7 +141,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
 
         $root = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -169,7 +170,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)
             ->withName('Старое имя')->withCode('EXP')->withFlow(PLFlow::INCOME)->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -202,7 +203,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         /** @var list<PLCategory> $persisted */
         $persisted = [];
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -351,7 +352,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceA = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('A')->withCode('A_CODE')->withParent($ancestor)->build();
         $sourceB = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('B')->withCode('B_CODE')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -396,7 +397,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
 
         $sourceX = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Общепроизводственные')->withCode('OVERHEAD')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -430,7 +431,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceRenamed = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Новое')->withCode('C')->build();
         $sourceCollision = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Старое')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -479,7 +480,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceNoCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Совпадает по имени')->build();
         $sourceWithCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Новый узел')->withCode('C')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -530,7 +531,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceNoCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Совпадает по имени')->build();
         $sourceWithCode = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Новый узел')->withCode('C')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -605,7 +606,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         // OLD_METRIC не существует нигде, 100 — не код.
         $margin->setFormula('(REVENUE - COGS) / OLD_METRIC * 100');
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -637,7 +638,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $kpi = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маржа')->withCode('MARGIN')->build();
         $kpi->setFormula('OLD * 2');
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -674,7 +675,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         // кириллический код, которого нет нигде.
         $kpi->setFormula('NET-PROFIT / GROSS.PROFIT + REVENUE-COGS / ВЫРУЧКА * 100 + 1E10');
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturn([]);
         $plCategoryRepository->method('findOneBy')->willReturn(null);
         $plCategoryRepository->method('findCodesByCompany')->willReturn([]);
@@ -698,7 +699,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $kpi = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маржа')->withCode('MARGIN')->build();
         $kpi->setFormula('NET + NET_PROFIT');
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturn([]);
         $plCategoryRepository->method('findOneBy')->willReturn(null);
         $plCategoryRepository->method('findCodesByCompany')->willReturn([]);
@@ -725,7 +726,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existing = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
         $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findOneBy')->willReturn(null);
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => 'Расходы' === ($criteria['name'] ?? null) ? [$existing] : [],
@@ -756,7 +757,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existing = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('OLD')->build();
         $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findOneBy')->willReturn(null);
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => 'Расходы' === ($criteria['name'] ?? null) ? [$existing] : [],
@@ -783,7 +784,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
 
         $root = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -806,7 +807,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $companyRepository = $this->createMock(CompanyRepository::class);
         $companyRepository->method('findById')->willReturn(null);
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -839,7 +840,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $existingY = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Y')->withParent($existingX)->build();
         PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Z')->withParent($existingY)->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -876,7 +877,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $sourceX = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('X')->withCode('DEEP')->build();
         $sourceY = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Y')->withParent($sourceX)->build();
 
-        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(
             static fn (array $criteria): array => null !== ($found = $plCategoryRepository->findOneBy($criteria)) ? [$found] : [],
         );
@@ -918,5 +919,17 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $func): mixed => $func());
 
         return new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em);
+    }
+
+    /**
+     * Сценарии этого теста идут через поиск совпадений, как для компании со статьями;
+     * короткий путь пустой компании проверяет EnsureDefaultPLTreeActionTest.
+     */
+    private function plCategoryRepositoryMock(): PLCategoryRepository&MockObject
+    {
+        $repository = $this->createMock(PLCategoryRepository::class);
+        $repository->method('existsByCompanyId')->willReturn(true);
+
+        return $repository;
     }
 }

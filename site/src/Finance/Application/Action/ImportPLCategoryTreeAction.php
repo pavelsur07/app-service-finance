@@ -283,12 +283,15 @@ final class ImportPLCategoryTreeAction
         /** @var array<string, true> $claimedTargetIds */
         $claimedTargetIds = [];
         $plan = [];
+        // У компании без статей искать нечего: новые узлы до flush в БД не видны,
+        // поэтому поиск по каждому узлу дал бы null ценой запроса на узел.
+        $targetHasCategories = $this->plCategoryRepository->existsByCompanyId((string) $targetCompany->getId());
 
         foreach ($sourceNodes as $sourceNode) {
             $sourceParent = $sourceNode->parent;
             $targetParent = null !== $sourceParent ? $resolvedBySourceKey[$sourceParent->key] : null;
 
-            $existing = $this->findExisting($targetCompany, $targetParent, $sourceNode);
+            $existing = $targetHasCategories ? $this->findExisting($targetCompany, $targetParent, $sourceNode) : null;
             if (null !== $existing && isset($claimedTargetIds[$existing->getId()])) {
                 $existing = null;
             }

@@ -319,6 +319,7 @@
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
 - Базовый шаблон дерева — `config/finance/default_pl_tree.json` (формат v1, `DefaultPLCategoryTreeProvider`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
+- Новая компания получает базовый шаблон автоматически: `Finance\EventListener\ApplyDefaultPLTreeOnCompanyCreated` на `CompanyCreatedEvent` вызывает `EnsureDefaultPLTreeAction(companyId)` — шаблон применяется тем же импортом в режиме `onlyCreate`, только если у компании нет ни одной статьи ОПиУ (`PLCategoryRepository::existsByCompanyId()`); настроенное дерево не дополняется. Ошибка шаблона или импорта откатывает создание компании. Импорт в компанию без статей не ищет совпадения по каждому узлу — искать нечего.
 
 ### Finance: уровень строки отчёта ОПиУ
 
@@ -4076,6 +4077,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.39 | 2026-10-20 | Finance: базовое дерево ОПиУ новой компании — `EnsureDefaultPLTreeAction` по `CompanyCreatedEvent`, только компании без статей; `PLCategoryRepository::existsByCompanyId()` |
 | 2.38 | 2026-10-20 | Cash: денежные счета новой компании («Основной счет» BANK и касса «Основная» CASH, RUB) создаёт `EnsureDefaultMoneyAccountsAction` по `CompanyCreatedEvent`, а не Company; ID новой компании — UUID v7 |
 | 2.37 | 2026-10-20 | Marketplace: `app:marketplace:month-preliminary-rebuild` получила ручной режим — один этап одной компании за указанный месяц (предпросмотр / `--execute`) |
 | 2.36 | 2026-10-20 | Marketplace: удалены одноразовая `app:marketplace:repair-pl-mapping-19621cff` и `SaleMappingRetargetWriter` — применены на проде 20.10; `FinanceFacade::assignPlCategoryCode()` остаётся |

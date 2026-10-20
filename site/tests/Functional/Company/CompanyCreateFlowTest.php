@@ -16,6 +16,7 @@ use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\FinancialResponsibilityCenterProjectRepository;
 use App\Company\Repository\FinancialResponsibilityCenterRepository;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Finance\Entity\PLCategory;
 use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -102,6 +103,9 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
             static fn (MoneyAccount $account): string => sprintf('%s:%s:%s', $account->getType()->value, $account->getName(), $account->getCurrency()),
             $em->getRepository(MoneyAccount::class)->findBy(['company' => $company], ['type' => 'ASC']),
         ));
+
+        // Базовое дерево ОПиУ создаёт Finance по CompanyCreatedEvent.
+        self::assertSame(70, $em->getRepository(PLCategory::class)->count(['company' => $company]));
     }
 
     public function testInvalidMinimumBalanceShowsValidationError(): void
