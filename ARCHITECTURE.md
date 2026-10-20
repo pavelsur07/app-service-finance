@@ -4069,6 +4069,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.36 | 2026-10-20 | Marketplace: удалены одноразовая `app:marketplace:repair-pl-mapping-19621cff` и `SaleMappingRetargetWriter` — применены на проде 20.10; `FinanceFacade::assignPlCategoryCode()` остаётся |
 | 2.35 | 2026-10-20 | Finance: `FinanceFacade::assignPlCategoryCode()`; Marketplace: одноразовая `app:marketplace:repair-pl-mapping-19621cff` (коды строк ОПиУ, перенос правил продаж WB с итоговых строк, правила возвратов), `SaleMappingRetargetWriter` |
 | 2.34 | 2026-10-20 | Marketplace: консольная команда `app:marketplace:sale-mapping:apply-default` — базовый маппинг продаж и возвратов по компании или по всем SELLER-подключениям |
 | 2.33 | 2026-10-20 | Marketplace: выгрузка предпросмотра ОПиУ строками для план-факта (`/marketplace/pl-preview/rows-xlsx`, `BuildPlPreviewRowsExportAction`, `PlPreviewRowsXlsxExporter`, формат 1.0); меню «Скачать xlsx» с двумя форматами |
