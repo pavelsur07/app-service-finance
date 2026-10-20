@@ -145,7 +145,6 @@ Read-only проверки можно выполнять после запрос
 - `messenger:consume`.
 - Любая команда с `--execute`.
 - `app:cash:backfill-transaction-splits --execute` — переносит категорию ДДС в строки разбивки. Wrapper допускает у неё только пустой список аргументов или ровно `--execute`, другие флаги отвергает. Без `--execute` команда read-only и только считает объём. Запускать в тихом окне с остановленными воркерами, после бэкапа `cash_transaction`, и сверять результат `app:cash:verify-transaction-splits`.
-- `app:company:prune-spam-accounts --registered-from=… --registered-to=… --execute --expected-count=N` — безвозвратно удаляет пользователей окна регистрации без данных и их пустые кабинеты (автосид: направление, ЦФО, связь). Без `--execute` — отчёт без почты и названий. Перед запуском — бэкап `user`, `companies` и трёх таблиц автосида; разбор — `docs/tasks/spam-accounts-cleanup/`.
 - `messenger:failed:remove <id> [--force]` — безвозвратно удаляет сообщение из failed-очереди. Wrapper требует первым аргументом только числовой id и допускает единственный дополнительный флаг `--force`; `--all` отвергается, поэтому очередь целиком снести нельзя. До удаления посмотреть на цель: класс сообщения и текст ошибки читаются через `codex-psql-ro` из `messenger_messages`. Удаление выбрасывает задачу, а не выполняет её.
 - `app:marketplace:ozon-financial-reports:sync` — ставит в `async_sync` загрузку
   начислений Ozon через `/v1/finance/accrual/by-day` за скользящее окно дней по

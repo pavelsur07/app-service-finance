@@ -175,27 +175,6 @@ case "$cmd" in
       exit 2
     fi
     ;;
-  app:company:prune-spam-accounts)
-    # Удаление спам-аккаунтов окна регистрации (docs/tasks/spam-accounts-cleanup).
-    # Без --execute read-only отчёт; --execute необратимо удаляет пользователей и
-    # их пустые кабинеты — запуск только по отдельному одобрению Владельца после
-    # бэкапа (AGENTS.md §3.3). Окно — ровно две даты; --execute требует
-    # --expected-count из dry-run, команда сверяет его сама.
-    seen_from=0; seen_to=0; seen_execute=0; seen_expected=0
-    for arg in "$@"; do
-      if   [[ "$arg" =~ ^--registered-from=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_from=$((seen_from + 1))
-      elif [[ "$arg" =~ ^--registered-to=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then seen_to=$((seen_to + 1))
-      elif [ "$arg" = "--execute" ]; then seen_execute=$((seen_execute + 1))
-      elif [[ "$arg" =~ ^--expected-count=[0-9]{1,6}$ ]]; then seen_expected=$((seen_expected + 1))
-      elif [[ "$arg" =~ ^(--no-interaction|-n)$ ]]; then :
-      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
-      fi
-    done
-    if [ "$seen_from" -ne 1 ] || [ "$seen_to" -ne 1 ] || [ "$seen_execute" -gt 1 ] || [ "$seen_expected" -ne "$seen_execute" ]; then
-      echo "Usage for $cmd: --registered-from=YYYY-MM-DD --registered-to=YYYY-MM-DD [--execute --expected-count=N]" >&2
-      exit 2
-    fi
-    ;;
   app:marketplace:reprocess)
     # Мутирующая: переобрабатывает raw-документы WB за период тем же
     # ReprocessMarketplacePeriodAction, что и кнопка UI — sales, returns и
