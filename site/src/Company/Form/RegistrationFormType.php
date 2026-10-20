@@ -14,6 +14,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\IsTrue;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Regex;
 
 class RegistrationFormType extends AbstractType
 {
@@ -63,13 +64,25 @@ class RegistrationFormType extends AbstractType
     }
 
     /**
-     * @return list<NotBlank>
+     * Ссылки и длинный текст в названии запрещены: в январе 2026 боты регистрировали
+     * чужие адреса со спамом в названии компании, чтобы разослать его нашим письмом.
+     *
+     * @return list<NotBlank|Length|Regex>
      */
     public static function companyNameConstraints(): array
     {
         return [
             new NotBlank([
                 'message' => 'Введите имя компании',
+            ]),
+            new Length([
+                'max' => 120,
+                'maxMessage' => 'Имя компании — не длиннее {{ limit }} символов',
+            ]),
+            new Regex([
+                'pattern' => '~(https?:|www\.|t\.me/|[\p{L}\d-]\.(ru|рф|su|com|net|org|info|biz|pro|io|me|cc|online|site|xyz|top|shop|store|club|link|click)\b)~iu',
+                'match' => false,
+                'message' => 'Имя компании не должно содержать ссылки',
             ]),
         ];
     }

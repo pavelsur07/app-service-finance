@@ -60,11 +60,10 @@
                             {{ form_widget(registrationForm.companyName, {
                                 attr: { class: 'form-control', placeholder: 'ООО Ромашка', required: true }
                             }) }}
+                            {% if registrationForm.companyName.vars.errors is empty %}
                             <div class="invalid-feedback">Введите имя компании</div>
-                            {#
-                            <div class="invalid-feedback">Введите имя компании</div>
+                            {% endif %}
                             {{ form_errors(registrationForm.companyName) }}
-                            #}
                         </div>
                         {% endif %}
 
