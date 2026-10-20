@@ -4,37 +4,59 @@ declare(strict_types=1);
 
 namespace App\Finance\Infrastructure\Provider;
 
+use App\Company\Enum\BusinessProfile;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Exception\DefaultPLTreeTemplateNotFoundException;
 
 /**
- * Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json).
+ * Стартовые шаблоны дерева ОПиУ по профилю бизнеса. Реестр «профиль → файл» — параметр
+ * `finance.pl_templates` в config/services.yaml; файлы — config/finance/pl_templates/.
  *
- * Коды статей шаблона — те же, на которые ссылаются шаблоны маппинга затрат и
- * продаж маркетплейсов (config/marketplace/default_*_mapping.yaml): компания с
- * этим деревом получает правила ночным sync-default без ручной настройки.
- * Файл — в формате выгрузки «Выгрузить в файл» и читается тем же
- * PLCategoryTreeFileReader, что и импорт из файла.
+ * Коды статей одинаковы во всех шаблонах (TemplateCodeDictionaryTest) и совпадают с
+ * кодами шаблонов маппинга затрат и продаж маркетплейсов
+ * (config/marketplace/default_*_mapping.yaml): компания с маркетплейсным деревом получает
+ * правила ночным sync-default без ручной настройки. Файл — в формате выгрузки
+ * «Выгрузить в файл» и читается тем же PLCategoryTreeFileReader, что и импорт из файла;
+ * `profile` и `templateVersion` конверта читатель импорта игнорирует.
  */
 final readonly class DefaultPLCategoryTreeProvider
 {
+    /**
+     * @param array<string, string> $templatePaths значение BusinessProfile → путь к файлу
+     */
     public function __construct(
-        private string $configPath,
+        private array $templatePaths,
         private PLCategoryTreeFileReader $reader,
     ) {
     }
 
     /**
-     * @return list<PLCategoryTreeNode> дерево в DFS pre-order
+     * @return list<PLCategoryTreeNode>
      */
-    public function nodes(): array
+    public function nodes(BusinessProfile $profile): array
     {
-        $json = @file_get_contents($this->configPath);
+        return $this->reader->read($this->json($profile));
+    }
+
+    /**
+     * Версия содержимого шаблона (`templateVersion`) — для лога применения.
+     */
+    public function templateVersion(BusinessProfile $profile): int
+    {
+        $envelope = json_decode($this->json($profile), true);
+
+        return \is_array($envelope) && \is_int($envelope['templateVersion'] ?? null) ? $envelope['templateVersion'] : 0;
+    }
+
+    private function json(BusinessProfile $profile): string
+    {
+        $path = $this->templatePaths[$profile->value] ?? throw DefaultPLTreeTemplateNotFoundException::forProfile($profile->value);
+        $json = @file_get_contents($path);
         if (false === $json) {
-            throw DefaultPLTreeTemplateNotFoundException::at($this->configPath);
+            throw DefaultPLTreeTemplateNotFoundException::at($path);
         }
 
-        return $this->reader->read($json);
+        return $json;
     }
 }

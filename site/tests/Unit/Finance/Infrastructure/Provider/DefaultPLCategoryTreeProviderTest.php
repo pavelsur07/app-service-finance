@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Finance\Infrastructure\Provider;
 
+use App\Company\Enum\BusinessProfile;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Exception\DefaultPLTreeTemplateNotFoundException;
@@ -23,7 +24,7 @@ final class DefaultPLCategoryTreeProviderTest extends TestCase
     public function testTemplateHasEveryCodeUsedByMarketplaceMappingTemplates(): void
     {
         $codes = [];
-        foreach ($this->provider()->nodes() as $node) {
+        foreach ($this->provider()->nodes(BusinessProfile::MARKETPLACE) as $node) {
             self::assertNotNull($node->code, \sprintf('Template category "%s" has no code: re-applying could not match it.', $node->name));
             $codes[$node->code] = $node->type;
         }
@@ -54,11 +55,24 @@ final class DefaultPLCategoryTreeProviderTest extends TestCase
     {
         $this->expectException(DefaultPLTreeTemplateNotFoundException::class);
 
-        (new DefaultPLCategoryTreeProvider('/nonexistent/default_pl_tree.json', new PLCategoryTreeFileReader()))->nodes();
+        (new DefaultPLCategoryTreeProvider(['MARKETPLACE' => '/nonexistent/marketplace.json'], new PLCategoryTreeFileReader()))->nodes(BusinessProfile::MARKETPLACE);
+    }
+
+    public function testProfileMissingFromRegistryFailsLoudly(): void
+    {
+        $this->expectException(DefaultPLTreeTemplateNotFoundException::class);
+        $this->expectExceptionMessage('UNIVERSAL');
+
+        $this->provider()->nodes(BusinessProfile::UNIVERSAL);
+    }
+
+    public function testTemplateVersionIsRead(): void
+    {
+        self::assertSame(1, $this->provider()->templateVersion(BusinessProfile::MARKETPLACE));
     }
 
     private function provider(): DefaultPLCategoryTreeProvider
     {
-        return new DefaultPLCategoryTreeProvider(self::ROOT.'/config/finance/default_pl_tree.json', new PLCategoryTreeFileReader());
+        return new DefaultPLCategoryTreeProvider(['MARKETPLACE' => self::ROOT.'/config/finance/pl_templates/marketplace.json'], new PLCategoryTreeFileReader());
     }
 }

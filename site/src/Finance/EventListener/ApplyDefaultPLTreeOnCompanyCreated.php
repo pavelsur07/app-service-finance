@@ -9,7 +9,7 @@ use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
 /**
- * Базовое дерево ОПиУ новой компании. Событие диспатчится после flush внутри
+ * Стартовое дерево ОПиУ новой компании по её профилю бизнеса. Событие диспатчится после flush внутри
  * транзакции создания: ошибка шаблона или импорта откатывает и компанию.
  */
 #[AsEventListener]
@@ -21,6 +21,6 @@ final readonly class ApplyDefaultPLTreeOnCompanyCreated
 
     public function __invoke(CompanyCreatedEvent $event): void
     {
-        ($this->ensure)($event->companyId);
+        ($this->ensure)($event->companyId, profile: $event->businessProfile);
     }
 }

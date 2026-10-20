@@ -26,7 +26,10 @@ final class CreateCompanyOwnerAccountActionBalanceSeedTest extends IntegrationTe
         foreach (['MONEY', 'CASH_BANK', 'CASH_PAYMENT_SYSTEMS', 'AR_MARKETPLACES', 'INV_MARKETPLACE', 'TAX_RECEIVABLE', 'EQUITY', 'LONG_LOANS'] as $code) {
             self::assertContains($code, $codes);
         }
-        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [(string) $company->getId()]));
+        // Аудит сида называет шаблон (профиль) и его версию.
+        $changes = $this->connection->fetchFirstColumn("SELECT changes::text FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [(string) $company->getId()]);
+        self::assertCount(1, $changes);
+        self::assertEquals(['template' => 'MARKETPLACE', 'version' => 3], json_decode((string) $changes[0], true, 512, \JSON_THROW_ON_ERROR));
         // Базовые учётные счета шаблона — с записью аудита на каждый.
         self::assertSame(['ACC_MAIN_BANK', 'ACC_MAIN_REGISTER'], $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [(string) $company->getId()]));
         self::assertSame(2, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='account' AND action='system_seed'", [(string) $company->getId()]));

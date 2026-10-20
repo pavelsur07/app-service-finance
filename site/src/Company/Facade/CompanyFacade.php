@@ -11,6 +11,7 @@ use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Enum\BusinessProfile;
+use App\Company\Exception\CompanyNotFoundException;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
@@ -39,6 +40,16 @@ final class CompanyFacade
     public function findById(string $companyId): ?Company
     {
         return $this->repository->findById($companyId);
+    }
+
+    /**
+     * Профиль бизнеса компании — по нему модули выбирают стартовые шаблоны.
+     *
+     * @throws CompanyNotFoundException
+     */
+    public function getBusinessProfile(string $companyId): BusinessProfile
+    {
+        return ($this->repository->findById($companyId) ?? throw new CompanyNotFoundException($companyId))->getBusinessProfile();
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Company\Infrastructure\Repository;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
@@ -122,6 +123,22 @@ class CompanyRepository extends ServiceEntityRepository
         $sql = 'SELECT id::text FROM companies ORDER BY id';
 
         return $this->connection->fetchFirstColumn($sql);
+    }
+
+    /**
+     * Профили бизнеса всех компаний в порядке getAllActiveCompanyIds(): одним запросом, без
+     * гидрации сущностей — для обхода всех компаний CLI-командами.
+     *
+     * @return array<string, BusinessProfile> id компании → профиль
+     */
+    public function getAllActiveCompanyProfiles(): array
+    {
+        $profiles = [];
+        foreach ($this->connection->fetchAllKeyValue('SELECT id::text, business_profile FROM companies ORDER BY id') as $id => $profile) {
+            $profiles[(string) $id] = BusinessProfile::from((string) $profile);
+        }
+
+        return $profiles;
     }
 
     /**

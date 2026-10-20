@@ -39,6 +39,14 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
     }
 
+    public function testUniversalProfileGetsTheSameSetupUntilItHasOwnTemplates(): void
+    {
+        // Реестр шаблонов: UNIVERSAL пока указывает на маркетплейсные файлы (Stage 3 — свои).
+        $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Setup Co', false, BusinessProfile::UNIVERSAL);
+
+        self::assertSame(self::FULL_SETUP, $this->onboardingOf((string) $company->getId()));
+    }
+
     public function testAdminAccountCreationCreatesFullSetup(): void
     {
         $company = (self::getContainer()->get(CreateAccountAction::class))($this->newUser(), 'plain-password', 'Admin Onboarding Co');
@@ -78,7 +86,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         // Битый шаблон ОПиУ: подписчик Finance падает уже после того, как компания, счета и
         // статьи ДДС записаны в той же транзакции.
         self::getContainer()->set(DefaultPLCategoryTreeProvider::class, new DefaultPLCategoryTreeProvider(
-            '/nonexistent/default_pl_tree.json',
+            ['MARKETPLACE' => '/nonexistent/default_pl_tree.json'],
             self::getContainer()->get(PLCategoryTreeFileReader::class),
         ));
 

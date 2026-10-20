@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance\Application;
 
 use App\Company\Entity\Company;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Exception\CompanyNotFoundException;
 use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
@@ -29,7 +31,7 @@ final class EnsureDefaultPLTreeActionTest extends IntegrationTestCase
         $templateRoots = array_map(
             static fn (PLCategoryTreeNode $node): string => $node->name,
             array_values(array_filter(
-                self::getContainer()->get(DefaultPLCategoryTreeProvider::class)->nodes(),
+                self::getContainer()->get(DefaultPLCategoryTreeProvider::class)->nodes(BusinessProfile::MARKETPLACE),
                 static fn (PLCategoryTreeNode $node): bool => null === $node->parent,
             )),
         );
@@ -55,7 +57,7 @@ final class EnsureDefaultPLTreeActionTest extends IntegrationTestCase
 
     public function testUnknownCompanyIsRejected(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(CompanyNotFoundException::class);
         (self::getContainer()->get(EnsureDefaultPLTreeAction::class))(Uuid::uuid7()->toString());
     }
 

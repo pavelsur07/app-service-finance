@@ -29,7 +29,7 @@ final readonly class BackfillBalanceSetup
         if ([] !== ($this->missingStructure)([$event->companyId])) {
             // Структура создаётся вместе со счетами шаблона — в отчёте оба пункта.
             $event->report('balance_structure', 1);
-            $event->report('balance_accounts', $this->accounts->templateAccountCount());
+            $event->report('balance_accounts', $this->accounts->templateAccountCount($event->businessProfile));
             if ($event->execute) {
                 ($this->structure)($event->companyId);
             }
@@ -37,6 +37,6 @@ final readonly class BackfillBalanceSetup
             return;
         }
 
-        $event->report('balance_accounts', ($this->accounts)($event->companyId, dryRun: !$event->execute));
+        $event->report('balance_accounts', ($this->accounts)($event->companyId, dryRun: !$event->execute, profile: $event->businessProfile));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Command;
 
+use App\Company\Facade\CompanyFacade;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
@@ -30,6 +31,7 @@ final class ApplyDefaultPLTreeCommand extends Command
     public function __construct(
         private readonly DefaultPLCategoryTreeProvider $defaultTree,
         private readonly ImportPLCategoryTreeAction $importAction,
+        private readonly CompanyFacade $companies,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -53,8 +55,11 @@ final class ApplyDefaultPLTreeCommand extends Command
         }
 
         try {
+            // Шаблон профиля бизнеса компании; неизвестная компания — тот же отказ, что у импорта.
+            $profile = $this->companies->findById($companyId)?->getBusinessProfile()
+                ?? throw new \DomainException('Целевая компания не найдена.');
             $result = ($this->importAction)(new ImportPLCategoryTreeCommand(
-                $this->defaultTree->nodes(),
+                $this->defaultTree->nodes($profile),
                 $companyId,
                 !$execute,
                 true,

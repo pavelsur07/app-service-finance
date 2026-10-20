@@ -56,7 +56,7 @@ class AppFixtures extends Fixture
         $manager->persist($company);
         $this->addReference(self::REF_COMPANY_ROMASHKA, $company);
 
-        ($this->seedBalanceStructureAction)($company->getId());
+        ($this->seedBalanceStructureAction)($company->getId(), profile: $company->getBusinessProfile());
 
         // --- Контрагенты для ООО "Ромашка" (добавлены Wildberries и Ozon + сервисные контрагенты)
         $counterpartiesData = [

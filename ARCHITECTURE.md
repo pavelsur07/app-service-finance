@@ -318,8 +318,8 @@
 - Формат файла v1 (`PLCategoryTreeExporter::FORMAT_VERSION`): `{version, exportedAt, company, categories[]}`, категория — `{name, code, type, format, flow, expenseType, weightInParent, isVisible, formula, calcOrder, sortOrder, children[]}`. `id` и `level` не пишутся и не читаются: идентификаторы чужого аккаунта в целевой компании смысла не имеют, уровень выводится из вложенности. Читатель игнорирует неизвестные ключи и дополнительно принимает голый массив категорий — формат прежней выгрузки без конверта. Категория обязана нести весь набор полей: импорт перезаписывает поля целиком, поэтому отсутствующее поле означало бы тихую замену настройки строки P&L значением по умолчанию (`flow` INCOME → NONE, вес −0.5000 → 1.0000) под видом обычного «обновить». `children` необязателен.
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
-- Базовый шаблон дерева — `config/finance/default_pl_tree.json` (формат v1, `DefaultPLCategoryTreeProvider`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
-- Новая компания получает базовый шаблон автоматически: `Finance\EventListener\ApplyDefaultPLTreeOnCompanyCreated` на `CompanyCreatedEvent` вызывает `EnsureDefaultPLTreeAction(companyId)` — шаблон применяется тем же импортом в режиме `onlyCreate`, только если у компании нет ни одной статьи ОПиУ (`PLCategoryRepository::existsByCompanyId()`); настроенное дерево не дополняется. Ошибка шаблона или импорта откатывает создание компании. Импорт в компанию без статей не ищет совпадения по каждому узлу — искать нечего.
+- Базовый шаблон дерева — по профилю бизнеса компании: реестр `finance.pl_templates` (`config/services.yaml`), файлы `config/finance/pl_templates/<profile>.json` (формат v1 + `profile`, `templateVersion`; `DefaultPLCategoryTreeProvider::nodes(BusinessProfile)`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
+- Новая компания получает базовый шаблон автоматически: `Finance\EventListener\ApplyDefaultPLTreeOnCompanyCreated` на `CompanyCreatedEvent` вызывает `EnsureDefaultPLTreeAction(companyId, profile: из события)` — шаблон профиля применяется тем же импортом в режиме `onlyCreate`, только если у компании нет ни одной статьи ОПиУ (`PLCategoryRepository::existsByCompanyId()`); настроенное дерево не дополняется. Ошибка шаблона или импорта откатывает создание компании. Импорт в компанию без статей не ищет совпадения по каждому узлу — искать нечего.
 
 ### Finance: уровень строки отчёта ОПиУ
 
@@ -1438,7 +1438,11 @@ seedDefaultStructure(string $companyId): bool
 `getPassiveTotals()`, `getDifferences()`, `getTotals()` (только актив, не сумма сторон).
 Дерево и суммы строятся из одного снимка. Архив/видимость не исключают остатки из итогов.
 
-Стартовая структура новой компании: шаблон `site/config/balance/default_structure.yaml`
+Стартовая структура новой компании: шаблон профиля бизнеса — реестр `balance.structure_templates`
+(`config/services.yaml`), файлы `site/config/balance/templates/<profile>.yaml`, поле `profile` в файле;
+профиль приходит из `CompanyCreatedEvent`, остальные пути (ленивый сид, `seedDefaultStructure()`,
+бэкфилл, фикстуры) берут его через `CompanyFacade::getBusinessProfile()`; аудит сида пишет
+`{template, version}`. Маркетплейсный шаблон
 (версия 3 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
 маркетплейсами, склады, налоги, кредиты; `code` — стабильный контракт статьи, порядок задаёт
 позиция, id в файле нет; компании со структурой версии 1 не меняются; у конечной статьи —
@@ -1669,6 +1673,12 @@ manage — только владелец. Новые права автомати
 (`CompanyController::new` и `CreateCompanyOwnerAccountAction` — регистрация и админка) после
 flush внутри `wrapInTransaction`: сбой любого подписчика откатывает компанию целиком.
 
+Шаблоны выбираются по профилю через реестры `finance.pl_templates` и `balance.structure_templates`
+(`config/services.yaml`): у каждого профиля запись, профиль без своего шаблона указывает на
+маркетплейсный явно (сейчас — `UNIVERSAL`). Код статьи значит одно и то же во всех шаблонах:
+ОПиУ — тип, поток, формат, код родителя; Баланс — сторона, вид, код родителя, статья счёта.
+Согласие держит `tests/Integration/Onboarding/TemplateRegistryTest`.
+
 Профиль бизнеса — `Company::$businessProfile`, enum `App\Company\Enum\BusinessProfile`
 (`MARKETPLACE` «Маркетплейсы и e-com», `UNIVERSAL` «Базовый»; `DEFAULT = MARKETPLACE`, колонка
 `companies.business_profile`, у компаний до появления профиля — `MARKETPLACE`). Выбирается
@@ -1682,12 +1692,12 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 | Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
 | Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
 | Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет счёта этого типа |
-| Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ из `config/finance/default_pl_tree.json` | нет ни одной статьи ОПиУ |
-| Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета из `config/balance/default_structure.yaml` | статьи — нет статей; счета — нет ни одного счёта |
+| Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
+| Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
-по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, execute)`; подписчики
+по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, businessProfile, execute)`; подписчики
 Cash (`BackfillDefaultMoneyAccounts`), Finance (`BackfillDefaultPLTree`), Balance
 (`BackfillBalanceSetup`: нет структуры — структура и счета, иначе только счета) теми же
 правилами считают (dry-run, по умолчанию) или создают недостающее и пишут итог в
@@ -4117,6 +4127,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.43 | 2026-10-20 | Finance, Balance: стартовые шаблоны по профилю бизнеса — реестры `finance.pl_templates`, `balance.structure_templates`, файлы `config/finance/pl_templates/`, `config/balance/templates/` (`UNIVERSAL` пока на маркетплейсных); `CompanyFacade::getBusinessProfile()`, `CompanyNotFoundException`; словарь кодов `TemplateRegistryTest` |
 | 2.42 | 2026-10-20 | Company: профиль бизнеса `BusinessProfile` (`MARKETPLACE`, `UNIVERSAL`) — колонка `companies.business_profile`, выбор при регистрации, в `/company/new` и в админке; `CompanyCreatedEvent` несёт профиль; `CompanyFacade::createOwnerAccount()` принимает профиль |
 | 2.41 | 2026-10-20 | Company: раздел «Онбординг компании»; `app:company:onboarding-backfill` и `CompanyOnboardingBackfillEvent` — дозаполнение кассы, дерева ОПиУ, структуры и счетов Баланса у существующих компаний |
 | 2.40 | 2026-10-20 | Balance: шаблон структуры версии 3 — `accounts` у конечных статей; базовые учётные счета новой компании (`ACC_MAIN_BANK`, `ACC_MAIN_REGISTER`) создаёт `EnsureBalanceAccountsAction` по `CompanyCreatedEvent` |

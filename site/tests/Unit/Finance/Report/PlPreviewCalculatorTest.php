@@ -38,7 +38,7 @@ final class PlPreviewCalculatorTest extends TestCase
         }
         $this->byCode['REV_WB']->setFlow(PLFlow::INCOME);
         $this->byCode['COGS']->setFlow(PLFlow::EXPENSE);
-        // Как в базовом дереве (config/finance/default_pl_tree.json): факт расхода отрицательный,
+        // Как в базовом дереве (config/finance/pl_templates/marketplace.json): факт расхода отрицательный,
         // маржа — сумма, а не разность.
         $this->byCode['MARGIN']->setFormula('REV_TOTAL + VAR_COSTS_TOTAL');
 

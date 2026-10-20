@@ -7,6 +7,8 @@ namespace App\Balance\Application;
 use App\Balance\DTO\BalanceStructureTemplateNode;
 use App\Balance\Entity\BalanceCategory;
 use App\Balance\Security\BalanceAccess;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -14,20 +16,24 @@ use Webmozart\Assert\Assert;
 
 final readonly class SeedBalanceStructureAction
 {
-    public function __construct(private EntityManagerInterface $entityManager, private Connection $db, private BalanceAccess $access, private BalanceStructureTemplateReader $template)
+    public function __construct(private EntityManagerInterface $entityManager, private Connection $db, private BalanceAccess $access, private BalanceStructureTemplateReader $template, private CompanyFacade $companies)
     {
     }
 
-    public function __invoke(string $companyId, ?string $actorId = null): bool
+    /**
+     * @param BusinessProfile|null $profile профиль, если вызывающий его уже знает (событие создания); иначе — профиль компании
+     */
+    public function __invoke(string $companyId, ?string $actorId = null, ?BusinessProfile $profile = null): bool
     {
         Assert::uuid($companyId);
+        $profile ??= $this->companies->getBusinessProfile($companyId);
         // Шаблон читаем и проверяем до транзакции: битый файл не должен оставить компанию с половиной структуры.
-        $template = $this->template->read();
+        $template = $this->template->read($profile);
         if (null !== $actorId) {
             $this->access->require($companyId, $actorId, 'manage');
         }
 
-        return $this->db->transactional(function () use ($companyId, $actorId, $template): bool {
+        return $this->db->transactional(function () use ($companyId, $actorId, $template, $profile): bool {
             if (null !== $actorId) {
                 $this->access->lockForMutation($companyId, $actorId, 'manage');
             }
@@ -38,7 +44,7 @@ final readonly class SeedBalanceStructureAction
             }
             $this->createNodes($companyId, $template, null);
             $this->entityManager->flush();
-            $this->db->insert('balance_audit_events', ['id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'object_type' => 'book', 'object_id' => $bookId, 'action' => null === $actorId ? 'system_seed' : 'seed', 'author_id' => $actorId, 'changes' => '{}', 'created_at' => date('Y-m-d H:i:s')]);
+            $this->db->insert('balance_audit_events', ['id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'object_type' => 'book', 'object_id' => $bookId, 'action' => null === $actorId ? 'system_seed' : 'seed', 'author_id' => $actorId, 'changes' => json_encode(['template' => $profile->value, 'version' => BalanceStructureTemplateReader::VERSION], \JSON_THROW_ON_ERROR), 'created_at' => date('Y-m-d H:i:s')]);
 
             return true;
         });

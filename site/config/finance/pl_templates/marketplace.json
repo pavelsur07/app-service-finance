@@ -1,7 +1,9 @@
 {
   "version": 1,
+  "profile": "MARKETPLACE",
+  "templateVersion": 1,
   "exportedAt": "2026-10-12T00:00:00+03:00",
-  "company": "Базовый шаблон ОПиУ",
+  "company": "Базовый шаблон ОПиУ — маркетплейсы и e-com",
   "categories": [
     {
       "name": "Выручка",

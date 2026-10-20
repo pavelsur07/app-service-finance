@@ -8,6 +8,7 @@ use App\Balance\Application\SeedBalanceStructureAction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\Company;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Event\CompanyOnboardingBackfillEvent;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -118,6 +119,26 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::INVALID, $tester->execute(['--execute' => true, '--expected-count' => '-1']));
         self::assertStringContainsString('неотрицательное целое', $tester->getDisplay());
+    }
+
+    public function testEventCarriesEachCompanyProfile(): void
+    {
+        $marketplace = (string) $this->bareCompany()->getId();
+        $universal = $this->bareCompany();
+        $universal->setBusinessProfile(BusinessProfile::UNIVERSAL);
+        $this->em->flush();
+        $seen = [];
+        self::getContainer()->get(EventDispatcherInterface::class)->addListener(
+            CompanyOnboardingBackfillEvent::class,
+            static function (CompanyOnboardingBackfillEvent $event) use (&$seen): void {
+                $seen[$event->companyId] = $event->businessProfile;
+            },
+        );
+
+        self::assertSame(Command::SUCCESS, $this->tester()->execute([]));
+
+        self::assertSame(BusinessProfile::MARKETPLACE, $seen[$marketplace] ?? null);
+        self::assertSame(BusinessProfile::UNIVERSAL, $seen[(string) $universal->getId()] ?? null);
     }
 
     public function testUnknownCompanyIsRejected(): void
