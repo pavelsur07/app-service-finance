@@ -117,6 +117,10 @@ Feature — атомарная возможность, которую можно
 ## 4) Жизненный цикл подписки
 
 ### 4.1 Создание подписки при создании компании
+> **Не реализовано** (на 2026-10-20): подписчика `CompanyCreatedEvent` в Billing и
+> `SubscriptionManager` нет. Ниже — проект. Что сейчас получает новая компания —
+> `ARCHITECTURE.md`, «Онбординг компании».
+
 Триггер: `CompanyCreatedEvent`
 
 Сервис: `SubscriptionManager::ensureTrialForCompany(Company $company)`

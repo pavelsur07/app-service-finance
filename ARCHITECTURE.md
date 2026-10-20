@@ -1662,6 +1662,31 @@ manage — только владелец. Новые права автомати
   chart-зависимости и подключает переиспользуемые стили
   `assets/styles/components/financial-chart.css`.
 
+### Онбординг компании: `CompanyCreatedEvent` и дозаполнение
+
+Стартовые данные новой компании заводят модули-подписчики; Company о них не знает.
+`App\Company\Event\CompanyCreatedEvent(companyId)` диспатчат оба пути создания
+(`CompanyController::new` и `CreateCompanyOwnerAccountAction` — регистрация и админка) после
+flush внутри `wrapInTransaction`: сбой любого подписчика откатывает компанию целиком.
+
+| Кто | Что создаёт | Правило повторного запуска |
+|---|---|---|
+| Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
+| Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
+| Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет счёта этого типа |
+| Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ из `config/finance/default_pl_tree.json` | нет ни одной статьи ОПиУ |
+| Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета из `config/balance/default_structure.yaml` | статьи — нет статей; счета — нет ни одного счёта |
+
+Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
+[--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
+по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, execute)`; подписчики
+Cash (`BackfillDefaultMoneyAccounts`), Finance (`BackfillDefaultPLTree`), Balance
+(`BackfillBalanceSetup`: нет структуры — структура и счета, иначе только счета) теми же
+правилами считают (dry-run, по умолчанию) или создают недостающее и пишут итог в
+`report()`. `--execute` — только с `--expected-count`, равным числу компаний с пробелами из
+dry-run; каждая компания — своя транзакция; останов на первой ошибке, повторный запуск
+продолжает. ДДС не дозаполняется: системные статьи у существующих компаний уже есть.
+
 ### Company → Cash: системные статьи ДДС и денежные счета по `CompanyCreatedEvent`
 
 - `Cash\EventListener\EnsureCashflowSystemCategoriesOnCompanyCreated` на
@@ -4084,6 +4109,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.41 | 2026-10-20 | Company: раздел «Онбординг компании»; `app:company:onboarding-backfill` и `CompanyOnboardingBackfillEvent` — дозаполнение кассы, дерева ОПиУ, структуры и счетов Баланса у существующих компаний |
 | 2.40 | 2026-10-20 | Balance: шаблон структуры версии 3 — `accounts` у конечных статей; базовые учётные счета новой компании (`ACC_MAIN_BANK`, `ACC_MAIN_REGISTER`) создаёт `EnsureBalanceAccountsAction` по `CompanyCreatedEvent` |
 | 2.39 | 2026-10-20 | Finance: базовое дерево ОПиУ новой компании — `EnsureDefaultPLTreeAction` по `CompanyCreatedEvent`, только компании без статей; `PLCategoryRepository::existsByCompanyId()` |
 | 2.38 | 2026-10-20 | Cash: денежные счета новой компании («Основной счет» BANK и касса «Основная» CASH, RUB) создаёт `EnsureDefaultMoneyAccountsAction` по `CompanyCreatedEvent`, а не Company; ID новой компании — UUID v7 |

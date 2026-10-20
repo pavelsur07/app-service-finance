@@ -36,9 +36,11 @@ final readonly class EnsureDefaultMoneyAccountsAction
     }
 
     /**
-     * @return int число созданных счетов
+     * @param bool $dryRun только посчитать, ничего не записывая
+     *
+     * @return int число созданных (в dry-run — недостающих) счетов
      */
-    public function __invoke(string $companyId): int
+    public function __invoke(string $companyId, bool $dryRun = false): int
     {
         $company = $this->companyFacade->findById($companyId)
             ?? throw new \DomainException(sprintf('Компания %s не найдена.', $companyId));
@@ -51,19 +53,23 @@ final readonly class EnsureDefaultMoneyAccountsAction
             // Имя уникально в компании: занято счётом другого типа — не создаём, чтобы
             // не уронить создание компании или дозаполнение на уникальном индексе.
             if ($this->accounts->existsByCompanyIdAndName($companyId, $name)) {
-                $this->logger->warning('Default money account skipped: name is taken', [
-                    'companyId' => $companyId,
-                    'type' => $type->value,
-                ]);
+                if (!$dryRun) {
+                    $this->logger->warning('Default money account skipped: name is taken', [
+                        'companyId' => $companyId,
+                        'type' => $type->value,
+                    ]);
+                }
 
                 continue;
             }
 
-            $this->entityManager->persist(new MoneyAccount(Uuid::uuid7()->toString(), $company, $type, $name, self::CURRENCY));
             ++$created;
+            if (!$dryRun) {
+                $this->entityManager->persist(new MoneyAccount(Uuid::uuid7()->toString(), $company, $type, $name, self::CURRENCY));
+            }
         }
 
-        if ($created > 0) {
+        if ($created > 0 && !$dryRun) {
             $this->entityManager->flush();
         }
 

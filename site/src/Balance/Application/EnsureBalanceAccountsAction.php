@@ -29,9 +29,11 @@ final readonly class EnsureBalanceAccountsAction
     }
 
     /**
-     * @return int число созданных счетов
+     * @param bool $dryRun только посчитать: без записи и без блокировки книги
+     *
+     * @return int число созданных (в dry-run — недостающих) счетов
      */
-    public function __invoke(string $companyId): int
+    public function __invoke(string $companyId, bool $dryRun = false): int
     {
         Assert::uuid($companyId);
         // Шаблон читаем до транзакции: битый файл не должен оставить половину счетов.
@@ -40,9 +42,9 @@ final readonly class EnsureBalanceAccountsAction
             return 0;
         }
 
-        [$created, $skipped] = $this->db->transactional(function () use ($companyId, $accountsByArticle): array {
+        [$created, $skipped] = $this->db->transactional(function () use ($companyId, $accountsByArticle, $dryRun): array {
             // Блокировка книги, как у сида и ручной правки структуры; нет книги — нет и структуры.
-            if (false === $this->db->fetchOne('SELECT id FROM balance_books WHERE company_id=? FOR UPDATE', [$companyId])) {
+            if (false === $this->db->fetchOne('SELECT id FROM balance_books WHERE company_id=?'.($dryRun ? '' : ' FOR UPDATE'), [$companyId])) {
                 return [0, []];
             }
             if (false !== $this->db->fetchOne('SELECT 1 FROM balance_accounts WHERE company_id=? LIMIT 1', [$companyId])) {
@@ -65,7 +67,9 @@ final readonly class EnsureBalanceAccountsAction
 
                         continue;
                     }
-                    $this->insert($companyId, (string) $articleIds[$articleCode], $account);
+                    if (!$dryRun) {
+                        $this->insert($companyId, (string) $articleIds[$articleCode], $account);
+                    }
                     ++$created;
                 }
             }
@@ -73,7 +77,7 @@ final readonly class EnsureBalanceAccountsAction
             return [$created, $skipped];
         });
 
-        if ([] !== $skipped) {
+        if ([] !== $skipped && !$dryRun) {
             $this->logger->warning('Default balance accounts skipped: article missing or archived', [
                 'companyId' => $companyId,
                 'accounts' => $skipped,

@@ -23,9 +23,11 @@ final readonly class EnsureDefaultPLTreeAction
     }
 
     /**
-     * @return int число созданных статей
+     * @param bool $dryRun только посчитать, ничего не записывая
+     *
+     * @return int число созданных (в dry-run — недостающих) статей
      */
-    public function __invoke(string $companyId): int
+    public function __invoke(string $companyId, bool $dryRun = false): int
     {
         if ($this->categories->existsByCompanyId($companyId)) {
             return 0;
@@ -34,7 +36,7 @@ final readonly class EnsureDefaultPLTreeAction
         $result = ($this->import)(new ImportPLCategoryTreeCommand(
             $this->defaultTree->nodes(),
             $companyId,
-            dryRun: false,
+            dryRun: $dryRun,
             onlyCreate: true,
         ));
 
