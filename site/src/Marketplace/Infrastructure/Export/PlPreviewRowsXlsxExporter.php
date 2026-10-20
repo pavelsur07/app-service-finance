@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Export;
 
 use App\Finance\Enum\PLValueFormat;
+use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Application\DTO\PlPreviewRowsExport;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\DateTimeCell;
+use OpenSpout\Common\Entity\Cell\EmptyCell;
 use OpenSpout\Common\Entity\Cell\NumericCell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
@@ -60,6 +62,15 @@ final readonly class PlPreviewRowsXlsxExporter
 
             $writer->addNewSheetAndMakeItCurrent();
             $this->writePassportSheet($writer, $export, $generatedAt, $rowsByChannel);
+
+            $writer->addNewSheetAndMakeItCurrent();
+            $this->writeCoverageSheet($writer, $export);
+
+            $writer->addNewSheetAndMakeItCurrent();
+            $this->writeAdsSheet($writer, $export);
+
+            $writer->addNewSheetAndMakeItCurrent();
+            $this->writeWarningsSheet($writer, $export);
         } finally {
             $writer->close();
         }
@@ -162,6 +173,72 @@ final readonly class PlPreviewRowsXlsxExporter
 
         foreach (self::DATA_FIELDS as $field => $label) {
             $add('field_'.$field, self::text(''), 'Поле «Данных» '.$field.': '.$label);
+        }
+    }
+
+    /**
+     * Плоский вид «Не попадёт в ОПиУ» и «Исключено» широкой выгрузки — по отчётам каналов, чтобы
+     * строки не задваивались общим отчётом.
+     */
+    private function writeCoverageSheet(Writer $writer, PlPreviewRowsExport $export): void
+    {
+        $this->startSheet($writer, 'Покрытие', ['period_key', 'marketplace', 'section', 'status', 'category_code', 'category_name', 'rows_count', 'amount', 'has_active_mapping']);
+
+        $periodKey = self::text(self::periodKey($export));
+        $empty = new EmptyCell(null, null);
+        foreach ($export->channels as $report) {
+            $marketplace = self::text(self::marketplace($report));
+            foreach ($report->costCoverage as $row) {
+                $writer->addRow(new Row([
+                    $periodKey, $marketplace, self::text('cost'), self::text($row->status->value),
+                    self::text($row->costCategoryCode ?? ''), self::text($row->costCategoryName ?? ''),
+                    new NumericCell($row->rowsCount, null), self::money($row->netAmount), $empty,
+                ]));
+            }
+            foreach ($report->salesCoverage as $row) {
+                $writer->addRow(new Row([
+                    $periodKey, $marketplace, self::text('sales'), self::text($row->kind->value),
+                    self::text(''), self::text($row->kind->label()),
+                    new NumericCell($row->rowsCount, null), self::money($row->amount), new NumericCell($row->hasActiveMapping ? 1 : 0, null),
+                ]));
+            }
+            foreach ($report->unplaced as $item) {
+                $writer->addRow(new Row([
+                    $periodKey, $marketplace, self::text('unplaced'), self::text($item->reason->value),
+                    self::text(''), self::text($item->categoryName ?? 'Статья удалена или недоступна'),
+                    $empty, self::money($item->values[BuildMarketplacePlPreviewAction::TOTAL_KEY] ?? '0'), $empty,
+                ]));
+            }
+        }
+    }
+
+    private function writeAdsSheet(Writer $writer, PlPreviewRowsExport $export): void
+    {
+        $this->startSheet($writer, 'Реклама', ['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference']);
+
+        foreach ($export->channels as $report) {
+            foreach ($report->adReconciliation as $ads) {
+                $writer->addRow(new Row([
+                    self::text(self::periodKey($export)),
+                    self::text($ads->marketplace->value),
+                    self::money($ads->ledger),
+                    self::money($ads->statistics),
+                    self::money($ads->onListings),
+                    self::money($ads->unallocated),
+                    self::money($ads->difference),
+                ]));
+            }
+        }
+    }
+
+    private function writeWarningsSheet(Writer $writer, PlPreviewRowsExport $export): void
+    {
+        $this->startSheet($writer, 'Предупреждения', ['period_key', 'marketplace', 'text']);
+
+        foreach ($export->channels as $report) {
+            foreach ($report->warnings as $warning) {
+                $writer->addRow(new Row([self::text(self::periodKey($export)), self::text(self::marketplace($report)), self::text($warning)]));
+            }
         }
     }
 

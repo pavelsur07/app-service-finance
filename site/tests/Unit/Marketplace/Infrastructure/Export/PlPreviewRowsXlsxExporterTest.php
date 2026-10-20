@@ -5,15 +5,20 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Infrastructure\Export;
 
 use App\Finance\Application\DTO\PlPreviewRow;
+use App\Finance\Application\DTO\PlPreviewUnplacedAmount;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PlPreviewUnplacedReason;
 use App\Finance\Enum\PLValueFormat;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewColumn;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
+use App\Marketplace\Application\DTO\PlPreviewAdReconciliationDTO;
 use App\Marketplace\Application\DTO\PlPreviewCostCoverageDTO;
 use App\Marketplace\Application\DTO\PlPreviewRowsExport;
+use App\Marketplace\Application\DTO\PlPreviewSalesCoverageDTO;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Enum\PlPreviewCostStatus;
+use App\Marketplace\Enum\PlPreviewSalesKind;
 use App\Marketplace\Infrastructure\Export\PlPreviewRowsXlsxExporter;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\DateTimeCell;
@@ -142,6 +147,54 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         $keys = array_map(static fn (array $row): string => self::v($row[0]), $sheets['Паспорт']);
         self::assertSame([], array_values(array_filter($keys, static fn (string $k): bool => str_starts_with($k, 'check_'))));
         self::assertCount(10, $sheets['Данные']);
+    }
+
+    public function testCoverageAdsAndWarningsSheetsFromChannels(): void
+    {
+        $base = $this->twoChannels();
+        $wb = $base->channels[1];
+        $wb = new MarketplacePlPreviewReport(
+            from: $wb->from,
+            to: $wb->to,
+            marketplace: $wb->marketplace,
+            columns: $wb->columns,
+            rows: $wb->rows,
+            tagsOverlap: false,
+            unplaced: [new PlPreviewUnplacedAmount(self::COST_ID, null, PlPreviewUnplacedReason::CATEGORY_NOT_FOUND, ['total' => '-15.50'])],
+            costCoverage: $wb->costCoverage,
+            costTotal: $wb->costTotal,
+            costReconciliationDelta: '0.00',
+            salesCoverage: [new PlPreviewSalesCoverageDTO(MarketplaceType::WILDBERRIES, PlPreviewSalesKind::RETURN, 2, '-300.00', false)],
+            warnings: ['=Нет проекта у подключения'],
+            adReconciliation: [new PlPreviewAdReconciliationDTO(MarketplaceType::WILDBERRIES, '-500.00', '-480.00', '-450.00', '-30.00', '-20.00')],
+        );
+
+        $sheets = $this->export(new PlPreviewRowsExport($base->from, $base->to, [$base->channels[0], $wb], $base->all));
+
+        self::assertSame(['Данные', 'Паспорт', 'Покрытие', 'Реклама', 'Предупреждения'], array_keys($sheets));
+
+        $coverage = $sheets['Покрытие'];
+        self::assertSame(['period_key', 'marketplace', 'section', 'status', 'category_code', 'category_name', 'rows_count', 'amount', 'has_active_mapping'], self::values($coverage[0]));
+        self::assertCount(5, $coverage);
+        self::assertEquals(['2026-10-12_2026-10-18', 'wildberries', 'cost', 'mapped', 'wb_log', 'Логистика', 3, -100.0], self::values(array_slice($coverage[1], 0, 8)));
+        self::assertEquals(['sales', 'return', '', 'Возвраты', 2, -300.0, 0], self::values(array_slice($coverage[3], 2)));
+        self::assertSame(['unplaced', 'category_not_found', '', 'Статья удалена или недоступна', ''], self::values(array_slice($coverage[4], 2, 5)));
+        self::assertEqualsWithDelta(-15.5, self::v($coverage[4][7]), 1e-9);
+        self::assertInstanceOf(NumericCell::class, $coverage[1][7]);
+
+        self::assertSame(['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference'], self::values($sheets['Реклама'][0]));
+        self::assertEquals(['2026-10-12_2026-10-18', 'wildberries', -500.0, -480.0, -450.0, -30.0, -20.0], self::values($sheets['Реклама'][1]));
+
+        self::assertSame([['period_key', 'marketplace', 'text'], ['2026-10-12_2026-10-18', 'wildberries', '=Нет проекта у подключения']], array_map(self::values(...), $sheets['Предупреждения']));
+        self::assertStringNotContainsString('<f>', $this->sheetXml(5));
+    }
+
+    public function testEmptyBlocksGiveHeaderOnlySheets(): void
+    {
+        $sheets = $this->export($this->twoChannels());
+
+        self::assertCount(1, $sheets['Реклама']);
+        self::assertCount(1, $sheets['Предупреждения']);
     }
 
     private function twoChannels(?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): PlPreviewRowsExport

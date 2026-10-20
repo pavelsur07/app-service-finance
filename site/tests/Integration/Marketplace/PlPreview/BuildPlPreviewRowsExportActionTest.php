@@ -60,6 +60,34 @@ final class BuildPlPreviewRowsExportActionTest extends IntegrationTestCase
         self::assertEqualsWithDelta(300.0, $this->total($export->channels[0], 'REAL'), 0.001);
     }
 
+    public function testChannelBlocksAddUpToAllReport(): void
+    {
+        $this->fixture->addWbPromotion(true, '120.00');
+        $this->fixture->addWbAdStatistics(['wbA' => '80.00'], '10.00');
+
+        $export = $this->build();
+        self::assertNotNull($export->all);
+
+        $key = static fn (object $row): string => serialize($row);
+        $collect = static function (array $reports, string $block) use ($key): array {
+            $rows = [];
+            foreach ($reports as $report) {
+                foreach ($report->{$block} as $row) {
+                    $rows[] = $key($row);
+                }
+            }
+            sort($rows);
+
+            return $rows;
+        };
+
+        foreach (['costCoverage', 'salesCoverage', 'adReconciliation'] as $block) {
+            self::assertSame($collect([$export->all], $block), $collect($export->channels, $block), $block);
+        }
+        self::assertNotSame([], $export->all->adReconciliation);
+        self::assertSame($export->all->costTotal, bcadd($export->channels[0]->costTotal, $export->channels[1]->costTotal, 2));
+    }
+
     public function testSellerConnectionWithoutDataGivesZeroChannelAndPerformanceDoesNot(): void
     {
         $this->connection(MarketplaceType::YANDEX_MARKET, MarketplaceConnectionType::SELLER);
