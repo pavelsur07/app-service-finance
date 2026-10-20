@@ -658,7 +658,7 @@ jobs:
                     export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
 
                     docker compose -f docker-compose.prod.yml pull site-php-cli
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction < /dev/null
                   EOF
 
     # 3. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм).
@@ -721,6 +721,10 @@ jobs:
 
             - name: 🚀 Deploy application (rolling update)
               run: |
+                  # Скрипт идёт удалённому bash через stdin. Каждый `docker compose run|exec`
+                  # внутри — с `< /dev/null` или своим файлом, иначе он выедает остаток
+                  # скрипта (с 17.10.2026 деплой молча обрывался после ozon-fetcher).
+                  # Гейт: tests/shell/deploy-workflow-test.sh.
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
                     set -e
                     cd ${{ secrets.SERVER_DIR }}
@@ -799,7 +803,7 @@ jobs:
                     echo "✅ land healthy"
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads scheduler
+                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance scheduler
 
                     # ozon-fetcher — за профилем: без OZON_FETCHER_ENABLED=true не стартует.
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
@@ -815,7 +819,7 @@ jobs:
                       docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
                         psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
                       docker compose -f docker-compose.prod.yml pull ozon-fetcher
-                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate
+                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate < /dev/null
                       docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher
                       echo "✅ ozon-fetcher healthy"
                     else
@@ -831,7 +835,7 @@ jobs:
                     # почта — не повод красить выкатку несвязанного кода, а logger->error внутри
                     # команды уже заводит issue в GlitchTip.
                     echo "📧 Проверяем SMTP-транспорт"
-                    docker compose -f docker-compose.prod.yml exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction \
+                    docker compose -f docker-compose.prod.yml exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction < /dev/null \
                       || echo "⚠️ SMTP не отвечает — проверь GitHub secret SITE_MAILER_DSN (см. docs/maintenance/mailer-monitoring.md)"
 
                     echo "🧹 Очистка старых образов Docker"
@@ -878,7 +882,7 @@ jobs:
                     export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
 
                     docker compose -f docker-compose.prod.yml pull site-php-cli
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:migrate --no-interaction
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:migrate --no-interaction < /dev/null
                     echo "✅ Миграции применены"
                   EOF
 

@@ -66,7 +66,7 @@ site-stan-baseline: site-stan-prepare
 
 # ===== TESTS =====
 
-.PHONY: test-provision-vf-prod-deploy test-gt
+.PHONY: test-provision-vf-prod-deploy test-gt test-deploy-workflow
 
 # Локальный security-тест owner-run provisioner; production не вызывается.
 test-provision-vf-prod-deploy:
@@ -77,6 +77,10 @@ test-provision-vf-prod-deploy:
 # запускается на хосте, а не через PHPUnit.
 test-gt:
 	bash tests/shell/gt-test.sh
+
+# Инварианты скрипта деплоя: stdin в ssh-heredoc и воркеры в шаге [4/5].
+test-deploy-workflow:
+	bash tests/shell/deploy-workflow-test.sh
 
 # Xdebug в dev-образе включён в режиме debug и замедляет прогон на ~22%;
 # для тестов он не нужен. Покрытие (site-test-cov) задаёт свой XDEBUG_MODE.
