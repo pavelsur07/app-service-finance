@@ -163,10 +163,22 @@
             </label>
             <button type="submit" class="btn btn-primary">Показать</button>
             {% if report is not null %}
-                <a class="btn btn-outline-secondary" href="{{ path('marketplace_pl_preview_xlsx', base_query) }}" data-testid="pl-preview-xlsx">
-                    <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
-                    Скачать xlsx
-                </a>
+                <div class="dropdown" data-testid="pl-preview-export">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="pl-preview-export-button">
+                        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                        Скачать xlsx
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="pl-preview-export-button">
+                        <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_xlsx', base_query) }}" data-testid="pl-preview-xlsx">
+                            <span>Таблица как на экране</span>
+                            <small class="text-secondary">Статьи × теги — для просмотра и печати</small>
+                        </a>
+                        <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_rows_xlsx', base_query) }}" data-testid="pl-preview-rows-xlsx">
+                            <span>Строками для план-факта</span>
+                            <small class="text-secondary">Одна сумма — одна строка, по каналам и тегам</small>
+                        </a>
+                    </div>
+                </div>
             {% endif %}
         </form>
         {% include 'partials/_period_presets.html.twig' with {

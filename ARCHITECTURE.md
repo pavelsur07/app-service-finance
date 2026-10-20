@@ -727,6 +727,21 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
   тот же отчёт, листы «ОПиУ по тегам», «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
   с форматом выгрузки ОПиУ, названия — текстовыми ячейками (строка на «=» не становится формулой).
   Ошибка периода — flash и redirect на вкладку.
+- Выгрузка строками для план-факта — `GET /marketplace/pl-preview/rows-xlsx`
+  (`marketplace_pl_preview_rows_xlsx`, `PlPreviewRowsXlsxController`, `MARKETPLACE_READ`), формат
+  `PlPreviewRowsXlsxExporter::FORMAT_VERSION` = `1.0`, постановка — `docs/plan/TZ_vygruzka_plan_fakt.md`.
+  `Application\Action\BuildPlPreviewRowsExportAction` → `Application\DTO\PlPreviewRowsExport`
+  (`from`, `to`, `channels`, `?all`): канал задан — один отчёт, `all = null`; не задан — общий
+  отчёт и по отчёту `BuildMarketplacePlPreviewAction` на канал из объединения SELLER-подключений
+  компании и каналов с данными периода общего отчёта (затраты, продажи, реклама), по значению enum.
+  Файл `pl-rows_<from>_<to>.xlsx`, листы: «Данные» (канал × колонка × все строки дерева, `empty` не
+  влияет; поля `period_from`…`format_ver`; `MONEY`/`QTY` — 2 знака, `PERCENT`/`RATIO` — доля),
+  «Паспорт» (`key`/`value`/`label`: счётчики строк, затраты по статусам на канал,
+  `check_channels_vs_all_<код|id>` — «Итого» каналов − общий только для `MONEY`/`QTY`, подписи полей),
+  «Покрытие» (`cost`/`sales`/`unplaced`; у `unplaced` в `category_code` — id статьи), «Реклама»,
+  «Предупреждения» — по отчётам каналов; предупреждение общего отчёта, которого нет ни у одного
+  канала, — с пустым `marketplace`. Каналы в файле — по алфавиту `value`.
+  Тексты — `StringCell`. На вкладке обе выгрузки — пункты меню кнопки «Скачать xlsx».
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -4049,6 +4064,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.33 | 2026-10-20 | Marketplace: выгрузка предпросмотра ОПиУ строками для план-факта (`/marketplace/pl-preview/rows-xlsx`, `BuildPlPreviewRowsExportAction`, `PlPreviewRowsXlsxExporter`, формат 1.0); меню «Скачать xlsx» с двумя форматами |
 | 2.32 | 2026-10-20 | Company: удалена одноразовая команда `app:company:prune-spam-accounts` (`SpamAccountCandidatesQuery`, `SpamAccountPurger`) — 1326 спам-аккаунтов 14–15.01.2026 удалены на проде 20.10; ограничения названия компании и письмо без названия остаются |
 | 2.31 | 2026-10-20 | Company: `app:company:prune-spam-accounts` — удаление аккаунтов окна регистрации без данных (`SpamAccountCandidatesQuery`, `SpamAccountPurger`); название компании при регистрации — не длиннее 120 символов и без ссылок, письмо «Регистрация завершена» его не выводит |
 | 2.30 | 2026-10-19 | Marketplace: серверный поиск и фильтр по тегу в реестре листингов (`ListingsFilter`, `?q=`, `?tag=`); назначение тега по фильтру — `filter` в `POST /api/marketplace/listings/tags/assign`, `matched` в ответе, `filter_too_broad` |
