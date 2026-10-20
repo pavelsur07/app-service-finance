@@ -19,10 +19,13 @@ use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalize
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Exception\PLCategoryCodeAssignmentException;
 use App\Finance\Report\PlPreviewCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\DocumentRepository;
@@ -150,6 +153,47 @@ final class FinanceFacade
             $columns,
             $natureBaseColumn,
         );
+    }
+
+    /**
+     * Присваивает код строке ввода ОПиУ без кода. Отчёт ОПиУ берёт суммы статьи по её коду: у
+     * листа без кода суммы в регистре есть, а в отчёте — ноль.
+     *
+     * Только persist: flush — у вызывающего Action/Command.
+     *
+     * @return bool true — код присвоен; false — у статьи уже этот код
+     *
+     * @throws PLCategoryCodeAssignmentException
+     */
+    public function assignPlCategoryCode(string $companyId, string $categoryId, string $code): bool
+    {
+        /** @var PLCategory|null $category */
+        $category = $this->plCategoryRepository->findOneBy(['id' => $categoryId, 'company' => $companyId]);
+        if (null === $category) {
+            throw PLCategoryCodeAssignmentException::notFound($categoryId);
+        }
+
+        $currentCode = trim((string) $category->getCode());
+        if ($currentCode === $code) {
+            return false;
+        }
+        if ('' !== $currentCode) {
+            throw PLCategoryCodeAssignmentException::hasOtherCode($categoryId, $currentCode);
+        }
+        if (PLCategoryType::LEAF_INPUT !== $category->getType()) {
+            throw PLCategoryCodeAssignmentException::notLeafInput($categoryId);
+        }
+
+        /** @var PLCategory|null $other */
+        $other = $this->plCategoryRepository->findOneBy(['company' => $companyId, 'code' => $code]);
+        if (null !== $other) {
+            throw PLCategoryCodeAssignmentException::codeTaken($code, (string) $other->getId());
+        }
+
+        $category->setCode($code);
+        $this->entityManager->persist($category);
+
+        return true;
     }
 
     /**
