@@ -172,6 +172,29 @@ case "$cmd" in
       esac
     done
     ;;
+  app:marketplace:month-preliminary-rebuild)
+    # Только ручной режим: один этап одной компании за указанный месяц — то же
+    # предварительное закрытие, что делает ночной cron за текущий месяц.
+    # Без --execute read-only предпросмотр (preflight); с --execute переоткрывает
+    # предварительно закрытый этап и закрывает заново, создаёт документ ОПиУ —
+    # отдельное одобрение Владельца (AGENTS.md §3.3). Финальное закрытие команда
+    # не трогает. Запуск без опций (все компании, текущий месяц) — дело cron,
+    # здесь он запрещён: все четыре опции обязательны.
+    seen_company=0; seen_marketplace=0; seen_month=0; seen_stage=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--company-id=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then seen_company=1
+      elif [[ "$arg" =~ ^--marketplace=(ozon|wildberries)$ ]]; then seen_marketplace=1
+      elif [[ "$arg" =~ ^--month=20[0-9]{2}-(0[1-9]|1[0-2])$ ]]; then seen_month=1
+      elif [[ "$arg" =~ ^--stage=(sales_returns|costs)$ ]]; then seen_stage=1
+      elif [[ "$arg" =~ ^(--execute|--no-interaction|-n|--quiet|-q)$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ] || [ "$seen_marketplace" -ne 1 ] || [ "$seen_month" -ne 1 ] || [ "$seen_stage" -ne 1 ]; then
+      echo "Usage for $cmd: --company-id=<uuid> --marketplace=ozon|wildberries --month=YYYY-MM --stage=sales_returns|costs [--execute]" >&2
+      exit 2
+    fi
+    ;;
   app:finance:pl-tree:apply-default)
     # Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json) для одной
     # компании — то же, что экран /pl-categories/import?source=template.

@@ -3951,7 +3951,7 @@ config/
 | `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
-| `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений |
+| `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений; вручную `--company-id --marketplace --month=YYYY-MM --stage [--execute]` — один этап за любой месяц, синхронно, без `--execute` только preflight |
 | **Marketplace — Ozon** | | |
 | `app:marketplace:ozon-listing-catalog:sync` | `40 3 * * *` | Синхронизация каталога листингов Ozon (`SyncOzonListingCatalogMessage` → `async_sync`) |
 | `app:marketplace:ozon-financial-reports:sync --days-back=2` | `0 4 * * *` | Планирование Ozon accrual by-day за последние 2 дня (`SyncOzonAccrualByDayMessage` → `async_sync`) |
@@ -4069,6 +4069,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.37 | 2026-10-20 | Marketplace: `app:marketplace:month-preliminary-rebuild` получила ручной режим — один этап одной компании за указанный месяц (предпросмотр / `--execute`) |
 | 2.36 | 2026-10-20 | Marketplace: удалены одноразовая `app:marketplace:repair-pl-mapping-19621cff` и `SaleMappingRetargetWriter` — применены на проде 20.10; `FinanceFacade::assignPlCategoryCode()` остаётся |
 | 2.35 | 2026-10-20 | Finance: `FinanceFacade::assignPlCategoryCode()`; Marketplace: одноразовая `app:marketplace:repair-pl-mapping-19621cff` (коды строк ОПиУ, перенос правил продаж WB с итоговых строк, правила возвратов), `SaleMappingRetargetWriter` |
 | 2.34 | 2026-10-20 | Marketplace: консольная команда `app:marketplace:sale-mapping:apply-default` — базовый маппинг продаж и возвратов по компании или по всем SELLER-подключениям |
