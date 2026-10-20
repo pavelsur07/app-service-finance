@@ -8,6 +8,7 @@ use App\Balance\Application\SeedBalanceStructureAction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\Company;
+use App\Company\Event\CompanyOnboardingBackfillEvent;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -18,6 +19,7 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
 {
@@ -36,7 +38,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]));
 
         $display = $tester->getDisplay();
-        self::assertStringContainsString((string) $bare->getId().' balance_structure=1, money_accounts=2, pl_categories=70', $display);
+        self::assertStringContainsString((string) $bare->getId().' balance_accounts=2, balance_structure=1, money_accounts=2, pl_categories=70', $display);
         self::assertStringNotContainsString((string) $complete->getId(), $display);
         self::assertSame($before, $this->counts((string) $bare->getId()));
     }
@@ -81,6 +83,41 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
             self::assertSame(Command::SUCCESS, $tester->execute(['--company' => $companyId]));
             self::assertMatchesRegularExpression('/candidates\s+0/', $tester->getDisplay());
         }
+    }
+
+    public function testFailureRollsBackCompanyAndStopsBeforeTheRest(): void
+    {
+        $failing = (string) $this->bareCompany()->getId();
+        $untouched = (string) $this->bareCompany()->getId();
+        // Последним слушателем: Cash и Finance уже записали своё в транзакции этой компании.
+        self::getContainer()->get(EventDispatcherInterface::class)->addListener(
+            CompanyOnboardingBackfillEvent::class,
+            static function (CompanyOnboardingBackfillEvent $event) use ($failing): void {
+                if ($event->execute && $event->companyId === $failing) {
+                    throw new \RuntimeException('subscriber failed');
+                }
+            },
+            -1000,
+        );
+        $tester = $this->tester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertSame(1, preg_match('/candidates\s+(\d+)/', $tester->getDisplay(), $m));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['--execute' => true, '--expected-count' => $m[1]]));
+        self::assertMatchesRegularExpression('/completed\s+0/', $tester->getDisplay());
+        self::assertStringContainsString('новый dry-run', $tester->getDisplay());
+
+        $empty = ['money' => 0, 'pl' => 0, 'balance_articles' => 0, 'balance_accounts' => 0];
+        self::assertSame($empty, $this->counts($failing));
+        self::assertSame($empty, $this->counts($untouched));
+    }
+
+    public function testNonNumericExpectedCountIsRejected(): void
+    {
+        $tester = $this->tester();
+
+        self::assertSame(Command::INVALID, $tester->execute(['--execute' => true, '--expected-count' => '-1']));
+        self::assertStringContainsString('неотрицательное целое', $tester->getDisplay());
     }
 
     public function testUnknownCompanyIsRejected(): void

@@ -38,7 +38,12 @@ final class BackfillCompanyOnboardingCommand extends Command
         $companyId = $input->getOption('company');
         $companyId = \is_string($companyId) && '' !== $companyId ? $companyId : null;
         $expected = $input->getOption('expected-count');
-        $expected = \is_string($expected) && ctype_digit($expected) ? (int) $expected : null;
+        if (\is_string($expected) && !ctype_digit($expected)) {
+            $io->error('--expected-count — неотрицательное целое число из последнего dry-run.');
+
+            return Command::INVALID;
+        }
+        $expected = \is_string($expected) ? (int) $expected : null;
 
         try {
             $result = ($this->backfill)($companyId, $execute, $expected);
@@ -67,7 +72,7 @@ final class BackfillCompanyOnboardingCommand extends Command
         }
 
         if ($result->failed > 0) {
-            $io->error('Дозаполнение прервано ошибкой, смотрите лог. Повторный запуск продолжит с оставшихся компаний.');
+            $io->error('Дозаполнение прервано ошибкой, смотрите лог. Уже дозаполненные компании сохранены; для продолжения — новый dry-run и --execute с его --expected-count.');
 
             return Command::FAILURE;
         }

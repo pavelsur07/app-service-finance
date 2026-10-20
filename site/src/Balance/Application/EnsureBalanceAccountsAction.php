@@ -87,6 +87,14 @@ final readonly class EnsureBalanceAccountsAction
         return $created;
     }
 
+    /**
+     * Сколько счетов шаблон заводит компании без счетов — для отчёта dry-run, пока структуры ещё нет.
+     */
+    public function templateAccountCount(): int
+    {
+        return array_sum(array_map(\count(...), $this->templateAccounts($this->template->read())));
+    }
+
     private function insert(string $companyId, string $articleId, BalanceStructureTemplateAccount $account): void
     {
         $now = date('Y-m-d H:i:s');

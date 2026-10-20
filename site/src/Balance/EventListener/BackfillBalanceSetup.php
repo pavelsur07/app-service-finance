@@ -27,7 +27,9 @@ final readonly class BackfillBalanceSetup
     public function __invoke(CompanyOnboardingBackfillEvent $event): void
     {
         if ([] !== ($this->missingStructure)([$event->companyId])) {
+            // Структура создаётся вместе со счетами шаблона — в отчёте оба пункта.
             $event->report('balance_structure', 1);
+            $event->report('balance_accounts', $this->accounts->templateAccountCount());
             if ($event->execute) {
                 ($this->structure)($event->companyId);
             }

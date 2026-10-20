@@ -52,6 +52,29 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         self::assertSame(0, $result->unchangedCount);
     }
 
+    public function testEmptyTargetCompanyIsNotSearchedNodeByNode(): void
+    {
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $root = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
+        $child = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маркетинг')->withParent($root)->build();
+
+        // Без статей у компании совпадений нет: запрос на каждый узел был бы N+1.
+        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository->expects(self::once())->method('existsByCompanyId')->willReturn(false);
+        $plCategoryRepository->expects(self::never())->method('findOneBy');
+        $plCategoryRepository->expects(self::never())->method('findBy');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::exactly(2))->method('persist');
+
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($this->nodes([$root, $child]), (string) $target->getId(), false),
+        );
+
+        self::assertCount(2, $result->created);
+    }
+
     public function testUpdatesExistingNodeMatchedByCode(): void
     {
         $source = CompanyBuilder::aCompany()->withIndex(1)->build();

@@ -79,7 +79,7 @@ final readonly class BackfillCompanyOnboardingAction
                 ++$result->completed;
                 $this->entityManager->clear();
             } catch (\Throwable $e) {
-                // Останов на первой ошибке: EntityManager после сбоя закрыт; повторный запуск продолжит с оставшихся.
+                // Останов на первой ошибке: EntityManager после сбоя закрыт; новый dry-run покажет оставшиеся.
                 $result->failed = 1;
                 $this->logger->error('Company onboarding backfill stopped on error', [
                     'companyId' => $id,
