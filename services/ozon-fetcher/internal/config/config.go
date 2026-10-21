@@ -157,7 +157,7 @@ func loadPlanner(cfg *Config) error {
 	}{
 		{"TAIL_DAYS", 0, 31, &cfg.TailDays},
 		{"FINAL_DAY", 1, 28, &cfg.FinalDay},
-		{"ORDERS_TAIL_DAYS", 0, 60, &cfg.OrdersTailDays},
+		{"ORDERS_TAIL_DAYS", 1, 60, &cfg.OrdersTailDays},
 	}
 	for _, v := range ints {
 		raw := os.Getenv(v.name)

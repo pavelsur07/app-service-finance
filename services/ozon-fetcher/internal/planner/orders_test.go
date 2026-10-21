@@ -39,7 +39,7 @@ func TestOrdersEnsureFromOrdersFromToTodayAndTodayRefreshes(t *testing.T) {
 	today := specFor(p.Ensure, executor.ResourceOrdersFBO, "2026-10-21")
 	require.NotNil(t, today)
 	assert.True(t, today.Refresh, "сегодня перезагружается каждый проход")
-	assert.Equal(t, PriorityCurrentMonth, today.Priority)
+	assert.Equal(t, PriorityRoutine, today.Priority, "не опережает финансовые отчёты")
 
 	backfill := specFor(p.Ensure, executor.ResourceOrdersFBO, "2026-10-18")
 	require.NotNil(t, backfill)
@@ -71,6 +71,16 @@ func TestOrdersTailCoversThirtyDaysForStatusChanges(t *testing.T) {
 	require.Len(t, days, 30)
 	assert.Equal(t, "2026-10-20", days[0])
 	assert.Equal(t, "2026-09-21", days[29])
+}
+
+func TestOrdersYesterdayIsReloadedEvenWithZeroTail(t *testing.T) {
+	cfg := DefaultConfig(msk)
+	cfg.OrdersTailDays = 0
+	p := Build(at("2026-10-21 00:20"), []connections.Cabinet{seller("a", executor.ResourceOrdersFBO)}, cfg)
+
+	tail := refresh(p, KindOrders)
+	require.NotNil(t, tail)
+	assert.Equal(t, []string{"2026-10-20"}, periods(tail.Specs, executor.ResourceOrdersFBO))
 }
 
 func TestOrdersTailDoesNotReachBeforeOrdersFrom(t *testing.T) {

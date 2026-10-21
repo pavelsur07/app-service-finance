@@ -187,8 +187,22 @@ func TestFetchPostingListPageLimit(t *testing.T) {
 
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Contains(t, err.Error(), "more than 100 pages")
+	assert.Contains(t, err.Error(), "more than 1000 pages")
 	assert.Len(t, got, MaxPostingPages)
+}
+
+func TestFetchPostingListPageLimitCountsPagesOfWindowAcrossAttempts(t *testing.T) {
+	// Прежняя попытка сохранила MaxPostingPages-1 страниц; продолжение не получает новых.
+	srv := &postingServer{pages: map[string][]byte{"c999": postingPage(100, true, "c1000"), "c1000": postingPage(100, true, "c1001")}}
+	client := clientFor(t, srv.handler(t))
+
+	var got []Page
+	err := client.FetchPostingList(context.Background(), testCreds, "conn-1", SchemeFBO, dayWindow(), "c999", MaxPostingPages, collect(&got))
+
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Contains(t, err.Error(), "more than 1000 pages")
+	assert.Len(t, got, 1, "последняя разрешённая страница сохранена, следующая не запрашивается")
 }
 
 func TestFetchPostingListResumesFromCursor(t *testing.T) {

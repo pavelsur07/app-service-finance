@@ -138,9 +138,13 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, false, now))
 			}
 			if !today.Before(ordersFrom) {
-				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, today.Format(time.DateOnly), PriorityCurrentMonth, true, now))
+				// Обычный приоритет: сегодняшние заказы не опережают финансовые
+				// отчёты в общей очереди кабинета.
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, today.Format(time.DateOnly), PriorityRoutine, true, now))
 			}
-			for i := 1; i <= cfg.OrdersTailDays; i++ {
+			// Вчера перечитывается всегда: последний проход дня не видит
+			// отправлений до полуночи.
+			for i := 1; i <= max(cfg.OrdersTailDays, 1); i++ {
 				d := today.AddDate(0, 0, -i)
 				if d.Before(ordersFrom) {
 					break

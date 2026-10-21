@@ -254,6 +254,9 @@ type taskRun struct {
 // errNoCredentials — у кабинета нет ключа seller для финансового ресурса.
 var errNoCredentials = errors.New("executor: no seller credentials")
 
+// errResourceNotEnabled — ресурс снят с кабинета в снимке Symfony.
+var errResourceNotEnabled = errors.New("executor: resource is not enabled for cabinet")
+
 func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error {
 	if cabinet.Seller == nil {
 		return errNoCredentials
@@ -287,6 +290,11 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 		})
 	default:
 		if scheme, ok := postingResources[r.task.ResourceType]; ok {
+			// Отправления включаются по кабинетам (снимок Symfony): снятый с
+			// кабинета ресурс не грузится и по уже поставленным задачам.
+			if !cabinet.Supports(r.task.ResourceType) {
+				return errResourceNotEnabled
+			}
 			return r.postings(ctx, creds, scheme)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)

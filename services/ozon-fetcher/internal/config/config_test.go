@@ -183,6 +183,7 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		"orders from bad":  {"ORDERS_FROM", "18.10.2026"},
 		"orders from next": {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
 		"orders tail big":  {"ORDERS_TAIL_DAYS", "61"},
+		"orders tail zero": {"ORDERS_TAIL_DAYS", "0"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			clear(t)
@@ -195,12 +196,12 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 	t.Run("orders from env", func(t *testing.T) {
 		clear(t)
 		t.Setenv("ORDERS_FROM", "2026-10-01")
-		t.Setenv("ORDERS_TAIL_DAYS", "0")
+		t.Setenv("ORDERS_TAIL_DAYS", "1")
 		cfg, err := Load()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if cfg.OrdersFrom != "2026-10-01" || cfg.OrdersTailDays != 0 {
+		if cfg.OrdersFrom != "2026-10-01" || cfg.OrdersTailDays != 1 {
 			t.Errorf("orders = %q %d", cfg.OrdersFrom, cfg.OrdersTailDays)
 		}
 	})

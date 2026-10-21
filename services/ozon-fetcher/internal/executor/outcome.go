@@ -42,6 +42,10 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 	if errors.Is(err, errNoCredentials) {
 		return store.Outcome{Status: store.StatusPending, Label: "no_credentials", ErrorClass: "no_credentials", KeepCursor: true, NextRunAt: now.Add(e.cfg.NoCredentialsIn)}
 	}
+	if errors.Is(err, errResourceNotEnabled) {
+		// Задача ждёт: ресурс могут включить снова, курсор сохраняется.
+		return store.Outcome{Status: store.StatusPending, Label: "resource_disabled", ErrorClass: "resource_disabled", KeepCursor: true, NextRunAt: now.Add(e.cfg.NoCredentialsIn)}
+	}
 	if errors.Is(err, errUnknownResource) || errors.Is(err, errBadPeriod) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "invalid_task", ErrorClass: "invalid_task", NextRunAt: now}
 	}
@@ -114,7 +118,18 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		}
 		return store.Outcome{Status: store.StatusNotReady, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now.Add(delay)}
 
-	default: // invalid_request, invalid_response
+	case ozon.ClassInvalidRequest:
+		if IsPostingResource(task.ResourceType) && task.Cursor != "" {
+			// Попытка продолжала курсор прежней (после паузы 429, backoff,
+			// рестарта): курсор Ozon мог истечь. Повтор окна с первой страницы,
+			// а не потеря дня до следующей перезагрузки.
+			out := e.retryable(task, "stale_cursor", now, false)
+			out.HTTPStatus = apiErr.Status
+			return out
+		}
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now}
+
+	default: // invalid_response
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now}
 	}
 }

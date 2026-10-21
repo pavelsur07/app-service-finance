@@ -18,9 +18,11 @@ const (
 // PostingPageLimit — максимум Ozon для новых методов: больше — 400.
 const PostingPageLimit = 100
 
-// MaxPostingPages — защитный предел страниц одного окна (10 000 отправлений).
-// Достижение предела с признаком продолжения — ошибка, не обрезка окна.
-const MaxPostingPages = 100
+// MaxPostingPages — защитный предел страниц одного окна (100 000 отправлений
+// за день — с запасом на распродажи; от зацикливания защищает проверка
+// повтора курсора). Достижение предела с признаком продолжения — ошибка, не
+// обрезка окна.
+const MaxPostingPages = 1000
 
 // PostingScheme — схема работы: FBO (склад Ozon) или FBS (склад продавца).
 type PostingScheme string
@@ -140,7 +142,9 @@ func (c *Client) FetchPostingList(ctx context.Context, creds Credentials, connec
 	}
 
 	for no := firstPageNo; ; no++ {
-		if no-firstPageNo >= MaxPostingPages {
+		// Предел — по номеру страницы окна, не по попытке: продолжение после
+		// рестарта не получает ещё MaxPostingPages страниц.
+		if no > MaxPostingPages {
 			return invalidResponse(endpoint, fmt.Sprintf("more than %d pages with a continuation marker", MaxPostingPages))
 		}
 		resp, err := c.Post(ctx, creds, connectionRef, endpoint, postingRequest(w, cursor))
