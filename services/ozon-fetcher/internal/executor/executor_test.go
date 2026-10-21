@@ -46,7 +46,9 @@ type fakeTasks struct {
 	pauses       []time.Duration // паузы, выданные RecordAuthFailure
 	stopErr      error
 	content      map[string][]store.RawObject // ресурс/период → страницы ревизии (ContentPages)
+	contentAt    time.Time                    // LastSuccessAt ревизии (по умолчанию t0)
 	contentErr   error
+	reloaded     []string
 	controlHang  bool // SuspendConnection/StopResource ждут отмены контекста
 	extendHang   bool // ExtendLease ждёт отмены контекста
 }
@@ -111,17 +113,28 @@ func (f *fakeTasks) ResumeConnection(_ context.Context, ref string) error {
 	return nil
 }
 
-func (f *fakeTasks) ContentPages(_ context.Context, key store.TaskKey) ([]store.RawObject, error) {
+func (f *fakeTasks) ContentPages(_ context.Context, key store.TaskKey) (store.Content, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.contentErr != nil {
-		return nil, f.contentErr
+		return store.Content{}, f.contentErr
 	}
 	pages, ok := f.content[key.ResourceType+"/"+key.PeriodKey]
 	if !ok {
-		return nil, store.ErrNoContent
+		return store.Content{}, store.ErrNoContent
 	}
-	return pages, nil
+	at := f.contentAt
+	if at.IsZero() {
+		at = t0
+	}
+	return store.Content{Pages: pages, LastSuccessAt: at}, nil
+}
+
+func (f *fakeTasks) ReloadWithoutContent(_ context.Context, key store.TaskKey, _ time.Time) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reloaded = append(f.reloaded, key.ResourceType+"/"+key.PeriodKey)
+	return true, nil
 }
 
 func (f *fakeTasks) StopResource(_ context.Context, resource, _ string) error {

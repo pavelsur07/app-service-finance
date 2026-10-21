@@ -63,7 +63,8 @@ type TaskStore interface {
 	RecordAuthFailure(ctx context.Context, connectionRef string, now time.Time, pauseFor func(failures int) time.Duration) (int, error)
 	ResumeConnection(ctx context.Context, connectionRef string) error
 	StopResource(ctx context.Context, resourceType, reason string) error
-	ContentPages(ctx context.Context, key store.TaskKey) ([]store.RawObject, error)
+	ContentPages(ctx context.Context, key store.TaskKey) (store.Content, error)
+	ReloadWithoutContent(ctx context.Context, key store.TaskKey, now time.Time) (bool, error)
 }
 
 // RawReader — чтение сохранённой страницы (зависимые ресурсы).
@@ -181,7 +182,7 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 	defer cancel(nil)
 	stopLease := e.keepLease(taskCtx, cancel, task, log)
 
-	run := &taskRun{exec: e, task: task, hashes: append([]string(nil), task.PageHashes...), cursor: task.Cursor, nextPage: task.NextPageNo}
+	run := &taskRun{exec: e, task: task, log: log, hashes: append([]string(nil), task.PageHashes...), cursor: task.Cursor, nextPage: task.NextPageNo}
 	fetchErr := run.fetch(taskCtx, cabinet)
 
 	// Lease продлевается и во время побочных действий исхода (пауза кабинета,
@@ -268,6 +269,7 @@ func (e *Executor) keepLease(ctx context.Context, cancel context.CancelCauseFunc
 type taskRun struct {
 	exec     *Executor
 	task     store.Task
+	log      *slog.Logger
 	hashes   []string
 	cursor   string
 	nextPage int

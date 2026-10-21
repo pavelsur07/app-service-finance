@@ -268,34 +268,77 @@ func (t *Tasks) FindObject(ctx context.Context, key TaskKey, sha256 string) (Raw
 // ErrNoContent — у задачи нет загруженной ревизии (ещё не было done).
 var ErrNoContent = errors.New("store: task has no loaded content")
 
-// ContentPages — объекты страниц текущей загруженной ревизии задачи по
-// порядку (content_pages последнего done). Нет ревизии — ErrNoContent;
-// страница без объекта — ошибка, не укороченный список.
-func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) ([]RawObject, error) {
+// ErrMissingObject — у страницы ревизии нет объекта в raw_object (нарушен инвариант).
+var ErrMissingObject = errors.New("store: content page has no raw object")
+
+// Content — текущая загруженная ревизия задачи.
+type Content struct {
+	Pages         []RawObject // по порядку, PageNo с 1
+	LastSuccessAt time.Time   // время записи ревизии (последний done)
+}
+
+// ContentPages — объекты страниц текущей загруженной ревизии задачи
+// (content_pages последнего done). Нет ревизии — ErrNoContent; страница без
+// объекта — ErrMissingObject, не укороченный список.
+func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) {
 	var pages string
+	var last *time.Time
 	err := t.pool.QueryRow(ctx, `
-		SELECT content_pages FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
-		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && pages == "") {
-		return nil, ErrNoContent
+		SELECT content_pages, last_success_at FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages, &last)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (pages == "" || last == nil)) {
+		return Content{}, ErrNoContent
 	}
 	if err != nil {
-		return nil, fmt.Errorf("store: content pages: %w", err)
+		return Content{}, fmt.Errorf("store: content pages: %w", err)
 	}
 	hashes := strings.Split(pages, ",")
-	out := make([]RawObject, 0, len(hashes))
-	for i, h := range hashes {
-		obj, found, err := t.FindObject(ctx, key, h)
-		if err != nil {
-			return nil, err
+	rows, err := t.pool.Query(ctx, `
+		SELECT DISTINCT ON (r.sha256) r.sha256, r.storage_uri, r.size_bytes, r.stored_bytes, r.content_type
+		FROM raw_object r JOIN fetch_attempt a ON a.attempt_id = r.attempt_id
+		WHERE a.connection_ref = $1 AND a.resource_type = $2 AND a.period_key = $3 AND r.sha256 = ANY($4)
+		ORDER BY r.sha256, r.created_at DESC`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, hashes)
+	if err != nil {
+		return Content{}, fmt.Errorf("store: content objects: %w", err)
+	}
+	defer rows.Close()
+	bySHA := map[string]RawObject{}
+	for rows.Next() {
+		var obj RawObject
+		if err := rows.Scan(&obj.SHA256, &obj.StorageURI, &obj.SizeBytes, &obj.StoredBytes, &obj.ContentType); err != nil {
+			return Content{}, fmt.Errorf("store: content objects scan: %w", err)
 		}
-		if !found {
-			return nil, fmt.Errorf("store: content page %d of %s/%s/%s has no raw object", i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
+		bySHA[obj.SHA256] = obj
+	}
+	if err := rows.Err(); err != nil {
+		return Content{}, fmt.Errorf("store: content objects: %w", err)
+	}
+	out := Content{Pages: make([]RawObject, 0, len(hashes)), LastSuccessAt: *last}
+	for i, h := range hashes {
+		obj, ok := bySHA[h]
+		if !ok {
+			return Content{}, fmt.Errorf("%w: page %d of %s/%s/%s", ErrMissingObject, i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
 		}
 		obj.PageNo = i + 1
-		out = append(out, obj)
+		out.Pages = append(out.Pages, obj)
 	}
 	return out, nil
+}
+
+// ReloadWithoutContent ставит на полную перезагрузку done-задачу, у которой
+// нет списка страниц ревизии (загружена до миграции 00004): зависимому
+// ресурсу без него не из чего читать. true — задача поставлена.
+func (t *Tasks) ReloadWithoutContent(ctx context.Context, key TaskKey, now time.Time) (bool, error) {
+	tag, err := t.pool.Exec(ctx, `
+		UPDATE fetch_task SET status = 'pending', next_run_at = $4, updated_at = $4
+		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3
+		  AND status = 'done' AND content_pages = ''`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, now)
+	if err != nil {
+		return false, fmt.Errorf("store: reload without content: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // RecordPage — страница и курсор следующей одной транзакцией.

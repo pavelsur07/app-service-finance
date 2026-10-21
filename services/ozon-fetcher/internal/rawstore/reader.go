@@ -14,6 +14,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // Getter — чтение объекта S3 (фейк в тестах).
@@ -27,8 +29,17 @@ const MaxReadBytes = 64 << 20
 // DefaultGetTimeout — предел одного чтения вместе с повторами SDK.
 const DefaultGetTimeout = 2 * time.Minute
 
-// ErrChecksumMismatch — содержимое объекта не совпало с ожидаемым sha256.
-var ErrChecksumMismatch = errors.New("rawstore: checksum mismatch")
+// Ошибки, которые повтором не исправить: объект повреждён, чужой или
+// отсутствует. Временные сбои S3 (сеть, таймаут) возвращаются как есть.
+var (
+	// ErrObjectInvalid — объект не того бакета, не gzip, больше предела или
+	// не совпал sha256.
+	ErrObjectInvalid = errors.New("rawstore: stored object is invalid")
+	// ErrChecksumMismatch — содержимое объекта не совпало с ожидаемым sha256.
+	ErrChecksumMismatch = fmt.Errorf("%w: checksum mismatch", ErrObjectInvalid)
+	// ErrObjectNotFound — объекта с этим ключом нет.
+	ErrObjectNotFound = errors.New("rawstore: stored object not found")
+)
 
 // Reader читает raw-объекты своего бакета: зависимый ресурс (начисления по
 // отправлениям) берёт номера из уже загруженных страниц заказов.
@@ -47,7 +58,7 @@ func NewReader(client Getter, bucket string) *Reader {
 func (r *Reader) Get(ctx context.Context, uri, wantSHA256 string) ([]byte, error) {
 	key, ok := strings.CutPrefix(uri, "s3://"+r.bucket+"/")
 	if !ok || key == "" {
-		return nil, fmt.Errorf("rawstore: object %q is not in bucket %s", uri, r.bucket)
+		return nil, fmt.Errorf("%w: %q is not in bucket %s", ErrObjectInvalid, uri, r.bucket)
 	}
 	getCtx, cancel := context.WithTimeout(ctx, r.getTimeout)
 	defer cancel()
@@ -56,20 +67,28 @@ func (r *Reader) Get(ctx context.Context, uri, wantSHA256 string) ([]byte, error
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		var noKey *types.NoSuchKey
+		var apiErr smithy.APIError
+		if errors.As(err, &noKey) || (errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey") {
+			return nil, fmt.Errorf("%w: %s", ErrObjectNotFound, key)
+		}
 		return nil, fmt.Errorf("rawstore: get %s: %w", key, err)
 	}
 	defer func() { _ = out.Body.Close() }()
 
 	zr, err := gzip.NewReader(io.LimitReader(out.Body, MaxReadBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("rawstore: gunzip %s: %w", key, err)
+		return nil, fmt.Errorf("%w: gunzip %s: %v", ErrObjectInvalid, key, err)
 	}
 	body, err := io.ReadAll(io.LimitReader(zr, MaxReadBytes+1))
 	if err != nil {
+		if errors.Is(err, gzip.ErrChecksum) || errors.Is(err, gzip.ErrHeader) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("%w: read %s: %v", ErrObjectInvalid, key, err)
+		}
 		return nil, fmt.Errorf("rawstore: read %s: %w", key, err)
 	}
 	if len(body) > MaxReadBytes {
-		return nil, fmt.Errorf("rawstore: object %s exceeds %d bytes", key, MaxReadBytes)
+		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrObjectInvalid, key, MaxReadBytes)
 	}
 	sum := sha256.Sum256(body)
 	if got := hex.EncodeToString(sum[:]); !strings.EqualFold(got, wantSHA256) {

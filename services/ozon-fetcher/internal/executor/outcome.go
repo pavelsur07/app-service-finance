@@ -53,6 +53,9 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		}
 		return store.Outcome{Status: store.StatusNotReady, Label: "orders_not_loaded", ErrorClass: "orders_not_loaded", NextRunAt: now.Add(delay)}
 	}
+	if errors.Is(err, errOrdersRevised) {
+		return e.retryable(task, "orders_revised", now, false)
+	}
 	if errors.Is(err, errOrdersRawInvalid) {
 		log.Error("stored orders page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "orders_raw_invalid", ErrorClass: "orders_raw_invalid", NextRunAt: now}

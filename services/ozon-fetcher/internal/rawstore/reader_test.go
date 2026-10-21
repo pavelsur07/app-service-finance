@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ func (g getterFromPutter) GetObject(_ context.Context, in *s3.GetObjectInput, _ 
 	defer g.p.mu.Unlock()
 	body, ok := g.p.objects[aws.ToString(in.Key)]
 	if !ok {
-		return nil, errors.New("NoSuchKey")
+		return nil, &types.NoSuchKey{}
 	}
 	return &s3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(body))}, nil
 }
@@ -47,11 +48,30 @@ func TestReaderRejectsChecksumMismatchForeignBucketAndMissingObject(t *testing.T
 	_, err = reader.Get(context.Background(), stored.URI, sha256Of("other"))
 	require.ErrorIs(t, err, ErrChecksumMismatch)
 
+	require.ErrorIs(t, err, ErrObjectInvalid)
+
 	_, err = NewReader(getterFromPutter{putter}, "other-bucket").Get(context.Background(), stored.URI, stored.SHA256)
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrObjectInvalid)
 
 	_, err = reader.Get(context.Background(), "s3://raw/missing.json.gz", stored.SHA256)
+	require.ErrorIs(t, err, ErrObjectNotFound)
+
+	putter.objects["broken.json.gz"] = []byte("not gzip")
+	_, err = reader.Get(context.Background(), "s3://raw/broken.json.gz", stored.SHA256)
+	require.ErrorIs(t, err, ErrObjectInvalid)
+}
+
+func TestReaderKeepsTransientErrorsRetryable(t *testing.T) {
+	_, err := NewReader(failingGetter{errors.New("connection reset")}, "raw").Get(context.Background(), "s3://raw/a.json.gz", "x")
 	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrObjectInvalid)
+	assert.NotErrorIs(t, err, ErrObjectNotFound)
+}
+
+type failingGetter struct{ err error }
+
+func (f failingGetter) GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	return nil, f.err
 }
 
 func sha256Of(s string) string {

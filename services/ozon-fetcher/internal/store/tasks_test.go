@@ -647,6 +647,9 @@ func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
 
 	_, err := tasks.ContentPages(ctx, s.TaskKey)
 	require.ErrorIs(t, err, ErrNoContent, "до первой загрузки ревизии нет")
+	reloaded, err := tasks.ReloadWithoutContent(ctx, s.TaskKey, t0)
+	require.NoError(t, err)
+	assert.False(t, reloaded, "не done — не трогается")
 
 	// Попытка 1: страница 1, затем 429; попытка 2 дочитывает страницу 2.
 	first, err := claim(t, tasks, []string{"ref-a"}, t0)
@@ -665,11 +668,16 @@ func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
 	_, err = tasks.FinishTask(ctx, second.TaskKey, second.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev1")}, t0)
 	require.NoError(t, err)
 
-	pages, err := tasks.ContentPages(ctx, s.TaskKey)
+	content, err := tasks.ContentPages(ctx, s.TaskKey)
 	require.NoError(t, err)
+	pages := content.Pages
 	require.Len(t, pages, 2, "страницы обеих попыток")
 	assert.Equal(t, []string{"s3://b/p1", "s3://b/p2"}, []string{pages[0].StorageURI, pages[1].StorageURI})
 	assert.Equal(t, []int{1, 2}, []int{pages[0].PageNo, pages[1].PageNo})
+	assert.True(t, content.LastSuccessAt.Equal(t0))
+	reloaded, err = tasks.ReloadWithoutContent(ctx, s.TaskKey, t0)
+	require.NoError(t, err)
+	assert.False(t, reloaded, "ревизия со страницами — не перезагружается")
 
 	// Перезагрузка в работе: пока не done, видна прежняя ревизия.
 	s.Refresh = true
@@ -678,15 +686,43 @@ func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
 	require.NoError(t, err)
 	p3 := RawObject{PageNo: 1, StorageURI: "s3://b/p3", SHA256: hash("p3"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
 	require.NoError(t, tasks.RecordPage(ctx, third.TaskKey, third.AttemptID, p3, ""))
-	pages, err = tasks.ContentPages(ctx, s.TaskKey)
+	content, err = tasks.ContentPages(ctx, s.TaskKey)
 	require.NoError(t, err)
-	assert.Len(t, pages, 2)
+	assert.Len(t, content.Pages, 2)
 	_, err = tasks.FinishTask(ctx, third.TaskKey, third.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev2")}, t0)
 	require.NoError(t, err)
-	pages, err = tasks.ContentPages(ctx, s.TaskKey)
+	content, err = tasks.ContentPages(ctx, s.TaskKey)
 	require.NoError(t, err)
-	require.Len(t, pages, 1, "новая ревизия заменяет прежнюю")
-	assert.Equal(t, "s3://b/p3", pages[0].StorageURI)
+	require.Len(t, content.Pages, 1, "новая ревизия заменяет прежнюю")
+	assert.Equal(t, "s3://b/p3", content.Pages[0].StorageURI)
+}
+
+func TestContentWithoutPagesListIsReloadedAndMissingObjectIsAnError(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-19", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), ""))
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+
+	// Ревизия до миграции 00004: done без списка страниц.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = '' WHERE period_key = '2026-10-19'`)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent)
+	reloaded, err := tasks.ReloadWithoutContent(ctx, s.TaskKey, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.True(t, reloaded)
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey))
+
+	// Страница без объекта — ошибка, не укороченный список.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = $1 WHERE period_key = '2026-10-19'`, hash("p")+","+hash("lost"))
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrMissingObject)
 }
 
 func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
