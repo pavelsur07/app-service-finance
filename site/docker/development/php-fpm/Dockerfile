@@ -1,4 +1,4 @@
-FROM php:8.4.24-fpm-alpine
+FROM php:8.4.27-fpm-alpine
 
 ENV XDEBUG_VERSION 3.4.1
 
@@ -8,7 +8,6 @@ RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetyp
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && git clone --branch $XDEBUG_VERSION --depth 1 https://github.com/xdebug/xdebug.git /usr/src/php/ext/xdebug \
-    && docker-php-ext-configure xdebug --enable-xdebug-dev \
     && docker-php-ext-install pdo_pgsql xdebug bcmath zip gd \
     && apk del git linux-headers
 
