@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance\Command;
 
 use App\Company\Enum\BusinessProfile;
+use App\Finance\Enum\PLCategoryType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -49,6 +51,7 @@ final class ApplyDefaultPLTreeCommandTest extends IntegrationTestCase
         $this->em->persist($user);
         $this->em->persist($company);
         $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->build());
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Выручка')->withCode('REV_TOTAL')->withType(PLCategoryType::KPI)->build());
         $this->em->flush();
 
         $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:apply-default'));

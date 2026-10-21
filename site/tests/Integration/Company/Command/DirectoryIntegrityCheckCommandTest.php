@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Company\Command;
 
+use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Company\Command\DirectoryIntegrityCheckCommand;
 use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
@@ -55,6 +56,29 @@ final class DirectoryIntegrityCheckCommandTest extends IntegrationTestCase
         $errors = array_values(array_filter($handler->getRecords(), static fn ($r): bool => Level::Error === $r->level));
         self::assertCount(1, $errors);
         self::assertSame(['duplicates' => 3, 'companies' => 1, 'byDirectory' => ['balance' => 1, 'dds' => 1, 'pl' => 1]], $errors[0]->context);
+    }
+
+    /**
+     * Отключённые статьи ДДС и архивные статьи Баланса в выборе не видны — не дубли.
+     */
+    public function testDisabledAndArchivedArticlesAreNotDuplicates(): void
+    {
+        $company = $this->company(1);
+        $disabled = CashflowCategoryBuilder::aCashflowCategory()->withIndex(2)->withCompany($company)->withName('Аренда')->build();
+        $disabled->setStatus(CashflowCategoryStatus::DISABLED);
+        $archived = BalanceCategoryBuilder::aBalanceCategory()->withIndex(2)->withCompanyId((string) $company->getId())->withName('Склад')->build();
+        $archived->setIsArchived(true);
+        $this->persist(
+            CashflowCategoryBuilder::aCashflowCategory()->withIndex(1)->withCompany($company)->withName('Аренда')->build(),
+            $disabled,
+            BalanceCategoryBuilder::aBalanceCategory()->withIndex(1)->withCompanyId((string) $company->getId())->withName('Склад')->build(),
+            $archived,
+        );
+
+        [$exit, $display] = $this->runCheck();
+
+        self::assertSame(Command::SUCCESS, $exit, $display);
+        self::assertStringContainsString('duplicates 0 in 0 companies', $display);
     }
 
     public function testCleanDirectoriesPassAndTemplateTreeIsNotNoted(): void

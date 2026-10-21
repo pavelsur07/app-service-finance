@@ -36,8 +36,8 @@
                 </p>
                 <p class="text-secondary small" data-template-origin>
                     {% if templateOrigin is defined and templateOrigin is not null %}
-                        Дерево создано шаблоном «{{ templateOrigin.profile.label }}», версия {{ templateOrigin.templateVersion }},
-                        {{ templateOrigin.appliedAt|date('d.m.Y') }}. Шаблон другого профиля к нему не применяется.
+                        Дерево из шаблона «{{ templateOrigin.profile.label }}» (версия {{ templateOrigin.templateVersion }},
+                        последнее применение {{ templateOrigin.appliedAt|date('d.m.Y') }}). Шаблон другого профиля к нему не применяется.
                     {% else %}
                         Происхождение дерева не записано: оно создано до учёта шаблонов или вручную.
                     {% endif %}

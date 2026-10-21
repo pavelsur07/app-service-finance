@@ -143,7 +143,7 @@ final class PLTemplateMappingControllerTest extends WebTestCaseBase
         self::assertSame(['screen'], $this->em()->getConnection()->fetchFirstColumn('SELECT source FROM pl_template_applications WHERE company_id = ?', [(string) $company->getId()]));
 
         $crawler = $client->request('GET', '/pl-categories/import');
-        self::assertStringContainsString('Дерево создано шаблоном «Маркетплейсы и e-com», версия 2', $crawler->filter('[data-template-origin]')->text());
+        self::assertStringContainsString('Дерево из шаблона «Маркетплейсы и e-com» (версия 2', $crawler->filter('[data-template-origin]')->text());
     }
 
     public function testTemplatePreviewOfAnotherProfileIsRefused(): void
@@ -152,7 +152,12 @@ final class PLTemplateMappingControllerTest extends WebTestCaseBase
         $user = UserBuilder::aUser()->asCompanyOwner()->build();
         $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
         $company->setBusinessProfile(BusinessProfile::UNIVERSAL);
-        $this->save($user, $company, PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->build());
+        $this->save(
+            $user,
+            $company,
+            PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->build(),
+            PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Выручка')->withCode('REV_TOTAL')->withType(PLCategoryType::KPI)->build(),
+        );
         $this->login($client, $user, $company);
 
         $client->request('GET', '/pl-categories/import?source=template');
@@ -160,6 +165,10 @@ final class PLTemplateMappingControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.toast.text-bg-danger', 'шаблон «Базовый» к нему не применяется');
         self::assertSelectorNotExists('input[name="mode"][value="template"]');
+
+        $client->request('POST', '/pl-categories/import/apply', ['mode' => 'template', '_token' => $this->csrfToken($client, 'pl-category-import'.(string) $company->getId())]);
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
     }
 
     /**

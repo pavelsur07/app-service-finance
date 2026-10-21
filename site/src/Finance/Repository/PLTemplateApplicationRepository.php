@@ -20,21 +20,24 @@ final class PLTemplateApplicationRepository extends ServiceEntityRepository
     }
 
     /**
-     * Первое применение шаблона — происхождение дерева ОПиУ компании; null — не записано.
+     * Последнее применение шаблона — происхождение дерева ОПиУ компании; null — не записано.
+     * Последнее, а не первое: дерево, удалённое и собранное заново шаблоном другого профиля,
+     * принадлежит новому шаблону (к непустому дереву шаблон другого профиля не применяется,
+     * поэтому иначе последняя запись с первой не расходится).
      */
-    public function findFirstByCompanyId(string $companyId): ?PLTemplateApplication
+    public function findLatestByCompanyId(string $companyId): ?PLTemplateApplication
     {
         Assert::uuid($companyId);
 
-        $first = $this->createQueryBuilder('a')
+        $latest = $this->createQueryBuilder('a')
             ->andWhere('a.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('a.appliedAt', \SortDirection::Ascending)
-            ->addOrderBy('a.id', \SortDirection::Ascending)
+            ->orderBy('a.appliedAt', \SortDirection::Descending)
+            ->addOrderBy('a.id', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
 
-        return $first instanceof PLTemplateApplication ? $first : null;
+        return $latest instanceof PLTemplateApplication ? $latest : null;
     }
 }

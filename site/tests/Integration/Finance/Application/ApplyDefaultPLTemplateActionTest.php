@@ -9,10 +9,12 @@ use App\Company\Enum\BusinessProfile;
 use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
 use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
 use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLTemplateProfileMismatchException;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -44,6 +46,7 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
     {
         $company = $this->company(BusinessProfile::UNIVERSAL);
         $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->withProfile(BusinessProfile::MARKETPLACE)->build());
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Выручка')->withCode('REV_TOTAL')->withType(PLCategoryType::KPI)->build());
         $this->em->flush();
 
         try {
@@ -53,8 +56,25 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
             self::assertStringContainsString('создано шаблоном «Маркетплейсы и e-com»; шаблон «Базовый»', $e->getMessage());
         }
 
-        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
         self::assertCount(1, $this->records($company));
+    }
+
+    /**
+     * Регрессия (ревью): пустое дерево смешивать не с чем — шаблон нового профиля его собирает и
+     * становится происхождением; дозаполнение онбординга на такой компании не падает.
+     */
+    public function testEmptyTreeIsBuiltByNewProfileAndBecomesOrigin(): void
+    {
+        $company = $this->company(BusinessProfile::UNIVERSAL);
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('2026-10-01 10:00'))->build());
+        $this->em->flush();
+
+        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId(), dryRun: true));
+        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+
+        self::assertSame(['MARKETPLACE', 'UNIVERSAL'], array_map(static fn (array $r): string => $r[0], $this->records($company)));
+        self::assertCount(0, $this->apply($company, dryRun: true)->created, 'дальше — дерево «Базового»');
     }
 
     /**
@@ -66,15 +86,16 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
         yield 'применение' => [false];
     }
 
-    public function testOriginIsTheFirstApplication(): void
+    public function testOriginIsTheLatestApplication(): void
     {
         $company = $this->company(BusinessProfile::MARKETPLACE);
         $id = (string) $company->getId();
-        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($id)->withProfile(BusinessProfile::UNIVERSAL)->appliedAt(new \DateTimeImmutable('2026-10-22 10:00'))->build());
-        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($id)->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('2026-10-01 10:00'))->build());
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($id)->withProfile(BusinessProfile::UNIVERSAL)->appliedAt(new \DateTimeImmutable('2026-10-01 10:00'))->build());
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($id)->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('2026-10-22 10:00'))->build());
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Выручка')->withCode('REV_TOTAL')->withType(PLCategoryType::KPI)->build());
         $this->em->flush();
 
-        self::assertCount(72, $this->apply($company, dryRun: true)->created);
+        self::assertCount(71, $this->apply($company, dryRun: true)->created);
     }
 
     public function testTreeWithoutOriginIsNotCheckedByProfile(): void
