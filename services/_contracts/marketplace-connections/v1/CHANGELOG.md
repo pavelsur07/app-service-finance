@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-21) — каталог товаров
+
+- Новые значения `resource_types` у seller: `ozon.products.list`, `ozon.products.info`
+  (`/v3/product/list`, `/v3/product/info/list`). Выдаются по списку
+  `ozon_fetcher.products_companies`. Схема не менялась.
+
 ## Правка (2026-10-21) — начисления по отправлениям
 
 - Новое значение `resource_types` у seller: `ozon.finance.accrual-postings`

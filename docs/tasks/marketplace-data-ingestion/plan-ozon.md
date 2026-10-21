@@ -79,6 +79,10 @@
 
 ### Этап 4. Карточки товаров
 
+Подробный план — [`stages/ozon-4-products.md`](stages/ozon-4-products.md): два ресурса
+(`ozon.products.list`, `ozon.products.info`), снимок дня МСК; подробности — по `product_id` из raw
+списка того же дня.
+
 **Результат.** Раз в сутки по каждому кабинету в raw — полный список товаров (`/v3/product/list`) и
 их подробности (`/v3/product/info/list`, порциями по SKU из списка).
 

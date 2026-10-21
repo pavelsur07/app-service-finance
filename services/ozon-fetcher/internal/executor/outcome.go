@@ -10,6 +10,9 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
+// labelSnapshotMissed — снимок за прошедший день не загружен (WARNING, не ERROR).
+const labelSnapshotMissed = "snapshot_missed"
+
 // outcome сопоставляет результат загрузки строке таблицы исходов (stage-9.md).
 // Побочные действия (пауза кабинета, стоп ресурса, обновление кабинетов)
 // выполняются здесь же — до записи итога задачи.
@@ -59,6 +62,23 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 	if errors.Is(err, errOrdersRawInvalid) {
 		log.Error("stored orders page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "orders_raw_invalid", ErrorClass: "orders_raw_invalid", NextRunAt: now}
+	}
+	if errors.Is(err, errSnapshotMissed) {
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: labelSnapshotMissed, ErrorClass: labelSnapshotMissed, NextRunAt: now}
+	}
+	if errors.Is(err, errCatalogNotLoaded) {
+		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]
+		if !ok {
+			delay = time.Hour
+		}
+		return store.Outcome{Status: store.StatusNotReady, Label: "catalog_not_loaded", ErrorClass: "catalog_not_loaded", NextRunAt: now.Add(delay)}
+	}
+	if errors.Is(err, errCatalogRevised) {
+		return e.retryable(task, "catalog_revised", now, false)
+	}
+	if errors.Is(err, errCatalogRawInvalid) {
+		log.Error("stored product list page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "catalog_raw_invalid", ErrorClass: "catalog_raw_invalid", NextRunAt: now}
 	}
 	if errors.Is(err, errUnknownResource) || errors.Is(err, errBadPeriod) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "invalid_task", ErrorClass: "invalid_task", NextRunAt: now}
@@ -133,10 +153,10 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return store.Outcome{Status: store.StatusNotReady, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now.Add(delay)}
 
 	case ozon.ClassInvalidRequest:
-		if IsPostingResource(task.ResourceType) && task.Cursor != "" {
-			// Попытка продолжала курсор прежней (после паузы 429, backoff,
-			// рестарта): курсор Ozon мог истечь. Повтор окна с первой страницы,
-			// а не потеря дня до следующей перезагрузки.
+		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList) && (task.Cursor != "" || run.cursor != "") {
+			// Запрос шёл с курсором — прежней попытки (после паузы 429, backoff,
+			// рестарта) или своей предыдущей страницы: курсор Ozon мог истечь.
+			// Повтор окна с первой страницы, а не потеря дня.
 			out := e.retryable(task, "stale_cursor", now, false)
 			out.HTTPStatus = apiErr.Status
 			return out

@@ -59,6 +59,29 @@ final class CoverageHeatmapBuilderTest extends TestCase
         self::assertSame('Начисления по отправлениям', $titles['ozon.finance.accrual-postings']);
     }
 
+    public function testProductsRowsAppearOnlyWithTasks(): void
+    {
+        $builder = new CoverageHeatmapBuilder();
+        $without = $builder->build(self::month('2026-10', [self::cell(self::BY_DAY, '2026-10-01', 4, 4)]), self::now());
+        $types = array_map(static fn ($r) => $r->resourceType, $without->rows);
+        self::assertNotContains('ozon.products.list', $types);
+        self::assertNotContains('ozon.products.info', $types);
+
+        $heatmap = $builder->build(self::month('2026-10', [
+            self::cell('ozon.products.list', '2026-10-18', 1, 1),
+            self::cell('ozon.products.info', '2026-10-18', 1, 0, retryable: 1),
+        ]), self::now());
+        $rows = [];
+        foreach ($heatmap->rows as $row) {
+            $rows[$row->resourceType] = $row;
+        }
+        self::assertSame('Каталог: список товаров', $rows['ozon.products.list']->title);
+        self::assertSame('Каталог: подробности', $rows['ozon.products.info']->title);
+        self::assertTrue($rows['ozon.products.list']->perDay);
+        self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.products.list']->cells[17]->state);
+        self::assertSame(CoverageHeatmapCell::EMPTY, $rows['ozon.products.list']->cells[16]->state, 'до первого снимка — не пропуск');
+    }
+
     private static function cell(string $resource, string $period, int $expected, int $done, int $running = 0, int $retryable = 0, int $permanent = 0, ?\DateTimeImmutable $lastSuccess = null): ServiceCoverageMonthCell
     {
         return new ServiceCoverageMonthCell($resource, $period, $expected, new ServiceCoverageStatusCounts($done, $running, 0, 0, $retryable, $permanent), $lastSuccess);

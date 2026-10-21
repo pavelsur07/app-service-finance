@@ -176,6 +176,16 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityRoutine, true, now))
 			}
 		}
+		// Каталог — снимок дня: только сегодня, без перечитывания (прошлое не
+		// загрузить). Подробности — только вместе со списком: id берутся из него.
+		if cab.Supports(executor.ResourceProductsList) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsList, today.Format(time.DateOnly), PriorityRoutine, false, now))
+			if cab.Supports(executor.ResourceProductsInfo) {
+				// Минутой позже списка: иначе подробности могут быть взяты первыми
+				// и уйти в not_ready на 10 минут.
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsInfo, today.Format(time.DateOnly), PriorityRoutine, false, now.Add(time.Minute)))
+			}
+		}
 		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
