@@ -12,8 +12,8 @@ S3, журнал загрузок в своей БД; выдача фактов 
 свой тип периода (дни/месяцы у финансов, день с курсором и перечитыванием у
 заказов), приоритет и лимит; очередь пока общая — одна задача кабинета
 одновременно, порядок по приоритету (отдельные слоты — когда замер покажет вытеснение). Сейчас реализованы финансовые ресурсы первой
-волны и отправления FBO/FBS (`ozon.orders.fbo`, `ozon.orders.fbs`, день МСК по дате
-создания, `docs/ozon-api.md`) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
+волны, отправления FBO/FBS (`ozon.orders.fbo`, `ozon.orders.fbs`, день МСК по дате
+создания) и начисления по ним (`ozon.finance.accrual-postings`, номера — из raw заказов; `docs/ozon-api.md`) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
 план загрузки Ozon — [`docs/tasks/marketplace-data-ingestion/plan-ozon.md`](../../docs/tasks/marketplace-data-ingestion/plan-ozon.md).
 Ozon Performance (другой API и авторизация) и другие маркетплейсы — не здесь.
 
@@ -55,6 +55,9 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 | `connection_state` | Кабинет: `last_served_at` (честная очередь), пауза после `auth` |
 | `connection_limit` | Пара (кабинет, endpoint): ручное `rps_override`, адаптированная `rps_current` |
 | `resource_stop` | Ресурс, снятый у Ozon (`obsolete_endpoint`), — не выдаётся никому |
+
+`fetch_task.content_pages` (00004) — sha256 страниц текущей загруженной ревизии по порядку: по ним
+зависимый ресурс (начисления по отправлениям) читает страницы заказов из S3.
 | `sync_job`, `checkpoint`, `outbox_batch` | `00001`, под выдачу фактов (позже) |
 
 Инварианты: у кабинета не больше одной `running`-задачи (частичный уникальный
@@ -92,6 +95,7 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `CONNECTION_ALLOWLIST` | Только эти кабинеты: `connection_ref` или `company_id` через запятую; пусто — все | этап 14 |
 | `OZON_BASE_URL` | Seller API, по умолчанию `https://api-seller.ozon.ru` (на стенде — мок) | этап 11 |
 | `TAIL_DAYS`, `RECONCILE_WEEKDAY`, `FINAL_DAY`, `PLAN_EVERY` | Окна планировщика: 3, 1 (пн), 10, 1h | этап 11 |
+| `ACCRUAL_POSTINGS_DAYS` | Начисления по отправлениям: сколько дней перед сегодня перечитывать раз в сутки (45, 1…90) | этап 3 Ozon |
 | `ORDERS_FROM`, `ORDERS_TAIL_DAYS` | Отправления: первый день загрузки (YYYY-MM-DD МСК, по умолчанию `2026-10-18`, не глубже M-2) и сколько дней перед сегодня перечитывать раз в сутки ради смен статусов (30, 1…60); сегодня — каждый проход | заказы, шаг 1.3 |
 
 ## Внутренний API сервиса (контракты, к кодовым Stage'ам)

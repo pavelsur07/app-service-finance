@@ -3521,7 +3521,9 @@ internal_api → stateless, /internal/* для сервисов services/
   него, один error-лог на запрос; кабинет без пригодных ключей не выдаётся.
   Ресурсы seller — финансовые всегда, отправления (`ozon.orders.fbo`,
   `ozon.orders.fbs`) — только компаниям из параметра `ozon_fetcher.orders_companies`
-  (`site/config/services.yaml`; `['*']` — всем, `[]` — никому).
+  (`site/config/services.yaml`; `['*']` — всем, `[]` — никому), начисления по
+  отправлениям (`ozon.finance.accrual-postings`) — из них компаниям
+  `ozon_fetcher.accrual_postings_companies`.
   Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
@@ -4148,6 +4150,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.52 | 2026-10-21 | Marketplace: ресурс `ozon.finance.accrual-postings` в снимке кабинетов (параметр `ozon_fetcher.accrual_postings_companies`, только с заказами); ServiceGateway: строка «Начисления по отправлениям» карты покрытия |
 | 2.51 | 2026-10-21 | Ingestion: сняты инкрементальные стратегии и cron заказов Ozon (`ozon_orders_fbo`/`ozon_orders_fbs`) — методы списков отключены Ozon (#439, #442), отправления грузит `ozon-fetcher`; обновление статусов (`refresh-statuses`) остаётся |
 | 2.50 | 2026-10-21 | Marketplace: ресурсы отправлений Ozon — всем кабинетам с ключом seller (`ozon_fetcher.orders_companies: ['*']`) |
 | 2.49 | 2026-10-21 | Marketplace: в снимке кабинетов — ресурсы отправлений `ozon.orders.fbo` / `ozon.orders.fbs` по списку компаний `ozon_fetcher.orders_companies`; ServiceGateway: строки «Заказы FBO/FBS» карты покрытия — только при задачах, дни до первой задачи не пропуск |
