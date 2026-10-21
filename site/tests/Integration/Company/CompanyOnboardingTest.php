@@ -27,7 +27,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         'project' => 'PROJECT_GENERAL:Общий',
         'responsibility_center' => 'CFO_GENERAL:Общий',
         'cashflow_system_categories' => 7,
-        'pl_categories' => 70,
+        'pl_categories' => 72,
         'balance_articles' => 33,
         'balance_accounts' => 'ACC_MAIN_BANK, ACC_MAIN_REGISTER',
     ];
@@ -44,7 +44,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Setup Co', false, BusinessProfile::UNIVERSAL);
         $companyId = (string) $company->getId();
 
-        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 42, 'balance_articles' => 31]), $this->onboardingOf($companyId));
+        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 44, 'balance_articles' => 31]), $this->onboardingOf($companyId));
         // Ни одной статьи маркетплейса: ни в ОПиУ, ни в Балансе.
         self::assertSame([], $this->connection->fetchFirstColumn(
             "SELECT code FROM pl_categories WHERE company_id = ? AND (code LIKE '%SPP%' OR code LIKE 'COGS_MP%' OR code ~ '^CM[0-9]' OR code LIKE 'PRODUCT_INFRA%' OR code LIKE 'OPEX_WH%' OR code LIKE 'PROMO%')",

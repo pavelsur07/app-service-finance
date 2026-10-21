@@ -23,11 +23,11 @@ final class EnsureDefaultPLTreeActionTest extends IntegrationTestCase
         $companyId = (string) $this->createCompany()->getId();
         $action = self::getContainer()->get(EnsureDefaultPLTreeAction::class);
 
-        self::assertSame(70, $action($companyId));
+        self::assertSame(72, $action($companyId));
         $this->em->clear();
         self::assertSame(0, $action($companyId));
 
-        self::assertSame(70, $this->categoryCount($companyId));
+        self::assertSame(72, $this->categoryCount($companyId));
         $templateRoots = array_map(
             static fn (PLCategoryTreeNode $node): string => $node->name,
             array_values(array_filter(

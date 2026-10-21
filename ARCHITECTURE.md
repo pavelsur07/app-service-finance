@@ -1676,12 +1676,14 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 
 Шаблоны выбираются по профилю через реестры `finance.pl_templates` и `balance.structure_templates`
 (`config/services.yaml`): у каждого профиля запись, профиль без своего шаблона указывает на
-маркетплейсный явно. Шаблоны: `MARKETPLACE` — `pl_templates/marketplace.json` (70 статей, CM1–CM4, ДРР),
-`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (42 статьи: выручка,
+маркетплейсный явно. Шаблоны: `MARKETPLACE` — `pl_templates/marketplace.json` (72 статьи, CM1–CM4, ДРР),
+`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (44 статьи: выручка,
 себестоимость, валовая прибыль и маржа, операционные расходы, EBITDA, чистая прибыль),
 `templates/universal.yaml` (31 статья — без расчётов и складов маркетплейсов). Код статьи значит одно и то же во всех шаблонах:
 ОПиУ — тип, поток, формат, код родителя; Баланс — сторона, вид, код родителя, статья счёта.
-Согласие держит `tests/Integration/Onboarding/TemplateRegistryTest`.
+Согласие держит `tests/Integration/Onboarding/TemplateRegistryTest`. В обоих ОПиУ «Расходы ниже EBITDA»
+(`BELOW_EBITDA_TOTAL`) включают амортизацию (`BELOW_EBITDA_DEPRECIATION`) и налог на прибыль
+(`BELOW_EBITDA_PROFIT_TAX`).
 
 Профиль бизнеса — `Company::$businessProfile`, enum `App\Company\Enum\BusinessProfile`
 (`MARKETPLACE` «Маркетплейсы и e-com», `UNIVERSAL` «Базовый»; `DEFAULT = MARKETPLACE`, колонка
@@ -4131,6 +4133,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.45 | 2026-10-21 | Finance: в оба шаблона ОПиУ (`templateVersion` 2) добавлены «Амортизация» `BELOW_EBITDA_DEPRECIATION` и «Налог на прибыль» `BELOW_EBITDA_PROFIT_TAX` в «Расходах ниже EBITDA»; маркетплейсный — 72 статьи, универсальный — 44 |
 | 2.44 | 2026-10-20 | Finance, Balance: универсальные стартовые шаблоны профиля `UNIVERSAL` — `pl_templates/universal.json` (42 статьи, валовая прибыль/маржа, EBITDA, чистая прибыль), `templates/universal.yaml` (31 статья) |
 | 2.43 | 2026-10-20 | Finance, Balance: стартовые шаблоны по профилю бизнеса — реестры `finance.pl_templates`, `balance.structure_templates`, файлы `config/finance/pl_templates/`, `config/balance/templates/` (`UNIVERSAL` пока на маркетплейсных); `CompanyFacade::getBusinessProfile()`, `CompanyNotFoundException`; словарь кодов `TemplateRegistryTest` |
 | 2.42 | 2026-10-20 | Company: профиль бизнеса `BusinessProfile` (`MARKETPLACE`, `UNIVERSAL`) — колонка `companies.business_profile`, выбор при регистрации, в `/company/new` и в админке; `CompanyCreatedEvent` несёт профиль; `CompanyFacade::createOwnerAccount()` принимает профиль |

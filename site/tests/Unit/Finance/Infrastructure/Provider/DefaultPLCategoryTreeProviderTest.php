@@ -68,7 +68,7 @@ final class DefaultPLCategoryTreeProviderTest extends TestCase
 
     public function testTemplateVersionIsRead(): void
     {
-        self::assertSame(1, $this->provider()->templateVersion(BusinessProfile::MARKETPLACE));
+        self::assertSame(2, $this->provider()->templateVersion(BusinessProfile::MARKETPLACE));
     }
 
     private function provider(): DefaultPLCategoryTreeProvider

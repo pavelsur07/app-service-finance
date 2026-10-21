@@ -1,7 +1,7 @@
 {
   "version": 1,
   "profile": "UNIVERSAL",
-  "templateVersion": 1,
+  "templateVersion": 2,
   "exportedAt": "2026-10-20T00:00:00+03:00",
   "company": "Базовый шаблон ОПиУ — универсальный",
   "categories": [
@@ -451,6 +451,19 @@
       "sortOrder": 70,
       "children": [
         {
+          "name": "Амортизация",
+          "code": "BELOW_EBITDA_DEPRECIATION",
+          "type": "LEAF_INPUT",
+          "format": "MONEY",
+          "flow": "EXPENSE",
+          "expenseType": "other",
+          "weightInParent": "1.0000",
+          "isVisible": true,
+          "formula": null,
+          "calcOrder": null,
+          "sortOrder": 5
+        },
+        {
           "name": "НДС начисленный 5% / 7% / 22%",
           "code": "BELOW_EBITDA_VAT",
           "type": "LEAF_INPUT",
@@ -475,6 +488,19 @@
           "formula": null,
           "calcOrder": null,
           "sortOrder": 20
+        },
+        {
+          "name": "Налог на прибыль",
+          "code": "BELOW_EBITDA_PROFIT_TAX",
+          "type": "LEAF_INPUT",
+          "format": "MONEY",
+          "flow": "EXPENSE",
+          "expenseType": "other",
+          "weightInParent": "1.0000",
+          "isVisible": true,
+          "formula": null,
+          "calcOrder": null,
+          "sortOrder": 25
         },
         {
           "name": "Проценты по кредитам",
