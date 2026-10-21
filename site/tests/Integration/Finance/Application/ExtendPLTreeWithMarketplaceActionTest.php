@@ -161,19 +161,21 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
      * EBITDA дважды — через OVERHEAD_TOTAL и напрямую.
      */
     /**
-     * @return iterable<string, array{bool, bool}>
+     * @return iterable<string, array{bool, bool, bool}>
      */
     public static function misplacements(): iterable
     {
-        yield 'прямо под OVERHEAD_TOTAL' => [false, false];
+        yield 'прямо под OVERHEAD_TOTAL' => [false, false, false];
         // Внешнее ревью: родитель без кода выглядел как «корень» по коду родителя.
-        yield 'под своей группой без кода внутри OVERHEAD_TOTAL' => [true, false];
+        yield 'под своей группой без кода внутри OVERHEAD_TOTAL' => [true, false, false];
         // Внешнее ревью: удалённая EBITDA создалась бы заново с формулой расширения без проверки.
-        yield 'EBITDA удалена' => [false, true];
+        yield 'EBITDA удалена' => [false, true, false];
+        // Внешнее ревью: формула уже расширена, а группа стоит не на месте.
+        yield 'формула EBITDA уже расширена' => [false, false, true];
     }
 
     #[DataProvider('misplacements')]
-    public function testExistingGroupOutOfTemplatePlaceRefuses(bool $underUncodedGroup, bool $ebitdaDeleted): void
+    public function testExistingGroupOutOfTemplatePlaceRefuses(bool $underUncodedGroup, bool $ebitdaDeleted, bool $ebitdaExtended): void
     {
         $company = $this->universalCompany();
         $parent = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
@@ -186,6 +188,9 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         $this->em->flush();
         if ($ebitdaDeleted) {
             $this->connection->delete('pl_categories', ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+        }
+        if ($ebitdaExtended) {
+            $this->connection->update('pl_categories', ['formula' => 'GROSS_PROFIT + PROMO_TOTAL + OPEX_WH_TOTAL + PRODUCT_INFRA_TOTAL + OVERHEAD_TOTAL'], ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
         }
 
         $this->expectException(PLTreeExtensionException::class);

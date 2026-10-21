@@ -150,6 +150,10 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 continue;
             }
             if (self::same($row['formula'], $node->formula)) {
+                // Формула уже расширена (дополнение прервано или собрано руками): места слагаемых
+                // проверяются всё равно — иначе статьи создались бы под группой не на своём месте.
+                $this->assertTermsInPlace($companyId, (string) $universalFormulas[$node->code], (string) $node->formula, $templateParents);
+
                 continue;
             }
             if (!self::same($row['formula'], $universalFormulas[$node->code])) {
