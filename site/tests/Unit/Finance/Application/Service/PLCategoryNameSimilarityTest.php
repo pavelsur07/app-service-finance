@@ -19,6 +19,15 @@ final class PLCategoryNameSimilarityTest extends TestCase
         self::assertSame($expected, $similarity->similar($b, $a), 'симметрично');
     }
 
+    public function testSameIsOnlyExactMatchAfterNormalization(): void
+    {
+        $similarity = new PLCategoryNameSimilarity();
+
+        self::assertTrue($similarity->same('Налог на ПРИБЫЛЬ', 'налог на прибыль'));
+        self::assertFalse($similarity->same('Налог на прибыль', 'Налог на прибыль / УСН'));
+        self::assertFalse($similarity->same('—', '—'));
+    }
+
     /**
      * @return iterable<string, array{string, string, bool}>
      */
@@ -31,6 +40,8 @@ final class PLCategoryNameSimilarityTest extends TestCase
         yield 'до разделителя «/»' => ['Налог на прибыль', 'Налог на прибыль / УСН', true];
         yield 'до скобки' => ['Налог на прибыль', 'Налог на прибыль (доходы)', true];
         yield 'до дефиса' => ['Прямые расходы', 'Прямые расходы - Шоурум', true];
+        yield 'дефис внутри слова — не разделитель' => ['Аренда офис', 'Аренда офис-склад', false];
+        yield 'тире с пробелами' => ['Прямые расходы', 'Прямые расходы — Шоурум', true];
         yield 'продолжение словами' => ['Расходы', 'Расходы ниже EBITDA', false];
         yield 'продолжение словами после короткого' => ['Хранение', 'Хранение на ФФ', false];
         yield 'начало посреди слова' => ['Налог на прибыль', 'Налог на прибыльность', false];

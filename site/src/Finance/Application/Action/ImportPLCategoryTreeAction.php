@@ -124,6 +124,32 @@ final class ImportPLCategoryTreeAction
             return [[], []];
         }
 
+        // Два прохода: сначала точные совпадения, потом до разделителя — иначе «Аренда / склад»
+        // шаблона забрала бы статью компании «Аренда», точно совпадающую с другой статьёй шаблона.
+        $matched = [];
+        foreach ([true, false] as $exactPass) {
+            $blocked = [];
+            foreach ($plan as $item) {
+                $node = $item['sourceNode'];
+                if (null !== $item['existing'] || isset($matched[$node->key])) {
+                    continue;
+                }
+                if (null !== $node->parent && (isset($matched[$node->parent->key]) || isset($blocked[$node->parent->key]))) {
+                    $blocked[$node->key] = true;
+
+                    continue;
+                }
+                foreach ($candidates as $i => $candidate) {
+                    if ($exactPass ? $this->similarity->same($node->name, $candidate->getName()) : $this->similarity->similar($node->name, $candidate->getName())) {
+                        $matched[$node->key] = $candidate;
+                        unset($candidates[$i]);
+
+                        break;
+                    }
+                }
+            }
+        }
+
         $similar = [];
         $skippedDescendants = [];
         $skippedKeys = [];
@@ -131,17 +157,16 @@ final class ImportPLCategoryTreeAction
         foreach ($plan as $item) {
             $node = $item['sourceNode'];
             if (null === $item['existing']) {
-                if (null !== $node->parent && isset($skippedKeys[$node->parent->key])) {
+                if (isset($matched[$node->key])) {
+                    $candidate = $matched[$node->key];
+                    $similar[] = new ImportPLCategoryTreeSimilarRow($node->name, $node->code, $this->buildPath($node), (string) $candidate->getId(), $candidate->getName());
                     $skippedKeys[$node->key] = true;
-                    $skippedDescendants[] = new ImportPLCategoryTreeRow($node->name, $node->code, $this->buildPath($node));
 
                     continue;
                 }
-                $candidate = $this->similarCandidate($node->name, $candidates);
-                if (null !== $candidate) {
-                    $candidates = array_values(array_filter($candidates, static fn (PLCategory $c): bool => $c !== $candidate));
-                    $similar[] = new ImportPLCategoryTreeSimilarRow($node->name, $node->code, $this->buildPath($node), (string) $candidate->getId(), $candidate->getName());
+                if (null !== $node->parent && isset($skippedKeys[$node->parent->key])) {
                     $skippedKeys[$node->key] = true;
+                    $skippedDescendants[] = new ImportPLCategoryTreeRow($node->name, $node->code, $this->buildPath($node));
 
                     continue;
                 }
@@ -154,23 +179,9 @@ final class ImportPLCategoryTreeAction
     }
 
     /**
-     * @param list<PLCategory> $candidates
-     */
-    private function similarCandidate(string $name, array $candidates): ?PLCategory
-    {
-        foreach ($candidates as $candidate) {
-            if ($this->similarity->similar($name, $candidate->getName())) {
-                return $candidate;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Новые корневые статьи в непустую компанию — только если источник опознал не меньше
-     * половины её корневых статей: иначе рядом с её деревом встал бы второй скелет (dry-run на
-     * проде 21.10: 0 из 3–9 у компаний со своим деревом, 19–21 из 21–27 у компаний на шаблоне).
+     * половины её корневых статей: иначе рядом с её деревом встал бы второй скелет (прод 21.10:
+     * 0 из 3–9 у компаний со своим деревом, 18–21 из 21–27 у компаний на шаблоне).
      * Опознанный корень — статья компании, совпавшая с корневым узлом источника: корень компании,
      * совпавший с вложенным узлом, остаётся корнем, и корень источника над ним встал бы рядом.
      *

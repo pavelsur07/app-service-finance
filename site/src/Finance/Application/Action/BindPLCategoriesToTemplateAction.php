@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Finance\Application\Action;
 
 use App\Company\Facade\CompanyFacade;
+use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Exception\PLTemplateBindingException;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Repository\PLCategoryRepository;
+use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
@@ -58,7 +60,7 @@ final readonly class BindPLCategoriesToTemplateAction
         }
         $takenCodes = array_flip($this->categories->findCodesByCompany($company));
 
-        /** @var list<array{PLCategory, string}> $plan */
+        /** @var list<array{PLCategory, PLCategoryTreeNode, string}> $plan */
         $plan = [];
         $seen = [];
         foreach ($bindings as $code => $categoryId) {
@@ -68,18 +70,7 @@ final readonly class BindPLCategoriesToTemplateAction
             if (!$category instanceof PLCategory) {
                 throw PLTemplateBindingException::categoryNotFound($categoryId);
             }
-            if (null !== $category->getCode()) {
-                throw PLTemplateBindingException::categoryHasCode($category->getName(), $category->getCode());
-            }
-            if ($category->getType() !== $node->type) {
-                throw PLTemplateBindingException::typeMismatch($category->getName(), $code);
-            }
-            if ((null === $category->getParent()) !== (null === $node->parent)) {
-                throw PLTemplateBindingException::levelMismatch($category->getName(), $code);
-            }
-            if ($node->type->sumsChildren($node->formula) && !$category->getType()->sumsChildren($category->getFormula())) {
-                throw PLTemplateBindingException::notSumming($category->getName(), $code);
-            }
+            $this->assertBindable($category, $node, $code);
             if (isset($takenCodes[$code])) {
                 throw PLTemplateBindingException::codeTaken($code);
             }
@@ -87,28 +78,46 @@ final readonly class BindPLCategoriesToTemplateAction
                 throw PLTemplateBindingException::categoryTwice($category->getName());
             }
             $seen[$categoryId] = true;
-            $plan[] = [$category, $code];
+            $plan[] = [$category, $node, $code];
         }
+        // Блокировки строк — в одном порядке у всех сохранений: иначе два встречных сохранения
+        // могли бы взаимно заблокироваться.
+        usort($plan, static fn (array $a, array $b): int => strcmp((string) $a[0]->getId(), (string) $b[0]->getId()));
 
-        // Проверка «без кода» выше — по прочитанному без блокировки: два одновременных сохранения
-        // прошли бы её оба, и второе молча заменило бы код первого. Под блокировкой строки статья
-        // перечитывается и проверяется заново; занятый за это время код ловит уникальный индекс.
+        // Проверки выше — по прочитанному без блокировки: одновременное сохранение или правка статьи
+        // прошли бы мимо них (второе сохранение молча заменило бы код первого). Под блокировкой
+        // строки статья перечитывается и проверяется заново целиком; занятый за это время код
+        // ловит уникальный индекс.
         try {
             $this->em->wrapInTransaction(function () use ($plan): void {
-                foreach ($plan as [$category, $code]) {
+                foreach ($plan as [$category, $node, $code]) {
                     $this->em->refresh($category, LockMode::PESSIMISTIC_WRITE);
-                    if (null !== $category->getCode()) {
-                        throw PLTemplateBindingException::categoryHasCode($category->getName(), $category->getCode());
-                    }
+                    $this->assertBindable($category, $node, $code);
                     $category->setCode($code);
                 }
             });
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException|DeadlockException) {
             throw PLTemplateBindingException::concurrentChange();
         }
 
         $this->logger->info('P&L categories bound to template', ['companyId' => $companyId, 'bound' => \count($plan)]);
 
         return \count($plan);
+    }
+
+    private function assertBindable(PLCategory $category, PLCategoryTreeNode $node, string $code): void
+    {
+        if (null !== $category->getCode()) {
+            throw PLTemplateBindingException::categoryHasCode($category->getName(), $category->getCode());
+        }
+        if ($category->getType() !== $node->type) {
+            throw PLTemplateBindingException::typeMismatch($category->getName(), $code);
+        }
+        if ((null === $category->getParent()) !== (null === $node->parent)) {
+            throw PLTemplateBindingException::levelMismatch($category->getName(), $code);
+        }
+        if ($node->type->sumsChildren($node->formula) && !$category->getType()->sumsChildren($category->getFormula())) {
+            throw PLTemplateBindingException::notSumming($category->getName(), $code);
+        }
     }
 }

@@ -8,7 +8,8 @@ namespace App\Finance\Application\Service;
  * Похожи ли названия двух статей ОПиУ настолько, что вторая статья с таким названием — дубль.
  *
  * Похожи: одинаковые после нормализации (регистр, «ё», знаки препинания, пробелы) либо одно
- * совпадает с началом другого до разделителя — «/», «(», «-», «,», «:», «;», «|»: «Налог на
+ * совпадает с началом другого до разделителя — «/», «(», «,», «:», «;», «|» или тире с пробелами
+ * вокруг («Шоурум - Прямые»; дефис внутри слова, «офис-склад», — не разделитель): «Налог на
  * прибыль» и «Налог на прибыль / УСН» или «Налог на прибыль (доходы)». Продолжение словами не
  * считается: «Хранение» и «Хранение на ФФ», «Расходы» и «Расходы ниже EBITDA» — разные статьи.
  * Короткие названия (меньше MIN_PREFIX_LENGTH символов) сравниваются только целиком.
@@ -16,7 +17,7 @@ namespace App\Finance\Application\Service;
 final readonly class PLCategoryNameSimilarity
 {
     private const MIN_PREFIX_LENGTH = 6;
-    private const SEPARATORS = '/(\-–—,:;|';
+    private const SEPARATOR = '#\s[-–—]\s|[/(,:;|]#u';
 
     public function similar(string $a, string $b): bool
     {
@@ -32,6 +33,17 @@ final readonly class PLCategoryNameSimilarity
         return $this->headEquals($a, $nb) || $this->headEquals($b, $na);
     }
 
+    /**
+     * Одинаковые после нормализации — точное совпадение; у импорта оно в приоритете над
+     * совпадением до разделителя.
+     */
+    public function same(string $a, string $b): bool
+    {
+        $na = self::normalize($a);
+
+        return '' !== $na && $na === self::normalize($b);
+    }
+
     public static function normalize(string $name): string
     {
         $name = str_replace('ё', 'е', mb_strtolower($name));
@@ -44,7 +56,7 @@ final readonly class PLCategoryNameSimilarity
      */
     private function headEquals(string $name, string $other): bool
     {
-        $parts = preg_split('#['.self::SEPARATORS.']#u', $name, 2);
+        $parts = preg_split(self::SEPARATOR, $name, 2);
         if (false === $parts || \count($parts) < 2) {
             return false;
         }

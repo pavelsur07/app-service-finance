@@ -116,6 +116,22 @@ final class BindPLCategoriesToTemplateActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия (внешнее ревью): статью, прочитанную подходящей, к моменту записи изменили —
+     * под блокировкой она проверяется заново целиком, а не только по коду.
+     */
+    public function testCategoryChangedConcurrentlyIsRevalidated(): void
+    {
+        [$company, $own] = $this->companyWithOwnTree();
+        self::assertSame(PLCategoryType::SUBTOTAL, $this->em->find(PLCategory::class, $own['cogs'])?->getType());
+        $this->connection->update('pl_categories', ['formula' => 'X * 0'], ['id' => $own['cogs']]);
+
+        $this->expectException(PLTemplateBindingException::class);
+        $this->expectExceptionMessage('считается иначе');
+
+        $this->bind($company, ['COGS_TOTAL' => $own['cogs']]);
+    }
+
+    /**
      * @param array<string, string> $bindings
      */
     private function bind(Company $company, array $bindings): int

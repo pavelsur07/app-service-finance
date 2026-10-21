@@ -114,6 +114,25 @@ final class ImportPLCategoryTreeNoSecondTreeTest extends IntegrationTestCase
     }
 
     /**
+     * Точное совпадение в приоритете: «Аренда / склад» шаблона не забирает статью компании
+     * «Аренда», точно совпадающую со следующей статьёй шаблона.
+     */
+    public function testExactMatchWinsOverSeparatorMatch(): void
+    {
+        $company = $this->company();
+        $root = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы')->withCode('ROOT')->withType(PLCategoryType::SUBTOTAL)->build();
+        $this->persist($root, PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($root)->withName('Аренда')->withCode(null)->build());
+        $node = static fn (string $key, ?PLCategoryTreeNode $parent, string $name, string $code, PLCategoryType $type, int $sort): PLCategoryTreeNode => new PLCategoryTreeNode($key, $parent, $name, $code, $type, PLValueFormat::MONEY, PLFlow::EXPENSE, PLExpenseType::OTHER, '1.0000', true, null, null, $sort);
+        $sourceRoot = $node('r', null, 'Расходы', 'ROOT', PLCategoryType::SUBTOTAL, 10);
+        $source = [$sourceRoot, $node('x', $sourceRoot, 'Аренда / склад', 'X', PLCategoryType::LEAF_INPUT, 10), $node('y', $sourceRoot, 'Аренда', 'Y', PLCategoryType::LEAF_INPUT, 20)];
+
+        $result = (self::getContainer()->get(ImportPLCategoryTreeAction::class))(new ImportPLCategoryTreeCommand($source, (string) $company->getId(), true, onlyCreate: true));
+
+        self::assertSame(['X'], $this->codes($result->created));
+        self::assertSame(['Y'], array_map(static fn (ImportPLCategoryTreeSimilarRow $r): ?string => $r->code, $result->similar));
+    }
+
+    /**
      * Регрессия (ревью): корень компании, сопоставленный со вложенной статьёй шаблона, остаётся
      * корнем — корень шаблона над ним встал бы рядом, поэтому опознанным он не считается.
      */
