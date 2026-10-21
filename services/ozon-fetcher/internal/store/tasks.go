@@ -67,8 +67,8 @@ func NewTasks(pool *Pool) *Tasks { return &Tasks{pool: pool} }
 // Upsert ставит задачу идемпотентно: running не трогает, приоритет —
 // максимум, done и failed_permanent переводит в pending только при Refresh
 // (плановая перезагрузка повторяет и задачи, упавшие на ответе Ozon). Refresh
-// незавершённой задачи без курсора сбрасывает сохранённые страницы: загрузка
-// пойдёт заново, а не закончится по страницам прежней попытки.
+// незапущенной задачи сбрасывает курсор и сохранённые страницы: загрузка
+// пойдёт заново, а не закончится продолжением прежней попытки.
 func (t *Tasks) Upsert(ctx context.Context, specs []TaskSpec) error {
 	if len(specs) == 0 {
 		return nil
@@ -91,13 +91,16 @@ func sendUpserts(ctx context.Context, conn batchSender, specs []TaskSpec) error 
 				priority    = GREATEST(fetch_task.priority, EXCLUDED.priority),
 				status      = CASE WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN 'pending' ELSE fetch_task.status END,
 				refresh_pending = fetch_task.refresh_pending OR (fetch_task.status = 'running' AND $6),
-				-- Все страницы сохранены, итог не записан (сбой до FinishTask): без
-				-- сброса перезагрузка закончилась бы без запроса источника, и данные,
-				-- появившиеся после последней загрузки, не пришли бы никогда.
+				-- Перезагрузка незапущенной задачи — окно заново: продолжение прежней
+				-- попытки (курсор после 429/рестарта или все страницы без записанного
+				-- итога) не перечитало бы уже сохранённые страницы, и однократный
+				-- проход (хвост, сверка) был бы поглощён.
+				cursor = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
+						THEN NULL ELSE fetch_task.cursor END,
 				page_hashes = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
-						AND fetch_task.cursor IS NULL THEN '' ELSE fetch_task.page_hashes END,
+						THEN '' ELSE fetch_task.page_hashes END,
 				next_page_no = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
-						AND fetch_task.cursor IS NULL THEN 1 ELSE fetch_task.next_page_no END,
+						THEN 1 ELSE fetch_task.next_page_no END,
 				next_run_at = CASE
 					WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN EXCLUDED.next_run_at
 					WHEN fetch_task.status IN ('pending', 'not_ready', 'failed_retryable') AND EXCLUDED.priority > fetch_task.priority

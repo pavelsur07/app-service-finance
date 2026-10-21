@@ -554,7 +554,37 @@ func TestRefreshOfUnfinishedTaskWithAllPagesSavedReloadsFromStart(t *testing.T) 
 	assert.Empty(t, again.Cursor)
 }
 
-func TestRefreshKeepsCursorOfUnfinishedTaskInProgress(t *testing.T) {
+func TestRefreshOfPausedTaskWithCursorReloadsWholeWindow(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	// Страница 1 сохранена, затем 429: задача ждёт продолжения с курсора.
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", ErrorClass: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+
+	// Суточный проход хвоста после полуночи.
+	s.Refresh = true
+	ok, err := tasks.PlanOnce(ctx, "orders_tail", "2026-10-21", "ref-a", []TaskSpec{s})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, again.Cursor, "перезагрузка не поглощается продолжением")
+	assert.Empty(t, again.PageHashes)
+	assert.Equal(t, 1, again.NextPageNo)
+
+	// Без Refresh продолжение по курсору сохраняется.
+	_, err = tasks.FinishTask(ctx, again.TaskKey, again.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, StatusDone, status(t, tasks, s.TaskKey))
+}
+
+func TestPlainUpsertKeepsCursorOfPausedTask(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()
 	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
@@ -565,11 +595,10 @@ func TestRefreshKeepsCursorOfUnfinishedTaskInProgress(t *testing.T) {
 	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
 	require.NoError(t, err)
 
-	s.Refresh = true
 	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
 	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
 	require.NoError(t, err)
-	assert.Equal(t, "cursor-1", again.Cursor, "недогруженная задача продолжает с курсора")
+	assert.Equal(t, "cursor-1", again.Cursor, "обычная постановка не сбрасывает продолжение")
 	assert.Equal(t, 2, again.NextPageNo)
 }
 
