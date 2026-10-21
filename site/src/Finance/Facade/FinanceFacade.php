@@ -7,6 +7,8 @@ namespace App\Finance\Facade;
 use App\Cash\Application\DTO\CreateDocumentCommand;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
+use App\Company\Enum\BusinessProfile;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
@@ -26,6 +28,7 @@ use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
 use App\Finance\Exception\PLCategoryCodeAssignmentException;
+use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Report\PlPreviewCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\DocumentRepository;
@@ -54,7 +57,34 @@ final class FinanceFacade
         private readonly FinanceDocumentResponsibilityCenterNormalizer $responsibilityCenterNormalizer,
         private readonly EntityManagerInterface $entityManager,
         private readonly PlPreviewCalculator $plPreviewCalculator,
+        private readonly DefaultPLCategoryTreeProvider $plTemplates,
+        private readonly CompanyFacade $companyFacade,
     ) {
+    }
+
+    /**
+     * Нужно ли дереву ОПиУ компании «Базовый» дополнение статьями маркетплейса: профиль «Базовый»,
+     * статьи есть, но не все статьи шаблона «Базовый + маркетплейсы». Подсказка на странице подключений.
+     */
+    public function needsMarketplacePlExtension(string $companyId): bool
+    {
+        if (BusinessProfile::UNIVERSAL !== $this->companyFacade->getBusinessProfile($companyId)
+            || !$this->plCategoryRepository->existsByCompanyId($companyId)
+        ) {
+            return false;
+        }
+        $company = $this->companyFacade->findById($companyId);
+        if (null === $company) {
+            return false;
+        }
+        $codes = array_flip($this->plCategoryRepository->findCodesByCompany($company));
+        foreach ($this->plTemplates->marketplaceExtension() as $node) {
+            if (null !== $node->code && !isset($codes[$node->code])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

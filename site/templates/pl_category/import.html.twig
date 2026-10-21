@@ -50,6 +50,69 @@
             </div>
         </div>
 
+        {% if businessProfile is defined and businessProfile.value == 'UNIVERSAL' %}
+            <div class="card mb-3" data-marketplace-extension>
+                <div class="card-body">
+                    <h3 class="card-title">Статьи маркетплейса</h3>
+                    <p class="text-secondary">
+                        Для продаж на маркетплейсах: выручка маркетплейса, комиссия, логистика возвратов, склад и
+                        удержания, продвижение, услуги фулфилмента — с теми кодами, которые ждут правила разнесения
+                        затрат и продаж маркетплейсов. Выручка маркетплейса войдёт в «Выручку», его расходы — в EBITDA:
+                        формулы этих итогов заменятся. Свои статьи и изменённые вами формулы не трогаются.
+                    </p>
+                    {% if extendPreview is defined and extendPreview is not null %}
+                        {% if extendPreview.empty %}
+                            <div class="alert alert-secondary mb-0">Статьи маркетплейса уже есть — добавлять нечего.</div>
+                        {% else %}
+                            <div class="row g-3 mb-3">
+                                <div class="col-auto">
+                                    <div class="text-secondary">Будет создано</div>
+                                    <div class="h2 mb-0">{{ extendPreview.import.created|length }}</div>
+                                </div>
+                            </div>
+                            {% if extendPreview.formulaChanges is not empty %}
+                                <p class="mb-1">Итоги, в которые войдут статьи маркетплейса:</p>
+                                <ul>
+                                    {% for change in extendPreview.formulaChanges %}
+                                        <li>{{ change.name }}: <code>{{ change.from }}</code> → <code>{{ change.to }}</code></li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if extendPreview.import.similar is not empty %}
+                                <div class="alert alert-warning">
+                                    Не будут созданы — у вас есть похожие статьи:
+                                    <ul class="mb-0">
+                                        {% for row in extendPreview.import.similar %}
+                                            <li>{{ row.path }} <code>{{ row.code }}</code> — у вас «{{ row.existingName }}»</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+                            <div class="table-responsive mb-3">
+                                <table class="table table-vcenter card-table">
+                                    <thead><tr><th>Путь</th><th>Код</th></tr></thead>
+                                    <tbody>
+                                        {% for row in extendPreview.import.created %}
+                                            <tr><td>{{ row.path }}</td><td>{{ row.code }}</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <form method="post" action="{{ path('pl_category_marketplace_extension') }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('pl-marketplace-extension' ~ targetCompanyId) }}">
+                                <button type="submit" class="btn btn-primary">Добавить статьи маркетплейса</button>
+                            </form>
+                        {% endif %}
+                    {% else %}
+                        <form method="get" action="{{ path('pl_category_import') }}">
+                            <input type="hidden" name="source" value="marketplace">
+                            <button type="submit" class="btn btn-outline-primary">Показать, что добавится</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
         <div class="card mb-3">
             <div class="card-body">
                 {% if sources is empty %}

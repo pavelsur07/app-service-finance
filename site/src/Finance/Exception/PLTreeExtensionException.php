@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Finance\Exception;
+
+/**
+ * Статьи маркетплейса к дереву ОПиУ не добавлены — ничего не записано. Наследует \DomainException:
+ * экран показывает его как отказ импорта.
+ */
+final class PLTreeExtensionException extends \DomainException
+{
+    public static function notUniversal(): self
+    {
+        return new self('Статьи маркетплейса добавляются к дереву профиля «Базовый»; в профиле «Маркетплейсы и e-com» они уже есть.');
+    }
+
+    public static function notUniversalTree(): self
+    {
+        return new self('Дерево ОПиУ компании не из шаблона «Базовый» (нет «Валовой прибыли» и «Выручки» шаблона) — статьи маркетплейса к нему не добавляются. Сопоставьте статьи с шаблоном или добавьте нужные вручную.');
+    }
+
+    public static function formulaChanged(string $name, string $current, string $expected): self
+    {
+        return new self(\sprintf('Формулу «%s» изменили вручную («%s»), а дополнение заменило бы шаблонную («%s»). Чтобы итоги не сломались, верните шаблонную формулу или включите статьи маркетплейса в итоги сами.', $name, $current, $expected));
+    }
+}

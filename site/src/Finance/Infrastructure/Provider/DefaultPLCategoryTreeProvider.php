@@ -28,6 +28,7 @@ final readonly class DefaultPLCategoryTreeProvider
     public function __construct(
         private array $templatePaths,
         private PLCategoryTreeFileReader $reader,
+        private ?string $marketplaceExtensionPath = null,
     ) {
     }
 
@@ -47,6 +48,35 @@ final readonly class DefaultPLCategoryTreeProvider
         $envelope = json_decode($this->json($profile), true);
 
         return \is_array($envelope) && \is_int($envelope['templateVersion'] ?? null) ? $envelope['templateVersion'] : 0;
+    }
+
+    /**
+     * «Базовый» шаблон со статьями маркетплейса — полное дерево: шаблон UNIVERSAL, в который
+     * вставлены статьи маркетплейсного (те же коды и места), и формулы REV_TOTAL/EBITDA с ними.
+     *
+     * @return list<PLCategoryTreeNode>
+     */
+    public function marketplaceExtension(): array
+    {
+        return $this->reader->read($this->extensionJson());
+    }
+
+    public function marketplaceExtensionVersion(): int
+    {
+        $envelope = json_decode($this->extensionJson(), true);
+
+        return \is_array($envelope) && \is_int($envelope['templateVersion'] ?? null) ? $envelope['templateVersion'] : 0;
+    }
+
+    private function extensionJson(): string
+    {
+        $path = $this->marketplaceExtensionPath ?? throw DefaultPLTreeTemplateNotFoundException::at('finance.pl_marketplace_extension');
+        $json = @file_get_contents($path);
+        if (false === $json) {
+            throw DefaultPLTreeTemplateNotFoundException::at($path);
+        }
+
+        return $json;
     }
 
     private function json(BusinessProfile $profile): string

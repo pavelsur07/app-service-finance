@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -19,6 +20,7 @@ class MarketplaceConnectionController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly MarketplaceConnectionRepository $connectionRepository,
+        private readonly FinanceFacade $financeFacade,
     ) {
     }
 
@@ -27,9 +29,13 @@ class MarketplaceConnectionController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
+        $connections = $this->connectionRepository->findByCompany($company);
+
         return $this->render('marketplace/connections.html.twig', [
-            'connections' => $this->connectionRepository->findByCompany($company),
+            'connections' => $connections,
             'availableMarketplaces' => MarketplaceType::cases(),
+            // «Базовое» дерево ОПиУ без статей маркетплейса: затраты и продажи МП некуда разнести.
+            'needsPlExtension' => [] !== $connections && $this->financeFacade->needsMarketplacePlExtension((string) $company->getId()),
         ]);
     }
 }

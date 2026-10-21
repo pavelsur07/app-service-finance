@@ -5,6 +5,13 @@
 {% block tab_content %}
     <div class="p-3">
 
+        {% if needsPlExtension is defined and needsPlExtension %}
+            <div class="alert alert-warning" data-pl-extension-hint>
+                В дереве ОПиУ профиля «Базовый» нет статей маркетплейса — затраты и продажи маркетплейса не попадут
+                в отчёт. <a href="{{ path('pl_category_import', {source: 'marketplace'}) }}">Добавить статьи маркетплейса</a>
+            </div>
+        {% endif %}
+
         {# Подключения #}
         <div class="card mb-3">
             <div class="card-header">

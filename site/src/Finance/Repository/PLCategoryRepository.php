@@ -19,6 +19,21 @@ class PLCategoryRepository extends ServiceEntityRepository
         parent::__construct($registry, PLCategory::class);
     }
 
+    public function findOneByCompanyIdAndCode(string $companyId, string $code): ?PLCategory
+    {
+        Assert::uuid($companyId);
+
+        $category = $this->createQueryBuilder('c')
+            ->andWhere('IDENTITY(c.company) = :companyId')
+            ->andWhere('c.code = :code')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('code', $code)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $category instanceof PLCategory ? $category : null;
+    }
+
     /**
      * Есть ли у компании хотя бы одна статья ОПиУ: базовое дерево получает только
      * компания без своих статей.

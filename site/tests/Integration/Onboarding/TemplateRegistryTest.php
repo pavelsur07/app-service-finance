@@ -53,11 +53,35 @@ final class TemplateRegistryTest extends KernelTestCase
     {
         $reader = new PLCategoryTreeFileReader();
         $templates = [];
-        foreach (array_unique($this->registry('finance.pl_templates')) as $path) {
+        // Расширение «Базовый + маркетплейсы» — тот же словарь: статьи маркетплейса на своих местах.
+        $extension = self::getContainer()->getParameter('finance.pl_marketplace_extension');
+        foreach ([...array_unique($this->registry('finance.pl_templates')), $extension] as $path) {
             $templates[basename($path)] = self::plSignatures($reader->read((string) file_get_contents($path)));
         }
 
+        self::assertCount(3, $templates);
         self::assertSame([], self::conflicts($templates));
+    }
+
+    /**
+     * Расширение содержит каждый код, на который ссылаются шаблоны маппинга затрат и продаж
+     * маркетплейсов: иначе у компании «Базовый» затрата осталась бы без статьи.
+     */
+    public function testMarketplaceExtensionCoversMappingTemplateCodes(): void
+    {
+        $extension = self::getContainer()->getParameter('finance.pl_marketplace_extension');
+        $codes = array_map(static fn ($n): ?string => $n->code, (new PLCategoryTreeFileReader())->read((string) file_get_contents($extension)));
+
+        $root = (string) self::getContainer()->getParameter('kernel.project_dir');
+        $mappingCodes = [];
+        foreach (['default_cost_mapping.yaml', 'default_sale_mapping.yaml'] as $file) {
+            preg_match_all("/pl_code:\\s*'?([A-Z0-9_]+)/", (string) file_get_contents($root.'/config/marketplace/'.$file), $m);
+            $mappingCodes = [...$mappingCodes, ...$m[1]];
+        }
+        $mappingCodes = array_values(array_unique($mappingCodes));
+        self::assertGreaterThanOrEqual(20, \count($mappingCodes));
+
+        self::assertSame([], array_values(array_diff($mappingCodes, $codes)));
     }
 
     public function testBalanceCodesMeanTheSameInEveryTemplate(): void
