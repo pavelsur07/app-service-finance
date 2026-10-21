@@ -92,6 +92,8 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 }
             }
             $this->em->flush();
+            // Граф после дополнения (созданные статьи и записанные формулы) — ещё раз до фиксации.
+            $this->assertPathToNetProfitIsTemplate($companyId, $nodes);
             // Последняя страховка — расчётом по собранному дереву: каждая статья маркетплейса входит в
             // чистую прибыль ровно один раз, «Выручка с СПП» — ни разу. Вручную перестроенное дерево
             // (группа вынесена, вес 0, тип изменён) иначе дало бы неверные итоги молча.
@@ -152,7 +154,6 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         }
 
         $this->assertMarketplaceLinesInPlace($companyId, $nodes, $universalFormulas);
-        $this->assertPathToNetProfitIsTemplate($companyId, $nodes);
 
         $changes = [];
         foreach ($nodes as $node) {
@@ -178,6 +179,13 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             $changes[] = new PLFormulaChange($node->code, (string) $row['name'], (string) $row['formula'], (string) $node->formula);
         }
 
+        // Путь — по графу после дополнения: группы, которые новые формулы впервые включают в итоги
+        // (свой корень PROMO_TOTAL с собственной формулой внутри), тоже проверяются.
+        $this->assertPathToNetProfitIsTemplate($companyId, $nodes, array_combine(
+            array_map(static fn (PLFormulaChange $c): string => $c->code, $changes),
+            array_map(static fn (PLFormulaChange $c): string => $c->to, $changes),
+        ));
+
         return $changes;
     }
 
@@ -190,7 +198,10 @@ final readonly class ExtendPLTreeWithMarketplaceAction
      *
      * @param list<PLCategoryTreeNode> $nodes
      */
-    private function assertPathToNetProfitIsTemplate(string $companyId, array $nodes): void
+    /**
+     * @param array<string, string> $overrides код → формула после дополнения (ещё не записана)
+     */
+    private function assertPathToNetProfitIsTemplate(string $companyId, array $nodes, array $overrides = []): void
     {
         $template = [];
         foreach ($nodes as $node) {
@@ -224,8 +235,8 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 continue;
             }
             $seen[$id] = true;
-            $formula = trim((string) $row['formula']);
             $code = null !== $row['code'] ? (string) $row['code'] : null;
+            $formula = trim((string) (null !== $code && isset($overrides[$code]) ? $overrides[$code] : $row['formula']));
             if ('' !== $formula) {
                 // Формула на пути — только шаблонная («Базового» или расширения) у статьи шаблона.
                 $allowed = null !== $code && \array_key_exists($code, $template) ? [$template[$code], $universal[$code] ?? $template[$code]] : [];

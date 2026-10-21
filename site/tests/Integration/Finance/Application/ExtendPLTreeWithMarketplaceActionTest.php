@@ -239,13 +239,22 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         yield 'группа с формулой' => ['OVERHEAD_TOTAL', 'OVERHEAD_PROD_TOTAL * 2'];
         // Внешнее ревью: своя группа с формулой внутри операционных расходов — обход по дереву компании.
         yield 'своя группа с формулой' => ['', 'OVERHEAD_PROD_TOTAL * REV_SALES_TOTAL'];
+        // Внешнее ревью: группа, которую в итоги впервые включает расширение (свой корень PROMO_TOTAL).
+        yield 'своя формула под PROMO_TOTAL' => ['PROMO_TOTAL', 'REV_SALES_TOTAL * PROMO_INTERNAL'];
     }
 
     #[DataProvider('changedPathTotals')]
     public function testChangedTotalOnPathToNetProfitRefuses(string $code, string $formula): void
     {
         $company = $this->universalCompany();
-        if ('' === $code) {
+        if ('PROMO_TOTAL' === $code) {
+            $promo = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы на продвижение')->withCode('PROMO_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
+            $own = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($promo)->withName('Своя надбавка')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $own->setFormula($formula);
+            $this->em->persist($promo);
+            $this->em->persist($own);
+            $this->em->flush();
+        } elseif ('' === $code) {
             $overhead = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
             self::assertInstanceOf(PLCategory::class, $overhead);
             $own = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($overhead)->withName('Своя надбавка')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
