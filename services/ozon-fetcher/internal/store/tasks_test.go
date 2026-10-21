@@ -525,6 +525,54 @@ func TestRefreshPendingSurvivesLeaseExpiryAsFullReload(t *testing.T) {
 	assert.Empty(t, again.PageHashes)
 }
 
+func TestRefreshOfUnfinishedTaskWithAllPagesSavedReloadsFromStart(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	// Последняя страница дня сохранена (курсор пуст), процесс упал до FinishTask.
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), ""))
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+
+	plain, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, []string{hash("p")}, plain.PageHashes, "без Refresh продолжение по сохранённым страницам")
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(4*time.Minute))
+	require.NoError(t, err)
+
+	s.Refresh = true
+	ok, err := tasks.PlanOnce(ctx, "orders_tail", "2026-10-21", "ref-a", []TaskSpec{s})
+	require.NoError(t, err)
+	require.True(t, ok)
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(4*time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, again.PageHashes, "плановая перезагрузка — заново, а не по страницам прежней попытки")
+	assert.Equal(t, 1, again.NextPageNo)
+	assert.Empty(t, again.Cursor)
+}
+
+func TestRefreshKeepsCursorOfUnfinishedTaskInProgress(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+
+	s.Refresh = true
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, "cursor-1", again.Cursor, "недогруженная задача продолжает с курсора")
+	assert.Equal(t, 2, again.NextPageNo)
+}
+
 func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

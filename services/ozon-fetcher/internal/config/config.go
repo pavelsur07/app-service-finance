@@ -178,8 +178,14 @@ func loadPlanner(cfg *Config) error {
 		cfg.ReconcileWeekday = time.Weekday(n)
 	}
 	if raw := os.Getenv("ORDERS_FROM"); raw != "" {
-		d, err := time.Parse(time.DateOnly, raw)
-		if err != nil || d.After(time.Now()) {
+		// День МСК, как у планировщика: сравниваются календарные даты.
+		loc, locErr := time.LoadLocation("Europe/Moscow")
+		if locErr != nil {
+			return fmt.Errorf("config: load Europe/Moscow: %w", locErr)
+		}
+		d, err := time.ParseInLocation(time.DateOnly, raw, loc)
+		today := time.Now().In(loc).Format(time.DateOnly)
+		if err != nil || d.Format(time.DateOnly) > today {
 			return fmt.Errorf("config: ORDERS_FROM must be a past date YYYY-MM-DD, got %q", raw)
 		}
 		cfg.OrdersFrom = raw

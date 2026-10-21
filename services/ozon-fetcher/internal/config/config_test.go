@@ -193,6 +193,17 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 			}
 		})
 	}
+	t.Run("orders from today in Moscow", func(t *testing.T) {
+		clear(t)
+		loc, err := time.LoadLocation("Europe/Moscow")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("ORDERS_FROM", time.Now().In(loc).Format(time.DateOnly))
+		if _, err := Load(); err != nil {
+			t.Fatalf("today (MSK) must be accepted: %v", err)
+		}
+	})
 	t.Run("orders from env", func(t *testing.T) {
 		clear(t)
 		t.Setenv("ORDERS_FROM", "2026-10-01")
