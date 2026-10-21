@@ -4148,6 +4148,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.50 | 2026-10-21 | Marketplace: ресурсы отправлений Ozon — всем кабинетам с ключом seller (`ozon_fetcher.orders_companies: ['*']`) |
 | 2.49 | 2026-10-21 | Marketplace: в снимке кабинетов — ресурсы отправлений `ozon.orders.fbo` / `ozon.orders.fbs` по списку компаний `ozon_fetcher.orders_companies`; ServiceGateway: строки «Заказы FBO/FBS» карты покрытия — только при задачах, дни до первой задачи не пропуск |
 | 2.48 | 2026-10-21 | Finance: статьи маркетплейса в «Базовом» дереве — `ExtendPLTreeWithMarketplaceAction`, шаблон `universal_marketplace_extension.json`, `FinanceFacade::needsMarketplacePlExtension()`; Marketplace: подсказка на странице подключений |
 | 2.47 | 2026-10-21 | Finance: происхождение дерева ОПиУ (`PLTemplateApplication`, `pl_template_applications`), `ApplyDefaultPLTemplateAction`, запрет шаблона другого профиля (`PLTemplateProfileMismatchException`); Company: смена профиля в настройках, ночная проверка справочников `app:directories:integrity-check` (`DirectoryIntegrityCheckEvent`) |
