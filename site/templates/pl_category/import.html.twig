@@ -34,6 +34,14 @@
                     сначала сопоставьте свои статьи со статьями шаблона — иначе шаблон не встанет вторым деревом
                     рядом и откажет.
                 </p>
+                <p class="text-secondary small" data-template-origin>
+                    {% if templateOrigin is defined and templateOrigin is not null %}
+                        Дерево создано шаблоном «{{ templateOrigin.profile.label }}», версия {{ templateOrigin.templateVersion }},
+                        {{ templateOrigin.appliedAt|date('d.m.Y') }}. Шаблон другого профиля к нему не применяется.
+                    {% else %}
+                        Происхождение дерева не записано: оно создано до учёта шаблонов или вручную.
+                    {% endif %}
+                </p>
                 <form method="get" action="{{ path('pl_category_import') }}" class="btn-list">
                     <input type="hidden" name="source" value="template">
                     <button type="submit" class="btn btn-primary">Показать предпросмотр</button>

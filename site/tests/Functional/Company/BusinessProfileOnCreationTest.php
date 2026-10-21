@@ -105,7 +105,7 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
         self::assertCount(0, $crawler->filter('input[name="registration_form[businessProfile]"]'));
     }
 
-    public function testCompanyNewStoresProfileAndEditDoesNotShowIt(): void
+    public function testCompanyNewStoresProfileAndEditChangesItWithoutTouchingDirectories(): void
     {
         $client = static::createClient();
         $owner = UserBuilder::aUser()->withEmail('profile-owner@example.test')->withRoles(['ROLE_COMPANY_OWNER'])->build();
@@ -122,9 +122,28 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
         $company = $this->companyNamed('New Universal Co');
         self::assertSame(BusinessProfile::UNIVERSAL, $company->getBusinessProfile());
 
+        $connection = $this->em()->getConnection();
+        $plBefore = (int) $connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]);
+        self::assertSame(44, $plBefore);
+
         $crawler = $client->request('GET', sprintf('/company/%s/edit', $company->getId()));
         self::assertResponseIsSuccessful();
-        self::assertCount(0, $crawler->filter('input[name="company[businessProfile]"]'));
+        self::assertSame('UNIVERSAL', $crawler->filter('input[name="company[businessProfile]"]:checked')->attr('value'));
+        self::assertStringContainsString('Справочники компании не изменятся', $crawler->filter('body')->text());
+
+        $client->submit($crawler->selectButton('Сохранить')->form(['company[businessProfile]' => 'MARKETPLACE']));
+        self::assertResponseRedirects('/company/');
+        self::assertSame(BusinessProfile::MARKETPLACE, $this->companyNamed('New Universal Co')->getBusinessProfile());
+        self::assertSame($plBefore, (int) $connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]), 'справочники не меняются');
+
+        // Запрос без поля профиль не меняет (а не сбрасывает на значение по умолчанию).
+        $connection->update('companies', ['business_profile' => 'UNIVERSAL'], ['id' => (string) $company->getId()]);
+        $crawler = $client->request('GET', sprintf('/company/%s/edit', $company->getId()));
+        $form = $crawler->selectButton('Сохранить')->form();
+        $form->remove('company[businessProfile]');
+        $client->submit($form);
+        self::assertResponseRedirects('/company/');
+        self::assertSame(BusinessProfile::UNIVERSAL, $this->companyNamed('New Universal Co')->getBusinessProfile());
     }
 
     public function testAdminAccountCreationStoresProfile(): void

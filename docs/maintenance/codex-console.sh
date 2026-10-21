@@ -339,6 +339,12 @@ case "$cmd" in
     # Ненулевой exit code — штатный результат гейта (ERROR), а не ошибка wrapper'а.
     if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
     ;;
+  app:directories:integrity-check)
+    # Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием
+    # (SELECT ... GROUP BY). Ничего не пишет, внешних вызовов нет. Аргументы запрещены.
+    # Ненулевой exit code — штатный результат гейта (ERROR), а не ошибка wrapper'а.
+    if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
+    ;;
   app:counterparty:refresh-display-names)
     # Только сухой прогон: отчёт «сырое → отображаемое» по правилам названий контрагентов
     # (docs/plan/counterparty-display-name.md, этап 3). --dry-run обязателен — без него команда

@@ -43,19 +43,24 @@ class CompanyType extends AbstractType
             ])
             ->add('minimumBalance', MoneyValueType::class);
 
-        // Профиль выбирается при создании: от него зависят стартовые шаблоны. Смена в
-        // настройках справочники не перестраивает и в эту форму не входит.
-        if ($options['with_business_profile']) {
-            $builder->add('businessProfile', BusinessProfileType::class);
-        }
+        // От профиля зависят стартовые шаблоны. Смена в настройках справочники не перестраивает:
+        // «Базовый шаблон ОПиУ» берёт шаблон нового профиля и не применяется к дереву из другого.
+        $company = $options['data'] ?? null;
+        $builder->add('businessProfile', BusinessProfileType::class, $options['business_profile_help'] && $company instanceof Company
+            ? [
+                'help' => 'Справочники компании не изменятся. «Базовый шаблон ОПиУ» будет брать шаблон нового профиля; к дереву ОПиУ, созданному шаблоном другого профиля, он не применится.',
+                // Запрос без поля не меняет профиль: значение по умолчанию — текущий, а не DEFAULT.
+                'empty_data' => $company->getBusinessProfile()->value,
+            ]
+            : []);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Company::class,
-            'with_business_profile' => false,
+            'business_profile_help' => false,
         ]);
-        $resolver->setAllowedTypes('with_business_profile', 'bool');
+        $resolver->setAllowedTypes('business_profile_help', 'bool');
     }
 }

@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Finance\Command;
 
 use App\Company\Facade\CompanyFacade;
-use App\Finance\Application\Action\ImportPLCategoryTreeAction;
-use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
-use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
+use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
+use App\Finance\Enum\PLTemplateApplicationSource;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,8 +28,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ApplyDefaultPLTreeCommand extends Command
 {
     public function __construct(
-        private readonly DefaultPLCategoryTreeProvider $defaultTree,
-        private readonly ImportPLCategoryTreeAction $importAction,
+        private readonly ApplyDefaultPLTemplateAction $applyTemplate,
         private readonly CompanyFacade $companies,
         private readonly LoggerInterface $logger,
     ) {
@@ -56,14 +54,10 @@ final class ApplyDefaultPLTreeCommand extends Command
 
         try {
             // Шаблон профиля бизнеса компании; неизвестная компания — тот же отказ, что у импорта.
-            $profile = $this->companies->findById($companyId)?->getBusinessProfile()
-                ?? throw new \DomainException('Целевая компания не найдена.');
-            $result = ($this->importAction)(new ImportPLCategoryTreeCommand(
-                $this->defaultTree->nodes($profile),
-                $companyId,
-                !$execute,
-                true,
-            ));
+            if (null === $this->companies->findById($companyId)) {
+                throw new \DomainException('Целевая компания не найдена.');
+            }
+            $result = ($this->applyTemplate)($companyId, !$execute, PLTemplateApplicationSource::COMMAND);
         } catch (\DomainException $e) {
             $this->logger->warning('Default P&L tree not applied', ['companyId' => $companyId, 'reason' => $e->getMessage()]);
             $output->writeln(\sprintf('<error>%s</error>', $e->getMessage()));
@@ -91,15 +85,6 @@ final class ApplyDefaultPLTreeCommand extends Command
         ));
         if ([] !== $result->unresolvedFormulaCodes) {
             $output->writeln(\sprintf('<comment>formula codes without a category: %s</comment>', implode(', ', $result->unresolvedFormulaCodes)));
-        }
-
-        if ($execute) {
-            $this->logger->info('Default P&L tree applied to company', [
-                'companyId' => $companyId,
-                'created' => \count($result->created),
-                'kept' => $result->unchangedCount,
-                'similar' => \count($result->similar),
-            ]);
         }
 
         return Command::SUCCESS;

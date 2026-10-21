@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Finance\Command;
 
+use App\Company\Enum\BusinessProfile;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -31,11 +33,28 @@ final class ApplyDefaultPLTreeCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
         self::assertStringContainsString('applied: create 72, keep existing 0, similar 0; company roots recognized 0 of 0', $tester->getDisplay());
         self::assertSame(72, $this->categories($companyId));
+        self::assertSame(['command'], $this->connection->fetchFirstColumn('SELECT source FROM pl_template_applications WHERE company_id = ?', [$companyId]));
 
         $this->em->clear();
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
         self::assertStringContainsString('applied: create 0, keep existing 72, similar 0; company roots recognized 21 of 21', $tester->getDisplay());
         self::assertSame(72, $this->categories($companyId));
+    }
+
+    public function testTemplateOfAnotherProfileFailsForTreeWithOrigin(): void
+    {
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $company->setBusinessProfile(BusinessProfile::UNIVERSAL);
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->build());
+        $this->em->flush();
+
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:apply-default'));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['companyId' => (string) $company->getId()]));
+        self::assertStringContainsString('создано шаблоном «Маркетплейсы и e-com»', $tester->getDisplay());
     }
 
     public function testUnknownCompanyFails(): void

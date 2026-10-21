@@ -11,6 +11,7 @@ use App\Company\Event\CompanyCreatedEvent;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -73,7 +74,7 @@ class CompanyController extends AbstractController
         $company = new Company(id: Uuid::uuid7()->toString(), user: $user);
         $company->setUser($user); // Автоматически проставляем владельца
 
-        $form = $this->createForm(CompanyType::class, $company, ['with_business_profile' => true]);
+        $form = $this->createForm(CompanyType::class, $company);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -108,7 +109,7 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function edit(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em): Response
+    public function edit(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em, LoggerInterface $logger): Response
     {
         $company = $companyRepository->find($id);
 
@@ -116,11 +117,16 @@ class CompanyController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $form = $this->createForm(CompanyType::class, $company);
+        \assert($company instanceof Company);
+        $profileBefore = $company->getBusinessProfile();
+        $form = $this->createForm(CompanyType::class, $company, ['business_profile_help' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
+            if ($company->getBusinessProfile() !== $profileBefore) {
+                $logger->info('Company business profile changed', ['companyId' => $id, 'from' => $profileBefore->value, 'to' => $company->getBusinessProfile()->value]);
+            }
 
             return $this->redirectToRoute('company_index');
         }
