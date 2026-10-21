@@ -128,37 +128,17 @@ class MoneyAccountRepository extends ServiceEntityRepository
     }
 
     /**
-     * Есть ли у компании счёт этого типа, включая неактивные: счёт по умолчанию
-     * создаётся только компании без счетов данного вида.
+     * Есть ли у компании хоть один денежный счёт, включая неактивные: счета по умолчанию
+     * создаются только компании без счетов.
      */
-    public function existsByCompanyIdAndType(string $companyId, MoneyAccountType $type): bool
+    public function existsByCompanyId(string $companyId): bool
     {
         Assert::uuid($companyId);
 
         return null !== $this->createQueryBuilder('m')
             ->select('1')
             ->andWhere('IDENTITY(m.company) = :companyId')
-            ->andWhere('m.type = :type')
             ->setParameter('companyId', $companyId)
-            ->setParameter('type', $type)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
-    /**
-     * Имя счёта уникально в компании (`uniq_company_name`).
-     */
-    public function existsByCompanyIdAndName(string $companyId, string $name): bool
-    {
-        Assert::uuid($companyId);
-
-        return null !== $this->createQueryBuilder('m')
-            ->select('1')
-            ->andWhere('IDENTITY(m.company) = :companyId')
-            ->andWhere('m.name = :name')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('name', $name)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

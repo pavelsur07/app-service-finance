@@ -9,6 +9,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
+use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
@@ -605,7 +606,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
             },
         );
 
-        (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em))(
+        (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em, new PLCategoryNameSimilarity()))(
             new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false),
         );
 
@@ -839,7 +840,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
 
         $this->expectException(\DomainException::class);
 
-        (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em))(
+        (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em, new PLCategoryNameSimilarity()))(
             new ImportPLCategoryTreeCommand([], '11111111-1111-1111-1111-000000000009', false),
         );
     }
@@ -941,7 +942,7 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         // wrapInTransaction) молча не выполнится.
         $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $func): mixed => $func());
 
-        return new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em);
+        return new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em, new PLCategoryNameSimilarity());
     }
 
     /**

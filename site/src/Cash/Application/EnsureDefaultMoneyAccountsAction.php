@@ -9,13 +9,13 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Company\Facade\CompanyFacade;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
  * Денежные счета новой компании: «Основной счет» (банк) и касса «Основная», оба в RUB.
- * Счёт создаётся, только если у компании нет ни одного счёта этого типа, поэтому
- * переименованный или архивный счёт не дублируется и повторный вызов ничего не меняет.
+ * Создаются, только если у компании нет ни одного денежного счёта (любого типа, в том числе
+ * архивного): у компании со своими счетами параллельный набор «по умолчанию» не появляется,
+ * повторный вызов ничего не меняет.
  */
 final readonly class EnsureDefaultMoneyAccountsAction
 {
@@ -31,7 +31,6 @@ final readonly class EnsureDefaultMoneyAccountsAction
         private CompanyFacade $companyFacade,
         private MoneyAccountRepository $accounts,
         private EntityManagerInterface $entityManager,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -45,34 +44,17 @@ final readonly class EnsureDefaultMoneyAccountsAction
         $company = $this->companyFacade->findById($companyId)
             ?? throw new \DomainException(sprintf('Компания %s не найдена.', $companyId));
 
-        $created = 0;
-        foreach (self::DEFAULTS as [$type, $name]) {
-            if ($this->accounts->existsByCompanyIdAndType($companyId, $type)) {
-                continue;
-            }
-            // Имя уникально в компании: занято счётом другого типа — не создаём, чтобы
-            // не уронить создание компании или дозаполнение на уникальном индексе.
-            if ($this->accounts->existsByCompanyIdAndName($companyId, $name)) {
-                if (!$dryRun) {
-                    $this->logger->warning('Default money account skipped: name is taken', [
-                        'companyId' => $companyId,
-                        'type' => $type->value,
-                    ]);
-                }
-
-                continue;
-            }
-
-            ++$created;
-            if (!$dryRun) {
-                $this->entityManager->persist(new MoneyAccount(Uuid::uuid7()->toString(), $company, $type, $name, self::CURRENCY));
-            }
+        if ($this->accounts->existsByCompanyId($companyId)) {
+            return 0;
         }
 
-        if ($created > 0 && !$dryRun) {
+        if (!$dryRun) {
+            foreach (self::DEFAULTS as [$type, $name]) {
+                $this->entityManager->persist(new MoneyAccount(Uuid::uuid7()->toString(), $company, $type, $name, self::CURRENCY));
+            }
             $this->entityManager->flush();
         }
 
-        return $created;
+        return \count(self::DEFAULTS);
     }
 }

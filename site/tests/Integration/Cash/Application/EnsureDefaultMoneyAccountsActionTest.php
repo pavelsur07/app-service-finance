@@ -12,6 +12,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 final class EnsureDefaultMoneyAccountsActionTest extends IntegrationTestCase
@@ -35,36 +36,39 @@ final class EnsureDefaultMoneyAccountsActionTest extends IntegrationTestCase
         }
     }
 
-    public function testRenamedOrArchivedAccountOfTheTypeIsNotDuplicated(): void
+    /**
+     * Регрессия: компания со своими счетами получала недостающий по типу счёт «по умолчанию»
+     * (COMPSHOP с 8 банковскими счетами — пустую кассу «Основная»).
+     */
+    #[DataProvider('ownAccounts')]
+    public function testCompanyWithAnyAccountGetsNothing(MoneyAccountType $type, bool $active): void
     {
-        $company = $this->createCompany('renamed-accounts@example.com');
-        $bank = MoneyAccountBuilder::aMoneyAccount()->withIndex(901)->forCompany($company)
-            ->withType(MoneyAccountType::BANK)->withName('Сбер')->build();
-        $bank->setIsActive(false);
-        $this->em->persist($bank);
+        $company = $this->createCompany('own-accounts-'.$type->value.'@example.com');
+        $own = MoneyAccountBuilder::aMoneyAccount()->withIndex(901)->forCompany($company)
+            ->withType($type)->withName('Сбер')->build();
+        $own->setIsActive($active);
+        $this->em->persist($own);
         $this->em->flush();
 
-        self::assertSame(1, (self::getContainer()->get(EnsureDefaultMoneyAccountsAction::class))((string) $company->getId()));
+        $action = self::getContainer()->get(EnsureDefaultMoneyAccountsAction::class);
+        self::assertSame(0, $action((string) $company->getId(), dryRun: true));
+        self::assertSame(0, $action((string) $company->getId()));
 
-        self::assertSame(['bank:Сбер', 'cash:Основная'], array_map(
+        self::assertSame([$type->value.':Сбер'], array_map(
             static fn (MoneyAccount $a): string => $a->getType()->value.':'.$a->getName(),
             $this->accounts($company),
         ));
     }
 
-    public function testTakenNameSkipsAccountWithoutFailing(): void
+    /**
+     * @return iterable<string, array{MoneyAccountType, bool}>
+     */
+    public static function ownAccounts(): iterable
     {
-        $company = $this->createCompany('taken-name@example.com');
-        $this->em->persist(MoneyAccountBuilder::aMoneyAccount()->withIndex(902)->forCompany($company)
-            ->withType(MoneyAccountType::EWALLET)->withName('Основной счет')->build());
-        $this->em->flush();
-
-        self::assertSame(1, (self::getContainer()->get(EnsureDefaultMoneyAccountsAction::class))((string) $company->getId()));
-
-        self::assertSame(['cash:Основная', 'ewallet:Основной счет'], array_map(
-            static fn (MoneyAccount $a): string => $a->getType()->value.':'.$a->getName(),
-            $this->accounts($company),
-        ));
+        yield 'только банк' => [MoneyAccountType::BANK, true];
+        yield 'только касса' => [MoneyAccountType::CASH, true];
+        yield 'архивный банк' => [MoneyAccountType::BANK, false];
+        yield 'только кошелёк' => [MoneyAccountType::EWALLET, true];
     }
 
     public function testUnknownCompanyIsRejected(): void

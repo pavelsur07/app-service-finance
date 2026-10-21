@@ -30,11 +30,14 @@
                     шаблоном маппинга затрат маркетплейсов — после переноса затраты разносятся по статьям
                     автоматически ночью.
                     {% endif %}
-                    Добавляются только недостающие статьи, существующие не меняются.
+                    Добавляются только недостающие статьи, существующие не меняются. Если у вас своё дерево,
+                    сначала сопоставьте свои статьи со статьями шаблона — иначе шаблон не встанет вторым деревом
+                    рядом и откажет.
                 </p>
-                <form method="get" action="{{ path('pl_category_import') }}">
+                <form method="get" action="{{ path('pl_category_import') }}" class="btn-list">
                     <input type="hidden" name="source" value="template">
                     <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+                    <a href="{{ path('pl_category_template_mapping') }}" class="btn btn-outline-secondary">Сопоставить с шаблоном</a>
                 </form>
             </div>
         </div>
@@ -102,6 +105,27 @@
                             которых в источнике нет — импорт способен освободить код, на который
                             они ссылаются. Формулы не правятся автоматически, проверьте их вручную.
                             Среди перечисленного могут быть имена функций, а не коды категорий.
+                        </div>
+                    {% endif %}
+
+                    {% if preview.similar is not empty %}
+                        <div class="alert alert-warning">
+                            <p>Эти статьи шаблона не будут созданы: у вас есть статьи с похожими названиями.
+                            Чтобы шаблон считал их своими, <a href="{{ path('pl_category_template_mapping') }}">сопоставьте их с шаблоном</a>.</p>
+                            <ul class="mb-0">
+                                {% for row in preview.similar %}
+                                    <li>{{ row.path }} <code>{{ row.code }}</code> — у вас «{{ row.existingName }}»</li>
+                                {% endfor %}
+                            </ul>
+                            {% if preview.skippedWithSimilar is not empty %}
+                                <p class="mt-2 mb-1">Вместе с ними не будут созданы вложенные статьи шаблона:</p>
+                                <ul class="mb-0">
+                                    {% for row in preview.skippedWithSimilar %}
+                                        <li>{{ row.path }} <code>{{ row.code }}</code></li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            <p class="mt-2 mb-0 small">Сопоставить можно статью того же типа и уровня; иначе переименуйте свою статью, если это не дубль.</p>
                         </div>
                     {% endif %}
 
