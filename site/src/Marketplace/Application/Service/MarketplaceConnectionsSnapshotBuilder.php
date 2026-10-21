@@ -31,7 +31,25 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
         'ozon.finance.mutual-settlement',
     ];
 
+    /**
+     * Отправления FBO/FBS (`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`):
+     * включаются по списку компаний — сначала один кабинет, затем все.
+     */
+    public const ORDERS_RESOURCE_TYPES = ['ozon.orders.fbo', 'ozon.orders.fbs'];
+
+    /** Значение списка компаний для заказов: все кабинеты с ключом seller. */
+    public const ORDERS_ALL_COMPANIES = '*';
+
     public const PERFORMANCE_RESOURCE_TYPES = ['ozon.ads.statistics'];
+
+    /**
+     * @param list<string> $ordersCompanyIds компании, которым выдаются ресурсы
+     *                                       заказов; ['*'] — всем, [] — никому
+     */
+    public function __construct(
+        private array $ordersCompanyIds = [],
+    ) {
+    }
 
     /**
      * @param list<ActiveConnectionCredentials> $rows
@@ -89,9 +107,16 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
             performance: $performanceCredentials,
             resourceTypes: [
                 ...(null !== $sellerCredentials ? self::SELLER_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && $this->ordersEnabled($companyId) ? self::ORDERS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials ? self::PERFORMANCE_RESOURCE_TYPES : []),
             ],
         );
+    }
+
+    private function ordersEnabled(string $companyId): bool
+    {
+        return \in_array(self::ORDERS_ALL_COMPANIES, $this->ordersCompanyIds, true)
+            || \in_array($companyId, $this->ordersCompanyIds, true);
     }
 
     private static function usable(ActiveConnectionCredentials $row): bool

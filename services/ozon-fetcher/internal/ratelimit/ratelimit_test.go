@@ -370,3 +370,14 @@ func TestNoStormAlertConfiguredIsSilent(t *testing.T) {
 	}
 	assert.InDelta(t, 0.1, r.Rate(refA, ep), 1e-9)
 }
+
+func TestDefaultConfigCoversPostingLists(t *testing.T) {
+	cfg := DefaultConfig()
+	for _, endpoint := range []string{ozon.EndpointPostingFBOList, ozon.EndpointPostingFBSList} {
+		limit, ok := cfg.Endpoints[endpoint]
+		require.True(t, ok, endpoint)
+		assert.LessOrEqual(t, limit.Start, 0.2, "ключ кабинета общий с Symfony — старт не выше 0,2 запроса/с")
+		assert.Positive(t, limit.Floor)
+		assert.Positive(t, limit.DefaultPause)
+	}
+}

@@ -25,9 +25,26 @@ const (
 	ResourceRealization      = "ozon.finance.realization"
 	ResourceMutualSettlement = "ozon.finance.mutual-settlement"
 
+	// Отправления по дате создания; period_key — день МСК. Текущий статус —
+	// в каждом отправлении, смены видны ревизиями перечитанных дней.
+	ResourceOrdersFBO = "ozon.orders.fbo"
+	ResourceOrdersFBS = "ozon.orders.fbs"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
+
+// postingResources — схема списка отправлений ресурса.
+var postingResources = map[string]ozon.PostingScheme{
+	ResourceOrdersFBO: ozon.SchemeFBO,
+	ResourceOrdersFBS: ozon.SchemeFBS,
+}
+
+// IsPostingResource — ресурс списков отправлений.
+func IsPostingResource(resourceType string) bool {
+	_, ok := postingResources[resourceType]
+	return ok
+}
 
 // TaskStore — часть store.Tasks, нужная исполнителю.
 type TaskStore interface {
@@ -51,6 +68,7 @@ type Ozon interface {
 	FetchAccrualTypes(ctx context.Context, creds ozon.Credentials, connectionRef string) (ozon.Page, error)
 	FetchRealization(ctx context.Context, creds ozon.Credentials, connectionRef string, year, month int) (ozon.Page, error)
 	FetchMutualSettlement(ctx context.Context, creds ozon.Credentials, connectionRef string, year, month int, poll ozon.ReportPoll, sleep func(context.Context, time.Duration) error) (ozon.Page, error)
+	FetchPostingList(ctx context.Context, creds ozon.Credentials, connectionRef string, scheme ozon.PostingScheme, w ozon.PostingWindow, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -70,6 +88,7 @@ type Config struct {
 	NoCredentialsIn time.Duration // повтор задачи без ключа seller
 	NotReadyDelay   map[string]time.Duration
 	ReportPoll      ozon.ReportPoll
+	Location        *time.Location // границы дня отправлений (Europe/Moscow)
 }
 
 // DefaultConfig — значения плана (stage-9.md).
@@ -90,6 +109,9 @@ func DefaultConfig() Config {
 			ResourceMutualSettlement: 24 * time.Hour,
 		},
 		ReportPoll: ozon.DefaultReportPoll,
+		// Москва без перехода на летнее время с 2014 г.; приложение передаёт
+		// загруженную Europe/Moscow.
+		Location: time.FixedZone("MSK", 3*60*60),
 	}
 }
 
@@ -264,8 +286,27 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return e.ozon.FetchMutualSettlement(ctx, creds, ref, year, month, e.cfg.ReportPoll, e.sleep)
 		})
 	default:
+		if scheme, ok := postingResources[r.task.ResourceType]; ok {
+			return r.postings(ctx, creds, scheme)
+		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}
+}
+
+// postings — отправления дня МСК [00:00; 00:00 следующего дня) постранично.
+func (r *taskRun) postings(ctx context.Context, creds ozon.Credentials, scheme ozon.PostingScheme) error {
+	if r.cursor == "" && len(r.hashes) > 0 {
+		// Все страницы окна уже сохранены прежней попыткой.
+		return nil
+	}
+	from, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, r.exec.cfg.Location)
+	if err != nil {
+		return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+	}
+	w := ozon.PostingWindow{From: from, To: from.AddDate(0, 0, 1)}
+	return r.exec.ozon.FetchPostingList(ctx, creds, r.task.ConnectionRef, scheme, w, r.cursor, r.nextPage, func(p ozon.Page) error {
+		return r.store(ctx, p)
+	})
 }
 
 var (

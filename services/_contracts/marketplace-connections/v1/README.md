@@ -27,7 +27,9 @@
   стороне сервиса.
 - `resource_types`: seller → `ozon.finance.accrual-by-day`,
   `ozon.finance.accrual-types`, `ozon.finance.realization`,
-  `ozon.finance.mutual-settlement`; performance → `ozon.ads.statistics`.
+  `ozon.finance.mutual-settlement`, а `ozon.orders.fbo`, `ozon.orders.fbs` —
+  только компаниям из `ozon_fetcher.orders_companies` (`['*']` — всем);
+  performance → `ozon.ads.statistics`.
 - `updated_at` — максимум из подключений кабинета.
 
 ## Правила

@@ -78,14 +78,43 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
         self::assertSame([self::SELLER_A, self::PERF_B], array_column($snapshot['connections'], 'connection_ref'));
     }
 
+    public function testOrdersResourcesOnlyForListedCompaniesWithSellerKey(): void
+    {
+        $rows = [
+            $this->seller(self::SELLER_A, self::COMPANY_A),
+            $this->performance(self::PERF_B, self::COMPANY_B),
+        ];
+
+        $none = $this->build($rows)['connections'];
+        self::assertSame(MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, $none[0]['resource_types'], 'по умолчанию заказы никому');
+
+        $one = $this->build($rows, [self::COMPANY_A, self::COMPANY_B])['connections'];
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ORDERS_RESOURCE_TYPES], $one[0]['resource_types']);
+        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $one[1]['resource_types'], 'без ключа seller заказов нет');
+    }
+
+    public function testOrdersResourcesForAllCompanies(): void
+    {
+        $cabinets = $this->build([
+            $this->seller(self::SELLER_A, self::COMPANY_A),
+            $this->seller('cccccccc-0000-7000-8000-00000000000c', self::COMPANY_B),
+        ], [MarketplaceConnectionsSnapshotBuilder::ORDERS_ALL_COMPANIES])['connections'];
+
+        foreach ($cabinets as $cabinet) {
+            self::assertContains('ozon.orders.fbo', $cabinet['resource_types']);
+            self::assertContains('ozon.orders.fbs', $cabinet['resource_types']);
+        }
+    }
+
     /**
      * @param list<ActiveConnectionCredentials> $rows
+     * @param list<string> $ordersCompanyIds
      *
      * @return array<string, mixed>
      */
-    private function build(array $rows): array
+    private function build(array $rows, array $ordersCompanyIds = []): array
     {
-        return (new MarketplaceConnectionsSnapshotBuilder())->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
+        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
     }
 
     private function seller(string $id, string $companyId, ?string $clientId = 'seller-client', ?string $secret = 'seller-key', string $updatedAt = '2026-10-01 10:00:00'): ActiveConnectionCredentials

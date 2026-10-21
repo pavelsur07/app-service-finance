@@ -1,4 +1,4 @@
-# Ozon Seller API — ресурсы первой волны и лимиты
+# Ozon Seller API — ресурсы и лимиты
 
 Сверка этапа 0 (`docs/tasks/ozon-fetcher-ingestion/`), 2026-10-17. Источники:
 рабочий PHP-код Symfony (прод), git-история удалённых клиентов, прод-отчёт
@@ -65,6 +65,33 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 формирования и TTL ссылки подтвердить на тестовом кабинете в этапе 4.
 Последняя версия клиента: `git show 117887d77^:site/src/Marketplace/Ozon/Infrastructure/Api/OzonMutualSettlementClient.php`.
 
+### `ozon.orders.fbo`, `ozon.orders.fbs` — `POST /v3/posting/fbo/list`, `POST /v4/posting/fbs/list`
+
+Замена снятых `/v2/posting/fbo/list` (400 с 19.10.2026) и `/v3/posting/fbs/list`
+(400 с 21.10.2026) — `docs/tasks/ozon-orders-posting-list/problem.md`.
+
+- **Запрос:** `{"filter": {"since": "<RFC3339 UTC>", "to": "<RFC3339 UTC>"}, "limit": 100,
+  "sort_dir": "ASC", "with": {"analytics_data": true, "financial_data": true}}`; со второй
+  страницы + `"cursor": "<курсор>"`. Окно — день МСК `[00:00; 00:00 следующего дня)`.
+  `offset` и `dir` **не отправляются**: новые методы их молча игнорируют.
+- **Ответ** (живой, 21.10.2026): `{"postings": [...], "has_next": <bool>, "cursor": "<40 символов>"}`
+  на верхнем уровне, без `result`. У последней страницы `has_next: false`, `cursor: ""`.
+  Отправление: `posting_number`, `order_id`, `order_number`, `status`, `substatus`,
+  `created_at`, `in_process_at`, `products`, `analytics_data`, `financial_data`,
+  `cancellation`, `legal_info` (у FBO — `null`), `additional_data` и др.
+- **Пагинация:** курсорная, `limit` ≤ 100 (`limit: 101` → 400 `value must be inside range (0, 100]`).
+  `has_next: true` без курсора, повтор курсора, полная страница без `has_next` и `cursor`,
+  больше 100 страниц за окно — `invalid_response` (не обрезка окна).
+- **Смены статусов:** `filter.last_changed_status_date` без `since/to` — 400
+  (`date since or date to must not be empty`; FBS — `filter.since and filter.to or
+  filter.order_numbers must not be empty`); вместе с `since/to` FBO v3 его **молча
+  игнорирует** (за 30 дней 2 348 отправлений с фильтром и без, те же статусы). Статус
+  приходит в каждом отправлении — смены видны перечитыванием окон: сегодня — каждый проход
+  планировщика, предыдущие 30 дней — раз в сутки (`ORDERS_TAIL_DAYS`), изменение — новая ревизия.
+- **Персональные данные:** `addressee`, `customer`, `legal_info` не запрашиваются.
+- **Включение:** ресурсы выдаются кабинетам по списку компаний в Symfony
+  (`ozon_fetcher.orders_companies`, `site/config/services.yaml`): `[]` — никому, `['*']` — всем.
+
 ### Вторая волна (не в первой)
 
 - `POST /v1/finance/accrual/postings` — по номерам отправлений (до 200 за
@@ -117,10 +144,15 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v2/finance/realization` | 0.2 | 0.05 | 1 | 900 с | **консервативно**; Symfony ждёт 60–3600 с, по умолчанию 900 с |
 | `/v1/finance/mutual-settlement` | 0.1 | 0.02 | 0.5 | 900 с | **консервативно**; генерация отчёта, не подтверждено |
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
+| `/v3/posting/fbo/list`, `/v4/posting/fbs/list` | 0.2 | 0.05 | 1 | 60 с | **консервативно**: ключ кабинета общий с Symfony, пока тот не отключён; 19.10 перед отключением старых методов — фаза 429 |
 
 Объём при дефолтах: первичная загрузка — 77 дней by-day по 1 странице
 (замер 17.10.2026) ≈ 4–15 мин на кабинет при 0,3…0,1 запроса/с; ежедневный
 хвост — 4 запроса. Низкий старт по времени почти ничего не стоит.
+
+Отправления: самый крупный кабинет (≈ 750 FBO в день) — ≈ 8 страниц на день; сегодня
+каждый час (≈ 190 запросов в сутки) + хвост 30 дней раз в сутки (≈ 240) ≈ 430 запросов,
+≈ 36 мин при 0,2 запроса/с. FBS без отправлений — 1 запрос на день.
 
 ### Замер на реальном кабинете (17.10.2026, ООО «Вумджой», тестовый ключ)
 
@@ -133,6 +165,16 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 
 Форма ответов, разобранная по коду Symfony, подтверждена; raw 12 МБ → 675 КБ в S3.
 
+### Списки отправлений на реальном кабинете (21.10.2026, тестовый ключ только для чтения)
+
+| Проверка | Результат |
+|---|---|
+| FBO v3, день 19.10 МСК | 2 страницы: 100 (`has_next: true`, курсор 40 символов) + 5 (`has_next: false`, `cursor: ""`) |
+| FBS v4, тот же день | 200, `postings: []`, `has_next: false` (у кабинета нет FBS) |
+| `limit: 101` | 400 `code 3`, `value must be inside range (0, 100]` — оба метода |
+| `last_changed_status_date` без `since/to` | 400 `code 3` — оба метода |
+| `last_changed_status_date` + `since/to` (FBO) | фильтр игнорируется: 2 348 = 2 348 за 30 дней |
+
 ### Классы ответов
 
 | Ответ | Класс |
@@ -143,8 +185,8 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | 5xx, таймаут, сеть | `transient` |
 | 401, 403 | `auth` |
 | 400 `{"code": 9, "message": "obsolete method cannot be used"}` | `obsolete_endpoint` |
-| прочий 4xx | `invalid_request` (ошибка задачи) |
-| 200 + неожиданная форма, повтор курсора, лимит страниц | `invalid_response` |
+| прочий 4xx | `invalid_request` (ошибка задачи); `message` Ozon — в тексте ошибки задачи |
+| 200 + неожиданная форма, повтор курсора, лимит страниц, полная страница без признака продолжения | `invalid_response` |
 
 ## Ссылки
 

@@ -21,6 +21,33 @@ final class CoverageHeatmapBuilderTest extends TestCase
         return new \DateTimeImmutable($at, new \DateTimeZone('Europe/Moscow'));
     }
 
+    public function testOrdersRowsAppearOnlyWithTasksAndDaysBeforeFirstTaskAreNotGaps(): void
+    {
+        $builder = new CoverageHeatmapBuilder();
+
+        $without = $builder->build(self::month('2026-10', [self::cell(self::BY_DAY, '2026-10-01', 4, 4)]), self::now());
+        self::assertNotContains('ozon.orders.fbo', array_map(static fn ($r) => $r->resourceType, $without->rows), 'заказы не включены — строки нет');
+
+        $with = $builder->build(self::month('2026-10', [
+            self::cell('ozon.orders.fbo', '2026-10-16', 1, 1),
+            self::cell('ozon.orders.fbo', '2026-10-17', 1, 1),
+        ]), self::now());
+        $rows = [];
+        foreach ($with->rows as $row) {
+            $rows[$row->resourceType] = $row;
+        }
+        self::assertArrayHasKey('ozon.orders.fbo', $rows);
+        self::assertArrayNotHasKey('ozon.orders.fbs', $rows);
+        self::assertSame('Заказы FBO', $rows['ozon.orders.fbo']->title);
+        self::assertTrue($rows['ozon.orders.fbo']->perDay);
+        self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.orders.fbo']->cells[15]->state);
+        self::assertSame(CoverageHeatmapCell::EMPTY, $rows['ozon.orders.fbo']->cells[0]->state);
+        // Покрытие: строка заказов добавляет 2 из 2 (дни до 16.10 не считаются), начисления — 0 из 17 × 4.
+        $baseline = $builder->build(self::month('2026-10', []), self::now());
+        self::assertSame($baseline->coveragePercent, 0);
+        self::assertSame((int) floor(2 * 100 / (17 * 4 + 4 + 2)), $with->coveragePercent);
+    }
+
     private static function cell(string $resource, string $period, int $expected, int $done, int $running = 0, int $retryable = 0, int $permanent = 0, ?\DateTimeImmutable $lastSuccess = null): ServiceCoverageMonthCell
     {
         return new ServiceCoverageMonthCell($resource, $period, $expected, new ServiceCoverageStatusCounts($done, $running, 0, 0, $retryable, $permanent), $lastSuccess);

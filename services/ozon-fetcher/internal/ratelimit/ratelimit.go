@@ -39,6 +39,10 @@ func DefaultConfig() Config {
 			ozon.EndpointRealization:      {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 900 * time.Second},
 			ozon.EndpointMutualSettlement: {Start: 0.1, Floor: 0.02, Ceiling: 0.5, DefaultPause: 900 * time.Second},
 			ozon.EndpointReportInfo:       {Start: 0.5, Floor: 0.1, Ceiling: 2, DefaultPause: 30 * time.Second},
+			// Списки отправлений: ключ кабинета общий с Symfony, пока тот не
+			// отключён (docs/tasks/marketplace-data-ingestion/plan-ozon.md) — старт ниже обычного.
+			ozon.EndpointPostingFBOList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			ozon.EndpointPostingFBSList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

@@ -103,7 +103,8 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 			return out
 		}
 		log.Error("ozon endpoint is obsolete, resource stopped for all cabinets",
-			slog.String("stage", "fetch"), slog.String("endpoint", apiErr.Endpoint), slog.Int("code", apiErr.Code))
+			slog.String("stage", "fetch"), slog.String("endpoint", apiErr.Endpoint), slog.Int("code", apiErr.Code),
+			slog.String("message", apiErr.Message))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now}
 
 	case ozon.ClassNotReady:
