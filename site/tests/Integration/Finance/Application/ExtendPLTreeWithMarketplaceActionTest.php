@@ -299,6 +299,8 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         // Внешнее ревью: веса 3 и 0 у продаж и возвратов МП давали ту же сумму, что 1 и 1.
         yield 'веса 3 и 0 компенсируют друг друга' => ['cancelling'];
         yield 'дробный вес 0,9' => ['fractional'];
+        // Внешнее ревью: общая с «Базовым» статья, на которую ложится логистика МП, с весом 0.
+        yield 'доставка с весом 0' => ['shared_zero'];
     }
 
     #[DataProvider('brokenTrees')]
@@ -306,7 +308,10 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     {
         $company = $this->universalCompany();
         $id = (string) $company->getId();
-        if ('prod_root' === $case) {
+        if ('shared_zero' === $case) {
+            $this->connection->update('pl_categories', ['weight_in_parent' => '0.0000'], ['company_id' => $id, 'code' => 'COGS_DELIVERY']);
+            $expected = 'COGS_DELIVERY';
+        } elseif ('prod_root' === $case) {
             $this->connection->update('pl_categories', ['parent_id' => null], ['company_id' => $id, 'code' => 'OVERHEAD_PROD_TOTAL']);
             $expected = 'OVERHEAD_PROD_CERT';
         } else {

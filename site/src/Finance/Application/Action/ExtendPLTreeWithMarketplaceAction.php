@@ -39,8 +39,8 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     /** Коды, по которым дерево опознаётся как «Базовое»: их нет в маркетплейсном шаблоне. */
     private const UNIVERSAL_MARKERS = ['GROSS_PROFIT', 'REV_SALES_TOTAL'];
 
-    /** Справочная группа: продажи с СПП в итоги не входят (как в маркетплейсном шаблоне). */
-    private const INFORMATIONAL_GROUP = 'REV_WITH_SPP';
+    /** Вне чистой прибыли по шаблону: продажи с СПП (справочно) и распределение прибыли. */
+    private const OUTSIDE_NET_PROFIT = ['REV_WITH_SPP', 'PROFIT_DISTR_TOTAL'];
 
     public function __construct(
         private ImportPLCategoryTreeAction $import,
@@ -197,8 +197,6 @@ final readonly class ExtendPLTreeWithMarketplaceAction
      * статье этого не увидит. Формулы вне пути (маржи, доли) — свободны.
      *
      * @param list<PLCategoryTreeNode> $nodes
-     */
-    /**
      * @param array<string, string> $overrides код → формула после дополнения (ещё не записана)
      */
     private function assertPathToNetProfitIsTemplate(string $companyId, array $nodes, array $overrides = []): void
@@ -297,8 +295,8 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     }
 
     /**
-     * Статьи ввода расширения, которых нет в «Базовом»: учитываемые в итогах и справочные (под
-     * «Выручкой с СПП» — как в маркетплейсном шаблоне, вне итогов).
+     * Статьи ввода шаблона: входящие в чистую прибыль и вне её (под «Выручкой с СПП» и
+     * «Распределением прибыли» — как в шаблонах).
      *
      * @param list<PLCategoryTreeNode> $nodes
      *
@@ -306,19 +304,17 @@ final readonly class ExtendPLTreeWithMarketplaceAction
      */
     private function marketplaceLeaves(array $nodes): array
     {
-        $universal = [];
-        foreach ($this->templates->nodes(BusinessProfile::UNIVERSAL) as $node) {
-            $universal[(string) $node->code] = true;
-        }
+        // Все статьи ввода шаблона, в том числе общие с «Базовым»: на доставку, эквайринг,
+        // себестоимость и банк тоже ложатся данные маркетплейса.
         $counted = $excluded = $names = [];
         foreach ($nodes as $node) {
-            if (null === $node->code || isset($universal[$node->code]) || PLCategoryType::LEAF_INPUT !== $node->type) {
+            if (null === $node->code || PLCategoryType::LEAF_INPUT !== $node->type) {
                 continue;
             }
             $names[$node->code] = $node->name;
             $informational = false;
             for ($p = $node->parent; null !== $p; $p = $p->parent) {
-                $informational = $informational || self::INFORMATIONAL_GROUP === $p->code;
+                $informational = $informational || \in_array($p->code, self::OUTSIDE_NET_PROFIT, true);
             }
             if ($informational) {
                 $excluded[] = $node->code;
