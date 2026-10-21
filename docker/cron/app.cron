@@ -304,6 +304,12 @@
 # Что делать с сообщениями — решение человека: messenger:failed:show|retry|remove (мутации — с разрешения Владельца).
 32 7 * * * cd /app && php bin/console app:messenger:failed-queue-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Раз в сутки в 07:37 (read-only гейт): соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием — дубль,
+# который путает отчёты (импорт, шаблон, ручной ввод). Находки — один агрегированный error (GlitchTip) + exit 1;
+# деревья ОПиУ без кодов шаблона — справочный info, на результат не влияют. Удалять или объединять статьи —
+# решение человека.
+37 7 * * * cd /app && php bin/console app:directories:integrity-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Раз в сутки в 07:34 (read-only гейт): заполнение диска хоста по inode и по байтам, порог 85%.
 # 19.09.2026 деплой десять часов падал на `docker compose pull`: inode кончились при 6.9G свободных байтов.
 # ERROR (logger->error → GlitchTip + exit 1) — один агрегированный event со стабильным текстом.

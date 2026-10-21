@@ -320,6 +320,7 @@
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
 - Базовый шаблон дерева — по профилю бизнеса компании: реестр `finance.pl_templates` (`config/services.yaml`), файлы `config/finance/pl_templates/<profile>.json` (формат v1 + `profile`, `templateVersion`; `DefaultPLCategoryTreeProvider::nodes(BusinessProfile)`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` (печатает `create`/`similar`/`skip` и итог `create N, keep existing M, similar S; company roots recognized K of R`) в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
+- Происхождение дерева — `Finance\Entity\PLTemplateApplication` (`pl_template_applications`): каждое применение стартового шаблона, создавшее статьи (профиль, `templateVersion`, сколько создано, источник `onboarding|screen|command`). Единый путь — `ApplyDefaultPLTemplateAction(companyId, dryRun, source, ?profile)`: импорт в режиме `onlyCreate` и запись одной транзакцией; экран, команда и `EnsureDefaultPLTreeAction` вызывают его. Происхождение — последняя запись (`PLTemplateApplicationRepository::findLatestByCompanyId()`); шаблон другого профиля к непустому дереву с происхождением не применяется (`PLTemplateProfileMismatchException`), проверка повторяется под `pg_advisory_xact_lock` по компании; пустое дерево собирается любым шаблоном. У компаний без записи (созданы до учёта) проверки нет. Экран импорта показывает происхождение.
 - Новая компания получает базовый шаблон автоматически: `Finance\EventListener\ApplyDefaultPLTreeOnCompanyCreated` на `CompanyCreatedEvent` вызывает `EnsureDefaultPLTreeAction(companyId, profile: из события)` — шаблон профиля применяется тем же импортом в режиме `onlyCreate`, только если у компании нет ни одной статьи ОПиУ (`PLCategoryRepository::existsByCompanyId()`); настроенное дерево не дополняется. Ошибка шаблона или импорта откатывает создание компании. Импорт в компанию без статей не ищет совпадения по каждому узлу — искать нечего.
 
 ### Finance: уровень строки отчёта ОПиУ
@@ -1691,8 +1692,17 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 `companies.business_profile`, у компаний до появления профиля — `MARKETPLACE`). Выбирается
 при создании: вопрос «Как вы продаёте?» при регистрации (не по приглашению), в `/company/new`
 и в создании аккаунта в админке — общий тип поля `Company\Form\BusinessProfileType`; без
-значения или с пустым — `DEFAULT`, неизвестное значение — ошибка формы. В редактировании компании профиля
-нет.
+значения или с пустым — `DEFAULT`, неизвестное значение — ошибка формы. Меняется в настройках
+компании (`/company/{id}/edit`, опция формы `business_profile_help`): справочники не меняются,
+запрос без поля профиль не сбрасывает (значение по умолчанию — текущий), смена — INFO-лог.
+
+Ночная проверка справочников — `app:directories:integrity-check` (Company, только чтение, cron
+07:37): `Company\Event\DirectoryIntegrityCheckEvent` со списком компаний; подписчики Finance
+(`CheckPLCategoryDirectory`), Cash (`CheckCashflowCategoryDirectory`, кроме отключённых) и Balance
+(`CheckBalanceArticleDirectory`, кроме архивных) сообщают соседние статьи с одинаковым названием
+(`lower(btrim(name))`, один родитель) как `DirectoryDuplicate`; Finance ещё отмечает (`note()`,
+на результат не влияет) деревья ОПиУ без единого кода шаблона. Находки — exit 1 и один
+агрегированный `error` («Directory duplicates found», счётчики по справочникам).
 
 | Кто | Что создаёт | Правило повторного запуска |
 |---|---|---|
@@ -4055,6 +4065,7 @@ config/
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
+| `app:directories:integrity-check` | `37 7 * * *` | Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; exit 1 + один агрегированный `error`; деревья ОПиУ без кодов шаблона — справочный `info` |
 | `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
 | `app:disk:healthcheck` | `34 7 * * *` | Read-only гейт диска хоста (каталог данных Docker через overlay): заполнение по inode и по байтам; ERROR + exit 1 при ≥ 85% |
 | heartbeat GlitchTip (`wget` на `$GLITCHTIP_SCHEDULER_HEARTBEAT_URL`) | `*/30 * * * *` | Сигнал живости scheduler'а; пропускается, если переменная не задана |
@@ -4133,6 +4144,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.47 | 2026-10-21 | Finance: происхождение дерева ОПиУ (`PLTemplateApplication`, `pl_template_applications`), `ApplyDefaultPLTemplateAction`, запрет шаблона другого профиля (`PLTemplateProfileMismatchException`); Company: смена профиля в настройках, ночная проверка справочников `app:directories:integrity-check` (`DirectoryIntegrityCheckEvent`) |
 | 2.46 | 2026-10-21 | Finance: импорт ОПиУ не строит второе дерево (`PLTreeWouldDuplicateException`), шаблон пропускает статьи с похожими названиями (`PLCategoryNameSimilarity`, `ImportPLCategoryTreeResult::$similar`), экран «Сопоставить с шаблоном» и `BindPLCategoriesToTemplateAction`; Cash: счета по умолчанию — только компании без денежных счетов |
 | 2.45 | 2026-10-21 | Finance: в оба шаблона ОПиУ (`templateVersion` 2) добавлены «Амортизация» `BELOW_EBITDA_DEPRECIATION` и «Налог на прибыль» `BELOW_EBITDA_PROFIT_TAX` в «Расходах ниже EBITDA»; маркетплейсный — 72 статьи, универсальный — 44 |
 | 2.44 | 2026-10-20 | Finance, Balance: универсальные стартовые шаблоны профиля `UNIVERSAL` — `pl_templates/universal.json` (42 статьи, валовая прибыль/маржа, EBITDA, чистая прибыль), `templates/universal.yaml` (31 статья) |

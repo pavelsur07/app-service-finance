@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
+use App\Company\Enum\BusinessProfile;
 use App\Company\Security\SystemCompanyRoles;
 use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
 use App\Finance\Entity\PLCategory;
@@ -16,6 +17,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
+use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
@@ -123,6 +125,50 @@ final class PLTemplateMappingControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.alert-warning', 'у вас «Налог на прибыль / УСН»');
         self::assertSelectorTextContains('.alert-warning', 'BELOW_EBITDA_PROFIT_TAX');
+    }
+
+    public function testScreenApplicationRecordsOriginAndScreenShowsIt(): void
+    {
+        $client = static::createClient();
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $this->save($user, $company);
+        $this->login($client, $user, $company);
+
+        $crawler = $client->request('GET', '/pl-categories/import');
+        self::assertStringContainsString('Происхождение дерева не записано', $crawler->filter('[data-template-origin]')->text());
+
+        $client->request('POST', '/pl-categories/import/apply', ['mode' => 'template', '_token' => $this->csrfToken($client, 'pl-category-import'.(string) $company->getId())]);
+        self::assertResponseRedirects('/pl-categories/');
+        self::assertSame(['screen'], $this->em()->getConnection()->fetchFirstColumn('SELECT source FROM pl_template_applications WHERE company_id = ?', [(string) $company->getId()]));
+
+        $crawler = $client->request('GET', '/pl-categories/import');
+        self::assertStringContainsString('Дерево из шаблона «Маркетплейсы и e-com» (версия 2', $crawler->filter('[data-template-origin]')->text());
+    }
+
+    public function testTemplatePreviewOfAnotherProfileIsRefused(): void
+    {
+        $client = static::createClient();
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $company->setBusinessProfile(BusinessProfile::UNIVERSAL);
+        $this->save(
+            $user,
+            $company,
+            PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->build(),
+            PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Выручка')->withCode('REV_TOTAL')->withType(PLCategoryType::KPI)->build(),
+        );
+        $this->login($client, $user, $company);
+
+        $client->request('GET', '/pl-categories/import?source=template');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.toast.text-bg-danger', 'шаблон «Базовый» к нему не применяется');
+        self::assertSelectorNotExists('input[name="mode"][value="template"]');
+
+        $client->request('POST', '/pl-categories/import/apply', ['mode' => 'template', '_token' => $this->csrfToken($client, 'pl-category-import'.(string) $company->getId())]);
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
     }
 
     /**

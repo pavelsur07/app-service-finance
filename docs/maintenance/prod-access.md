@@ -128,6 +128,7 @@ Read-only проверки можно выполнять после запрос
 - Ozon preview/verification через `codex-console`.
 - Живость SMTP через `codex-console app:mailer:healthcheck` — SMTP handshake с AUTH, письмо не отправляется, данные не меняются. Мутирующего режима и флагов у команды нет. Учитывать: сбой пишет `error` и заводит issue в GlitchTip, поэтому ручной прогон при мёртвой почте создаёт алерт.
 - Сверка строк разбивки ДДС через `codex-console app:cash:verify-transaction-splits` — только чтение, ненулевой exit code при расхождении. Wrapper запрещает этой команде любые аргументы.
+- Гейт справочников через `codex-console app:directories:integrity-check` (cron 07:37) — только чтение: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; аргументы запрещены, exit 1 — штатный результат гейта. В боевой wrapper устанавливает Владелец.
 - Гейт очереди `failed` через `codex-console app:messenger:failed-queue-check` (cron 07:32) — только чтение: агрегатный SELECT по `messenger_messages` (глубина, возраст самого
   старого, разбивка по классу без `unserialize`); ничего не retry, не remove и не ack, внешних вызовов нет. Wrapper запрещает любые аргументы. **Ненулевой exit code — штатный
   результат гейта** (ERROR: самое старое сообщение ≥ 12 ч или в очереди ≥ 10), а не ошибка wrapper'а; ERROR уходит `logger->error('Messenger failed queue unhealthy')` →

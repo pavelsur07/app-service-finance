@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
+use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DeletePLCategoryAction;
@@ -15,10 +16,11 @@ use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLCategoryInUseException;
 use App\Finance\Form\PLCategoryFormType;
-use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLTemplateApplicationRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -41,7 +43,8 @@ class PLCategoryController extends AbstractController
         private readonly PLCategoryTreeExporter $exporter,
         private readonly PLCategoryTreeFileReader $fileReader,
         private readonly CompanyFacade $companyFacade,
-        private readonly DefaultPLCategoryTreeProvider $defaultTree,
+        private readonly ApplyDefaultPLTemplateAction $applyTemplate,
+        private readonly PLTemplateApplicationRepository $templateApplications,
     ) {
     }
 
@@ -102,12 +105,7 @@ class PLCategoryController extends AbstractController
             // компании (имена, места, типы совпавших по коду статей) не трогаются.
             $sourceCompanyId = null;
             try {
-                $preview = $importAction(new ImportPLCategoryTreeCommand(
-                    $this->defaultTree->nodes($targetCompany->getBusinessProfile()),
-                    (string) $targetCompany->getId(),
-                    true,
-                    true,
-                ));
+                $preview = ($this->applyTemplate)((string) $targetCompany->getId(), true, PLTemplateApplicationSource::SCREEN, $targetCompany->getBusinessProfile());
                 $previewMode = 'template';
             } catch (\DomainException $e) {
                 $this->addFlash('danger', $e->getMessage());
@@ -134,6 +132,7 @@ class PLCategoryController extends AbstractController
             'selectedSourceCompanyId' => $sourceCompanyId,
             'targetCompanyId' => (string) $targetCompany->getId(),
             'businessProfile' => $targetCompany->getBusinessProfile(),
+            'templateOrigin' => $this->templateApplications->findLatestByCompanyId((string) $targetCompany->getId()),
             'preview' => $preview,
             'previewMode' => $previewMode,
             'uploadedFileName' => null,
@@ -204,6 +203,7 @@ class PLCategoryController extends AbstractController
             'selectedSourceCompanyId' => null,
             'targetCompanyId' => (string) $targetCompany->getId(),
             'businessProfile' => $targetCompany->getBusinessProfile(),
+            'templateOrigin' => $this->templateApplications->findLatestByCompanyId((string) $targetCompany->getId()),
             'preview' => $preview,
             'previewMode' => 'file',
             'uploadedFileName' => $file->getClientOriginalName(),
@@ -251,18 +251,13 @@ class PLCategoryController extends AbstractController
         }
 
         try {
-            $sourceNodes = match (true) {
-                'template' === $mode => $this->defaultTree->nodes($targetCompany->getBusinessProfile()),
-                null === $sourceCompanyId => $this->fileReader->read($this->submittedJson($request)),
-                default => $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
-            };
-
-            $result = $importAction(new ImportPLCategoryTreeCommand(
-                $sourceNodes,
-                (string) $targetCompany->getId(),
-                false,
-                'template' === $mode,
-            ));
+            $result = 'template' === $mode
+                ? ($this->applyTemplate)((string) $targetCompany->getId(), false, PLTemplateApplicationSource::SCREEN, $targetCompany->getBusinessProfile())
+                : $importAction(new ImportPLCategoryTreeCommand(
+                    null === $sourceCompanyId ? $this->fileReader->read($this->submittedJson($request)) : $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
+                    (string) $targetCompany->getId(),
+                    false,
+                ));
         } catch (\DomainException $e) {
             // Без sourceCompanyId в redirect: GET заново пересчитал бы тот же
             // dry-run и добавил бы второй, дублирующий flash с той же ошибкой.
