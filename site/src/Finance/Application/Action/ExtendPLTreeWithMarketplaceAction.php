@@ -71,6 +71,11 @@ final readonly class ExtendPLTreeWithMarketplaceAction
 
         $result = $this->em->wrapInTransaction(function () use ($companyId, $nodes): ExtendPLTreeResult {
             $this->em->getConnection()->executeStatement('SELECT pg_advisory_xact_lock(hashtext(:key))', ['key' => 'pl-template:'.$companyId]);
+            // Статьи компании — под блокировкой строк до фиксации (правка в карточке подождёт), и
+            // EntityManager очищен: импорт и сверка читают актуальные веса, места и формулы, а не
+            // загруженные предпросмотром до транзакции.
+            $this->em->getConnection()->executeQuery('SELECT id FROM pl_categories WHERE company_id = ? FOR UPDATE', [$companyId]);
+            $this->em->clear();
             $changes = $this->check($companyId, $nodes);
             $import = ($this->import)(new ImportPLCategoryTreeCommand($nodes, $companyId, false, onlyCreate: true));
             if ([] !== $import->similar) {

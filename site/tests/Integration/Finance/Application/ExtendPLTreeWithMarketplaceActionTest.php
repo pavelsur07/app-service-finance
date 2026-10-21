@@ -303,6 +303,26 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия (внешнее ревью): вес изменили после предпросмотра (статьи уже в EntityManager) —
+     * применение читает актуальные данные и откатывается, а не сверяет по устаревшим.
+     */
+    public function testChangeAfterPreviewIsSeenByApply(): void
+    {
+        $company = $this->universalCompany();
+        $this->extend($company, true);
+        $this->connection->update('pl_categories', ['weight_in_parent' => '0.0000'], ['company_id' => (string) $company->getId(), 'code' => 'COGS_DELIVERY']);
+
+        try {
+            $this->extend($company, false);
+            self::fail('Устаревший вес не должен пройти сверку');
+        } catch (PLTreeExtensionException $e) {
+            self::assertStringContainsString('COGS_DELIVERY', $e->getMessage());
+        }
+
+        self::assertSame(44, $this->categoryCount($company));
+    }
+
+    /**
      * Регрессия (внешнее ревью): EBITDA строкой ввода формулу не считает — расходы МП не вошли бы в итог.
      */
     public function testTotalWithChangedTypeRefuses(): void
