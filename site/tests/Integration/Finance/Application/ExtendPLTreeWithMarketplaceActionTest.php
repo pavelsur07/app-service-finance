@@ -12,6 +12,8 @@ use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
 use App\Finance\Application\Action\ExtendPLTreeWithMarketplaceAction;
 use App\Finance\Application\DTO\ExtendPLTreeResult;
 use App\Finance\Application\DTO\PLFormulaChange;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLTreeExtensionException;
 use App\Finance\Facade\FinanceFacade;
@@ -21,6 +23,7 @@ use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 
 /**
@@ -127,6 +130,47 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
 
         self::assertSame(44, $this->categoryCount($company));
         self::assertSame('REV_SALES_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'REV_TOTAL'", [(string) $company->getId()]));
+    }
+
+    /**
+     * Регрессия (ревью): своя похожая статья («Расходы на продвижение» без кода) погасила бы группу
+     * PROMO_TOTAL, а EBITDA всё равно сослалась бы на неё — отказ целиком.
+     */
+    public function testSimilarOwnLineRefusesWholeExtension(): void
+    {
+        $company = $this->universalCompany();
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы на продвижение')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build());
+        $this->em->flush();
+
+        foreach ([true, false] as $dryRun) {
+            try {
+                $this->extend($company, $dryRun);
+                self::fail('Похожая статья должна отклонять дополнение');
+            } catch (PLTreeExtensionException $e) {
+                self::assertStringContainsString('«Расходы на продвижение» ≈ ваша «Расходы на продвижение»', $e->getMessage());
+            }
+        }
+
+        self::assertSame(45, $this->categoryCount($company));
+        self::assertSame('GROSS_PROFIT + OVERHEAD_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'EBITDA'", [(string) $company->getId()]));
+    }
+
+    /**
+     * Регрессия (ревью): своя группа с кодом OPEX_WH_TOTAL внутри операционных расходов попала бы в
+     * EBITDA дважды — через OVERHEAD_TOTAL и напрямую.
+     */
+    public function testExistingGroupOutOfTemplatePlaceRefuses(): void
+    {
+        $company = $this->universalCompany();
+        $overhead = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
+        self::assertInstanceOf(PLCategory::class, $overhead);
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($overhead)->withName('Склад')->withCode('OPEX_WH_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build());
+        $this->em->flush();
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('посчиталась бы в итогах дважды');
+
+        $this->extend($company, true);
     }
 
     private function extend(Company $company, bool $dryRun): ExtendPLTreeResult

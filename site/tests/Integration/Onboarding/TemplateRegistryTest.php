@@ -64,6 +64,41 @@ final class TemplateRegistryTest extends KernelTestCase
     }
 
     /**
+     * Расширение = «Базовый» шаблон + вставки: каждая статья «Базового» в нём с теми же полями и
+     * родителем; формулы REV_TOTAL и EBITDA расширения содержат все слагаемые формул «Базового» —
+     * новая версия «Базового» не разойдётся с расширением молча.
+     */
+    public function testMarketplaceExtensionIsUniversalTemplatePlusInserts(): void
+    {
+        $reader = new PLCategoryTreeFileReader();
+        $describe = static function (array $nodes): array {
+            $out = [];
+            foreach ($nodes as $n) {
+                $out[(string) $n->code] = ['parent' => $n->parent?->code, 'name' => $n->name, 'type' => $n->type->value, 'flow' => $n->flow->value, 'format' => $n->format->value, 'expenseType' => $n->expenseType->value, 'weight' => $n->weightInParent, 'visible' => $n->isVisible, 'formula' => $n->formula];
+            }
+
+            return $out;
+        };
+        $universal = $describe($reader->read((string) file_get_contents((string) $this->registry('finance.pl_templates')['UNIVERSAL'])));
+        $extension = $describe($reader->read((string) file_get_contents((string) self::getContainer()->getParameter('finance.pl_marketplace_extension'))));
+
+        foreach ($universal as $code => $node) {
+            self::assertArrayHasKey($code, $extension);
+            $inExtension = $extension[$code];
+            $formula = (string) $node['formula'];
+            $extended = (string) $inExtension['formula'];
+            if ($formula !== $extended) {
+                preg_match_all('/[A-Z][A-Z0-9_]*/', $formula, $terms);
+                foreach ($terms[0] as $term) {
+                    self::assertStringContainsString($term, $extended, $code.': слагаемое «Базового» потеряно');
+                }
+                $node['formula'] = $inExtension['formula'] = null;
+            }
+            self::assertSame($node, $inExtension, $code);
+        }
+    }
+
+    /**
      * Расширение содержит каждый код, на который ссылаются шаблоны маппинга затрат и продаж
      * маркетплейсов: иначе у компании «Базовый» затрата осталась бы без статьи.
      */

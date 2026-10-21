@@ -52,6 +52,11 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         $command = new ImportPLCategoryTreeCommand($nodes, $companyId, true, onlyCreate: true);
         $changes = $this->check($companyId, $nodes);
         $preview = ($this->import)($command);
+        // Пропущенная как «похожая» статья не встала бы на своё место, а формулы итогов на неё
+        // сослались бы (EBITDA с нулём вместо продвижения) и маппинг маркетплейса её не нашёл бы.
+        if ([] !== $preview->similar) {
+            throw PLTreeExtensionException::similarLines(array_map(static fn ($r): string => \sprintf('«%s» ≈ ваша «%s»', $r->name, $r->existingName), $preview->similar));
+        }
         if ($dryRun) {
             return new ExtendPLTreeResult($preview, $changes);
         }
@@ -60,9 +65,19 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             $this->em->getConnection()->executeStatement('SELECT pg_advisory_xact_lock(hashtext(:key))', ['key' => 'pl-template:'.$companyId]);
             $changes = $this->check($companyId, $nodes);
             $import = ($this->import)(new ImportPLCategoryTreeCommand($nodes, $companyId, false, onlyCreate: true));
+            if ([] !== $import->similar) {
+                throw PLTreeExtensionException::similarLines(array_map(static fn ($r): string => \sprintf('«%s» ≈ ваша «%s»', $r->name, $r->existingName), $import->similar));
+            }
             foreach ($changes as $change) {
-                $category = $this->categories->findOneByCompanyIdAndCode($companyId, $change->code);
-                $category?->setFormula($change->to);
+                // Условная запись: правка формулы в карточке статьи (без этой блокировки) между
+                // проверкой и записью не перетирается — откат всего дополнения.
+                $updated = $this->em->getConnection()->executeStatement(
+                    'UPDATE pl_categories SET formula = ? WHERE company_id = ? AND code = ? AND formula = ?',
+                    [$change->to, $companyId, $change->code, $change->from],
+                );
+                if (1 !== $updated) {
+                    throw PLTreeExtensionException::concurrentChange($change->name);
+                }
             }
             if ([] !== $import->created) {
                 $this->em->persist(new PLTemplateApplication($companyId, BusinessProfile::UNIVERSAL, $this->templates->marketplaceExtensionVersion(), \count($import->created), PLTemplateApplicationSource::MARKETPLACE_EXTENSION, new \DateTimeImmutable()));
@@ -114,6 +129,13 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             }
         }
 
+        $templateParents = [];
+        foreach ($nodes as $node) {
+            if (null !== $node->code) {
+                $templateParents[$node->code] = $node->parent?->code;
+            }
+        }
+
         $changes = [];
         foreach ($nodes as $node) {
             if (null === $node->code || self::same($node->formula, $universalFormulas[$node->code] ?? $node->formula)) {
@@ -127,10 +149,32 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             if (!self::same($row['formula'], $universalFormulas[$node->code])) {
                 throw PLTreeExtensionException::formulaChanged((string) $row['name'], (string) $row['formula'], (string) $universalFormulas[$node->code]);
             }
+            $this->assertTermsInPlace($companyId, (string) $universalFormulas[$node->code], (string) $node->formula, $templateParents);
             $changes[] = new PLFormulaChange($node->code, (string) $row['name'], (string) $row['formula'], (string) $node->formula);
         }
 
         return $changes;
+    }
+
+    /**
+     * Статьи, которые новая формула добавляет в итог, если они у компании уже есть, должны стоять на
+     * месте шаблона: своя «OPEX_WH_TOTAL» внутри операционных расходов посчиталась бы в EBITDA дважды.
+     *
+     * @param array<string, ?string> $templateParents код → код родителя в шаблоне
+     */
+    private function assertTermsInPlace(string $companyId, string $from, string $to, array $templateParents): void
+    {
+        preg_match_all('/[A-Z][A-Z0-9_]*/', $from, $old);
+        preg_match_all('/[A-Z][A-Z0-9_]*/', $to, $new);
+        foreach (array_diff($new[0], $old[0]) as $term) {
+            $row = $this->em->getConnection()->fetchAssociative(
+                'SELECT c.name, p.code AS parent_code FROM pl_categories c LEFT JOIN pl_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.code = ?',
+                [$companyId, $term],
+            );
+            if (false !== $row && ($row['parent_code'] ?? null) !== ($templateParents[$term] ?? null)) {
+                throw PLTreeExtensionException::misplaced((string) $row['name'], $term);
+            }
+        }
     }
 
     private static function same(?string $a, ?string $b): bool

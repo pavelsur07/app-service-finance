@@ -78,8 +78,17 @@ final class FinanceFacade
             return false;
         }
         $codes = array_flip($this->plCategoryRepository->findCodesByCompany($company));
+        // Только дерево «Базового» (своё дерево дополнение отклонит) и только статьи, которых в
+        // «Базовом» нет: удалённая своя статья шаблона не должна держать подсказку вечно.
+        if (!isset($codes['GROSS_PROFIT'], $codes['REV_SALES_TOTAL'])) {
+            return false;
+        }
+        $universal = [];
+        foreach ($this->plTemplates->nodes(BusinessProfile::UNIVERSAL) as $node) {
+            $universal[(string) $node->code] = true;
+        }
         foreach ($this->plTemplates->marketplaceExtension() as $node) {
-            if (null !== $node->code && !isset($codes[$node->code])) {
+            if (null !== $node->code && !isset($universal[$node->code]) && !isset($codes[$node->code])) {
                 return true;
             }
         }

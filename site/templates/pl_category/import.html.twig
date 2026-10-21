@@ -36,8 +36,8 @@
                 </p>
                 <p class="text-secondary small" data-template-origin>
                     {% if templateOrigin is defined and templateOrigin is not null %}
-                        Дерево из шаблона «{{ templateOrigin.profile.label }}» (версия {{ templateOrigin.templateVersion }},
-                        последнее применение {{ templateOrigin.appliedAt|date('d.m.Y') }}). Шаблон другого профиля к нему не применяется.
+                        Дерево из шаблона «{{ templateOrigin.profile.label }}»{{ templateOrigin.source.value == 'mp_extension' ? ' со статьями маркетплейса' : '' }}
+                        (последнее применение {{ templateOrigin.appliedAt|date('d.m.Y') }}). Шаблон другого профиля к нему не применяется.
                     {% else %}
                         Происхождение дерева не записано: оно создано до учёта шаблонов или вручную.
                     {% endif %}
@@ -98,10 +98,14 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <form method="post" action="{{ path('pl_category_marketplace_extension') }}">
-                                <input type="hidden" name="_token" value="{{ csrf_token('pl-marketplace-extension' ~ targetCompanyId) }}">
-                                <button type="submit" class="btn btn-primary">Добавить статьи маркетплейса</button>
-                            </form>
+                            {% if is_granted('module.finance.write') %}
+                                <form method="post" action="{{ path('pl_category_marketplace_extension') }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('pl-marketplace-extension' ~ targetCompanyId) }}">
+                                    <button type="submit" class="btn btn-primary">Добавить статьи маркетплейса</button>
+                                </form>
+                            {% else %}
+                                <div class="text-secondary">Добавить статьи может пользователь с правом записи в «Финансы».</div>
+                            {% endif %}
                         {% endif %}
                     {% else %}
                         <form method="get" action="{{ path('pl_category_import') }}">
