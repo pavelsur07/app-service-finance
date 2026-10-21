@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Finance;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -73,7 +74,7 @@ final class ImportPLCategoryTreeActionCodeCollisionTest extends IntegrationTestC
         /** @var PLCategoryRepository $plCategoryRepository */
         $plCategoryRepository = self::getContainer()->get(PLCategoryRepository::class);
 
-        $action = new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $this->em);
+        $action = new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $this->em, new PLCategoryNameSimilarity());
 
         $exporter = new PLCategoryTreeExporter();
         $sourceNodes = $exporter->fromEntities($plCategoryRepository->findTreeByCompany($sourceCompany));

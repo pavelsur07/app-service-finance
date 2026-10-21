@@ -252,8 +252,10 @@ Read-only проверки можно выполнять после запрос
 - `app:finance:pl-tree:apply-default <companyId> [--execute]` — базовый шаблон
   дерева ОПиУ (`config/finance/default_pl_tree.json`) для одной компании, тот же
   `ImportPLCategoryTreeAction`, что у экрана `/pl-categories/import?source=template`.
-  Без `--execute` — read-only план (`create …` по узлам и итог
-  `plan (dry run): create N, keep existing M`), рутинная проверка; с
+  Без `--execute` — read-only план (`create …` и `similar …` по узлам и итог
+  `plan (dry run): create N, keep existing M, similar S; company roots recognized K of R`),
+  рутинная проверка; дерево, в котором шаблон опознал меньше половины корневых статей, —
+  отказ, exit 1 (второе дерево не строится); с
   `--execute` пишет `pl_categories`: создаёт недостающие узлы, существующие не
   меняет. Конфликт с деревом компании (например, код шаблонной группы у её
   листа) блокирует запись целиком, exit 1. Wrapper пропускает ровно один

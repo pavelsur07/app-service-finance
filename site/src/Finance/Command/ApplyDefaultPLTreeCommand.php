@@ -74,11 +74,17 @@ final class ApplyDefaultPLTreeCommand extends Command
         foreach ($result->created as $row) {
             $output->writeln(\sprintf('create  %-40s %s', $row->code ?? '', $row->path));
         }
+        foreach ($result->similar as $row) {
+            $output->writeln(\sprintf('similar %-40s %s ≈ «%s»', $row->code ?? '', $row->path, $row->existingName));
+        }
         $output->writeln(\sprintf(
-            '%s: create %d, keep existing %d',
+            '%s: create %d, keep existing %d, similar %d; company roots recognized %d of %d',
             $execute ? 'applied' : 'plan (dry run)',
             \count($result->created),
             $result->unchangedCount,
+            \count($result->similar),
+            $result->recognizedRoots,
+            $result->companyRoots,
         ));
         if ([] !== $result->unresolvedFormulaCodes) {
             $output->writeln(\sprintf('<comment>formula codes without a category: %s</comment>', implode(', ', $result->unresolvedFormulaCodes)));
@@ -89,6 +95,7 @@ final class ApplyDefaultPLTreeCommand extends Command
                 'companyId' => $companyId,
                 'created' => \count($result->created),
                 'kept' => $result->unchangedCount,
+                'similar' => \count($result->similar),
             ]);
         }
 

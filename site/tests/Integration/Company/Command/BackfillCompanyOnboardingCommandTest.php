@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Company\Command;
 
 use App\Balance\Application\SeedBalanceStructureAction;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\Company;
 use App\Company\Enum\BusinessProfile;
 use App\Company\Event\CompanyOnboardingBackfillEvent;
-use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -60,9 +58,10 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
     public function testExecuteFillsGapsOnceAndKeepsOwnData(): void
     {
         $bare = (string) $this->bareCompany()->getId();
-        // Компания, которая уже настроила банк, ОПиУ и Баланс сама: недостаёт только кассы.
+        // Компания, которая уже настроила ОПиУ и Баланс сама: недостаёт только денежных счетов.
+        // (Компания с любым своим денежным счётом счетов «по умолчанию» не получает —
+        // EnsureDefaultMoneyAccountsActionTest.)
         $configured = $this->bareCompany();
-        $this->em->persist(MoneyAccountBuilder::aMoneyAccount()->withIndex(911)->forCompany($configured)->withType(MoneyAccountType::BANK)->withName('Сбер')->build());
         $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($configured)->withName('Выручка')->withCode(null)->build());
         $this->em->flush();
         $configuredId = (string) $configured->getId();
@@ -78,7 +77,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
 
         self::assertSame(['money' => 2, 'pl' => 72, 'balance_articles' => 33, 'balance_accounts' => 2], $this->counts($bare));
         self::assertSame(['money' => 2, 'pl' => 1, 'balance_articles' => 33, 'balance_accounts' => 1], $this->counts($configuredId));
-        self::assertSame(['bank:Сбер', 'cash:Основная'], $this->connection->fetchFirstColumn("SELECT type || ':' || name FROM money_account WHERE company_id=? ORDER BY type", [$configuredId]));
+        self::assertSame(['bank:Основной счет', 'cash:Основная'], $this->connection->fetchFirstColumn("SELECT type || ':' || name FROM money_account WHERE company_id=? ORDER BY type", [$configuredId]));
 
         foreach ([$bare, $configuredId] as $companyId) {
             self::assertSame(Command::SUCCESS, $tester->execute(['--company' => $companyId]));

@@ -9,9 +9,12 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\ImportPLCategoryTreeRow;
+use App\Finance\Application\DTO\ImportPLCategoryTreeSimilarRow;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
+use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Exception\PLTreeWouldDuplicateException;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -28,6 +31,11 @@ use Ramsey\Uuid\Uuid;
  * всей компании), иначе по (parent, name). Совпавшие узлы обновляются,
  * несовпавшие — создаются. Узлы целевой компании, отсутствующие в источнике,
  * никогда не удаляются и не изменяются.
+ *
+ * Второго дерева импорт не строит: корневые статьи в непустую компанию создаются, только если
+ * источник опознал не меньше половины её корневых статей (PLTreeWouldDuplicateException). В режиме
+ * шаблона (`onlyCreate`) статья, похожая по названию на неопознанную статью компании, не создаётся
+ * вместе со своими новыми потомками и возвращается в `similar`.
  */
 final class ImportPLCategoryTreeAction
 {
@@ -37,6 +45,7 @@ final class ImportPLCategoryTreeAction
         private readonly CompanyRepository $companyRepository,
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly EntityManagerInterface $em,
+        private readonly PLCategoryNameSimilarity $similarity,
     ) {
     }
 
@@ -48,7 +57,10 @@ final class ImportPLCategoryTreeAction
         }
 
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
+        $companyCategories = $this->plCategoryRepository->findTreeByCompany($targetCompany);
+        $similar = $command->onlyCreate ? $this->skipSimilar($plan, $companyCategories) : [];
         [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $command->onlyCreate);
+        [$companyRoots, $recognizedRoots] = $this->guardAgainstSecondTree($plan, $companyCategories, $command->onlyCreate);
 
         // Строго до мутаций: метод сравнивает старый code совпавшего узла с
         // новым, а после applyFields() старого уже не существует.
@@ -85,7 +97,105 @@ final class ImportPLCategoryTreeAction
             });
         }
 
-        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes);
+        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes, $similar, $companyRoots, $recognizedRoots);
+    }
+
+    /**
+     * Убирает из плана новые узлы, у которых в компании уже есть неопознанная статья с похожим
+     * названием, вместе с их новыми потомками: шаблонная «Налог на прибыль» рядом со своей
+     * «Налог на прибыль / УСН» — дубль. Опознанные статьи компании (совпавшие по коду с другим узлом
+     * источника) в кандидаты не входят: они уже заняты своим узлом.
+     *
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> &$plan
+     * @param PLCategory[] $companyCategories
+     *
+     * @return list<ImportPLCategoryTreeSimilarRow>
+     */
+    private function skipSimilar(array &$plan, array $companyCategories): array
+    {
+        $claimed = [];
+        foreach ($plan as $item) {
+            if (null !== $item['existing']) {
+                $claimed[$item['existing']->getId()] = true;
+            }
+        }
+        $candidates = array_values(array_filter($companyCategories, static fn (PLCategory $c): bool => !isset($claimed[$c->getId()])));
+        if ([] === $candidates) {
+            return [];
+        }
+
+        $similar = [];
+        $skippedKeys = [];
+        $kept = [];
+        foreach ($plan as $item) {
+            $node = $item['sourceNode'];
+            if (null === $item['existing']) {
+                if (null !== $node->parent && isset($skippedKeys[$node->parent->key])) {
+                    $skippedKeys[$node->key] = true;
+
+                    continue;
+                }
+                $candidate = $this->similarCandidate($node->name, $candidates);
+                if (null !== $candidate) {
+                    $similar[] = new ImportPLCategoryTreeSimilarRow($node->name, $node->code, $this->buildPath($node), (string) $candidate->getId(), $candidate->getName());
+                    $skippedKeys[$node->key] = true;
+
+                    continue;
+                }
+            }
+            $kept[] = $item;
+        }
+        $plan = $kept;
+
+        return $similar;
+    }
+
+    /**
+     * @param list<PLCategory> $candidates
+     */
+    private function similarCandidate(string $name, array $candidates): ?PLCategory
+    {
+        foreach ($candidates as $candidate) {
+            if ($this->similarity->similar($name, $candidate->getName())) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Новые корневые статьи в непустую компанию — только если источник опознал не меньше
+     * половины её корневых статей: иначе рядом с её деревом встал бы второй скелет (dry-run на
+     * проде 21.10: 0 из 3–9 у компаний со своим деревом, 19–21 из 21–27 у компаний на шаблоне).
+     *
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     * @param PLCategory[] $companyCategories
+     *
+     * @return array{0: int, 1: int} корневых статей компании, из них опознано
+     */
+    private function guardAgainstSecondTree(array $plan, array $companyCategories, bool $template): array
+    {
+        $claimed = [];
+        $createsRoot = false;
+        foreach ($plan as $item) {
+            if (null !== $item['existing']) {
+                $claimed[$item['existing']->getId()] = true;
+            }
+            if ('create' === $item['operation'] && null === $item['sourceNode']->parent) {
+                $createsRoot = true;
+            }
+        }
+
+        $roots = array_filter($companyCategories, static fn (PLCategory $c): bool => null === $c->getParent());
+        $recognized = \count(array_filter($roots, static fn (PLCategory $c): bool => isset($claimed[$c->getId()])));
+        $total = \count($roots);
+
+        if ($createsRoot && $total > 0 && (0 === $recognized || $recognized * 2 < $total)) {
+            throw PLTreeWouldDuplicateException::roots($recognized, $total, $template);
+        }
+
+        return [$total, $recognized];
     }
 
     /**

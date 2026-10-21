@@ -1,0 +1,81 @@
+{% extends 'base.html.twig' %}
+{% block title %}Сопоставить с шаблоном ОПиУ{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Сопоставить с шаблоном ОПиУ</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <a href="{{ path('pl_category_import') }}" class="btn btn-outline-secondary">Назад к импорту</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-secondary">
+                    Укажите, какая ваша статья соответствует статье шаблона «{{ businessProfile.label }}».
+                    Статье присвоится код шаблона; название, место в дереве и данные не меняются. После этого
+                    «Базовый шаблон ОПиУ» добавит только недостающие статьи — второго дерева рядом с вашим не будет.
+                    Выбрать можно статью без кода того же типа.
+                </p>
+                <div class="row g-3 mb-3">
+                    <div class="col-auto">
+                        <div class="text-secondary">Уже есть по коду</div>
+                        <div class="h2 mb-0">{{ mapping.matchedCount }} из {{ mapping.templateCount }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="text-secondary">Не сопоставлено</div>
+                        <div class="h2 mb-0">{{ mapping.rows|length }}</div>
+                    </div>
+                </div>
+
+                {% if mapping.rows is empty %}
+                    <div class="alert alert-secondary mb-0">Все статьи шаблона уже есть у компании — сопоставлять нечего.</div>
+                {% else %}
+                    <form method="post" action="{{ path('pl_category_template_mapping_save') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('pl-template-mapping' ~ companyId) }}">
+                        <div class="table-responsive mb-3">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Статья шаблона</th>
+                                        <th>Код</th>
+                                        <th>Ваша статья</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in mapping.rows %}
+                                        <tr>
+                                            <td>{{ row.path }}</td>
+                                            <td><code>{{ row.code }}</code></td>
+                                            <td>
+                                                {% if row.candidates is empty %}
+                                                    <span class="text-secondary">нет статей этого типа без кода — шаблон её добавит</span>
+                                                {% else %}
+                                                    <select class="form-select" name="map[{{ row.code }}]" aria-label="Ваша статья для {{ row.path }}">
+                                                        <option value="">— не сопоставлять, шаблон добавит —</option>
+                                                        {% for candidate in row.candidates %}
+                                                            <option value="{{ candidate.id }}"{{ candidate.id == row.suggestedId ? ' selected' : '' }}>{{ candidate.path }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Сопоставить</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
