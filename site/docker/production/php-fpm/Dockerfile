@@ -14,9 +14,8 @@ ENV MAKEFLAGS="-j1"
 
 RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
+    && docker-php-ext-install pdo_pgsql bcmath zip gd
 
 # Install ext-redis for the build stage so that Composer sees the extension
 RUN apk add --no-cache $PHPIZE_DEPS \
@@ -48,9 +47,8 @@ RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetyp
     && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
+    && docker-php-ext-install pdo_pgsql bcmath zip gd
 
 ENV TZ=Europe/Moscow
 
@@ -65,6 +63,12 @@ RUN mv $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini
 COPY ./docker/common/php/conf.d /usr/local/etc/php/conf.d
 COPY ./docker/common/php/php-fpm.d /usr/local/etc/php-fpm.d
 COPY ./docker/production/php/conf.d /usr/local/etc/php/conf.d
+
+# opcache — штатный из образа (собран с JIT под заголовки PHP). Пересборка с
+# --disable-opcache-jit давала opcache.so без zend_jit_status: модуль не
+# загружался, FPM работал без opcache. JIT выключен в opcache.ini.
+RUN php -d display_startup_errors=1 -r 'exit(extension_loaded("Zend OPcache") ? 0 : 1);' \
+    && ! php -v 2>&1 | grep -Fq 'Failed loading Zend extension'
 
 WORKDIR /app
 
