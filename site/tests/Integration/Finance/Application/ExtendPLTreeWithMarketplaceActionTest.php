@@ -237,13 +237,24 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     {
         yield 'чистая прибыль с умножением' => ['NET_PROFIT', 'EBITDA + BELOW_EBITDA_TOTAL + BELOW_EBITDA_INCOME_TOTAL + REV_SALES_TOTAL * PROMO_TOTAL'];
         yield 'группа с формулой' => ['OVERHEAD_TOTAL', 'OVERHEAD_PROD_TOTAL * 2'];
+        // Внешнее ревью: своя группа с формулой внутри операционных расходов — обход по дереву компании.
+        yield 'своя группа с формулой' => ['', 'OVERHEAD_PROD_TOTAL * REV_SALES_TOTAL'];
     }
 
     #[DataProvider('changedPathTotals')]
     public function testChangedTotalOnPathToNetProfitRefuses(string $code, string $formula): void
     {
         $company = $this->universalCompany();
-        $this->connection->update('pl_categories', ['formula' => $formula], ['company_id' => (string) $company->getId(), 'code' => $code]);
+        if ('' === $code) {
+            $overhead = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $overhead);
+            $own = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($overhead)->withName('Своя надбавка')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $own->setFormula($formula);
+            $this->em->persist($own);
+            $this->em->flush();
+        } else {
+            $this->connection->update('pl_categories', ['formula' => $formula], ['company_id' => (string) $company->getId(), 'code' => $code]);
+        }
 
         $this->expectException(PLTreeExtensionException::class);
         $this->expectExceptionMessage('изменили вручную');

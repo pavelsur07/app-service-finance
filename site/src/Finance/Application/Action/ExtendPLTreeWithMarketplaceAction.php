@@ -192,14 +192,10 @@ final readonly class ExtendPLTreeWithMarketplaceAction
      */
     private function assertPathToNetProfitIsTemplate(string $companyId, array $nodes): void
     {
-        $byCode = [];
-        $children = [];
+        $template = [];
         foreach ($nodes as $node) {
             if (null !== $node->code) {
-                $byCode[$node->code] = $node;
-                if (null !== $node->parent?->code) {
-                    $children[$node->parent->code][] = $node->code;
-                }
+                $template[$node->code] = $node->formula;
             }
         }
         $universal = [];
@@ -207,33 +203,45 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             $universal[(string) $node->code] = $node->formula;
         }
 
-        $path = [];
-        $queue = ['NET_PROFIT'];
-        while ([] !== $queue) {
-            $code = array_shift($queue);
-            $node = $byCode[$code] ?? null;
-            if (null === $node || isset($path[$code]) || PLCategoryType::LEAF_INPUT === $node->type) {
-                continue;
+        // Обход по настоящему дереву компании: свои группы и статьи без кода тоже на пути.
+        $rows = $this->em->getConnection()->fetchAllAssociative('SELECT id, parent_id, code, name, type, formula FROM pl_categories WHERE company_id = ?', [$companyId]);
+        $byCode = $children = [];
+        foreach ($rows as $row) {
+            if (null !== $row['code']) {
+                $byCode[(string) $row['code']] = $row;
             }
-            $path[$code] = $node;
-            if (null !== $node->formula && '' !== trim($node->formula)) {
-                preg_match_all('/[A-Z][A-Z0-9_]*/', $node->formula, $terms);
-                $queue = [...$queue, ...$terms[0]];
-            } else {
-                $queue = [...$queue, ...($children[$code] ?? [])];
+            if (null !== $row['parent_id']) {
+                $children[(string) $row['parent_id']][] = $row;
             }
         }
 
-        $rows = $this->em->getConnection()->fetchAllAssociative(
-            'SELECT code, name, formula FROM pl_categories WHERE company_id = ? AND code IN (?)',
-            [$companyId, array_keys($path)],
-            [ParameterType::STRING, ArrayParameterType::STRING],
-        );
-        foreach ($rows as $row) {
-            $node = $path[(string) $row['code']];
-            $allowed = [$node->formula, $universal[$node->code] ?? $node->formula];
-            if (!self::same($row['formula'], $allowed[0]) && !self::same($row['formula'], $allowed[1])) {
-                throw PLTreeExtensionException::formulaChanged((string) $row['name'], (string) $row['formula'], (string) ($universal[$node->code] ?? $node->formula));
+        $seen = [];
+        $queue = isset($byCode['NET_PROFIT']) ? [$byCode['NET_PROFIT']] : [];
+        while ([] !== $queue) {
+            $row = array_shift($queue);
+            $id = (string) $row['id'];
+            if (isset($seen[$id]) || PLCategoryType::LEAF_INPUT->value === $row['type']) {
+                continue;
+            }
+            $seen[$id] = true;
+            $formula = trim((string) $row['formula']);
+            $code = null !== $row['code'] ? (string) $row['code'] : null;
+            if ('' !== $formula) {
+                // Формула на пути — только шаблонная («Базового» или расширения) у статьи шаблона.
+                $allowed = null !== $code && \array_key_exists($code, $template) ? [$template[$code], $universal[$code] ?? $template[$code]] : [];
+                if (!\in_array(true, array_map(static fn (?string $f): bool => self::same($formula, $f) && '' !== trim((string) $f), $allowed), true)) {
+                    throw PLTreeExtensionException::formulaChanged((string) $row['name'], $formula, (string) (null !== $code ? ($universal[$code] ?? $template[$code] ?? '') : ''));
+                }
+                preg_match_all('/[A-Z][A-Z0-9_]*/', $formula, $terms);
+                foreach ($terms[0] as $term) {
+                    if (isset($byCode[$term])) {
+                        $queue[] = $byCode[$term];
+                    }
+                }
+            } else {
+                foreach ($children[$id] ?? [] as $child) {
+                    $queue[] = $child;
+                }
             }
         }
     }
