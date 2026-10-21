@@ -722,7 +722,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $this->em()->clear();
         $repository = $this->em()->getRepository(PLCategory::class);
         $all = $repository->findBy(['company' => $target]);
-        self::assertCount(70, $all);
+        self::assertCount(72, $all);
 
         $kept = $repository->find($ownStorageId);
         self::assertInstanceOf(PLCategory::class, $kept);
@@ -741,7 +741,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         ]);
         self::assertResponseRedirects('/pl-categories/');
         $this->em()->clear();
-        self::assertCount(70, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+        self::assertCount(72, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 
     /**

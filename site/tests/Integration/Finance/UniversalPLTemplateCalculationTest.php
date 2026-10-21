@@ -19,9 +19,10 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Итоги универсального дерева ОПиУ считаются тем же калькулятором отчёта, что и для любой
+ * Итоги шаблонных деревьев ОПиУ (универсального, а для статей ниже EBITDA — обоих) считаются тем же калькулятором отчёта, что и для любой
  * компании: формулы шаблона ссылаются на существующие коды, а знаки — от фактов (расход
  * отрицательный), поток статьи в расчёт не входит.
  */
@@ -86,14 +87,43 @@ final class UniversalPLTemplateCalculationTest extends IntegrationTestCase
         self::assertSame([1500.0, 1500.0, 1500.0], [$values['REV_TOTAL'], $values['GROSS_PROFIT'], $values['NET_PROFIT']]);
     }
 
+    /**
+     * Амортизация и налог на прибыль — ниже EBITDA: уменьшают чистую прибыль, EBITDA не меняют.
+     */
+    #[DataProvider('profiles')]
+    public function testDepreciationAndProfitTaxReduceNetProfitOnly(BusinessProfile $profile, int $categories): void
+    {
+        $company = $this->companyWithTree($profile, $categories);
+        $base = $this->calculate($company, ['REV_SALES' => 1000.0, 'REV_NOT_SPP' => 1000.0]);
+
+        $values = $this->calculate($company, ['REV_SALES' => 1000.0, 'REV_NOT_SPP' => 1000.0, 'BELOW_EBITDA_DEPRECIATION' => -10.0, 'BELOW_EBITDA_PROFIT_TAX' => -20.0]);
+
+        self::assertGreaterThan(0.0, $base['EBITDA']);
+        self::assertSame([$base['EBITDA'], -30.0, $base['NET_PROFIT'] - 30.0], [$values['EBITDA'], $values['BELOW_EBITDA_TOTAL'], $values['NET_PROFIT']]);
+    }
+
+    /**
+     * @return iterable<string, array{BusinessProfile, int}>
+     */
+    public static function profiles(): iterable
+    {
+        yield 'marketplace' => [BusinessProfile::MARKETPLACE, 72];
+        yield 'universal' => [BusinessProfile::UNIVERSAL, 44];
+    }
+
     private function companyWithUniversalTree(): Company
+    {
+        return $this->companyWithTree(BusinessProfile::UNIVERSAL, 44);
+    }
+
+    private function companyWithTree(BusinessProfile $profile, int $categories): Company
     {
         $owner = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
         $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->flush();
-        self::assertSame(42, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId(), profile: BusinessProfile::UNIVERSAL));
+        self::assertSame($categories, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId(), profile: $profile));
         $this->em->clear();
         $company = $this->em->find(Company::class, $company->getId());
         self::assertInstanceOf(Company::class, $company);

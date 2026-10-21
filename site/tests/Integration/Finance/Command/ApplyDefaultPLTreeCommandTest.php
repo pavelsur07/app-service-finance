@@ -25,17 +25,17 @@ final class ApplyDefaultPLTreeCommandTest extends IntegrationTestCase
         $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:apply-default'));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId]));
-        self::assertStringContainsString('plan (dry run): create 70, keep existing 0', $tester->getDisplay());
+        self::assertStringContainsString('plan (dry run): create 72, keep existing 0', $tester->getDisplay());
         self::assertSame(0, $this->categories($companyId));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
-        self::assertStringContainsString('applied: create 70, keep existing 0', $tester->getDisplay());
-        self::assertSame(70, $this->categories($companyId));
+        self::assertStringContainsString('applied: create 72, keep existing 0', $tester->getDisplay());
+        self::assertSame(72, $this->categories($companyId));
 
         $this->em->clear();
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
-        self::assertStringContainsString('applied: create 0, keep existing 70', $tester->getDisplay());
-        self::assertSame(70, $this->categories($companyId));
+        self::assertStringContainsString('applied: create 0, keep existing 72', $tester->getDisplay());
+        self::assertSame(72, $this->categories($companyId));
     }
 
     public function testUnknownCompanyFails(): void
