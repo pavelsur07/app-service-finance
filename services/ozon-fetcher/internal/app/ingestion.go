@@ -77,9 +77,15 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	client := ozon.NewClient(cfg.OzonBaseURL, &http.Client{Timeout: ozon.DefaultTimeout}, logger, now).WithLimiter(limits)
 	raw := rawstore.New(rawstore.NewS3Client(cfg.S3Endpoint, cfg.S3Region, cfg.S3AccessKeyID, cfg.S3SecretAccessKey), cfg.S3Bucket, cfg.MaxParallelConnections*2)
 	execCfg := executor.DefaultConfig()
+	execCfg.Location = loc
 	exec := executor.New(execCfg, tasks, raw, client, cabinets, logger, now, jitter, ozon.SleepContext)
 
-	plannerCfg := planner.Config{Location: loc, TailDays: cfg.TailDays, ReconcileWeekday: cfg.ReconcileWeekday, FinalDay: cfg.FinalDay}
+	ordersFrom, err := time.ParseInLocation(time.DateOnly, cfg.OrdersFrom, loc)
+	if err != nil {
+		return nil, fmt.Errorf("app: ORDERS_FROM: %w", err)
+	}
+	plannerCfg := planner.Config{Location: loc, TailDays: cfg.TailDays, ReconcileWeekday: cfg.ReconcileWeekday, FinalDay: cfg.FinalDay,
+		OrdersFrom: ordersFrom, OrdersTailDays: cfg.OrdersTailDays}
 	scheduler := planner.NewScheduler(plannerCfg, cfg.PlanEvery, tasks, cabinets, logger, now)
 
 	hostname, _ := os.Hostname()

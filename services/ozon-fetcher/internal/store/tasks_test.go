@@ -525,6 +525,120 @@ func TestRefreshPendingSurvivesLeaseExpiryAsFullReload(t *testing.T) {
 	assert.Empty(t, again.PageHashes)
 }
 
+func TestRefreshOfUnfinishedTaskWithAllPagesSavedReloadsAfterIt(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	// Последняя страница дня сохранена (курсор пуст), процесс упал до FinishTask.
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), ""))
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+
+	s.Refresh = true
+	ok, err := tasks.PlanOnce(ctx, "orders_tail", "2026-10-21", "ref-a", []TaskSpec{s})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// Попытка закрывает прежнюю загрузку по сохранённым страницам…
+	cont, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, []string{hash("p")}, cont.PageHashes)
+	_, err = tasks.FinishTask(ctx, cont.TaskKey, cont.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+
+	// …и проход хвоста не поглощён: окно заново.
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey))
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(3*time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, again.PageHashes)
+	assert.Empty(t, again.Cursor)
+	assert.Equal(t, 1, again.NextPageNo)
+}
+
+func TestRefreshOfPausedTaskKeepsProgressThroughPausesThenReloads(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-21", 5)
+	s.Refresh = true // «сегодня»: каждый проход планировщика
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+
+	pause := func(at time.Time, page int, cursor string) {
+		t.Helper()
+		task, err := claim(t, tasks, []string{"ref-a"}, at)
+		require.NoError(t, err)
+		assert.Equal(t, page, task.NextPageNo, "продолжение с сохранённой страницы")
+		require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(page), cursor))
+		_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", ErrorClass: "rate_limit", KeepCursor: true, NextRunAt: at}, at)
+		require.NoError(t, err)
+		// Часовой проход планировщика между паузами.
+		require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	}
+	pause(t0, 1, "c1")
+	pause(t0.Add(time.Hour), 2, "c2")
+	pause(t0.Add(2*time.Hour), 3, "c3")
+
+	last, err := claim(t, tasks, []string{"ref-a"}, t0.Add(3*time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, "c3", last.Cursor, "часовые проходы не сбрасывают прогресс")
+	assert.Equal(t, 4, last.NextPageNo)
+	_, err = tasks.FinishTask(ctx, last.TaskKey, last.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("day")}, t0.Add(3*time.Hour))
+	require.NoError(t, err)
+
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey), "отложенная перезагрузка — после итога")
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(3*time.Hour))
+	require.NoError(t, err)
+	assert.Empty(t, again.Cursor)
+	assert.Equal(t, 1, again.NextPageNo)
+	_, err = tasks.FinishTask(ctx, again.TaskKey, again.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("day")}, t0.Add(3*time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, StatusDone, status(t, tasks, s.TaskKey), "флаг одноразовый")
+}
+
+func TestRefreshOfPausedTaskWithCursorIsNotSwallowed(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", ErrorClass: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+
+	s.Refresh = true
+	ok, err := tasks.PlanOnce(ctx, "orders_tail", "2026-10-21", "ref-a", []TaskSpec{s})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	cont, err := claim(t, tasks, []string{"ref-a"}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, "cursor-1", cont.Cursor, "продолжение сохраняется")
+	_, err = tasks.FinishTask(ctx, cont.TaskKey, cont.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey), "проход хвоста не поглощён продолжением")
+}
+
+func TestPlainUpsertKeepsCursorOfPausedTask(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), "cursor-1"))
+	_, err = tasks.ReleaseExpired(ctx, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, "cursor-1", again.Cursor, "обычная постановка не сбрасывает продолжение")
+	assert.Equal(t, 2, again.NextPageNo)
+}
+
 func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

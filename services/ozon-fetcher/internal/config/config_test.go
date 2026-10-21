@@ -154,7 +154,7 @@ func TestLoadMaxParallel(t *testing.T) {
 
 func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 	clear := func(t *testing.T) {
-		for _, k := range []string{"TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
+		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
 			t.Setenv(k, "")
 		}
 	}
@@ -167,6 +167,9 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		if cfg.TailDays != 3 || cfg.FinalDay != 10 || cfg.ReconcileWeekday != time.Monday || cfg.PlanEvery != time.Hour {
 			t.Errorf("defaults = %+v", cfg)
 		}
+		if cfg.OrdersFrom != "2026-10-18" || cfg.OrdersTailDays != 30 {
+			t.Errorf("orders defaults = %q %d", cfg.OrdersFrom, cfg.OrdersTailDays)
+		}
 		if cfg.OzonBaseURL != "https://api-seller.ozon.ru" || cfg.IngestionEnabled() {
 			t.Errorf("ozon/ingestion = %q %v", cfg.OzonBaseURL, cfg.IngestionEnabled())
 		}
@@ -177,6 +180,10 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		"weekday 7":        {"RECONCILE_WEEKDAY", "7"},
 		"plan every short": {"PLAN_EVERY", "10s"},
 		"ozon url":         {"OZON_BASE_URL", "api-seller.ozon.ru"},
+		"orders from bad":  {"ORDERS_FROM", "18.10.2026"},
+		"orders from next": {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
+		"orders tail big":  {"ORDERS_TAIL_DAYS", "61"},
+		"orders tail zero": {"ORDERS_TAIL_DAYS", "0"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			clear(t)
@@ -186,6 +193,29 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 			}
 		})
 	}
+	t.Run("orders from today in Moscow", func(t *testing.T) {
+		clear(t)
+		loc, err := time.LoadLocation("Europe/Moscow")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("ORDERS_FROM", time.Now().In(loc).Format(time.DateOnly))
+		if _, err := Load(); err != nil {
+			t.Fatalf("today (MSK) must be accepted: %v", err)
+		}
+	})
+	t.Run("orders from env", func(t *testing.T) {
+		clear(t)
+		t.Setenv("ORDERS_FROM", "2026-10-01")
+		t.Setenv("ORDERS_TAIL_DAYS", "1")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.OrdersFrom != "2026-10-01" || cfg.OrdersTailDays != 1 {
+			t.Errorf("orders = %q %d", cfg.OrdersFrom, cfg.OrdersTailDays)
+		}
+	})
 	t.Run("ingestion needs db and s3", func(t *testing.T) {
 		clear(t)
 		t.Setenv("SYMFONY_INTERNAL_BASE_URL", "http://site-nginx")

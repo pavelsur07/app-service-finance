@@ -1,5 +1,13 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-21) — ресурсы отправлений
+
+- Новые значения `resource_types` у seller: `ozon.orders.fbo`, `ozon.orders.fbs`
+  (`/v3/posting/fbo/list`, `/v4/posting/fbs/list`). Выдаются не всем кабинетам с
+  seller, а по списку компаний в Symfony (`ozon_fetcher.orders_companies`) —
+  поле по-прежнему выводимое, сервис грузит только объявленные ресурсы.
+  Схема не менялась (аддитивно).
+
 ## Правка проекта (2026-10-17, до утверждения)
 
 - Пример `resource_types` — `ozon.finance.accrual-by-day` вместо

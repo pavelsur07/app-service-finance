@@ -142,6 +142,9 @@ type fakeOzon struct {
 	singleErr  error
 	creds      []ozon.Credentials
 	block      chan struct{} // FetchAccrualTypes ждёт закрытия или отмены
+
+	postingErr   error
+	postingCalls []postingCall
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {
@@ -183,6 +186,36 @@ func (f *fakeOzon) FetchRealization(_ context.Context, _ ozon.Credentials, _ str
 
 func (f *fakeOzon) FetchMutualSettlement(_ context.Context, _ ozon.Credentials, _ string, _, _ int, _ ozon.ReportPoll, _ func(context.Context, time.Duration) error) (ozon.Page, error) {
 	return f.singlePage, f.singleErr
+}
+
+// FetchPostingList — те же страницы по курсорам, что у by-day; ошибка — postingErr.
+func (f *fakeOzon) FetchPostingList(_ context.Context, creds ozon.Credentials, _ string, scheme ozon.PostingScheme, w ozon.PostingWindow, cursor string, firstPageNo int, onPage ozon.PageHandler) error {
+	f.creds = append(f.creds, creds)
+	f.postingCalls = append(f.postingCalls, postingCall{scheme: scheme, window: w, cursor: cursor, firstPage: firstPageNo})
+	if f.postingErr != nil {
+		return f.postingErr
+	}
+	for no := firstPageNo; ; no++ {
+		p, ok := f.pages[cursor]
+		if !ok {
+			return f.byDayErr
+		}
+		p.No = no
+		if err := onPage(p); err != nil {
+			return err
+		}
+		if p.Cursor == "" {
+			return nil
+		}
+		cursor = p.Cursor
+	}
+}
+
+type postingCall struct {
+	scheme    ozon.PostingScheme
+	window    ozon.PostingWindow
+	cursor    string
+	firstPage int
 }
 
 type fakeRefresher struct{ calls int }

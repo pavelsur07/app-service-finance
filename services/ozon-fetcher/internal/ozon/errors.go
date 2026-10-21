@@ -44,6 +44,15 @@ func (e *APIError) Error() string {
 	if e.Status == 0 {
 		return fmt.Sprintf("ozon: %s %s: %v", e.Class, e.Endpoint, e.Err)
 	}
+	if e.Message != "" {
+		// Текст ошибки Ozon (не тело целиком, до messageLimit): без него отказ
+		// метода в журнале неотличим от прочих 400 (#439, #442).
+		return fmt.Sprintf("ozon: %s %s: HTTP %d code %d: %s", e.Class, e.Endpoint, e.Status, e.Code, e.Message)
+	}
+	if e.Err != nil {
+		// Причина проверки формы ответа (invalid_response, not_ready при 200).
+		return fmt.Sprintf("ozon: %s %s: HTTP %d: %v", e.Class, e.Endpoint, e.Status, e.Err)
+	}
 	return fmt.Sprintf("ozon: %s %s: HTTP %d code %d", e.Class, e.Endpoint, e.Status, e.Code)
 }
 

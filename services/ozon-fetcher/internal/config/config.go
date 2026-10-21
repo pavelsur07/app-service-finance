@@ -43,6 +43,9 @@ type Config struct {
 	ReconcileWeekday time.Weekday
 	FinalDay         int
 	PlanEvery        time.Duration
+	// Отправления: первый день (YYYY-MM-DD, МСК) и хвост перезагрузки.
+	OrdersFrom     string
+	OrdersTailDays int
 
 	// GlitchTip (Sentry-протокол): пустой DSN — ошибки только в лог.
 	SentryDSN         string
@@ -71,6 +74,8 @@ func Load() (Config, error) {
 		ReconcileWeekday:        time.Monday,
 		FinalDay:                10,
 		PlanEvery:               time.Hour,
+		OrdersFrom:              "2026-10-18",
+		OrdersTailDays:          30,
 		SentryDSN:               os.Getenv("SENTRY_DSN"),
 		SentryRelease:           os.Getenv("SENTRY_RELEASE"),
 		SentryEnvironment:       envOr("SENTRY_ENVIRONMENT", "prod"),
@@ -152,6 +157,7 @@ func loadPlanner(cfg *Config) error {
 	}{
 		{"TAIL_DAYS", 0, 31, &cfg.TailDays},
 		{"FINAL_DAY", 1, 28, &cfg.FinalDay},
+		{"ORDERS_TAIL_DAYS", 1, 60, &cfg.OrdersTailDays},
 	}
 	for _, v := range ints {
 		raw := os.Getenv(v.name)
@@ -170,6 +176,19 @@ func loadPlanner(cfg *Config) error {
 			return fmt.Errorf("config: RECONCILE_WEEKDAY must be 0..6 (0 = Sunday), got %q", raw)
 		}
 		cfg.ReconcileWeekday = time.Weekday(n)
+	}
+	if raw := os.Getenv("ORDERS_FROM"); raw != "" {
+		// День МСК, как у планировщика: сравниваются календарные даты.
+		loc, locErr := time.LoadLocation("Europe/Moscow")
+		if locErr != nil {
+			return fmt.Errorf("config: load Europe/Moscow: %w", locErr)
+		}
+		d, err := time.ParseInLocation(time.DateOnly, raw, loc)
+		today := time.Now().In(loc).Format(time.DateOnly)
+		if err != nil || d.Format(time.DateOnly) > today {
+			return fmt.Errorf("config: ORDERS_FROM must be a past date YYYY-MM-DD, got %q", raw)
+		}
+		cfg.OrdersFrom = raw
 	}
 	if raw := os.Getenv("PLAN_EVERY"); raw != "" {
 		d, err := time.ParseDuration(raw)

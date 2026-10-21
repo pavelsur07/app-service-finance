@@ -39,6 +39,15 @@ final readonly class CoverageHeatmapBuilder
         'ozon.finance.accrual-types' => ['Типы начислений (справочник)', self::STEP_REF],
     ];
 
+    /**
+     * Отчёты, которые включаются по кабинетам постепенно: строка — только при
+     * задачах в месяце, дни до первой задачи — не пропуск (отчёт ещё не грузился).
+     */
+    private const OPTIONAL_RESOURCES = [
+        'ozon.orders.fbo' => ['Заказы FBO', self::STEP_DAY],
+        'ozon.orders.fbs' => ['Заказы FBS', self::STEP_DAY],
+    ];
+
     private const STATUS_LABELS = [
         'running' => 'в работе',
         'pending' => 'в очереди',
@@ -84,7 +93,8 @@ final readonly class CoverageHeatmapBuilder
         $expected = 0;
         foreach ($order as $resourceType) {
             $cells = $byResource[$resourceType] ?? [];
-            [$title, $step] = self::RESOURCES[$resourceType] ?? [$resourceType, $this->guessStep($cells)];
+            [$title, $step] = self::RESOURCES[$resourceType] ?? self::OPTIONAL_RESOURCES[$resourceType] ?? [$resourceType, $this->guessStep($cells)];
+            $firstLoaded = isset(self::OPTIONAL_RESOURCES[$resourceType]) && [] !== $cells ? min(array_map('strval', array_keys($cells))) : null;
             $perDay = self::STEP_DAY === $step;
             $built = [];
             /** @var list<ServiceCoverageMonthCell|null> $periods наступившие периоды строки */
@@ -94,7 +104,7 @@ final readonly class CoverageHeatmapBuilder
                     $key = sprintf('%s-%02d', $month->month, $day->day);
                     $isFuture = $key >= $today;
                     $built[] = $this->cell($title, $this->dayLabel($key), $cells[$key] ?? null, $isFuture);
-                    if (!$isFuture) {
+                    if (!$isFuture && (null === $firstLoaded || $key >= $firstLoaded)) {
                         $periods[] = $cells[$key] ?? null;
                     }
                 }

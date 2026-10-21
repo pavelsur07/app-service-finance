@@ -24,19 +24,35 @@ const (
 	KindTypes     = "accrual_types"
 	KindReconcile = "reconcile_m1"
 	KindFinal     = "final_m2"
+	KindOrders    = "orders_tail"
 )
+
+// DefaultOrdersFrom — первый день загрузки отправлений: день перекрытия с
+// последней успешной загрузкой Symfony (problem.md §1, 19.10 09:35 МСК).
+const DefaultOrdersFrom = "2026-10-18"
+
+// DefaultOrdersTailDays — сколько дней перед сегодня перечитываются раз в
+// сутки: так видны смены статусов (доставка, отмена) — фильтр по дате смены
+// статуса Ozon игнорирует.
+const DefaultOrdersTailDays = 30
+
+// ordersResources — списки отправлений (executor.postingResources).
+var ordersResources = []string{executor.ResourceOrdersFBO, executor.ResourceOrdersFBS}
 
 // Config — параметры окон загрузки.
 type Config struct {
 	Location         *time.Location // Europe/Moscow
 	TailDays         int            // вчера + TailDays предыдущих
 	ReconcileWeekday time.Weekday
-	FinalDay         int // число месяца финальной перезагрузки M-2
+	FinalDay         int       // число месяца финальной перезагрузки M-2
+	OrdersFrom       time.Time // первый день отправлений (полночь МСК)
+	OrdersTailDays   int       // дней перед сегодня, перечитываемых раз в сутки (смены статусов)
 }
 
 // DefaultConfig — значения плана.
 func DefaultConfig(loc *time.Location) Config {
-	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10}
+	from, _ := time.ParseInLocation(time.DateOnly, DefaultOrdersFrom, loc)
+	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10, OrdersFrom: from, OrdersTailDays: DefaultOrdersTailDays}
 }
 
 // Refresh — проход с перезагрузкой кабинета, выполняемый один раз за RunDate.
@@ -106,7 +122,37 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAccrualTypes, executor.PeriodRef, PriorityRoutine, false, now))
 			types.Specs = append(types.Specs, spec(cab.Ref, executor.ResourceAccrualTypes, executor.PeriodRef, PriorityRoutine, true, now))
 		}
-		for _, r := range []Refresh{tail, types, reconcile, final} {
+		orders := Refresh{Kind: KindOrders, RunDate: runDate, ConnectionRef: cab.Ref}
+		// Отправления: догон с OrdersFrom (не глубже M-2), сегодня — каждый
+		// проход, хвост — раз в сутки.
+		ordersFrom := cfg.OrdersFrom.In(cfg.Location)
+		ordersFrom = time.Date(ordersFrom.Year(), ordersFrom.Month(), ordersFrom.Day(), 0, 0, 0, 0, cfg.Location)
+		if ordersFrom.Before(m2Start) {
+			ordersFrom = m2Start
+		}
+		for _, resource := range ordersResources {
+			if !cab.Supports(resource) {
+				continue
+			}
+			for d := ordersFrom; d.Before(today); d = d.AddDate(0, 0, 1) {
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, false, now))
+			}
+			if !today.Before(ordersFrom) {
+				// Обычный приоритет: сегодняшние заказы не опережают финансовые
+				// отчёты в общей очереди кабинета.
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, today.Format(time.DateOnly), PriorityRoutine, true, now))
+			}
+			// Вчера перечитывается всегда: последний проход дня не видит
+			// отправлений до полуночи.
+			for i := 1; i <= max(cfg.OrdersTailDays, 1); i++ {
+				d := today.AddDate(0, 0, -i)
+				if d.Before(ordersFrom) {
+					break
+				}
+				orders.Specs = append(orders.Specs, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityRoutine, true, now))
+			}
+		}
+		for _, r := range []Refresh{tail, types, reconcile, final, orders} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
 			}
