@@ -75,7 +75,8 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertSame(['seller', 'performance'], array_keys($cabinet['credentials']));
         self::assertSame(['client_id' => 'seller-client-a', 'api_key' => 'seller-key-a'], $cabinet['credentials']['seller']);
         self::assertSame(['client_id' => 'perf-client-a', 'client_secret' => 'perf-secret-a'], $cabinet['credentials']['performance']);
-        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES], $cabinet['resource_types']);
+        // Отправления — всем кабинетам с ключом seller (`ozon_fetcher.orders_companies: ['*']`).
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ORDERS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES], $cabinet['resource_types']);
         self::assertNotFalse(\DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, (string) $cabinet['updated_at']));
 
         self::assertSame(['client_id' => 'legacy-client', 'api_key' => 'legacy-plain-key'], $byRef[self::SELLER_LEGACY]['credentials']['seller']);
