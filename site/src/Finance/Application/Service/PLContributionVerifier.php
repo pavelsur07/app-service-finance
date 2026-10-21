@@ -12,8 +12,7 @@ use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\PLCategoryRepository;
 
 /**
- * Проверка расчётом: каждая статья ввода из `$counted` входит в чистую прибыль (NET_PROFIT) ровно
- * один раз с весом 1, статьи из `$excluded` — ни разу. Считает тем же PlReportCalculator, что и
+ * Проверка расчётом: вклад каждой статьи ввода в каждый из итогов — тот, что задан (по шаблону). Считает тем же PlReportCalculator, что и
  * отчёт, по дереву компании в текущем состоянии базы и EntityManager: по прогону на статью с фактом 1
  * у неё одной (около двадцати прогонов при применении — дёшево по сравнению с неверными итогами).
  *
@@ -26,19 +25,24 @@ final readonly class PLContributionVerifier
     }
 
     /**
-     * @param list<string> $counted
-     * @param list<string> $excluded
+     * @param array<string, array<string, float>> $expected статья ввода → итог → ожидаемый вклад (нет итога — 0)
+     * @param list<string> $totals итоги, по которым сверяется вклад
      *
-     * @return list<string> коды, вклад которых не тот
+     * @return list<string> статьи, вклад которых в какой-то итог не тот
      */
-    public function offenders(Company $company, array $counted, array $excluded): array
+    public function offenders(Company $company, array $expected, array $totals): array
     {
         // По одной статье и с точным сравнением: суммарный прогон обманывается весами (3 и 0 вместо
         // 1 и 1 дают ту же сумму), а допуск пропустил бы вес 0,9.
         $offenders = [];
-        foreach ([...array_map(static fn (string $c): array => [$c, 1.0], $counted), ...array_map(static fn (string $c): array => [$c, 0.0], $excluded)] as [$code, $want]) {
-            if (abs($this->netProfit($company, [$code => 1.0]) - $want) > 1e-9) {
-                $offenders[] = $code;
+        foreach ($expected as $code => $want) {
+            $actual = $this->totals($company, [$code => 1.0], $totals);
+            foreach ($totals as $total) {
+                if (abs(($actual[$total] ?? 0.0) - ($want[$total] ?? 0.0)) > 1e-9) {
+                    $offenders[] = $code;
+
+                    break;
+                }
             }
         }
 
@@ -47,8 +51,11 @@ final readonly class PLContributionVerifier
 
     /**
      * @param array<string, float> $facts
+     * @param list<string> $totals
+     *
+     * @return array<string, float>
      */
-    private function netProfit(Company $company, array $facts): float
+    private function totals(Company $company, array $facts, array $totals): array
     {
         $calculator = new PlReportCalculator($this->categories, new class($facts) implements FactsProviderInterface {
             /** @param array<string, float> $facts */
@@ -62,12 +69,13 @@ final readonly class PLContributionVerifier
             }
         });
         $period = new PlReportPeriod(new \DateTimeImmutable('2000-01-01'), new \DateTimeImmutable('2000-01-31'), 'check');
+        $values = [];
         foreach ($calculator->calculate($company, $period)->rows as $row) {
-            if ('NET_PROFIT' === $row->code) {
-                return (float) $row->rawValue;
+            if (\in_array($row->code, $totals, true)) {
+                $values[(string) $row->code] = (float) $row->rawValue;
             }
         }
 
-        return 0.0;
+        return $values;
     }
 }

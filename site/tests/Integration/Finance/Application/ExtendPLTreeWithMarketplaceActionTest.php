@@ -301,6 +301,8 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         yield 'дробный вес 0,9' => ['fractional'];
         // Внешнее ревью: общая с «Базовым» статья, на которую ложится логистика МП, с весом 0.
         yield 'доставка с весом 0' => ['shared_zero'];
+        // Внешнее ревью: «Производственные» внутри себестоимости — сертификация уменьшала бы валовую прибыль.
+        yield '«Производственные» в себестоимости' => ['prod_in_cogs'];
     }
 
     #[DataProvider('brokenTrees')]
@@ -308,7 +310,11 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     {
         $company = $this->universalCompany();
         $id = (string) $company->getId();
-        if ('shared_zero' === $case) {
+        if ('prod_in_cogs' === $case) {
+            $cogsId = $this->connection->fetchOne("SELECT id FROM pl_categories WHERE company_id = ? AND code = 'COGS_TOTAL'", [$id]);
+            $this->connection->update('pl_categories', ['parent_id' => $cogsId], ['company_id' => $id, 'code' => 'OVERHEAD_PROD_TOTAL']);
+            $expected = 'OVERHEAD_PROD_CERT';
+        } elseif ('shared_zero' === $case) {
             $this->connection->update('pl_categories', ['weight_in_parent' => '0.0000'], ['company_id' => $id, 'code' => 'COGS_DELIVERY']);
             $expected = 'COGS_DELIVERY';
         } elseif ('prod_root' === $case) {

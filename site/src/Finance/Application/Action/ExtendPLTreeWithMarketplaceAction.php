@@ -39,8 +39,8 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     /** Коды, по которым дерево опознаётся как «Базовое»: их нет в маркетплейсном шаблоне. */
     private const UNIVERSAL_MARKERS = ['GROSS_PROFIT', 'REV_SALES_TOTAL'];
 
-    /** Вне чистой прибыли по шаблону: продажи с СПП (справочно) и распределение прибыли. */
-    private const OUTSIDE_NET_PROFIT = ['REV_WITH_SPP', 'PROFIT_DISTR_TOTAL'];
+    /** Итоги, вклад в которые сверяется расчётом после дополнения. */
+    private const CHECKED_TOTALS = ['REV_TOTAL', 'GROSS_PROFIT', 'EBITDA', 'NET_PROFIT'];
 
     public function __construct(
         private ImportPLCategoryTreeAction $import,
@@ -94,12 +94,12 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             $this->em->flush();
             // Граф после дополнения (созданные статьи и записанные формулы) — ещё раз до фиксации.
             $this->assertPathToNetProfitIsTemplate($companyId, $nodes);
-            // Последняя страховка — расчётом по собранному дереву: каждая статья маркетплейса входит в
-            // чистую прибыль ровно один раз, «Выручка с СПП» — ни разу. Вручную перестроенное дерево
-            // (группа вынесена, вес 0, тип изменён) иначе дало бы неверные итоги молча.
-            [$counted, $excluded, $names] = $this->marketplaceLeaves($nodes);
+            // Последняя страховка — расчётом по собранному дереву: вклад каждой статьи ввода шаблона в
+            // «Выручку», валовую прибыль, EBITDA и чистую прибыль — как по шаблону. Вручную перестроенное
+            // дерево (группа вынесена или перенесена, вес, тип) иначе дало бы неверные итоги молча.
+            [$expected, $names] = $this->templateContributions($nodes);
             $company = $this->companies->findById($companyId) ?? throw new \DomainException('Целевая компания не найдена.');
-            $offenders = $this->verifier->offenders($company, $counted, $excluded);
+            $offenders = $this->verifier->offenders($company, $expected, self::CHECKED_TOTALS);
             if ([] !== $offenders) {
                 throw PLTreeExtensionException::totalsBroken(array_map(static fn (string $code): string => \sprintf('«%s» (%s)', $names[$code], $code), $offenders));
             }
@@ -295,35 +295,77 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     }
 
     /**
-     * Статьи ввода шаблона: входящие в чистую прибыль и вне её (под «Выручкой с СПП» и
-     * «Распределением прибыли» — как в шаблонах).
+     * Ожидаемый вклад каждой статьи ввода шаблона в проверяемые итоги — по самому шаблону: итоги на
+     * пути — суммы (подытог — потомки с весом, KPI — слагаемые формулы со знаком).
      *
      * @param list<PLCategoryTreeNode> $nodes
      *
-     * @return array{0: list<string>, 1: list<string>, 2: array<string, string>}
+     * @return array{0: array<string, array<string, float>>, 1: array<string, string>}
      */
-    private function marketplaceLeaves(array $nodes): array
+    private function templateContributions(array $nodes): array
     {
-        // Все статьи ввода шаблона, в том числе общие с «Базовым»: на доставку, эквайринг,
-        // себестоимость и банк тоже ложатся данные маркетплейса.
-        $counted = $excluded = $names = [];
+        $byCode = $children = $names = [];
         foreach ($nodes as $node) {
-            if (null === $node->code || PLCategoryType::LEAF_INPUT !== $node->type) {
+            if (null === $node->code) {
                 continue;
             }
-            $names[$node->code] = $node->name;
-            $informational = false;
-            for ($p = $node->parent; null !== $p; $p = $p->parent) {
-                $informational = $informational || \in_array($p->code, self::OUTSIDE_NET_PROFIT, true);
+            $byCode[$node->code] = $node;
+            if (null !== $node->parent?->code) {
+                $children[$node->parent->code][] = $node;
             }
-            if ($informational) {
-                $excluded[] = $node->code;
-            } else {
-                $counted[] = $node->code;
+            if (PLCategoryType::LEAF_INPUT === $node->type) {
+                $names[$node->code] = $node->name;
             }
         }
 
-        return [$counted, $excluded, $names];
+        $expected = array_fill_keys(array_keys($names), []);
+        foreach (self::CHECKED_TOTALS as $total) {
+            foreach ($this->coefficients($total, $byCode, $children) as $leaf => $k) {
+                if (0.0 !== $k) {
+                    $expected[$leaf][$total] = $k;
+                }
+            }
+        }
+
+        return [$expected, $names];
+    }
+
+    /**
+     * @param array<string, PLCategoryTreeNode> $byCode
+     * @param array<string, list<PLCategoryTreeNode>> $children
+     *
+     * @return array<string, float> статья ввода → коэффициент
+     */
+    private function coefficients(string $code, array $byCode, array $children): array
+    {
+        $node = $byCode[$code] ?? null;
+        if (null === $node) {
+            return [];
+        }
+        if (PLCategoryType::LEAF_INPUT === $node->type) {
+            return [$code => 1.0];
+        }
+        $result = [];
+        if (null !== $node->formula && '' !== trim($node->formula)) {
+            if (1 !== preg_match('/^\s*[A-Z][A-Z0-9_]*(\s*[+-]\s*[A-Z][A-Z0-9_]*)*\s*$/', $node->formula)) {
+                throw new \LogicException(\sprintf('Формула %s шаблона не сумма — проверка расчётом её не поддерживает.', $code));
+            }
+            preg_match_all('/([+-]?)\s*([A-Z][A-Z0-9_]*)/', $node->formula, $m, \PREG_SET_ORDER);
+            foreach ($m as [, $sign, $term]) {
+                foreach ($this->coefficients($term, $byCode, $children) as $leaf => $k) {
+                    $result[$leaf] = ($result[$leaf] ?? 0.0) + ('-' === $sign ? -$k : $k);
+                }
+            }
+
+            return $result;
+        }
+        foreach ($children[$code] ?? [] as $child) {
+            foreach ($this->coefficients((string) $child->code, $byCode, $children) as $leaf => $k) {
+                $result[$leaf] = ($result[$leaf] ?? 0.0) + $k * (float) $child->weightInParent;
+            }
+        }
+
+        return $result;
     }
 
     private static function same(?string $a, ?string $b): bool
