@@ -45,6 +45,8 @@ type fakeTasks struct {
 	authFailures int             // счётчик отказов кабинета подряд
 	pauses       []time.Duration // паузы, выданные RecordAuthFailure
 	stopErr      error
+	content      map[string][]store.RawObject // ресурс/период → страницы ревизии (ContentPages)
+	contentErr   error
 	controlHang  bool // SuspendConnection/StopResource ждут отмены контекста
 	extendHang   bool // ExtendLease ждёт отмены контекста
 }
@@ -109,6 +111,19 @@ func (f *fakeTasks) ResumeConnection(_ context.Context, ref string) error {
 	return nil
 }
 
+func (f *fakeTasks) ContentPages(_ context.Context, key store.TaskKey) ([]store.RawObject, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.contentErr != nil {
+		return nil, f.contentErr
+	}
+	pages, ok := f.content[key.ResourceType+"/"+key.PeriodKey]
+	if !ok {
+		return nil, store.ErrNoContent
+	}
+	return pages, nil
+}
+
 func (f *fakeTasks) StopResource(_ context.Context, resource, _ string) error {
 	if f.stopErr != nil {
 		return f.stopErr
@@ -145,6 +160,10 @@ type fakeOzon struct {
 
 	postingErr   error
 	postingCalls []postingCall
+
+	accrualErr       error
+	accrualFailAfter int
+	accrualCalls     [][]string
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {
@@ -209,6 +228,16 @@ func (f *fakeOzon) FetchPostingList(_ context.Context, creds ozon.Credentials, _
 		}
 		cursor = p.Cursor
 	}
+}
+
+// FetchAccrualPostings — эхо запрошенных номеров; ошибка — accrualErr, после accrualFailAfter вызовов.
+func (f *fakeOzon) FetchAccrualPostings(_ context.Context, creds ozon.Credentials, _ string, numbers []string) (ozon.Page, error) {
+	f.creds = append(f.creds, creds)
+	f.accrualCalls = append(f.accrualCalls, append([]string(nil), numbers...))
+	if f.accrualErr != nil && len(f.accrualCalls) > f.accrualFailAfter {
+		return ozon.Page{}, f.accrualErr
+	}
+	return ozon.Page{No: 1, Body: []byte(`{"posting_accruals":"` + strings.Join(numbers, ",") + `"}`), ContentType: "application/json"}, nil
 }
 
 type postingCall struct {

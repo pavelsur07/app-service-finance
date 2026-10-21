@@ -199,6 +199,10 @@ func TestPutAgainstS3(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, string(obj.Body), string(gunzip(t, raw)))
 	assert.Equal(t, stored.SHA256, got.Metadata["sha256"])
+
+	read, err := NewReader(client, bucket).Get(ctx, stored.URI, stored.SHA256)
+	require.NoError(t, err, "Reader читает записанное")
+	assert.Equal(t, string(obj.Body), string(read))
 }
 
 // envOr — локальный S3 (seaweedfs) принимает любые ключи.

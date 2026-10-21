@@ -639,6 +639,56 @@ func TestPlainUpsertKeepsCursorOfPausedTask(t *testing.T) {
 	assert.Equal(t, 2, again.NextPageNo)
 }
 
+func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+
+	_, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent, "до первой загрузки ревизии нет")
+
+	// Попытка 1: страница 1, затем 429; попытка 2 дочитывает страницу 2.
+	first, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p1 := RawObject{PageNo: 1, StorageURI: "s3://b/p1", SHA256: hash("p1"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, first.TaskKey, first.AttemptID, p1, "c1"))
+	_, err = tasks.FinishTask(ctx, first.TaskKey, first.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent, "промежуточный итог ревизию не создаёт")
+
+	second, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p2 := RawObject{PageNo: 2, StorageURI: "s3://b/p2", SHA256: hash("p2"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, second.TaskKey, second.AttemptID, p2, ""))
+	_, err = tasks.FinishTask(ctx, second.TaskKey, second.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev1")}, t0)
+	require.NoError(t, err)
+
+	pages, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	require.Len(t, pages, 2, "страницы обеих попыток")
+	assert.Equal(t, []string{"s3://b/p1", "s3://b/p2"}, []string{pages[0].StorageURI, pages[1].StorageURI})
+	assert.Equal(t, []int{1, 2}, []int{pages[0].PageNo, pages[1].PageNo})
+
+	// Перезагрузка в работе: пока не done, видна прежняя ревизия.
+	s.Refresh = true
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	third, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p3 := RawObject{PageNo: 1, StorageURI: "s3://b/p3", SHA256: hash("p3"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, third.TaskKey, third.AttemptID, p3, ""))
+	pages, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	assert.Len(t, pages, 2)
+	_, err = tasks.FinishTask(ctx, third.TaskKey, third.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev2")}, t0)
+	require.NoError(t, err)
+	pages, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	require.Len(t, pages, 1, "новая ревизия заменяет прежнюю")
+	assert.Equal(t, "s3://b/p3", pages[0].StorageURI)
+}
+
 func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

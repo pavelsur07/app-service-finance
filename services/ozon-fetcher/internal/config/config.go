@@ -46,6 +46,8 @@ type Config struct {
 	// Отправления: первый день (YYYY-MM-DD, МСК) и хвост перезагрузки.
 	OrdersFrom     string
 	OrdersTailDays int
+	// Начисления по отправлениям: дней перед сегодня, перечитываемых раз в сутки.
+	AccrualPostingsDays int
 
 	// GlitchTip (Sentry-протокол): пустой DSN — ошибки только в лог.
 	SentryDSN         string
@@ -76,6 +78,7 @@ func Load() (Config, error) {
 		PlanEvery:               time.Hour,
 		OrdersFrom:              "2026-10-18",
 		OrdersTailDays:          30,
+		AccrualPostingsDays:     45,
 		SentryDSN:               os.Getenv("SENTRY_DSN"),
 		SentryRelease:           os.Getenv("SENTRY_RELEASE"),
 		SentryEnvironment:       envOr("SENTRY_ENVIRONMENT", "prod"),
@@ -158,6 +161,7 @@ func loadPlanner(cfg *Config) error {
 		{"TAIL_DAYS", 0, 31, &cfg.TailDays},
 		{"FINAL_DAY", 1, 28, &cfg.FinalDay},
 		{"ORDERS_TAIL_DAYS", 1, 60, &cfg.OrdersTailDays},
+		{"ACCRUAL_POSTINGS_DAYS", 1, 90, &cfg.AccrualPostingsDays},
 	}
 	for _, v := range ints {
 		raw := os.Getenv(v.name)

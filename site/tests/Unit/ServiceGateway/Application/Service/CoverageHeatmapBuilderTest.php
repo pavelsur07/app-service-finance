@@ -38,6 +38,7 @@ final class CoverageHeatmapBuilderTest extends TestCase
         }
         self::assertArrayHasKey('ozon.orders.fbo', $rows);
         self::assertArrayNotHasKey('ozon.orders.fbs', $rows);
+        self::assertArrayNotHasKey('ozon.finance.accrual-postings', $rows);
         self::assertSame('Заказы FBO', $rows['ozon.orders.fbo']->title);
         self::assertTrue($rows['ozon.orders.fbo']->perDay);
         self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.orders.fbo']->cells[15]->state);
@@ -46,6 +47,16 @@ final class CoverageHeatmapBuilderTest extends TestCase
         $baseline = $builder->build(self::month('2026-10', []), self::now());
         self::assertSame($baseline->coveragePercent, 0);
         self::assertSame((int) floor(2 * 100 / (17 * 4 + 4 + 2)), $with->coveragePercent);
+    }
+
+    public function testAccrualPostingsRowIsLabelledWhenTasksExist(): void
+    {
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-10', [
+            self::cell('ozon.finance.accrual-postings', '2026-10-18', 1, 1),
+        ]), self::now());
+
+        $titles = array_column(array_map(static fn ($r) => ['t' => $r->title, 'r' => $r->resourceType], $heatmap->rows), 't', 'r');
+        self::assertSame('Начисления по отправлениям', $titles['ozon.finance.accrual-postings']);
     }
 
     private static function cell(string $resource, string $period, int $expected, int $done, int $running = 0, int $retryable = 0, int $permanent = 0, ?\DateTimeImmutable $lastSuccess = null): ServiceCoverageMonthCell

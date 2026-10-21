@@ -265,6 +265,39 @@ func (t *Tasks) FindObject(ctx context.Context, key TaskKey, sha256 string) (Raw
 	return obj, true, nil
 }
 
+// ErrNoContent — у задачи нет загруженной ревизии (ещё не было done).
+var ErrNoContent = errors.New("store: task has no loaded content")
+
+// ContentPages — объекты страниц текущей загруженной ревизии задачи по
+// порядку (content_pages последнего done). Нет ревизии — ErrNoContent;
+// страница без объекта — ошибка, не укороченный список.
+func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) ([]RawObject, error) {
+	var pages string
+	err := t.pool.QueryRow(ctx, `
+		SELECT content_pages FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && pages == "") {
+		return nil, ErrNoContent
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: content pages: %w", err)
+	}
+	hashes := strings.Split(pages, ",")
+	out := make([]RawObject, 0, len(hashes))
+	for i, h := range hashes {
+		obj, found, err := t.FindObject(ctx, key, h)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("store: content page %d of %s/%s/%s has no raw object", i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
+		}
+		obj.PageNo = i + 1
+		out = append(out, obj)
+	}
+	return out, nil
+}
+
 // RecordPage — страница и курсор следующей одной транзакцией.
 func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, obj RawObject, nextCursor string) error {
 	tx, err := t.pool.Begin(ctx)
@@ -337,6 +370,7 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 			refresh_pending = refresh_pending AND $5 NOT IN ('done', 'failed_permanent'),
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
+			content_pages = CASE WHEN $5 = 'done' THEN page_hashes ELSE content_pages END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,
 			last_error_class = NULLIF($9, ''),
 			last_success_at  = CASE WHEN $5 = 'done' THEN $10 ELSE last_success_at END,

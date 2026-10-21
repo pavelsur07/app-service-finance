@@ -43,6 +43,8 @@ func DefaultConfig() Config {
 			// отключён (docs/tasks/marketplace-data-ingestion/plan-ozon.md) — старт ниже обычного.
 			ozon.EndpointPostingFBOList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointPostingFBSList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Лимит метода не опубликован; объём мал (крупный кабинет ≈ 5 запросов на день).
+			ozon.EndpointAccrualPostings: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

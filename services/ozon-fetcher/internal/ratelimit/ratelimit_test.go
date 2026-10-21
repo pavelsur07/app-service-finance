@@ -373,7 +373,7 @@ func TestNoStormAlertConfiguredIsSilent(t *testing.T) {
 
 func TestDefaultConfigCoversPostingLists(t *testing.T) {
 	cfg := DefaultConfig()
-	for _, endpoint := range []string{ozon.EndpointPostingFBOList, ozon.EndpointPostingFBSList} {
+	for _, endpoint := range []string{ozon.EndpointPostingFBOList, ozon.EndpointPostingFBSList, ozon.EndpointAccrualPostings} {
 		limit, ok := cfg.Endpoints[endpoint]
 		require.True(t, ok, endpoint)
 		assert.LessOrEqual(t, limit.Start, 0.2, "ключ кабинета общий с Symfony — старт не выше 0,2 запроса/с")

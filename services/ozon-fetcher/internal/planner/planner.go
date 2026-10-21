@@ -20,12 +20,18 @@ const (
 
 // Виды проходов с перезагрузкой — не чаще одного раза за свою дату.
 const (
-	KindTail      = "tail"
-	KindTypes     = "accrual_types"
-	KindReconcile = "reconcile_m1"
-	KindFinal     = "final_m2"
-	KindOrders    = "orders_tail"
+	KindTail            = "tail"
+	KindTypes           = "accrual_types"
+	KindReconcile       = "reconcile_m1"
+	KindFinal           = "final_m2"
+	KindOrders          = "orders_tail"
+	KindAccrualPostings = "accrual_postings_tail"
 )
+
+// DefaultAccrualPostingsDays — сколько дней перед сегодня раз в сутки
+// перечитываются начисления по отправлениям: они копятся неделями
+// (доставка, возвраты).
+const DefaultAccrualPostingsDays = 45
 
 // DefaultOrdersFrom — первый день загрузки отправлений: день перекрытия с
 // последней успешной загрузкой Symfony (problem.md §1, 19.10 09:35 МСК).
@@ -47,12 +53,16 @@ type Config struct {
 	FinalDay         int       // число месяца финальной перезагрузки M-2
 	OrdersFrom       time.Time // первый день отправлений (полночь МСК)
 	OrdersTailDays   int       // дней перед сегодня, перечитываемых раз в сутки (смены статусов)
+	// AccrualPostingsDays — дней перед сегодня, в которых раз в сутки
+	// перечитываются начисления по отправлениям.
+	AccrualPostingsDays int
 }
 
 // DefaultConfig — значения плана.
 func DefaultConfig(loc *time.Location) Config {
 	from, _ := time.ParseInLocation(time.DateOnly, DefaultOrdersFrom, loc)
-	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10, OrdersFrom: from, OrdersTailDays: DefaultOrdersTailDays}
+	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10, OrdersFrom: from, OrdersTailDays: DefaultOrdersTailDays,
+		AccrualPostingsDays: DefaultAccrualPostingsDays}
 }
 
 // Refresh — проход с перезагрузкой кабинета, выполняемый один раз за RunDate.
@@ -152,7 +162,21 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				orders.Specs = append(orders.Specs, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityRoutine, true, now))
 			}
 		}
-		for _, r := range []Refresh{tail, types, reconcile, final, orders} {
+		accrualPostings := Refresh{Kind: KindAccrualPostings, RunDate: runDate, ConnectionRef: cab.Ref}
+		if cab.Supports(executor.ResourceAccrualPostings) {
+			// Дни отправлений до вчера: у сегодняшних начислений почти нет.
+			for d := ordersFrom; d.Before(today); d = d.AddDate(0, 0, 1) {
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityBackfill, false, now))
+			}
+			for i := 1; i <= cfg.AccrualPostingsDays; i++ {
+				d := today.AddDate(0, 0, -i)
+				if d.Before(ordersFrom) {
+					break
+				}
+				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityRoutine, true, now))
+			}
+		}
+		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
 			}
