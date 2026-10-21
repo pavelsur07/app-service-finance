@@ -14,6 +14,7 @@ use App\Finance\Application\DTO\ExtendPLTreeResult;
 use App\Finance\Application\DTO\PLFormulaChange;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLTreeExtensionException;
 use App\Finance\Facade\FinanceFacade;
@@ -251,6 +252,9 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     {
         yield '«Производственные» в корне' => ['prod_root'];
         yield 'вес продаж МП 0' => ['zero_weight'];
+        // Внешнее ревью: веса 3 и 0 у продаж и возвратов МП давали ту же сумму, что 1 и 1.
+        yield 'веса 3 и 0 компенсируют друг друга' => ['cancelling'];
+        yield 'дробный вес 0,9' => ['fractional'];
     }
 
     #[DataProvider('brokenTrees')]
@@ -266,9 +270,14 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
             self::assertInstanceOf(PLCategory::class, $rev);
             $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($rev)->withName('Выручка без СПП')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
             $sales = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Продажи без СПП')->withCode('REV_NOT_SPP')->build();
-            $sales->setWeightInParent('0.0000');
+            $sales->setWeightInParent(['zero_weight' => '0.0000', 'cancelling' => '3.0000', 'fractional' => '0.9000'][$case]);
             $this->em->persist($group);
             $this->em->persist($sales);
+            if ('cancelling' === $case) {
+                $returns = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Возвраты без СПП (−)')->withCode('REV_RETURNS')->withFlow(PLFlow::EXPENSE)->build();
+                $returns->setWeightInParent('0.0000');
+                $this->em->persist($returns);
+            }
             $this->em->flush();
             $expected = 'REV_NOT_SPP';
         }

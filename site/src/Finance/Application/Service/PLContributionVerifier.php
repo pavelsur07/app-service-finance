@@ -14,9 +14,8 @@ use App\Finance\Repository\PLCategoryRepository;
 /**
  * Проверка расчётом: каждая статья ввода из `$counted` входит в чистую прибыль (NET_PROFIT) ровно
  * один раз с весом 1, статьи из `$excluded` — ни разу. Считает тем же PlReportCalculator, что и
- * отчёт, по дереву компании в текущем состоянии базы и EntityManager, на подставных фактах: у статьи
- * i — 2^i, поэтому по одному итогу видно, что кто-то не вошёл, вошёл дважды или не с тем весом;
- * виновники уточняются прогоном по одной статье.
+ * отчёт, по дереву компании в текущем состоянии базы и EntityManager: по прогону на статью с фактом 1
+ * у неё одной (около двадцати прогонов при применении — дёшево по сравнению с неверными итогами).
  *
  * Калькулятор собирается здесь, а не внедряется: факты — данные проверки, а не источник отчёта.
  */
@@ -34,22 +33,10 @@ final readonly class PLContributionVerifier
      */
     public function offenders(Company $company, array $counted, array $excluded): array
     {
-        $all = [...$counted, ...$excluded];
-        $facts = [];
-        $expected = 0.0;
-        foreach ($all as $i => $code) {
-            $facts[$code] = (float) (2 ** $i);
-            if ($i < \count($counted)) {
-                $expected += $facts[$code];
-            }
-        }
-        if (abs($this->netProfit($company, $facts) - $expected) < 0.5) {
-            return [];
-        }
-
+        // По одной статье и с точным сравнением: суммарный прогон обманывается весами (3 и 0 вместо
+        // 1 и 1 дают ту же сумму), а допуск пропустил бы вес 0,9.
         $offenders = [];
-        foreach ($all as $i => $code) {
-            $want = $i < \count($counted) ? 1.0 : 0.0;
+        foreach ([...array_map(static fn (string $c): array => [$c, 1.0], $counted), ...array_map(static fn (string $c): array => [$c, 0.0], $excluded)] as [$code, $want]) {
             if (abs($this->netProfit($company, [$code => 1.0]) - $want) > 1e-9) {
                 $offenders[] = $code;
             }
