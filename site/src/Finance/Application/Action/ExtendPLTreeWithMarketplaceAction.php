@@ -10,7 +10,9 @@ use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DTO\ExtendPLTreeResult;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\DTO\PLFormulaChange;
+use App\Finance\Application\Service\PLContributionVerifier;
 use App\Finance\Entity\PLTemplateApplication;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLTemplateProfileMismatchException;
 use App\Finance\Exception\PLTreeExtensionException;
@@ -37,6 +39,9 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     /** Коды, по которым дерево опознаётся как «Базовое»: их нет в маркетплейсном шаблоне. */
     private const UNIVERSAL_MARKERS = ['GROSS_PROFIT', 'REV_SALES_TOTAL'];
 
+    /** Справочная группа: продажи с СПП в итоги не входят (как в маркетплейсном шаблоне). */
+    private const INFORMATIONAL_GROUP = 'REV_WITH_SPP';
+
     public function __construct(
         private ImportPLCategoryTreeAction $import,
         private DefaultPLCategoryTreeProvider $templates,
@@ -45,6 +50,7 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         private CompanyFacade $companies,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private PLContributionVerifier $verifier,
     ) {
     }
 
@@ -80,6 +86,20 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 if (1 !== $updated) {
                     throw PLTreeExtensionException::concurrentChange($change->name);
                 }
+                $category = $this->categories->findOneBy(['company' => $companyId, 'code' => $change->code]);
+                if (null !== $category) {
+                    $this->em->refresh($category);
+                }
+            }
+            $this->em->flush();
+            // Последняя страховка — расчётом по собранному дереву: каждая статья маркетплейса входит в
+            // чистую прибыль ровно один раз, «Выручка с СПП» — ни разу. Вручную перестроенное дерево
+            // (группа вынесена, вес 0, тип изменён) иначе дало бы неверные итоги молча.
+            [$counted, $excluded, $names] = $this->marketplaceLeaves($nodes);
+            $company = $this->companies->findById($companyId) ?? throw new \DomainException('Целевая компания не найдена.');
+            $offenders = $this->verifier->offenders($company, $counted, $excluded);
+            if ([] !== $offenders) {
+                throw PLTreeExtensionException::totalsBroken(array_map(static fn (string $code): string => \sprintf('«%s» (%s)', $names[$code], $code), $offenders));
             }
             if ([] !== $import->created) {
                 $this->em->persist(new PLTemplateApplication($companyId, BusinessProfile::UNIVERSAL, $this->templates->marketplaceExtensionVersion(), \count($import->created), PLTemplateApplicationSource::MARKETPLACE_EXTENSION, new \DateTimeImmutable()));
@@ -197,6 +217,40 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 throw PLTreeExtensionException::misplaced((string) $row['name'], (string) $row['code']);
             }
         }
+    }
+
+    /**
+     * Статьи ввода расширения, которых нет в «Базовом»: учитываемые в итогах и справочные (под
+     * «Выручкой с СПП» — как в маркетплейсном шаблоне, вне итогов).
+     *
+     * @param list<PLCategoryTreeNode> $nodes
+     *
+     * @return array{0: list<string>, 1: list<string>, 2: array<string, string>}
+     */
+    private function marketplaceLeaves(array $nodes): array
+    {
+        $universal = [];
+        foreach ($this->templates->nodes(BusinessProfile::UNIVERSAL) as $node) {
+            $universal[(string) $node->code] = true;
+        }
+        $counted = $excluded = $names = [];
+        foreach ($nodes as $node) {
+            if (null === $node->code || isset($universal[$node->code]) || PLCategoryType::LEAF_INPUT !== $node->type) {
+                continue;
+            }
+            $names[$node->code] = $node->name;
+            $informational = false;
+            for ($p = $node->parent; null !== $p; $p = $p->parent) {
+                $informational = $informational || self::INFORMATIONAL_GROUP === $p->code;
+            }
+            if ($informational) {
+                $excluded[] = $node->code;
+            } else {
+                $counted[] = $node->code;
+            }
+        }
+
+        return [$counted, $excluded, $names];
     }
 
     private static function same(?string $a, ?string $b): bool

@@ -240,6 +240,54 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         $this->extend($company, true);
     }
 
+    /**
+     * Регрессии (внешнее ревью): вручную перестроенное дерево, которое проверки мест не ловят, —
+     * «Производственные» вынесены в корень (сертификация не дошла бы до EBITDA), вес «Продаж без СПП»
+     * 0 (продажи МП не вошли бы в выручку). Сверка расчётом откатывает дополнение целиком.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function brokenTrees(): iterable
+    {
+        yield '«Производственные» в корне' => ['prod_root'];
+        yield 'вес продаж МП 0' => ['zero_weight'];
+    }
+
+    #[DataProvider('brokenTrees')]
+    public function testTreeWhereMarketplaceLinesWouldNotReachNetProfitIsRolledBack(string $case): void
+    {
+        $company = $this->universalCompany();
+        $id = (string) $company->getId();
+        if ('prod_root' === $case) {
+            $this->connection->update('pl_categories', ['parent_id' => null], ['company_id' => $id, 'code' => 'OVERHEAD_PROD_TOTAL']);
+            $expected = 'OVERHEAD_PROD_CERT';
+        } else {
+            $rev = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'REV_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $rev);
+            $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($rev)->withName('Выручка без СПП')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
+            $sales = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Продажи без СПП')->withCode('REV_NOT_SPP')->build();
+            $sales->setWeightInParent('0.0000');
+            $this->em->persist($group);
+            $this->em->persist($sales);
+            $this->em->flush();
+            $expected = 'REV_NOT_SPP';
+        }
+        $before = $this->categoryCount($company);
+        $this->em->clear();
+
+        try {
+            $this->extend($company, false);
+            self::fail('Дерево, где статьи МП не дошли бы до чистой прибыли, не должно дополняться');
+        } catch (PLTreeExtensionException $e) {
+            self::assertStringContainsString('не вошли бы в чистую прибыль', $e->getMessage());
+            self::assertStringContainsString($expected, $e->getMessage());
+        }
+
+        self::assertSame($before, $this->categoryCount($company), 'откат: статьи не созданы');
+        self::assertSame('GROSS_PROFIT + OVERHEAD_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'EBITDA'", [$id]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_template_applications WHERE company_id = ?', [$id]));
+    }
+
     private function extend(Company $company, bool $dryRun): ExtendPLTreeResult
     {
         return (self::getContainer()->get(ExtendPLTreeWithMarketplaceAction::class))((string) $company->getId(), $dryRun);
