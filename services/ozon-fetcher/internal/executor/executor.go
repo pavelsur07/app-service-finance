@@ -30,6 +30,10 @@ const (
 	ResourceOrdersFBO = "ozon.orders.fbo"
 	ResourceOrdersFBS = "ozon.orders.fbs"
 
+	// Начисления по отправлениям дня (period_key — день МСК создания
+	// отправлений): номера — из загруженных страниц заказов того же дня.
+	ResourceAccrualPostings = "ozon.finance.accrual-postings"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -39,6 +43,10 @@ var postingResources = map[string]ozon.PostingScheme{
 	ResourceOrdersFBO: ozon.SchemeFBO,
 	ResourceOrdersFBS: ozon.SchemeFBS,
 }
+
+// gatedResources — ресурсы, которые Symfony выдаёт кабинетам по списку
+// компаний: снятый с кабинета ресурс не грузится и по поставленным задачам.
+var gatedResources = map[string]bool{ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true}
 
 // IsPostingResource — ресурс списков отправлений.
 func IsPostingResource(resourceType string) bool {
@@ -55,6 +63,13 @@ type TaskStore interface {
 	RecordAuthFailure(ctx context.Context, connectionRef string, now time.Time, pauseFor func(failures int) time.Duration) (int, error)
 	ResumeConnection(ctx context.Context, connectionRef string) error
 	StopResource(ctx context.Context, resourceType, reason string) error
+	ContentPages(ctx context.Context, key store.TaskKey) (store.Content, error)
+	ReloadWithoutContent(ctx context.Context, key store.TaskKey, now time.Time) (bool, error)
+}
+
+// RawReader — чтение сохранённой страницы (зависимые ресурсы).
+type RawReader interface {
+	Get(ctx context.Context, uri, sha256 string) ([]byte, error)
 }
 
 // RawStore — запись страницы в S3.
@@ -69,6 +84,7 @@ type Ozon interface {
 	FetchRealization(ctx context.Context, creds ozon.Credentials, connectionRef string, year, month int) (ozon.Page, error)
 	FetchMutualSettlement(ctx context.Context, creds ozon.Credentials, connectionRef string, year, month int, poll ozon.ReportPoll, sleep func(context.Context, time.Duration) error) (ozon.Page, error)
 	FetchPostingList(ctx context.Context, creds ozon.Credentials, connectionRef string, scheme ozon.PostingScheme, w ozon.PostingWindow, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
+	FetchAccrualPostings(ctx context.Context, creds ozon.Credentials, connectionRef string, numbers []string) (ozon.Page, error)
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -107,6 +123,7 @@ func DefaultConfig() Config {
 			ResourceAccrualTypes:     time.Hour,
 			ResourceRealization:      24 * time.Hour,
 			ResourceMutualSettlement: 24 * time.Hour,
+			ResourceAccrualPostings:  time.Hour, // заказы дня ещё не загружены
 		},
 		ReportPoll: ozon.DefaultReportPoll,
 		// Москва без перехода на летнее время с 2014 г.; приложение передаёт
@@ -120,6 +137,7 @@ type Executor struct {
 	cfg       Config
 	tasks     TaskStore
 	raw       RawStore
+	rawReader RawReader
 	ozon      Ozon
 	refresher Refresher
 	logger    *slog.Logger
@@ -131,6 +149,13 @@ type Executor struct {
 func New(cfg Config, tasks TaskStore, raw RawStore, client Ozon, refresher Refresher, logger *slog.Logger,
 	now func() time.Time, jitter func(time.Duration) time.Duration, sleep func(context.Context, time.Duration) error) *Executor {
 	return &Executor{cfg: cfg, tasks: tasks, raw: raw, ozon: client, refresher: refresher, logger: logger, now: now, jitter: jitter, sleep: sleep}
+}
+
+// WithRawReader — копия с чтением сохранённых страниц (начисления по отправлениям).
+func (e *Executor) WithRawReader(r RawReader) *Executor {
+	clone := *e
+	clone.rawReader = r
+	return &clone
 }
 
 // errLeaseLost — внутренний сигнал: продление не удалось, задачу ведёт другой воркер.
@@ -157,7 +182,7 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 	defer cancel(nil)
 	stopLease := e.keepLease(taskCtx, cancel, task, log)
 
-	run := &taskRun{exec: e, task: task, hashes: append([]string(nil), task.PageHashes...), cursor: task.Cursor, nextPage: task.NextPageNo}
+	run := &taskRun{exec: e, task: task, log: log, hashes: append([]string(nil), task.PageHashes...), cursor: task.Cursor, nextPage: task.NextPageNo}
 	fetchErr := run.fetch(taskCtx, cabinet)
 
 	// Lease продлевается и во время побочных действий исхода (пауза кабинета,
@@ -244,6 +269,7 @@ func (e *Executor) keepLease(ctx context.Context, cancel context.CancelCauseFunc
 type taskRun struct {
 	exec     *Executor
 	task     store.Task
+	log      *slog.Logger
 	hashes   []string
 	cursor   string
 	nextPage int
@@ -289,13 +315,16 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return e.ozon.FetchMutualSettlement(ctx, creds, ref, year, month, e.cfg.ReportPoll, e.sleep)
 		})
 	default:
+		// Отправления и начисления по ним включаются по кабинетам (снимок
+		// Symfony): снятый с кабинета ресурс не грузится и по уже поставленным задачам.
+		if gatedResources[r.task.ResourceType] && !cabinet.Supports(r.task.ResourceType) {
+			return errResourceNotEnabled
+		}
 		if scheme, ok := postingResources[r.task.ResourceType]; ok {
-			// Отправления включаются по кабинетам (снимок Symfony): снятый с
-			// кабинета ресурс не грузится и по уже поставленным задачам.
-			if !cabinet.Supports(r.task.ResourceType) {
-				return errResourceNotEnabled
-			}
 			return r.postings(ctx, creds, scheme)
+		}
+		if r.task.ResourceType == ResourceAccrualPostings {
+			return r.accrualPostings(ctx, creds, cabinet)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

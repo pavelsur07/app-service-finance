@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-21) — начисления по отправлениям
+
+- Новое значение `resource_types` у seller: `ozon.finance.accrual-postings`
+  (`/v1/finance/accrual/postings`). Выдаётся только кабинетам с ресурсами
+  отправлений и по списку `ozon_fetcher.accrual_postings_companies`. Схема не менялась.
+
 ## Правка (2026-10-21) — ресурсы отправлений
 
 - Новые значения `resource_types` у seller: `ozon.orders.fbo`, `ozon.orders.fbs`

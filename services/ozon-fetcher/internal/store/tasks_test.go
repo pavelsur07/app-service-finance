@@ -639,6 +639,134 @@ func TestPlainUpsertKeepsCursorOfPausedTask(t *testing.T) {
 	assert.Equal(t, 2, again.NextPageNo)
 }
 
+func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+
+	_, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent, "до первой загрузки ревизии нет")
+	reloaded, err := tasks.ReloadWithoutContent(ctx, s.TaskKey, t0)
+	require.NoError(t, err)
+	assert.False(t, reloaded, "не done — не трогается")
+
+	// Попытка 1: страница 1, затем 429; попытка 2 дочитывает страницу 2.
+	first, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p1 := RawObject{PageNo: 1, StorageURI: "s3://b/p1", SHA256: hash("p1"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, first.TaskKey, first.AttemptID, p1, "c1"))
+	_, err = tasks.FinishTask(ctx, first.TaskKey, first.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent, "промежуточный итог ревизию не создаёт")
+
+	second, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p2 := RawObject{PageNo: 2, StorageURI: "s3://b/p2", SHA256: hash("p2"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, second.TaskKey, second.AttemptID, p2, ""))
+	_, err = tasks.FinishTask(ctx, second.TaskKey, second.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev1")}, t0)
+	require.NoError(t, err)
+
+	content, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	pages := content.Pages
+	require.Len(t, pages, 2, "страницы обеих попыток")
+	assert.Equal(t, []string{"s3://b/p1", "s3://b/p2"}, []string{pages[0].StorageURI, pages[1].StorageURI})
+	assert.Equal(t, []int{1, 2}, []int{pages[0].PageNo, pages[1].PageNo})
+	assert.False(t, content.StartedAt.IsZero(), "начало ревизии — запись её первой страницы")
+	firstStart := content.StartedAt
+	reloaded, err = tasks.ReloadWithoutContent(ctx, s.TaskKey, t0)
+	require.NoError(t, err)
+	assert.False(t, reloaded, "ревизия со страницами — не перезагружается")
+
+	// Перезагрузка в работе: пока не done, видна прежняя ревизия.
+	s.Refresh = true
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	third, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	p3 := RawObject{PageNo: 1, StorageURI: "s3://b/p3", SHA256: hash("p3"), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+	require.NoError(t, tasks.RecordPage(ctx, third.TaskKey, third.AttemptID, p3, ""))
+	content, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	assert.Len(t, content.Pages, 2)
+	_, err = tasks.FinishTask(ctx, third.TaskKey, third.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("rev2")}, t0)
+	require.NoError(t, err)
+	content, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	require.Len(t, content.Pages, 1, "новая ревизия заменяет прежнюю")
+	assert.Equal(t, "s3://b/p3", content.Pages[0].StorageURI)
+	assert.False(t, content.StartedAt.Before(firstStart), "начало новой ревизии — её первая страница")
+}
+
+func TestContentStartIsFirstPageOfRevisionNotOfContinuation(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	first, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, first.TaskKey, first.AttemptID, rawObj(1), "c1"))
+	var started time.Time
+	require.NoError(t, tasks.pool.QueryRow(ctx, `SELECT load_started_at FROM fetch_task WHERE period_key = '2026-10-20'`).Scan(&started))
+	assert.True(t, started.Equal(t0), "начало загрузки — начало попытки (до запроса), не время записи страницы")
+	_, err = tasks.FinishTask(ctx, first.TaskKey, first.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+
+	cont, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Hour))
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, cont.TaskKey, cont.AttemptID, rawObj(2), ""))
+	_, err = tasks.FinishTask(ctx, cont.TaskKey, cont.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+
+	content, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	assert.True(t, content.StartedAt.Equal(t0), "продолжение не сдвигает начало ревизии")
+}
+
+func TestContentWithoutPagesListIsReloadedAndMissingObjectIsAnError(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-19", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	task, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, rawObj(1), ""))
+	_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+
+	// Ревизия до миграции 00004: done без списка страниц.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = '' WHERE period_key = '2026-10-19'`)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent)
+	reloaded, err := tasks.ReloadWithoutContent(ctx, s.TaskKey, t0.Add(time.Minute))
+	require.NoError(t, err)
+	assert.True(t, reloaded)
+	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey))
+
+	// Загрузка, начатая до миграции и завершённая после: страницы есть,
+	// начала ревизии нет — тоже на перезагрузку.
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, again.TaskKey, again.AttemptID, rawObj(1), ""))
+	_, err = tasks.FinishTask(ctx, again.TaskKey, again.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("b")}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_started_at = NULL WHERE period_key = '2026-10-19'`)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent)
+	reloaded, err = tasks.ReloadWithoutContent(ctx, s.TaskKey, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.True(t, reloaded, "без начала ревизии — перезагрузка")
+
+	// Страница без объекта — ошибка, не укороченный список.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = $1, content_started_at = now() WHERE period_key = '2026-10-19'`, hash("p")+","+hash("lost"))
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrMissingObject)
+}
+
 func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

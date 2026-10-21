@@ -46,6 +46,20 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		// Задача ждёт: ресурс могут включить снова, курсор сохраняется.
 		return store.Outcome{Status: store.StatusPending, Label: "resource_disabled", ErrorClass: "resource_disabled", KeepCursor: true, NextRunAt: now.Add(e.cfg.NoCredentialsIn)}
 	}
+	if errors.Is(err, errOrdersNotLoaded) {
+		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]
+		if !ok {
+			delay = time.Hour
+		}
+		return store.Outcome{Status: store.StatusNotReady, Label: "orders_not_loaded", ErrorClass: "orders_not_loaded", NextRunAt: now.Add(delay)}
+	}
+	if errors.Is(err, errOrdersRevised) {
+		return e.retryable(task, "orders_revised", now, false)
+	}
+	if errors.Is(err, errOrdersRawInvalid) {
+		log.Error("stored orders page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "orders_raw_invalid", ErrorClass: "orders_raw_invalid", NextRunAt: now}
+	}
 	if errors.Is(err, errUnknownResource) || errors.Is(err, errBadPeriod) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "invalid_task", ErrorClass: "invalid_task", NextRunAt: now}
 	}

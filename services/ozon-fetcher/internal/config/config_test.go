@@ -154,7 +154,7 @@ func TestLoadMaxParallel(t *testing.T) {
 
 func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 	clear := func(t *testing.T) {
-		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
+		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "ACCRUAL_POSTINGS_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
 			t.Setenv(k, "")
 		}
 	}
@@ -166,6 +166,9 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		}
 		if cfg.TailDays != 3 || cfg.FinalDay != 10 || cfg.ReconcileWeekday != time.Monday || cfg.PlanEvery != time.Hour {
 			t.Errorf("defaults = %+v", cfg)
+		}
+		if cfg.AccrualPostingsDays != 45 {
+			t.Errorf("accrual postings days = %d", cfg.AccrualPostingsDays)
 		}
 		if cfg.OrdersFrom != "2026-10-18" || cfg.OrdersTailDays != 30 {
 			t.Errorf("orders defaults = %q %d", cfg.OrdersFrom, cfg.OrdersTailDays)
@@ -184,6 +187,8 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		"orders from next": {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
 		"orders tail big":  {"ORDERS_TAIL_DAYS", "61"},
 		"orders tail zero": {"ORDERS_TAIL_DAYS", "0"},
+		"accrual days big": {"ACCRUAL_POSTINGS_DAYS", "91"},
+		"accrual days 0":   {"ACCRUAL_POSTINGS_DAYS", "0"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			clear(t)

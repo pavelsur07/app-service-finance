@@ -127,3 +127,42 @@ func TestOrdersDoNotChangeFinancePlan(t *testing.T) {
 	}
 	assert.Equal(t, refresh(finance, KindTail).Specs, refresh(both, KindTail).Specs)
 }
+
+func TestAccrualPostingsEnsureUntilYesterdayAndDailyWindow(t *testing.T) {
+	cfg := DefaultConfig(msk)
+	cfg.OrdersFrom = time.Date(2026, 8, 1, 0, 0, 0, 0, msk)
+	cabs := []connections.Cabinet{seller("a", executor.ResourceOrdersFBO, executor.ResourceAccrualPostings)}
+	p := Build(at("2026-10-21 00:20"), cabs, cfg)
+
+	days := periods(p.Ensure, executor.ResourceAccrualPostings)
+	require.NotEmpty(t, days)
+	assert.Equal(t, "2026-08-01", days[0], "не глубже M-2")
+	assert.Equal(t, "2026-10-20", days[len(days)-1], "сегодня не ставится")
+	for _, s := range p.Ensure {
+		if s.ResourceType == executor.ResourceAccrualPostings {
+			assert.False(t, s.Refresh)
+			assert.Equal(t, PriorityBackfill, s.Priority)
+		}
+	}
+
+	tail := refresh(p, KindAccrualPostings)
+	require.NotNil(t, tail)
+	window := periods(tail.Specs, executor.ResourceAccrualPostings)
+	require.Len(t, window, 45)
+	assert.Equal(t, "2026-10-20", window[0])
+	assert.Equal(t, "2026-09-06", window[44])
+	for _, s := range tail.Specs {
+		assert.True(t, s.Refresh)
+		assert.Equal(t, PriorityRoutine, s.Priority)
+	}
+}
+
+func TestAccrualPostingsNotPlannedWithoutResourceAndNotBeforeOrdersFrom(t *testing.T) {
+	p := Build(at("2026-10-21 12:00"), []connections.Cabinet{seller("a", executor.ResourceOrdersFBO)}, DefaultConfig(msk))
+	assert.Empty(t, periods(p.Ensure, executor.ResourceAccrualPostings))
+	assert.Nil(t, refresh(p, KindAccrualPostings))
+
+	p = Build(at("2026-10-21 12:00"), []connections.Cabinet{seller("a", executor.ResourceOrdersFBO, executor.ResourceAccrualPostings)}, DefaultConfig(msk))
+	assert.Equal(t, []string{"2026-10-18", "2026-10-19", "2026-10-20"}, periods(p.Ensure, executor.ResourceAccrualPostings))
+	assert.Equal(t, []string{"2026-10-20", "2026-10-19", "2026-10-18"}, periods(refresh(p, KindAccrualPostings).Specs, executor.ResourceAccrualPostings))
+}

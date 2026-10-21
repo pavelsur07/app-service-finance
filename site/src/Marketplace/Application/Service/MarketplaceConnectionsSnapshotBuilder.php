@@ -37,7 +37,13 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      */
     public const ORDERS_RESOURCE_TYPES = ['ozon.orders.fbo', 'ozon.orders.fbs'];
 
-    /** Значение списка компаний для заказов: все кабинеты с ключом seller. */
+    /**
+     * Начисления по отправлениям (`docs/tasks/marketplace-data-ingestion/stages/ozon-3-accrual-postings.md`):
+     * номера берутся из заказов, поэтому ресурс выдаётся только кабинетам с заказами.
+     */
+    public const ACCRUAL_POSTINGS_RESOURCE_TYPE = 'ozon.finance.accrual-postings';
+
+    /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';
 
     public const PERFORMANCE_RESOURCE_TYPES = ['ozon.ads.statistics'];
@@ -45,9 +51,12 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
     /**
      * @param list<string> $ordersCompanyIds компании, которым выдаются ресурсы
      *                                       заказов; ['*'] — всем, [] — никому
+     * @param list<string> $accrualPostingsCompanyIds то же для начислений по отправлениям
+     *                                                (из тех, кому выданы заказы)
      */
     public function __construct(
         private array $ordersCompanyIds = [],
+        private array $accrualPostingsCompanyIds = [],
     ) {
     }
 
@@ -107,16 +116,21 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
             performance: $performanceCredentials,
             resourceTypes: [
                 ...(null !== $sellerCredentials ? self::SELLER_RESOURCE_TYPES : []),
-                ...(null !== $sellerCredentials && $this->ordersEnabled($companyId) ? self::ORDERS_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && self::listed($this->ordersCompanyIds, $companyId) ? self::ORDERS_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && self::listed($this->ordersCompanyIds, $companyId) && self::listed($this->accrualPostingsCompanyIds, $companyId)
+                    ? [self::ACCRUAL_POSTINGS_RESOURCE_TYPE] : []),
                 ...(null !== $performanceCredentials ? self::PERFORMANCE_RESOURCE_TYPES : []),
             ],
         );
     }
 
-    private function ordersEnabled(string $companyId): bool
+    /**
+     * @param list<string> $companyIds
+     */
+    private static function listed(array $companyIds, string $companyId): bool
     {
-        return \in_array(self::ORDERS_ALL_COMPANIES, $this->ordersCompanyIds, true)
-            || \in_array($companyId, $this->ordersCompanyIds, true);
+        return \in_array(self::ORDERS_ALL_COMPANIES, $companyIds, true)
+            || \in_array($companyId, $companyIds, true);
     }
 
     private static function usable(ActiveConnectionCredentials $row): bool

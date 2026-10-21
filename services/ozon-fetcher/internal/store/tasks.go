@@ -265,6 +265,85 @@ func (t *Tasks) FindObject(ctx context.Context, key TaskKey, sha256 string) (Raw
 	return obj, true, nil
 }
 
+// ErrNoContent — у задачи нет загруженной ревизии (ещё не было done).
+var ErrNoContent = errors.New("store: task has no loaded content")
+
+// ErrMissingObject — у страницы ревизии нет объекта в raw_object (нарушен инвариант).
+var ErrMissingObject = errors.New("store: content page has no raw object")
+
+// Content — текущая загруженная ревизия задачи.
+type Content struct {
+	Pages []RawObject // по порядку, PageNo с 1
+	// StartedAt — запись первой страницы ревизии: вся ревизия загружена не
+	// раньше этого момента (страницы прежних загрузок в неё не входят).
+	StartedAt time.Time
+}
+
+// ContentPages — объекты страниц текущей загруженной ревизии задачи
+// (content_pages последнего done). Нет ревизии — ErrNoContent; страница без
+// объекта — ErrMissingObject, не укороченный список.
+func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) {
+	var pages string
+	var started *time.Time
+	err := t.pool.QueryRow(ctx, `
+		SELECT content_pages, content_started_at FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages, &started)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (pages == "" || started == nil)) {
+		return Content{}, ErrNoContent
+	}
+	if err != nil {
+		return Content{}, fmt.Errorf("store: content pages: %w", err)
+	}
+	hashes := strings.Split(pages, ",")
+	rows, err := t.pool.Query(ctx, `
+		SELECT DISTINCT ON (r.sha256) r.sha256, r.storage_uri, r.size_bytes, r.stored_bytes, r.content_type
+		FROM raw_object r JOIN fetch_attempt a ON a.attempt_id = r.attempt_id
+		WHERE a.connection_ref = $1 AND a.resource_type = $2 AND a.period_key = $3 AND r.sha256 = ANY($4)
+		ORDER BY r.sha256, r.created_at DESC`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, hashes)
+	if err != nil {
+		return Content{}, fmt.Errorf("store: content objects: %w", err)
+	}
+	defer rows.Close()
+	bySHA := map[string]RawObject{}
+	for rows.Next() {
+		var obj RawObject
+		if err := rows.Scan(&obj.SHA256, &obj.StorageURI, &obj.SizeBytes, &obj.StoredBytes, &obj.ContentType); err != nil {
+			return Content{}, fmt.Errorf("store: content objects scan: %w", err)
+		}
+		bySHA[obj.SHA256] = obj
+	}
+	if err := rows.Err(); err != nil {
+		return Content{}, fmt.Errorf("store: content objects: %w", err)
+	}
+	out := Content{Pages: make([]RawObject, 0, len(hashes)), StartedAt: *started}
+	for i, h := range hashes {
+		obj, ok := bySHA[h]
+		if !ok {
+			return Content{}, fmt.Errorf("%w: page %d of %s/%s/%s", ErrMissingObject, i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
+		}
+		obj.PageNo = i + 1
+		out.Pages = append(out.Pages, obj)
+	}
+	return out, nil
+}
+
+// ReloadWithoutContent ставит на полную перезагрузку done-задачу, у которой
+// нет списка страниц ревизии или времени её начала (загрузка начата до
+// миграции 00004): зависимому ресурсу без них не из чего читать. У done-задачи
+// прогресс уже сброшен — загрузка пойдёт с первой страницы. true — поставлена.
+func (t *Tasks) ReloadWithoutContent(ctx context.Context, key TaskKey, now time.Time) (bool, error) {
+	tag, err := t.pool.Exec(ctx, `
+		UPDATE fetch_task SET status = 'pending', next_run_at = $4, updated_at = $4
+		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3
+		  AND status = 'done' AND (content_pages = '' OR content_started_at IS NULL)`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, now)
+	if err != nil {
+		return false, fmt.Errorf("store: reload without content: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // RecordPage — страница и курсор следующей одной транзакцией.
 func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, obj RawObject, nextCursor string) error {
 	tx, err := t.pool.Begin(ctx)
@@ -275,7 +354,11 @@ func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, o
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE fetch_task SET cursor = NULLIF($5, ''), next_page_no = $6,
-			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END, updated_at = now()
+			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END,
+			-- Начало загрузки — начало попытки с первой страницей (до первого
+			-- запроса), не время записи: ответ мог прийти уже после полуночи.
+			load_started_at = CASE WHEN page_hashes = '' THEN (SELECT a.started_at FROM fetch_attempt a WHERE a.attempt_id = $4) ELSE load_started_at END,
+			updated_at = now()
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, nextCursor, obj.PageNo+1, obj.SHA256)
 	if err != nil {
@@ -337,6 +420,8 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 			refresh_pending = refresh_pending AND $5 NOT IN ('done', 'failed_permanent'),
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
+			content_pages = CASE WHEN $5 = 'done' THEN page_hashes ELSE content_pages END,
+			content_started_at = CASE WHEN $5 = 'done' THEN load_started_at ELSE content_started_at END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,
 			last_error_class = NULLIF($9, ''),
 			last_success_at  = CASE WHEN $5 = 'done' THEN $10 ELSE last_success_at END,
