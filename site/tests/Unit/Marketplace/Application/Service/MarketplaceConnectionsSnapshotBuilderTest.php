@@ -114,6 +114,31 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
         }
     }
 
+    public function testProductsOnlyForListedCompaniesWithSellerKey(): void
+    {
+        $rows = [
+            $this->seller(self::SELLER_A, self::COMPANY_A),
+            $this->performance(self::PERF_B, self::COMPANY_B),
+            $this->seller('cccccccc-0000-7000-8000-00000000000c', 'dddddddd-0000-7000-8000-00000000000d'),
+        ];
+
+        foreach ($this->build($rows)['connections'] as $cabinet) {
+            self::assertNotContains('ozon.products.list', $cabinet['resource_types'], 'по умолчанию — никому');
+        }
+
+        $one = array_column($this->build($rows, [], [], [self::COMPANY_A, self::COMPANY_B])['connections'], 'resource_types', 'company_id');
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::PRODUCTS_RESOURCE_TYPES], $one[self::COMPANY_A], 'не зависит от заказов');
+        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $one[self::COMPANY_B], 'без ключа seller каталога нет');
+        self::assertNotContains('ozon.products.info', $one['dddddddd-0000-7000-8000-00000000000d'], 'компания не в списке');
+
+        foreach ($this->build($rows, [], [], [MarketplaceConnectionsSnapshotBuilder::ORDERS_ALL_COMPANIES])['connections'] as $cabinet) {
+            if (isset($cabinet['credentials']['seller'])) {
+                self::assertContains('ozon.products.list', $cabinet['resource_types']);
+                self::assertContains('ozon.products.info', $cabinet['resource_types']);
+            }
+        }
+    }
+
     public function testOrdersResourcesForAllCompanies(): void
     {
         $cabinets = $this->build([
@@ -131,12 +156,13 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
      * @param list<ActiveConnectionCredentials> $rows
      * @param list<string> $ordersCompanyIds
      * @param list<string> $accrualPostingsCompanyIds
+     * @param list<string> $productsCompanyIds
      *
      * @return array<string, mixed>
      */
-    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = []): array
+    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = [], array $productsCompanyIds = []): array
     {
-        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
+        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds, $productsCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
     }
 
     private function seller(string $id, string $companyId, ?string $clientId = 'seller-client', ?string $secret = 'seller-key', string $updatedAt = '2026-10-01 10:00:00'): ActiveConnectionCredentials

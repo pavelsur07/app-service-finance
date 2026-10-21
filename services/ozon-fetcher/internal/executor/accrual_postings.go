@@ -14,7 +14,6 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
@@ -89,9 +88,6 @@ func numbersFingerprint(numbers []string) string {
 // orderPostingNumbers — номера отправлений дня из страниц заказов кабинета.
 func (r *taskRun) orderPostingNumbers(ctx context.Context, cabinet connections.Cabinet) ([]string, error) {
 	e := r.exec
-	if e.rawReader == nil {
-		return nil, errors.New("executor: raw reader is not configured")
-	}
 	set := map[string]bool{}
 	sources := 0
 	for _, resource := range []string{ResourceOrdersFBO, ResourceOrdersFBS} {
@@ -129,24 +125,18 @@ func (r *taskRun) orderPostingNumbers(ctx context.Context, cabinet connections.C
 		if content.StartedAt.Before(dayStart.AddDate(0, 0, 1)) {
 			return nil, fmt.Errorf("%w: %s revision started before the day ended", errOrdersNotLoaded, resource)
 		}
-		for _, p := range content.Pages {
-			body, err := e.rawReader.Get(ctx, p.StorageURI, p.SHA256)
-			if err != nil {
-				if ctx.Err() != nil {
-					return nil, ctx.Err()
-				}
-				if errors.Is(err, rawstore.ErrObjectInvalid) || errors.Is(err, rawstore.ErrObjectNotFound) {
-					return nil, fmt.Errorf("%w: %s page %d: %v", errOrdersRawInvalid, resource, p.PageNo, err)
-				}
-				return nil, &storeError{err}
-			}
+		err = r.readContent(ctx, content, resource, errOrdersRawInvalid, func(body []byte) error {
 			found, err := postingNumbersOf(body)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %s page %d: %v", errOrdersRawInvalid, resource, p.PageNo, err)
+				return err
 			}
 			for _, n := range found {
 				set[n] = true
 			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	if sources == 0 {

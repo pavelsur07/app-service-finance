@@ -45,6 +45,9 @@ func DefaultConfig() Config {
 			ozon.EndpointPostingFBSList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			// Лимит метода не опубликован; объём мал (крупный кабинет ≈ 5 запросов на день).
 			ozon.EndpointAccrualPostings: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Каталог: 2–3 запроса на кабинет в сутки.
+			ozon.EndpointProductList:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			ozon.EndpointProductInfoList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

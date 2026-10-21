@@ -132,6 +132,47 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   31–45 начисления перечитываются по последнему списку номеров (новых отправлений у старого дня нет).
 - **Включение:** Symfony `ozon_fetcher.accrual_postings_companies` — только среди кабинетов с заказами.
 
+### `ozon.products.list` — `POST /v3/product/list`
+
+Список всех товаров кабинета — снимок дня. Symfony грузит то же в 03:40
+(`RefreshOzonListingCatalogAction`); план —
+`docs/tasks/marketplace-data-ingestion/stages/ozon-4-products.md`.
+
+- **Запрос:** `{"filter": {"visibility": "ALL"}, "last_id": "<курсор>", "limit": 1000}`; `limit` в
+  `(0, 1000]`, 1001 → 400 `code 3`.
+- **Ответ** (живой, 21.10.2026): `{"result": {"items": [...], "total": N, "last_id": "...",
+  "total_items": N}}`; товар — `product_id`, `offer_id`, `sku`, `archived`, `has_fbo_stocks`,
+  `has_fbs_stocks`, `is_discounted`, `quants`.
+- **Пагинация:** `last_id` (keyset, base64). Последняя полная страница отдаёт **непустой** `last_id`;
+  конец — следующая страница `items: []`, `last_id: ""`. Сохраняются все страницы, включая концевую
+  пустую; пустая страница завершает обход и при непустом `last_id`.
+- **Проверка:** нет `result`, `items`, строки `last_id` или неотрицательного `total` —
+  `invalid_response`; непустая страница с уже виденным `last_id` — `invalid_response`; больше 1000
+  страниц — `invalid_response`. 400 при продолжении с курсором — `stale_cursor`, снимок заново.
+- **`period_key`:** день МСК снимка. Задача ставится только на сегодня, без перечитывания; задача за
+  прошедший день в Ozon не ходит — `snapshot_missed`, `failed_permanent`, WARNING (пропуск виден в
+  покрытии).
+
+### `ozon.products.info` — `POST /v3/product/info/list`
+
+Подробности по каждому товару списка того же дня.
+
+- **Запрос:** `{"product_id": [...]}` — 1…1000; 1001 → 400 `no more than 1000 item(s)`; пустой
+  массив → 400 `use either offer_id or product_id or sku`.
+- **Ответ** (живой, 21.10.2026): `{"items": [...]}` без `result`; товар — `id`, `offer_id`, `sku`,
+  `sources`, `barcodes`, `name`, `description_category_id`, `type_id`, цены, `stocks`, `statuses`,
+  `commissions` и др. (39 полей), ≈ 3 КБ на товар. **Неизвестные `product_id` Ozon молча
+  пропускает.**
+- **Проверка:** нет `items` — `invalid_response`; `id` не из запроса, повторный или без `id` —
+  `invalid_response`; недостающие (удалённые между списком и подробностями) — WARNING с числом.
+- **id:** из текущей ревизии `ozon.products.list` того же дня (`content_pages` → S3), без дублей по
+  возрастанию, порции по 1000; курсор — `отпечаток списка:последний id`, список изменился —
+  `catalog_revised`, заново. Число товаров списка ≠ `total` — WARNING. Список дня не загружен —
+  `catalog_not_loaded`, `not_ready` через 10 мин. Пустой каталог — служебная страница
+  `{"items": []}` без запроса. Повреждённый raw списка — `catalog_raw_invalid` + ERROR.
+- **Включение:** Symfony `ozon_fetcher.products_companies` (оба ресурса, ключ seller); подробности
+  ставятся только кабинету со списком.
+
 ### Вторая волна (не в первой)
 
 - Прочие финансовые отчёты (компенсации, cash-flow statement и т. п.) — сверка
@@ -181,6 +222,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v2/finance/realization` | 0.2 | 0.05 | 1 | 900 с | **консервативно**; Symfony ждёт 60–3600 с, по умолчанию 900 с |
 | `/v1/finance/mutual-settlement` | 0.1 | 0.02 | 0.5 | 900 с | **консервативно**; генерация отчёта, не подтверждено |
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
+| `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v1/finance/accrual/postings` | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимит не опубликован; крупный кабинет ≈ 5 запросов на день × 45 дней ≈ 225 в сутки |
 | `/v3/posting/fbo/list`, `/v4/posting/fbs/list` | 0.2 | 0.05 | 1 | 60 с | **консервативно**: ключ кабинета общий с Symfony, пока тот не отключён; 19.10 перед отключением старых методов — фаза 429 |
 

@@ -34,6 +34,11 @@ const (
 	// отправлений): номера — из загруженных страниц заказов того же дня.
 	ResourceAccrualPostings = "ozon.finance.accrual-postings"
 
+	// Каталог товаров — снимок дня (period_key — день МСК загрузки): список
+	// всех товаров и подробности по product_id из списка того же дня.
+	ResourceProductsList = "ozon.products.list"
+	ResourceProductsInfo = "ozon.products.info"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -46,7 +51,10 @@ var postingResources = map[string]ozon.PostingScheme{
 
 // gatedResources — ресурсы, которые Symfony выдаёт кабинетам по списку
 // компаний: снятый с кабинета ресурс не грузится и по поставленным задачам.
-var gatedResources = map[string]bool{ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true}
+var gatedResources = map[string]bool{
+	ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true,
+	ResourceProductsList: true, ResourceProductsInfo: true,
+}
 
 // IsPostingResource — ресурс списков отправлений.
 func IsPostingResource(resourceType string) bool {
@@ -85,6 +93,8 @@ type Ozon interface {
 	FetchMutualSettlement(ctx context.Context, creds ozon.Credentials, connectionRef string, year, month int, poll ozon.ReportPoll, sleep func(context.Context, time.Duration) error) (ozon.Page, error)
 	FetchPostingList(ctx context.Context, creds ozon.Credentials, connectionRef string, scheme ozon.PostingScheme, w ozon.PostingWindow, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchAccrualPostings(ctx context.Context, creds ozon.Credentials, connectionRef string, numbers []string) (ozon.Page, error)
+	FetchProductList(ctx context.Context, creds ozon.Credentials, connectionRef, fromLastID string, firstPageNo int, onPage ozon.PageHandler) error
+	FetchProductInfo(ctx context.Context, creds ozon.Credentials, connectionRef string, ids []int64) (ozon.Page, int, error)
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -123,7 +133,8 @@ func DefaultConfig() Config {
 			ResourceAccrualTypes:     time.Hour,
 			ResourceRealization:      24 * time.Hour,
 			ResourceMutualSettlement: 24 * time.Hour,
-			ResourceAccrualPostings:  time.Hour, // заказы дня ещё не загружены
+			ResourceAccrualPostings:  time.Hour,        // заказы дня ещё не загружены
+			ResourceProductsInfo:     10 * time.Minute, // список дня грузится за секунды
 		},
 		ReportPoll: ozon.DefaultReportPoll,
 		// Москва без перехода на летнее время с 2014 г.; приложение передаёт
@@ -151,7 +162,8 @@ func New(cfg Config, tasks TaskStore, raw RawStore, client Ozon, refresher Refre
 	return &Executor{cfg: cfg, tasks: tasks, raw: raw, ozon: client, refresher: refresher, logger: logger, now: now, jitter: jitter, sleep: sleep}
 }
 
-// WithRawReader — копия с чтением сохранённых страниц (начисления по отправлениям).
+// WithRawReader — копия с чтением сохранённых страниц (начисления по
+// отправлениям, подробности товаров).
 func (e *Executor) WithRawReader(r RawReader) *Executor {
 	clone := *e
 	clone.rawReader = r
@@ -212,10 +224,12 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 	}
 
 	level := slog.LevelInfo
-	switch out.Status {
-	case store.StatusFailedRetryable:
+	switch {
+	case out.Status == store.StatusFailedRetryable, out.Label == labelSnapshotMissed:
+		// Пропущенный снимок — следствие простоя, о котором уже сигналят;
+		// пропуск виден в покрытии.
 		level = slog.LevelWarn
-	case store.StatusFailedPermanent:
+	case out.Status == store.StatusFailedPermanent:
 		level = slog.LevelError
 	}
 	if result.Outcome == "lease_lost" {
@@ -315,7 +329,7 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return e.ozon.FetchMutualSettlement(ctx, creds, ref, year, month, e.cfg.ReportPoll, e.sleep)
 		})
 	default:
-		// Отправления и начисления по ним включаются по кабинетам (снимок
+		// Отправления, начисления по ним и каталог включаются по кабинетам (снимок
 		// Symfony): снятый с кабинета ресурс не грузится и по уже поставленным задачам.
 		if gatedResources[r.task.ResourceType] && !cabinet.Supports(r.task.ResourceType) {
 			return errResourceNotEnabled
@@ -323,8 +337,13 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 		if scheme, ok := postingResources[r.task.ResourceType]; ok {
 			return r.postings(ctx, creds, scheme)
 		}
-		if r.task.ResourceType == ResourceAccrualPostings {
+		switch r.task.ResourceType {
+		case ResourceAccrualPostings:
 			return r.accrualPostings(ctx, creds, cabinet)
+		case ResourceProductsList:
+			return r.productList(ctx, creds)
+		case ResourceProductsInfo:
+			return r.productInfo(ctx, creds, cabinet)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

@@ -43,6 +43,12 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      */
     public const ACCRUAL_POSTINGS_RESOURCE_TYPE = 'ozon.finance.accrual-postings';
 
+    /**
+     * Каталог товаров — снимок дня (`docs/tasks/marketplace-data-ingestion/stages/ozon-4-products.md`):
+     * список товаров и подробности по нему; включается по списку компаний.
+     */
+    public const PRODUCTS_RESOURCE_TYPES = ['ozon.products.list', 'ozon.products.info'];
+
     /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';
 
@@ -53,10 +59,12 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      *                                       заказов; ['*'] — всем, [] — никому
      * @param list<string> $accrualPostingsCompanyIds то же для начислений по отправлениям
      *                                                (из тех, кому выданы заказы)
+     * @param list<string> $productsCompanyIds то же для каталога товаров
      */
     public function __construct(
         private array $ordersCompanyIds = [],
         private array $accrualPostingsCompanyIds = [],
+        private array $productsCompanyIds = [],
     ) {
     }
 
@@ -119,6 +127,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                 ...(null !== $sellerCredentials && self::listed($this->ordersCompanyIds, $companyId) ? self::ORDERS_RESOURCE_TYPES : []),
                 ...(null !== $sellerCredentials && self::listed($this->ordersCompanyIds, $companyId) && self::listed($this->accrualPostingsCompanyIds, $companyId)
                     ? [self::ACCRUAL_POSTINGS_RESOURCE_TYPE] : []),
+                ...(null !== $sellerCredentials && self::listed($this->productsCompanyIds, $companyId) ? self::PRODUCTS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials ? self::PERFORMANCE_RESOURCE_TYPES : []),
             ],
         );

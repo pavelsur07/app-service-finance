@@ -47,6 +47,8 @@ final readonly class CoverageHeatmapBuilder
         'ozon.orders.fbo' => ['Заказы FBO', self::STEP_DAY],
         'ozon.orders.fbs' => ['Заказы FBS', self::STEP_DAY],
         'ozon.finance.accrual-postings' => ['Начисления по отправлениям', self::STEP_DAY],
+        'ozon.products.list' => ['Каталог: список товаров', self::STEP_DAY],
+        'ozon.products.info' => ['Каталог: подробности', self::STEP_DAY],
     ];
 
     private const STATUS_LABELS = [

@@ -177,6 +177,14 @@ type fakeOzon struct {
 	accrualErr       error
 	accrualFailAfter int
 	accrualCalls     [][]string
+
+	productPages    map[string]ozon.Page // last_id → страница списка
+	productListErr  error                // после всех страниц
+	productListFrom []string             // fromLastID каждого вызова
+	infoErr         error
+	infoFailAfter   int
+	infoMissing     int
+	infoCalls       [][]int64
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {
