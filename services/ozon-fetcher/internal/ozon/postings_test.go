@@ -177,7 +177,9 @@ func TestFetchPostingListPageLimit(t *testing.T) {
 		if i > 0 {
 			cur = fmt.Sprintf("c%d", i)
 		}
-		pages[cur] = postingPage(100, true, fmt.Sprintf("c%d", i+1))
+		// Одно отправление на странице: продолжение задаёт has_next, а тест
+		// из 1000 запросов не раздувает память под -race.
+		pages[cur] = postingPage(1, true, fmt.Sprintf("c%d", i+1))
 	}
 	srv := &postingServer{pages: pages}
 	client := clientFor(t, srv.handler(t))

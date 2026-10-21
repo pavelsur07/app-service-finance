@@ -67,8 +67,7 @@ func NewTasks(pool *Pool) *Tasks { return &Tasks{pool: pool} }
 // Upsert ставит задачу идемпотентно: running не трогает, приоритет —
 // максимум, done и failed_permanent переводит в pending только при Refresh
 // (плановая перезагрузка повторяет и задачи, упавшие на ответе Ozon). Refresh
-// незапущенной задачи сбрасывает курсор и сохранённые страницы: загрузка
-// пойдёт заново, а не закончится продолжением прежней попытки.
+// задачи с незавершённой загрузкой откладывается до её итога (refresh_pending).
 func (t *Tasks) Upsert(ctx context.Context, specs []TaskSpec) error {
 	if len(specs) == 0 {
 		return nil
@@ -90,17 +89,14 @@ func sendUpserts(ctx context.Context, conn batchSender, specs []TaskSpec) error 
 			ON CONFLICT (connection_ref, resource_type, period_key) DO UPDATE SET
 				priority    = GREATEST(fetch_task.priority, EXCLUDED.priority),
 				status      = CASE WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN 'pending' ELSE fetch_task.status END,
-				refresh_pending = fetch_task.refresh_pending OR (fetch_task.status = 'running' AND $6),
-				-- Перезагрузка незапущенной задачи — окно заново: продолжение прежней
-				-- попытки (курсор после 429/рестарта или все страницы без записанного
-				-- итога) не перечитало бы уже сохранённые страницы, и однократный
-				-- проход (хвост, сверка) был бы поглощён.
-				cursor = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
-						THEN NULL ELSE fetch_task.cursor END,
-				page_hashes = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
-						THEN '' ELSE fetch_task.page_hashes END,
-				next_page_no = CASE WHEN $6 AND fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
-						THEN 1 ELSE fetch_task.next_page_no END,
+				-- Перезагрузка запущенной задачи или незапущенной с прогрессом
+				-- (курсор после 429/рестарта, страницы без записанного итога) —
+				-- отложенная: попытка дочитывает окно, затем окно заново. Сброс сразу
+				-- терял бы прогресс на каждом часовом проходе, продолжение без флага
+				-- поглощало бы однократный проход (хвост, сверку).
+				refresh_pending = fetch_task.refresh_pending OR ($6 AND (fetch_task.status = 'running'
+					OR (fetch_task.status IN ('pending', 'not_ready', 'failed_retryable')
+						AND (fetch_task.cursor IS NOT NULL OR fetch_task.page_hashes <> '')))),
 				next_run_at = CASE
 					WHEN fetch_task.status IN ('done', 'failed_permanent') AND $6 THEN EXCLUDED.next_run_at
 					WHEN fetch_task.status IN ('pending', 'not_ready', 'failed_retryable') AND EXCLUDED.priority > fetch_task.priority
@@ -326,18 +322,19 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// refresh_pending (перезагрузка пришла во время попытки): итог попытки
-	// записывается, затем задача снова pending с первой страницы.
+	// refresh_pending (перезагрузка пришла во время незавершённой загрузки):
+	// итог попытки записывается; на окончательном итоге задача снова pending с
+	// первой страницы, на промежуточном (повтор с курсором) — флаг ждёт.
 	var revision int
 	err = tx.QueryRow(ctx, `
 		UPDATE fetch_task SET
 			status       = CASE WHEN refresh_pending AND $5 IN ('done', 'failed_permanent') THEN 'pending' ELSE $5 END,
 			lease_owner  = NULL, lease_until = NULL, attempt_id = NULL,
-			next_run_at  = CASE WHEN refresh_pending THEN $10 WHEN $5 = 'done' THEN next_run_at ELSE $6 END,
-			cursor       = CASE WHEN $7 AND NOT refresh_pending THEN cursor ELSE NULL END,
-			next_page_no = CASE WHEN $7 AND NOT refresh_pending THEN next_page_no ELSE 1 END,
-			page_hashes  = CASE WHEN $7 AND NOT refresh_pending THEN page_hashes ELSE '' END,
-			refresh_pending = false,
+			next_run_at  = CASE WHEN refresh_pending AND $5 IN ('done', 'failed_permanent') THEN $10 WHEN $5 = 'done' THEN next_run_at ELSE $6 END,
+			cursor       = CASE WHEN $7 THEN cursor ELSE NULL END,
+			next_page_no = CASE WHEN $7 THEN next_page_no ELSE 1 END,
+			page_hashes  = CASE WHEN $7 THEN page_hashes ELSE '' END,
+			refresh_pending = refresh_pending AND $5 NOT IN ('done', 'failed_permanent'),
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,
