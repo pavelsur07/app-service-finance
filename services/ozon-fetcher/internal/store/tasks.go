@@ -329,13 +329,14 @@ func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) 
 }
 
 // ReloadWithoutContent ставит на полную перезагрузку done-задачу, у которой
-// нет списка страниц ревизии (загружена до миграции 00004): зависимому
-// ресурсу без него не из чего читать. true — задача поставлена.
+// нет списка страниц ревизии или времени её начала (загрузка начата до
+// миграции 00004): зависимому ресурсу без них не из чего читать. У done-задачи
+// прогресс уже сброшен — загрузка пойдёт с первой страницы. true — поставлена.
 func (t *Tasks) ReloadWithoutContent(ctx context.Context, key TaskKey, now time.Time) (bool, error) {
 	tag, err := t.pool.Exec(ctx, `
 		UPDATE fetch_task SET status = 'pending', next_run_at = $4, updated_at = $4
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3
-		  AND status = 'done' AND content_pages = ''`,
+		  AND status = 'done' AND (content_pages = '' OR content_started_at IS NULL)`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, now)
 	if err != nil {
 		return false, fmt.Errorf("store: reload without content: %w", err)
@@ -354,7 +355,9 @@ func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, o
 	tag, err := tx.Exec(ctx, `
 		UPDATE fetch_task SET cursor = NULLIF($5, ''), next_page_no = $6,
 			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END,
-			load_started_at = CASE WHEN page_hashes = '' THEN now() ELSE load_started_at END,
+			-- Начало загрузки — начало попытки с первой страницей (до первого
+			-- запроса), не время записи: ответ мог прийти уже после полуночи.
+			load_started_at = CASE WHEN page_hashes = '' THEN (SELECT a.started_at FROM fetch_attempt a WHERE a.attempt_id = $4) ELSE load_started_at END,
 			updated_at = now()
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, nextCursor, obj.PageNo+1, obj.SHA256)

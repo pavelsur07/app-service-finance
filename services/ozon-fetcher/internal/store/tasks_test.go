@@ -707,13 +707,13 @@ func TestContentStartIsFirstPageOfRevisionNotOfContinuation(t *testing.T) {
 	first, err := claim(t, tasks, []string{"ref-a"}, t0)
 	require.NoError(t, err)
 	require.NoError(t, tasks.RecordPage(ctx, first.TaskKey, first.AttemptID, rawObj(1), "c1"))
-	// Страница 1 «до полуночи»: сдвигаем время её записи назад.
-	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET load_started_at = now() - interval '1 hour' WHERE period_key = '2026-10-20'`)
-	require.NoError(t, err)
+	var started time.Time
+	require.NoError(t, tasks.pool.QueryRow(ctx, `SELECT load_started_at FROM fetch_task WHERE period_key = '2026-10-20'`).Scan(&started))
+	assert.True(t, started.Equal(t0), "начало загрузки — начало попытки (до запроса), не время записи страницы")
 	_, err = tasks.FinishTask(ctx, first.TaskKey, first.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
 	require.NoError(t, err)
 
-	cont, err := claim(t, tasks, []string{"ref-a"}, t0)
+	cont, err := claim(t, tasks, []string{"ref-a"}, t0.Add(2*time.Hour))
 	require.NoError(t, err)
 	require.NoError(t, tasks.RecordPage(ctx, cont.TaskKey, cont.AttemptID, rawObj(2), ""))
 	_, err = tasks.FinishTask(ctx, cont.TaskKey, cont.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
@@ -721,7 +721,7 @@ func TestContentStartIsFirstPageOfRevisionNotOfContinuation(t *testing.T) {
 
 	content, err := tasks.ContentPages(ctx, s.TaskKey)
 	require.NoError(t, err)
-	assert.True(t, content.StartedAt.Before(time.Now().Add(-30*time.Minute)), "продолжение не сдвигает начало ревизии")
+	assert.True(t, content.StartedAt.Equal(t0), "продолжение не сдвигает начало ревизии")
 }
 
 func TestContentWithoutPagesListIsReloadedAndMissingObjectIsAnError(t *testing.T) {
@@ -745,8 +745,23 @@ func TestContentWithoutPagesListIsReloadedAndMissingObjectIsAnError(t *testing.T
 	assert.True(t, reloaded)
 	assert.Equal(t, StatusPending, status(t, tasks, s.TaskKey))
 
+	// Загрузка, начатая до миграции и завершённая после: страницы есть,
+	// начала ревизии нет — тоже на перезагрузку.
+	again, err := claim(t, tasks, []string{"ref-a"}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, again.TaskKey, again.AttemptID, rawObj(1), ""))
+	_, err = tasks.FinishTask(ctx, again.TaskKey, again.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("b")}, t0.Add(time.Minute))
+	require.NoError(t, err)
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_started_at = NULL WHERE period_key = '2026-10-19'`)
+	require.NoError(t, err)
+	_, err = tasks.ContentPages(ctx, s.TaskKey)
+	require.ErrorIs(t, err, ErrNoContent)
+	reloaded, err = tasks.ReloadWithoutContent(ctx, s.TaskKey, t0.Add(2*time.Minute))
+	require.NoError(t, err)
+	assert.True(t, reloaded, "без начала ревизии — перезагрузка")
+
 	// Страница без объекта — ошибка, не укороченный список.
-	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = $1 WHERE period_key = '2026-10-19'`, hash("p")+","+hash("lost"))
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET content_pages = $1, content_started_at = now() WHERE period_key = '2026-10-19'`, hash("p")+","+hash("lost"))
 	require.NoError(t, err)
 	_, err = tasks.ContentPages(ctx, s.TaskKey)
 	require.ErrorIs(t, err, ErrMissingObject)
