@@ -153,10 +153,10 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return store.Outcome{Status: store.StatusNotReady, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now.Add(delay)}
 
 	case ozon.ClassInvalidRequest:
-		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList) && task.Cursor != "" {
-			// Попытка продолжала курсор прежней (после паузы 429, backoff,
-			// рестарта): курсор Ozon мог истечь. Повтор окна с первой страницы,
-			// а не потеря дня до следующей перезагрузки.
+		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList) && (task.Cursor != "" || run.cursor != "") {
+			// Запрос шёл с курсором — прежней попытки (после паузы 429, backoff,
+			// рестарта) или своей предыдущей страницы: курсор Ozon мог истечь.
+			// Повтор окна с первой страницы, а не потеря дня.
 			out := e.retryable(task, "stale_cursor", now, false)
 			out.HTTPStatus = apiErr.Status
 			return out

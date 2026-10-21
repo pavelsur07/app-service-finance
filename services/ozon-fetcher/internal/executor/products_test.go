@@ -143,6 +143,19 @@ func TestProductListStaleCursorRestartsFromFirstPage(t *testing.T) {
 	assert.Equal(t, "invalid_request", res.Outcome, "без курсора — постоянная ошибка")
 }
 
+func TestProductListStaleCursorWithinAttemptRestarts(t *testing.T) {
+	// Первая страница сохранена этой же попыткой, 400 — на продолжении.
+	o := &fakeOzon{productPages: map[string]ozon.Page{"": page(listPage(2, 5), "L1")},
+		productListErr: &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozon.EndpointProductList, Status: 400}}
+	h := newHarness(o)
+
+	res := h.exec.Run(context.Background(), task(ResourceProductsList, today), productsCabinet, "trace")
+
+	assert.Equal(t, "stale_cursor", res.Outcome)
+	assert.Equal(t, store.StatusFailedRetryable, h.tasks.finished.Status)
+	assert.False(t, h.tasks.finished.KeepCursor, "снимок — заново с первой страницы")
+}
+
 func TestProductSnapshotOfPassedDayIsNotFetched(t *testing.T) {
 	o := &fakeOzon{productPages: map[string]ozon.Page{"": page(listPage(1, 5), "")}}
 	for _, resource := range []string{ResourceProductsList, ResourceProductsInfo} {
