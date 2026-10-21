@@ -17,6 +17,8 @@ use App\Finance\Exception\PLTreeExtensionException;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Finance\Repository\PLTemplateApplicationRepository;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -129,12 +131,7 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             }
         }
 
-        $templateParents = [];
-        foreach ($nodes as $node) {
-            if (null !== $node->code) {
-                $templateParents[$node->code] = $node->parent?->code;
-            }
-        }
+        $this->assertMarketplaceLinesInPlace($companyId, $nodes, $universalFormulas);
 
         $changes = [];
         foreach ($nodes as $node) {
@@ -142,24 +139,21 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 continue;
             }
             // Из базы, а не из EntityManager: под блокировкой важна текущая формула, а не прочитанная раньше.
-            $row = $this->em->getConnection()->fetchAssociative('SELECT name, formula FROM pl_categories WHERE company_id = ? AND code = ?', [$companyId, $node->code]);
+            // Итога нет — импорт создаст его по шаблону, с формулой расширения.
+            $row = $this->em->getConnection()->fetchAssociative('SELECT name, formula, type FROM pl_categories WHERE company_id = ? AND code = ?', [$companyId, $node->code]);
             if (false === $row) {
-                // Итога нет — импорт создаст его уже с формулой расширения: все её слагаемые должны стоять на местах.
-                $this->assertTermsInPlace($companyId, '', (string) $node->formula, $templateParents);
-
                 continue;
             }
+            // Строка ввода формулу не считает (PlReportCalculator): новая формула молча не работала бы.
+            if ($row['type'] !== $node->type->value) {
+                throw PLTreeExtensionException::totalTypeChanged((string) $row['name'], $node->code);
+            }
             if (self::same($row['formula'], $node->formula)) {
-                // Формула уже расширена (дополнение прервано или собрано руками): места слагаемых
-                // проверяются всё равно — иначе статьи создались бы под группой не на своём месте.
-                $this->assertTermsInPlace($companyId, (string) $universalFormulas[$node->code], (string) $node->formula, $templateParents);
-
                 continue;
             }
             if (!self::same($row['formula'], $universalFormulas[$node->code])) {
                 throw PLTreeExtensionException::formulaChanged((string) $row['name'], (string) $row['formula'], (string) $universalFormulas[$node->code]);
             }
-            $this->assertTermsInPlace($companyId, (string) $universalFormulas[$node->code], (string) $node->formula, $templateParents);
             $changes[] = new PLFormulaChange($node->code, (string) $row['name'], (string) $row['formula'], (string) $node->formula);
         }
 
@@ -167,29 +161,40 @@ final readonly class ExtendPLTreeWithMarketplaceAction
     }
 
     /**
-     * Статьи, которые новая формула добавляет в итог, если они у компании уже есть, должны стоять на
-     * месте шаблона: своя «OPEX_WH_TOTAL» внутри операционных расходов посчиталась бы в EBITDA дважды.
+     * Статьи маркетплейса (коды расширения, которых нет в «Базовом»), которые у компании уже есть,
+     * должны стоять на месте шаблона и быть того же типа. Импорт `onlyCreate` их не переносит, а
+     * итоги расширения на эти места рассчитаны: своя «OPEX_WH_TOTAL» внутри операционных расходов
+     * посчиталась бы в EBITDA дважды, «Продажи без СПП» в корне не вошли бы в выручку, «Выручка с СПП»
+     * под «Выручкой» попала бы в прибыль.
      *
-     * @param array<string, ?string> $templateParents код → код родителя в шаблоне
+     * @param list<PLCategoryTreeNode> $nodes
+     * @param array<string, ?string> $universalFormulas коды «Базового»
      */
-    private function assertTermsInPlace(string $companyId, string $from, string $to, array $templateParents): void
+    private function assertMarketplaceLinesInPlace(string $companyId, array $nodes, array $universalFormulas): void
     {
-        preg_match_all('/[A-Z][A-Z0-9_]*/', $from, $old);
-        preg_match_all('/[A-Z][A-Z0-9_]*/', $to, $new);
-        foreach (array_diff($new[0], $old[0]) as $term) {
-            $row = $this->em->getConnection()->fetchAssociative(
-                'SELECT c.name, c.parent_id, p.code AS parent_code FROM pl_categories c LEFT JOIN pl_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.code = ?',
-                [$companyId, $term],
-            );
-            if (false === $row) {
-                continue;
+        $template = [];
+        foreach ($nodes as $node) {
+            if (null !== $node->code && !\array_key_exists($node->code, $universalFormulas)) {
+                $template[$node->code] = $node;
             }
+        }
+        if ([] === $template) {
+            return;
+        }
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT c.code, c.name, c.type, c.parent_id, p.code AS parent_code FROM pl_categories c LEFT JOIN pl_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.code IN (?)',
+            [$companyId, array_keys($template)],
+            [ParameterType::STRING, ArrayParameterType::STRING],
+        );
+        foreach ($rows as $row) {
+            $node = $template[(string) $row['code']];
             // Корень шаблона — только корень у компании (родитель без кода — тоже не корень);
             // вложенная — под родителем с тем же кодом.
-            $expectedParent = $templateParents[$term] ?? null;
+            $expectedParent = $node->parent?->code;
             $inPlace = null === $expectedParent ? null === $row['parent_id'] : $expectedParent === $row['parent_code'];
-            if (!$inPlace) {
-                throw PLTreeExtensionException::misplaced((string) $row['name'], $term);
+            if (!$inPlace || $row['type'] !== $node->type->value) {
+                throw PLTreeExtensionException::misplaced((string) $row['name'], (string) $row['code']);
             }
         }
     }

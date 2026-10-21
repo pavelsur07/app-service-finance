@@ -30,7 +30,12 @@ final class PLTreeExtensionException extends \DomainException
 
     public static function misplaced(string $name, string $code): self
     {
-        return new self(\sprintf('Статья «%s» (код %s) стоит не на месте шаблона: после дополнения она посчиталась бы в итогах дважды. Перенесите её на место шаблона или уберите код и повторите.', $name, $code));
+        return new self(\sprintf('Статья «%s» (код %s) стоит не на месте шаблона или другого типа: после дополнения она посчиталась бы в итогах дважды или не попала бы в них. Перенесите её на место шаблона или уберите код и повторите.', $name, $code));
+    }
+
+    public static function totalTypeChanged(string $name, string $code): self
+    {
+        return new self(\sprintf('Итог «%s» (код %s) другого типа, чем в шаблоне, — новая формула в нём не считалась бы. Верните тип шаблона и повторите.', $name, $code));
     }
 
     public static function concurrentChange(string $name): self

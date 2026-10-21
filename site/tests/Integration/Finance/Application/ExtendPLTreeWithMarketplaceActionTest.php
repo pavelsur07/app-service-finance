@@ -194,7 +194,48 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         }
 
         $this->expectException(PLTreeExtensionException::class);
-        $this->expectExceptionMessage('посчиталась бы в итогах дважды');
+        $this->expectExceptionMessage('не на месте шаблона');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессии (внешнее ревью): своя статья маркетплейса не на месте шаблона — «Продажи без СПП» в
+     * корне выпали бы из выручки, «Выручка с СПП» под «Выручкой» попала бы в прибыль.
+     *
+     * @return iterable<string, array{string, string, PLCategoryType, ?string}>
+     */
+    public static function misplacedMarketplaceLines(): iterable
+    {
+        yield 'продажи без СПП в корне' => ['REV_NOT_SPP', 'Продажи без СПП', PLCategoryType::LEAF_INPUT, null];
+        yield 'выручка с СПП под «Выручкой»' => ['REV_WITH_SPP', 'Выручка с СПП', PLCategoryType::SUBTOTAL, 'REV_SALES_TOTAL'];
+        yield 'группа склада — строкой ввода' => ['OPEX_WH_TOTAL', 'Склад МП', PLCategoryType::LEAF_INPUT, null];
+    }
+
+    #[DataProvider('misplacedMarketplaceLines')]
+    public function testMisplacedMarketplaceLineRefuses(string $code, string $name, PLCategoryType $type, ?string $parentCode): void
+    {
+        $company = $this->universalCompany();
+        $parent = null === $parentCode ? null : $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => $parentCode]);
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent instanceof PLCategory ? $parent : null)->withName($name)->withCode($code)->withType($type)->build());
+        $this->em->flush();
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('не на месте шаблона или другого типа');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессия (внешнее ревью): EBITDA строкой ввода формулу не считает — расходы МП не вошли бы в итог.
+     */
+    public function testTotalWithChangedTypeRefuses(): void
+    {
+        $company = $this->universalCompany();
+        $this->connection->update('pl_categories', ['type' => 'LEAF_INPUT'], ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('Итог «EBITDA» (код EBITDA) другого типа');
 
         $this->extend($company, true);
     }
