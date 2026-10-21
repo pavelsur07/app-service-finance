@@ -360,7 +360,7 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
     {
         $company = $this->seedCompany(1014);
         $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001014', MarketplaceType::WILDBERRIES);
-        $this->seedCursor($company->getId(), $connection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, $connection->getId(), '2025-01-10');
+        $this->seedCursor((string) $company->getId(), (string) $connection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, (string) $connection->getId(), '2025-01-10');
 
         $transport = $this->getIngestFetchTransport();
         $transport->reset();
