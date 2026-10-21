@@ -4,7 +4,9 @@
 `stage_base_commit`: `4b1262a2a`. Ветка — своя на каждый шаг. Решения Владельца — `problem.md` §5, §7.
 
 **Только загрузка**: ответы Ozon — в S3, журнал — в БД сервиса. Выдача фактов в Symfony, запись
-`ingest_orders`, выключение старых `posting/*/list` и `posting/*/get` — этап 2 (`problem.md` §7).
+`ingest_orders`, выключение старых `posting/*/list` и `posting/*/get` — не в этом плане: Symfony не
+отключается (решение 21.10), импорт и выключение — отдельным решением (`problem.md` §7). Общий план
+загрузки Ozon — `docs/tasks/marketplace-data-ingestion/plan-ozon.md` (этот файл — его этапы 1–2).
 До этапа 2 Symfony по-прежнему получает 400 на `list` (#439/#442) и обновляет статусы через `get`.
 
 ## Решения для всех шагов
@@ -122,8 +124,8 @@ ensure — все дни с `ORDERS_FROM` по сегодня; сегодня �
 **Результат.** Ресурсы `ozon.orders.fbo-status-changes` и `ozon.orders.fbs-status-changes`: тот же
 клиент с фильтром `last_changed_status_date`, те же окна и хвост; объявлены сначала для одного
 кабинета, после проверки — для всех. Если Ozon не принимает фильтр (400 `invalid_request`), ресурс —
-`failed_permanent` с ERROR, статусы остаются за Symfony `get`, решение — в этап 2 (актуальные версии
-`posting/*/get` в `ozon-fetcher`).
+`failed_permanent` с ERROR, и смены статусов грузятся через актуальные версии `posting/*/get` в
+`ozon-fetcher` по номерам заказов шага 1.5 (Symfony продолжает обновлять статусы сам).
 
 **Чек-лист**
 - [ ] Тесты Go: запрос с `last_changed_status_date` вместо `since/to`; 400 на фильтре → `failed_permanent`, `resource_stop` не вызывается (метод не снят), заказы по созданию продолжают грузиться.
