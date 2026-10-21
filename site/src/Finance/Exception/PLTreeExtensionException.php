@@ -41,6 +41,11 @@ final class PLTreeExtensionException extends \DomainException
         return new self(\sprintf('После дополнения эти статьи маркетплейса не вошли бы в чистую прибыль ровно один раз: %s. Проверьте, где у вас стоят их группы и какой у них вес, и повторите — ничего не изменено.', implode(', ', $lines)));
     }
 
+    public static function flowChanged(string $name, string $code): self
+    {
+        return new self(\sprintf('У статьи «%s» (код %s) другое направление (доход/расход), чем в шаблоне: данные маркетплейса легли бы с неверным знаком. Верните направление шаблона и повторите.', $name, $code));
+    }
+
     public static function totalTypeChanged(string $name, string $code): self
     {
         return new self(\sprintf('Итог «%s» (код %s) другого типа, чем в шаблоне, — новая формула в нём не считалась бы. Верните тип шаблона и повторите.', $name, $code));

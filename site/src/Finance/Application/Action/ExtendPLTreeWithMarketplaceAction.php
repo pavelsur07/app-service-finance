@@ -154,6 +154,7 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         }
 
         $this->assertMarketplaceLinesInPlace($companyId, $nodes, $universalFormulas);
+        $this->assertInputFlows($companyId, $nodes);
 
         $changes = [];
         foreach ($nodes as $node) {
@@ -251,6 +252,36 @@ final readonly class ExtendPLTreeWithMarketplaceAction
                 foreach ($children[$id] ?? [] as $child) {
                     $queue[] = $child;
                 }
+            }
+        }
+    }
+
+    /**
+     * Направление (доход/расход) уже существующих статей ввода шаблона — как в шаблоне: по нему
+     * документы ОПиУ маркетплейса получают знак, и комиссия с направлением «доход» завысила бы прибыль.
+     * Сверка расчётом этого не видит: она подставляет факты сама.
+     *
+     * @param list<PLCategoryTreeNode> $nodes
+     */
+    private function assertInputFlows(string $companyId, array $nodes): void
+    {
+        $flows = [];
+        foreach ($nodes as $node) {
+            if (null !== $node->code && PLCategoryType::LEAF_INPUT === $node->type) {
+                $flows[$node->code] = $node->flow->value;
+            }
+        }
+        if ([] === $flows) {
+            return;
+        }
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT code, name, flow FROM pl_categories WHERE company_id = ? AND code IN (?)',
+            [$companyId, array_keys($flows)],
+            [ParameterType::STRING, ArrayParameterType::STRING],
+        );
+        foreach ($rows as $row) {
+            if ($row['flow'] !== $flows[(string) $row['code']]) {
+                throw PLTreeExtensionException::flowChanged((string) $row['name'], (string) $row['code']);
             }
         }
     }

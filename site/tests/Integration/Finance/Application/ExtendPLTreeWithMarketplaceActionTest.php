@@ -272,6 +272,37 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия (внешнее ревью): комиссия МП (своя, на месте шаблона) или общая «Доставка» с
+     * направлением «доход» — данные МП легли бы с неверным знаком.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function wrongFlows(): iterable
+    {
+        yield 'своя комиссия МП' => ['COGS_MP_COMMISSION'];
+        yield 'общая доставка' => ['COGS_DELIVERY'];
+    }
+
+    #[DataProvider('wrongFlows')]
+    public function testInputLineWithWrongFlowRefuses(string $code): void
+    {
+        $company = $this->universalCompany();
+        if ('COGS_MP_COMMISSION' === $code) {
+            $cogs = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'COGS_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $cogs);
+            $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($cogs)->withName('Комиссия МП')->withCode($code)->withFlow(PLFlow::INCOME)->build());
+            $this->em->flush();
+        } else {
+            $this->connection->update('pl_categories', ['flow' => 'INCOME'], ['company_id' => (string) $company->getId(), 'code' => $code]);
+        }
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('другое направление');
+
+        $this->extend($company, true);
+    }
+
+    /**
      * Регрессия (внешнее ревью): EBITDA строкой ввода формулу не считает — расходы МП не вошли бы в итог.
      */
     public function testTotalWithChangedTypeRefuses(): void
@@ -323,8 +354,8 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         } else {
             $rev = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'REV_TOTAL']);
             self::assertInstanceOf(PLCategory::class, $rev);
-            $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($rev)->withName('Выручка без СПП')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
-            $sales = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Продажи без СПП')->withCode('REV_NOT_SPP')->build();
+            $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($rev)->withName('Выручка без СПП')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->withFlow(PLFlow::INCOME)->build();
+            $sales = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Продажи без СПП')->withCode('REV_NOT_SPP')->withFlow(PLFlow::INCOME)->build();
             $sales->setWeightInParent(['zero_weight' => '0.0000', 'cancelling' => '3.0000', 'fractional' => '0.9000'][$case]);
             $this->em->persist($group);
             $this->em->persist($sales);
