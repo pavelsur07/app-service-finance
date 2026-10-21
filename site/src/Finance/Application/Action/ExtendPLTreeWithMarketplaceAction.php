@@ -152,6 +152,7 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         }
 
         $this->assertMarketplaceLinesInPlace($companyId, $nodes, $universalFormulas);
+        $this->assertPathToNetProfitIsTemplate($companyId, $nodes);
 
         $changes = [];
         foreach ($nodes as $node) {
@@ -178,6 +179,63 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         }
 
         return $changes;
+    }
+
+    /**
+     * Итоги, через которые статьи доходят до чистой прибыли (от NET_PROFIT по слагаемым формул и по
+     * потомкам групп), должны считаться по шаблону: KPI — шаблонной формулой («Базового» или уже
+     * расширения), группа — суммой потомков без формулы. Своя формула на этом пути (например, с
+     * умножением) могла бы считать статьи маркетплейса не один раз, и проверка расчётом по одной
+     * статье этого не увидит. Формулы вне пути (маржи, доли) — свободны.
+     *
+     * @param list<PLCategoryTreeNode> $nodes
+     */
+    private function assertPathToNetProfitIsTemplate(string $companyId, array $nodes): void
+    {
+        $byCode = [];
+        $children = [];
+        foreach ($nodes as $node) {
+            if (null !== $node->code) {
+                $byCode[$node->code] = $node;
+                if (null !== $node->parent?->code) {
+                    $children[$node->parent->code][] = $node->code;
+                }
+            }
+        }
+        $universal = [];
+        foreach ($this->templates->nodes(BusinessProfile::UNIVERSAL) as $node) {
+            $universal[(string) $node->code] = $node->formula;
+        }
+
+        $path = [];
+        $queue = ['NET_PROFIT'];
+        while ([] !== $queue) {
+            $code = array_shift($queue);
+            $node = $byCode[$code] ?? null;
+            if (null === $node || isset($path[$code]) || PLCategoryType::LEAF_INPUT === $node->type) {
+                continue;
+            }
+            $path[$code] = $node;
+            if (null !== $node->formula && '' !== trim($node->formula)) {
+                preg_match_all('/[A-Z][A-Z0-9_]*/', $node->formula, $terms);
+                $queue = [...$queue, ...$terms[0]];
+            } else {
+                $queue = [...$queue, ...($children[$code] ?? [])];
+            }
+        }
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT code, name, formula FROM pl_categories WHERE company_id = ? AND code IN (?)',
+            [$companyId, array_keys($path)],
+            [ParameterType::STRING, ArrayParameterType::STRING],
+        );
+        foreach ($rows as $row) {
+            $node = $path[(string) $row['code']];
+            $allowed = [$node->formula, $universal[$node->code] ?? $node->formula];
+            if (!self::same($row['formula'], $allowed[0]) && !self::same($row['formula'], $allowed[1])) {
+                throw PLTreeExtensionException::formulaChanged((string) $row['name'], (string) $row['formula'], (string) ($universal[$node->code] ?? $node->formula));
+            }
+        }
     }
 
     /**

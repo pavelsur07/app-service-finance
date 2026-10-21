@@ -228,6 +228,30 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     }
 
     /**
+     * Регрессия (внешнее ревью): своя нелинейная формула на пути к чистой прибыли (умножение)
+     * считала бы статьи маркетплейса не один раз, а проверка по одной статье этого не видит.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function changedPathTotals(): iterable
+    {
+        yield 'чистая прибыль с умножением' => ['NET_PROFIT', 'EBITDA + BELOW_EBITDA_TOTAL + BELOW_EBITDA_INCOME_TOTAL + REV_SALES_TOTAL * PROMO_TOTAL'];
+        yield 'группа с формулой' => ['OVERHEAD_TOTAL', 'OVERHEAD_PROD_TOTAL * 2'];
+    }
+
+    #[DataProvider('changedPathTotals')]
+    public function testChangedTotalOnPathToNetProfitRefuses(string $code, string $formula): void
+    {
+        $company = $this->universalCompany();
+        $this->connection->update('pl_categories', ['formula' => $formula], ['company_id' => (string) $company->getId(), 'code' => $code]);
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('изменили вручную');
+
+        $this->extend($company, true);
+    }
+
+    /**
      * Регрессия (внешнее ревью): EBITDA строкой ввода формулу не считает — расходы МП не вошли бы в итог.
      */
     public function testTotalWithChangedTypeRefuses(): void
