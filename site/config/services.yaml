@@ -263,18 +263,10 @@ services:
     App\Ingestion\Application\Source\Ozon\OzonOrderMapper:
         tags: ['app.ingestion.order_mapper']
 
-    # Один класс стратегии на обе схемы: они отличаются только строкой ресурса.
-    ingestion.strategy.ozon_orders_fbo:
-        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
-        arguments:
-            $resourceType: 'ozon_orders_fbo'
-        tags: ['app.ingestion.incremental_strategy']
-
-    ingestion.strategy.ozon_orders_fbs:
-        class: App\Ingestion\Application\Service\OzonOrdersIncrementalStrategy
-        arguments:
-            $resourceType: 'ozon_orders_fbs'
-        tags: ['app.ingestion.incremental_strategy']
+    # Инкрементальная загрузка заказов Ozon (ozon_orders_fbo / ozon_orders_fbs) снята 21.10.2026:
+    # /v2/posting/fbo/list и /v3/posting/fbs/list отключены Ozon (GlitchTip #439, #442), отправления
+    # грузит ozon-fetcher (docs/tasks/ozon-orders-posting-list/). Обновление статусов загруженных
+    # заказов (/v2/posting/fbo/get, /v3/posting/fbs/get) — RefreshOrderStatusesAction, остаётся.
 
     # ─── Заказы Wildberries ───
     App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClientInterface: '@App\Ingestion\Infrastructure\Api\Wildberries\WbOrdersClient'

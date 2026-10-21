@@ -150,7 +150,7 @@
 
 - `app:ingestion:reap-stale-jobs` (cron `52 * * * *`) переводит задачи, застрявшие в `OPEN`/`RUNNING` без движения дольше порога (по умолчанию 6 ч), в `FAILED` с причиной `stale_no_progress`. Без этого ресурс блокируется навсегда: `SyncJobRepository::findLatestForResource()` считает активной любую такую задачу **без ограничения по возрасту**, а `StartIncrementalAction` бросает на неё `ActiveBackfillExistsException`. Воркер, убитый по SIGKILL или OOM, не выполняет `finally`, и загрузка прекращается молча — `RunIncrementalCommand` засчитывает это как `skippedActive` и возвращает успех.
 
-- `app:ingestion:run-incremental --resource=<type>` ограничивает обход одним ресурсом. Опция существует ради каденции: заказы обходятся раз в час, финансовые ресурсы — раз в сутки, и у каждой группы своя строка в `docker/cron/app.cron` (`35/37 * * * *` для `ozon_orders_fbo`/`ozon_orders_fbs`, `0 3 * * *` для остального). Переводить общую команду на почасовой запуск нельзя: финансовые стратегии просыпались бы 24 раза в сутки без нужды. Неизвестное значение даёт пустой отбор и ноль задач, а не полный обход — опечатка в cron не должна тихо превращаться в обход всех ресурсов.
+- `app:ingestion:run-incremental --resource=<type>` ограничивает обход одним ресурсом. Опция существует ради каденции: заказы обходятся раз в час, финансовые ресурсы — раз в сутки, и у каждой группы своя строка в `docker/cron/app.cron` (`39/41 * * * *` для заказов WB, `0 3 * * *` для остального; заказы Ozon `ozon_orders_fbo`/`ozon_orders_fbs` сняты 21.10.2026 — списки отправлений отключены Ozon, отправления грузит `ozon-fetcher`, `--resource` с ними даёт ошибку). Переводить общую команду на почасовой запуск нельзя: финансовые стратегии просыпались бы 24 раза в сутки без нужды. Неизвестное значение даёт пустой отбор и ноль задач, а не полный обход — опечатка в cron не должна тихо превращаться в обход всех ресурсов.
 - Каденция принадлежит стратегии, а не крону: `IncrementalResourceStrategyInterface::cursorIsDue()` — единственный источник истины. `AbstractHourlyCursorIncrementalStrategy` пропускает курсор, обновлённый менее `$minIntervalMinutes` назад. По умолчанию 55, а не 60: порог намеренно меньше периода крона, потому что курсор пишется по фактическому времени воркера — при ровно часовом пороге прогон, завершившийся в 12:36, отодвигал бы следующий обход с 13:35 на 14:35, и ресурс молча становился двухчасовым. Лишний запуск крона безвреден: повторный обход окна идемпотентен.
 
 - `IngestCursor` stores opaque cursor state for `(companyId, connectionRef, resourceType, shopRef)` and advances only through `UpdateCursorAction` / `SyncFacade::updateCursor`.
@@ -4053,7 +4053,7 @@ config/
 | `app:marketplace-ads:finalizer` | `* * * * *` | RUNNING jobs → COMPLETED / FAILED / PARTIAL_SUCCESS |
 | `app:marketplace-ads:wb-daily-spend` | `15 6 * * *` | Загрузка расхода рекламы WB за завершённый день с распределением по nmId |
 | **Ingestion** | | |
-| `app:ingestion:run-incremental --resource=<ozon_orders_fbo|ozon_orders_fbs|wildberries_orders_marketplace|wildberries_orders_statistics>` | `35`, `37`, `39`, `41` минута каждого часа | Почасовой обход заказов, отдельная строка на ресурс |
+| `app:ingestion:run-incremental --resource=<wildberries_orders_marketplace|wildberries_orders_statistics>` | `39`, `41` минута каждого часа | Почасовой обход заказов WB, отдельная строка на ресурс (заказы Ozon — `ozon-fetcher`) |
 | `app:ingestion:run-incremental` | `0 3 * * *` | Суточный обход остальных (финансовых) ресурсов |
 | `app:ingestion:orders:refresh-statuses` | `47 * * * *` | Почасовой перепрос статусов заказов |
 | `app:ingestion:reap-stale-jobs` | `52 * * * *` | Перевод застрявших `OPEN`/`RUNNING` задач в `FAILED` (`stale_no_progress`) |
@@ -4148,6 +4148,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.51 | 2026-10-21 | Ingestion: сняты инкрементальные стратегии и cron заказов Ozon (`ozon_orders_fbo`/`ozon_orders_fbs`) — методы списков отключены Ozon (#439, #442), отправления грузит `ozon-fetcher`; обновление статусов (`refresh-statuses`) остаётся |
 | 2.50 | 2026-10-21 | Marketplace: ресурсы отправлений Ozon — всем кабинетам с ключом seller (`ozon_fetcher.orders_companies: ['*']`) |
 | 2.49 | 2026-10-21 | Marketplace: в снимке кабинетов — ресурсы отправлений `ozon.orders.fbo` / `ozon.orders.fbs` по списку компаний `ozon_fetcher.orders_companies`; ServiceGateway: строки «Заказы FBO/FBS» карты покрытия — только при задачах, дни до первой задачи не пропуск |
 | 2.48 | 2026-10-21 | Finance: статьи маркетплейса в «Базовом» дереве — `ExtendPLTreeWithMarketplaceAction`, шаблон `universal_marketplace_extension.json`, `FinanceFacade::needsMarketplacePlExtension()`; Marketplace: подсказка на странице подключений |

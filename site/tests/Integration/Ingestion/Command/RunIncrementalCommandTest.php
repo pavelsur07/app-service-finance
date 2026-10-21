@@ -359,21 +359,41 @@ final class RunIncrementalCommandTest extends IntegrationTestCase
     public function testResourceFilterDispatchesOnlyRequestedResource(): void
     {
         $company = $this->seedCompany(1014);
-        $this->seedConnection($company, '77777777-7777-7777-7777-000000001014');
+        $connection = $this->seedConnection($company, '77777777-7777-7777-7777-000000001014', MarketplaceType::WILDBERRIES);
+        $this->seedCursor($company->getId(), $connection->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED, $connection->getId(), '2025-01-10');
 
         $transport = $this->getIngestFetchTransport();
         $transport->reset();
 
         $tester = $this->tester('app:ingestion:run-incremental');
-        $exit = $tester->execute(['--resource' => OzonResourceType::ORDERS_FBO]);
+        $exit = $tester->execute(['--resource' => WbResourceType::ORDERS_MARKETPLACE]);
 
         self::assertSame(Command::SUCCESS, $exit);
         // Смысл опции: дать заказам собственный часовой слот в кроне, не
         // разбудив при этом суточные финансовые стратегии.
-        self::assertSame(1, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ORDERS_FBO));
-        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ORDERS_FBS));
-        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), OzonResourceType::ACCRUAL_BY_DAY));
+        self::assertSame(1, $this->incrementalJobCountForResource((string) $company->getId(), WbResourceType::ORDERS_MARKETPLACE));
+        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), WbResourceType::ORDERS_STATISTICS));
+        self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), WbResourceType::FINANCE_SALES_REPORT_DETAILED));
         self::assertCount(1, $transport->getSent());
+    }
+
+    public function testRetiredOzonOrdersListIsNotLoaded(): void
+    {
+        // /v2/posting/fbo/list и /v3/posting/fbs/list отключены Ozon (GlitchTip #439, #442);
+        // отправления грузит ozon-fetcher. Ни общий прогон, ни фильтр не ходят в них.
+        $company = $this->seedCompany(1016);
+        $this->seedConnection($company, '77777777-7777-7777-7777-000000001016');
+
+        $transport = $this->getIngestFetchTransport();
+        $transport->reset();
+
+        $tester = $this->tester('app:ingestion:run-incremental');
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        foreach ([OzonResourceType::ORDERS_FBO, OzonResourceType::ORDERS_FBS] as $resource) {
+            self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), $resource), $resource);
+            self::assertSame(Command::INVALID, $this->tester('app:ingestion:run-incremental')->execute(['--resource' => $resource]), $resource);
+            self::assertSame(0, $this->incrementalJobCountForResource((string) $company->getId(), $resource), $resource);
+        }
     }
 
     public function testUnknownResourceFilterDispatchesNothing(): void
