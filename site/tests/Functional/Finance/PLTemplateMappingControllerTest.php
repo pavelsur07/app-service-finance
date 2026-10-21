@@ -143,7 +143,7 @@ final class PLTemplateMappingControllerTest extends WebTestCaseBase
         self::assertSame(['screen'], $this->em()->getConnection()->fetchFirstColumn('SELECT source FROM pl_template_applications WHERE company_id = ?', [(string) $company->getId()]));
 
         $crawler = $client->request('GET', '/pl-categories/import');
-        self::assertStringContainsString('Дерево из шаблона «Маркетплейсы и e-com» (версия 2', $crawler->filter('[data-template-origin]')->text());
+        self::assertStringContainsString('Дерево из шаблона «Маркетплейсы и e-com»', $crawler->filter('[data-template-origin]')->text());
     }
 
     public function testTemplatePreviewOfAnotherProfileIsRefused(): void

@@ -10,6 +10,8 @@ parameters:
     finance.pl_templates:
         MARKETPLACE: '%kernel.project_dir%/config/finance/pl_templates/marketplace.json'
         UNIVERSAL: '%kernel.project_dir%/config/finance/pl_templates/universal.json'
+    # «Базовый» шаблон со статьями маркетплейса: дополнение дерева компании UNIVERSAL (ExtendPLTreeWithMarketplaceAction).
+    finance.pl_marketplace_extension: '%kernel.project_dir%/config/finance/pl_templates/universal_marketplace_extension.json'
     balance.structure_templates:
         MARKETPLACE: '%kernel.project_dir%/config/balance/templates/marketplace.yaml'
         UNIVERSAL: '%kernel.project_dir%/config/balance/templates/universal.yaml'
@@ -520,6 +522,7 @@ services:
     App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider:
         arguments:
             $templatePaths: '%finance.pl_templates%'
+            $marketplaceExtensionPath: '%finance.pl_marketplace_extension%'
 
     # Dedicated untraceable transport: credentials must not enter the HTTP profiler.
     moysklad.http_client:

@@ -53,11 +53,70 @@ final class TemplateRegistryTest extends KernelTestCase
     {
         $reader = new PLCategoryTreeFileReader();
         $templates = [];
-        foreach (array_unique($this->registry('finance.pl_templates')) as $path) {
+        // Расширение «Базовый + маркетплейсы» — тот же словарь: статьи маркетплейса на своих местах.
+        $extension = self::getContainer()->getParameter('finance.pl_marketplace_extension');
+        foreach ([...array_unique($this->registry('finance.pl_templates')), $extension] as $path) {
             $templates[basename($path)] = self::plSignatures($reader->read((string) file_get_contents($path)));
         }
 
+        self::assertCount(3, $templates);
         self::assertSame([], self::conflicts($templates));
+    }
+
+    /**
+     * Расширение = «Базовый» шаблон + вставки: каждая статья «Базового» в нём с теми же полями и
+     * родителем; формулы REV_TOTAL и EBITDA расширения содержат все слагаемые формул «Базового» —
+     * новая версия «Базового» не разойдётся с расширением молча.
+     */
+    public function testMarketplaceExtensionIsUniversalTemplatePlusInserts(): void
+    {
+        $reader = new PLCategoryTreeFileReader();
+        $describe = static function (array $nodes): array {
+            $out = [];
+            foreach ($nodes as $n) {
+                $out[(string) $n->code] = ['parent' => $n->parent?->code, 'name' => $n->name, 'type' => $n->type->value, 'flow' => $n->flow->value, 'format' => $n->format->value, 'expenseType' => $n->expenseType->value, 'weight' => $n->weightInParent, 'visible' => $n->isVisible, 'formula' => $n->formula];
+            }
+
+            return $out;
+        };
+        $universal = $describe($reader->read((string) file_get_contents((string) $this->registry('finance.pl_templates')['UNIVERSAL'])));
+        $extension = $describe($reader->read((string) file_get_contents((string) self::getContainer()->getParameter('finance.pl_marketplace_extension'))));
+
+        foreach ($universal as $code => $node) {
+            self::assertArrayHasKey($code, $extension);
+            $inExtension = $extension[$code];
+            $formula = (string) $node['formula'];
+            $extended = (string) $inExtension['formula'];
+            if ($formula !== $extended) {
+                preg_match_all('/[A-Z][A-Z0-9_]*/', $formula, $terms);
+                foreach ($terms[0] as $term) {
+                    self::assertStringContainsString($term, $extended, $code.': слагаемое «Базового» потеряно');
+                }
+                $node['formula'] = $inExtension['formula'] = null;
+            }
+            self::assertSame($node, $inExtension, $code);
+        }
+    }
+
+    /**
+     * Расширение содержит каждый код, на который ссылаются шаблоны маппинга затрат и продаж
+     * маркетплейсов: иначе у компании «Базовый» затрата осталась бы без статьи.
+     */
+    public function testMarketplaceExtensionCoversMappingTemplateCodes(): void
+    {
+        $extension = self::getContainer()->getParameter('finance.pl_marketplace_extension');
+        $codes = array_map(static fn ($n): ?string => $n->code, (new PLCategoryTreeFileReader())->read((string) file_get_contents($extension)));
+
+        $root = (string) self::getContainer()->getParameter('kernel.project_dir');
+        $mappingCodes = [];
+        foreach (['default_cost_mapping.yaml', 'default_sale_mapping.yaml'] as $file) {
+            preg_match_all("/pl_code:\\s*'?([A-Z0-9_]+)/", (string) file_get_contents($root.'/config/marketplace/'.$file), $m);
+            $mappingCodes = [...$mappingCodes, ...$m[1]];
+        }
+        $mappingCodes = array_values(array_unique($mappingCodes));
+        self::assertGreaterThanOrEqual(20, \count($mappingCodes));
+
+        self::assertSame([], array_values(array_diff($mappingCodes, $codes)));
     }
 
     public function testBalanceCodesMeanTheSameInEveryTemplate(): void

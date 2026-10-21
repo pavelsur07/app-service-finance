@@ -1,0 +1,481 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Finance\Application;
+
+use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
+use App\Company\Enum\BusinessProfile;
+use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
+use App\Finance\Application\Action\EnsureDefaultPLTreeAction;
+use App\Finance\Application\Action\ExtendPLTreeWithMarketplaceAction;
+use App\Finance\Application\DTO\ExtendPLTreeResult;
+use App\Finance\Application\DTO\PLFormulaChange;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
+use App\Finance\Enum\PLTemplateApplicationSource;
+use App\Finance\Exception\PLTreeExtensionException;
+use App\Finance\Facade\FinanceFacade;
+use App\Finance\Facts\FactsProviderInterface;
+use App\Finance\Report\PlReportCalculator;
+use App\Finance\Report\PlReportPeriod;
+use App\Finance\Repository\PLCategoryRepository;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+/**
+ * «Базовое» дерево со статьями маркетплейса: статьи создаются на местах маркетплейсного шаблона,
+ * выручка маркетплейса входит в «Выручку», его расходы — в EBITDA.
+ */
+final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
+{
+    public function testExtendsUniversalTreeOnceAndRewritesTotals(): void
+    {
+        $company = $this->universalCompany();
+        self::assertTrue($this->facade()->needsMarketplacePlExtension((string) $company->getId()));
+
+        $preview = $this->extend($company, true);
+        self::assertCount(24, $preview->import->created);
+        self::assertSame(44, $this->categoryCount($company), 'предпросмотр ничего не пишет');
+
+        $result = $this->extend($company, false);
+
+        self::assertCount(24, $result->import->created);
+        self::assertEquals([
+            new PLFormulaChange('REV_TOTAL', 'Выручка', 'REV_SALES_TOTAL', 'REV_SALES_TOTAL + REV_NOT_SPP_TOTAL'),
+            new PLFormulaChange('EBITDA', 'EBITDA', 'GROSS_PROFIT + OVERHEAD_TOTAL', 'GROSS_PROFIT + PROMO_TOTAL + OPEX_WH_TOTAL + PRODUCT_INFRA_TOTAL + OVERHEAD_TOTAL'),
+        ], $result->formulaChanges);
+        self::assertSame(68, $this->categoryCount($company));
+        self::assertSame([['UNIVERSAL', 'onboarding'], ['UNIVERSAL', 'mp_extension']], $this->connection->fetchAllNumeric('SELECT profile, source FROM pl_template_applications WHERE company_id = ? ORDER BY applied_at, source DESC', [(string) $company->getId()]));
+        self::assertFalse($this->facade()->needsMarketplacePlExtension((string) $company->getId()));
+
+        $this->em->clear();
+        self::assertTrue($this->extend($company, false)->isEmpty(), 'повтор ничего не делает');
+        self::assertCount(0, (self::getContainer()->get(ApplyDefaultPLTemplateAction::class))((string) $company->getId(), true, PLTemplateApplicationSource::SCREEN)->created, '«Базовый шаблон» по-прежнему применяется');
+    }
+
+    public function testMarketplaceRevenueAndCostsReachTotals(): void
+    {
+        $company = $this->extendedCompany();
+
+        $values = $this->calculate($company, [
+            'REV_SALES' => 1000.0,
+            'REV_NOT_SPP' => 500.0,
+            'REV_RETURNS' => -50.0,
+            'REV_SPP_SALES' => 999.0,
+            'COGS_MP_COMMISSION' => -100.0,
+            'OPEX_WH_STORAGE' => -30.0,
+            'PROMO_INTERNAL' => -20.0,
+            'PRODUCT_INFRA_FF_SERVICES' => -10.0,
+            'OVERHEAD_PROD_CERT' => -5.0,
+        ]);
+
+        self::assertSame(
+            ['REV_TOTAL' => 1450.0, 'GROSS_PROFIT' => 1350.0, 'EBITDA' => 1285.0, 'NET_PROFIT' => 1285.0],
+            array_intersect_key($values, array_flip(['REV_TOTAL', 'GROSS_PROFIT', 'EBITDA', 'NET_PROFIT'])),
+        );
+    }
+
+    /**
+     * Каждая строка ввода доходит до чистой прибыли ровно один раз, кроме дивидендов
+     * (распределение прибыли) и выручки с СПП (справочно: СПП платит маркетплейс).
+     */
+    public function testEveryInputLineReachesNetProfitOnceExceptDividendsAndSpp(): void
+    {
+        $company = $this->extendedCompany();
+        $leaves = $this->connection->fetchFirstColumn("SELECT code FROM pl_categories WHERE company_id = ? AND type = 'LEAF_INPUT'", [(string) $company->getId()]);
+        $excluded = ['PROFIT_DISTR_DIVIDENDS', 'REV_SPP_SALES', 'REV_SPP_RETURNS'];
+        self::assertSame([], array_values(array_diff($excluded, $leaves)));
+
+        $values = $this->calculate($company, array_fill_keys($leaves, -1.0));
+
+        self::assertSame(-(float) (\count($leaves) - \count($excluded)), $values['NET_PROFIT']);
+    }
+
+    public function testMarketplaceProfileIsRefused(): void
+    {
+        $company = $this->company(BusinessProfile::MARKETPLACE);
+        self::assertSame(72, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('уже есть');
+
+        $this->extend($company, true);
+    }
+
+    public function testTreeNotFromUniversalTemplateIsRefused(): void
+    {
+        $company = $this->company(BusinessProfile::UNIVERSAL);
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('не из шаблона «Базовый»');
+
+        $this->extend($company, true);
+    }
+
+    public function testFormulaChangedByUserIsRefusedAndNothingWritten(): void
+    {
+        $company = $this->universalCompany();
+        $this->connection->update('pl_categories', ['formula' => 'GROSS_PROFIT + OVERHEAD_TOTAL + 0'], ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+
+        try {
+            $this->extend($company, false);
+            self::fail('Изменённую формулу нельзя перетирать');
+        } catch (PLTreeExtensionException $e) {
+            self::assertStringContainsString('Формулу «EBITDA» изменили вручную', $e->getMessage());
+        }
+
+        self::assertSame(44, $this->categoryCount($company));
+        self::assertSame('REV_SALES_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'REV_TOTAL'", [(string) $company->getId()]));
+    }
+
+    /**
+     * Регрессия (ревью): своя похожая статья («Расходы на продвижение» без кода) погасила бы группу
+     * PROMO_TOTAL, а EBITDA всё равно сослалась бы на неё — отказ целиком.
+     */
+    public function testSimilarOwnLineRefusesWholeExtension(): void
+    {
+        $company = $this->universalCompany();
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы на продвижение')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build());
+        $this->em->flush();
+
+        foreach ([true, false] as $dryRun) {
+            try {
+                $this->extend($company, $dryRun);
+                self::fail('Похожая статья должна отклонять дополнение');
+            } catch (PLTreeExtensionException $e) {
+                self::assertStringContainsString('«Расходы на продвижение» ≈ ваша «Расходы на продвижение»', $e->getMessage());
+            }
+        }
+
+        self::assertSame(45, $this->categoryCount($company));
+        self::assertSame('GROSS_PROFIT + OVERHEAD_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'EBITDA'", [(string) $company->getId()]));
+    }
+
+    /**
+     * Регрессия (ревью): своя группа с кодом OPEX_WH_TOTAL внутри операционных расходов попала бы в
+     * EBITDA дважды — через OVERHEAD_TOTAL и напрямую.
+     */
+    /**
+     * @return iterable<string, array{bool, bool, bool}>
+     */
+    public static function misplacements(): iterable
+    {
+        yield 'прямо под OVERHEAD_TOTAL' => [false, false, false];
+        // Внешнее ревью: родитель без кода выглядел как «корень» по коду родителя.
+        yield 'под своей группой без кода внутри OVERHEAD_TOTAL' => [true, false, false];
+        // Внешнее ревью: удалённая EBITDA создалась бы заново с формулой расширения без проверки.
+        yield 'EBITDA удалена' => [false, true, false];
+        // Внешнее ревью: формула уже расширена, а группа стоит не на месте.
+        yield 'формула EBITDA уже расширена' => [false, false, true];
+    }
+
+    #[DataProvider('misplacements')]
+    public function testExistingGroupOutOfTemplatePlaceRefuses(bool $underUncodedGroup, bool $ebitdaDeleted, bool $ebitdaExtended): void
+    {
+        $company = $this->universalCompany();
+        $parent = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
+        self::assertInstanceOf(PLCategory::class, $parent);
+        if ($underUncodedGroup) {
+            $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent)->withName('Логистика и склад')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $this->em->persist($parent);
+        }
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent)->withName('Склад')->withCode('OPEX_WH_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build());
+        $this->em->flush();
+        if ($ebitdaDeleted) {
+            $this->connection->delete('pl_categories', ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+        }
+        if ($ebitdaExtended) {
+            $this->connection->update('pl_categories', ['formula' => 'GROSS_PROFIT + PROMO_TOTAL + OPEX_WH_TOTAL + PRODUCT_INFRA_TOTAL + OVERHEAD_TOTAL'], ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+        }
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('не на месте шаблона');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессии (внешнее ревью): своя статья маркетплейса не на месте шаблона — «Продажи без СПП» в
+     * корне выпали бы из выручки, «Выручка с СПП» под «Выручкой» попала бы в прибыль.
+     *
+     * @return iterable<string, array{string, string, PLCategoryType, ?string}>
+     */
+    public static function misplacedMarketplaceLines(): iterable
+    {
+        yield 'продажи без СПП в корне' => ['REV_NOT_SPP', 'Продажи без СПП', PLCategoryType::LEAF_INPUT, null];
+        yield 'выручка с СПП под «Выручкой»' => ['REV_WITH_SPP', 'Выручка с СПП', PLCategoryType::SUBTOTAL, 'REV_SALES_TOTAL'];
+        yield 'группа склада — строкой ввода' => ['OPEX_WH_TOTAL', 'Склад МП', PLCategoryType::LEAF_INPUT, null];
+    }
+
+    #[DataProvider('misplacedMarketplaceLines')]
+    public function testMisplacedMarketplaceLineRefuses(string $code, string $name, PLCategoryType $type, ?string $parentCode): void
+    {
+        $company = $this->universalCompany();
+        $parent = null === $parentCode ? null : $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => $parentCode]);
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent instanceof PLCategory ? $parent : null)->withName($name)->withCode($code)->withType($type)->build());
+        $this->em->flush();
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('не на месте шаблона или другого типа');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессия (внешнее ревью): своя нелинейная формула на пути к чистой прибыли (умножение)
+     * считала бы статьи маркетплейса не один раз, а проверка по одной статье этого не видит.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function changedPathTotals(): iterable
+    {
+        yield 'чистая прибыль с умножением' => ['NET_PROFIT', 'EBITDA + BELOW_EBITDA_TOTAL + BELOW_EBITDA_INCOME_TOTAL + REV_SALES_TOTAL * PROMO_TOTAL'];
+        yield 'группа с формулой' => ['OVERHEAD_TOTAL', 'OVERHEAD_PROD_TOTAL * 2'];
+        // Внешнее ревью: своя группа с формулой внутри операционных расходов — обход по дереву компании.
+        yield 'своя группа с формулой' => ['', 'OVERHEAD_PROD_TOTAL * REV_SALES_TOTAL'];
+        // Внешнее ревью: группа, которую в итоги впервые включает расширение (свой корень PROMO_TOTAL).
+        yield 'своя формула под PROMO_TOTAL' => ['PROMO_TOTAL', 'REV_SALES_TOTAL * PROMO_INTERNAL'];
+    }
+
+    #[DataProvider('changedPathTotals')]
+    public function testChangedTotalOnPathToNetProfitRefuses(string $code, string $formula): void
+    {
+        $company = $this->universalCompany();
+        if ('PROMO_TOTAL' === $code) {
+            $promo = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Расходы на продвижение')->withCode('PROMO_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build();
+            $own = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($promo)->withName('Своя надбавка')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $own->setFormula($formula);
+            $this->em->persist($promo);
+            $this->em->persist($own);
+            $this->em->flush();
+        } elseif ('' === $code) {
+            $overhead = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $overhead);
+            $own = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($overhead)->withName('Своя надбавка')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $own->setFormula($formula);
+            $this->em->persist($own);
+            $this->em->flush();
+        } else {
+            $this->connection->update('pl_categories', ['formula' => $formula], ['company_id' => (string) $company->getId(), 'code' => $code]);
+        }
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('изменили вручную');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессия (внешнее ревью): комиссия МП (своя, на месте шаблона) или общая «Доставка» с
+     * направлением «доход» — данные МП легли бы с неверным знаком.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function wrongFlows(): iterable
+    {
+        yield 'своя комиссия МП' => ['COGS_MP_COMMISSION'];
+        yield 'общая доставка' => ['COGS_DELIVERY'];
+    }
+
+    #[DataProvider('wrongFlows')]
+    public function testInputLineWithWrongFlowRefuses(string $code): void
+    {
+        $company = $this->universalCompany();
+        if ('COGS_MP_COMMISSION' === $code) {
+            $cogs = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'COGS_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $cogs);
+            $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($cogs)->withName('Комиссия МП')->withCode($code)->withFlow(PLFlow::INCOME)->build());
+            $this->em->flush();
+        } else {
+            $this->connection->update('pl_categories', ['flow' => 'INCOME'], ['company_id' => (string) $company->getId(), 'code' => $code]);
+        }
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('другое направление');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессия (внешнее ревью): вес изменили после предпросмотра (статьи уже в EntityManager) —
+     * применение читает актуальные данные и откатывается, а не сверяет по устаревшим.
+     */
+    public function testChangeAfterPreviewIsSeenByApply(): void
+    {
+        $company = $this->universalCompany();
+        $this->extend($company, true);
+        $this->connection->update('pl_categories', ['weight_in_parent' => '0.0000'], ['company_id' => (string) $company->getId(), 'code' => 'COGS_DELIVERY']);
+
+        try {
+            $this->extend($company, false);
+            self::fail('Устаревший вес не должен пройти сверку');
+        } catch (PLTreeExtensionException $e) {
+            self::assertStringContainsString('COGS_DELIVERY', $e->getMessage());
+        }
+
+        self::assertSame(44, $this->categoryCount($company));
+    }
+
+    /**
+     * Регрессия (внешнее ревью): EBITDA строкой ввода формулу не считает — расходы МП не вошли бы в итог.
+     */
+    public function testTotalWithChangedTypeRefuses(): void
+    {
+        $company = $this->universalCompany();
+        $this->connection->update('pl_categories', ['type' => 'LEAF_INPUT'], ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+
+        $this->expectException(PLTreeExtensionException::class);
+        $this->expectExceptionMessage('Итог «EBITDA» (код EBITDA) другого типа');
+
+        $this->extend($company, true);
+    }
+
+    /**
+     * Регрессии (внешнее ревью): вручную перестроенное дерево, которое проверки мест не ловят, —
+     * «Производственные» вынесены в корень (сертификация не дошла бы до EBITDA), вес «Продаж без СПП»
+     * 0 (продажи МП не вошли бы в выручку). Сверка расчётом откатывает дополнение целиком.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function brokenTrees(): iterable
+    {
+        yield '«Производственные» в корне' => ['prod_root'];
+        yield 'вес продаж МП 0' => ['zero_weight'];
+        // Внешнее ревью: веса 3 и 0 у продаж и возвратов МП давали ту же сумму, что 1 и 1.
+        yield 'веса 3 и 0 компенсируют друг друга' => ['cancelling'];
+        yield 'дробный вес 0,9' => ['fractional'];
+        // Внешнее ревью: общая с «Базовым» статья, на которую ложится логистика МП, с весом 0.
+        yield 'доставка с весом 0' => ['shared_zero'];
+        // Внешнее ревью: «Производственные» внутри себестоимости — сертификация уменьшала бы валовую прибыль.
+        yield '«Производственные» в себестоимости' => ['prod_in_cogs'];
+    }
+
+    #[DataProvider('brokenTrees')]
+    public function testTreeWhereMarketplaceLinesWouldNotReachNetProfitIsRolledBack(string $case): void
+    {
+        $company = $this->universalCompany();
+        $id = (string) $company->getId();
+        if ('prod_in_cogs' === $case) {
+            $cogsId = $this->connection->fetchOne("SELECT id FROM pl_categories WHERE company_id = ? AND code = 'COGS_TOTAL'", [$id]);
+            $this->connection->update('pl_categories', ['parent_id' => $cogsId], ['company_id' => $id, 'code' => 'OVERHEAD_PROD_TOTAL']);
+            $expected = 'OVERHEAD_PROD_CERT';
+        } elseif ('shared_zero' === $case) {
+            $this->connection->update('pl_categories', ['weight_in_parent' => '0.0000'], ['company_id' => $id, 'code' => 'COGS_DELIVERY']);
+            $expected = 'COGS_DELIVERY';
+        } elseif ('prod_root' === $case) {
+            $this->connection->update('pl_categories', ['parent_id' => null], ['company_id' => $id, 'code' => 'OVERHEAD_PROD_TOTAL']);
+            $expected = 'OVERHEAD_PROD_CERT';
+        } else {
+            $rev = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'REV_TOTAL']);
+            self::assertInstanceOf(PLCategory::class, $rev);
+            $group = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($rev)->withName('Выручка без СПП')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->withFlow(PLFlow::INCOME)->build();
+            $sales = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Продажи без СПП')->withCode('REV_NOT_SPP')->withFlow(PLFlow::INCOME)->build();
+            $sales->setWeightInParent(['zero_weight' => '0.0000', 'cancelling' => '3.0000', 'fractional' => '0.9000'][$case]);
+            $this->em->persist($group);
+            $this->em->persist($sales);
+            if ('cancelling' === $case) {
+                $returns = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($group)->withName('Возвраты без СПП (−)')->withCode('REV_RETURNS')->withFlow(PLFlow::EXPENSE)->build();
+                $returns->setWeightInParent('0.0000');
+                $this->em->persist($returns);
+            }
+            $this->em->flush();
+            $expected = 'REV_NOT_SPP';
+        }
+        $before = $this->categoryCount($company);
+        $this->em->clear();
+
+        try {
+            $this->extend($company, false);
+            self::fail('Дерево, где статьи МП не дошли бы до чистой прибыли, не должно дополняться');
+        } catch (PLTreeExtensionException $e) {
+            self::assertStringContainsString('не вошли бы в чистую прибыль', $e->getMessage());
+            self::assertStringContainsString($expected, $e->getMessage());
+        }
+
+        self::assertSame($before, $this->categoryCount($company), 'откат: статьи не созданы');
+        self::assertSame('GROSS_PROFIT + OVERHEAD_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'EBITDA'", [$id]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_template_applications WHERE company_id = ?', [$id]));
+    }
+
+    private function extend(Company $company, bool $dryRun): ExtendPLTreeResult
+    {
+        return (self::getContainer()->get(ExtendPLTreeWithMarketplaceAction::class))((string) $company->getId(), $dryRun);
+    }
+
+    private function facade(): FinanceFacade
+    {
+        return self::getContainer()->get(FinanceFacade::class);
+    }
+
+    private function extendedCompany(): Company
+    {
+        $company = $this->universalCompany();
+        $this->extend($company, false);
+        $this->em->clear();
+        $company = $this->em->find(Company::class, $company->getId());
+        self::assertInstanceOf(Company::class, $company);
+
+        return $company;
+    }
+
+    private function universalCompany(): Company
+    {
+        $company = $this->company(BusinessProfile::UNIVERSAL);
+        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+
+        return $company;
+    }
+
+    private function company(BusinessProfile $profile): Company
+    {
+        $owner = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $company->setBusinessProfile($profile);
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->em->flush();
+
+        return $company;
+    }
+
+    private function categoryCount(Company $company): int
+    {
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]);
+    }
+
+    /**
+     * @param array<string, float> $facts
+     *
+     * @return array<string, float>
+     */
+    private function calculate(Company $company, array $facts): array
+    {
+        $calculator = new PlReportCalculator(self::getContainer()->get(PLCategoryRepository::class), new class($facts) implements FactsProviderInterface {
+            /** @param array<string, float> $facts */
+            public function __construct(private array $facts)
+            {
+            }
+
+            public function value(Company $company, PlReportPeriod $period, string $code, ProjectDirection|array|null $projectDirection = null, string|array|null $responsibilityCenterId = null): float
+            {
+                return $this->facts[$code] ?? 0.0;
+            }
+        });
+
+        $result = $calculator->calculate($company, new PlReportPeriod(new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-31'), 'Октябрь'));
+        self::assertSame([], $result->warnings, 'Формулы ссылаются на существующие коды');
+
+        $values = [];
+        foreach ($result->rows as $row) {
+            $values[(string) $row->code] = round($row->rawValue, 4);
+        }
+
+        return $values;
+    }
+}

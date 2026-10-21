@@ -9,6 +9,7 @@ use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
+use App\Finance\Application\Action\ExtendPLTreeWithMarketplaceAction;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DeletePLCategoryAction;
@@ -45,6 +46,7 @@ class PLCategoryController extends AbstractController
         private readonly CompanyFacade $companyFacade,
         private readonly ApplyDefaultPLTemplateAction $applyTemplate,
         private readonly PLTemplateApplicationRepository $templateApplications,
+        private readonly ExtendPLTreeWithMarketplaceAction $extendWithMarketplace,
     ) {
     }
 
@@ -100,7 +102,16 @@ class PLCategoryController extends AbstractController
         $preview = null;
         $previewMode = null;
 
-        if ('template' === $request->query->get('source')) {
+        $extendPreview = null;
+        if ('marketplace' === $request->query->get('source')) {
+            // Статьи маркетплейса в «Базовом» дереве: предпросмотр — что создаст и какие формулы итогов заменит.
+            $sourceCompanyId = null;
+            try {
+                $extendPreview = ($this->extendWithMarketplace)((string) $targetCompany->getId(), true);
+            } catch (\DomainException $e) {
+                $this->addFlash('danger', $e->getMessage());
+            }
+        } elseif ('template' === $request->query->get('source')) {
             // Базовый шаблон только добавляет недостающие статьи: настройки
             // компании (имена, места, типы совпавших по коду статей) не трогаются.
             $sourceCompanyId = null;
@@ -133,6 +144,7 @@ class PLCategoryController extends AbstractController
             'targetCompanyId' => (string) $targetCompany->getId(),
             'businessProfile' => $targetCompany->getBusinessProfile(),
             'templateOrigin' => $this->templateApplications->findLatestByCompanyId((string) $targetCompany->getId()),
+            'extendPreview' => $extendPreview,
             'preview' => $preview,
             'previewMode' => $previewMode,
             'uploadedFileName' => null,
