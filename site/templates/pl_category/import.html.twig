@@ -117,6 +117,15 @@
                                     <li>{{ row.path }} <code>{{ row.code }}</code> — у вас «{{ row.existingName }}»</li>
                                 {% endfor %}
                             </ul>
+                            {% if preview.skippedWithSimilar is not empty %}
+                                <p class="mt-2 mb-1">Вместе с ними не будут созданы вложенные статьи шаблона:</p>
+                                <ul class="mb-0">
+                                    {% for row in preview.skippedWithSimilar %}
+                                        <li>{{ row.path }} <code>{{ row.code }}</code></li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            <p class="mt-2 mb-0 small">Сопоставить можно статью того же типа и уровня; иначе переименуйте свою статью, если это не дубль.</p>
                         </div>
                     {% endif %}
 

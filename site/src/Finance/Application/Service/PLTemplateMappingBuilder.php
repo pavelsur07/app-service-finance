@@ -31,12 +31,13 @@ final readonly class PLTemplateMappingBuilder
         // Одним запросом: родители статей уже в памяти, путь собирается без запросов.
         $tree = $this->categories->findTreeByCompany($company);
         $codes = [];
+        /** @var list<array{PLCategory, PLTemplateMappingCandidate}> $uncoded */
         $uncoded = [];
         foreach ($tree as $category) {
             if (null !== $category->getCode()) {
                 $codes[$category->getCode()] = true;
             } else {
-                $uncoded[] = $category;
+                $uncoded[] = [$category, new PLTemplateMappingCandidate((string) $category->getId(), $this->categoryPath($category))];
             }
         }
 
@@ -56,11 +57,15 @@ final readonly class PLTemplateMappingBuilder
 
             $candidates = [];
             $suggestedId = null;
-            foreach ($uncoded as $category) {
-                if ($category->getType() !== $node->type) {
+            foreach ($uncoded as [$category, $candidate]) {
+                // Те же условия, что проверит BindPLCategoriesToTemplateAction: тип, уровень, суммирование.
+                if ($category->getType() !== $node->type
+                    || (null === $category->getParent()) !== (null === $node->parent)
+                    || ($node->type->sumsChildren($node->formula) && !$category->getType()->sumsChildren($category->getFormula()))
+                ) {
                     continue;
                 }
-                $candidates[] = new PLTemplateMappingCandidate((string) $category->getId(), $this->categoryPath($category));
+                $candidates[] = $candidate;
                 if (null === $suggestedId && !isset($suggested[$category->getId()]) && $this->similarity->similar($node->name, $category->getName())) {
                     $suggestedId = (string) $category->getId();
                     $suggested[$suggestedId] = true;

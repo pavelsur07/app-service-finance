@@ -77,6 +77,9 @@ final class ApplyDefaultPLTreeCommand extends Command
         foreach ($result->similar as $row) {
             $output->writeln(\sprintf('similar %-40s %s ≈ «%s»', $row->code ?? '', $row->path, $row->existingName));
         }
+        foreach ($result->skippedWithSimilar as $row) {
+            $output->writeln(\sprintf('skip    %-40s %s', $row->code ?? '', $row->path));
+        }
         $output->writeln(\sprintf(
             '%s: create %d, keep existing %d, similar %d; company roots recognized %d of %d',
             $execute ? 'applied' : 'plan (dry run)',

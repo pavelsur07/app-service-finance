@@ -13,7 +13,6 @@ use App\Finance\Application\DTO\ImportPLCategoryTreeSimilarRow;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Entity\PLCategory;
-use App\Finance\Enum\PLCategoryType;
 use App\Finance\Exception\PLTreeWouldDuplicateException;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -58,7 +57,7 @@ final class ImportPLCategoryTreeAction
 
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
         $companyCategories = $this->plCategoryRepository->findTreeByCompany($targetCompany);
-        $similar = $command->onlyCreate ? $this->skipSimilar($plan, $companyCategories) : [];
+        [$similar, $skippedWithSimilar] = $command->onlyCreate ? $this->skipSimilar($plan, $companyCategories) : [[], []];
         [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $command->onlyCreate);
         [$companyRoots, $recognizedRoots] = $this->guardAgainstSecondTree($plan, $companyCategories, $command->onlyCreate);
 
@@ -97,19 +96,20 @@ final class ImportPLCategoryTreeAction
             });
         }
 
-        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes, $similar, $companyRoots, $recognizedRoots);
+        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes, $similar, $companyRoots, $recognizedRoots, $skippedWithSimilar);
     }
 
     /**
      * Убирает из плана новые узлы, у которых в компании уже есть неопознанная статья с похожим
      * названием, вместе с их новыми потомками: шаблонная «Налог на прибыль» рядом со своей
      * «Налог на прибыль / УСН» — дубль. Опознанные статьи компании (совпавшие по коду с другим узлом
-     * источника) в кандидаты не входят: они уже заняты своим узлом.
+     * источника) в кандидаты не входят: они уже заняты своим узлом. Одна статья компании гасит не
+     * больше одного узла — как одна строка не может быть дублем нескольких.
      *
      * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> &$plan
      * @param PLCategory[] $companyCategories
      *
-     * @return list<ImportPLCategoryTreeSimilarRow>
+     * @return array{0: list<ImportPLCategoryTreeSimilarRow>, 1: list<ImportPLCategoryTreeRow>} похожие и пропущенные вместе с ними потомки
      */
     private function skipSimilar(array &$plan, array $companyCategories): array
     {
@@ -121,10 +121,11 @@ final class ImportPLCategoryTreeAction
         }
         $candidates = array_values(array_filter($companyCategories, static fn (PLCategory $c): bool => !isset($claimed[$c->getId()])));
         if ([] === $candidates) {
-            return [];
+            return [[], []];
         }
 
         $similar = [];
+        $skippedDescendants = [];
         $skippedKeys = [];
         $kept = [];
         foreach ($plan as $item) {
@@ -132,11 +133,13 @@ final class ImportPLCategoryTreeAction
             if (null === $item['existing']) {
                 if (null !== $node->parent && isset($skippedKeys[$node->parent->key])) {
                     $skippedKeys[$node->key] = true;
+                    $skippedDescendants[] = new ImportPLCategoryTreeRow($node->name, $node->code, $this->buildPath($node));
 
                     continue;
                 }
                 $candidate = $this->similarCandidate($node->name, $candidates);
                 if (null !== $candidate) {
+                    $candidates = array_values(array_filter($candidates, static fn (PLCategory $c): bool => $c !== $candidate));
                     $similar[] = new ImportPLCategoryTreeSimilarRow($node->name, $node->code, $this->buildPath($node), (string) $candidate->getId(), $candidate->getName());
                     $skippedKeys[$node->key] = true;
 
@@ -147,7 +150,7 @@ final class ImportPLCategoryTreeAction
         }
         $plan = $kept;
 
-        return $similar;
+        return [$similar, $skippedDescendants];
     }
 
     /**
@@ -168,6 +171,8 @@ final class ImportPLCategoryTreeAction
      * Новые корневые статьи в непустую компанию — только если источник опознал не меньше
      * половины её корневых статей: иначе рядом с её деревом встал бы второй скелет (dry-run на
      * проде 21.10: 0 из 3–9 у компаний со своим деревом, 19–21 из 21–27 у компаний на шаблоне).
+     * Опознанный корень — статья компании, совпавшая с корневым узлом источника: корень компании,
+     * совпавший с вложенным узлом, остаётся корнем, и корень источника над ним встал бы рядом.
      *
      * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
      * @param PLCategory[] $companyCategories
@@ -179,7 +184,7 @@ final class ImportPLCategoryTreeAction
         $claimed = [];
         $createsRoot = false;
         foreach ($plan as $item) {
-            if (null !== $item['existing']) {
+            if (null !== $item['existing'] && null === $item['sourceNode']->parent) {
                 $claimed[$item['existing']->getId()] = true;
             }
             if ('create' === $item['operation'] && null === $item['sourceNode']->parent) {
@@ -425,11 +430,6 @@ final class ImportPLCategoryTreeAction
         return $plan;
     }
 
-    private function sumsChildren(PLCategoryType $type, ?string $formula): bool
-    {
-        return PLCategoryType::SUBTOTAL === $type && '' === trim((string) $formula);
-    }
-
     /**
      * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
      */
@@ -479,8 +479,8 @@ final class ImportPLCategoryTreeAction
                 // строка ввода берёт свои факты, KPI и подытог с формулой — формулу.
                 // Если в шаблоне это сумма потомков, а у компании нет, новые
                 // статьи под ней молча выпали бы из итогов отчёта.
-                if ($this->sumsChildren($sourceNode->type, $sourceNode->formula)
-                    && !$this->sumsChildren($existing->getType(), $existing->getFormula())
+                if ($sourceNode->type->sumsChildren($sourceNode->formula)
+                    && !$existing->getType()->sumsChildren($existing->getFormula())
                     && $this->hasChildren($plan, $sourceNode)
                 ) {
                     throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании считается не суммой вложенных статей, а в шаблоне это группа. Сделайте её подытогом без формулы или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));

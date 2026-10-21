@@ -95,7 +95,71 @@ final class ImportPLCategoryTreeNoSecondTreeTest extends IntegrationTestCase
 
         self::assertSame([], $result->created);
         self::assertSame(['BELOW_EBITDA_TOTAL'], array_map(static fn (ImportPLCategoryTreeSimilarRow $r): ?string => $r->code, $result->similar));
+        self::assertSame(['BELOW_EBITDA_DEPRECIATION', 'BELOW_EBITDA_INTEREST', 'BELOW_EBITDA_PROFIT_TAX', 'BELOW_EBITDA_USN', 'BELOW_EBITDA_VAT'], $this->codes($result->skippedWithSimilar), 'пропущенные потомки видны в отчёте');
         self::assertSame(67, $this->categoryCount($company));
+    }
+
+    public function testOneCompanyLineSuppressesAtMostOneTemplateLine(): void
+    {
+        $company = $this->templateCompany();
+        // «Сервисы и подписки» есть в шаблоне дважды (административные и «(коммерческие)»).
+        $this->deleteCodes($company, ['OVERHEAD_ADMIN_SUBS', 'OVERHEAD_SALES_SUBS']);
+        $admin = $this->byCode($company, 'OVERHEAD_ADMIN_TOTAL');
+        $this->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($admin)->withName('Сервисы и подписки')->withCode(null)->build());
+
+        $result = $this->applyTemplate($company, false);
+
+        self::assertCount(1, $result->similar);
+        self::assertCount(1, $result->created);
+    }
+
+    /**
+     * Регрессия (ревью): корень компании, сопоставленный со вложенной статьёй шаблона, остаётся
+     * корнем — корень шаблона над ним встал бы рядом, поэтому опознанным он не считается.
+     */
+    public function testRootMatchedByNestedTemplateLineIsNotRecognized(): void
+    {
+        $company = $this->company();
+        $this->persist(
+            PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Продажи')->withCode('REV_NOT_SPP_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build(),
+            PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Затраты')->withCode('COGS_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build(),
+        );
+
+        // Считая «Продажи» опознанной, вышло бы 2 из 3 — шаблон встал бы рядом с ними своей «Выручкой».
+        $this->expectException(PLTreeWouldDuplicateException::class);
+        $this->expectExceptionMessage('Шаблон опознал 1 из 3 корневых статей');
+
+        $this->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Шоурум')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build());
+        $this->applyTemplate($company, true);
+    }
+
+    /**
+     * @return iterable<string, array{int, int, bool}>
+     */
+    public static function boundaries(): iterable
+    {
+        yield 'ровно половина — можно' => [2, 2, true];
+        yield 'меньше половины — нельзя' => [1, 2, false];
+    }
+
+    #[DataProvider('boundaries')]
+    public function testHalfOfRootsIsTheBoundary(int $templateRoots, int $ownRoots, bool $allowed): void
+    {
+        $company = $this->company();
+        foreach (array_slice(['COGS_TOTAL', 'NET_PROFIT'], 0, $templateRoots) as $code) {
+            $type = 'NET_PROFIT' === $code ? PLCategoryType::KPI : PLCategoryType::SUBTOTAL;
+            $this->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Своя '.$code)->withCode($code)->withType($type)->build());
+        }
+        for ($i = 1; $i <= $ownRoots; ++$i) {
+            $this->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Своя группа '.$i)->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build());
+        }
+
+        if (!$allowed) {
+            $this->expectException(PLTreeWouldDuplicateException::class);
+        }
+        $result = $this->applyTemplate($company, true);
+
+        self::assertSame([$templateRoots + $ownRoots, $templateRoots], [$result->companyRoots, $result->recognizedRoots]);
     }
 
     public function testCompanyLineRecognizedByCodeIsNotACandidate(): void
