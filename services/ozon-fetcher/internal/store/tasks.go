@@ -273,8 +273,10 @@ var ErrMissingObject = errors.New("store: content page has no raw object")
 
 // Content — текущая загруженная ревизия задачи.
 type Content struct {
-	Pages         []RawObject // по порядку, PageNo с 1
-	LastSuccessAt time.Time   // время записи ревизии (последний done)
+	Pages []RawObject // по порядку, PageNo с 1
+	// StartedAt — запись первой страницы ревизии: вся ревизия загружена не
+	// раньше этого момента (страницы прежних загрузок в неё не входят).
+	StartedAt time.Time
 }
 
 // ContentPages — объекты страниц текущей загруженной ревизии задачи
@@ -282,11 +284,11 @@ type Content struct {
 // объекта — ErrMissingObject, не укороченный список.
 func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) {
 	var pages string
-	var last *time.Time
+	var started *time.Time
 	err := t.pool.QueryRow(ctx, `
-		SELECT content_pages, last_success_at FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
-		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages, &last)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (pages == "" || last == nil)) {
+		SELECT content_pages, content_started_at FROM fetch_task WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey).Scan(&pages, &started)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (pages == "" || started == nil)) {
 		return Content{}, ErrNoContent
 	}
 	if err != nil {
@@ -314,7 +316,7 @@ func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) 
 	if err := rows.Err(); err != nil {
 		return Content{}, fmt.Errorf("store: content objects: %w", err)
 	}
-	out := Content{Pages: make([]RawObject, 0, len(hashes)), LastSuccessAt: *last}
+	out := Content{Pages: make([]RawObject, 0, len(hashes)), StartedAt: *started}
 	for i, h := range hashes {
 		obj, ok := bySHA[h]
 		if !ok {
@@ -351,7 +353,9 @@ func (t *Tasks) RecordPage(ctx context.Context, key TaskKey, attemptID string, o
 
 	tag, err := tx.Exec(ctx, `
 		UPDATE fetch_task SET cursor = NULLIF($5, ''), next_page_no = $6,
-			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END, updated_at = now()
+			page_hashes = CASE WHEN page_hashes = '' THEN $7 ELSE page_hashes || ',' || $7 END,
+			load_started_at = CASE WHEN page_hashes = '' THEN now() ELSE load_started_at END,
+			updated_at = now()
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, nextCursor, obj.PageNo+1, obj.SHA256)
 	if err != nil {
@@ -414,6 +418,7 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 			revision     = CASE WHEN $5 = 'done' AND content_hash IS DISTINCT FROM NULLIF($8, '') THEN revision + 1 ELSE revision END,
 			content_hash = CASE WHEN $5 = 'done' THEN NULLIF($8, '') ELSE content_hash END,
 			content_pages = CASE WHEN $5 = 'done' THEN page_hashes ELSE content_pages END,
+			content_started_at = CASE WHEN $5 = 'done' THEN load_started_at ELSE content_started_at END,
 			attempts     = CASE WHEN $5 = 'done' THEN 0 ELSE attempts END,
 			last_error_class = NULLIF($9, ''),
 			last_success_at  = CASE WHEN $5 = 'done' THEN $10 ELSE last_success_at END,

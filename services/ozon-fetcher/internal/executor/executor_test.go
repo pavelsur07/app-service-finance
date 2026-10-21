@@ -46,7 +46,7 @@ type fakeTasks struct {
 	pauses       []time.Duration // паузы, выданные RecordAuthFailure
 	stopErr      error
 	content      map[string][]store.RawObject // ресурс/период → страницы ревизии (ContentPages)
-	contentAt    time.Time                    // LastSuccessAt ревизии (по умолчанию t0)
+	contentAt    time.Time                    // StartedAt ревизии (по умолчанию t0)
 	contentErr   error
 	reloaded     []string
 	controlHang  bool // SuspendConnection/StopResource ждут отмены контекста
@@ -127,7 +127,7 @@ func (f *fakeTasks) ContentPages(_ context.Context, key store.TaskKey) (store.Co
 	if at.IsZero() {
 		at = t0
 	}
-	return store.Content{Pages: pages, LastSuccessAt: at}, nil
+	return store.Content{Pages: pages, StartedAt: at}, nil
 }
 
 func (f *fakeTasks) ReloadWithoutContent(_ context.Context, key store.TaskKey, _ time.Time) (bool, error) {

@@ -76,16 +76,26 @@ func (r *Reader) Get(ctx context.Context, uri, wantSHA256 string) ([]byte, error
 	}
 	defer func() { _ = out.Body.Close() }()
 
-	zr, err := gzip.NewReader(io.LimitReader(out.Body, MaxReadBytes+1))
+	// Сначала сжатые байты целиком: обрыв соединения здесь — временный сбой
+	// (повтор), а не повреждение объекта.
+	compressed, err := io.ReadAll(io.LimitReader(out.Body, MaxReadBytes+1))
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("rawstore: read %s: %w", key, err)
+	}
+	if len(compressed) > MaxReadBytes {
+		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrObjectInvalid, key, MaxReadBytes)
+	}
+	// Распаковка из памяти: любая ошибка — повреждённый объект.
+	zr, err := gzip.NewReader(bytes.NewReader(compressed))
 	if err != nil {
 		return nil, fmt.Errorf("%w: gunzip %s: %v", ErrObjectInvalid, key, err)
 	}
 	body, err := io.ReadAll(io.LimitReader(zr, MaxReadBytes+1))
 	if err != nil {
-		if errors.Is(err, gzip.ErrChecksum) || errors.Is(err, gzip.ErrHeader) || errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, fmt.Errorf("%w: read %s: %v", ErrObjectInvalid, key, err)
-		}
-		return nil, fmt.Errorf("rawstore: read %s: %w", key, err)
+		return nil, fmt.Errorf("%w: gunzip %s: %v", ErrObjectInvalid, key, err)
 	}
 	if len(body) > MaxReadBytes {
 		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrObjectInvalid, key, MaxReadBytes)
@@ -94,5 +104,5 @@ func (r *Reader) Get(ctx context.Context, uri, wantSHA256 string) ([]byte, error
 	if got := hex.EncodeToString(sum[:]); !strings.EqualFold(got, wantSHA256) {
 		return nil, fmt.Errorf("%w: %s: want %s, got %s", ErrChecksumMismatch, key, wantSHA256, got)
 	}
-	return bytes.Clone(body), nil
+	return body, nil
 }

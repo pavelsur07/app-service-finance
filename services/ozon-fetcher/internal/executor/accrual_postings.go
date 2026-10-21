@@ -119,14 +119,15 @@ func (r *taskRun) orderPostingNumbers(ctx context.Context, cabinet connections.C
 		if err != nil {
 			return nil, &storeError{err}
 		}
-		// Ревизия заказов должна быть записана после конца дня: иначе в ней нет
-		// отправлений после последней загрузки «сегодня» (до ночного дочитывания).
+		// Ревизия заказов должна быть загружена целиком после конца дня — с
+		// первой страницы, не дочитана по страницам до полуночи: иначе в ней нет
+		// отправлений после последней загрузки «сегодня».
 		dayStart, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, e.cfg.Location)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
 		}
-		if content.LastSuccessAt.Before(dayStart.AddDate(0, 0, 1)) {
-			return nil, fmt.Errorf("%w: %s loaded before the day ended", errOrdersNotLoaded, resource)
+		if content.StartedAt.Before(dayStart.AddDate(0, 0, 1)) {
+			return nil, fmt.Errorf("%w: %s revision started before the day ended", errOrdersNotLoaded, resource)
 		}
 		for _, p := range content.Pages {
 			body, err := e.rawReader.Get(ctx, p.StorageURI, p.SHA256)

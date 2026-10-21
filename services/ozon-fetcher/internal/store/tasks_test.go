@@ -674,7 +674,8 @@ func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
 	require.Len(t, pages, 2, "страницы обеих попыток")
 	assert.Equal(t, []string{"s3://b/p1", "s3://b/p2"}, []string{pages[0].StorageURI, pages[1].StorageURI})
 	assert.Equal(t, []int{1, 2}, []int{pages[0].PageNo, pages[1].PageNo})
-	assert.True(t, content.LastSuccessAt.Equal(t0))
+	assert.False(t, content.StartedAt.IsZero(), "начало ревизии — запись её первой страницы")
+	firstStart := content.StartedAt
 	reloaded, err = tasks.ReloadWithoutContent(ctx, s.TaskKey, t0)
 	require.NoError(t, err)
 	assert.False(t, reloaded, "ревизия со страницами — не перезагружается")
@@ -695,6 +696,32 @@ func TestContentPagesFollowLoadedRevisionAcrossAttempts(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, content.Pages, 1, "новая ревизия заменяет прежнюю")
 	assert.Equal(t, "s3://b/p3", content.Pages[0].StorageURI)
+	assert.False(t, content.StartedAt.Before(firstStart), "начало новой ревизии — её первая страница")
+}
+
+func TestContentStartIsFirstPageOfRevisionNotOfContinuation(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	s := spec("ref-a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+	first, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, first.TaskKey, first.AttemptID, rawObj(1), "c1"))
+	// Страница 1 «до полуночи»: сдвигаем время её записи назад.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET load_started_at = now() - interval '1 hour' WHERE period_key = '2026-10-20'`)
+	require.NoError(t, err)
+	_, err = tasks.FinishTask(ctx, first.TaskKey, first.AttemptID, Outcome{Status: StatusPending, Label: "rate_limit", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+
+	cont, err := claim(t, tasks, []string{"ref-a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.RecordPage(ctx, cont.TaskKey, cont.AttemptID, rawObj(2), ""))
+	_, err = tasks.FinishTask(ctx, cont.TaskKey, cont.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash("a")}, t0)
+	require.NoError(t, err)
+
+	content, err := tasks.ContentPages(ctx, s.TaskKey)
+	require.NoError(t, err)
+	assert.True(t, content.StartedAt.Before(time.Now().Add(-30*time.Minute)), "продолжение не сдвигает начало ревизии")
 }
 
 func TestContentWithoutPagesListIsReloadedAndMissingObjectIsAnError(t *testing.T) {

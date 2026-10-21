@@ -78,3 +78,46 @@ func sha256Of(s string) string {
 	stored, _ := New(&fakePutter{}, "x", 1).Put(context.Background(), page(s))
 	return stored.SHA256
 }
+
+// brokenBody — тело ответа, которое обрывается посреди чтения.
+type brokenBody struct{ data []byte }
+
+func (b *brokenBody) Read(p []byte) (int, error) {
+	if len(b.data) == 0 {
+		return 0, errors.New("connection reset by peer")
+	}
+	n := copy(p, b.data[:min(len(b.data), 4)])
+	b.data = b.data[n:]
+	return n, nil
+}
+
+func (b *brokenBody) Close() error { return nil }
+
+type bodyGetter struct{ body io.ReadCloser }
+
+func (g bodyGetter) GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	return &s3.GetObjectOutput{Body: g.body}, nil
+}
+
+func TestReaderBodyReadFailureIsTransient(t *testing.T) {
+	putter := &fakePutter{}
+	stored, err := New(putter, "raw", 1).Put(context.Background(), page(`{"postings":[]}`))
+	require.NoError(t, err)
+	partial := putter.objects[stored.Key][:10]
+
+	_, err = NewReader(bodyGetter{&brokenBody{data: append([]byte(nil), partial...)}}, "raw").Get(context.Background(), stored.URI, stored.SHA256)
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrObjectInvalid, "обрыв соединения — повтор, не повреждение")
+}
+
+func TestReaderTruncatedGzipIsInvalid(t *testing.T) {
+	putter := &fakePutter{}
+	stored, err := New(putter, "raw", 1).Put(context.Background(), page(`{"postings":[{"posting_number":"P-1"}]}`))
+	require.NoError(t, err)
+	truncated := putter.objects[stored.Key][:len(putter.objects[stored.Key])-6]
+
+	_, err = NewReader(bodyGetter{io.NopCloser(bytes.NewReader(truncated))}, "raw").Get(context.Background(), stored.URI, stored.SHA256)
+
+	require.ErrorIs(t, err, ErrObjectInvalid, "полностью прочитанный, но битый gzip — повреждение")
+}
