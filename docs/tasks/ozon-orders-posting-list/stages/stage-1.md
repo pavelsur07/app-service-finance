@@ -46,6 +46,16 @@
   400 фильтра статусов → `failed_permanent` без остановки остальных ресурсов; планировщик — окна,
   приоритеты, хвост раз в сутки, сегодня каждый проход.
 
+## 3а. Что в каком сервисе
+
+| Где | Что меняется | Что не меняется |
+|---|---|---|
+| `services/ozon-fetcher` (Go) | `internal/ozon` — клиент `posting/fbo/list` v3 и `posting/fbs/list` v4; `internal/executor` — 4 ресурса; `internal/planner` — окна заказов; `internal/ratelimit` — дефолты; `internal/config` — `ORDERS_FROM`, `ORDERS_TAIL_DAYS`; `docs/ozon-api.md`, README | финансовые ресурсы, схема БД сервиса, выдача фактов |
+| `site/src/Marketplace` (Symfony) | `MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES` + 4 типа — без этого сервис не грузит ресурс | ключи, снимок остальных полей |
+| `site/src/ServiceGateway` (Symfony) | подписи 4 ресурсов в `CoverageHeatmapBuilder` | — |
+| `site/src/Ingestion` (Symfony) | **ничего**: загрузка заказов, cron, `OzonOrdersClient`, обновление статусов остаются как есть | старые `list` продолжают получать 400, `get` работает — выключение на этапе 2 (`problem.md` §7) |
+| `services/_contracts/marketplace-connections/v1` | список ресурсов + `CHANGELOG.md` (аддитивно) | версия контракта |
+
 ## 4. Что считаем выполненной работой
 
 На проде сервис по всем кабинетам грузит отправления FBO/FBS и смены статусов новыми методами в raw
@@ -70,5 +80,5 @@ S3, разрыв с 18.10 догружен, свежесть — до часа; 
 
 ## Не входит
 
-Выдача фактов заказов в Symfony, запись `ingest_orders`, выключение старого пути и шумящих
-#439/#442 — этап 2. Товары, остатки, `accrual-postings` — этап 3.
+Выдача фактов заказов в Symfony, запись `ingest_orders`, выключение старых `posting/*/list` и
+`posting/*/get` и шумящих #439/#442 — этап 2 (`problem.md` §7). Товары, остатки, `accrual-postings` — этап 3.
