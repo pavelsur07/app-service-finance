@@ -143,7 +143,13 @@ final readonly class ExtendPLTreeWithMarketplaceAction
             }
             // Из базы, а не из EntityManager: под блокировкой важна текущая формула, а не прочитанная раньше.
             $row = $this->em->getConnection()->fetchAssociative('SELECT name, formula FROM pl_categories WHERE company_id = ? AND code = ?', [$companyId, $node->code]);
-            if (false === $row || self::same($row['formula'], $node->formula)) {
+            if (false === $row) {
+                // Итога нет — импорт создаст его уже с формулой расширения: все её слагаемые должны стоять на местах.
+                $this->assertTermsInPlace($companyId, '', (string) $node->formula, $templateParents);
+
+                continue;
+            }
+            if (self::same($row['formula'], $node->formula)) {
                 continue;
             }
             if (!self::same($row['formula'], $universalFormulas[$node->code])) {
@@ -168,10 +174,17 @@ final readonly class ExtendPLTreeWithMarketplaceAction
         preg_match_all('/[A-Z][A-Z0-9_]*/', $to, $new);
         foreach (array_diff($new[0], $old[0]) as $term) {
             $row = $this->em->getConnection()->fetchAssociative(
-                'SELECT c.name, p.code AS parent_code FROM pl_categories c LEFT JOIN pl_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.code = ?',
+                'SELECT c.name, c.parent_id, p.code AS parent_code FROM pl_categories c LEFT JOIN pl_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.code = ?',
                 [$companyId, $term],
             );
-            if (false !== $row && ($row['parent_code'] ?? null) !== ($templateParents[$term] ?? null)) {
+            if (false === $row) {
+                continue;
+            }
+            // Корень шаблона — только корень у компании (родитель без кода — тоже не корень);
+            // вложенная — под родителем с тем же кодом.
+            $expectedParent = $templateParents[$term] ?? null;
+            $inPlace = null === $expectedParent ? null === $row['parent_id'] : $expectedParent === $row['parent_code'];
+            if (!$inPlace) {
                 throw PLTreeExtensionException::misplaced((string) $row['name'], $term);
             }
         }

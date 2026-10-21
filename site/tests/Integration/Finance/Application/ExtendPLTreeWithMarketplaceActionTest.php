@@ -25,6 +25,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * «Базовое» дерево со статьями маркетплейса: статьи создаются на местах маркетплейсного шаблона,
@@ -159,13 +160,33 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
      * Регрессия (ревью): своя группа с кодом OPEX_WH_TOTAL внутри операционных расходов попала бы в
      * EBITDA дважды — через OVERHEAD_TOTAL и напрямую.
      */
-    public function testExistingGroupOutOfTemplatePlaceRefuses(): void
+    /**
+     * @return iterable<string, array{bool, bool}>
+     */
+    public static function misplacements(): iterable
+    {
+        yield 'прямо под OVERHEAD_TOTAL' => [false, false];
+        // Внешнее ревью: родитель без кода выглядел как «корень» по коду родителя.
+        yield 'под своей группой без кода внутри OVERHEAD_TOTAL' => [true, false];
+        // Внешнее ревью: удалённая EBITDA создалась бы заново с формулой расширения без проверки.
+        yield 'EBITDA удалена' => [false, true];
+    }
+
+    #[DataProvider('misplacements')]
+    public function testExistingGroupOutOfTemplatePlaceRefuses(bool $underUncodedGroup, bool $ebitdaDeleted): void
     {
         $company = $this->universalCompany();
-        $overhead = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
-        self::assertInstanceOf(PLCategory::class, $overhead);
-        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($overhead)->withName('Склад')->withCode('OPEX_WH_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build());
+        $parent = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_TOTAL']);
+        self::assertInstanceOf(PLCategory::class, $parent);
+        if ($underUncodedGroup) {
+            $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent)->withName('Логистика и склад')->withCode(null)->withType(PLCategoryType::SUBTOTAL)->build();
+            $this->em->persist($parent);
+        }
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($parent)->withName('Склад')->withCode('OPEX_WH_TOTAL')->withType(PLCategoryType::SUBTOTAL)->build());
         $this->em->flush();
+        if ($ebitdaDeleted) {
+            $this->connection->delete('pl_categories', ['company_id' => (string) $company->getId(), 'code' => 'EBITDA']);
+        }
 
         $this->expectException(PLTreeExtensionException::class);
         $this->expectExceptionMessage('посчиталась бы в итогах дважды');
