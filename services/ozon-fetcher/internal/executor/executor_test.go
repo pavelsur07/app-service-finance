@@ -185,6 +185,7 @@ type fakeOzon struct {
 	infoFailAfter   int
 	infoMissing     int
 	infoCalls       [][]int64
+	productHang     bool // список и подробности ждут отмены контекста
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {

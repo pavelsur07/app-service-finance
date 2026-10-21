@@ -21,6 +21,9 @@ func TestProductsSnapshotOnlyForTodayWithoutRefresh(t *testing.T) {
 		require.NotNil(t, s, r)
 		assert.False(t, s.Refresh, "снимок дня — один раз")
 		assert.Equal(t, PriorityRoutine, s.Priority)
+		if r == executor.ResourceProductsInfo {
+			assert.Equal(t, at("2026-10-22 00:06"), s.RunAt, "подробности — после списка")
+		}
 		for _, rf := range p.Refreshes {
 			assert.Empty(t, periods(rf.Specs, r), "каталог не перечитывается")
 		}

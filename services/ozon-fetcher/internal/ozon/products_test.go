@@ -93,12 +93,13 @@ func TestFetchProductListEmptyPageEndsEvenWithLastID(t *testing.T) {
 
 func TestFetchProductListRejectsBrokenPages(t *testing.T) {
 	cases := map[string]string{
-		"no result":   `{"items":[]}`,
-		"no items":    `{"result":{"total":1,"last_id":""}}`,
-		"no last_id":  `{"result":{"items":[{"product_id":1}],"total":1}}`,
-		"no total":    `{"result":{"items":[{"product_id":1}],"last_id":""}}`,
-		"neg total":   `{"result":{"items":[],"total":-1,"last_id":""}}`,
-		"repeated id": productListBody("L0", 2, 1),
+		"no result":             `{"items":[]}`,
+		"no items":              `{"result":{"total":1,"last_id":""}}`,
+		"no last_id":            `{"result":{"items":[{"product_id":1}],"total":1}}`,
+		"no total":              `{"result":{"items":[{"product_id":1}],"last_id":""}}`,
+		"neg total":             `{"result":{"items":[],"total":-1,"last_id":""}}`,
+		"repeated id":           productListBody("L0", 2, 1),
+		"items without last_id": productListBody("", 1500, 1, 2),
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {

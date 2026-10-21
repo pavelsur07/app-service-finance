@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,9 +20,13 @@ import (
 // today — день снимка в t0 (12:00 МСК 17.10).
 const today = "2026-10-17"
 
-func (f *fakeOzon) FetchProductList(_ context.Context, creds ozon.Credentials, _, lastID string, firstPageNo int, onPage ozon.PageHandler) error {
+func (f *fakeOzon) FetchProductList(ctx context.Context, creds ozon.Credentials, _, lastID string, firstPageNo int, onPage ozon.PageHandler) error {
 	f.creds = append(f.creds, creds)
 	f.productListFrom = append(f.productListFrom, lastID)
+	if f.productHang {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	for no := firstPageNo; ; no++ {
 		p, ok := f.productPages[lastID]
 		if !ok {
@@ -39,9 +44,13 @@ func (f *fakeOzon) FetchProductList(_ context.Context, creds ozon.Credentials, _
 }
 
 // FetchProductInfo — эхо запрошенных id; ошибка — infoErr после infoFailAfter вызовов.
-func (f *fakeOzon) FetchProductInfo(_ context.Context, creds ozon.Credentials, _ string, ids []int64) (ozon.Page, int, error) {
+func (f *fakeOzon) FetchProductInfo(ctx context.Context, creds ozon.Credentials, _ string, ids []int64) (ozon.Page, int, error) {
 	f.creds = append(f.creds, creds)
 	f.infoCalls = append(f.infoCalls, append([]int64(nil), ids...))
+	if f.productHang {
+		<-ctx.Done()
+		return ozon.Page{}, 0, ctx.Err()
+	}
 	if f.infoErr != nil && len(f.infoCalls) > f.infoFailAfter {
 		return ozon.Page{}, 0, f.infoErr
 	}
@@ -188,6 +197,10 @@ func TestProductInfoUsesListIDsSortedDedupedInChunks(t *testing.T) {
 	assert.Equal(t, []string{numbersFingerprint(idsKeys(all)) + ":" + fmt.Sprint(o.infoCalls[0][999]), ""}, h.tasks.cursors)
 	assert.Equal(t, ResourceProductsInfo, h.raw.puts[0].ResourceType)
 	assert.Contains(t, h.logs.String(), "item count differs from total", "1502 строки против total 1501")
+
+	h2, _ := productsHarness(t, &fakeOzon{}, []string{listPage(2, 1, 2), `{"result":{"items":[],"total":0,"last_id":""}}`})
+	assert.Equal(t, "done", h2.exec.Run(context.Background(), task(ResourceProductsInfo, today), productsCabinet, "trace").Outcome)
+	assert.NotContains(t, h2.logs.String(), "item count differs", "total концевой пустой страницы не сверяется")
 }
 
 func TestProductInfoResumeAndRevisedList(t *testing.T) {
@@ -306,4 +319,34 @@ func TestProductInfoStorageAndRawErrors(t *testing.T) {
 	res = h4.exec.Run(context.Background(), task(ResourceProductsInfo, today), productsCabinet, "trace")
 	assert.Equal(t, "catalog_raw_invalid", res.Outcome)
 	assert.Empty(t, o.infoCalls)
+}
+
+// Попытка, пересёкшая полночь МСК (ожидание лимитера, медленный ответ),
+// прерывается на границе суток: страницы нового дня под вчерашней датой не
+// сохраняются.
+func TestProductSnapshotLoadCrossingMidnightIsMissed(t *testing.T) {
+	beforeMidnight := time.Date(2026, 10, 17, 20, 59, 59, 950_000_000, time.UTC) // 23:59:59.95 МСК
+	for _, resource := range []string{ResourceProductsList, ResourceProductsInfo} {
+		o := &fakeOzon{productHang: true}
+		h, _ := productsHarness(t, o, []string{listPage(1, 5)})
+		h.exec.now = func() time.Time { return beforeMidnight }
+
+		res := h.exec.Run(context.Background(), task(resource, today), productsCabinet, "trace")
+
+		assert.Equal(t, "snapshot_missed", res.Outcome, resource)
+		assert.Equal(t, store.StatusFailedPermanent, h.tasks.finished.Status, resource)
+		assert.Empty(t, h.tasks.pages, resource)
+		assert.NotContains(t, h.logs.String(), `"level":"ERROR"`, resource)
+	}
+}
+
+func TestProductSnapshotShutdownIsNotMissed(t *testing.T) {
+	o := &fakeOzon{productHang: true}
+	h := newHarness(o)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
+
+	res := h.exec.Run(ctx, task(ResourceProductsList, today), productsCabinet, "trace")
+
+	assert.Equal(t, "released", res.Outcome, "остановка сервиса — не пропуск снимка")
 }

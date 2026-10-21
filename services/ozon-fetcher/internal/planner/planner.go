@@ -181,7 +181,9 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 		if cab.Supports(executor.ResourceProductsList) {
 			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsList, today.Format(time.DateOnly), PriorityRoutine, false, now))
 			if cab.Supports(executor.ResourceProductsInfo) {
-				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsInfo, today.Format(time.DateOnly), PriorityRoutine, false, now))
+				// Минутой позже списка: иначе подробности могут быть взяты первыми
+				// и уйти в not_ready на 10 минут.
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsInfo, today.Format(time.DateOnly), PriorityRoutine, false, now.Add(time.Minute)))
 			}
 		}
 		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {

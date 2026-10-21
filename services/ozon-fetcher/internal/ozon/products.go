@@ -34,8 +34,8 @@ type productListShape struct {
 }
 
 // parseProductListPage — число товаров и last_id следующей страницы ("" —
-// конец). Конец списка Ozon сообщает пустой страницей: последняя полная
-// страница отдаёт непустой last_id (живая проверка 21.10.2026).
+// конец). Конец списка Ozon сообщает пустой страницей: последняя страница с
+// товарами отдаёт непустой last_id (живая проверка 21.10.2026).
 func parseProductListPage(body []byte) (int, string, error) {
 	var shape productListShape
 	if err := json.Unmarshal(body, &shape); err != nil || shape.Result == nil {
@@ -57,7 +57,13 @@ func parseProductListPage(body []byte) (int, string, error) {
 		// Пустая страница завершает обход и при непустом last_id.
 		return 0, "", nil
 	}
-	return len(items), strings.TrimSpace(*r.LastID), nil
+	next := strings.TrimSpace(*r.LastID)
+	if next == "" {
+		// Конец подтверждает только пустая страница: товары без курсора —
+		// тихая обрезка каталога.
+		return 0, "", invalidResponse(EndpointProductList, "non-empty page without last_id")
+	}
+	return len(items), next, nil
 }
 
 // FetchProductList выгружает список всех товаров кабинета (visibility ALL)

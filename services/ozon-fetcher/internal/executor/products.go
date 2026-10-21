@@ -33,18 +33,29 @@ var (
 	errCatalogRevised = errors.New("executor: product list of the day changed since the saved chunk")
 )
 
-// snapshotDay — снимок грузится только в свой день МСК.
-func (r *taskRun) snapshotDay() error {
+// withinSnapshotDay выполняет загрузку только в день снимка МСК: прошедший
+// день — сразу errSnapshotMissed, а попытка, пересёкшая полночь (ожидание
+// лимитера, медленные страницы), прерывается на границе суток — страницы
+// нового дня под вчерашней датой не сохраняются. Граница — по часам
+// исполнителя.
+func (r *taskRun) withinSnapshotDay(ctx context.Context, load func(ctx context.Context) error) error {
 	loc := r.exec.cfg.Location
 	day, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, loc)
 	if err != nil {
 		return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
 	}
 	now := r.exec.now().In(loc)
-	if now.Before(day) || !now.Before(day.AddDate(0, 0, 1)) {
+	end := day.AddDate(0, 0, 1)
+	if now.Before(day) || !now.Before(end) {
 		return fmt.Errorf("%w: %s", errSnapshotMissed, r.task.PeriodKey)
 	}
-	return nil
+	dayCtx, cancel := context.WithTimeoutCause(ctx, end.Sub(now), errSnapshotMissed)
+	defer cancel()
+	err = load(dayCtx)
+	if err != nil && ctx.Err() == nil && errors.Is(context.Cause(dayCtx), errSnapshotMissed) {
+		return fmt.Errorf("%w: %s ended during the load", errSnapshotMissed, r.task.PeriodKey)
+	}
+	return err
 }
 
 // productList — список всех товаров кабинета по last_id до пустой страницы.
@@ -53,11 +64,10 @@ func (r *taskRun) productList(ctx context.Context, creds ozon.Credentials) error
 		// Все страницы уже сохранены прежней попыткой.
 		return nil
 	}
-	if err := r.snapshotDay(); err != nil {
-		return err
-	}
-	return r.exec.ozon.FetchProductList(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
-		return r.store(ctx, p)
+	return r.withinSnapshotDay(ctx, func(ctx context.Context) error {
+		return r.exec.ozon.FetchProductList(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
+			return r.store(ctx, p)
+		})
 	})
 }
 
@@ -68,9 +78,10 @@ func (r *taskRun) productInfo(ctx context.Context, creds ozon.Credentials, cabin
 	if r.cursor == "" && len(r.hashes) > 0 {
 		return nil
 	}
-	if err := r.snapshotDay(); err != nil {
-		return err
-	}
+	return r.withinSnapshotDay(ctx, func(ctx context.Context) error { return r.loadProductInfo(ctx, creds, cabinet) })
+}
+
+func (r *taskRun) loadProductInfo(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
 	ids, err := r.catalogProductIDs(ctx, cabinet)
 	if err != nil {
 		return err
@@ -146,7 +157,10 @@ func (r *taskRun) catalogProductIDs(ctx context.Context, cabinet connections.Cab
 			return err
 		}
 		listed += len(ids)
-		total = pageTotal
+		if len(ids) > 0 {
+			// total — со страницы с товарами: что пишет концевая пустая, не подтверждено.
+			total = pageTotal
+		}
 		for _, id := range ids {
 			set[id] = true
 		}
