@@ -72,8 +72,8 @@ final readonly class UpdateManualDocumentAction
 
     /**
      * Форма правила документ, загруженный до блокировки. Если с тех пор другой запрос закоммитил
-     * правку того же документа (день, статус, проект, ЦФО, операции — всё, из чего строится
-     * регистр), применение формы поверх молча перезаписало бы её или пересчитало регистр по
+     * правку того же документа (день, статус, тип, проект, ЦФО, операции — всё, из чего
+     * строится регистр), применение формы поверх молча перезаписало бы её или пересчитало регистр по
      * устаревшим операциям: отказ, форму открывают заново. Загруженное состояние — исходные
      * данные UnitOfWork, сохранённое — строка документа под `FOR UPDATE` и его операции.
      */
@@ -91,11 +91,13 @@ final readonly class UpdateManualDocumentAction
         $loaded = $unitOfWork->getOriginalEntityData($document);
         $loadedDate = $loaded['date'] ?? null;
         $loadedStatus = $loaded['status'] ?? null;
+        $loadedType = $loaded['type'] ?? null;
 
         // Исходные данные UnitOfWork после вставки несут значения как есть (enum — строкой).
         $changed = !$loadedDate instanceof \DateTimeInterface
             || $loadedDate->format('Y-m-d H:i:s') !== (new \DateTimeImmutable($stored['date']))->format('Y-m-d H:i:s')
             || ($loadedStatus instanceof \BackedEnum ? (string) $loadedStatus->value : $loadedStatus) !== $stored['status']
+            || ($loadedType instanceof \BackedEnum ? (string) $loadedType->value : $loadedType) !== $stored['type']
             || $this->entityId($loaded['projectDirection'] ?? null) !== $stored['projectDirectionId']
             || ($loaded['responsibilityCenterId'] ?? null) !== $stored['responsibilityCenterId'];
 
@@ -106,7 +108,11 @@ final readonly class UpdateManualDocumentAction
             $loadedById[(string) $operation->getId()] = $unitOfWork->getOriginalEntityData($operation);
         }
 
-        if (array_keys($loadedById) != array_keys($stored['operations'])) {
+        $loadedIds = array_keys($loadedById);
+        $storedIds = array_keys($stored['operations']);
+        sort($loadedIds);
+        sort($storedIds);
+        if ($loadedIds !== $storedIds) {
             $changed = true;
         }
 

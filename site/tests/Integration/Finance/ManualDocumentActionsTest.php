@@ -21,6 +21,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\PersistentCollection;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -123,6 +124,56 @@ final class ManualDocumentActionsTest extends IntegrationTestCase
             'SELECT date FROM documents WHERE id = :id',
             ['id' => $document->getId()],
         ));
+    }
+
+    public function testUpdateRejectsTypeChangedConcurrently(): void
+    {
+        $document = $this->makeDocument('2026-03-05', '250.00');
+        self::getContainer()->get(CreateManualDocumentAction::class)($document);
+
+        // Тип выбирает формулу агрегации регистра: параллельно сменён на marketplace_pl.
+        $this->connection->executeStatement(
+            'UPDATE documents SET type = :type WHERE id = :id',
+            ['type' => DocumentType::MARKETPLACE_PL->value, 'id' => $document->getId()],
+        );
+        $document->setDescription('правка формы');
+
+        $this->expectExceptionObject(new \DomainException('Документ изменён другим пользователем — откройте его заново.'));
+
+        self::getContainer()->get(UpdateManualDocumentAction::class)(
+            $document,
+            DocumentStatus::ACTIVE,
+            new \DateTimeImmutable('2026-03-05'),
+        );
+    }
+
+    public function testUpdateAcceptsSameOperationsInAnotherOrder(): void
+    {
+        $document = $this->makeDocument('2026-03-05', '100.00');
+        $second = new DocumentOperation();
+        $second->setPlCategory($this->category);
+        $second->setProjectDirection($this->project);
+        $second->setAmount('50.00');
+        $document->addOperation($second);
+        self::getContainer()->get(CreateManualDocumentAction::class)($document);
+
+        // Порядок строк операций в БД не задан: коллекция формы — в обратном порядке.
+        $operations = $document->getOperations();
+        self::assertInstanceOf(PersistentCollection::class, $operations);
+        $reversed = array_reverse($operations->getSnapshot());
+        $operations->clear();
+        foreach ($reversed as $operation) {
+            $operations->add($operation);
+        }
+        $operations->takeSnapshot();
+
+        self::getContainer()->get(UpdateManualDocumentAction::class)(
+            $document,
+            DocumentStatus::ACTIVE,
+            new \DateTimeImmutable('2026-03-05'),
+        );
+
+        self::assertSame(['2026-03-05' => '150.00'], $this->registerExpenseByDay());
     }
 
     public function testUpdateRejectsOperationsChangedConcurrently(): void

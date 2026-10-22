@@ -296,6 +296,7 @@ class DocumentRepository extends ServiceEntityRepository
      * @return array{
      *     date: string,
      *     status: string,
+     *     type: string,
      *     deleted: bool,
      *     projectDirectionId: ?string,
      *     responsibilityCenterId: ?string,
@@ -306,7 +307,7 @@ class DocumentRepository extends ServiceEntityRepository
     {
         $connection = $this->getEntityManager()->getConnection();
         $row = $connection->fetchAssociative(
-            'SELECT date, status, deleted_at, project_direction_id, responsibility_center_id FROM documents WHERE id = :id AND company_id = :company_id FOR UPDATE',
+            'SELECT date, status, type, deleted_at, project_direction_id, responsibility_center_id FROM documents WHERE id = :id AND company_id = :company_id FOR UPDATE',
             ['id' => $documentId, 'company_id' => $companyId],
         );
         if (false === $row) {
@@ -329,6 +330,7 @@ class DocumentRepository extends ServiceEntityRepository
         return [
             'date' => (string) $row['date'],
             'status' => (string) $row['status'],
+            'type' => (string) $row['type'],
             'deleted' => null !== $row['deleted_at'],
             'projectDirectionId' => null !== $row['project_direction_id'] ? (string) $row['project_direction_id'] : null,
             'responsibilityCenterId' => null !== $row['responsibility_center_id'] ? (string) $row['responsibility_center_id'] : null,
