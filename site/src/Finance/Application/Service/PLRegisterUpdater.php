@@ -7,6 +7,7 @@ namespace App\Finance\Application\Service;
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
+use App\Finance\Application\DTO\PLRegisterRow;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
@@ -37,25 +38,8 @@ final class PLRegisterUpdater
 
         $this->clearTotals($company, $day, $day);
 
-        $documents = $this->documentRepository->createQueryBuilder('d')
-            ->addSelect('o', 'c', 'pd', 'opd')
-            ->leftJoin('d.projectDirection', 'pd')
-            ->leftJoin('d.operations', 'o')
-            ->leftJoin('o.category', 'c')
-            ->leftJoin('o.projectDirection', 'opd')
-            ->where('d.company = :company')
-            ->andWhere('d.date BETWEEN :from AND :to')
-            ->andWhere('d.status = :status')
-            ->andWhere('d.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->setParameter('status', DocumentStatus::ACTIVE)
-            ->setParameter('from', $day->setTime(0, 0), Types::DATETIME_IMMUTABLE)
-            ->setParameter('to', $day->setTime(23, 59, 59), Types::DATETIME_IMMUTABLE)
-            ->getQuery()
-            ->getResult();
-
-        $aggregated = $this->aggregateDocuments($documents);
-        $this->persistAggregatedTotals($company, $aggregated, true);
+        $aggregated = $this->aggregateDocuments($this->loadDocuments($company, $day, $day));
+        $this->persistRows($company, $this->flattenRows($aggregated));
 
         $this->em->flush();
 
@@ -73,7 +57,37 @@ final class PLRegisterUpdater
 
         $this->clearTotals($company, $fromDay, $toDay);
 
-        $documents = $this->documentRepository->createQueryBuilder('d')
+        $aggregated = $this->aggregateDocuments($this->loadDocuments($company, $fromDay, $toDay));
+        $this->persistRows($company, $this->flattenRows($aggregated));
+
+        $this->em->flush();
+
+        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+    }
+
+    /**
+     * Строки регистра, которые пересчёт записал бы за окно, — без записи. Источник сверки
+     * `app:finance:verify-pl-register`: тот же отбор документов и та же агрегация, что у пересчёта.
+     *
+     * @return list<PLRegisterRow>
+     */
+    public function calculateRows(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return $this->flattenRows($this->aggregateDocuments(
+            $this->loadDocuments($company, $from->setTime(0, 0), $to->setTime(0, 0)),
+        ));
+    }
+
+    /**
+     * @return list<Document>
+     */
+    private function loadDocuments(Company $company, \DateTimeImmutable $fromDay, \DateTimeImmutable $toDay): array
+    {
+        return $this->documentRepository->createQueryBuilder('d')
             ->addSelect('o', 'c', 'pd', 'opd')
             ->leftJoin('d.projectDirection', 'pd')
             ->leftJoin('d.operations', 'o')
@@ -90,13 +104,6 @@ final class PLRegisterUpdater
             ->orderBy('d.date', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
-
-        $aggregated = $this->aggregateDocuments($documents);
-        $this->persistAggregatedTotals($company, $aggregated, true);
-
-        $this->em->flush();
-
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
     /**
@@ -232,68 +239,93 @@ final class PLRegisterUpdater
         return $result;
     }
 
-    private function persistAggregatedTotals(Company $company, array $aggregated, bool $replace): void
+    /**
+     * @param array<string, array{
+     *   date: \DateTimeImmutable,
+     *   projects: array<string, array{
+     *     project: ProjectDirection,
+     *     responsibilityCenters: array<string, array{
+     *       responsibilityCenterId: ?string,
+     *       categories: array<string, array{
+     *         category: PLCategory,
+     *         income: float,
+     *         expense: float,
+     *         mpIncomeSigned: float,
+     *         mpExpenseSigned: float,
+     *       }>,
+     *     }>,
+     *   }>,
+     * }> $aggregated
+     *
+     * @return list<PLRegisterRow>
+     */
+    private function flattenRows(array $aggregated): array
     {
+        $rows = [];
+
         foreach ($aggregated as $data) {
             $date = $data['date'];
 
             foreach ($data['projects'] as $projectData) {
-                $project = $projectData['project'];
+                $projectDirectionId = $projectData['project']->getId();
 
                 foreach ($projectData['responsibilityCenters'] as $responsibilityCenterData) {
                     foreach ($responsibilityCenterData['categories'] as $categoryData) {
-                        $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned'] ?? 0.0);
-                        $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned'] ?? 0.0);
+                        $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned']);
+                        $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned']);
 
                         if (0.0 === $income && 0.0 === $expense) {
                             continue;
                         }
 
-                        $this->upsertDailyTotal(
-                            $company,
-                            $date,
-                            $project,
+                        $categoryId = $categoryData['category']->getId();
+
+                        if (null === $categoryId || null === $projectDirectionId) {
+                            throw new \LogicException('Unable to upsert PL daily total without identifiers.');
+                        }
+
+                        $rows[] = new PLRegisterRow(
+                            $date->format('Y-m-d'),
+                            $categoryId,
+                            $projectDirectionId,
                             $responsibilityCenterData['responsibilityCenterId'],
-                            $categoryData['category'],
-                            $income,
-                            $expense,
-                            $replace,
+                            $this->formatAmount($income),
+                            $this->formatAmount($expense),
                         );
                     }
                 }
             }
         }
+
+        return $rows;
     }
 
-    private function upsertDailyTotal(
-        Company $company,
-        \DateTimeImmutable $date,
-        ProjectDirection $projectDirection,
-        ?string $responsibilityCenterId,
-        PLCategory $category,
-        float $income,
-        float $expense,
-        bool $replace,
-    ): void {
+    /**
+     * @param list<PLRegisterRow> $rows
+     */
+    private function persistRows(Company $company, array $rows): void
+    {
         $companyId = $company->getId();
-        $categoryId = $category->getId();
-        $projectDirectionId = $projectDirection->getId();
 
-        if (null === $companyId || null === $categoryId || null === $projectDirectionId) {
+        if (null === $companyId) {
             throw new \LogicException('Unable to upsert PL daily total without identifiers.');
         }
 
-        $this->dailyTotals->upsert(
-            $companyId,
-            $categoryId,
-            $date,
-            $projectDirectionId,
-            $this->formatAmount($income),
-            $this->formatAmount($expense),
-            $replace,
-            new \DateTimeImmutable(),
-            responsibilityCenterId: $responsibilityCenterId,
-        );
+        $timestamp = new \DateTimeImmutable();
+
+        foreach ($rows as $row) {
+            $this->dailyTotals->upsert(
+                $companyId,
+                $row->categoryId,
+                new \DateTimeImmutable($row->date),
+                $row->projectDirectionId,
+                $row->income,
+                $row->expense,
+                true,
+                $timestamp,
+                responsibilityCenterId: $row->responsibilityCenterId,
+            );
+        }
     }
 
     private function clearTotals(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void

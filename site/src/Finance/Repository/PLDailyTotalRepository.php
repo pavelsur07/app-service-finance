@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Repository;
 
 use App\Company\Entity\Company;
+use App\Finance\Application\DTO\PLRegisterRow;
 use App\Finance\Entity\PLDailyTotal;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
@@ -113,6 +114,37 @@ SQL,
                 'created_at' => Types::DATETIME_IMMUTABLE,
                 'updated_at' => Types::DATETIME_IMMUTABLE,
             ],
+        );
+    }
+
+    /**
+     * Фактические строки регистра компании за окно — для сверки с документами.
+     *
+     * @return list<PLRegisterRow>
+     */
+    public function findRowsForRange(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            <<<'SQL'
+SELECT date, pl_category_id, project_direction_id, responsibility_center_id, amount_income, amount_expense
+FROM pl_daily_totals
+WHERE company_id = :company_id
+  AND date BETWEEN :from AND :to
+SQL,
+            ['company_id' => $companyId, 'from' => $from, 'to' => $to],
+            ['company_id' => Types::GUID, 'from' => Types::DATE_IMMUTABLE, 'to' => Types::DATE_IMMUTABLE],
+        );
+
+        return array_map(
+            static fn (array $row): PLRegisterRow => new PLRegisterRow(
+                (string) $row['date'],
+                null === $row['pl_category_id'] ? null : (string) $row['pl_category_id'],
+                (string) $row['project_direction_id'],
+                null === $row['responsibility_center_id'] ? null : (string) $row['responsibility_center_id'],
+                (string) $row['amount_income'],
+                (string) $row['amount_expense'],
+            ),
+            $rows,
         );
     }
 
