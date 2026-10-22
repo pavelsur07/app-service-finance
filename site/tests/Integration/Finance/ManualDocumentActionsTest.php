@@ -9,6 +9,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Application\CreateManualDocumentAction;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Application\UpdateManualDocumentAction;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -94,6 +95,34 @@ final class ManualDocumentActionsTest extends IntegrationTestCase
         self::getContainer()->get(UpdateManualDocumentAction::class)($document, $initialStatus, $initialDate);
 
         self::assertSame(['2026-03-07' => '250.00'], $this->registerExpenseByDay());
+    }
+
+    public function testUpdateReleasesDayOfConcurrentMove(): void
+    {
+        $document = $this->makeDocument('2026-03-05', '250.00');
+        self::getContainer()->get(CreateManualDocumentAction::class)($document);
+        $loadedDate = $document->getDate();
+
+        // Параллельный запрос перенёс документ на 07.03 и закоммитил регистр.
+        $this->connection->executeStatement(
+            "UPDATE documents SET date = '2026-03-07 00:00:00' WHERE id = :id",
+            ['id' => $document->getId()],
+        );
+        $this->em->clear();
+        $company = $this->em->getReference(Company::class, (string) $this->company->getId())
+            ?? throw new \LogicException('Company reference is missing.');
+        $updater = self::getContainer()->get(PLRegisterUpdater::class);
+        $updater->recalcRange($company, new \DateTimeImmutable('2026-03-05'), new \DateTimeImmutable('2026-03-07'));
+        self::assertSame(['2026-03-07' => '250.00'], $this->registerExpenseByDay());
+
+        // Эта форма загружена до переноса (05.03) и переносит на 09.03.
+        $stale = $this->em->find(Document::class, $document->getId());
+        self::assertInstanceOf(Document::class, $stale);
+        $stale->setDate(new \DateTimeImmutable('2026-03-09'));
+
+        self::getContainer()->get(UpdateManualDocumentAction::class)($stale, DocumentStatus::ACTIVE, $loadedDate);
+
+        self::assertSame(['2026-03-09' => '250.00'], $this->registerExpenseByDay());
     }
 
     public function testUpdateSeesDocumentCreatedByConcurrentRequest(): void

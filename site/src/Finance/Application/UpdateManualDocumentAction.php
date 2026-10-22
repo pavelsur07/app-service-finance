@@ -7,6 +7,7 @@ namespace App\Finance\Application;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Enum\DocumentStatus;
+use App\Finance\Repository\DocumentRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -20,6 +21,7 @@ final readonly class UpdateManualDocumentAction
     public function __construct(
         private EntityManagerInterface $entityManager,
         private PLRegisterUpdater $plRegisterUpdater,
+        private DocumentRepository $documentRepository,
     ) {
     }
 
@@ -27,7 +29,8 @@ final readonly class UpdateManualDocumentAction
      * @param DocumentStatus $initialStatus статус до применения формы
      * @param \DateTimeImmutable $initialDate дата до применения формы
      *
-     * @throws \DomainException сумма документа больше остатка транзакции ДДС; транзакция откатывается
+     * @throws \DomainException сумма документа больше остатка транзакции ДДС или документ удалён
+     *                          параллельно; транзакция откатывается
      */
     public function __invoke(Document $document, DocumentStatus $initialStatus, \DateTimeImmutable $initialDate): void
     {
@@ -43,12 +46,25 @@ final readonly class UpdateManualDocumentAction
                 $cashTransaction->recalculateAllocatedAmount();
             }
 
+            // Строка документа — после строки транзакции ДДС (источник раньше производных).
+            // Сохранённый день читается под блокировкой: параллельная правка могла перенести
+            // документ после загрузки формы, и её день тоже освобождается.
+            $stored = $this->documentRepository->lockStoredDateAndStatus(
+                (string) $document->getId(),
+                (string) $document->getCompany()->getId(),
+            ) ?? throw new \DomainException('Документ ОПиУ не найден.');
+            if ($stored['deleted']) {
+                throw new \DomainException('Документ ОПиУ удалён.');
+            }
+
             $this->entityManager->flush();
 
             $days = [];
-            if (DocumentStatus::ACTIVE === $initialStatus) {
-                $day = $initialDate->setTime(0, 0);
-                $days[$day->format('Y-m-d')] = $day;
+            foreach ([[$initialStatus, $initialDate], [$stored['status'], $stored['date']]] as [$status, $date]) {
+                if (DocumentStatus::ACTIVE === $status) {
+                    $day = $date->setTime(0, 0);
+                    $days[$day->format('Y-m-d')] = $day;
+                }
             }
             if (DocumentStatus::ACTIVE === $document->getStatus()) {
                 $day = $document->getDate()->setTime(0, 0);

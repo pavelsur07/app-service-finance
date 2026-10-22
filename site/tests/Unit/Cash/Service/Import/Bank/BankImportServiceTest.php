@@ -80,8 +80,9 @@ final class BankImportServiceTest extends TestCase
     }
 
     /**
-     * Сбой выгрузки посреди дня: строки дня до flush() отсоединяются до снятия блокировки счёта,
-     * иначе flush() журнала импорта записал бы их уже без блокировки.
+     * Сбой выгрузки посреди дня: строки дня до flush() и курсор (новый при первом импорте счёта)
+     * отсоединяются до снятия блокировки счёта, иначе flush() журнала импорта записал бы их уже
+     * без блокировки.
      */
     public function testUnflushedRowsOfFailedDayAreDetachedBeforeLockRelease(): void
     {
@@ -92,7 +93,7 @@ final class BankImportServiceTest extends TestCase
             self::assertSame('bank is down', $exception->getMessage());
         }
 
-        self::assertSame(['lock', 'persist:bank-tx-1', 'detach:bank-tx-1', 'unlock'], array_values(array_filter(
+        self::assertSame(['lock', 'persist:bank-tx-1', 'detach:bank-tx-1', 'detach:cursor', 'unlock'], array_values(array_filter(
             $this->events,
             static fn (string $event): bool => !str_starts_with($event, 'flush'),
         )));
@@ -197,6 +198,9 @@ final class BankImportServiceTest extends TestCase
             ->willReturnCallback(function (object $entity): void {
                 if ($entity instanceof CashTransaction) {
                     $this->events[] = 'detach:'.$entity->getExternalId();
+                }
+                if ($entity instanceof BankImportCursor) {
+                    $this->events[] = 'detach:cursor';
                 }
             });
         $entityManager

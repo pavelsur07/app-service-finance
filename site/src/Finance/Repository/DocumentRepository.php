@@ -8,6 +8,7 @@ use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
+use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -286,5 +287,28 @@ class DocumentRepository extends ServiceEntityRepository
         $pager->setCurrentPage(max(1, $page));
 
         return $pager;
+    }
+
+    /**
+     * Сохранённые дата, статус и удалённость документа компании под `FOR UPDATE` — правка из формы
+     * пересчитывает регистр по дню, который лежит в БД, а не по загруженному до блокировки.
+     *
+     * @return array{date: \DateTimeImmutable, status: DocumentStatus, deleted: bool}|null
+     */
+    public function lockStoredDateAndStatus(string $documentId, string $companyId): ?array
+    {
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'SELECT date, status, deleted_at FROM documents WHERE id = :id AND company_id = :company_id FOR UPDATE',
+            ['id' => $documentId, 'company_id' => $companyId],
+        );
+        if (false === $row) {
+            return null;
+        }
+
+        return [
+            'date' => new \DateTimeImmutable((string) $row['date']),
+            'status' => DocumentStatus::from((string) $row['status']),
+            'deleted' => null !== $row['deleted_at'],
+        ];
     }
 }
