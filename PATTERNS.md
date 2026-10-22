@@ -28,7 +28,7 @@
 - [19. OpenAPI / Nelmio](#19-openapi--nelmio) — публичный API, документация endpoint
 - [20. Событийная модель: Доменные события](#20-событийная-модель-доменные-события) — реакция на смену состояния
 - [21. Оптимистичная блокировка](#21-оптимистичная-блокировка) — конкурентное редактирование
-- [22. Idempotency в Messenger](#22-idempotency-в-messenger) — webhook, ретраи, повторная обработка
+- [22. Idempotency: повтор запроса, сообщения и эффекта](#22-idempotency-повтор-запроса-сообщения-и-эффекта) — ключ повтора, retry, отметка вместо dispatch
 - [23. Логирование: выбор уровня (error vs warning)](#23-логирование-выбор-уровня-error-vs-warning) — уровень лога, GlitchTip-алерты
 - [24. Финансовые типы данных](#24-финансовые-типы-данных) — деньги, проценты, округление
 - [25. Request / Response DTO](#25-request--response-dto) — API-контракты
@@ -115,9 +115,54 @@ final class CreateProductAction
 }
 ```
 
-**Правила:** без `Request`/`Response` · Action — граница транзакции: `flush()` / `wrapInTransaction()` здесь (ещё допустимо в MessageHandler и консольной Command), не в сервисе и не в Repository · пакет >100 записей: сервис отдаёт порции, `flush()` + `clear()` каждые N делает Action · максимум ~100 строк · побочные эффекты → Messenger dispatch
+**Правила:** без `Request`/`Response` · Action — граница транзакции: `flush()` / `wrapInTransaction()` здесь (ещё допустимо в MessageHandler и консольной Command), не в сервисе и не в Repository · Action, вызванный из другого Action/Handler/Facade, не коммитит · пакет >100 записей: сервис отдаёт порции, `flush()` + `clear()` каждые N делает Action · максимум ~100 строк · побочные эффекты → Messenger dispatch после commit; обязательный эффект — отметка в той же транзакции
 
 Эталон: `CreateProductAction`, проверено 2026-09-13
+
+### 3.1. Сценарий из нескольких шагов: `wrapInTransaction()` + блокировка
+
+Голый `flush()` выше — один агрегат. Когда сценарий пишет несколько агрегатов,
+берёт блокировку или пересчитывает производные, весь сценарий — одна
+транзакция. Промежуточный `flush()` внутри неё нормален: следующий шаг читает
+записанное из БД.
+
+```php
+final class CreateDocumentFromTransactionAction
+{
+    public function __invoke(string $companyId, string $transactionId, string $requestKey): string
+    {
+        return $this->em->wrapInTransaction(function () use ($companyId, $transactionId, $requestKey): string {
+            // 1. Блокировка источника ДО проверки остатка; refresh — чтобы остаток
+            //    считался по свежей коллекции документов, а не по загруженной до ожидания.
+            $tx = $this->transactions->getForUpdate($companyId, $transactionId); // SELECT … FOR UPDATE
+
+            // 2. Повтор того же запроса — вернуть исходный результат.
+            if (null !== $existing = $this->financeFacade->findDocumentIdByRequestKey($companyId, $requestKey)) {
+                return $existing;
+            }
+
+            // $amount, $command, $day собираются из $tx, как в текущем Action.
+            $tx->assertCanAllocate($amount);
+            $documentId = $this->financeFacade->createDocumentFromCashTransaction($companyId, $tx, $command); // только persist
+
+            $this->em->flush();                                           // пересчёт читает документ из БД
+            $this->financeFacade->recalcPLRegisterDay($companyId, $day);  // без своего flush, под advisory lock дня
+
+            return $documentId;
+        });
+        // Исключение внутри — rollback и закрытый EM: повторять сценарий целиком.
+    }
+}
+```
+
+Порядок блокировок: компания → счёт → день, ключи одного уровня —
+отсортированными. HTTP к внешним системам — до транзакции или отдельным
+сообщением. Журнал, который должен пережить откат, — после rollback отдельной
+транзакцией: DBAL через соединение EM откатывается вместе с ним.
+
+Схема, не эталон: методов `getForUpdate`, `findDocumentIdByRequestKey`,
+`recalcPLRegisterDay` пока нет — их вводит задача идемпотентности Cash/Finance
+(`docs/tasks/cash-pl-idempotency/`).
 
 ---
 
@@ -1033,64 +1078,66 @@ public function __invoke(string $id, string $companyId, int $expectedVersion, Up
 
 ---
 
-## 22. Idempotency в Messenger
+## 22. Idempotency: повтор запроса, сообщения и эффекта
 
-> **Статус: спецификация, инфраструктура не реализована.** Классов `ProcessedMessage`, `IdempotentHandlerTrait`, `ImportBankStatementHandler` в кодовой базе нет (проверено 2026-09-13). Не импортировать их в новый код. Применять паттерны раздела только после реализации Shared-компонентов либо реализовать их в scope задачи, явно указав это в плане.
+Отдельной таблицы обработанных сообщений (`ProcessedMessage`) нет и не
+вводится: ключ повтора живёт в самой записи. Правила — `CLAUDE.md`,
+«Идемпотентность». Три разных случая, у каждого свой механизм.
 
-Защита от дублирования при retry — если Handler упал после flush, но до успешного ack.
+**1. Повтор создания** (двойная отправка формы, retry HTTP, повтор сообщения).
+Ключ задаёт вызывающий и закреплён unique в БД.
 
 ```php
-// Entity для хранения обработанных сообщений
-// src/Shared/Entity/ProcessedMessage.php
-#[ORM\Entity]
-#[ORM\Table(name: 'processed_messages')]
-class ProcessedMessage
-{
-    #[ORM\Id, ORM\Column]
-    private string $messageId;
+// Форма: скрытое поле с UUIDv7, сгенерированным при показе формы (не при отправке).
+// Образец — CashTransferController / CashTransferType (idempotency_key).
 
-    #[ORM\Column]
-    private \DateTimeImmutable $processedAt;
+try {
+    $this->em->wrapInTransaction(fn () => $this->create($companyId, $key, $cmd));
+} catch (UniqueConstraintViolationException $e) {
+    // EM закрыт, транзакция откачена. Существующую запись ищем DBAL-запросом,
+    // прежний UnitOfWork не используем.
+    $id = $this->connection->fetchOne(
+        'SELECT id FROM cash_transfer WHERE company_id = :c AND idempotency_key = :k',
+        ['c' => $companyId, 'k' => $key],
+    );
+    if (false === $id) {
+        // Сработал другой unique (например, нога перевода) — это не повтор.
+        throw $e;
+    }
+
+    return CreateResult::duplicate((string) $id);
 }
 ```
 
-```php
-// src/Shared/Messenger/IdempotentHandlerTrait.php
-trait IdempotentHandlerTrait
-{
-    private function isAlreadyProcessed(string $messageId): bool
-    {
-        return $this->em->find(ProcessedMessage::class, $messageId) !== null;
-    }
+Внешний источник — естественный ключ `(company_id, import_source, external_id)`
+(`uniq_cashflow_import`). Эвристический хеш (`dedupe_hash`: дата, сумма,
+назначение) unique не делать: одинаковые законные операции бывают; дубли внутри
+одной пачки отсекать множеством уже увиденных ключей в памяти пачки — проверка
+в БД их не видит до `flush()`.
 
-    private function markAsProcessed(string $messageId): void
-    {
-        $this->em->persist(new ProcessedMessage($messageId, new \DateTimeImmutable()));
-        // flush вызывает Action — не здесь
-    }
-}
-```
+**2. Повтор обработки** (Messenger retry после падения). Сообщение несёт ID,
+Handler сначала проверяет состояние; работа уже сделана — `info` и выход.
+Многофазный Handler — захват статуса отдельным commit, обработка порциями,
+финализация; зависший промежуточный статус снимается по таймауту.
+Фазы есть в `CashFileImportHandler` (`queued` → `processing` → `done/failed`),
+но образец неполный: таймаута/lease нет, повторная доставка выходит на любом
+статусе, кроме `queued`, и job, оставшийся в `processing` после падения
+процесса, сам не восстановится.
 
-```php
-#[AsMessageHandler]
-final class ImportBankStatementHandler
-{
-    use IdempotentHandlerTrait;
+**3. Повтор эффекта** (событие или пересчёт после commit). `dispatch()` после
+commit теряется при падении между ними, а повтор сценария уходит в ветку
+«уже есть» и эффект не повторяет. Обязательный эффект — отметка в той же
+транзакции, что и источник («период грязный», outbox-строка), и идемпотентный
+потребитель, который снимает отметку. Пересчёт — замена окна под
+`pg_advisory_xact_lock`, не прибавление дельты.
 
-    public function __invoke(ImportBankStatementMessage $message): void
-    {
-        if ($this->isAlreadyProcessed($message->idempotencyKey)) {
-            $this->logger->info('Сообщение уже обработано, пропускаем', ['key' => $message->idempotencyKey]);
-            return;
-        }
+**Тесты:** повторный вызов → тот же результат и то же число строк; для
+блокировок — два параллельных вызова; для случая 3 — падение между commit и
+эффектом.
 
-        ($this->action)($message->companyId, $message->statementId);
-        $this->markAsProcessed($message->idempotencyKey);
-    }
-}
-```
-
-**Когда:** импорты из внешних систем · финансовые операции · любой Handler с деструктивными или неотменяемыми эффектами. Не нужно для read-only и вычислительных Handler.
+**Когда:** импорты из внешних систем · финансовые операции · формы создания
+денежных записей · любой Handler с неотменяемыми эффектами. Не нужно для
+read-only и чистых вычислений.
 
 ---
 
