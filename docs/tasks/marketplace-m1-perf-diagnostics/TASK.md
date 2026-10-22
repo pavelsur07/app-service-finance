@@ -5,7 +5,7 @@
 
 ## Контекст
 
-Основание: Stage 0, `docs/architecture/marketplace-audit/01–07`, особенно `06-migration-roadmap.md`.
+Основание: Stage 0, marketplace-аудит 01–07 (удалён из docs 22.10.2026, есть в истории git), особенно `06-migration-roadmap.md`.
 Production: Symfony, Redis Streams, PostgreSQL, S3; 2–3 кабинета, проблемы производительности
 уже проявляются. Prometheus/Grafana нет; на M1 новую инфраструктуру не добавляем.
 
@@ -73,7 +73,7 @@ queue lag и handler runtime отдельно; число отсутствующ
 
 ## 6. Аудит границы нормализации
 
-`docs/architecture/marketplace-audit/08-normalization-boundary.md`: source parsing Ozon/WB; source
+аудит 08-normalization-boundary.md: source parsing Ozon/WB; source
 normalization; financial mapping; зависимости от Doctrine и финансовых Entity; справочники и
 настройки компаний; корректировки и закрытые периоды; что технически выносится в Go/Python; что
 обязательно остаётся в Symfony. Без рефакторинга нормализации.
