@@ -18,6 +18,10 @@ type EndpointLimit struct {
 	Floor        float64
 	Ceiling      float64
 	DefaultPause time.Duration // пауза после 429 без Retry-After
+	// SharedQuota — квота метода общая для всех клиентов Ozon: 429 вызван
+	// чужой нагрузкой, поэтому темп не снижается и шторм не считается —
+	// только пауза.
+	SharedQuota bool
 }
 
 // Config — лимиты по endpoint'ам и правило роста.
@@ -43,8 +47,9 @@ func DefaultConfig() Config {
 			// отключён (docs/tasks/marketplace-data-ingestion/plan-ozon.md) — старт ниже обычного.
 			ozon.EndpointPostingFBOList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointPostingFBSList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
-			// Лимит метода не опубликован; объём мал (крупный кабинет ≈ 5 запросов на день).
-			ozon.EndpointAccrualPostings: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Замер 22.10.2026: 50 запросов на окно 5 с на всех клиентов метода,
+			// окно пустеет за 1–3 с — запрос раз в окно (docs/ozon-api.md).
+			ozon.EndpointAccrualPostings: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 			// Каталог: 2–3 запроса на кабинет в сутки.
 			ozon.EndpointProductList:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointProductInfoList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
@@ -247,9 +252,11 @@ func (r *Registry) Observe(ref, endpoint string, apiErr *ozon.APIError) {
 		}
 	case apiErr.Class == ozon.ClassRateLimit:
 		p.successes = 0
-		atFloor := p.current <= p.limit.Floor
-		changed = p.setCurrent(p.current / 2)
-		storm = r.trackStorm(p, ref, endpoint, atFloor)
+		if !p.limit.SharedQuota {
+			atFloor := p.current <= p.limit.Floor
+			changed = p.setCurrent(p.current / 2)
+			storm = r.trackStorm(p, ref, endpoint, atFloor)
+		}
 		pause := apiErr.RetryAfter
 		if pause <= 0 {
 			pause = p.limit.DefaultPause

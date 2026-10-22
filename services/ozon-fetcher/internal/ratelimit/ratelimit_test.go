@@ -17,6 +17,7 @@ const (
 	refB = "conn-b"
 	ep   = ozon.EndpointAccrualByDay
 	ep2  = ozon.EndpointAccrualTypes
+	ep3  = ozon.EndpointAccrualPostings
 )
 
 type fakeClock struct {
@@ -58,6 +59,7 @@ func testConfig() Config {
 		Endpoints: map[string]EndpointLimit{
 			ep:  {Start: 1, Floor: 0.1, Ceiling: 5, DefaultPause: 10 * time.Second},
 			ep2: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: time.Minute},
+			ep3: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 		},
 		Fallback:     EndpointLimit{Start: 0.5, Floor: 0.1, Ceiling: 1, DefaultPause: time.Minute},
 		GrowAfter:    3,
@@ -380,4 +382,32 @@ func TestDefaultConfigCoversPostingLists(t *testing.T) {
 		assert.Positive(t, limit.Floor)
 		assert.Positive(t, limit.DefaultPause)
 	}
+}
+
+func TestSharedQuotaRateLimitOnlyPauses(t *testing.T) {
+	r, clock, st := stormRegistry()
+	for range 10 {
+		r.Observe(refA, ep3, rateLimited(0))
+	}
+	assert.InDelta(t, 0.2, r.Rate(refA, ep3), 1e-9, "чужая нагрузка не снижает темп")
+	assert.Empty(t, st.list, "и не шторм")
+
+	require.NoError(t, r.Wait(context.Background(), refA, ep3))
+	assert.Equal(t, []time.Duration{5 * time.Second}, clock.sleeps, "пауза без Retry-After — дефолт endpoint'а")
+
+	r.Observe(refA, ep3, rateLimited(time.Second))
+	require.NoError(t, r.Wait(context.Background(), refA, ep3))
+	assert.Equal(t, time.Second, clock.sleeps[len(clock.sleeps)-1], "Retry-After соблюдается")
+
+	toFloor(r, refA)
+	r.Observe(refA, ep, rateLimited(0))
+	r.Observe(refA, ep, rateLimited(0))
+	r.Observe(refA, ep, rateLimited(0))
+	assert.Len(t, st.list, 1, "у остальных endpoint'ов шторм прежний")
+}
+
+func TestSharedQuotaSavedRateBelowFloorIsRaised(t *testing.T) {
+	r, _, _ := newRegistry()
+	r.Seed(refA, ep3, 0, 0.05)
+	assert.InDelta(t, 0.2, r.Rate(refA, ep3), 1e-9, "темп, сохранённый до общей квоты, поднимается до пола")
 }
