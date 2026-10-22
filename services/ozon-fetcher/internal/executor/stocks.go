@@ -38,7 +38,8 @@ func (r *taskRun) stocks(ctx context.Context, creds ozon.Credentials) error {
 				for _, sku := range page.SKUs {
 					skus[sku] = true
 				}
-				if page.Items > 0 {
+				// total — с непустых страниц; пустой снимок — с концевой.
+				if page.Items > 0 || total < 0 {
 					total = page.Total
 				}
 			}

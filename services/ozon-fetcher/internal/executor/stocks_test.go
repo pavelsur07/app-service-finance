@@ -78,6 +78,17 @@ func TestStocksStoresEveryPageAndLogsCounts(t *testing.T) {
 	assert.NotContains(t, h.logs.String(), `"level":"WARN"`)
 }
 
+func TestStocksEmptySnapshotLogsZeroTotal(t *testing.T) {
+	o := &fakeOzon{stockPages: map[string]ozon.Page{"": stocksPage(0, "")}}
+	h := newHarness(o)
+
+	res := h.exec.Run(context.Background(), task(ResourceStocks, today), stocksCabinet, "trace")
+
+	assert.Equal(t, "done", res.Outcome)
+	assert.Contains(t, h.logs.String(), `"items":0,"skus":0,"total":0`)
+	assert.NotContains(t, h.logs.String(), `"level":"WARN"`)
+}
+
 func TestStocksCountMismatchIsWarned(t *testing.T) {
 	o := &fakeOzon{stockPages: map[string]ozon.Page{"": stocksPage(5, "C1", 5), "C1": stocksPage(5, "")}}
 	h := newHarness(o)
