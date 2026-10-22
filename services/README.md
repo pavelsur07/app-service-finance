@@ -1,7 +1,7 @@
 # services/ — монорепо Go/Python-сервисов
 
 Сервисы вне PHP-монолита (`site/`). Линия развития — marketplace-аудит
-(`docs/architecture/marketplace-audit/`, продолжение M1/M2): fetch, parse и
+(продолжение M1/M2; документы аудита удалены из docs 22.10.2026, есть в истории git): fetch, parse и
 source normalization маркетплейсов. Symfony остаётся владельцем финансовых
 операций, правил, закрытия периодов и posting.
 

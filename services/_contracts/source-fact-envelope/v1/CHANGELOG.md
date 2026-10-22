@@ -18,7 +18,7 @@
 
 ## v1.0.0-draft (2026-10-13) — первый проект
 
-Проект контракта на базе `docs/architecture/marketplace-audit/05-target-architecture.md`
+Проект контракта на базе marketplace-аудита, 05-target-architecture.md
 (§«Контракт handoff»). Статус «проект»: до реализации Symfony inbox endpoint
 согласовать с `docs/financial-core/05-financial-events.md`, `07-idempotency.md`,
 ADR-006/008 и natural keys Ingestion. После утверждения — изменения только через v2.

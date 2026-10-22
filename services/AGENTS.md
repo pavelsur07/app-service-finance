@@ -12,7 +12,7 @@
 
 ## 1. Неизменяемые границы (marketplace-аудит 05/08)
 
-Эти правила наследуются из `docs/architecture/marketplace-audit/` и не
+Эти правила сформулированы marketplace-аудитом (документы удалены из docs 22.10.2026, есть в истории git) и не
 переопределяются per-service:
 
 1. **Только Symfony пишет** `marketplace_*`, Finance, Financial Core,
