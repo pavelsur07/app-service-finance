@@ -19,6 +19,7 @@ import (
 
 // reportFake — заказ, статус и скачивание отчётов.
 type reportFake struct {
+	statusErr error
 	orderHang bool // заказ ждёт отмены контекста (лимитер, медленный ответ)
 	orders    [][]string
 	ranges    [][2]string
@@ -45,6 +46,9 @@ func (f *fakePerf) OrderReport(ctx context.Context, _ ozonperf.Credentials, _ st
 func (f *fakePerf) ReportStatus(_ context.Context, _ ozonperf.Credentials, _, id string) (ozonperf.ReportStatus, error) {
 	r := f.reports
 	r.polled = append(r.polled, id)
+	if r.statusErr != nil {
+		return ozonperf.ReportStatus{}, r.statusErr
+	}
 	if len(r.states) == 0 {
 		return ozonperf.ReportStatus{State: ozonperf.ReportReady, Raw: "OK", Link: "/api/client/statistics/report?UUID=" + id}, nil
 	}
@@ -419,4 +423,52 @@ func TestAdsReportOrderOversized5xxKeepsReservation(t *testing.T) {
 	assert.NotEqual(t, store.StatusFailedPermanent, h.tasks.finished.Status)
 	assert.True(t, h.tasks.finished.KeepCursor)
 	assert.Contains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved)
+}
+
+func TestAdsReportStatusErrorsKeepUUID(t *testing.T) {
+	for name, statusErr := range map[string]error{
+		"oversized 500": &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: ozonperf.EndpointStatisticsStatus, Status: 500, Err: ozon.ErrBodyTooLarge},
+		"bad state":     &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: ozonperf.EndpointStatisticsStatus, Status: 200},
+		"auth":          &ozon.APIError{Class: ozon.ClassAuth, Endpoint: ozonperf.EndpointStatisticsStatus, Status: 401},
+	} {
+		h, p, _ := reportsHarness(t, "2026-10-18 02:00", campaignsBody(3), nil)
+		p.reports.statusErr = statusErr
+		tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+		tk.Cursor = reportCursor{fp: numbersFingerprint([]string{"3"}), uuid: "uuid-7", orderedAt: msk(t, "2026-10-18 01:30").Unix()}.String()
+
+		res := h.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+
+		assert.Equal(t, labelReportPending, res.Outcome, name)
+		assert.True(t, h.tasks.finished.KeepCursor, name)
+		assert.Empty(t, p.reports.orders, name)
+	}
+
+	// Опрос недоступен дольше срока — отчёт брошен, следующее окно.
+	h, p, _ := reportsHarness(t, "2026-10-18 04:31", campaignsBody(3), nil)
+	p.reports.statusErr = &ozon.APIError{Class: ozon.ClassTransient, Endpoint: ozonperf.EndpointStatisticsStatus, Status: 503}
+	tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+	tk.Cursor = reportCursor{fp: numbersFingerprint([]string{"3"}), uuid: "uuid-7", orderedAt: msk(t, "2026-10-18 01:30").Unix()}.String()
+	res := h.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, labelReportWait, res.Outcome)
+	assert.NotContains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], "uuid-7")
+}
+
+func TestAdsReportBrokenCampaignsRawFinishesOutstandingReportFirst(t *testing.T) {
+	h, p, _ := reportsHarness(t, "2026-10-18 02:00", `{"broken":true}`, nil)
+	p.reports.states = []ozonperf.ReportState{ozonperf.ReportPending, ozonperf.ReportPending}
+	p.reports.states = append(p.reports.states, make([]ozonperf.ReportState, 100)...)
+	for i := range p.reports.states {
+		p.reports.states[i] = ozonperf.ReportPending
+	}
+	tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+	tk.Cursor = reportCursor{fp: "x", uuid: "uuid-7", orderedAt: msk(t, "2026-10-18 01:30").Unix()}.String()
+
+	res := h.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+
+	assert.Equal(t, labelReportPending, res.Outcome, "UUID не сбрасывается постоянной ошибкой")
+	assert.True(t, h.tasks.finished.KeepCursor)
+
+	h2, _, _ := reportsHarness(t, "2026-10-18 02:10", `{"broken":true}`, nil)
+	res = h2.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, "ads_raw_invalid", res.Outcome, "отчёт готов — теперь постоянная ошибка")
 }

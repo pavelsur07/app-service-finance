@@ -118,6 +118,16 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 		return err
 	}
 	ids, err := r.reportCampaigns(ctx, cabinet, from, to)
+	if errors.Is(err, errAdsRawInvalid) {
+		// Постоянная ошибка сбросит курсор: заказанный отчёт сначала доводится
+		// до конца, чтобы аккаунт не получил второй отчёт.
+		if saved, ok := parseReportCursor(r.cursor); ok && saved.uuid != "" {
+			if retireErr := r.retireReport(ctx, creds, saved); !errors.Is(retireErr, errAdsCampaignsRevised) {
+				return retireErr
+			}
+		}
+		return err
+	}
 	if err != nil {
 		return err
 	}
@@ -283,7 +293,17 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 	for {
 		st, err := e.perf.ReportStatus(ctx, creds, r.task.ConnectionRef, cur.uuid)
 		if err != nil {
-			return st, err
+			if ctx.Err() != nil {
+				return st, ctx.Err()
+			}
+			// Отчёт заказан: любая ошибка опроса (сеть, 5xx, 401, битый ответ)
+			// оставляет UUID — аккаунт занят, опрос повторится; срок «брошен»
+			// проверяется на каждом опросе.
+			r.log.Warn("ads report status failed, UUID kept", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+			if e.now().Sub(time.Unix(cur.orderedAt, 0)) >= e.cfg.AdsReportAbandon {
+				return st, r.abandonReport(ctx, cur, "status unavailable")
+			}
+			return st, errAdsReportPending
 		}
 		switch st.State {
 		case ozonperf.ReportReady:
@@ -302,12 +322,7 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 		}
 		now := e.now()
 		if now.Sub(time.Unix(cur.orderedAt, 0)) >= e.cfg.AdsReportAbandon {
-			r.log.Warn("ads report abandoned: not ready in time", slog.String("stage", "fetch"), slog.String("state", st.Raw))
-			cur.uuid, cur.orderedAt = "", 0
-			if err := r.saveCursor(ctx, *cur); err != nil {
-				return st, err
-			}
-			return st, &adsReportWait{at: e.nextAdsWindow(now), reason: "report abandoned"}
+			return st, r.abandonReport(ctx, cur, st.Raw)
 		}
 		if !now.Before(deadline) {
 			return st, errAdsReportPending
@@ -316,6 +331,17 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 			return st, err
 		}
 	}
+}
+
+// abandonReport — отчёт не готов за AdsReportAbandon: UUID брошен, заказ —
+// в следующем окне (WARNING).
+func (r *taskRun) abandonReport(ctx context.Context, cur *reportCursor, state string) error {
+	r.log.Warn("ads report abandoned: not ready in time", slog.String("stage", "fetch"), slog.String("state", state))
+	cur.uuid, cur.orderedAt = "", 0
+	if err := r.saveCursor(ctx, *cur); err != nil {
+		return err
+	}
+	return &adsReportWait{at: r.exec.nextAdsWindow(r.exec.now()), reason: "report abandoned"}
 }
 
 func (r *taskRun) saveCursor(ctx context.Context, cur reportCursor) error {
