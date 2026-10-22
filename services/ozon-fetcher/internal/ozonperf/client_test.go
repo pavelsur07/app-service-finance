@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -245,4 +246,26 @@ func TestShortTokenIsNotCachedPastExpiry(t *testing.T) {
 	_, err = c.FetchCampaigns(context.Background(), testCreds, "conn-1")
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), f.tokens.Load(), "токен на 30 с не живёт в кэше 25 с")
+}
+
+func TestSecretCrossingMessageLimitIsRedacted(t *testing.T) {
+	pad := strings.Repeat("x", 195) // секрет пересекает границу обрезки текста (200)
+	echo := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, auth string) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 3, "message": pad + auth})
+	}}
+	c, _, _ := newTestClient(t, echo)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "tok-", "и префикс токена")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 16, "message": pad + secret})
+	}))
+	t.Cleanup(srv.Close)
+	c2 := NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), time.Now)
+	_, err = c2.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret[:5], "и префикс секрета")
 }

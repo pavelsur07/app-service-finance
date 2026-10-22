@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -114,10 +113,9 @@ func (c *Client) do(ctx context.Context, creds Credentials, connectionRef, endpo
 		if payload != nil {
 			header.Set("Content-Type", "application/json")
 		}
-		resp, err := c.send(ctx, connectionRef, endpoint, method, target, header, payload)
+		resp, err := c.send(ctx, connectionRef, endpoint, method, target, header, payload, creds.ClientSecret, tok.value)
 		var apiErr *ozon.APIError
 		if errors.As(err, &apiErr) {
-			scrub(apiErr, creds.ClientSecret, tok.value)
 			c.limiter.Observe(connectionRef, endpoint, apiErr)
 			if apiErr.Status == http.StatusUnauthorized && attempt == 0 {
 				// Токен мог истечь раньше срока: новый и один повтор.
@@ -182,15 +180,12 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 		return token{}, fmt.Errorf("ozonperf: encode token request: %w", err)
 	}
 	header := http.Header{"Content-Type": {"application/json"}, "Accept": {"application/json"}}
-	resp, err := c.send(ctx, connectionRef, EndpointToken, http.MethodPost, c.baseURL+EndpointToken, header, payload)
+	resp, err := c.send(ctx, connectionRef, EndpointToken, http.MethodPost, c.baseURL+EndpointToken, header, payload, creds.ClientSecret)
 	if err != nil {
 		var apiErr *ozon.APIError
-		if errors.As(err, &apiErr) {
-			scrub(apiErr, creds.ClientSecret)
-			if apiErr.Status == http.StatusBadRequest {
-				// Неверная пара client_id/secret Ozon отдаёт и как 400.
-				apiErr.Class = ozon.ClassAuth
-			}
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusBadRequest {
+			// Неверная пара client_id/secret Ozon отдаёт и как 400.
+			apiErr.Class = ozon.ClassAuth
 		}
 		return token{}, err
 	}
@@ -213,19 +208,21 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 	return token{value: body.AccessToken, expires: c.now().Add(cache)}, nil
 }
 
-// scrub убирает из текста ошибки Ozon секреты запроса: он уходит в журнал
-// и GlitchTip, а ответ может повторять присланное.
-func scrub(apiErr *ozon.APIError, secrets ...string) {
+// scrub убирает из тела ответа об ошибке секреты запроса до разбора и
+// обрезки текста: текст уходит в журнал и GlitchTip, а ответ может повторять
+// присланное.
+func scrub(body []byte, secrets ...string) []byte {
 	for _, s := range secrets {
-		if s != "" && strings.Contains(apiErr.Message, s) {
-			apiErr.Message = strings.ReplaceAll(apiErr.Message, s, redacted)
+		if s != "" {
+			body = bytes.ReplaceAll(body, []byte(s), []byte(redacted))
 		}
 	}
+	return body
 }
 
 // send — один HTTP-запрос: чтение тела с потолком, классификация, журнал без
 // query, тела и заголовков.
-func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, target string, header http.Header, payload []byte) (ozon.Response, error) {
+func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, target string, header http.Header, payload []byte, secrets ...string) (ozon.Response, error) {
 	var body io.Reader
 	if payload != nil {
 		body = bytes.NewReader(payload)
@@ -263,6 +260,9 @@ func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, targ
 	if len(raw) > ozon.MaxBodyBytes {
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ozon.ClassInvalidResponse))
 		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ozon.ErrBodyTooLarge}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw = scrub(raw, secrets...)
 	}
 	if apiErr := ozon.Classify(endpoint, resp.StatusCode, resp.Header, raw, c.now()); apiErr != nil {
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(apiErr.Class))
