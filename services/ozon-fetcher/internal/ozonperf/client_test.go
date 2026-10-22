@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -202,4 +203,46 @@ func TestRateLimitCarriesRetryAfter(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, ozon.ClassRateLimit, apiErr.Class)
 	assert.Equal(t, 7*time.Second, apiErr.RetryAfter)
+}
+
+func TestErrorMessagesNeverCarrySecretOrToken(t *testing.T) {
+	echo := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, auth string) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 3, "message": "bad request with " + auth + " and " + secret})
+	}}
+	c, _, logs := newTestClient(t, echo)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret)
+	assert.NotContains(t, err.Error(), "tok-1")
+	assert.Contains(t, err.Error(), "bad request with", "текст Ozon остаётся")
+	assert.NotContains(t, logs.String(), secret)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 16, "message": "invalid client_secret " + secret})
+	}))
+	t.Cleanup(srv.Close)
+	c2 := NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), time.Now)
+	_, err = c2.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret)
+}
+
+func TestTokenNeverFormatsValue(t *testing.T) {
+	tok := token{value: "tok-secret", expires: time.Now()}
+	for _, s := range []string{fmt.Sprint(tok), fmt.Sprintf("%v %+v %#v", tok, tok, tok)} {
+		assert.NotContains(t, s, "tok-secret")
+	}
+}
+
+func TestShortTokenIsNotCachedPastExpiry(t *testing.T) {
+	f := &fakePerf{ttl: 30, handle: campaignsOK}
+	c, clk, _ := newTestClient(t, f)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.NoError(t, err)
+	clk.Add(25 * time.Second)
+	_, err = c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), f.tokens.Load(), "токен на 30 с не живёт в кэше 25 с")
 }

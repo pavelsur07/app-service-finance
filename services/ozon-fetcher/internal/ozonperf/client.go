@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,9 @@ type token struct {
 }
 
 func (t token) String() string { return redacted }
+
+// GoString закрывает %#v.
+func (t token) GoString() string { return redacted }
 
 // tokenEntry — токен одного client_id; mu сериализует его получение:
 // параллельные задачи ждут один запрос токена.
@@ -113,6 +117,7 @@ func (c *Client) do(ctx context.Context, creds Credentials, connectionRef, endpo
 		resp, err := c.send(ctx, connectionRef, endpoint, method, target, header, payload)
 		var apiErr *ozon.APIError
 		if errors.As(err, &apiErr) {
+			scrub(apiErr, creds.ClientSecret, tok.value)
 			c.limiter.Observe(connectionRef, endpoint, apiErr)
 			if apiErr.Status == http.StatusUnauthorized && attempt == 0 {
 				// Токен мог истечь раньше срока: новый и один повтор.
@@ -180,9 +185,12 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 	resp, err := c.send(ctx, connectionRef, EndpointToken, http.MethodPost, c.baseURL+EndpointToken, header, payload)
 	if err != nil {
 		var apiErr *ozon.APIError
-		if errors.As(err, &apiErr) && apiErr.Status == http.StatusBadRequest {
-			// Неверная пара client_id/secret Ozon отдаёт и как 400.
-			apiErr.Class = ozon.ClassAuth
+		if errors.As(err, &apiErr) {
+			scrub(apiErr, creds.ClientSecret)
+			if apiErr.Status == http.StatusBadRequest {
+				// Неверная пара client_id/secret Ozon отдаёт и как 400.
+				apiErr.Class = ozon.ClassAuth
+			}
 		}
 		return token{}, err
 	}
@@ -197,8 +205,22 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 	if body.ExpiresIn > 0 {
 		ttl = time.Duration(body.ExpiresIn) * time.Second
 	}
-	ttl = max(ttl-tokenSafetyMargin, minTokenTTL)
-	return token{value: body.AccessToken, expires: c.now().Add(ttl)}, nil
+	// Запас 5 мин; короткий токен — не меньше минуты, но не дольше 3/4 его срока.
+	cache := ttl - tokenSafetyMargin
+	if cache < minTokenTTL {
+		cache = min(minTokenTTL, ttl*3/4)
+	}
+	return token{value: body.AccessToken, expires: c.now().Add(cache)}, nil
+}
+
+// scrub убирает из текста ошибки Ozon секреты запроса: он уходит в журнал
+// и GlitchTip, а ответ может повторять присланное.
+func scrub(apiErr *ozon.APIError, secrets ...string) {
+	for _, s := range secrets {
+		if s != "" && strings.Contains(apiErr.Message, s) {
+			apiErr.Message = strings.ReplaceAll(apiErr.Message, s, redacted)
+		}
+	}
 }
 
 // send — один HTTP-запрос: чтение тела с потолком, классификация, журнал без
