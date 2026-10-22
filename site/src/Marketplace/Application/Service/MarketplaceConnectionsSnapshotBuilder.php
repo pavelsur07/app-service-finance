@@ -50,10 +50,10 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
     public const PRODUCTS_RESOURCE_TYPES = ['ozon.products.list', 'ozon.products.info'];
 
     /**
-     * Остатки — снимки (`docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md`): ежедневный
-     * 05:00 и отсечка недели в воскресенье 23:30; включается по списку компаний.
+     * Остатки — снимок дня 05:00 (`docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md`); конец
+     * недели — снимок понедельника («неделя готова» в понедельник 06:00); включается по списку компаний.
      */
-    public const STOCKS_RESOURCE_TYPES = ['ozon.stocks', 'ozon.stocks.week-close'];
+    public const STOCKS_RESOURCE_TYPES = ['ozon.stocks'];
 
     /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';

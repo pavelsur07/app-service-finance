@@ -49,30 +49,29 @@ func TestProductsDoNotChangeOtherPlans(t *testing.T) {
 	assert.Equal(t, without.Refreshes, with.Refreshes)
 }
 
-func TestStocksSnapshotTodayFrom0500AndWeekCloseOnSunday(t *testing.T) {
-	cabs := []connections.Cabinet{seller("a", executor.ResourceStocks, executor.ResourceStocksWeekClose)}
+func TestStocksSnapshotTodayFrom0500(t *testing.T) {
+	cabs := []connections.Cabinet{seller("a", executor.ResourceStocks)}
 
-	// Четверг 22.10, первый проход дня.
-	p := Build(at("2026-10-22 00:05"), cabs, DefaultConfig(msk))
-	assert.Equal(t, []string{"2026-10-22"}, periods(p.Ensure, executor.ResourceStocks))
-	s := specFor(p.Ensure, executor.ResourceStocks, "2026-10-22")
-	require.NotNil(t, s)
-	assert.Equal(t, at("2026-10-22 05:00"), s.RunAt)
-	assert.False(t, s.Refresh)
-	assert.Empty(t, periods(p.Ensure, executor.ResourceStocksWeekClose), "отсечка недели — только в воскресенье")
-
-	// Воскресенье 25.10.
-	p = Build(at("2026-10-25 12:00"), cabs, DefaultConfig(msk))
-	w := specFor(p.Ensure, executor.ResourceStocksWeekClose, "2026-10-25")
-	require.NotNil(t, w)
-	assert.Equal(t, at("2026-10-25 23:30"), w.RunAt)
-	for _, rf := range p.Refreshes {
-		assert.Empty(t, periods(rf.Specs, executor.ResourceStocks), "снимок не перечитывается")
+	for _, now := range []string{"2026-10-22 00:05", "2026-10-25 12:00", "2026-10-26 00:05"} {
+		p := Build(at(now), cabs, DefaultConfig(msk))
+		day := now[:10]
+		assert.Equal(t, []string{day}, periods(p.Ensure, executor.ResourceStocks), now)
+		s := specFor(p.Ensure, executor.ResourceStocks, day)
+		require.NotNil(t, s)
+		assert.Equal(t, at(day+" 05:00"), s.RunAt, "и в воскресенье, и в понедельник — один снимок в 05:00")
+		assert.False(t, s.Refresh)
+		assert.Len(t, p.Ensure, 1, "отдельного снимка конца недели нет")
 	}
+}
+
+func TestStocksRemovedWeekCloseFromStaleSnapshotIsIgnored(t *testing.T) {
+	// Снимок кабинетов, закэшированный до снятия ресурса, ещё объявляет его.
+	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", executor.ResourceStocks, "ozon.stocks.week-close")}, DefaultConfig(msk))
+	assert.Equal(t, []string{"2026-10-25"}, periods(p.Ensure, executor.ResourceStocks))
+	assert.Empty(t, periods(p.Ensure, "ozon.stocks.week-close"))
 }
 
 func TestStocksNotPlannedWithoutResource(t *testing.T) {
 	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
 	assert.Empty(t, periods(p.Ensure, executor.ResourceStocks))
-	assert.Empty(t, periods(p.Ensure, executor.ResourceStocksWeekClose))
 }

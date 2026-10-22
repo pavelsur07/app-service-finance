@@ -39,10 +39,9 @@ const (
 	ResourceProductsList = "ozon.products.list"
 	ResourceProductsInfo = "ozon.products.info"
 
-	// Остатки — снимки (period_key — день МСК снимка): ежедневный с 05:00 и
-	// отсечка недели в воскресенье с 23:30.
-	ResourceStocks          = "ozon.stocks"
-	ResourceStocksWeekClose = "ozon.stocks.week-close"
+	// Остатки — снимок дня (period_key — день МСК снимка) с 05:00; конец
+	// недели — снимок понедельника («неделя готова» в понедельник 06:00).
+	ResourceStocks = "ozon.stocks"
 
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
@@ -59,7 +58,7 @@ var postingResources = map[string]ozon.PostingScheme{
 var gatedResources = map[string]bool{
 	ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true,
 	ResourceProductsList: true, ResourceProductsInfo: true,
-	ResourceStocks: true, ResourceStocksWeekClose: true,
+	ResourceStocks: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -383,7 +382,7 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.productList(ctx, creds)
 		case ResourceProductsInfo:
 			return r.productInfo(ctx, creds, cabinet)
-		case ResourceStocks, ResourceStocksWeekClose:
+		case ResourceStocks:
 			return r.stocks(ctx, creds)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)

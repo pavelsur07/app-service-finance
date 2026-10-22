@@ -82,31 +82,18 @@ final class CoverageHeatmapBuilderTest extends TestCase
         self::assertSame(CoverageHeatmapCell::EMPTY, $rows['ozon.products.list']->cells[16]->state, 'до первого снимка — не пропуск');
     }
 
-    public function testStocksRowsAndWeekCloseCountsOnlySundays(): void
+    public function testStocksAndAdsRowsAppearOnlyWithTasks(): void
     {
         $builder = new CoverageHeatmapBuilder();
-        $heatmap = $builder->build(self::month('2026-10', [
-            self::cell('ozon.stocks', '2026-10-18', 1, 1),
-            self::cell('ozon.stocks.week-close', '2026-10-18', 1, 1),
-        ]), self::now());
-        $rows = [];
-        foreach ($heatmap->rows as $row) {
-            $rows[$row->resourceType] = $row;
-        }
-        self::assertSame('Остатки: снимок 05:00', $rows['ozon.stocks']->title);
-        self::assertSame('Остатки: отсечка недели', $rows['ozon.stocks.week-close']->title);
+        $heatmap = $builder->build(self::month('2026-10', [self::cell('ozon.stocks', '2026-10-18', 1, 1)]), self::now());
+        $titles = array_map(static fn ($r) => $r->title, $heatmap->rows);
+        self::assertContains('Остатки: снимок 05:00', $titles);
 
         $ads = $builder->build(self::month('2026-10', [self::cell('ozon.ads.expense', '2026-10-18', 1, 1)]), self::now());
         $titles = array_map(static fn ($r) => $r->title, $ads->rows);
         self::assertContains('Реклама: расход', $titles);
         self::assertNotContains('Реклама: кампании', $titles, 'строка — только при задачах');
-        self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.stocks.week-close']->cells[17]->state);
-
-        // Один загруженный снимок 18.10 (вес 1000 кабинетов — перевешивает обязательные строки), сейчас 21.10: у ежедневного снимка 19–20.10 — пропуски,
-        // у отсечки недели будни не считаются — процент карты выше.
-        $weekOnly = $builder->build(self::month('2026-10', [self::cell('ozon.stocks.week-close', '2026-10-18', 1000, 1000)]), self::now('2026-10-21 09:10:00'));
-        $daily = $builder->build(self::month('2026-10', [self::cell('ozon.stocks', '2026-10-18', 1000, 1000)]), self::now('2026-10-21 09:10:00'));
-        self::assertGreaterThan($daily->coveragePercent, $weekOnly->coveragePercent, 'будни — не пропуск отсечки недели');
+        self::assertNotContains('Остатки: снимок 05:00', $titles);
     }
 
     private static function cell(string $resource, string $period, int $expected, int $done, int $running = 0, int $retryable = 0, int $permanent = 0, ?\DateTimeImmutable $lastSuccess = null): ServiceCoverageMonthCell

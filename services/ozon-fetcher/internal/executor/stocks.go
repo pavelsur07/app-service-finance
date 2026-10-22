@@ -11,8 +11,7 @@ import (
 // StocksWindowStart — начало окна снимка остатков после полуночи МСК
 // (docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md §3).
 var StocksWindowStart = map[string]time.Duration{
-	ResourceStocks:          5 * time.Hour,
-	ResourceStocksWeekClose: 23*time.Hour + 30*time.Minute,
+	ResourceStocks: 5 * time.Hour,
 }
 
 // IsStocksResource — ресурс снимков остатков.
