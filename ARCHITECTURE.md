@@ -4154,6 +4154,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.58 | 2026-10-22 | Marketplace: снимки остатков Ozon — всем кабинетам с ключом seller (`ozon_fetcher.stocks_companies: ['*']`) |
 | 2.57 | 2026-10-22 | Marketplace: ресурсы рекламы `ozon.ads.campaigns` / `ozon.ads.expense` / `ozon.ads.daily` в снимке кабинетов (параметр `ozon_fetcher.ads_companies`, ключ performance); ServiceGateway: строки «Реклама: кампании», «Реклама: расход», «Реклама: статистика по дням» карты покрытия — только при задачах |
 | 2.56 | 2026-10-22 | Marketplace: ресурсы остатков `ozon.stocks` / `ozon.stocks.week-close` в снимке кабинетов (параметр `ozon_fetcher.stocks_companies`); ServiceGateway: строки «Остатки: снимок 05:00», «Остатки: отсечка недели» карты покрытия — только при задачах, у отсечки недели считаются только воскресенья |
 | 2.55 | 2026-10-22 | Marketplace: начисления по отправлениям Ozon — всем кабинетам с заказами (`ozon_fetcher.accrual_postings_companies: ['*']`) |

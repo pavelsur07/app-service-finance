@@ -26,7 +26,7 @@ parameters:
     ozon_fetcher.products_companies: ['*']
     # Компании, которым ozon-fetcher грузит снимки остатков:
     # docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md.
-    ozon_fetcher.stocks_companies: ['3f4d87cc-a967-43a7-9b5e-8a9113c0a910']
+    ozon_fetcher.stocks_companies: ['*']
     # Компании, которым ozon-fetcher грузит рекламу (кампании, расход, дневная статистика; ключ performance):
     # docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md.
     ozon_fetcher.ads_companies: ['3f4d87cc-a967-43a7-9b5e-8a9113c0a910']
