@@ -10,6 +10,7 @@ use App\Finance\Enum\DocumentStatus;
 use App\Finance\Repository\DocumentRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\PersistentCollection;
 
 /**
  * Правка документа ОПиУ из формы: документ уже изменён формой и не сохранён. Проверка остатка
@@ -29,8 +30,8 @@ final readonly class UpdateManualDocumentAction
      * @param DocumentStatus $initialStatus статус до применения формы
      * @param \DateTimeImmutable $initialDate дата до применения формы
      *
-     * @throws \DomainException сумма документа больше остатка транзакции ДДС или документ удалён
-     *                          параллельно; транзакция откатывается
+     * @throws \DomainException сумма документа больше остатка транзакции ДДС, документ изменён или
+     *                          удалён параллельно; транзакция откатывается
      */
     public function __invoke(Document $document, DocumentStatus $initialStatus, \DateTimeImmutable $initialDate): void
     {
@@ -47,24 +48,14 @@ final readonly class UpdateManualDocumentAction
             }
 
             // Строка документа — после строки транзакции ДДС (источник раньше производных).
-            // Сохранённый день читается под блокировкой: параллельная правка могла перенести
-            // документ после загрузки формы, и её день тоже освобождается.
-            $stored = $this->documentRepository->lockStoredDateAndStatus(
-                (string) $document->getId(),
-                (string) $document->getCompany()->getId(),
-            ) ?? throw new \DomainException('Документ ОПиУ не найден.');
-            if ($stored['deleted']) {
-                throw new \DomainException('Документ ОПиУ удалён.');
-            }
+            $this->assertNotChangedConcurrently($document);
 
             $this->entityManager->flush();
 
             $days = [];
-            foreach ([[$initialStatus, $initialDate], [$stored['status'], $stored['date']]] as [$status, $date]) {
-                if (DocumentStatus::ACTIVE === $status) {
-                    $day = $date->setTime(0, 0);
-                    $days[$day->format('Y-m-d')] = $day;
-                }
+            if (DocumentStatus::ACTIVE === $initialStatus) {
+                $day = $initialDate->setTime(0, 0);
+                $days[$day->format('Y-m-d')] = $day;
             }
             if (DocumentStatus::ACTIVE === $document->getStatus()) {
                 $day = $document->getDate()->setTime(0, 0);
@@ -77,6 +68,79 @@ final readonly class UpdateManualDocumentAction
         });
 
         $this->plRegisterUpdater->invalidateCacheForCompanyId((string) $document->getCompany()->getId());
+    }
+
+    /**
+     * Форма правила документ, загруженный до блокировки. Если с тех пор другой запрос закоммитил
+     * правку того же документа (день, статус, проект, ЦФО, операции — всё, из чего строится
+     * регистр), применение формы поверх молча перезаписало бы её или пересчитало регистр по
+     * устаревшим операциям: отказ, форму открывают заново. Загруженное состояние — исходные
+     * данные UnitOfWork, сохранённое — строка документа под `FOR UPDATE` и его операции.
+     */
+    private function assertNotChangedConcurrently(Document $document): void
+    {
+        $stored = $this->documentRepository->lockStoredRegisterState(
+            (string) $document->getId(),
+            (string) $document->getCompany()->getId(),
+        ) ?? throw new \DomainException('Документ ОПиУ не найден.');
+        if ($stored['deleted']) {
+            throw new \DomainException('Документ ОПиУ удалён.');
+        }
+
+        $unitOfWork = $this->entityManager->getUnitOfWork();
+        $loaded = $unitOfWork->getOriginalEntityData($document);
+        $loadedDate = $loaded['date'] ?? null;
+        $loadedStatus = $loaded['status'] ?? null;
+
+        // Исходные данные UnitOfWork после вставки несут значения как есть (enum — строкой).
+        $changed = !$loadedDate instanceof \DateTimeInterface
+            || $loadedDate->format('Y-m-d H:i:s') !== (new \DateTimeImmutable($stored['date']))->format('Y-m-d H:i:s')
+            || ($loadedStatus instanceof \BackedEnum ? (string) $loadedStatus->value : $loadedStatus) !== $stored['status']
+            || $this->entityId($loaded['projectDirection'] ?? null) !== $stored['projectDirectionId']
+            || ($loaded['responsibilityCenterId'] ?? null) !== $stored['responsibilityCenterId'];
+
+        $operations = $document->getOperations();
+        $loadedOperations = $operations instanceof PersistentCollection ? $operations->getSnapshot() : [];
+        $loadedById = [];
+        foreach ($loadedOperations as $operation) {
+            $loadedById[(string) $operation->getId()] = $unitOfWork->getOriginalEntityData($operation);
+        }
+
+        if (array_keys($loadedById) != array_keys($stored['operations'])) {
+            $changed = true;
+        }
+
+        foreach ($stored['operations'] as $id => $storedOperation) {
+            $loadedOperation = $loadedById[$id] ?? null;
+            if (null === $loadedOperation) {
+                continue;
+            }
+
+            $loadedAmount = $loadedOperation['amount'] ?? null;
+            if (!is_numeric($loadedAmount)
+                || 0 !== bccomp((string) $loadedAmount, $storedOperation['amount'], 2)
+                || $this->entityId($loadedOperation['category'] ?? null) !== $storedOperation['categoryId']
+                || $this->entityId($loadedOperation['projectDirection'] ?? null) !== $storedOperation['projectDirectionId']
+                || ($loadedOperation['responsibilityCenterId'] ?? null) !== $storedOperation['responsibilityCenterId']
+            ) {
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            throw new \DomainException('Документ изменён другим пользователем — откройте его заново.');
+        }
+    }
+
+    private function entityId(mixed $entity): ?string
+    {
+        if (null === $entity) {
+            return null;
+        }
+
+        $id = \is_object($entity) && method_exists($entity, 'getId') ? $entity->getId() : null;
+
+        return null !== $id ? (string) $id : null;
     }
 
     /**

@@ -8,7 +8,6 @@ use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -290,25 +289,50 @@ class DocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Сохранённые дата, статус и удалённость документа компании под `FOR UPDATE` — правка из формы
-     * пересчитывает регистр по дню, который лежит в БД, а не по загруженному до блокировки.
+     * Сохранённое состояние документа компании, от которого зависит регистр ОПиУ: строка документа
+     * под `FOR UPDATE` и его операции. Правка из формы сверяет с ним то, что загрузила форма, —
+     * параллельная правка того же документа не перезаписывается молча.
      *
-     * @return array{date: \DateTimeImmutable, status: DocumentStatus, deleted: bool}|null
+     * @return array{
+     *     date: string,
+     *     status: string,
+     *     deleted: bool,
+     *     projectDirectionId: ?string,
+     *     responsibilityCenterId: ?string,
+     *     operations: array<string, array{amount: string, categoryId: ?string, projectDirectionId: ?string, responsibilityCenterId: ?string}>
+     * }|null
      */
-    public function lockStoredDateAndStatus(string $documentId, string $companyId): ?array
+    public function lockStoredRegisterState(string $documentId, string $companyId): ?array
     {
-        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
-            'SELECT date, status, deleted_at FROM documents WHERE id = :id AND company_id = :company_id FOR UPDATE',
+        $connection = $this->getEntityManager()->getConnection();
+        $row = $connection->fetchAssociative(
+            'SELECT date, status, deleted_at, project_direction_id, responsibility_center_id FROM documents WHERE id = :id AND company_id = :company_id FOR UPDATE',
             ['id' => $documentId, 'company_id' => $companyId],
         );
         if (false === $row) {
             return null;
         }
 
+        $operations = [];
+        foreach ($connection->fetchAllAssociative(
+            'SELECT id, amount, category_id, project_direction_id, responsibility_center_id FROM document_operations WHERE document_id = :id',
+            ['id' => $documentId],
+        ) as $operation) {
+            $operations[(string) $operation['id']] = [
+                'amount' => (string) $operation['amount'],
+                'categoryId' => null !== $operation['category_id'] ? (string) $operation['category_id'] : null,
+                'projectDirectionId' => null !== $operation['project_direction_id'] ? (string) $operation['project_direction_id'] : null,
+                'responsibilityCenterId' => null !== $operation['responsibility_center_id'] ? (string) $operation['responsibility_center_id'] : null,
+            ];
+        }
+
         return [
-            'date' => new \DateTimeImmutable((string) $row['date']),
-            'status' => DocumentStatus::from((string) $row['status']),
+            'date' => (string) $row['date'],
+            'status' => (string) $row['status'],
             'deleted' => null !== $row['deleted_at'],
+            'projectDirectionId' => null !== $row['project_direction_id'] ? (string) $row['project_direction_id'] : null,
+            'responsibilityCenterId' => null !== $row['responsibility_center_id'] ? (string) $row['responsibility_center_id'] : null,
+            'operations' => $operations,
         ];
     }
 }
