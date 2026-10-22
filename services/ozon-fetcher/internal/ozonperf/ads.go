@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
+	"sort"
+	"strings"
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 )
@@ -72,4 +75,52 @@ func isArray(raw json.RawMessage) bool {
 
 func invalid(endpoint string, status int, reason string) error {
 	return &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: status, Err: errors.New(reason)}
+}
+
+// Shape — имена полей ответа без значений: ключи верхнего уровня и ключи
+// первого объекта в каждом массиве объектов. Для журнала: живая форма
+// ответов рекламы не проверена (нет тестового ключа), значения в журнал не
+// попадают.
+func Shape(body []byte) string {
+	var top any
+	if err := json.Unmarshal(body, &top); err != nil {
+		return "not json"
+	}
+	describe := func(v any) string {
+		obj, ok := v.(map[string]any)
+		if !ok {
+			return fmt.Sprintf("%T", v)
+		}
+		keys := make([]string, 0, len(obj))
+		for k := range obj {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return "{" + strings.Join(keys, ",") + "}"
+	}
+	switch t := top.(type) {
+	case []any:
+		if len(t) == 0 {
+			return "[]"
+		}
+		return fmt.Sprintf("[%d]%s", len(t), describe(t[0]))
+	case map[string]any:
+		parts := []string{describe(t)}
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if arr, ok := t[k].([]any); ok {
+				if len(arr) == 0 {
+					parts = append(parts, k+"=[]")
+				} else {
+					parts = append(parts, fmt.Sprintf("%s=[%d]%s", k, len(arr), describe(arr[0])))
+				}
+			}
+		}
+		return strings.Join(parts, " ")
+	}
+	return fmt.Sprintf("%T", top)
 }

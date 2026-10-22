@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -61,16 +62,29 @@ func (r *taskRun) fetchAds(ctx context.Context, cabinet connections.Cabinet) err
 			return nil
 		}
 		return r.withinSnapshotDay(ctx, func(ctx context.Context) error {
-			return r.single(ctx, func() (ozon.Page, error) { return perf.FetchCampaigns(ctx, creds, ref) })
+			return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchCampaigns(ctx, creds, ref) }))
 		})
 	case ResourceAdsExpense, ResourceAdsDaily:
 		if _, err := time.Parse(time.DateOnly, r.task.PeriodKey); err != nil {
 			return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
 		}
 		if r.task.ResourceType == ResourceAdsExpense {
-			return r.single(ctx, func() (ozon.Page, error) { return perf.FetchExpense(ctx, creds, ref, r.task.PeriodKey) })
+			return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchExpense(ctx, creds, ref, r.task.PeriodKey) }))
 		}
-		return r.single(ctx, func() (ozon.Page, error) { return perf.FetchDaily(ctx, creds, ref, r.task.PeriodKey) })
+		return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchDaily(ctx, creds, ref, r.task.PeriodKey) }))
 	}
 	return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
+}
+
+// logShape пишет в журнал имена полей ответа (без значений): живая форма
+// ответов рекламы снимается на шаге «один кабинет».
+func (r *taskRun) logShape(fetch func() (ozon.Page, error)) func() (ozon.Page, error) {
+	return func() (ozon.Page, error) {
+		page, err := fetch()
+		if err == nil {
+			r.log.Info("ads page shape", slog.String("stage", "fetch"), slog.String("shape", ozonperf.Shape(page.Body)),
+				slog.Int("bytes", len(page.Body)), slog.String("content_type", page.ContentType))
+		}
+		return page, err
+	}
 }

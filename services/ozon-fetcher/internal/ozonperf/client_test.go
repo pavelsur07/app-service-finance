@@ -283,3 +283,12 @@ func TestJSONEscapedSecretIsRedacted(t *testing.T) {
 	assert.NotContains(t, err.Error(), secret)
 	assert.Contains(t, err.Error(), "invalid client_secret [redacted]")
 }
+
+func TestShapeListsKeysWithoutValues(t *testing.T) {
+	assert.Equal(t, `{list,total} list=[2]{advObjectType,id,state,title}`,
+		Shape([]byte(`{"list":[{"id":"1","title":"Secret title","state":"X","advObjectType":"SKU"},{"id":"2"}],"total":"2"}`)))
+	assert.Equal(t, `{rows} rows=[]`, Shape([]byte(`{"rows":[]}`)))
+	assert.Equal(t, `[1]{date,moneySpent}`, Shape([]byte(`[{"date":"2026-10-21","moneySpent":"123,45"}]`)))
+	assert.NotContains(t, Shape([]byte(`{"list":[{"title":"Secret title"}]}`)), "Secret")
+	assert.Equal(t, "not json", Shape([]byte(`x`)))
+}
