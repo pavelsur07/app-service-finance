@@ -877,7 +877,7 @@ Telegram-строка ДДС и балансы, плановые платежи,
 ### Результат этапа 8 (2026-10-15)
 
 - Удалены мёртвые `Service/Import/File/CashTransactionPersister.php_` и
-  `CashFileImportReader.php_` (упоминание в `docs/tasks/cash-p0-import-restore` —
+  `CashFileImportReader.php_` (упоминание в задаче cash-p0-import-restore —
   исторический follow-up, закрыт этим этапом).
 - `site/src/Cash/README.md`: раздел «Целевая модель» (разрешал доступ к Cash через
   `Service\*` и `Repository\*`) заменён на «Границы модуля» (что закрыто гейтом,
