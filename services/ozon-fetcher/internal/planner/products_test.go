@@ -64,6 +64,13 @@ func TestStocksSnapshotTodayFrom0500(t *testing.T) {
 	}
 }
 
+func TestStocksRemovedWeekCloseFromStaleSnapshotIsIgnored(t *testing.T) {
+	// Снимок кабинетов, закэшированный до снятия ресурса, ещё объявляет его.
+	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", executor.ResourceStocks, "ozon.stocks.week-close")}, DefaultConfig(msk))
+	assert.Equal(t, []string{"2026-10-25"}, periods(p.Ensure, executor.ResourceStocks))
+	assert.Empty(t, periods(p.Ensure, "ozon.stocks.week-close"))
+}
+
 func TestStocksNotPlannedWithoutResource(t *testing.T) {
 	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
 	assert.Empty(t, periods(p.Ensure, executor.ResourceStocks))
