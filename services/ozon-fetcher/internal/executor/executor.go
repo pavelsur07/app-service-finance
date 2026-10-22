@@ -39,6 +39,11 @@ const (
 	ResourceProductsList = "ozon.products.list"
 	ResourceProductsInfo = "ozon.products.info"
 
+	// Остатки — снимки (period_key — день МСК снимка): ежедневный с 05:00 и
+	// отсечка недели в воскресенье с 23:30.
+	ResourceStocks          = "ozon.stocks"
+	ResourceStocksWeekClose = "ozon.stocks.week-close"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -54,6 +59,7 @@ var postingResources = map[string]ozon.PostingScheme{
 var gatedResources = map[string]bool{
 	ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true,
 	ResourceProductsList: true, ResourceProductsInfo: true,
+	ResourceStocks: true, ResourceStocksWeekClose: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -95,6 +101,7 @@ type Ozon interface {
 	FetchAccrualPostings(ctx context.Context, creds ozon.Credentials, connectionRef string, numbers []string) (ozon.Page, error)
 	FetchProductList(ctx context.Context, creds ozon.Credentials, connectionRef, fromLastID string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchProductInfo(ctx context.Context, creds ozon.Credentials, connectionRef string, ids []int64) (ozon.Page, int, error)
+	FetchStocks(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -344,6 +351,8 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.productList(ctx, creds)
 		case ResourceProductsInfo:
 			return r.productInfo(ctx, creds, cabinet)
+		case ResourceStocks, ResourceStocksWeekClose:
+			return r.stocks(ctx, creds)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

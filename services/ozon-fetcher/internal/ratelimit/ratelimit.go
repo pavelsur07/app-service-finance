@@ -53,6 +53,8 @@ func DefaultConfig() Config {
 			// Каталог: 2–3 запроса на кабинет в сутки.
 			ozon.EndpointProductList:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointProductInfoList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Остатки: 2 запроса на снимок.
+			ozon.EndpointStocks: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

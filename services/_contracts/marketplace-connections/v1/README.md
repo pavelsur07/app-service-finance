@@ -31,6 +31,7 @@
   только компаниям из `ozon_fetcher.orders_companies` (`['*']` — всем),
   `ozon.finance.accrual-postings` — из них компаниям `ozon_fetcher.accrual_postings_companies`;
   `ozon.products.list`, `ozon.products.info` — компаниям `ozon_fetcher.products_companies`;
+  `ozon.stocks`, `ozon.stocks.week-close` — компаниям `ozon_fetcher.stocks_companies`;
   performance → `ozon.ads.statistics`.
 - `updated_at` — максимум из подключений кабинета.
 

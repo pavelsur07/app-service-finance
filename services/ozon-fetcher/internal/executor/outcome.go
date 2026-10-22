@@ -63,6 +63,10 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		log.Error("stored orders page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "orders_raw_invalid", ErrorClass: "orders_raw_invalid", NextRunAt: now}
 	}
+	var early *snapshotEarlyError
+	if errors.As(err, &early) {
+		return store.Outcome{Status: store.StatusPending, Label: "snapshot_early", ErrorClass: "snapshot_early", KeepCursor: true, NextRunAt: early.at}
+	}
 	if errors.Is(err, errSnapshotMissed) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: labelSnapshotMissed, ErrorClass: labelSnapshotMissed, NextRunAt: now}
 	}
@@ -153,7 +157,7 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return store.Outcome{Status: store.StatusNotReady, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now.Add(delay)}
 
 	case ozon.ClassInvalidRequest:
-		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList) && (task.Cursor != "" || run.cursor != "") {
+		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList || IsStocksResource(task.ResourceType)) && (task.Cursor != "" || run.cursor != "") {
 			// Запрос шёл с курсором — прежней попытки (после паузы 429, backoff,
 			// рестарта) или своей предыдущей страницы: курсор Ozon мог истечь.
 			// Повтор окна с первой страницы, а не потеря дня.

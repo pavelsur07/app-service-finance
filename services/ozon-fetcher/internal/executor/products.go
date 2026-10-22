@@ -20,6 +20,13 @@ import (
 // запрос без product_id, день при этом загружен.
 const emptyProductInfoPage = `{"items":[]}`
 
+// snapshotEarlyError — окно снимка ещё не началось: задача ждёт его начала.
+type snapshotEarlyError struct{ at time.Time }
+
+func (e *snapshotEarlyError) Error() string {
+	return "executor: snapshot window starts at " + e.at.Format(time.RFC3339)
+}
+
 var (
 	// errSnapshotMissed — снимок за прошедший день: сегодняшний каталог под
 	// вчерашней датой подменил бы данные, в Ozon не ходим.
@@ -39,6 +46,12 @@ var (
 // нового дня под вчерашней датой не сохраняются. Граница — по часам
 // исполнителя.
 func (r *taskRun) withinSnapshotDay(ctx context.Context, load func(ctx context.Context) error) error {
+	return r.withinSnapshot(ctx, 0, load)
+}
+
+// withinSnapshot — то же с началом окна снимка from после полуночи МСК
+// (остатки — с 05:00): раньше начала — snapshotEarlyError, в Ozon не ходим.
+func (r *taskRun) withinSnapshot(ctx context.Context, from time.Duration, load func(ctx context.Context) error) error {
 	loc := r.exec.cfg.Location
 	day, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, loc)
 	if err != nil {
@@ -48,6 +61,9 @@ func (r *taskRun) withinSnapshotDay(ctx context.Context, load func(ctx context.C
 	end := day.AddDate(0, 0, 1)
 	if now.Before(day) || !now.Before(end) {
 		return fmt.Errorf("%w: %s", errSnapshotMissed, r.task.PeriodKey)
+	}
+	if start := day.Add(from); now.Before(start) {
+		return &snapshotEarlyError{at: start}
 	}
 	dayCtx, cancel := context.WithTimeoutCause(ctx, end.Sub(now), errSnapshotMissed)
 	defer cancel()
