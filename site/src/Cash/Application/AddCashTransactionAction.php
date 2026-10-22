@@ -160,8 +160,12 @@ final class AddCashTransactionAction
             });
         } catch (UniqueConstraintViolationException $exception) {
             // Две одновременные отправки одной формы: обе не нашли транзакцию по ключу,
-            // вторая упёрлась в PK. Её результат — транзакция первой.
-            return $this->concurrentlyCreated($dto, $exception);
+            // вторая упёрлась в PK. Её результат — транзакция первой; сброс кэша повторяем —
+            // первая могла упасть между commit и событием.
+            $first = $this->concurrentlyCreated($dto, $exception);
+            $this->eventDispatcher->dispatch(new CashTransactionsChanged($dto->companyId));
+
+            return $first;
         }
 
         // После commit инвалидируем snapshot: виджеты dashboard читают агрегированные данные,
