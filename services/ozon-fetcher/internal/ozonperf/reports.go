@@ -76,6 +76,11 @@ func (c *Client) OrderReport(ctx context.Context, creds Credentials, connectionR
 // ReportStatus — состояние отчёта по UUID.
 func (c *Client) ReportStatus(ctx context.Context, creds Credentials, connectionRef, id string) (ReportStatus, error) {
 	resp, err := c.getPath(ctx, creds, connectionRef, EndpointStatisticsStatus, "/api/client/statistics/"+url.PathEscape(id), nil)
+	var apiErr *ozon.APIError
+	if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+		// Отчёт пропал — как ошибка формирования: новый заказ, 3 подряд — отказ.
+		return ReportStatus{State: ReportFailed, Raw: "HTTP_404"}, nil
+	}
 	if err != nil {
 		return ReportStatus{}, err
 	}

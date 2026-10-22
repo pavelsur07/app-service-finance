@@ -63,11 +63,25 @@ func ActiveCampaigns(body []byte) (map[string]bool, bool) {
 		if id == "" {
 			return nil, false
 		}
-		for _, k := range []string{"views", "clicks", "moneySpent", "spent"} {
-			if positive(row[k]) {
-				active[id] = true
-				break
+		known := 0
+		for _, k := range []string{"views", "clicks", "moneySpent"} {
+			v, present := row[k]
+			if !present {
+				continue
 			}
+			f, ok := number(v)
+			if !ok {
+				// Значение не число — форма незнакома.
+				return nil, false
+			}
+			known++
+			if f > 0 {
+				active[id] = true
+			}
+		}
+		if known == 0 {
+			// Ни одной известной метрики — пустой список был бы тихой потерей.
+			return nil, false
 		}
 	}
 	return active, true
@@ -85,16 +99,16 @@ func idString(v any) string {
 	return ""
 }
 
-// positive — число или строка числа (Ozon отдаёт «123,45») больше нуля.
-func positive(v any) bool {
+// number — число или строка числа (Ozon отдаёт «123,45»).
+func number(v any) (float64, bool) {
 	switch t := v.(type) {
 	case float64:
-		return t > 0
+		return t, true
 	case string:
 		f, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(t), ",", "."), 64)
-		return err == nil && f > 0
+		return f, err == nil
 	}
-	return false
+	return 0, false
 }
 
 func sortedIDs(set map[string]bool) []string {

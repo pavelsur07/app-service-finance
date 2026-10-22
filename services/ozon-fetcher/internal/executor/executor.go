@@ -135,28 +135,31 @@ type Config struct {
 	AdsReportAbandon    time.Duration
 	AdsReportRetry      time.Duration
 	AdsReportBusy       time.Duration
-	AdsCampaignsWait    time.Duration
+	// AdsReportReservation — срок резерва заказа без номера отчёта (исход заказа неизвестен).
+	AdsReportReservation time.Duration
+	AdsCampaignsWait     time.Duration
 }
 
 // DefaultConfig — значения плана (stage-9.md).
 func DefaultConfig() Config {
 	return Config{
-		Lease:               2 * time.Minute,
-		FinishTimeout:       10 * time.Second,
-		BackoffBase:         time.Minute,
-		BackoffMax:          time.Hour,
-		RateLimitPause:      30 * time.Second,
-		AuthRetryPause:      time.Minute,
-		AuthSuspend:         time.Hour,
-		NoCredentialsIn:     time.Hour,
-		AdsReportWindowFrom: 30 * time.Minute,
-		AdsReportWindowTo:   4 * time.Hour,
-		AdsReportPoll:       30 * time.Second,
-		AdsReportAttempt:    20 * time.Minute,
-		AdsReportAbandon:    3 * time.Hour,
-		AdsReportRetry:      30 * time.Minute,
-		AdsReportBusy:       5 * time.Minute,
-		AdsCampaignsWait:    30 * time.Minute,
+		Lease:                2 * time.Minute,
+		FinishTimeout:        10 * time.Second,
+		BackoffBase:          time.Minute,
+		BackoffMax:           time.Hour,
+		RateLimitPause:       30 * time.Second,
+		AuthRetryPause:       time.Minute,
+		AuthSuspend:          time.Hour,
+		NoCredentialsIn:      time.Hour,
+		AdsReportWindowFrom:  30 * time.Minute,
+		AdsReportWindowTo:    4 * time.Hour,
+		AdsReportPoll:        30 * time.Second,
+		AdsReportAttempt:     20 * time.Minute,
+		AdsReportAbandon:     3 * time.Hour,
+		AdsReportRetry:       30 * time.Minute,
+		AdsReportBusy:        5 * time.Minute,
+		AdsReportReservation: time.Hour,
+		AdsCampaignsWait:     30 * time.Minute,
 		NotReadyDelay: map[string]time.Duration{
 			ResourceAccrualByDay:     time.Hour,
 			ResourceAccrualTypes:     time.Hour,

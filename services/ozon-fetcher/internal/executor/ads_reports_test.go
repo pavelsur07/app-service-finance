@@ -19,6 +19,7 @@ import (
 
 // reportFake — заказ, статус и скачивание отчётов.
 type reportFake struct {
+	orderHang bool // заказ ждёт отмены контекста (лимитер, медленный ответ)
 	orders    [][]string
 	ranges    [][2]string
 	orderErr  error
@@ -27,8 +28,12 @@ type reportFake struct {
 	downloads []string
 }
 
-func (f *fakePerf) OrderReport(_ context.Context, _ ozonperf.Credentials, _ string, campaigns []string, from, to time.Time) (string, error) {
+func (f *fakePerf) OrderReport(ctx context.Context, _ ozonperf.Credentials, _ string, campaigns []string, from, to time.Time) (string, error) {
 	r := f.reports
+	if r.orderHang {
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
 	if r.orderErr != nil {
 		return "", r.orderErr
 	}
@@ -123,8 +128,9 @@ func TestAdsReportOrdersBatchesOfTenAndStoresEachReport(t *testing.T) {
 	assert.Equal(t, "application/zip", h.raw.puts[0].ContentType)
 	assert.NotEmpty(t, h.tasks.cursors[0], "после первой порции — курсор следующей")
 	assert.Empty(t, h.tasks.cursors[1])
-	assert.Len(t, h.tasks.savedCursors, 2, "UUID — в курсоре сразу после заказа")
-	assert.Contains(t, h.tasks.savedCursors[0], ":uuid-1:")
+	require.Len(t, h.tasks.savedCursors, 4, "резерв до заказа, UUID — сразу после")
+	assert.Contains(t, h.tasks.savedCursors[0], ":"+reportReserved+":")
+	assert.Contains(t, h.tasks.savedCursors[1], ":uuid-1:")
 	assert.NotContains(t, h.logs.String(), perfSecret)
 }
 
@@ -301,4 +307,92 @@ func TestAdsReportRevisedCampaignsRestart(t *testing.T) {
 	assert.Equal(t, "ads_campaigns_revised", res.Outcome)
 	assert.False(t, h.tasks.finished.KeepCursor)
 	assert.Empty(t, p.reports.orders)
+}
+
+func TestAdsReportOrderWithUnknownOutcomeKeepsReservation(t *testing.T) {
+	h, p, _ := reportsHarness(t, "2026-10-18 01:30", campaignsBody(3), nil)
+	p.reports.orderErr = &ozon.APIError{Class: ozon.ClassTransient, Endpoint: ozonperf.EndpointStatistics}
+
+	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
+
+	assert.Equal(t, "transient", res.Outcome)
+	assert.True(t, h.tasks.finished.KeepCursor)
+	reserved := h.tasks.savedCursors[len(h.tasks.savedCursors)-1]
+	assert.Contains(t, reserved, ":"+reportReserved+":", "Ozon мог принять заказ — аккаунт занят")
+
+	// Повтор до срока резерва — без заказа, ждать срока.
+	h2, p2, _ := reportsHarness(t, "2026-10-18 02:00", campaignsBody(3), nil)
+	tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+	tk.Cursor = reserved
+	res = h2.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, labelReportWait, res.Outcome)
+	assert.True(t, h2.tasks.finished.NextRunAt.Equal(msk(t, "2026-10-18 02:30")))
+	assert.Empty(t, p2.reports.orders)
+
+	// После срока — резерв снят (WARNING), заказ заново.
+	h3, p3, _ := reportsHarness(t, "2026-10-18 02:31", campaignsBody(3), nil)
+	res = h3.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, "done", res.Outcome)
+	assert.Len(t, p3.reports.orders, 1)
+	assert.Contains(t, h3.logs.String(), "reservation expired")
+}
+
+func TestAdsReportRejectedOrderClearsReservation(t *testing.T) {
+	h, p, _ := reportsHarness(t, "2026-10-18 01:30", campaignsBody(3), nil)
+	p.reports.orderErr = &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozonperf.EndpointStatistics, Status: 400}
+
+	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
+
+	assert.Equal(t, "invalid_request", res.Outcome)
+	assert.NotContains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved, "отказ Ozon — заказа нет")
+}
+
+func TestAdsReportOrderCannotLeaveTheWindow(t *testing.T) {
+	h, p, clk := reportsHarness(t, "2026-10-18 03:59", campaignsBody(3), nil)
+	clk.now = clk.now.Add(59*time.Second + 950*time.Millisecond) // до конца окна — 50 мс
+	p.reports.orderHang = true
+
+	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
+
+	assert.Equal(t, labelReportWait, res.Outcome, "ожидание лимитера за 04:00 — не заказ")
+	assert.True(t, h.tasks.finished.NextRunAt.Equal(msk(t, "2026-10-19 00:30")))
+	assert.Contains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved, "запрос мог уйти — резерв остаётся")
+}
+
+func TestAdsReportRevisedCampaignsFinishOutstandingReportFirst(t *testing.T) {
+	old := reportCursor{fp: numbersFingerprint([]string{"3"}), uuid: "uuid-7", orderedAt: msk(t, "2026-10-18 01:30").Unix()}.String()
+
+	// Отчёт прежнего набора ещё не готов — ждать с тем же UUID.
+	h, p, _ := reportsHarness(t, "2026-10-18 01:40", campaignsBody(3, 4), nil)
+	pending := make([]ozonperf.ReportState, 100)
+	for i := range pending {
+		pending[i] = ozonperf.ReportPending
+	}
+	p.reports.states = pending
+	tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+	tk.Cursor = old
+	res := h.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, labelReportPending, res.Outcome)
+	assert.True(t, h.tasks.finished.KeepCursor)
+	assert.Empty(t, p.reports.orders)
+
+	// Готов — результат отброшен, задача заново.
+	h2, p2, _ := reportsHarness(t, "2026-10-18 01:50", campaignsBody(3, 4), nil)
+	res = h2.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+	assert.Equal(t, "ads_campaigns_revised", res.Outcome)
+	assert.False(t, h2.tasks.finished.KeepCursor)
+	assert.Empty(t, p2.reports.downloads)
+	assert.Empty(t, p2.reports.orders)
+}
+
+func TestAdsReportEmptyListWithSavedBatchesIsRevision(t *testing.T) {
+	daily := map[string]string{"2026-10-17": `{"rows":[{"id":"3","views":"0","clicks":"0","moneySpent":"0"}]}`}
+	h, _, _ := reportsHarness(t, "2026-10-18 01:30", campaignsBody(3), daily)
+	tk := reportTask(ResourceAdsStatistics, "2026-10-17")
+	tk.Cursor, tk.NextPageNo, tk.PageHashes = reportCursor{fp: numbersFingerprint([]string{"3", "4"}), idx: 1}.String(), 2, []string{"h1"}
+
+	res := h.exec.Run(context.Background(), tk, reportsCabinet, "trace")
+
+	assert.Equal(t, "ads_campaigns_revised", res.Outcome, "служебная страница не дописывается к прежним порциям")
+	assert.Empty(t, h.raw.puts)
 }

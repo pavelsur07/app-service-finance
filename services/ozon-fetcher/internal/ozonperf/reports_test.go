@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -77,4 +78,44 @@ func TestDownloadReportFollowsLinkOnlyOnPerformanceHost(t *testing.T) {
 	var apiErr *ozon.APIError
 	require.ErrorAs(t, err, &apiErr, "Bearer не уходит на чужой хост")
 	assert.Len(t, paths, 2)
+}
+
+func TestReportStatusNotFoundIsFailure(t *testing.T) {
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, _ string) { w.WriteHeader(http.StatusNotFound) }}
+	c, _, _ := newTestClient(t, f)
+	st, err := c.ReportStatus(context.Background(), testCreds, "conn-1", "u-1")
+	require.NoError(t, err)
+	assert.Equal(t, ReportFailed, st.State, "пропавший отчёт — под правило «3 подряд»")
+}
+
+func TestDownloadRedirectToAnotherHostIsRefused(t *testing.T) {
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("запрос ушёл на чужой хост, Authorization=%q", r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(other.Close)
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, r *http.Request, _ string) {
+		http.Redirect(w, r, other.URL+"/file.zip", http.StatusFound)
+	}}
+	c, _, _ := newTestClient(t, f)
+	_, err := c.DownloadReport(context.Background(), testCreds, "conn-1", "u-1", "")
+	require.Error(t, err)
+}
+
+func TestActiveCampaignsNeedKnownNumericMetrics(t *testing.T) {
+	active, ok := ActiveCampaigns([]byte(`{"rows":[{"id":"3","views":"10","clicks":"0","moneySpent":"0"},{"id":4,"views":0,"clicks":0,"moneySpent":"0,00"}]}`))
+	require.True(t, ok)
+	assert.Equal(t, map[string]bool{"3": true}, active)
+
+	for name, body := range map[string]string{
+		"renamed":    `{"rows":[{"id":"3","renamedViews":"10"}]}`,
+		"not number": `{"rows":[{"id":"3","views":"много"}]}`,
+		"no id":      `{"rows":[{"views":"10"}]}`,
+		"no rows":    `{"result":{}}`,
+	} {
+		_, ok := ActiveCampaigns([]byte(body))
+		assert.False(t, ok, name)
+	}
+	empty, ok := ActiveCampaigns([]byte(`{"rows":[]}`))
+	assert.True(t, ok, "пустой день — известная форма")
+	assert.Empty(t, empty)
 }

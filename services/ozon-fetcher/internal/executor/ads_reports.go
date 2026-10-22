@@ -121,21 +121,31 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 	if err != nil {
 		return err
 	}
-	if len(ids) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyAdsReportPage), ContentType: "application/json"})
-	}
 	fp := numbersFingerprint(ids)
 	cur := reportCursor{fp: fp}
 	if r.cursor != "" {
 		saved, ok := parseReportCursor(r.cursor)
-		if !ok || saved.fp != fp {
+		if !ok {
 			return errAdsCampaignsRevised
 		}
+		if saved.fp != fp || len(ids) == 0 {
+			// Набор порций изменился: заказанный отчёт прежнего набора сначала
+			// доводится до конца (не держать второй отчёт аккаунта), затем — заново.
+			return r.retireReport(ctx, creds, saved)
+		}
 		cur = saved
+	}
+	if len(ids) == 0 {
+		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyAdsReportPage), ContentType: "application/json"})
 	}
 
 	for cur.idx*ozonperf.MaxReportCampaigns < len(ids) {
 		chunk := ids[cur.idx*ozonperf.MaxReportCampaigns : min((cur.idx+1)*ozonperf.MaxReportCampaigns, len(ids))]
+		if cur.uuid == reportReserved {
+			if err := r.expireReservation(ctx, &cur); err != nil {
+				return err
+			}
+		}
 		if cur.uuid == "" {
 			if err := r.orderReport(ctx, creds, &cur, chunk, from, to); err != nil {
 				return err
@@ -164,12 +174,56 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 	return nil
 }
 
-// orderReport заказывает отчёт порции: только в окне и только если у
-// аккаунта нет другого заказанного отчёта. UUID сразу сохраняется в курсор.
+// reportReserved — UUID курсора, пока заказ отправлен, а номер отчёта не
+// получен: Ozon мог принять заказ (сбой ответа, рестарт). Резерв держит
+// аккаунт занятым до AdsReportReservation после заказа.
+const reportReserved = "reserved"
+
+// retireReport — смена набора порций при сохранённом курсоре: отчёт прежнего
+// набора (или резерв заказа) доводится до конца, результат отбрасывается,
+// затем задача — заново.
+func (r *taskRun) retireReport(ctx context.Context, creds ozonperf.Credentials, saved reportCursor) error {
+	switch saved.uuid {
+	case "":
+	case reportReserved:
+		if err := r.expireReservation(ctx, &saved); err != nil {
+			return err
+		}
+	default:
+		if _, err := r.awaitReport(ctx, creds, &saved); err != nil {
+			var wait *adsReportWait
+			if !errors.As(err, &wait) {
+				// Не готов, сбой — ждём с прежним курсором (UUID сохранён).
+				return err
+			}
+			// Ошибка Ozon или брошен — отчёта больше нет, можно заново.
+		}
+	}
+	return errAdsCampaignsRevised
+}
+
+// expireReservation — резерв заказа старше AdsReportReservation снимается
+// (WARNING: принятый Ozon отчёт мог потеряться), иначе — ждать его срока.
+func (r *taskRun) expireReservation(ctx context.Context, cur *reportCursor) error {
+	e := r.exec
+	until := time.Unix(cur.orderedAt, 0).Add(e.cfg.AdsReportReservation)
+	if e.now().Before(until) {
+		return &adsReportWait{at: until, reason: "report order outcome unknown"}
+	}
+	r.log.Warn("ads report order outcome unknown, reservation expired", slog.String("stage", "fetch"), slog.Int("batch", cur.idx))
+	cur.uuid, cur.orderedAt = "", 0
+	return r.saveCursor(ctx, *cur)
+}
+
+// orderReport заказывает отчёт порции: только в окне (и запрос уходит до его
+// конца — дедлайн покрывает токен и лимитер) и только если у аккаунта нет
+// другого заказанного отчёта. Перед заказом — резерв в курсоре, номер
+// отчёта — сразу после.
 func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, cur *reportCursor, chunk []string, from, to time.Time) error {
 	e := r.exec
 	now := e.now()
-	if start, end := e.adsWindow(now); now.Before(start) || !now.Before(end) {
+	start, end := e.adsWindow(now)
+	if now.Before(start) || !now.Before(end) {
 		return &adsReportWait{at: e.nextAdsWindow(now), reason: "outside the order window"}
 	}
 	busy, err := e.tasks.AdsReportInFlight(ctx, r.task.TaskKey)
@@ -179,25 +233,43 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 	if busy {
 		return errAdsReportBusy
 	}
-	id, err := e.perf.OrderReport(ctx, creds, r.task.ConnectionRef, chunk, from, to)
-	var apiErr *ozon.APIError
-	if errors.As(err, &apiErr) && apiErr.Class == ozon.ClassRateLimit {
-		// Лимит отчётов аккаунта общий с Symfony: не повторять подряд —
-		// следующее окно.
-		start, _ := e.adsWindow(e.now())
-		return &adsReportWait{at: start.AddDate(0, 0, 1), reason: "report order rate limited"}
-	}
-	if err != nil {
+	cur.uuid, cur.orderedAt = reportReserved, now.Unix()
+	if err := r.saveCursor(ctx, *cur); err != nil {
 		return err
 	}
-	cur.uuid, cur.orderedAt = id, e.now().Unix()
-	if err := e.tasks.SaveCursor(ctx, r.task.TaskKey, r.task.AttemptID, cur.String()); err != nil {
-		if errors.Is(err, store.ErrLeaseLost) {
+	orderCtx, cancel := context.WithTimeout(ctx, end.Sub(now))
+	id, err := e.perf.OrderReport(orderCtx, creds, r.task.ConnectionRef, chunk, from, to)
+	cancel()
+	if err != nil {
+		var apiErr *ozon.APIError
+		switch {
+		case ctx.Err() != nil:
+			return ctx.Err()
+		case errors.Is(err, context.DeadlineExceeded):
+			// Окно закончилось в ожидании лимитера или ответа — резерв
+			// остаётся: запрос мог уйти.
+			return &adsReportWait{at: e.nextAdsWindow(e.now()), reason: "order window ended"}
+		case errors.As(err, &apiErr) && apiErr.Status != 0 && apiErr.Class != ozon.ClassTransient:
+			// Ozon ответил отказом — заказа нет, резерв снимается.
+			cur.uuid, cur.orderedAt = "", 0
+			if saveErr := r.saveCursor(ctx, *cur); saveErr != nil {
+				return saveErr
+			}
+			if apiErr.Class == ozon.ClassRateLimit {
+				// Лимит отчётов аккаунта общий с Symfony: не повторять подряд —
+				// следующее окно.
+				return &adsReportWait{at: start.AddDate(0, 0, 1), reason: "report order rate limited"}
+			}
+			return err
+		default:
+			// Сбой сети, 5xx: Ozon мог принять заказ — резерв до срока.
 			return err
 		}
-		return &storeError{err}
 	}
-	r.cursor = cur.String()
+	cur.uuid = id
+	if err := r.saveCursor(ctx, *cur); err != nil {
+		return err
+	}
 	r.log.Info("ads report ordered", slog.String("stage", "fetch"), slog.Int("batch", cur.idx), slog.Int("campaigns", len(chunk)))
 	return nil
 }
