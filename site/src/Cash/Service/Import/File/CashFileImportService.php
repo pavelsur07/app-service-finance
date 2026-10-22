@@ -38,11 +38,12 @@ final class CashFileImportService
     private array $batchTransactions = [];
 
     /**
-     * Ключ строки → [сколько таких уже было в БД до импорта, сколько встречено в файле].
+     * dedupe_hash → ещё не сопоставленные транзакции, бывшие в БД до импорта, по номеру
+     * документа ('' — без номера).
      *
-     * @var array<string, array{existing: int, seen: int}>
+     * @var array<string, array<string, int>>
      */
-    private array $rowKeyOccurrences = [];
+    private array $unmatchedExisting = [];
 
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
@@ -102,7 +103,7 @@ final class CashFileImportService
         // должен попасть в пачку следующего.
         $this->batchTransactions = [];
         $this->counterpartyCache = [];
-        $this->rowKeyOccurrences = [];
+        $this->unmatchedExisting = [];
 
         $created = 0;
         $createdMinDate = null;
@@ -383,28 +384,39 @@ final class CashFileImportService
     }
 
     /**
-     * Дубль считается по количеству, а не по факту наличия: k-я строка файла с ключом
-     * (dedupe_hash + номер документа) — дубль, если в БД до импорта совпадающих было не
-     * меньше k. Число из БД берётся при первой встрече ключа — до того, как импорт запишет
-     * свои строки, поэтому результат не зависит от нарезки на пачки: повтор файла не создаёт
-     * ничего, законные одинаковые операции не теряются, прерванный импорт дописывает только
-     * недостающее. Пустой номер совпадает с любым (см. countActiveByCompanyDedupeAndDocNumber):
-     * выписка 1С с номерами и файл без колонки номера одного периода не дублируют друг друга.
-     * Параллельные задания одного счёта сериализует CashFileImportHandler — иначе M у обоих
-     * было бы одинаковым.
+     * Дубль считается по количеству, а не по факту наличия: каждая транзакция, бывшая в БД до
+     * импорта, закрывает не больше одной строки файла. Снимок по хешу берётся один раз — до
+     * первой строки с этим хешем, поэтому собственные строки импорта (в том числе уже
+     * закоммиченные пачки) не считаются: результат не зависит от нарезки на пачки, повтор файла
+     * ничего не создаёт, прерванный импорт дописывает недостающее.
+     *
+     * Номер документа есть не у всех источников (файлы без колонки номера, выписки 1С с номером),
+     * поэтому пустой номер совпадает с любым. Строка с номером закрывает сначала транзакцию того
+     * же номера, потом транзакцию без номера; строка без номера — сначала транзакцию без номера,
+     * потом любую. Параллельные задания одного счёта сериализует CashFileImportHandler — иначе
+     * снимки обоих были бы одинаковыми.
      */
     private function isAlreadyImported(string $companyId, string $dedupeHash, ?string $docNumber): bool
     {
         $docKey = trim((string) $docNumber);
-        $key = $dedupeHash.'|'.$docKey;
 
-        $this->rowKeyOccurrences[$key] ??= [
-            'existing' => $this->cashTransactionRepository->countActiveByCompanyDedupeAndDocNumber($companyId, $dedupeHash, $docKey),
-            'seen' => 0,
-        ];
-        ++$this->rowKeyOccurrences[$key]['seen'];
+        $this->unmatchedExisting[$dedupeHash] ??= $this->cashTransactionRepository
+            ->countActiveByCompanyDedupeGroupedByDocNumber($companyId, $dedupeHash);
+        $pool = &$this->unmatchedExisting[$dedupeHash];
 
-        return $this->rowKeyOccurrences[$key]['seen'] <= $this->rowKeyOccurrences[$key]['existing'];
+        $candidates = '' === $docKey
+            ? array_merge([''], array_values(array_diff(array_map('strval', array_keys($pool)), [''])))
+            : [$docKey, ''];
+
+        foreach ($candidates as $candidate) {
+            if (($pool[$candidate] ?? 0) > 0) {
+                --$pool[$candidate];
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function normalizePurposeForDedupe(?string $value): string

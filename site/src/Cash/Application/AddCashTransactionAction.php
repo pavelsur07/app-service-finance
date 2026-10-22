@@ -14,8 +14,10 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
+use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -30,6 +32,7 @@ final class AddCashTransactionAction
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
         private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
+        private readonly ManagerRegistry $managerRegistry,
     ) {
     }
 
@@ -134,7 +137,13 @@ final class AddCashTransactionAction
 
         // Сохраняем
         $this->entityManager->persist($tx);
-        $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+        try {
+            $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+        } catch (UniqueConstraintViolationException $exception) {
+            // Две одновременные отправки одной формы: обе не нашли транзакцию по ключу,
+            // вторая упёрлась в PK. Её результат — транзакция первой.
+            return $this->concurrentlyCreated($dto, $exception);
+        }
 
         // Совпадение с плановым платежом сохраняется до пересчёта, как раньше
         // делал сам матчер (flush вынесен сюда, этап 5.3).
@@ -151,5 +160,36 @@ final class AddCashTransactionAction
         $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         return $tx;
+    }
+
+    /**
+     * Транзакция, созданная параллельной отправкой той же формы. EntityManager после ошибки
+     * flush закрыт — читаем свежим. Ключ чужой компании — не повтор: исключение пробрасывается.
+     */
+    private function concurrentlyCreated(CashTransactionDTO $dto, UniqueConstraintViolationException $exception): CashTransaction
+    {
+        $key = $dto->idempotencyKey;
+        if (null === $key) {
+            throw $exception;
+        }
+
+        $ownerCompanyId = $this->entityManager->getConnection()->fetchOne(
+            'SELECT company_id FROM cash_transaction WHERE id = :id',
+            ['id' => $key],
+        );
+        if (false === $ownerCompanyId || (string) $ownerCompanyId !== $dto->companyId) {
+            throw $exception;
+        }
+
+        $this->managerRegistry->resetManager();
+        $entityManager = $this->managerRegistry->getManager();
+        \assert($entityManager instanceof EntityManagerInterface);
+
+        $transaction = $entityManager->getRepository(CashTransaction::class)->findOneBy(['id' => $key, 'company' => $dto->companyId]);
+        if (!$transaction instanceof CashTransaction) {
+            throw $exception;
+        }
+
+        return $transaction;
     }
 }

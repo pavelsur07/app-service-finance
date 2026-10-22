@@ -88,6 +88,65 @@ final class CashFileImportIdempotencyTest extends CashFileImportTestCase
         self::assertSame(3, $this->countActiveTransactions());
     }
 
+    /**
+     * Одна транзакция без номера закрывает не больше одной строки файла: две строки с номерами
+     * 101 и 102 при одной такой транзакции — одна новая операция.
+     */
+    public function testUnnumberedExistingTransactionMatchesOnlyOneNumberedRow(): void
+    {
+        $this->handle((string) $this->queueCsvImport([$this->identicalRow()])->getId());
+        $this->handle((string) $this->queueCsvImport([
+            $this->identicalRow() + ['doc_number' => '101'],
+            $this->identicalRow() + ['doc_number' => '102'],
+        ])->getId());
+
+        self::assertSame(2, $this->countActiveTransactions());
+    }
+
+    /**
+     * Собственные строки импорта, уже закоммиченные пачкой, не считаются совпадениями.
+     */
+    public function testOwnCommittedBatchDoesNotHideNextRowOfSameHash(): void
+    {
+        $rows = $this->distinctRows(199);
+        $rows[] = $this->identicalRow() + ['doc_number' => '101'];
+        $rows[] = $this->identicalRow();
+
+        $this->handle((string) $this->queueCsvImport($rows)->getId());
+
+        self::assertSame(201, $this->countActiveTransactions());
+    }
+
+    /**
+     * Воркер умер после последней пачки, но до пересчёта остатков: возобновление ничего не
+     * создаёт, но обязано пересчитать остатки счёта.
+     */
+    public function testResumedJobRecalculatesBalancesOfCommittedRows(): void
+    {
+        $rows = $this->distinctRows(2);
+        $job = $this->queueCsvImport($rows);
+        $job->start();
+        $this->em->flush();
+        $jobId = (string) $job->getId();
+
+        // «Первая попытка» записала строки (здесь — соседним заданием того же файла)…
+        $this->handle((string) $this->queueCsvImport($rows)->getId());
+        // …но остатки не пересчитаны.
+        $this->em->getConnection()->executeStatement(
+            'DELETE FROM money_account_daily_balance WHERE money_account_id = :account',
+            ['account' => $this->account->getId()],
+        );
+
+        $this->handle($jobId);
+
+        self::assertSame(CashFileImportJob::STATUS_DONE, $this->reloadJob($jobId)->getStatus());
+        self::assertSame(2, $this->countActiveTransactions());
+        self::assertGreaterThan(0, (int) $this->em->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM money_account_daily_balance WHERE money_account_id = :account',
+            ['account' => $this->account->getId()],
+        ));
+    }
+
     public function testJobOfAccountBeingImportedIsDeferred(): void
     {
         $jobId = (string) $this->queueCsvImport($this->distinctRows(1))->getId();

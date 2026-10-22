@@ -131,6 +131,12 @@ final class CashFileImportHandler
 
         try {
             $this->importService->import($job);
+            if ($resumed) {
+                // Прежний воркер мог умереть после последней пачки, но до пересчёта остатков:
+                // тогда импорт выше ничего не создаёт и пересчёт пропускает. Добираем диапазон
+                // всех строк задания с первого старта.
+                $this->importService->recalculateCommittedRows($job);
+            }
         } catch (\Throwable $exception) {
             $importException = $exception;
         }

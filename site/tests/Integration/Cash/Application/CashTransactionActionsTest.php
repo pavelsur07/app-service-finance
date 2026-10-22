@@ -19,6 +19,7 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Exception\FinancePeriodLockedException;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -28,6 +29,8 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -64,6 +67,74 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         }
         $this->em->persist(new FinancialResponsibilityCenterProject((string) $this->company->getId(), $project, $center));
         $this->em->flush();
+    }
+
+    /**
+     * Две одновременные отправки формы: обе не нашли транзакцию по ключу, вторая упирается в PK
+     * и возвращает транзакцию первой, а не 500.
+     */
+    public function testConcurrentSubmissionWithSameKeyReturnsFirstTransaction(): void
+    {
+        $key = Uuid::uuid7()->toString();
+        $first = $this->action(AddCashTransactionAction::class)($this->dto('100.00', '2024-02-10', $key));
+        self::assertSame($key, $first->getId());
+        $this->em->clear();
+
+        $registry = self::getContainer()->get(ManagerRegistry::class);
+        // Поиск по ключу «не успел» увидеть транзакцию первой отправки.
+        $missingLookup = new class($registry) extends CashTransactionRepository {
+            public function findOneByIdAndCompanyId(string $id, string $companyId): ?CashTransaction
+            {
+                return null;
+            }
+        };
+        $container = self::getContainer();
+        $action = new AddCashTransactionAction(
+            $this->em,
+            $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
+            $container->get(\App\Cash\Application\Service\DailyBalanceRecalculator::class),
+            $missingLookup,
+            $container->get(\App\Cash\Service\PaymentPlan\PaymentPlanMatcher::class),
+            $container->get('event_dispatcher'),
+            $container->get(\App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver::class),
+            $container->get(\App\Cash\Service\Transaction\CashTransactionSplitSynchronizer::class),
+            $registry,
+        );
+
+        $second = $action($this->dto('100.00', '2024-02-10', $key));
+
+        self::assertSame($key, $second->getId());
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM cash_transaction WHERE company_id = :company',
+            ['company' => $this->company->getId()],
+        ));
+    }
+
+    public function testKeyOfAnotherCompanyIsNotTreatedAsRepeat(): void
+    {
+        $key = Uuid::uuid7()->toString();
+        $this->action(AddCashTransactionAction::class)($this->dto('100.00', '2024-02-10', $key));
+        $this->em->clear();
+
+        $user = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('cash-actions-other@example.com')->build();
+        $other = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($user)->withName('Other')->build();
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $other, MoneyAccountType::BANK, 'Other', 'RUB');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $other, 'Общий', ProjectDirection::CODE_GENERAL);
+        $center = new FinancialResponsibilityCenter((string) $other->getId(), FinancialResponsibilityCenter::CODE_GENERAL, FinancialResponsibilityCenter::NAME_GENERAL);
+        foreach ([$user, $other, $account, $project, $center] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->persist(new FinancialResponsibilityCenterProject((string) $other->getId(), $project, $center));
+        $this->em->flush();
+
+        $dto = $this->dto('100.00', '2024-02-10', $key);
+        $dto->companyId = (string) $other->getId();
+        $dto->moneyAccountId = (string) $account->getId();
+        $dto->cashflowCategoryId = null;
+
+        $this->expectException(UniqueConstraintViolationException::class);
+        $this->action(AddCashTransactionAction::class)($dto);
     }
 
     public function testAddPersistsPaymentPlanMatch(): void
@@ -154,9 +225,10 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         return $action;
     }
 
-    private function dto(string $amount, string $date): CashTransactionDTO
+    private function dto(string $amount, string $date, ?string $idempotencyKey = null): CashTransactionDTO
     {
         $dto = new CashTransactionDTO();
+        $dto->idempotencyKey = $idempotencyKey;
         $dto->companyId = (string) $this->company->getId();
         $dto->moneyAccountId = (string) $this->account->getId();
         $dto->direction = CashDirection::OUTFLOW;

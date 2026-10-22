@@ -203,30 +203,32 @@ class CashTransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Сколько неудалённых транзакций компании совпадает со строкой выписки по эвристическому
-     * dedupe_hash (дата, сумма, назначение) с учётом номера документа. Номер есть не у всех
-     * источников (файлы без колонки номера, выписки 1С с номером), поэтому пустой номер с любой
-     * стороны совпадает с любым: строка без номера ('') сравнивается только по хешу, строка с
-     * номером — со строками того же номера или без номера. Файловый импорт сравнивает это
-     * число с номером вхождения ключа в файле.
+     * Неудалённые транзакции компании с эвристическим dedupe_hash (дата, сумма, назначение),
+     * разложенные по номеру документа (пустой номер — ''). Файловый импорт снимает это один раз
+     * на хеш и расходует совпадения строками файла.
+     *
+     * @return array<string, int> номер документа → сколько транзакций
      */
-    public function countActiveByCompanyDedupeAndDocNumber(string $companyId, string $dedupeHash, string $docNumber): int
+    public function countActiveByCompanyDedupeGroupedByDocNumber(string $companyId, string $dedupeHash): array
     {
-        $sql = <<<'SQL'
-SELECT COUNT(*)
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            <<<'SQL'
+SELECT COALESCE(BTRIM(doc_number), '') AS doc_number, COUNT(*) AS n
 FROM cash_transaction
 WHERE company_id = :company_id
   AND dedupe_hash = :dedupe_hash
   AND deleted_at IS NULL
-SQL;
-        $params = ['company_id' => $companyId, 'dedupe_hash' => $dedupeHash];
+GROUP BY 1
+SQL,
+            ['company_id' => $companyId, 'dedupe_hash' => $dedupeHash],
+        );
 
-        if ('' !== $docNumber) {
-            $sql .= "\n  AND COALESCE(BTRIM(doc_number), '') IN (:doc_number, '')";
-            $params['doc_number'] = $docNumber;
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row['doc_number']] = (int) $row['n'];
         }
 
-        return (int) $this->getEntityManager()->getConnection()->fetchOne($sql, $params);
+        return $counts;
     }
 
     public function findOneByCompanyImportSourceExternalId(string $companyId, string $importSource, string $externalId): ?CashTransaction
