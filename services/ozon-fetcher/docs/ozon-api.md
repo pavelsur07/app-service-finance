@@ -175,7 +175,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 - **Включение:** Symfony `ozon_fetcher.products_companies` (оба ресурса, ключ seller); подробности
   ставятся только кабинету со списком.
 
-### `ozon.stocks`, `ozon.stocks.week-close` — `POST /v4/product/info/stocks`
+### `ozon.stocks` — `POST /v4/product/info/stocks`
 
 Снимок остатков всех товаров кабинета
 (`docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md`).
@@ -189,13 +189,13 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   каждая страница, включая концевую пустую, — в raw. Непустая страница без курсора, повтор курсора,
   нет `items` / `cursor` / `total`, товар без `stocks` — `invalid_response`; потолок 1000 страниц.
   Битый курсор → 400 `invalid last_id ...` → `stale_cursor`, снимок с первой страницы.
-- **`period_key`:** день МСК снимка. Окно: `ozon.stocks` — с 05:00, `ozon.stocks.week-close` — с
-  23:30 (ставится только в воскресенье); раньше окна — `snapshot_early`, ожидание его начала;
-  после полуночи — `snapshot_missed` (`failed_permanent`, WARNING), загрузка, пересекающая
-  полночь, прерывается. Перечитывания нет.
+- **`period_key`:** день МСК снимка, окно с 05:00; раньше окна — `snapshot_early`, ожидание его
+  начала; после полуночи — `snapshot_missed` (`failed_permanent`, WARNING), загрузка, пересекающая
+  полночь, прерывается. Перечитывания нет. Конец недели — снимок понедельника («неделя готова» в
+  понедельник 06:00, решение Владельца 22.10); отдельного снимка в воскресенье нет.
 - **Журнал:** INFO «stocks snapshot read» — страниц, товаров, разных SKU, `total`; товаров ≠ `total`
   — WARNING.
-- **Включение:** Symfony `ozon_fetcher.stocks_companies` (оба ресурса, ключ seller).
+- **Включение:** Symfony `ozon_fetcher.stocks_companies` (ключ seller).
 
 ## Ozon Performance API (реклама)
 
