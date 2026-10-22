@@ -197,6 +197,33 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   — WARNING.
 - **Включение:** Symfony `ozon_fetcher.stocks_companies` (оба ресурса, ключ seller).
 
+## Ozon Performance API (реклама)
+
+Хост `https://api-performance.ozon.ru` (`OZON_PERFORMANCE_BASE_URL`), пакет `internal/ozonperf`
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md`).
+
+- **Токен:** `POST /api/client/token`, `{"client_id","client_secret","grant_type":"client_credentials"}`
+  → `access_token`, `expires_in`; кэш по `client_id` в памяти на `expires_in − 5 мин` (не меньше 1 мин),
+  параллельные задачи ждут один запрос; 400/401/403 на токене — `auth`, 429 — `rate_limit`, 5xx —
+  `transient`. Запросы — `Authorization: Bearer`; 401 — новый токен и один повтор.
+- **Журнал:** «ozon performance request» — endpoint без query, статус, время; токен, секрет и тело —
+  никогда.
+- **Слот:** одна `running`-задача на (кабинет, семейство `ozon.ads.*`) — параллельно с задачей seller
+  (миграция 00006); пауза кабинета по отказу ключа seller рекламу не останавливает, отказ ключа
+  Performance — пауза только задачи рекламы (`AuthRetryPause`, со второго подряд — `AuthSuspend` + ERROR).
+
+### `ozon.ads.campaigns` — `GET /api/client/campaign`
+
+Список всех кампаний аккаунта (все типы и состояния). Снимок дня: `period_key` — день МСК загрузки,
+с 01:00, прошедший день — `snapshot_missed`. Проверка — объект с массивом `list`.
+
+### `ozon.ads.expense`, `ozon.ads.daily` — `GET /api/client/statistics/expense/json`, `/api/client/statistics/daily/json`
+
+Расход аккаунта и дневная статистика по кампаниям за день: `dateFrom = dateTo = period_key`.
+Дни с 01.10.2026 (догон), вчера — с 01:00, перечитывание 14 дней раз в сутки (`ads_tail`).
+**Форма ответа вживую не проверена** (нет тестового ключа) — проверяется только JSON-объект или
+массив; живая форма записывается сюда на шаге «один кабинет».
+
 ### Вторая волна (не в первой)
 
 - Прочие финансовые отчёты (компенсации, cash-flow statement и т. п.) — сверка
@@ -248,6 +275,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
+| `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |
 | `/v1/finance/accrual/postings` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 22.10.2026: квота 50 запросов на окно 5 с **общая для всех клиентов метода** (`ratelimit-remaining` восстанавливается каждые 5 с и пустеет за 1–3 с), 429 с `retry-after: 1`; поэтому `SharedQuota` — 429 только пауза, темп не снижается, шторм не считается |
 | `/v3/posting/fbo/list`, `/v4/posting/fbs/list` | 0.2 | 0.05 | 1 | 60 с | **консервативно**: ключ кабинета общий с Symfony, пока тот не отключён; 19.10 перед отключением старых методов — фаза 429 |
 

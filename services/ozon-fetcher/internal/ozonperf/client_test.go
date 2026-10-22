@@ -1,0 +1,205 @@
+package ozonperf
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+)
+
+var testCreds = Credentials{ClientID: "perf-1", ClientSecret: secret}
+
+// fakePerf — токен и методы рекламы; tokens — число выданных токенов.
+type fakePerf struct {
+	tokens   atomic.Int32
+	ttl      int
+	tokenErr int // статус ответа токена, 0 — успех
+	// handle — ответ метода по выданному токену.
+	handle func(w http.ResponseWriter, r *http.Request, token string)
+}
+
+func (f *fakePerf) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == EndpointToken {
+		var body map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["client_id"] != testCreds.ClientID || body["client_secret"] != secret || body["grant_type"] != "client_credentials" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if f.tokenErr != 0 {
+			w.WriteHeader(f.tokenErr)
+			_, _ = w.Write([]byte(`{"error":"x"}`))
+			return
+		}
+		n := f.tokens.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "tok-" + string(rune('0'+n)), "expires_in": f.ttl, "token_type": "Bearer"})
+		return
+	}
+	auth := r.Header.Get("Authorization")
+	f.handle(w, r, auth)
+}
+
+type clock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *clock) Now() time.Time      { c.mu.Lock(); defer c.mu.Unlock(); return c.now }
+func (c *clock) Add(d time.Duration) { c.mu.Lock(); c.now = c.now.Add(d); c.mu.Unlock() }
+
+func newTestClient(t *testing.T, f *fakePerf) (*Client, *clock, *bytes.Buffer) {
+	t.Helper()
+	srv := httptest.NewServer(f)
+	t.Cleanup(srv.Close)
+	clk := &clock{now: time.Date(2026, 10, 22, 1, 0, 0, 0, time.UTC)}
+	logs := &bytes.Buffer{}
+	return NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(logs, nil)), clk.Now), clk, logs
+}
+
+func campaignsOK(w http.ResponseWriter, _ *http.Request, _ string) {
+	_, _ = w.Write([]byte(`{"list":[{"id":"1","title":"A","state":"CAMPAIGN_STATE_RUNNING","advObjectType":"SKU"}],"total":"1"}`))
+}
+
+func TestTokenIsSharedAndRefreshedBeforeExpiry(t *testing.T) {
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, r *http.Request, auth string) {
+		assert.Contains(t, auth, "Bearer tok-")
+		campaignsOK(w, r, auth)
+	}}
+	c, clk, logs := newTestClient(t, f)
+
+	var wg sync.WaitGroup
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, int32(1), f.tokens.Load(), "параллельные задачи — один запрос токена")
+
+	clk.Add(1800*time.Second - tokenSafetyMargin - time.Second)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), f.tokens.Load(), "до запаса срока — тот же токен")
+
+	clk.Add(2 * time.Second)
+	_, err = c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), f.tokens.Load(), "за 5 мин до истечения — новый токен")
+
+	assert.NotContains(t, logs.String(), secret)
+	assert.NotContains(t, logs.String(), "tok-")
+}
+
+func TestUnauthorizedRefreshesTokenOnce(t *testing.T) {
+	var calls atomic.Int32
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, r *http.Request, auth string) {
+		calls.Add(1)
+		if auth == "Bearer tok-1" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		campaignsOK(w, r, auth)
+	}}
+	c, _, _ := newTestClient(t, f)
+
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), f.tokens.Load())
+	assert.Equal(t, int32(2), calls.Load())
+
+	always := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, _ string) { w.WriteHeader(http.StatusUnauthorized) }}
+	c2, _, _ := newTestClient(t, always)
+	_, err = c2.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	var apiErr *ozon.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, ozon.ClassAuth, apiErr.Class)
+	assert.Equal(t, int32(2), always.tokens.Load(), "повтор — один")
+}
+
+func TestTokenErrorsAreClassified(t *testing.T) {
+	for status, class := range map[int]ozon.Class{
+		http.StatusBadRequest:         ozon.ClassAuth,
+		http.StatusUnauthorized:       ozon.ClassAuth,
+		http.StatusForbidden:          ozon.ClassAuth,
+		http.StatusTooManyRequests:    ozon.ClassRateLimit,
+		http.StatusServiceUnavailable: ozon.ClassTransient,
+	} {
+		f := &fakePerf{ttl: 1800, tokenErr: status, handle: campaignsOK}
+		c, _, logs := newTestClient(t, f)
+		_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+		var apiErr *ozon.APIError
+		require.ErrorAs(t, err, &apiErr, status)
+		assert.Equal(t, class, apiErr.Class, status)
+		assert.NotContains(t, logs.String(), secret)
+		assert.NotContains(t, err.Error(), secret)
+	}
+}
+
+func TestDayMethodsSendSingleDayAndCheckJSON(t *testing.T) {
+	var queries []string
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, r *http.Request, _ string) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		queries = append(queries, r.URL.Path+"?"+r.URL.RawQuery)
+		switch r.URL.Path {
+		case EndpointExpense:
+			_, _ = w.Write([]byte(`{"rows":[]}`))
+		case EndpointDaily:
+			_, _ = w.Write([]byte(`<html>oops</html>`))
+		}
+	}}
+	c, _, logs := newTestClient(t, f)
+
+	p, err := c.FetchExpense(context.Background(), testCreds, "conn-1", "2026-10-21")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"rows":[]}`, string(p.Body))
+	assert.Equal(t, 1, p.No)
+
+	_, err = c.FetchDaily(context.Background(), testCreds, "conn-1", "2026-10-21")
+	var apiErr *ozon.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, ozon.ClassInvalidResponse, apiErr.Class)
+
+	assert.Equal(t, []string{
+		EndpointExpense + "?dateFrom=2026-10-21&dateTo=2026-10-21",
+		EndpointDaily + "?dateFrom=2026-10-21&dateTo=2026-10-21",
+	}, queries)
+	assert.NotContains(t, logs.String(), "dateFrom", "query не в журнале")
+}
+
+func TestCampaignsRequireList(t *testing.T) {
+	for name, body := range map[string]string{"no list": `{"total":"0"}`, "not json": `x`, "list object": `{"list":{}}`} {
+		f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, _ string) { _, _ = w.Write([]byte(body)) }}
+		c, _, _ := newTestClient(t, f)
+		_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+		var apiErr *ozon.APIError
+		require.ErrorAs(t, err, &apiErr, name)
+		assert.Equal(t, ozon.ClassInvalidResponse, apiErr.Class, name)
+	}
+}
+
+func TestRateLimitCarriesRetryAfter(t *testing.T) {
+	f := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, _ string) {
+		w.Header().Set("Retry-After", "7")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}}
+	c, _, _ := newTestClient(t, f)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	var apiErr *ozon.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, ozon.ClassRateLimit, apiErr.Class)
+	assert.Equal(t, 7*time.Second, apiErr.RetryAfter)
+}

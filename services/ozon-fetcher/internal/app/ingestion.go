@@ -17,6 +17,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/dispatcher"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/planner"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ratelimit"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
@@ -79,8 +80,10 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	raw := rawstore.New(s3Client, cfg.S3Bucket, cfg.MaxParallelConnections*2)
 	execCfg := executor.DefaultConfig()
 	execCfg.Location = loc
+	perf := ozonperf.NewClient(cfg.OzonPerformanceBaseURL, &http.Client{Timeout: ozonperf.DefaultTimeout}, logger, now).WithLimiter(limits)
 	exec := executor.New(execCfg, tasks, raw, client, cabinets, logger, now, jitter, ozon.SleepContext).
-		WithRawReader(rawstore.NewReader(s3Client, cfg.S3Bucket))
+		WithRawReader(rawstore.NewReader(s3Client, cfg.S3Bucket)).
+		WithPerformance(perf)
 
 	ordersFrom, err := time.ParseInLocation(time.DateOnly, cfg.OrdersFrom, loc)
 	if err != nil {

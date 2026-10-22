@@ -26,7 +26,20 @@ const (
 	KindFinal           = "final_m2"
 	KindOrders          = "orders_tail"
 	KindAccrualPostings = "accrual_postings_tail"
+	KindAdsTail         = "ads_tail"
 )
+
+// DefaultAdsFrom — первый день расхода и статистики рекламы
+// (docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md §3).
+const DefaultAdsFrom = "2026-10-01"
+
+// AdsTailDays — дней перед сегодня, в которых раз в сутки перечитываются
+// расход и статистика рекламы: Ozon дописывает атрибуцию задним числом.
+const AdsTailDays = 14
+
+// adsStart — смещение начала загрузки рекламы дня после полуночи МСК: день
+// закрыт, отчёты Symfony (04:30) ещё не начались.
+const adsStart = time.Hour
 
 // DefaultAccrualPostingsDays — сколько дней перед сегодня перечитываются
 // начисления по отправлениям: они копятся неделями (доставка, возвраты).
@@ -96,6 +109,8 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 
 	var plan Plan
 	for _, cab := range cabinets {
+		// Реклама — свой ключ: кабинет без seller её тоже получает.
+		planAds(&plan, cab, today, runDate, now, cfg)
 		if cab.Seller == nil {
 			continue
 		}
@@ -231,5 +246,43 @@ func spec(ref, resource, period string, priority int, refresh bool, now time.Tim
 		Priority: priority,
 		Refresh:  refresh,
 		RunAt:    now,
+	}
+}
+
+// planAds — кампании (снимок дня), расход и статистика по дням с
+// DefaultAdsFrom и перечитывание AdsTailDays раз в сутки. Слот рекламы у
+// кабинета свой — приоритеты соперничают только внутри рекламы.
+func planAds(plan *Plan, cab connections.Cabinet, today time.Time, runDate string, now time.Time, cfg Config) {
+	if !cab.HasPerformance {
+		return
+	}
+	start := today.Add(adsStart)
+	if cab.Supports(executor.ResourceAdsCampaigns) {
+		plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAdsCampaigns, today.Format(time.DateOnly), PriorityRoutine, false, start))
+	}
+	from, _ := time.ParseInLocation(time.DateOnly, DefaultAdsFrom, cfg.Location)
+	tail := Refresh{Kind: KindAdsTail, RunDate: runDate, ConnectionRef: cab.Ref}
+	for _, resource := range []string{executor.ResourceAdsExpense, executor.ResourceAdsDaily} {
+		if !cab.Supports(resource) {
+			continue
+		}
+		for d := from; d.Before(today); d = d.AddDate(0, 0, 1) {
+			runAt := now
+			if d.Equal(today.AddDate(0, 0, -1)) {
+				// Вчера — не сразу после полуночи: с началом рекламы дня.
+				runAt = start
+			}
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, false, runAt))
+		}
+		for i := 1; i <= AdsTailDays; i++ {
+			d := today.AddDate(0, 0, -i)
+			if d.Before(from) {
+				break
+			}
+			tail.Specs = append(tail.Specs, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityRoutine, true, start))
+		}
+	}
+	if len(tail.Specs) > 0 {
+		plan.Refreshes = append(plan.Refreshes, tail)
 	}
 }

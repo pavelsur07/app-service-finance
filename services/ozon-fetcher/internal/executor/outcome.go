@@ -29,9 +29,12 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		if hash == task.ContentHash {
 			label = "unchanged"
 		}
-		// Успех с ключом кабинета сбрасывает счётчик отказов, даже если эта
-		// задача сама 401 не получала (no-op, когда сбрасывать нечего).
-		e.sideEffect(log, "resume connection", e.tasks.ResumeConnection(side, task.ConnectionRef))
+		// Успех с ключом seller сбрасывает счётчик отказов кабинета, даже если
+		// эта задача сама 401 не получала (no-op, когда сбрасывать нечего);
+		// у рекламы свой ключ — счётчик seller она не трогает.
+		if !IsAdsResource(task.ResourceType) {
+			e.sideEffect(log, "resume connection", e.tasks.ResumeConnection(side, task.ConnectionRef))
+		}
 		return store.Outcome{Status: store.StatusDone, Label: label, ContentHash: hash}
 	}
 
@@ -112,6 +115,20 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return out
 
 	case ozon.ClassAuth:
+		if IsAdsResource(task.ResourceType) {
+			// Ключ Performance: пауза только этой задачи рекламы — продажи
+			// кабинета идут; подряд второй отказ — длинная пауза + ERROR.
+			_, refreshErr := e.refresher.ForceRefresh(side)
+			e.sideEffect(log, "refresh connections", refreshErr)
+			pause := e.cfg.AuthRetryPause
+			if task.LastErrorClass == string(ozon.ClassAuth) {
+				pause = e.cfg.AuthSuspend
+				log.Error("ozon performance rejected cabinet keys again, ads task paused",
+					slog.String("stage", "fetch"), slog.Int("http_status", apiErr.Status),
+					slog.Time("paused_until", now.Add(pause)))
+			}
+			return store.Outcome{Status: store.StatusFailedRetryable, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, KeepCursor: true, NextRunAt: now.Add(pause)}
+		}
 		// Счётчик подряд — по кабинету: первая пауза короткая (снимок с новым
 		// ключом успевает обновиться), со второго отказа — длинная + ERROR.
 		failures, err := e.tasks.RecordAuthFailure(side, task.ConnectionRef, now, func(n int) time.Duration {

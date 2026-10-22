@@ -163,8 +163,11 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 		WHERE t.status IN ('pending', 'not_ready', 'failed_retryable')
 		  AND t.next_run_at <= $2
 		  AND t.connection_ref = ANY($1)
-		  AND (cs.suspended_until IS NULL OR cs.suspended_until <= $2)
-		  AND NOT EXISTS (SELECT 1 FROM fetch_task r WHERE r.connection_ref = t.connection_ref AND r.status = 'running')
+		  -- Пауза кабинета — по отказу ключа seller; у рекламы свой ключ (00006).
+		  AND (t.resource_type LIKE 'ozon.ads.%' OR cs.suspended_until IS NULL OR cs.suspended_until <= $2)
+		  -- Одна running-задача на (кабинет, семейство API): индекс 00006.
+		  AND NOT EXISTS (SELECT 1 FROM fetch_task r WHERE r.connection_ref = t.connection_ref AND r.status = 'running'
+		                  AND (r.resource_type LIKE 'ozon.ads.%') = (t.resource_type LIKE 'ozon.ads.%'))
 		  AND NOT EXISTS (SELECT 1 FROM resource_stop s WHERE s.resource_type = t.resource_type)
 		ORDER BY t.priority DESC, cs.last_served_at ASC NULLS FIRST, t.next_run_at ASC
 		LIMIT 1
@@ -192,7 +195,7 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 		task.ConnectionRef, task.ResourceType, task.PeriodKey, owner, task.LeaseUntil, attemptID, now,
 	); err != nil {
 		if isUniqueViolation(err) {
-			// Другой воркер успел захватить задачу этого кабинета.
+			// Другой воркер успел захватить задачу этого кабинета и семейства API.
 			return Task{}, ErrNoTask
 		}
 		return Task{}, fmt.Errorf("store: claim update: %w", err)

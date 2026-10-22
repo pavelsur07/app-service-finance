@@ -839,3 +839,48 @@ func TestRateLimitedTaskYieldsToReadyTaskOfSamePriority(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, backfill.TaskKey, got.TaskKey, "догон кабинета не ждёт за 429 общей квоты")
 }
+
+func TestAdsAndSellerTasksOfCabinetRunInParallel(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("a", "ozon.finance.accrual-by-day", "2026-10-20", 5),
+		spec("a", "ozon.orders.fbo", "2026-10-20", 5),
+		spec("a", "ozon.ads.expense", "2026-10-20", 5),
+		spec("a", "ozon.ads.daily", "2026-10-20", 5),
+	}))
+
+	first, err := claim(t, tasks, []string{"a"}, t0)
+	require.NoError(t, err)
+	second, err := claim(t, tasks, []string{"a"}, t0)
+	require.NoError(t, err)
+	_, err = claim(t, tasks, []string{"a"}, t0)
+	assert.ErrorIs(t, err, ErrNoTask, "по одной задаче на семейство API")
+
+	families := map[bool]int{}
+	for _, tk := range []Task{first, second} {
+		families[strings.HasPrefix(tk.ResourceType, "ozon.ads.")]++
+	}
+	assert.Equal(t, map[bool]int{true: 1, false: 1}, families, "реклама и seller — параллельно")
+
+	// Индекс — последний рубеж: вторая running-задача семейства не записывается.
+	_, err = tasks.pool.Exec(ctx, `UPDATE fetch_task SET status = 'running', lease_until = $1
+		WHERE connection_ref = 'a' AND status = 'pending' AND resource_type LIKE 'ozon.ads.%'`, t0.Add(time.Minute))
+	assert.True(t, isUniqueViolation(err), "две running-задачи рекламы кабинета")
+}
+
+func TestSellerSuspensionDoesNotStopAds(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("a", "ozon.finance.accrual-by-day", "2026-10-20", 5),
+		spec("a", "ozon.ads.expense", "2026-10-20", 5),
+	}))
+	require.NoError(t, tasks.SuspendConnection(ctx, "a", "auth", t0.Add(time.Hour)))
+
+	got, err := claim(t, tasks, []string{"a"}, t0)
+	require.NoError(t, err)
+	assert.Equal(t, "ozon.ads.expense", got.ResourceType, "пауза ключа seller рекламу не останавливает")
+	_, err = claim(t, tasks, []string{"a"}, t0)
+	assert.ErrorIs(t, err, ErrNoTask, "seller на паузе")
+}

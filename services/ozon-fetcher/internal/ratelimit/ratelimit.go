@@ -10,6 +10,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
 )
 
 // EndpointLimit — границы скорости endpoint'а, запросов в секунду.
@@ -53,6 +54,10 @@ func DefaultConfig() Config {
 			// Каталог: 2–3 запроса на кабинет в сутки.
 			ozon.EndpointProductList:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozon.EndpointProductInfoList: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Реклама (Performance API): лимиты не опубликованы, единицы запросов на кабинет в сутки.
+			ozonperf.EndpointCampaigns: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			ozonperf.EndpointExpense:   {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			ozonperf.EndpointDaily:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			// Остатки: 2 запроса на снимок.
 			ozon.EndpointStocks: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},

@@ -61,18 +61,26 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
     public const PERFORMANCE_RESOURCE_TYPES = ['ozon.ads.statistics'];
 
     /**
+     * Реклама: кампании, расход и дневная статистика (`docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md`);
+     * только с ключом performance, включается по списку компаний.
+     */
+    public const ADS_RESOURCE_TYPES = ['ozon.ads.campaigns', 'ozon.ads.expense', 'ozon.ads.daily'];
+
+    /**
      * @param list<string> $ordersCompanyIds компании, которым выдаются ресурсы
      *                                       заказов; ['*'] — всем, [] — никому
      * @param list<string> $accrualPostingsCompanyIds то же для начислений по отправлениям
      *                                                (из тех, кому выданы заказы)
      * @param list<string> $productsCompanyIds то же для каталога товаров
      * @param list<string> $stocksCompanyIds то же для остатков
+     * @param list<string> $adsCompanyIds то же для рекламы (ключ performance)
      */
     public function __construct(
         private array $ordersCompanyIds = [],
         private array $accrualPostingsCompanyIds = [],
         private array $productsCompanyIds = [],
         private array $stocksCompanyIds = [],
+        private array $adsCompanyIds = [],
     ) {
     }
 
@@ -138,6 +146,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                 ...(null !== $sellerCredentials && self::listed($this->productsCompanyIds, $companyId) ? self::PRODUCTS_RESOURCE_TYPES : []),
                 ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) ? self::STOCKS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials ? self::PERFORMANCE_RESOURCE_TYPES : []),
+                ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) ? self::ADS_RESOURCE_TYPES : []),
             ],
         );
     }

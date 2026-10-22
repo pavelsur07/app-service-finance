@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-22) — реклама: кампании, расход, дневная статистика
+
+- Новые значения `resource_types` у performance: `ozon.ads.campaigns`, `ozon.ads.expense`,
+  `ozon.ads.daily`. Выдаются по списку `ozon_fetcher.ads_companies`. Сервис начинает
+  держать `credentials.performance.client_secret` в памяти (токен Performance). Схема не менялась.
+
 ## Правка (2026-10-22) — остатки
 
 - Новые значения `resource_types` у seller: `ozon.stocks` (снимок 05:00) и

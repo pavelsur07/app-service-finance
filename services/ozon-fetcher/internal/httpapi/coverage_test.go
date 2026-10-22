@@ -30,7 +30,7 @@ func coverageDeps(t *testing.T, call *coverageCall) Deps {
 		return []connections.Cabinet{
 			{Ref: "ref-a", Seller: seller, ResourceTypes: []string{byDay, "ozon.finance.realization", byDay}},
 			{Ref: "ref-b", Seller: seller, ResourceTypes: []string{byDay}},
-			{Ref: "ref-perf", HasPerformance: true, ResourceTypes: []string{byDay}},
+			{Ref: "ref-perf", HasPerformance: true, ResourceTypes: []string{byDay, "ozon.ads.expense"}},
 		}
 	}
 	success := time.Date(2026, 10, 16, 21, 5, 0, 0, time.UTC)
@@ -39,6 +39,7 @@ func coverageDeps(t *testing.T, call *coverageCall) Deps {
 		return []store.CoverageRow{
 			{ResourceType: byDay, PeriodKey: "2026-10-15", ByStatus: map[string]int{"done": 2, "running": 0, "pending": 0, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0}, LastSuccessAt: &success},
 			{ResourceType: "ozon.finance.realization", PeriodKey: "2026-09", ByStatus: map[string]int{"done": 0, "running": 0, "pending": 1, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0}},
+			{ResourceType: "ozon.ads.expense", PeriodKey: "2026-10-15", ByStatus: map[string]int{"done": 1, "running": 0, "pending": 0, "not_ready": 0, "failed_retryable": 0, "failed_permanent": 0}},
 		}, nil
 	}
 	return d
@@ -76,7 +77,7 @@ func TestCoverageDefaultWindowAndContractShape(t *testing.T) {
 	code, body := do(t, New(coverageDeps(t, &call)), "/internal/coverage", "Bearer "+token)
 
 	require.Equal(t, http.StatusOK, code)
-	assert.Equal(t, coverageCall{refs: []string{"ref-a", "ref-b"}, from: "2026-08-01", to: "2026-10-31"}, call, "окно M-2…конец M по МСК, только кабинеты с Seller")
+	assert.Equal(t, coverageCall{refs: []string{"ref-a", "ref-b", "ref-perf"}, from: "2026-08-01", to: "2026-10-31"}, call, "окно M-2…конец M по МСК, кабинеты с ключом Seller или Performance")
 
 	// Ключи — как в services/_contracts/service-coverage/v1/schema.json.
 	assert.Equal(t, []string{"cabinets_total", "from", "generated_at", "rows", "schema_version", "service", "to"}, keys(body))
@@ -86,7 +87,8 @@ func TestCoverageDefaultWindowAndContractShape(t *testing.T) {
 	assert.InDelta(t, 2, body["cabinets_total"], 0)
 
 	rows := body["rows"].([]any)
-	require.Len(t, rows, 2)
+	require.Len(t, rows, 3)
+	assert.InDelta(t, 1, rows[2].(map[string]any)["cabinets_expected"], 0, "реклама — у кабинета с ключом Performance")
 	first, second := rows[0].(map[string]any), rows[1].(map[string]any)
 	assert.Equal(t, []string{"by_status", "cabinets_expected", "last_success_at", "period_key", "resource_type"}, keys(first))
 	assert.Equal(t, []string{"done", "failed_permanent", "failed_retryable", "not_ready", "pending", "running"}, keys(first["by_status"].(map[string]any)))
