@@ -343,6 +343,13 @@
 - ЦФО (`responsibilityCenterId`) — строковый id без связи, сущность его не проверяет; путь записи — форма (активные ЦФО компании) и `FinanceDocumentResponsibilityCenterNormalizer`.
 - `CashTransactionController::createPnlDocument` ловит исключение: `logger->error` с `companyId` и flash вместо 500 (испорченная статья ДДС или справочник операции ДДС).
 
+### Finance: сверка регистра ОПиУ с документами
+
+- `app:finance:verify-pl-register [--company=UUID] [--from=Y-m-d] [--to=Y-m-d]` (`VerifyPlRegisterCommand`) ничего не пишет: окно компании пересчитывается в памяти `PLRegisterUpdater::calculateRows()` — тот же отбор документов (активные, неудалённые) и та же агрегация, что у `recalcRange()`, — и сравнивается с `PLDailyTotalRepository::findRowsForRange()` по ключу частичных unique-индексов (день, статья, проект, ЦФО). Обход — компании из `PLRegisterCompanyRangesQuery` (есть активные документы или строки регистра), окно — по календарным месяцам с `clear()` после месяца.
+- Строка — `Application\DTO\PLRegisterRow`, суммы — decimal-строки с двумя знаками, как их пишет пересчёт; сравнение — `bccomp`.
+- Exit code ≠ 0 — есть строки «нет в регистре», «лишние со статьёй» или «расходятся суммы». Строка без статьи, которой нет в документах, — след `DeletePLCategoryAction` (суммы удалённой статьи переносятся в «без статьи»): печатается отдельно и сверку не валит.
+- На проде — через `codex-console` (блок команды в `docs/maintenance/codex-console.sh`, аргументы только `--company`/`--from`/`--to` строгого формата).
+
 ### Finance: списки «Документы ОПиУ» и «Операции»
 
 - Вкладки раздела: `document_index` (`GET /documents/`, документы), `document_operation_index` (`GET /documents/operations`, `DocumentOperationIndexController`, одна строка — одна `DocumentOperation`), `document_deleted_index`. У роута операций `priority: 10`: у роутов документа `{id}` без требования формата, и `/documents/operations` иначе ушёл бы в `document_show`.
@@ -4155,6 +4162,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.62 | 2026-10-22 | Finance: read-only сверка регистра ОПиУ `app:finance:verify-pl-register`, `PLRegisterUpdater::calculateRows()`, `PLRegisterRow`, `PLRegisterCompanyRangesQuery` |
 | 2.61 | 2026-10-22 | Marketplace / ServiceGateway: снят `ozon.stocks.week-close` и его строка карты покрытия (подсчёт «только воскресенья» убран) — конец недели — снимок понедельника, «неделя готова» в понедельник 06:00 |
 | 2.60 | 2026-10-22 | Marketplace: реклама Ozon (кампании, расход, дневная статистика) — всем кабинетам с ключом performance (`ozon_fetcher.ads_companies: ['*']`) |
 | 2.59 | 2026-10-22 | Marketplace: `ozon.ads.statistics` и новый `ozon.ads.statistics.tail` — только компаниям `ozon_fetcher.ads_reports_companies` (из тех, кому выдана реклама), не всем кабинетам с performance; ServiceGateway: строки «Реклама: отчёт по товарам», «Реклама: отчёт, хвост 14 дней» |

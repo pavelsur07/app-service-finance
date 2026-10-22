@@ -2703,12 +2703,6 @@ parameters:
 			path: src/Finance/Application/Service/PLRegisterUpdater.php
 
 		-
-			message: '#^Method App\\Finance\\Application\\Service\\PLRegisterUpdater\:\:persistAggregatedTotals\(\) has parameter \$aggregated with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Finance/Application/Service/PLRegisterUpdater.php
-
-		-
 			message: '#^Call to function method_exists\(\) with App\\Finance\\Entity\\DocumentOperation and ''getCategory'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1

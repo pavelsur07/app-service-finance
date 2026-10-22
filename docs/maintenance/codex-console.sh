@@ -345,6 +345,17 @@ case "$cmd" in
     # Ненулевой exit code — штатный результат гейта (ERROR), а не ошибка wrapper'а.
     if [ "$#" -ne 0 ]; then echo "Arguments not allowed for $cmd" >&2; exit 2; fi
     ;;
+  app:finance:verify-pl-register)
+    # Read-only сверка регистра ОПиУ (pl_daily_totals) с документами: пересчёт в памяти и
+    # SELECT, ничего не пишет, внешних вызовов нет (docs/tasks/cash-pl-idempotency, этап 1).
+    # Ненулевой exit code — найдено расхождение, а не ошибка wrapper'а.
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--company=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then :
+      elif [[ "$arg" =~ ^--(from|to)=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    ;;
   app:counterparty:refresh-display-names)
     # Только сухой прогон: отчёт «сырое → отображаемое» по правилам названий контрагентов
     # (docs/plan/counterparty-display-name.md, этап 3). --dry-run обязателен — без него команда
