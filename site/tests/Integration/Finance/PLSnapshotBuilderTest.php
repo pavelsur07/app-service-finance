@@ -12,6 +12,8 @@ use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -87,6 +89,30 @@ final class PLSnapshotBuilderTest extends IntegrationTestCase
             'SELECT name FROM companies WHERE id = :id',
             ['id' => $this->company->getId()],
         ));
+    }
+
+    public function testRebuildWaitsForConcurrentRebuildOfSameMonth(): void
+    {
+        $this->registerRow(null, '2026-04-11', '30.00');
+
+        // Параллельная пересборка того же месяца держит блокировку в своей сессии.
+        $other = DriverManager::getConnection($this->connection->getParams());
+        self::assertTrue((bool) $other->fetchOne(
+            "SELECT pg_try_advisory_lock(hashtext('pl_monthly_snapshot'), hashtext(:key))",
+            ['key' => $this->company->getId().':2026-04'],
+        ));
+        $this->connection->executeStatement("SET LOCAL lock_timeout = '200ms'");
+
+        try {
+            self::getContainer()->get(PLSnapshotBuilder::class)->rebuildMonthly($this->company, '2026-04');
+            self::fail('Пересборка должна ждать параллельную пересборку того же месяца.');
+        } catch (DriverException $exception) {
+            self::assertSame('55P03', $exception->getSQLState(), 'Ожидалось ожидание блокировки (lock_timeout).');
+        } finally {
+            $other->close();
+        }
+
+        self::assertSame([], $this->snapshotIncome());
     }
 
     private function registerRow(?string $categoryId, string $day, string $income): void

@@ -141,6 +141,64 @@ final class ManualDocumentActionsTest extends IntegrationTestCase
         self::assertSame(['2026-03-05' => '400.00'], $this->registerExpenseByDay());
     }
 
+    public function testUpdateSeesSiblingDocumentEditedByConcurrentRequest(): void
+    {
+        $transaction = $this->makeTransaction('1000.00');
+        $document = $this->makeDocument('2026-03-05', '400.00');
+        $sibling = $this->makeDocument('2026-03-05', '400.00');
+        $transaction->addDocument($document);
+        self::getContainer()->get(CreateManualDocumentAction::class)($document);
+        $transaction->addDocument($sibling);
+        self::getContainer()->get(CreateManualDocumentAction::class)($sibling);
+
+        // Сосед и его операции загружены — как в форме правки до отправки; параллельная правка
+        // соседа поднимает его до 600.
+        self::assertCount(2, $transaction->getDocuments());
+        self::assertSame('400.00', $sibling->getOperations()->first() instanceof DocumentOperation ? $sibling->getOperations()->first()->getAmount() : null);
+        $this->connection->executeStatement(
+            "UPDATE document_operations SET amount = '600.00' WHERE document_id = :id",
+            ['id' => $sibling->getId()],
+        );
+
+        $operation = $document->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        $operation->setAmount('600.00');
+
+        try {
+            self::getContainer()->get(UpdateManualDocumentAction::class)(
+                $document,
+                DocumentStatus::ACTIVE,
+                $document->getDate(),
+            );
+            self::fail('Документ превысил остаток транзакции ДДС с соседом, изменённым параллельным запросом.');
+        } catch (\DomainException) {
+        }
+
+        self::assertSame('400.00', $this->connection->fetchOne(
+            'SELECT SUM(amount) FROM document_operations WHERE document_id = :id',
+            ['id' => $document->getId()],
+        ));
+    }
+
+    private function makeTransaction(string $amount): CashTransaction
+    {
+        $account = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($this->company)
+            ->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($this->company)
+            ->withMoneyAccount($account)
+            ->withAmount($amount)
+            ->withDirection(CashDirection::OUTFLOW)
+            ->build();
+        $this->em->persist($account);
+        $this->em->persist($transaction);
+
+        return $transaction;
+    }
+
     private function makeDocument(string $day, string $amount): Document
     {
         $document = new Document(Uuid::uuid4()->toString(), $this->company);

@@ -33,6 +33,8 @@ final class BankImportServiceTest extends TestCase
 {
     private string $projectId;
     private string $centerId;
+    /** @var list<string> */
+    private array $events = [];
 
     protected function setUp(): void
     {
@@ -78,9 +80,29 @@ final class BankImportServiceTest extends TestCase
     }
 
     /**
-     * Импорт одного счёта за сегодня: страницы дня отдаются по порядку, затем пусто.
+     * Сбой выгрузки посреди дня: строки дня до flush() отсоединяются до снятия блокировки счёта,
+     * иначе flush() журнала импорта записал бы их уже без блокировки.
+     */
+    public function testUnflushedRowsOfFailedDayAreDetachedBeforeLockRelease(): void
+    {
+        try {
+            $this->import([[$this->bankTransaction('bank-tx-1')], new \RuntimeException('bank is down')]);
+            self::fail('Сбой выгрузки должен дойти до вызывающего.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('bank is down', $exception->getMessage());
+        }
+
+        self::assertSame(['lock', 'persist:bank-tx-1', 'detach:bank-tx-1', 'unlock'], array_values(array_filter(
+            $this->events,
+            static fn (string $event): bool => !str_starts_with($event, 'flush'),
+        )));
+    }
+
+    /**
+     * Импорт одного счёта за сегодня: страницы дня отдаются по порядку, затем пусто; исключение
+     * вместо страницы — сбой выгрузки.
      *
-     * @param list<list<array<string, mixed>>> $pages
+     * @param list<list<array<string, mixed>>|\Throwable> $pages
      *
      * @return list<CashTransaction>
      */
@@ -134,6 +156,10 @@ final class BankImportServiceTest extends TestCase
             ]);
         $responses = [];
         foreach ($pages as $index => $transactions) {
+            if ($transactions instanceof \Throwable) {
+                $responses[] = $transactions;
+                continue;
+            }
             $response = ['transactions' => $transactions];
             if ($index < \count($pages) - 1) {
                 $response['_links'] = [['rel' => 'next', 'href' => 'https://bank.test/next']];
@@ -144,7 +170,14 @@ final class BankImportServiceTest extends TestCase
         $provider
             ->expects($accountFree ? self::atLeastOnce() : self::never())
             ->method('getTransactions')
-            ->willReturnOnConsecutiveCalls(...$responses);
+            ->willReturnCallback(static function () use (&$responses): array {
+                $response = array_shift($responses) ?? ['transactions' => []];
+                if ($response instanceof \Throwable) {
+                    throw $response;
+                }
+
+                return $response;
+            });
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
@@ -153,14 +186,31 @@ final class BankImportServiceTest extends TestCase
             ->willReturn($systemProject);
         $entityManager
             ->method('persist')
-            ->willReturnCallback(static function (object $entity) use (&$persistedTransactions): void {
+            ->willReturnCallback(function (object $entity) use (&$persistedTransactions): void {
                 if ($entity instanceof CashTransaction) {
                     $persistedTransactions[] = $entity;
+                    $this->events[] = 'persist:'.$entity->getExternalId();
                 }
+            });
+        $entityManager
+            ->method('detach')
+            ->willReturnCallback(function (object $entity): void {
+                if ($entity instanceof CashTransaction) {
+                    $this->events[] = 'detach:'.$entity->getExternalId();
+                }
+            });
+        $entityManager
+            ->method('flush')
+            ->willReturnCallback(function (): void {
+                $this->events[] = 'flush';
             });
 
         $lockConnection = $this->createMock(Connection::class);
-        $lockConnection->method('fetchOne')->willReturn($accountFree);
+        $lockConnection->method('fetchOne')->willReturnCallback(function (string $sql) use ($accountFree): bool {
+            $this->events[] = str_contains($sql, 'unlock') ? 'unlock' : 'lock';
+
+            return $accountFree;
+        });
 
         $service = new BankImportService(
             $cursorRepository,

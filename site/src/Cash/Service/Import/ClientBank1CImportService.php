@@ -244,7 +244,7 @@ class ClientBank1CImportService
     }
 
     /**
-     * @param array<int, mixed>    $preview
+     * @param array<int, mixed> $preview
      * @param array<string, mixed> $context
      *
      * @return array<string, mixed>

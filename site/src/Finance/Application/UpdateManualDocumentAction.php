@@ -38,6 +38,7 @@ final readonly class UpdateManualDocumentAction
                 // Остаток — по свежей коллекции документов, а не по загруженной до блокировки.
                 // Сам документ не перечитывается: в нём несохранённые правки формы.
                 $this->entityManager->refresh($cashTransaction);
+                $this->refreshSiblingDocuments($cashTransaction->getDocuments(), $document);
                 $cashTransaction->assertCanAllocateAmount($document->getTotalAmount(), $document);
                 $cashTransaction->recalculateAllocatedAmount();
             }
@@ -60,5 +61,27 @@ final readonly class UpdateManualDocumentAction
         });
 
         $this->plRegisterUpdater->invalidateCacheForCompanyId((string) $document->getCompany()->getId());
+    }
+
+    /**
+     * Перечитанная коллекция транзакции гидрирует уже загруженные (до блокировки) документы и
+     * операции из identity map, со старыми суммами: соседние документы и их операции
+     * перечитываются по одному, иначе параллельная правка соседа не видна ни проверке остатка,
+     * ни пересчёту регистра.
+     *
+     * @param iterable<Document> $documents
+     */
+    private function refreshSiblingDocuments(iterable $documents, Document $edited): void
+    {
+        foreach ($documents as $sibling) {
+            if ($sibling === $edited) {
+                continue;
+            }
+
+            $this->entityManager->refresh($sibling);
+            foreach ($sibling->getOperations() as $operation) {
+                $this->entityManager->refresh($operation);
+            }
+        }
     }
 }

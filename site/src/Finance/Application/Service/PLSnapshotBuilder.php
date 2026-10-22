@@ -21,7 +21,8 @@ final class PLSnapshotBuilder
     /**
      * Снимок месяца заменяется целиком одной транзакцией соединения, без flush(): чтение
      * регистра, удаление прежних строк и вставка новых коммитятся вместе, чужой UnitOfWork не
-     * сохраняется. Во внешней транзакции вызывающего — точка сохранения.
+     * сохраняется. Пересборки одного месяца компании сериализованы advisory-блокировкой. Во
+     * внешней транзакции вызывающего — точка сохранения.
      */
     public function rebuildMonthly(Company $company, string $periodYm): void
     {
@@ -36,6 +37,8 @@ final class PLSnapshotBuilder
 
         $connection = $this->em->getConnection();
         $connection->transactional(function (Connection $connection) use ($companyId, $periodYm, $monthStart, $monthEnd): void {
+            $this->monthlySnapshots->acquireRebuildLock($companyId, $periodYm);
+
             $totals = $connection
                 ->createQueryBuilder()
                 ->select('pl_category_id')
