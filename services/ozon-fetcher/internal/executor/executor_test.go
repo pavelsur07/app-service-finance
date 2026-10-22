@@ -48,6 +48,8 @@ type fakeTasks struct {
 	content      map[string][]store.RawObject // ресурс/период → страницы ревизии (ContentPages)
 	contentAt    time.Time                    // StartedAt ревизии (по умолчанию t0)
 	contentErr   error
+	savedCursors []string // SaveCursor
+	adsBusy      bool     // AdsReportInFlight
 	reloaded     []string
 	controlHang  bool // SuspendConnection/StopResource ждут отмены контекста
 	extendHang   bool // ExtendLease ждёт отмены контекста
@@ -128,6 +130,17 @@ func (f *fakeTasks) ContentPages(_ context.Context, key store.TaskKey) (store.Co
 		at = t0
 	}
 	return store.Content{Pages: pages, StartedAt: at}, nil
+}
+
+func (f *fakeTasks) SaveCursor(_ context.Context, _ store.TaskKey, _, cursor string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.savedCursors = append(f.savedCursors, cursor)
+	return nil
+}
+
+func (f *fakeTasks) AdsReportInFlight(context.Context, store.TaskKey) (bool, error) {
+	return f.adsBusy, nil
 }
 
 func (f *fakeTasks) ReloadWithoutContent(_ context.Context, key store.TaskKey, _ time.Time) (bool, error) {

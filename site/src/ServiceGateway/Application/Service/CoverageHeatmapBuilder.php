@@ -54,6 +54,8 @@ final readonly class CoverageHeatmapBuilder
         'ozon.ads.campaigns' => ['Реклама: кампании', self::STEP_DAY],
         'ozon.ads.expense' => ['Реклама: расход', self::STEP_DAY],
         'ozon.ads.daily' => ['Реклама: статистика по дням', self::STEP_DAY],
+        'ozon.ads.statistics' => ['Реклама: отчёт по товарам', self::STEP_DAY],
+        'ozon.ads.statistics.tail' => ['Реклама: отчёт, хвост 14 дней', self::STEP_DAY],
     ];
 
     /**

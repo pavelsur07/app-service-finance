@@ -494,3 +494,36 @@ func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
+
+// SaveCursor записывает курсор попытки без страницы (номер заказанного
+// отчёта рекламы): рестарт продолжает опрос того же отчёта.
+func (t *Tasks) SaveCursor(ctx context.Context, key TaskKey, attemptID, cursor string) error {
+	tag, err := t.pool.Exec(ctx, `
+		UPDATE fetch_task SET cursor = NULLIF($5, ''), updated_at = now()
+		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4`,
+		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID, cursor)
+	if err != nil {
+		return fmt.Errorf("store: save cursor: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrLeaseLost
+	}
+	return nil
+}
+
+// AdsReportInFlight — у кабинета есть другая незавершённая задача отчётов
+// рекламы с заказанным отчётом (третье поле курсора «отпечаток:порция:UUID:…»):
+// у аккаунта Performance — не больше одного отчёта одновременно.
+func (t *Tasks) AdsReportInFlight(ctx context.Context, except TaskKey) (bool, error) {
+	var found bool
+	err := t.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM fetch_task
+			WHERE connection_ref = $1 AND resource_type LIKE 'ozon.ads.statistics%'
+			  AND NOT (resource_type = $2 AND period_key = $3)
+			  AND status <> 'done' AND split_part(COALESCE(cursor, ''), ':', 3) <> '')`,
+		except.ConnectionRef, except.ResourceType, except.PeriodKey).Scan(&found)
+	if err != nil {
+		return false, fmt.Errorf("store: ads report in flight: %w", err)
+	}
+	return found, nil
+}

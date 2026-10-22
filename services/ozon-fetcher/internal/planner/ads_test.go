@@ -71,3 +71,24 @@ func TestAdsDoNotChangeSellerPlan(t *testing.T) {
 	assert.Equal(t, len(without.Ensure), sellerEnsure)
 	assert.Len(t, with.Refreshes, len(without.Refreshes)+1)
 }
+
+func TestAdsReportsPlannedYesterdayAndTailFrom0130WithCampaigns(t *testing.T) {
+	all := append(append([]string{}, adsResources...), executor.ResourceAdsStatistics, executor.ResourceAdsStatisticsTail)
+	p := Build(at("2026-10-22 00:05"), []connections.Cabinet{perfOnly("a", all...)}, DefaultConfig(msk))
+
+	assert.Equal(t, []string{"2026-10-21"}, periods(p.Ensure, executor.ResourceAdsStatistics), "только вчера, без догона")
+	assert.Equal(t, []string{"2026-10-22"}, periods(p.Ensure, executor.ResourceAdsStatisticsTail), "хвост — день прохода")
+	for _, r := range []string{executor.ResourceAdsStatistics, executor.ResourceAdsStatisticsTail} {
+		for _, s := range p.Ensure {
+			if s.ResourceType == r {
+				assert.Equal(t, at("2026-10-22 01:30"), s.RunAt, r)
+				assert.False(t, s.Refresh, r)
+			}
+		}
+	}
+
+	// Без кампаний (ресурс этапа 6 не выдан) — отчёты не ставятся: сейчас
+	// ozon.ads.statistics выдаётся всем кабинетам с performance.
+	legacy := Build(at("2026-10-22 00:05"), []connections.Cabinet{perfOnly("b", executor.ResourceAdsStatistics)}, DefaultConfig(msk))
+	assert.Empty(t, periods(legacy.Ensure, executor.ResourceAdsStatistics))
+}

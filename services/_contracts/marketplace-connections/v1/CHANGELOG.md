@@ -1,5 +1,12 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-22) — реклама: отчёты по товарам
+
+- `ozon.ads.statistics` больше не выдаётся всем кабинетам с performance: вместе с новым
+  `ozon.ads.statistics.tail` — только компаниям `ozon_fetcher.ads_reports_companies` из тех,
+  кому выданы ресурсы рекламы (`ozon_fetcher.ads_companies`). До этого сервис ресурс не грузил.
+  Кабинет только с performance без списков получает пустой `resource_types`. Схема не менялась.
+
 ## Правка (2026-10-22) — реклама: кампании, расход, дневная статистика
 
 - Новые значения `resource_types` у performance: `ozon.ads.campaigns`, `ozon.ads.expense`,

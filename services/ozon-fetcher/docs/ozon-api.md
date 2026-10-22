@@ -221,8 +221,39 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 
 Расход аккаунта и дневная статистика по кампаниям за день: `dateFrom = dateTo = period_key`.
 Дни с 01.10.2026 (догон), вчера — с 01:00, перечитывание 14 дней раз в сутки (`ads_tail`).
-**Форма ответа вживую не проверена** (нет тестового ключа) — проверяется только JSON-объект или
-массив; живая форма записывается сюда на шаге «один кабинет».
+Проверяется только JSON-объект или массив.
+
+**Живая форма** (22.10.2026, журнал «ads page shape» — имена полей без значений):
+- кампании — `{list, total}`, кампания: `id`, `title`, `state`, `advObjectType`, `fromDate`, `toDate`,
+  `budget`, `dailyBudget`, `weeklyBudget`, `budgetType`, `expenseStrategy`, `placement`,
+  `PaymentType`, `ProductAdvPlacements`, `autopilot`, `createdAt`, `updatedAt`, …; JSON;
+- расход — `{rows}`, строка: `id`, `title`, `date`, `moneySpent`, `bonusSpent`, `prepaymentSpent`;
+  `application/json; charset=utf-8`;
+- дневная статистика — `{rows}`, строка: `id`, `title`, `date`, `views`, `clicks`, `moneySpent`,
+  `orders`, `ordersMoney`; `application/json; charset=utf-8`.
+
+### `ozon.ads.statistics`, `ozon.ads.statistics.tail` — асинхронный отчёт `POST /api/client/statistics`
+
+Отчёт по товарам кампаний (`docs/tasks/marketplace-data-ingestion/stages/ozon-7-ads-reports.md`).
+
+- **Заказ:** `{"campaigns": [≤ 10 id], "from": "D−1T21:00:00Z", "to": "DT20:59:59Z", "groupBy": "DATE"}`
+  (дни МСК → UTC) → `UUID`. `ozon.ads.statistics` — день `period_key` (вчера), `ozon.ads.statistics.tail`
+  — 14 дней до `period_key` (день прохода).
+- **Статус:** `GET /api/client/statistics/{UUID}` → `state` (`NOT_STARTED`/`IN_PROGRESS` — ждать, `OK`/`READY`
+  — готов, `ERROR`/`CANCELLED`/`NOT_FOUND` — ошибка), `link`.
+- **Файл:** `GET link` (только хост Performance — Bearer на чужой хост не уходит) или
+  `/api/client/statistics/report?UUID=`; ZIP (по сигнатуре `PK`) или CSV — в raw как есть; страница = отчёт порции.
+- **Кампании:** SKU из снимка `ozon.ads.campaigns` дня исполнения; только с показами, кликами или
+  расходом в днях отчёта по raw `ozon.ads.daily` (строки `rows`/`list` с `id`); форма незнакома или
+  день не загружен — все SKU (как Symfony). Нет кампаний — служебная страница `{"reports":[]}`.
+- **Курсор:** `отпечаток порций:порция:UUID:время заказа:ошибок подряд` — пишется сразу после заказа;
+  рестарт опрашивает тот же UUID.
+- **Окно заказа:** 00:30–04:00 МСК (задачи ставятся с 01:30 — после расхода и статистики дня); вне
+  окна — `report_wait` до следующего окна; опрос и скачивание — в любое время. Пока у кабинета есть
+  задача отчётов с UUID — другая не заказывает (`report_busy`, 5 мин).
+- **Опрос:** каждые 30 с до 20 мин в попытке, затем `report_pending` (5 мин, UUID сохранён); не готов 3 ч
+  — UUID брошен, следующее окно (WARNING). Ошибка Ozon — новый заказ через 30 мин; 3 подряд —
+  `report_failed` (`failed_permanent`, ERROR). 429 на заказ — следующее окно, без повтора подряд.
 
 ### Вторая волна (не в первой)
 
@@ -276,6 +307,8 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
 | `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |
+| `/api/client/statistics` (заказ отчёта) | 1/120 | 1/120 | 1/120 | 120 с | разнос заказов как у Symfony; 429 — следующее окно |
+| `/api/client/statistics/{UUID}`, `/statistics/report` | 0.5 / 0.2 | 0.1 / 0.05 | 1 | 30 / 60 с | опрос статуса не ограничен Ozon (опыт Symfony) |
 | `/v1/finance/accrual/postings` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 22.10.2026: квота 50 запросов на окно 5 с **общая для всех клиентов метода** (`ratelimit-remaining` восстанавливается каждые 5 с и пустеет за 1–3 с), 429 с `retry-after: 1`; поэтому `SharedQuota` — 429 только пауза, темп не снижается, шторм не считается |
 | `/v3/posting/fbo/list`, `/v4/posting/fbs/list` | 0.2 | 0.05 | 1 | 60 с | **консервативно**: ключ кабинета общий с Symfony, пока тот не отключён; 19.10 перед отключением старых методов — фаза 429 |
 

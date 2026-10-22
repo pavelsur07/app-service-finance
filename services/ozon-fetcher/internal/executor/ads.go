@@ -36,6 +36,9 @@ type Performance interface {
 	FetchCampaigns(ctx context.Context, creds ozonperf.Credentials, connectionRef string) (ozon.Page, error)
 	FetchExpense(ctx context.Context, creds ozonperf.Credentials, connectionRef, day string) (ozon.Page, error)
 	FetchDaily(ctx context.Context, creds ozonperf.Credentials, connectionRef, day string) (ozon.Page, error)
+	OrderReport(ctx context.Context, creds ozonperf.Credentials, connectionRef string, campaigns []string, from, to time.Time) (string, error)
+	ReportStatus(ctx context.Context, creds ozonperf.Credentials, connectionRef, id string) (ozonperf.ReportStatus, error)
+	DownloadReport(ctx context.Context, creds ozonperf.Credentials, connectionRef, id, link string) (ozon.Page, error)
 }
 
 // WithPerformance — копия с клиентом рекламы.
@@ -72,6 +75,8 @@ func (r *taskRun) fetchAds(ctx context.Context, cabinet connections.Cabinet) err
 			return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchExpense(ctx, creds, ref, r.task.PeriodKey) }))
 		}
 		return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchDaily(ctx, creds, ref, r.task.PeriodKey) }))
+	case ResourceAdsStatistics, ResourceAdsStatisticsTail:
+		return r.adsReports(ctx, creds, cabinet)
 	}
 	return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 }

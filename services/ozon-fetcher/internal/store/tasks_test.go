@@ -884,3 +884,45 @@ func TestSellerSuspensionDoesNotStopAds(t *testing.T) {
 	_, err = claim(t, tasks, []string{"a"}, t0)
 	assert.ErrorIs(t, err, ErrNoTask, "seller на паузе")
 }
+
+func TestSaveCursorAndAdsReportInFlight(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	daily := spec("a", "ozon.ads.statistics", "2026-10-21", 5)
+	tail := spec("a", "ozon.ads.statistics.tail", "2026-10-22", 5)
+	other := spec("b", "ozon.ads.statistics", "2026-10-21", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{daily, tail, other}))
+
+	busy, err := tasks.AdsReportInFlight(ctx, tail.TaskKey)
+	require.NoError(t, err)
+	assert.False(t, busy)
+
+	got, err := claim(t, tasks, []string{"a"}, t0)
+	require.NoError(t, err)
+	require.NoError(t, tasks.SaveCursor(ctx, got.TaskKey, got.AttemptID, "fp:0:uuid-1:1700000000:0"))
+	assert.ErrorIs(t, tasks.SaveCursor(ctx, got.TaskKey, newAttemptID(), "x"), ErrLeaseLost)
+
+	otherKey := tail.TaskKey
+	if got.TaskKey == tail.TaskKey {
+		otherKey = daily.TaskKey
+	}
+	busy, err = tasks.AdsReportInFlight(ctx, otherKey)
+	require.NoError(t, err)
+	assert.True(t, busy, "отчёт другой задачи кабинета заказан")
+	busy, err = tasks.AdsReportInFlight(ctx, got.TaskKey)
+	require.NoError(t, err)
+	assert.False(t, busy, "своя задача не мешает")
+	busy, err = tasks.AdsReportInFlight(ctx, other.TaskKey)
+	require.NoError(t, err)
+	assert.False(t, busy, "другой кабинет не мешает")
+
+	// Освобождение с курсором (отчёт ещё не готов) — UUID сохраняется.
+	_, err = tasks.FinishTask(ctx, got.TaskKey, got.AttemptID, Outcome{Status: StatusPending, Label: "report_pending", KeepCursor: true, NextRunAt: t0}, t0)
+	require.NoError(t, err)
+	again, err := claim(t, tasks, []string{"a"}, t0)
+	require.NoError(t, err)
+	if again.TaskKey == got.TaskKey {
+		assert.Equal(t, "fp:0:uuid-1:1700000000:0", again.Cursor)
+	}
+	require.NoError(t, tasks.SaveCursor(ctx, again.TaskKey, again.AttemptID, "fp:1::0:0"))
+}

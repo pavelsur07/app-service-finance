@@ -41,6 +41,10 @@ const AdsTailDays = 14
 // закрыт, отчёты Symfony (04:30) ещё не начались.
 const adsStart = time.Hour
 
+// adsReportsStart — отчёты по товарам: после расхода и статистики дня
+// (активные кампании — по ним), внутри окна заказа 00:30–04:00.
+const adsReportsStart = 90 * time.Minute
+
 // DefaultAccrualPostingsDays — сколько дней перед сегодня перечитываются
 // начисления по отправлениям: они копятся неделями (доставка, возвраты).
 const DefaultAccrualPostingsDays = 45
@@ -284,5 +288,15 @@ func planAds(plan *Plan, cab connections.Cabinet, today time.Time, runDate strin
 	}
 	if len(tail.Specs) > 0 {
 		plan.Refreshes = append(plan.Refreshes, tail)
+	}
+	// Отчёты по товарам — только вместе с кампаниями: порции — из их снимка.
+	if cab.Supports(executor.ResourceAdsCampaigns) {
+		reports := today.Add(adsReportsStart)
+		if cab.Supports(executor.ResourceAdsStatistics) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAdsStatistics, today.AddDate(0, 0, -1).Format(time.DateOnly), PriorityRoutine, false, reports))
+		}
+		if cab.Supports(executor.ResourceAdsStatisticsTail) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAdsStatisticsTail, today.Format(time.DateOnly), PriorityRoutine, false, reports))
+		}
 	}
 }
