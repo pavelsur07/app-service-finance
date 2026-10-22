@@ -45,6 +45,14 @@ class CashTransactionToDocumentService
     }
 
     /**
+     * Сбрасывает кэш дашборда после commit транзакции, в которой обновлён регистр.
+     */
+    public function invalidatePlRegisterCache(string $companyId): void
+    {
+        $this->financeFacade->invalidatePLRegisterCache($companyId);
+    }
+
+    /**
      * Создаёт операцию документа из транзакции ДДС.
      */
     public function createOperationFromTransaction(CashTransaction $transaction): DocumentOperation

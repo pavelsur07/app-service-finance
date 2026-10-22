@@ -47,17 +47,26 @@ final class DeletePLDocumentAction
         // Запоминаем дату ДО удаления — нужна для пересчёта регистра
         $documentDate = $document->getDate()->setTime(0, 0);
 
-        $this->em->remove($document);
-        $this->em->flush();
-
         // Пересчитываем PL-регистр за день удалённого документа.
         // Метод recalcRange принимает Company — получаем через Facade.
         $company = $this->companyFacade->findById($companyId);
-        if (null === $company) {
-            // Компания удалена — регистр пересчитывать незачем
-            return;
-        }
 
-        $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
+        // Удаление и регистр — один commit: сбой между ними не оставит в регистре сумму
+        // документа, которого уже нет.
+        $this->em->wrapInTransaction(function () use ($document, $company, $documentDate): void {
+            $this->em->remove($document);
+            $this->em->flush();
+
+            if (null === $company) {
+                // Компания удалена — регистр пересчитывать незачем
+                return;
+            }
+
+            $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
+        });
+
+        if (null !== $company) {
+            $this->plRegisterUpdater->invalidateCacheForCompanyId($companyId);
+        }
     }
 }

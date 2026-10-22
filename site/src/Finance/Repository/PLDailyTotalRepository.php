@@ -118,6 +118,24 @@ SQL,
     }
 
     /**
+     * Сериализует пересчёты регистра ОПиУ одной компании. Блокировка транзакционная —
+     * снимается на commit/rollback внешней транзакции. Порядок: сначала источник (строка
+     * транзакции ДДС), потом регистр; обратного порядка в коде нет.
+     */
+    public function acquireRecalculationLock(string $companyId): void
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('PL register recalculation lock requires an active transaction.');
+        }
+
+        $connection->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:company_id))',
+            ['namespace' => 'pl_register', 'company_id' => $companyId],
+        );
+    }
+
+    /**
      * Фактические строки регистра компании за окно — для сверки с документами.
      *
      * @return list<PLRegisterRow>

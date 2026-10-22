@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\CreateDocumentFromTransactionAction;
+use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -384,5 +385,105 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->expectExceptionMessage('Транзакция уже полностью разнесена.');
 
         ($this->action)($tx, confirmed: false);
+    }
+    // -------------------------------------------------------------------------
+    // Параллельный запрос: документ на весь остаток уже создан другим запросом
+    // -------------------------------------------------------------------------
+
+    public function testSeesDocumentCreatedByConcurrentRequest(): void
+    {
+        [$tx, $company] = $this->makeLoadedTxWithConcurrentDocument();
+
+        try {
+            ($this->action)($tx, confirmed: false);
+            self::fail('Второй документ на тот же остаток создан.');
+        } catch (\DomainException $exception) {
+            self::assertSame('Транзакция уже полностью разнесена.', $exception->getMessage());
+        }
+
+        self::assertSame(1, $this->countDocuments((string) $tx->getId()));
+    }
+
+    public function testPnlActionSeesDocumentCreatedByConcurrentRequest(): void
+    {
+        [$tx] = $this->makeLoadedTxWithConcurrentDocument();
+
+        try {
+            self::getContainer()->get(CreatePnlDocumentFromTransactionAction::class)($tx);
+            self::fail('Второй документ на тот же остаток создан.');
+        } catch (\DomainException $exception) {
+            // Остаток под блокировкой — 0: документ на нулевую сумму не создаётся.
+            self::assertSame('Сумма документа должна быть больше нуля.', $exception->getMessage());
+        }
+
+        self::assertSame(1, $this->countDocuments((string) $tx->getId()));
+    }
+
+    public function testDocumentAndRegisterAreCommittedTogether(): void
+    {
+        $company = $this->makeCompany();
+        $account = $this->makeMoneyAccount($company);
+        $plCategory = $this->makePLCategory($company);
+        $cashflowCategory = $this->makeCashflowCategory($company, $plCategory);
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Основной');
+        $this->em->persist($project);
+        $tx = $this->makeTx($company, $account, '1000.00', $cashflowCategory);
+        $tx->setProjectDirection($project);
+        $this->em->flush();
+
+        $result = ($this->action)($tx, confirmed: false);
+
+        self::assertNotNull($result->documentId);
+        self::assertSame('1000.00', $this->connection->fetchOne(
+            'SELECT SUM(amount_income + amount_expense) FROM pl_daily_totals WHERE company_id = :company',
+            ['company' => $company->getId()],
+        ));
+    }
+
+    /**
+     * Транзакция на 1000 загружена вместе с коллекцией документов, после чего «другой запрос»
+     * создаёт документ на весь остаток в обход этого EntityManager.
+     *
+     * @return array{0: CashTransaction, 1: Company}
+     */
+    private function makeLoadedTxWithConcurrentDocument(): array
+    {
+        $company = $this->makeCompany();
+        $account = $this->makeMoneyAccount($company);
+        $plCategory = $this->makePLCategory($company);
+        $cashflowCategory = $this->makeCashflowCategory($company, $plCategory);
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Основной');
+        $this->em->persist($project);
+        $tx = $this->makeTx($company, $account, '1000.00', $cashflowCategory);
+        $tx->setProjectDirection($project);
+        $this->em->flush();
+
+        self::assertTrue($tx->getRemainingMoney()->isPositive());
+
+        $documentId = Uuid::uuid4()->toString();
+        $this->connection->insert('documents', [
+            'id' => $documentId,
+            'company_id' => $company->getId(),
+            'date' => $tx->getOccurredAt()->format('Y-m-d 00:00:00'),
+            'type' => 'CASHFLOW_EXPENSE',
+            'status' => 'ACTIVE',
+            'cash_transaction_id' => $tx->getId(),
+        ]);
+        $this->connection->insert('document_operations', [
+            'id' => Uuid::uuid4()->toString(),
+            'document_id' => $documentId,
+            'amount' => '1000.00',
+            'category_id' => $plCategory->getId(),
+        ]);
+
+        return [$tx, $company];
+    }
+
+    private function countDocuments(string $transactionId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE cash_transaction_id = :tx AND deleted_at IS NULL',
+            ['tx' => $transactionId],
+        );
     }
 }

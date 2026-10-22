@@ -44,7 +44,8 @@ class CashTransactionRepository extends ServiceEntityRepository
      * нарушение uniq_cts_tx_category (GlitchTip #414).
      *
      * Вызывать внутри транзакции и до первого чтения этой транзакции в текущем EntityManager:
-     * уже загруженная сущность (и её коллекция строк) не обновляется.
+     * уже загруженная сущность (и её коллекции строк и документов) не обновляется —
+     * вызывающий сначала делает clear() (см. CreateDocumentFromTransactionAction).
      */
     public function findOneByIdAndCompanyIdForUpdate(string $id, string $companyId): ?CashTransaction
     {
