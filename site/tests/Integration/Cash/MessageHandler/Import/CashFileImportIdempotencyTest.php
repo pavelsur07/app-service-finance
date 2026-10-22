@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Cash\MessageHandler\Import;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Tests\Integration\Cash\Service\Import\File\CashFileImportTestCase;
 use Doctrine\DBAL\DriverManager;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 
 /**
@@ -145,6 +146,36 @@ final class CashFileImportIdempotencyTest extends CashFileImportTestCase
             'SELECT COUNT(*) FROM money_account_daily_balance WHERE money_account_id = :account',
             ['account' => $this->account->getId()],
         ));
+    }
+
+    /**
+     * Строка без номера не отнимает совпадение у строки с номером — ни в каком порядке строк.
+     *
+     * @param list<string> $docNumbers
+     */
+    #[DataProvider('mixedRowOrders')]
+    public function testUnnumberedRowDoesNotStealExactMatch(array $docNumbers): void
+    {
+        $this->handle((string) $this->queueCsvImport([
+            $this->identicalRow() + ['doc_number' => '101'],
+            $this->identicalRow() + ['doc_number' => '102'],
+        ])->getId());
+
+        $rows = array_map(fn (string $doc): array => $this->identicalRow() + ('' === $doc ? [] : ['doc_number' => $doc]), $docNumbers);
+        $this->handle((string) $this->queueCsvImport($rows)->getId());
+        // Тот же смешанный файл ещё раз — ничего нового.
+        $this->handle((string) $this->queueCsvImport($rows)->getId());
+
+        self::assertSame(2, $this->countActiveTransactions());
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function mixedRowOrders(): iterable
+    {
+        yield 'без номера, потом 101' => [['', '101']];
+        yield '101, потом без номера' => [['101', '']];
     }
 
     public function testJobOfAccountBeingImportedIsDeferred(): void

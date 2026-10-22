@@ -110,6 +110,55 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         ));
     }
 
+    /**
+     * Сбой после записи транзакции (здесь — в пересчёте остатков) откатывает и транзакцию:
+     * повтор формы с тем же ключом создаёт её заново вместе с остатками, а не возвращает
+     * «готовую» с непересчитанными остатками.
+     */
+    public function testFailureAfterFlushRollsBackAndRetryCreatesWithBalances(): void
+    {
+        $key = Uuid::uuid7()->toString();
+        $container = self::getContainer();
+        $registry = $container->get(ManagerRegistry::class);
+        $failingRecalculator = new class($container->get(\App\Cash\Repository\Accounts\MoneyAccountRepository::class), $container->get(\App\Cash\Service\Accounts\AccountBalanceService::class)) extends \App\Cash\Application\Service\DailyBalanceRecalculator {
+            public function recalcRange(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, ?array $accountIds = null): void
+            {
+                throw new \RuntimeException('Пересчёт упал.');
+            }
+        };
+        $failing = new AddCashTransactionAction(
+            $this->em,
+            $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
+            $failingRecalculator,
+            $container->get(CashTransactionRepository::class),
+            $container->get(\App\Cash\Service\PaymentPlan\PaymentPlanMatcher::class),
+            $container->get('event_dispatcher'),
+            $container->get(\App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver::class),
+            $container->get(\App\Cash\Service\Transaction\CashTransactionSplitSynchronizer::class),
+            $registry,
+        );
+
+        try {
+            $failing($this->dto('100.00', '2024-02-10', $key));
+            self::fail('Ожидался сбой пересчёта.');
+        } catch (\RuntimeException) {
+        }
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE id = :id', ['id' => $key]));
+
+        $registry->resetManager();
+        $freshManager = $registry->getManager();
+        self::assertInstanceOf(\Doctrine\ORM\EntityManagerInterface::class, $freshManager);
+        $this->em = $freshManager;
+        $this->action(AddCashTransactionAction::class)($this->dto('100.00', '2024-02-10', $key));
+
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE id = :id', ['id' => $key]));
+        self::assertSame('100.00', (string) $this->connection->fetchOne(
+            'SELECT outflow FROM money_account_daily_balance WHERE money_account_id = :account AND date = :date',
+            ['account' => $this->account->getId(), 'date' => '2024-02-10'],
+        ));
+    }
+
     public function testKeyOfAnotherCompanyIsNotTreatedAsRepeat(): void
     {
         $key = Uuid::uuid7()->toString();

@@ -38,7 +38,8 @@ final class AddCashTransactionAction
 
     /**
      * Создание транзакции ДДС.
-     * Важно: сперва пишем транзакцию (flush), затем — пересчитываем факты, чтобы расчёт шёл по актуальным данным.
+     * Важно: сперва пишем транзакцию (flush), затем — пересчитываем факты, чтобы расчёт шёл по актуальным данным;
+     * всё это — одна транзакция БД, событие для кэша — после commit.
      *
      * @throws ORMException
      */
@@ -58,6 +59,10 @@ final class AddCashTransactionAction
         if (null !== $dto->idempotencyKey) {
             $repeated = $this->txRepo->findOneByIdAndCompanyId($dto->idempotencyKey, $dto->companyId);
             if ($repeated instanceof CashTransaction) {
+                // Транзакция и её остатки закоммичены одним действием; сброс кэша безопасно
+                // повторить — первый запрос мог упасть сразу после commit.
+                $this->eventDispatcher->dispatch(new CashTransactionsChanged($dto->companyId));
+
                 return $repeated;
             }
         }
@@ -135,28 +140,32 @@ final class AddCashTransactionAction
 
         $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
 
-        // Сохраняем
-        $this->entityManager->persist($tx);
+        // Транзакция, совпадение с плановым платежом и пересчёт остатков — один commit:
+        // иначе сбой после первого flush оставлял транзакцию с непересчитанными остатками, а
+        // повтор формы по ключу возвращал её как готовую.
         try {
-            $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+            $this->entityManager->wrapInTransaction(function () use ($tx, $dto, $company, $account): void {
+                $this->entityManager->persist($tx);
+                $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+
+                // Совпадение с плановым платежом сохраняется до пересчёта, как раньше
+                // делал сам матчер (flush вынесен сюда, этап 5.3).
+                if (null !== $this->paymentPlanMatcher->matchForTransaction($tx)) {
+                    $this->entityManager->flush();
+                }
+
+                $from = $dto->occurredAt->setTime(0, 0);
+                $to = (new \DateTimeImmutable('today'))->setTime(0, 0); // правая граница — сегодня, дальше DailyBalanceRecalculator сам расширит до макс. факта
+                $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+            });
         } catch (UniqueConstraintViolationException $exception) {
             // Две одновременные отправки одной формы: обе не нашли транзакцию по ключу,
             // вторая упёрлась в PK. Её результат — транзакция первой.
             return $this->concurrentlyCreated($dto, $exception);
         }
 
-        // Совпадение с плановым платежом сохраняется до пересчёта, как раньше
-        // делал сам матчер (flush вынесен сюда, этап 5.3).
-        if (null !== $this->paymentPlanMatcher->matchForTransaction($tx)) {
-            $this->entityManager->flush();
-        }
-
-        // После фиксации транзакции обязательно пересчитываем факты и инвалидируем snapshot:
-        // виджеты dashboard читают агрегированные данные, поэтому без инвалидации пользователь
-        // может увидеть устаревший слепок в пределах TTL даже после успешного сохранения.
-        $from = $dto->occurredAt->setTime(0, 0);
-        $to = (new \DateTimeImmutable('today'))->setTime(0, 0); // правая граница — сегодня, дальше DailyBalanceRecalculator сам расширит до макс. факта
-        $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+        // После commit инвалидируем snapshot: виджеты dashboard читают агрегированные данные,
+        // без инвалидации пользователь увидит устаревший слепок в пределах TTL.
         $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         return $tx;
