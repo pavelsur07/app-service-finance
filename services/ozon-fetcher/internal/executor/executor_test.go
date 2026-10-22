@@ -186,6 +186,10 @@ type fakeOzon struct {
 	infoMissing     int
 	infoCalls       [][]int64
 	productHang     bool // список и подробности ждут отмены контекста
+	// Остатки: страницы по курсору, ошибка при отсутствии страницы, курсоры запросов.
+	stockPages map[string]ozon.Page
+	stockErr   error
+	stockFrom  []string
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {

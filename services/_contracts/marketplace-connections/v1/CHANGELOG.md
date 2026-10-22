@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-22) — остатки
+
+- Новые значения `resource_types` у seller: `ozon.stocks` (снимок 05:00) и
+  `ozon.stocks.week-close` (отсечка недели, воскресенье 23:30), оба — `/v4/product/info/stocks`.
+  Выдаются по списку `ozon_fetcher.stocks_companies`. Схема не менялась.
+
 ## Правка (2026-10-21) — каталог товаров
 
 - Новые значения `resource_types` у seller: `ozon.products.list`, `ozon.products.info`

@@ -14,7 +14,8 @@ S3, журнал загрузок в своей БД; выдача фактов 
 одновременно, порядок по приоритету (отдельные слоты — когда замер покажет вытеснение). Сейчас реализованы финансовые ресурсы первой
 волны, отправления FBO/FBS (`ozon.orders.fbo`, `ozon.orders.fbs`, день МСК по дате
 создания), начисления по ним (`ozon.finance.accrual-postings`, номера — из raw заказов; `docs/ozon-api.md`)
-и снимок каталога товаров дня (`ozon.products.list`, `ozon.products.info`) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
+снимок каталога товаров дня (`ozon.products.list`, `ozon.products.info`) и снимки остатков
+(`ozon.stocks` — 05:00, `ozon.stocks.week-close` — воскресенье 23:30) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
 план загрузки Ozon — [`docs/tasks/marketplace-data-ingestion/plan-ozon.md`](../../docs/tasks/marketplace-data-ingestion/plan-ozon.md).
 Ozon Performance (другой API и авторизация) и другие маркетплейсы — не здесь.
 

@@ -197,6 +197,16 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceProductsInfo, today.Format(time.DateOnly), PriorityRoutine, false, now.Add(time.Minute)))
 			}
 		}
+		// Остатки — снимки дня: только сегодня, без перечитывания; исполняются
+		// с начала окна (05:00, отсечка недели — воскресенье 23:30).
+		if cab.Supports(executor.ResourceStocks) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceStocks, today.Format(time.DateOnly), PriorityRoutine, false,
+				today.Add(executor.StocksWindowStart[executor.ResourceStocks])))
+		}
+		if cab.Supports(executor.ResourceStocksWeekClose) && today.Weekday() == time.Sunday {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceStocksWeekClose, today.Format(time.DateOnly), PriorityRoutine, false,
+				today.Add(executor.StocksWindowStart[executor.ResourceStocksWeekClose])))
+		}
 		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)

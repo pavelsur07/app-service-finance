@@ -82,6 +82,28 @@ final class CoverageHeatmapBuilderTest extends TestCase
         self::assertSame(CoverageHeatmapCell::EMPTY, $rows['ozon.products.list']->cells[16]->state, 'до первого снимка — не пропуск');
     }
 
+    public function testStocksRowsAndWeekCloseCountsOnlySundays(): void
+    {
+        $builder = new CoverageHeatmapBuilder();
+        $heatmap = $builder->build(self::month('2026-10', [
+            self::cell('ozon.stocks', '2026-10-18', 1, 1),
+            self::cell('ozon.stocks.week-close', '2026-10-18', 1, 1),
+        ]), self::now());
+        $rows = [];
+        foreach ($heatmap->rows as $row) {
+            $rows[$row->resourceType] = $row;
+        }
+        self::assertSame('Остатки: снимок 05:00', $rows['ozon.stocks']->title);
+        self::assertSame('Остатки: отсечка недели', $rows['ozon.stocks.week-close']->title);
+        self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.stocks.week-close']->cells[17]->state);
+
+        // Один загруженный снимок 18.10 (вес 1000 кабинетов — перевешивает обязательные строки), сейчас 21.10: у ежедневного снимка 19–20.10 — пропуски,
+        // у отсечки недели будни не считаются — процент карты выше.
+        $weekOnly = $builder->build(self::month('2026-10', [self::cell('ozon.stocks.week-close', '2026-10-18', 1000, 1000)]), self::now('2026-10-21 09:10:00'));
+        $daily = $builder->build(self::month('2026-10', [self::cell('ozon.stocks', '2026-10-18', 1000, 1000)]), self::now('2026-10-21 09:10:00'));
+        self::assertGreaterThan($daily->coveragePercent, $weekOnly->coveragePercent, 'будни — не пропуск отсечки недели');
+    }
+
     private static function cell(string $resource, string $period, int $expected, int $done, int $running = 0, int $retryable = 0, int $permanent = 0, ?\DateTimeImmutable $lastSuccess = null): ServiceCoverageMonthCell
     {
         return new ServiceCoverageMonthCell($resource, $period, $expected, new ServiceCoverageStatusCounts($done, $running, 0, 0, $retryable, $permanent), $lastSuccess);

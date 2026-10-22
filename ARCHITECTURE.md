@@ -3524,7 +3524,8 @@ internal_api → stateless, /internal/* для сервисов services/
   (`site/config/services.yaml`; `['*']` — всем, `[]` — никому), начисления по
   отправлениям (`ozon.finance.accrual-postings`) — из них компаниям
   `ozon_fetcher.accrual_postings_companies`, каталог товаров (`ozon.products.list`,
-  `ozon.products.info`) — компаниям `ozon_fetcher.products_companies`.
+  `ozon.products.info`) — компаниям `ozon_fetcher.products_companies`, снимки остатков
+  (`ozon.stocks`, `ozon.stocks.week-close`) — компаниям `ozon_fetcher.stocks_companies`.
   Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
@@ -4151,6 +4152,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.56 | 2026-10-22 | Marketplace: ресурсы остатков `ozon.stocks` / `ozon.stocks.week-close` в снимке кабинетов (параметр `ozon_fetcher.stocks_companies`); ServiceGateway: строки «Остатки: снимок 05:00», «Остатки: отсечка недели» карты покрытия — только при задачах, у отсечки недели считаются только воскресенья |
 | 2.55 | 2026-10-22 | Marketplace: начисления по отправлениям Ozon — всем кабинетам с заказами (`ozon_fetcher.accrual_postings_companies: ['*']`) |
 | 2.54 | 2026-10-22 | Marketplace: каталог товаров Ozon — всем кабинетам с ключом seller (`ozon_fetcher.products_companies: ['*']`) |
 | 2.53 | 2026-10-21 | Marketplace: ресурсы каталога `ozon.products.list` / `ozon.products.info` в снимке кабинетов (параметр `ozon_fetcher.products_companies`); ServiceGateway: строки «Каталог: список товаров», «Каталог: подробности» карты покрытия — только при задачах |

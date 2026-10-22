@@ -49,7 +49,14 @@ final readonly class CoverageHeatmapBuilder
         'ozon.finance.accrual-postings' => ['Начисления по отправлениям', self::STEP_DAY],
         'ozon.products.list' => ['Каталог: список товаров', self::STEP_DAY],
         'ozon.products.info' => ['Каталог: подробности', self::STEP_DAY],
+        'ozon.stocks' => ['Остатки: снимок 05:00', self::STEP_DAY],
+        'ozon.stocks.week-close' => ['Остатки: отсечка недели', self::STEP_DAY],
     ];
+
+    /**
+     * Снимки только по воскресеньям: остальные дни строки — не пропуск.
+     */
+    private const SUNDAY_ONLY_RESOURCES = ['ozon.stocks.week-close'];
 
     private const STATUS_LABELS = [
         'running' => 'в работе',
@@ -107,7 +114,9 @@ final readonly class CoverageHeatmapBuilder
                     $key = sprintf('%s-%02d', $month->month, $day->day);
                     $isFuture = $key >= $today;
                     $built[] = $this->cell($title, $this->dayLabel($key), $cells[$key] ?? null, $isFuture);
-                    if (!$isFuture && (null === $firstLoaded || $key >= $firstLoaded)) {
+                    $counted = !\in_array($resourceType, self::SUNDAY_ONLY_RESOURCES, true)
+                        || 7 === (int) (new \DateTimeImmutable($key))->format('N');
+                    if ($counted && !$isFuture && (null === $firstLoaded || $key >= $firstLoaded)) {
                         $periods[] = $cells[$key] ?? null;
                     }
                 }

@@ -175,6 +175,28 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 - **Включение:** Symfony `ozon_fetcher.products_companies` (оба ресурса, ключ seller); подробности
   ставятся только кабинету со списком.
 
+### `ozon.stocks`, `ozon.stocks.week-close` — `POST /v4/product/info/stocks`
+
+Снимок остатков всех товаров кабинета
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md`).
+
+- **Запрос:** `{"filter": {"visibility": "ALL"}, "limit": 1000}`, со второй страницы — `"cursor"`;
+  `limit` в `(0, 1000]`, 1001 → 400 `code 3`.
+- **Ответ** (живой, 22.10.2026): `{"items": [...], "total": N, "cursor": "...", "total_items": N}` —
+  без `result`; товар — `product_id`, `offer_id`, `stocks[]` (`type` fbo/fbs/rfbs, `present`,
+  `reserved`, `sku`, `shipment_type`, `warehouse_ids`). Разбивки по складам нет.
+- **Пагинация:** `cursor` до пустой страницы — последняя полная страница отдаёт непустой курсор;
+  каждая страница, включая концевую пустую, — в raw. Непустая страница без курсора, повтор курсора,
+  нет `items` / `cursor` / `total`, товар без `stocks` — `invalid_response`; потолок 1000 страниц.
+  Битый курсор → 400 `invalid last_id ...` → `stale_cursor`, снимок с первой страницы.
+- **`period_key`:** день МСК снимка. Окно: `ozon.stocks` — с 05:00, `ozon.stocks.week-close` — с
+  23:30 (ставится только в воскресенье); раньше окна — `snapshot_early`, ожидание его начала;
+  после полуночи — `snapshot_missed` (`failed_permanent`, WARNING), загрузка, пересекающая
+  полночь, прерывается. Перечитывания нет.
+- **Журнал:** INFO «stocks snapshot read» — страниц, товаров, разных SKU, `total`; товаров ≠ `total`
+  — WARNING.
+- **Включение:** Symfony `ozon_fetcher.stocks_companies` (оба ресурса, ключ seller).
+
 ### Вторая волна (не в первой)
 
 - Прочие финансовые отчёты (компенсации, cash-flow statement и т. п.) — сверка
@@ -225,6 +247,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v1/finance/mutual-settlement` | 0.1 | 0.02 | 0.5 | 900 с | **консервативно**; генерация отчёта, не подтверждено |
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
+| `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
 | `/v1/finance/accrual/postings` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 22.10.2026: квота 50 запросов на окно 5 с **общая для всех клиентов метода** (`ratelimit-remaining` восстанавливается каждые 5 с и пустеет за 1–3 с), 429 с `retry-after: 1`; поэтому `SharedQuota` — 429 только пауза, темп не снижается, шторм не считается |
 | `/v3/posting/fbo/list`, `/v4/posting/fbs/list` | 0.2 | 0.05 | 1 | 60 с | **консервативно**: ключ кабинета общий с Symfony, пока тот не отключён; 19.10 перед отключением старых методов — фаза 429 |
 
