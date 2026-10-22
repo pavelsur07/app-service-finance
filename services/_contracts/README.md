@@ -23,6 +23,6 @@
 
 `source-fact-envelope` v1 — проект контракта (по терминологии аудита
 `05-target-architecture.md`): до реализации Symfony inbox endpoint его нужно
-согласовать с `docs/financial-core/05-financial-events.md`,
-`07-idempotency.md`, ADR-006/008 и natural keys Ingestion. До согласования
+согласовать с финансовой моделью (события, идемпотентность, деньги и валюта)
+и natural keys Ingestion; проект Financial Core удалён из docs 22.10.2026 (история git). До согласования
 изменения в v1 допустимы; после — только через v2.

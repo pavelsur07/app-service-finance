@@ -1076,7 +1076,7 @@ Telegram-строка ДДС и балансы, плановые платежи,
     `\Throwable`: при `\Error` транзакция БД останется открытой; закроется
     переходом на `wrapInTransaction()`.
   - `AddCashTransactionAction` не атомарен (flush → матчер → flush → пересчёт
-    через DBAL) — риск C3 из `docs/financial-core/03-current-failure-model.md`.
+    через DBAL) — риск C3 модели отказов Financial Core (документы удалены 22.10.2026, есть в истории git).
   - `CashTransactionServiceTest` теперь тестирует Action'ы — переименовать или
     перенести в `tests/Integration/Cash/Application/`.
 - `FundController::convertToMinorUnits()` — ветка «Некорректная сумма»
