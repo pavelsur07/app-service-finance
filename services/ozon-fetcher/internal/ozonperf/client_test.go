@@ -249,23 +249,37 @@ func TestShortTokenIsNotCachedPastExpiry(t *testing.T) {
 }
 
 func TestSecretCrossingMessageLimitIsRedacted(t *testing.T) {
-	pad := strings.Repeat("x", 195) // секрет пересекает границу обрезки текста (200)
+	// Токен и секрет начинаются за 3–4 символа до границы обрезки текста (200).
 	echo := &fakePerf{ttl: 1800, handle: func(w http.ResponseWriter, _ *http.Request, auth string) {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]any{"code": 3, "message": pad + auth})
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 3, "message": strings.Repeat("x", 190) + auth})
 	}}
 	c, _, _ := newTestClient(t, echo)
 	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "tok-", "и префикс токена")
+	assert.NotContains(t, err.Error(), "Bearer tok", "и префикс токена")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		_ = json.NewEncoder(w).Encode(map[string]any{"code": 16, "message": pad + secret})
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 16, "message": strings.Repeat("x", 196) + secret})
 	}))
 	t.Cleanup(srv.Close)
 	c2 := NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), time.Now)
 	_, err = c2.FetchCampaigns(context.Background(), testCreds, "conn-1")
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), secret[:5], "и префикс секрета")
+	assert.NotContains(t, err.Error(), "xperf", "и префикс секрета")
+}
+
+func TestJSONEscapedSecretIsRedacted(t *testing.T) {
+	escaped := `\u0070` + secret[1:] // «p» секрета — JSON-экранированием
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"code":16,"message":"invalid client_secret ` + escaped + `"}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), time.Now)
+	_, err := c.FetchCampaigns(context.Background(), testCreds, "conn-1")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret)
+	assert.Contains(t, err.Error(), "invalid client_secret [redacted]")
 }

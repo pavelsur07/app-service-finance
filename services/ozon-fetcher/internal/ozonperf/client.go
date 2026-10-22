@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -208,16 +209,27 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 	return token{value: body.AccessToken, expires: c.now().Add(cache)}, nil
 }
 
-// scrub убирает из тела ответа об ошибке секреты запроса до разбора и
-// обрезки текста: текст уходит в журнал и GlitchTip, а ответ может повторять
-// присланное.
-func scrub(body []byte, secrets ...string) []byte {
+// messageLimit — длина текста ошибки Ozon в журнале (как у Seller API).
+const messageLimit = 200
+
+// safeMessage — текст ошибки Ozon без секретов запроса: декодируется целиком
+// (JSON-экранирование тоже), секреты вычищаются, затем текст обрезается —
+// он уходит в журнал и GlitchTip, а ответ может повторять присланное.
+func safeMessage(body []byte, secrets ...string) string {
+	var env struct {
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(body, &env)
+	msg := env.Message
 	for _, s := range secrets {
 		if s != "" {
-			body = bytes.ReplaceAll(body, []byte(s), []byte(redacted))
+			msg = strings.ReplaceAll(msg, s, redacted)
 		}
 	}
-	return body
+	if r := []rune(msg); len(r) > messageLimit {
+		msg = string(r[:messageLimit])
+	}
+	return msg
 }
 
 // send — один HTTP-запрос: чтение тела с потолком, классификация, журнал без
@@ -261,10 +273,8 @@ func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, targ
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ozon.ClassInvalidResponse))
 		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ozon.ErrBodyTooLarge}
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		raw = scrub(raw, secrets...)
-	}
 	if apiErr := ozon.Classify(endpoint, resp.StatusCode, resp.Header, raw, c.now()); apiErr != nil {
+		apiErr.Message = safeMessage(raw, secrets...)
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(apiErr.Class))
 		return ozon.Response{}, apiErr
 	}
