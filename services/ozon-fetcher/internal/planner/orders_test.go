@@ -154,7 +154,7 @@ func TestAccrualPostingsEnsureUntilYesterdayAndDailyWindow(t *testing.T) {
 	assert.Equal(t, []string{"2026-09-30", "2026-09-23", "2026-09-16", "2026-09-09"}, window[14:], "возраст 21, 28, 35, 42")
 	for _, s := range tail.Specs {
 		assert.True(t, s.Refresh)
-		assert.Equal(t, PriorityRoutine, s.Priority)
+		assert.Equal(t, PriorityBackfill, s.Priority, "429 общей квоты не опережают догон других ресурсов")
 	}
 }
 

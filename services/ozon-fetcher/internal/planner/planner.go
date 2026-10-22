@@ -181,7 +181,10 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				if i > cfg.AccrualPostingsDailyDays && (i-cfg.AccrualPostingsDailyDays)%7 != 0 {
 					continue
 				}
-				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityRoutine, true, now))
+				// Низкий приоритет: при сплошных 429 общей квоты метода задача
+				// уходит в конец очереди по next_run_at и не занимает слот
+				// кабинета раньше догона других ресурсов.
+				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityBackfill, true, now))
 			}
 		}
 		// Каталог — снимок дня: только сегодня, без перечитывания (прошлое не
