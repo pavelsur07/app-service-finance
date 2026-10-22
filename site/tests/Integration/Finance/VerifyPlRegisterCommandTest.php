@@ -132,6 +132,11 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
         self::assertSame(Command::INVALID, $this->tester->execute(['--company' => 'not-a-uuid']));
     }
 
+    public function testRejectsReversedWindow(): void
+    {
+        self::assertSame(Command::INVALID, $this->verify(['--from' => '2026-02-01', '--to' => '2026-01-01']));
+    }
+
     /**
      * @param array<string, string> $options
      */

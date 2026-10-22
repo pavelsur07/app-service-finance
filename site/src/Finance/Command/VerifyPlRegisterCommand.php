@@ -72,6 +72,12 @@ final class VerifyPlRegisterCommand extends Command
             return Command::INVALID;
         }
 
+        if (null !== $from && null !== $to && $from > $to) {
+            $io->error('--from позже --to: окно пустое, сверять нечего.');
+
+            return Command::INVALID;
+        }
+
         $tableRows = [];
         $totals = ['companies' => 0, 'expected' => 0, 'actual' => 0, 'missing' => 0, 'extra' => 0, 'mismatch' => 0, 'uncategorized' => 0];
         $diffSum = '0.00';
