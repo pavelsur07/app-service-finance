@@ -1769,6 +1769,13 @@ dry-run; каждая компания — своя транзакция; ост
 - Внутри: `EntityManager::clear()` и `CashTransactionRepository::findOneByIdAndCompanyIdForUpdate()` — вызывающий загрузил транзакцию (и коллекцию документов) до блокировки, поэтому она перечитывается под `FOR UPDATE`. Параллельный или повторный запрос ждёт commit первого и видит остаток 0: отказ «Транзакция уже полностью разнесена» / «Сумма документа должна быть больше нуля», второй документ не создаётся. Ключа повтора нет: оба пути создают документ на весь остаток.
 - Сущность, переданная в Action, после вызова отсоединена (`clear()`): вызывающий использует только её id.
 
+### Cash: идемпотентность файлового импорта и ручной транзакции
+
+- `CashFileImportService` считает дубль по количеству: ключ строки — `dedupe_hash` (дата, сумма, назначение) + номер документа; для ключа при первой встрече запоминается M = `CashTransactionRepository::countActiveByCompanyDedupeAndDocNumber()`, k-я строка файла создаётся при k > M. Пустой номер совпадает с любым (файлы без колонки номера и выписки 1С с номером). Результат не зависит от нарезки на пачки (200 строк), повтор файла не создаёт ничего, прерванный импорт дописывает недостающее.
+- `CashFileImportHandler` — фазы захват (queued → processing, свой commit) → импорт пачками → финализация под `Infrastructure\Lock\CashImportAccountLock` — сессионным `pg_try_advisory_lock(hashtext('cash_import_account'), hashtext(company:account))`, снимается в `finally`. Занято — задание не трогается, `RecoverableMessageHandlingException` с `retryDelay` 60 с (Messenger повторяет recoverable без лимита `max_retries`). Задание в `processing` при свободной блокировке — воркер умер (сессионная блокировка снялась с его соединением): импорт продолжается, `warning`. `done`/`failed` — пропуск без блокировки.
+- Форма создания транзакции ДДС (`cash_transaction_new`) выдаёт `CashTransactionDTO::$idempotencyKey` (UUIDv7, скрытое поле, опция формы `idempotency_key`); `AddCashTransactionAction` использует его как ID: транзакция компании с этим ID уже есть — возвращается она. Гонку одновременных отправок останавливает PK.
+- `ClientBank1CImportService` (синхронный импорт 1С) — вне этого контракта: дедуп по `external_id` с номером вхождения, блокировку счёта не берёт.
+
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
 - `App\Cash\Domain\Event\CashTransactionsChanged(string $companyId)` — синхронное
@@ -4180,6 +4187,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.64 | 2026-10-22 | Cash: файловый импорт — дедуп по количеству (хеш + номер документа), сериализация по счёту сессионной advisory-блокировкой, возобновление брошенного `processing`; ключ повтора формы ручной транзакции = ID |
 | 2.63 | 2026-10-22 | Finance/Cash: пересчёт регистра ОПиУ атомарен под `pg_advisory_xact_lock`, без `flush()`; документ из ДДС, удаление и восстановление документа — один commit с регистром под блокировкой строки транзакции ДДС; сброс кэша дашборда после commit (`FinanceFacade::invalidatePLRegisterCache()`); сверка читает месяц одним снимком |
 | 2.62 | 2026-10-22 | Finance: read-only сверка регистра ОПиУ `app:finance:verify-pl-register`, `PLRegisterUpdater::calculateRows()`, `PLRegisterRow`, `PLRegisterCompanyRangesQuery` |
 | 2.61 | 2026-10-22 | Marketplace / ServiceGateway: снят `ozon.stocks.week-close` и его строка карты покрытия (подсчёт «только воскресенья» убран) — конец недели — снимок понедельника, «неделя готова» в понедельник 06:00 |

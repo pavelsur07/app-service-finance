@@ -50,6 +50,15 @@ final class AddCashTransactionAction
         // --- Безопасность: запрет операций в закрытом периоде компании
         $this->transactions->assertNotLockedForCompany($company, $dto->occurredAt);
 
+        // Повторная отправка формы создания: транзакция с ключом повтора уже есть — она и
+        // результат. Гонку двух одновременных отправок останавливает PK (ключ = ID).
+        if (null !== $dto->idempotencyKey) {
+            $repeated = $this->txRepo->findOneByIdAndCompanyId($dto->idempotencyKey, $dto->companyId);
+            if ($repeated instanceof CashTransaction) {
+                return $repeated;
+            }
+        }
+
         $existingTransaction = null;
         if (null !== $dto->importSource && null !== $dto->externalId) {
             $existingTransaction = $this->txRepo->findOneByImport(
@@ -90,7 +99,7 @@ final class AddCashTransactionAction
         // Создаём сущность транзакции
         $amount = $this->transactions->requireAmount($dto);
         $tx = new CashTransaction(
-            Uuid::uuid4()->toString(),
+            $dto->idempotencyKey ?? Uuid::uuid4()->toString(),
             $company,
             $account,
             $dto->direction,

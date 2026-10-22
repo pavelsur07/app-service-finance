@@ -37,6 +37,13 @@ final class CashFileImportService
     /** @var list<CashTransaction> */
     private array $batchTransactions = [];
 
+    /**
+     * Ключ строки → [сколько таких уже было в БД до импорта, сколько встречено в файле].
+     *
+     * @var array<string, array{existing: int, seen: int}>
+     */
+    private array $rowKeyOccurrences = [];
+
     public function __construct(
         private readonly CashFileRowNormalizer $rowNormalizer,
         private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
@@ -95,6 +102,7 @@ final class CashFileImportService
         // должен попасть в пачку следующего.
         $this->batchTransactions = [];
         $this->counterpartyCache = [];
+        $this->rowKeyOccurrences = [];
 
         $created = 0;
         $createdMinDate = null;
@@ -173,7 +181,7 @@ final class CashFileImportService
                             $description ?? ''
                         );
 
-                        if ($this->cashTransactionRepository->existsByCompanyAndDedupe($companyId, $dedupeHash)) {
+                        if ($this->isAlreadyImported((string) $companyId, $dedupeHash, $docNumber)) {
                             if ($importLog) {
                                 $this->importLogger->incSkippedDuplicate($importLog);
                             }
@@ -204,7 +212,7 @@ final class CashFileImportService
                         $transaction->setUpdatedAt(new \DateTimeImmutable());
                         // Номер документа не идёт в external_id: он повторяется между годами
                         // и счетами, а uniq_cashflow_import валил на нём весь импорт.
-                        // Дубли файла ловит dedupeHash, номер хранится в doc_number.
+                        // Дубли файла ловит isAlreadyImported() по dedupeHash и doc_number.
 
                         if (null !== $counterpartyName) {
                             $counterparty = $this->getOrCreateCounterparty($companyId, $counterpartyName, $company);
@@ -372,6 +380,31 @@ final class CashFileImportService
         }
 
         return $trim ? trim($stringValue) : $stringValue;
+    }
+
+    /**
+     * Дубль считается по количеству, а не по факту наличия: k-я строка файла с ключом
+     * (dedupe_hash + номер документа) — дубль, если в БД до импорта совпадающих было не
+     * меньше k. Число из БД берётся при первой встрече ключа — до того, как импорт запишет
+     * свои строки, поэтому результат не зависит от нарезки на пачки: повтор файла не создаёт
+     * ничего, законные одинаковые операции не теряются, прерванный импорт дописывает только
+     * недостающее. Пустой номер совпадает с любым (см. countActiveByCompanyDedupeAndDocNumber):
+     * выписка 1С с номерами и файл без колонки номера одного периода не дублируют друг друга.
+     * Параллельные задания одного счёта сериализует CashFileImportHandler — иначе M у обоих
+     * было бы одинаковым.
+     */
+    private function isAlreadyImported(string $companyId, string $dedupeHash, ?string $docNumber): bool
+    {
+        $docKey = trim((string) $docNumber);
+        $key = $dedupeHash.'|'.$docKey;
+
+        $this->rowKeyOccurrences[$key] ??= [
+            'existing' => $this->cashTransactionRepository->countActiveByCompanyDedupeAndDocNumber($companyId, $dedupeHash, $docKey),
+            'seen' => 0,
+        ];
+        ++$this->rowKeyOccurrences[$key]['seen'];
+
+        return $this->rowKeyOccurrences[$key]['seen'] <= $this->rowKeyOccurrences[$key]['existing'];
     }
 
     private function normalizePurposeForDedupe(?string $value): string

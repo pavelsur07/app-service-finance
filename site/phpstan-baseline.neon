@@ -1424,12 +1424,6 @@ parameters:
 			path: src/Cash/Service/Import/File/CashFileImportService.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:existsByCompanyAndDedupe\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
-
-		-
 			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:getOrCreateCounterparty\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1

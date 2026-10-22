@@ -202,18 +202,31 @@ class CashTransactionRepository extends ServiceEntityRepository
             : null;
     }
 
-    public function existsByCompanyAndDedupe(string $companyId, string $dedupeHash): bool
+    /**
+     * Сколько неудалённых транзакций компании совпадает со строкой выписки по эвристическому
+     * dedupe_hash (дата, сумма, назначение) с учётом номера документа. Номер есть не у всех
+     * источников (файлы без колонки номера, выписки 1С с номером), поэтому пустой номер с любой
+     * стороны совпадает с любым: строка без номера ('') сравнивается только по хешу, строка с
+     * номером — со строками того же номера или без номера. Файловый импорт сравнивает это
+     * число с номером вхождения ключа в файле.
+     */
+    public function countActiveByCompanyDedupeAndDocNumber(string $companyId, string $dedupeHash, string $docNumber): int
     {
-        return (bool) $this->createQueryBuilder('t')
-            ->select('1')
-            ->andWhere('IDENTITY(t.company) = :companyId')
-            ->andWhere('t.dedupeHash = :dedupeHash')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setMaxResults(1)
-            ->setParameter('companyId', $companyId)
-            ->setParameter('dedupeHash', $dedupeHash)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $sql = <<<'SQL'
+SELECT COUNT(*)
+FROM cash_transaction
+WHERE company_id = :company_id
+  AND dedupe_hash = :dedupe_hash
+  AND deleted_at IS NULL
+SQL;
+        $params = ['company_id' => $companyId, 'dedupe_hash' => $dedupeHash];
+
+        if ('' !== $docNumber) {
+            $sql .= "\n  AND COALESCE(BTRIM(doc_number), '') IN (:doc_number, '')";
+            $params['doc_number'] = $docNumber;
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->fetchOne($sql, $params);
     }
 
     public function findOneByCompanyImportSourceExternalId(string $companyId, string $importSource, string $externalId): ?CashTransaction

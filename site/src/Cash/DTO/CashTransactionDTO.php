@@ -44,6 +44,13 @@ class CashTransactionDTO
     public ?string $description = null;
 
     /**
+     * Ключ повтора формы создания: UUIDv7 выдаётся при показе формы и становится ID
+     * транзакции — повторная отправка той же формы возвращает уже созданную транзакцию.
+     */
+    #[Assert\Uuid]
+    public ?string $idempotencyKey = null;
+
+    /**
      * Код источника импорта (для составного ключа идемпотентности).
      */
     public ?string $importSource = null;

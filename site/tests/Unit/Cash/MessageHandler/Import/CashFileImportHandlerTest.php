@@ -8,6 +8,7 @@ use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\MessageHandler\Import\CashFileImportHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -25,6 +26,7 @@ use App\Shared\Service\Storage\LegacyXlsConverter;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryFileFactory;
 use App\Shared\Service\Storage\TemporaryLocalFile;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
@@ -32,6 +34,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 
 final class CashFileImportHandlerTest extends TestCase
 {
@@ -69,7 +72,7 @@ final class CashFileImportHandlerTest extends TestCase
         self::assertStringNotContainsString('DBG:', $error);
     }
 
-    public function testSkippedNotQueuedJobKeepsErrorMessageUntouched(): void
+    public function testJobOfBusyAccountIsDeferredUntouched(): void
     {
         $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Account', 'RUB');
@@ -79,12 +82,47 @@ final class CashFileImportHandlerTest extends TestCase
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->method('find')->willReturn($job);
         $entityManager->method('isOpen')->willReturn(true);
+        $entityManager->expects(self::never())->method('beginTransaction');
 
-        $handler = $this->createHandler($entityManager);
-        $handler(new CashFileImportMessage((string) $job->getId()));
+        $handler = $this->createHandler($entityManager, accountLockFree: false);
+
+        try {
+            $handler(new CashFileImportMessage((string) $job->getId()));
+            self::fail('Импорт занятого счёта должен откладываться.');
+        } catch (RecoverableMessageHandlingException $exception) {
+            self::assertSame(60_000, $exception->getRetryDelay());
+        }
 
         self::assertSame(CashFileImportJob::STATUS_PROCESSING, $job->getStatus());
         self::assertNull($job->getErrorMessage());
+    }
+
+    public function testFinishedJobIsSkippedWithoutTakingAccountLock(): void
+    {
+        $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Account', 'RUB');
+        $job = new CashFileImportJob(Uuid::uuid4()->toString(), $company, $account, 'file', 'a.csv', 'hash', []);
+        $job->finishOk();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('find')->willReturn($job);
+        $entityManager->expects(self::never())->method('beginTransaction');
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects(self::never())->method('fetchOne');
+
+        $registry = $this->createMock(ManagerRegistry::class);
+        $handler = new CashFileImportHandler(
+            $entityManager,
+            $this->createImportService(),
+            $registry,
+            new ImportLogger($entityManager),
+            new NullLogger(),
+            new CashImportAccountLock($connection),
+        );
+        $handler(new CashFileImportMessage((string) $job->getId()));
+
+        self::assertSame(CashFileImportJob::STATUS_DONE, $job->getStatus());
     }
 
     public function testFailureOnClosedEntityManagerIsRecordedThroughFreshManagerAndLogged(): void
@@ -132,6 +170,7 @@ final class CashFileImportHandlerTest extends TestCase
             $registry,
             new ImportLogger($freshManager),
             $logger,
+            $this->accountLock(true),
         );
         $handler(new CashFileImportMessage($jobId));
 
@@ -139,7 +178,7 @@ final class CashFileImportHandlerTest extends TestCase
         self::assertStringContainsString(\DomainException::class, (string) $freshJob->getErrorMessage());
     }
 
-    private function createHandler(EntityManagerInterface $entityManager): CashFileImportHandler
+    private function createHandler(EntityManagerInterface $entityManager, bool $accountLockFree = true): CashFileImportHandler
     {
         $registry = $this->createMock(ManagerRegistry::class);
         $registry->method('getManager')->willReturn($entityManager);
@@ -150,7 +189,16 @@ final class CashFileImportHandlerTest extends TestCase
             $registry,
             new ImportLogger($entityManager),
             new NullLogger(),
+            $this->accountLock($accountLockFree),
         );
+    }
+
+    private function accountLock(bool $free): CashImportAccountLock
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn($free);
+
+        return new CashImportAccountLock($connection);
     }
 
     private function createImportService(): CashFileImportService
