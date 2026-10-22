@@ -11,12 +11,13 @@ use App\Company\Facade\CounterpartyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
+use App\Finance\Application\CreateManualDocumentAction;
 use App\Finance\Application\RestoreDocumentAction;
 use App\Finance\Application\Service\DocumentPlContribution;
 use App\Finance\Application\Service\FinanceDocumentResponsibilityCenterNormalizer;
 use App\Finance\Application\Service\PlNatureResolver;
-use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Application\SoftDeleteDocumentAction;
+use App\Finance\Application\UpdateManualDocumentAction;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -28,7 +29,6 @@ use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -45,7 +45,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class DocumentController extends AbstractController
 {
     public function __construct(
-        private readonly PLRegisterUpdater $plRegisterUpdater,
         private readonly FinanceDocumentResponsibilityCenterNormalizer $responsibilityCenterNormalizer,
     ) {
     }
@@ -126,7 +125,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/new', name: 'document_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function new(Request $request, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, CreateManualDocumentAction $createDocument, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -155,10 +154,7 @@ class DocumentController extends AbstractController
             }
 
             if ($form->isValid()) {
-                $em->persist($document);
-                $em->flush();
-
-                $this->plRegisterUpdater->updateForDocument($document);
+                $createDocument($document);
 
                 return $this->redirectToRoute('document_list_resume');
             }
@@ -175,7 +171,7 @@ class DocumentController extends AbstractController
         Document $document,
         PLCategoryRepository $catRepo,
         ProjectDirectionRepository $projectDirectionRepo,
-        EntityManagerInterface $em,
+        CreateManualDocumentAction $createDocument,
         ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
@@ -208,10 +204,7 @@ class DocumentController extends AbstractController
             }
 
             if ($form->isValid()) {
-                $em->persist($copy);
-                $em->flush();
-
-                $this->plRegisterUpdater->updateForDocument($copy);
+                $createDocument($copy);
 
                 return $this->redirectToRoute('document_list_resume');
             }
@@ -256,7 +249,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'document_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, ProjectDirectionRepository $projectDirectionRepo, UpdateManualDocumentAction $updateDocument, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -311,25 +304,15 @@ class DocumentController extends AbstractController
                 }
 
                 if ($form->isValid()) {
-                    if ($cashTransaction instanceof CashTransaction) {
-                        $cashTransaction->recalculateAllocatedAmount();
-                    }
+                    try {
+                        $updateDocument($document, $initialStatus, $initialDate);
+                    } catch (\DomainException $e) {
+                        // Остаток транзакции ДДС изменил параллельный запрос: проверка под
+                        // блокировкой отказала, транзакция откатилась, EntityManager закрыт —
+                        // форма открывается заново по сохранённому документу.
+                        $this->addFlash('danger', $e->getMessage());
 
-                    $em->flush();
-
-                    $daysToRecalc = [];
-                    $currentDate = $document->getDate()->setTime(0, 0);
-
-                    if (DocumentStatus::ACTIVE === $initialStatus) {
-                        $daysToRecalc[$initialDate->format('Y-m-d')] = $initialDate;
-                    }
-
-                    if (DocumentStatus::ACTIVE === $document->getStatus()) {
-                        $daysToRecalc[$currentDate->format('Y-m-d')] = $currentDate;
-                    }
-
-                    foreach ($daysToRecalc as $day) {
-                        $this->plRegisterUpdater->recalcRange($company, $day, $day);
+                        return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
                     }
 
                     return $this->redirectToRoute('document_list_resume');

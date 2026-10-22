@@ -287,10 +287,4 @@ class DocumentRepository extends ServiceEntityRepository
 
         return $pager;
     }
-
-    public function save(Document $document): void
-    {
-        $this->getEntityManager()->persist($document);
-        $this->getEntityManager()->flush();
-    }
 }

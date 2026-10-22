@@ -14,6 +14,7 @@ use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DeletePLCategoryAction;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
+use App\Finance\Application\SavePLCategoryAction;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Application\Service\PLCategoryTreeFileReader;
 use App\Finance\Entity\PLCategory;
@@ -23,7 +24,6 @@ use App\Finance\Form\PLCategoryFormType;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Finance\Repository\PLTemplateApplicationRepository;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -295,7 +295,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/new', name: 'pl_category_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function new(Request $request, SavePLCategoryAction $saveCategory, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -327,8 +327,7 @@ class PLCategoryController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $nextSortOrder = $this->categoryRepository->getNextSortOrder($company, $category->getParent());
             $category->setSortOrder($nextSortOrder);
-            $em->persist($category);
-            $em->flush();
+            $saveCategory($category);
 
             return $this->redirectToRoute('pl_category_index');
         }
@@ -341,7 +340,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'pl_category_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, PLCategory $category, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(Request $request, PLCategory $category, SavePLCategoryAction $saveCategory, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -373,7 +372,7 @@ class PLCategoryController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
+            $saveCategory($category);
 
             return $this->redirectToRoute('pl_category_index');
         }

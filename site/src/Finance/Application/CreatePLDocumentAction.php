@@ -17,15 +17,15 @@ use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
-use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 final readonly class CreatePLDocumentAction
 {
     public function __construct(
         private CompanyRepository $companyRepository,
-        private DocumentRepository $documentRepository,
+        private EntityManagerInterface $entityManager,
         private PLCategoryRepository $plCategoryRepository,
         private CounterpartyRepository $counterpartyRepository,
         private ProjectDirectionRepository $projectDirectionRepository,
@@ -65,8 +65,14 @@ final readonly class CreatePLDocumentAction
 
         $this->responsibilityCenterNormalizer->prepareExplicitDocument($document, $company);
 
-        $this->documentRepository->save($document);
-        $this->plRegisterUpdater->updateForDocument($document);
+        // Документ и регистр — один commit; во внешней транзакции вызывающего (закрытие месяца
+        // маркетплейса) — одна точка сохранения, откатываются вместе с ней.
+        $this->entityManager->wrapInTransaction(function () use ($document): void {
+            $this->entityManager->persist($document);
+            $this->entityManager->flush();
+
+            $this->plRegisterUpdater->updateForDocument($document);
+        });
 
         return (string) $document->getId();
     }
