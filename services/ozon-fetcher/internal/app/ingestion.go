@@ -87,7 +87,8 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 		return nil, fmt.Errorf("app: ORDERS_FROM: %w", err)
 	}
 	plannerCfg := planner.Config{Location: loc, TailDays: cfg.TailDays, ReconcileWeekday: cfg.ReconcileWeekday, FinalDay: cfg.FinalDay,
-		OrdersFrom: ordersFrom, OrdersTailDays: cfg.OrdersTailDays, AccrualPostingsDays: cfg.AccrualPostingsDays}
+		OrdersFrom: ordersFrom, OrdersTailDays: cfg.OrdersTailDays, AccrualPostingsDays: cfg.AccrualPostingsDays,
+		AccrualPostingsDailyDays: cfg.AccrualPostingsDailyDays}
 	scheduler := planner.NewScheduler(plannerCfg, cfg.PlanEvery, tasks, cabinets, logger, now)
 
 	hostname, _ := os.Hostname()

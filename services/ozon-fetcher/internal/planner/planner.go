@@ -28,10 +28,13 @@ const (
 	KindAccrualPostings = "accrual_postings_tail"
 )
 
-// DefaultAccrualPostingsDays — сколько дней перед сегодня раз в сутки
-// перечитываются начисления по отправлениям: они копятся неделями
-// (доставка, возвраты).
+// DefaultAccrualPostingsDays — сколько дней перед сегодня перечитываются
+// начисления по отправлениям: они копятся неделями (доставка, возвраты).
 const DefaultAccrualPostingsDays = 45
+
+// DefaultAccrualPostingsDailyDays — из них перечитываются каждые сутки;
+// старшие — раз в неделю: квота метода общая для всех клиентов Ozon.
+const DefaultAccrualPostingsDailyDays = 14
 
 // DefaultOrdersFrom — первый день загрузки отправлений: день перекрытия с
 // последней успешной загрузкой Symfony (problem.md §1, 19.10 09:35 МСК).
@@ -53,16 +56,18 @@ type Config struct {
 	FinalDay         int       // число месяца финальной перезагрузки M-2
 	OrdersFrom       time.Time // первый день отправлений (полночь МСК)
 	OrdersTailDays   int       // дней перед сегодня, перечитываемых раз в сутки (смены статусов)
-	// AccrualPostingsDays — дней перед сегодня, в которых раз в сутки
-	// перечитываются начисления по отправлениям.
-	AccrualPostingsDays int
+	// AccrualPostingsDays — дней перед сегодня, в которых перечитываются
+	// начисления по отправлениям: первые AccrualPostingsDailyDays — каждые
+	// сутки, старшие — в дни, когда возраст дня кратен неделе от границы.
+	AccrualPostingsDays      int
+	AccrualPostingsDailyDays int
 }
 
 // DefaultConfig — значения плана.
 func DefaultConfig(loc *time.Location) Config {
 	from, _ := time.ParseInLocation(time.DateOnly, DefaultOrdersFrom, loc)
 	return Config{Location: loc, TailDays: 3, ReconcileWeekday: time.Monday, FinalDay: 10, OrdersFrom: from, OrdersTailDays: DefaultOrdersTailDays,
-		AccrualPostingsDays: DefaultAccrualPostingsDays}
+		AccrualPostingsDays: DefaultAccrualPostingsDays, AccrualPostingsDailyDays: DefaultAccrualPostingsDailyDays}
 }
 
 // Refresh — проход с перезагрузкой кабинета, выполняемый один раз за RunDate.
@@ -173,7 +178,13 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				if d.Before(ordersFrom) {
 					break
 				}
-				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityRoutine, true, now))
+				if i > cfg.AccrualPostingsDailyDays && (i-cfg.AccrualPostingsDailyDays)%7 != 0 {
+					continue
+				}
+				// Низкий приоритет: при сплошных 429 общей квоты метода задача
+				// уходит в конец очереди по next_run_at и не занимает слот
+				// кабинета раньше догона других ресурсов.
+				accrualPostings.Specs = append(accrualPostings.Specs, spec(cab.Ref, executor.ResourceAccrualPostings, d.Format(time.DateOnly), PriorityBackfill, true, now))
 			}
 		}
 		// Каталог — снимок дня: только сегодня, без перечитывания (прошлое не

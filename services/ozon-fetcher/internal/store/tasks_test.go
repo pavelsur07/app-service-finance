@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -801,4 +802,40 @@ func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	empty, err := tasks.Coverage(ctx, nil, "2026-08-01", "2026-10-31")
 	require.NoError(t, err)
 	assert.Empty(t, empty)
+}
+
+func TestMigrationLowersAccrualPostingsPriority(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	accrual := spec("a", "ozon.finance.accrual-postings", "2026-10-20", 5)
+	orders := spec("a", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{accrual, orders}))
+
+	up, err := migrationsFS.ReadFile("migrations/00005_accrual_postings_priority.sql")
+	require.NoError(t, err)
+	body, _, _ := strings.Cut(string(up), "-- +goose Down")
+	_, err = tasks.pool.Exec(ctx, body)
+	require.NoError(t, err)
+
+	priority := func(s TaskSpec) int {
+		var p int
+		require.NoError(t, tasks.pool.QueryRow(ctx, `SELECT priority FROM fetch_task WHERE connection_ref=$1 AND resource_type=$2 AND period_key=$3`,
+			s.ConnectionRef, s.ResourceType, s.PeriodKey).Scan(&p))
+		return p
+	}
+	assert.Equal(t, 1, priority(accrual))
+	assert.Equal(t, 5, priority(orders), "другие ресурсы не трогаются")
+}
+
+func TestRateLimitedTaskYieldsToReadyTaskOfSamePriority(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	accrual := spec("a", "ozon.finance.accrual-postings", "2026-10-20", 1)
+	accrual.RunAt = t0.Add(time.Second) // повтор после 429 с Retry-After
+	backfill := spec("a", "ozon.finance.accrual-by-day", "2026-10-01", 1)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{accrual, backfill}))
+
+	got, err := claim(t, tasks, []string{"a"}, t0.Add(2*time.Second))
+	require.NoError(t, err)
+	assert.Equal(t, backfill.TaskKey, got.TaskKey, "догон кабинета не ждёт за 429 общей квоты")
 }

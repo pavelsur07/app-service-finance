@@ -148,12 +148,13 @@ func TestAccrualPostingsEnsureUntilYesterdayAndDailyWindow(t *testing.T) {
 	tail := refresh(p, KindAccrualPostings)
 	require.NotNil(t, tail)
 	window := periods(tail.Specs, executor.ResourceAccrualPostings)
-	require.Len(t, window, 45)
+	require.Len(t, window, 18, "14 дней ежедневно + 4 недельных")
 	assert.Equal(t, "2026-10-20", window[0])
-	assert.Equal(t, "2026-09-06", window[44])
+	assert.Equal(t, "2026-10-07", window[13], "возраст 14 — последний ежедневный")
+	assert.Equal(t, []string{"2026-09-30", "2026-09-23", "2026-09-16", "2026-09-09"}, window[14:], "возраст 21, 28, 35, 42")
 	for _, s := range tail.Specs {
 		assert.True(t, s.Refresh)
-		assert.Equal(t, PriorityRoutine, s.Priority)
+		assert.Equal(t, PriorityBackfill, s.Priority, "429 общей квоты не опережают догон других ресурсов")
 	}
 }
 
@@ -165,4 +166,23 @@ func TestAccrualPostingsNotPlannedWithoutResourceAndNotBeforeOrdersFrom(t *testi
 	p = Build(at("2026-10-21 12:00"), []connections.Cabinet{seller("a", executor.ResourceOrdersFBO, executor.ResourceAccrualPostings)}, DefaultConfig(msk))
 	assert.Equal(t, []string{"2026-10-18", "2026-10-19", "2026-10-20"}, periods(p.Ensure, executor.ResourceAccrualPostings))
 	assert.Equal(t, []string{"2026-10-20", "2026-10-19", "2026-10-18"}, periods(refresh(p, KindAccrualPostings).Specs, executor.ResourceAccrualPostings))
+}
+
+func TestAccrualPostingsOlderDaysRefreshWeekly(t *testing.T) {
+	cfg := DefaultConfig(msk)
+	cfg.OrdersFrom = time.Date(2026, 8, 1, 0, 0, 0, 0, msk)
+	cabs := []connections.Cabinet{seller("a", executor.ResourceOrdersFBO, executor.ResourceAccrualPostings)}
+	target := "2026-09-20"
+	var hits []string
+	for d := 0; d < 31; d++ {
+		now := time.Date(2026, 10, 5, 0, 20, 0, 0, msk).AddDate(0, 0, d)
+		if specFor(refresh(Build(now, cabs, cfg), KindAccrualPostings).Specs, executor.ResourceAccrualPostings, target) != nil {
+			hits = append(hits, now.Format(time.DateOnly))
+		}
+	}
+	assert.Equal(t, []string{"2026-10-11", "2026-10-18", "2026-10-25", "2026-11-01"}, hits, "возраст 21, 28, 35, 42 — раз в неделю")
+
+	cfg.AccrualPostingsDailyDays = 45
+	window := periods(refresh(Build(at("2026-10-21 00:20"), cabs, cfg), KindAccrualPostings).Specs, executor.ResourceAccrualPostings)
+	assert.Len(t, window, 45, "все дни ежедневно")
 }

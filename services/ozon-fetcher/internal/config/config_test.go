@@ -154,7 +154,7 @@ func TestLoadMaxParallel(t *testing.T) {
 
 func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 	clear := func(t *testing.T) {
-		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "ACCRUAL_POSTINGS_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
+		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "ACCRUAL_POSTINGS_DAYS", "ACCRUAL_POSTINGS_DAILY_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
 			t.Setenv(k, "")
 		}
 	}
@@ -167,8 +167,8 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		if cfg.TailDays != 3 || cfg.FinalDay != 10 || cfg.ReconcileWeekday != time.Monday || cfg.PlanEvery != time.Hour {
 			t.Errorf("defaults = %+v", cfg)
 		}
-		if cfg.AccrualPostingsDays != 45 {
-			t.Errorf("accrual postings days = %d", cfg.AccrualPostingsDays)
+		if cfg.AccrualPostingsDays != 45 || cfg.AccrualPostingsDailyDays != 14 {
+			t.Errorf("accrual postings days = %d/%d", cfg.AccrualPostingsDays, cfg.AccrualPostingsDailyDays)
 		}
 		if cfg.OrdersFrom != "2026-10-18" || cfg.OrdersTailDays != 30 {
 			t.Errorf("orders defaults = %q %d", cfg.OrdersFrom, cfg.OrdersTailDays)
@@ -178,17 +178,19 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		}
 	})
 	for name, env := range map[string][2]string{
-		"tail too big":     {"TAIL_DAYS", "40"},
-		"final day 31":     {"FINAL_DAY", "31"},
-		"weekday 7":        {"RECONCILE_WEEKDAY", "7"},
-		"plan every short": {"PLAN_EVERY", "10s"},
-		"ozon url":         {"OZON_BASE_URL", "api-seller.ozon.ru"},
-		"orders from bad":  {"ORDERS_FROM", "18.10.2026"},
-		"orders from next": {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
-		"orders tail big":  {"ORDERS_TAIL_DAYS", "61"},
-		"orders tail zero": {"ORDERS_TAIL_DAYS", "0"},
-		"accrual days big": {"ACCRUAL_POSTINGS_DAYS", "91"},
-		"accrual days 0":   {"ACCRUAL_POSTINGS_DAYS", "0"},
+		"tail too big":      {"TAIL_DAYS", "40"},
+		"final day 31":      {"FINAL_DAY", "31"},
+		"weekday 7":         {"RECONCILE_WEEKDAY", "7"},
+		"plan every short":  {"PLAN_EVERY", "10s"},
+		"ozon url":          {"OZON_BASE_URL", "api-seller.ozon.ru"},
+		"orders from bad":   {"ORDERS_FROM", "18.10.2026"},
+		"orders from next":  {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
+		"orders tail big":   {"ORDERS_TAIL_DAYS", "61"},
+		"orders tail zero":  {"ORDERS_TAIL_DAYS", "0"},
+		"accrual days big":  {"ACCRUAL_POSTINGS_DAYS", "91"},
+		"accrual days 0":    {"ACCRUAL_POSTINGS_DAYS", "0"},
+		"accrual daily 0":   {"ACCRUAL_POSTINGS_DAILY_DAYS", "0"},
+		"accrual daily big": {"ACCRUAL_POSTINGS_DAILY_DAYS", "91"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			clear(t)

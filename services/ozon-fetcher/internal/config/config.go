@@ -46,8 +46,10 @@ type Config struct {
 	// Отправления: первый день (YYYY-MM-DD, МСК) и хвост перезагрузки.
 	OrdersFrom     string
 	OrdersTailDays int
-	// Начисления по отправлениям: дней перед сегодня, перечитываемых раз в сутки.
-	AccrualPostingsDays int
+	// Начисления по отправлениям: дней перед сегодня, перечитываемых; из них
+	// первые AccrualPostingsDailyDays — каждые сутки, остальные — раз в неделю.
+	AccrualPostingsDays      int
+	AccrualPostingsDailyDays int
 
 	// GlitchTip (Sentry-протокол): пустой DSN — ошибки только в лог.
 	SentryDSN         string
@@ -64,29 +66,30 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		ListenAddr:              os.Getenv("LISTEN_ADDR"),
-		DBDSN:                   os.Getenv("DB_DSN"),
-		SymfonyBaseURL:          os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
-		InternalAuthToken:       os.Getenv("INTERNAL_AUTH_TOKEN"),
-		ServiceAPIToken:         os.Getenv("SERVICE_API_TOKEN"),
-		ConnectionsPollInterval: defaultPollInterval,
-		MaxParallelConnections:  defaultMaxParallel,
-		OzonBaseURL:             envOr("OZON_BASE_URL", "https://api-seller.ozon.ru"),
-		TailDays:                3,
-		ReconcileWeekday:        time.Monday,
-		FinalDay:                10,
-		PlanEvery:               time.Hour,
-		OrdersFrom:              "2026-10-18",
-		OrdersTailDays:          30,
-		AccrualPostingsDays:     45,
-		SentryDSN:               os.Getenv("SENTRY_DSN"),
-		SentryRelease:           os.Getenv("SENTRY_RELEASE"),
-		SentryEnvironment:       envOr("SENTRY_ENVIRONMENT", "prod"),
-		S3Endpoint:              os.Getenv("S3_ENDPOINT"),
-		S3Region:                os.Getenv("S3_REGION"),
-		S3Bucket:                os.Getenv("S3_BUCKET"),
-		S3AccessKeyID:           os.Getenv("S3_ACCESS_KEY_ID"),
-		S3SecretAccessKey:       os.Getenv("S3_SECRET_ACCESS_KEY"),
+		ListenAddr:               os.Getenv("LISTEN_ADDR"),
+		DBDSN:                    os.Getenv("DB_DSN"),
+		SymfonyBaseURL:           os.Getenv("SYMFONY_INTERNAL_BASE_URL"),
+		InternalAuthToken:        os.Getenv("INTERNAL_AUTH_TOKEN"),
+		ServiceAPIToken:          os.Getenv("SERVICE_API_TOKEN"),
+		ConnectionsPollInterval:  defaultPollInterval,
+		MaxParallelConnections:   defaultMaxParallel,
+		OzonBaseURL:              envOr("OZON_BASE_URL", "https://api-seller.ozon.ru"),
+		TailDays:                 3,
+		ReconcileWeekday:         time.Monday,
+		FinalDay:                 10,
+		PlanEvery:                time.Hour,
+		OrdersFrom:               "2026-10-18",
+		OrdersTailDays:           30,
+		AccrualPostingsDays:      45,
+		AccrualPostingsDailyDays: 14,
+		SentryDSN:                os.Getenv("SENTRY_DSN"),
+		SentryRelease:            os.Getenv("SENTRY_RELEASE"),
+		SentryEnvironment:        envOr("SENTRY_ENVIRONMENT", "prod"),
+		S3Endpoint:               os.Getenv("S3_ENDPOINT"),
+		S3Region:                 os.Getenv("S3_REGION"),
+		S3Bucket:                 os.Getenv("S3_BUCKET"),
+		S3AccessKeyID:            os.Getenv("S3_ACCESS_KEY_ID"),
+		S3SecretAccessKey:        os.Getenv("S3_SECRET_ACCESS_KEY"),
 	}
 	if cfg.ListenAddr == "" {
 		cfg.ListenAddr = ":8080"
@@ -162,6 +165,7 @@ func loadPlanner(cfg *Config) error {
 		{"FINAL_DAY", 1, 28, &cfg.FinalDay},
 		{"ORDERS_TAIL_DAYS", 1, 60, &cfg.OrdersTailDays},
 		{"ACCRUAL_POSTINGS_DAYS", 1, 90, &cfg.AccrualPostingsDays},
+		{"ACCRUAL_POSTINGS_DAILY_DAYS", 1, 90, &cfg.AccrualPostingsDailyDays},
 	}
 	for _, v := range ints {
 		raw := os.Getenv(v.name)
