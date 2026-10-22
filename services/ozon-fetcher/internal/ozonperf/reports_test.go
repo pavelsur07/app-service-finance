@@ -1,8 +1,10 @@
 package ozonperf
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -126,4 +128,16 @@ func TestRedirectSchemeDowngradeIsRefused(t *testing.T) {
 	assert.Error(t, c.http.CheckRedirect(req, nil), "https → http — Bearer открытым текстом")
 	same, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api-performance.ozon.ru/file.zip", nil)
 	assert.NoError(t, c.http.CheckRedirect(same, nil))
+}
+
+func TestTokenNotFoundIsNotReportFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) }))
+	t.Cleanup(srv.Close)
+	c := NewClient(srv.URL, srv.Client(), slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), time.Now)
+
+	_, err := c.ReportStatus(context.Background(), testCreds, "conn-1", "u-1")
+
+	var apiErr *ozon.APIError
+	require.ErrorAs(t, err, &apiErr, "404 токена — не «отчёт пропал»")
+	assert.Equal(t, EndpointToken, apiErr.Endpoint)
 }
