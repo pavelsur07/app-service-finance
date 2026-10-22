@@ -322,7 +322,7 @@ git revert <commit-sha-of-quarantine>
 
 ## 12. Next step
 
-Отдельная задача «Legacy Quarantine Execute» (`legacy-quarantine-execute.md`) выполняет план из раздела 7 и проходит smoke из раздела 8 в ветке `chore/legacy-quarantine`.
+Отдельная задача «Legacy Quarantine Execute» выполнила план из раздела 7 и проходит smoke из раздела 8 в ветке `chore/legacy-quarantine`.
 
 ---
 
