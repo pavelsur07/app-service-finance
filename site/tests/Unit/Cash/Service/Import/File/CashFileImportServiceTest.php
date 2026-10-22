@@ -101,8 +101,8 @@ final class CashFileImportServiceTest extends TestCase
 
         $transactionRepository = $this->createMock(CashTransactionRepository::class);
         $transactionRepository
-            ->method('existsByCompanyAndDedupe')
-            ->willReturn(false);
+            ->method('countActiveByCompanyDedupeGroupedByDocNumber')
+            ->willReturn([]);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager

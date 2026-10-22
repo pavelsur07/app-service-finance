@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\MessageHandler\Import;
 
 use App\Cash\Entity\Import\CashFileImportJob;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\ImportLogger;
@@ -14,21 +15,75 @@ use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 
+/**
+ * Фазы: захват задания (queued → processing, свой commit) → импорт пачками → финализация.
+ * Задания одного счёта не идут параллельно: CashImportAccountLock берётся до захвата и
+ * держится до финализации. Занято — задание не трогается, сообщение повторяется через
+ * RETRY_DELAY_MS. Задание в processing при свободной блокировке брошено умершим воркером
+ * (сессионная блокировка снялась вместе с его соединением) — импорт продолжается: дедуп по
+ * количеству дописывает только недостающее.
+ */
 #[AsMessageHandler]
 final class CashFileImportHandler
 {
+    private const RETRY_DELAY_MS = 60_000;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CashFileImportService $importService,
         private readonly ManagerRegistry $managerRegistry,
         private readonly ImportLogger $importLogger,
         private readonly LoggerInterface $logger,
+        private readonly CashImportAccountLock $accountLock,
     ) {
     }
 
     public function __invoke(CashFileImportMessage $message): void
     {
+        $job = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
+        if (!$job instanceof CashFileImportJob) {
+            return;
+        }
+
+        if (!\in_array($job->getStatus(), [CashFileImportJob::STATUS_QUEUED, CashFileImportJob::STATUS_PROCESSING], true)) {
+            $this->logSkipped($message, $job);
+
+            return;
+        }
+
+        $companyId = (string) $job->getCompany()->getId();
+        $accountId = (string) $job->getMoneyAccount()->getId();
+
+        if (!$this->accountLock->tryAcquire($companyId, $accountId)) {
+            $this->logger->warning('Cash file import deferred: another import of the account is running', [
+                'jobId' => $message->getJobId(),
+                'companyId' => $companyId,
+            ]);
+
+            throw new RecoverableMessageHandlingException('Импорт в этот счёт уже выполняется.', 0, null, self::RETRY_DELAY_MS);
+        }
+
+        try {
+            $this->process($message);
+        } finally {
+            try {
+                $this->accountLock->release($companyId, $accountId);
+            } catch (\Throwable $exception) {
+                // Соединение потеряно — PostgreSQL снял сессионную блокировку сам.
+                $this->logger->warning('Cash file import: account lock release failed', [
+                    'jobId' => $message->getJobId(),
+                    'companyId' => $companyId,
+                    'exceptionClass' => $exception::class,
+                ]);
+            }
+        }
+    }
+
+    private function process(CashFileImportMessage $message): void
+    {
+        $resumed = false;
         $this->entityManager->beginTransaction();
 
         try {
@@ -42,21 +97,21 @@ final class CashFileImportHandler
 
                 return;
             }
+            // Сущность загружена до блокировки счёта: статус мог смениться, пока ждали.
+            $this->entityManager->refresh($job);
 
-            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
+            if (CashFileImportJob::STATUS_QUEUED === $job->getStatus()) {
+                $job->start();
+                $this->entityManager->flush();
+            } elseif (CashFileImportJob::STATUS_PROCESSING === $job->getStatus()) {
+                $resumed = true;
+            } else {
                 $this->entityManager->commit();
-                // Повторная доставка уже взятой задачи: молчаливый выход здесь
-                // прятал 66 зависших в processing задач на проде.
-                $this->logger->warning('Cash file import skipped: job is not queued', [
-                    'jobId' => $message->getJobId(),
-                    'status' => $job->getStatus(),
-                ]);
+                $this->logSkipped($message, $job);
 
                 return;
             }
 
-            $job->start();
-            $this->entityManager->flush();
             $this->entityManager->commit();
         } catch (\Throwable $exception) {
             $this->entityManager->rollback();
@@ -66,12 +121,22 @@ final class CashFileImportHandler
 
         $companyId = (string) $job->getCompany()->getId();
         $logContext = ['jobId' => $message->getJobId(), 'companyId' => $companyId];
-        $this->logger->info('Cash file import started', $logContext);
+        if ($resumed) {
+            $this->logger->warning('Cash file import resumed: job was abandoned in processing', $logContext);
+        } else {
+            $this->logger->info('Cash file import started', $logContext);
+        }
 
         $importException = null;
 
         try {
             $this->importService->import($job);
+            if ($resumed) {
+                // Прежний воркер мог умереть после последней пачки, но до пересчёта остатков:
+                // тогда импорт выше ничего не создаёт и пересчёт пропускает. Добираем диапазон
+                // всех строк задания с первого старта.
+                $this->importService->recalculateCommittedRows($job);
+            }
         } catch (\Throwable $exception) {
             $importException = $exception;
         }
@@ -134,5 +199,14 @@ final class CashFileImportHandler
                 'exceptionClass' => $recalcException::class,
             ]);
         }
+    }
+
+    private function logSkipped(CashFileImportMessage $message, CashFileImportJob $job): void
+    {
+        // Повторная доставка завершённой задачи — ничего не делаем.
+        $this->logger->warning('Cash file import skipped: job is already finished', [
+            'jobId' => $message->getJobId(),
+            'status' => $job->getStatus(),
+        ]);
     }
 }

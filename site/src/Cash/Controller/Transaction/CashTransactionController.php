@@ -330,8 +330,10 @@ class CashTransactionController extends AbstractController
 
         $dto = new CashTransactionDTO();
         $dto->occurredAt = new \DateTimeImmutable('today');
+        // Ключ повтора выдаётся при показе формы: двойная отправка не создаёт вторую транзакцию.
+        $dto->idempotencyKey = Uuid::uuid7()->toString();
 
-        $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company]);
+        $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company, 'idempotency_key' => true]);
 
         $form->handleRequest($request);
 

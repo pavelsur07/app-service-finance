@@ -202,18 +202,33 @@ class CashTransactionRepository extends ServiceEntityRepository
             : null;
     }
 
-    public function existsByCompanyAndDedupe(string $companyId, string $dedupeHash): bool
+    /**
+     * Неудалённые транзакции компании с эвристическим dedupe_hash (дата, сумма, назначение),
+     * разложенные по номеру документа (пустой номер — ''). Файловый импорт снимает это один раз
+     * на хеш и расходует совпадения строками файла.
+     *
+     * @return array<string, int> номер документа → сколько транзакций
+     */
+    public function countActiveByCompanyDedupeGroupedByDocNumber(string $companyId, string $dedupeHash): array
     {
-        return (bool) $this->createQueryBuilder('t')
-            ->select('1')
-            ->andWhere('IDENTITY(t.company) = :companyId')
-            ->andWhere('t.dedupeHash = :dedupeHash')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setMaxResults(1)
-            ->setParameter('companyId', $companyId)
-            ->setParameter('dedupeHash', $dedupeHash)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            <<<'SQL'
+SELECT COALESCE(BTRIM(doc_number), '') AS doc_number, COUNT(*) AS n
+FROM cash_transaction
+WHERE company_id = :company_id
+  AND dedupe_hash = :dedupe_hash
+  AND deleted_at IS NULL
+GROUP BY 1
+SQL,
+            ['company_id' => $companyId, 'dedupe_hash' => $dedupeHash],
+        );
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row['doc_number']] = (int) $row['n'];
+        }
+
+        return $counts;
     }
 
     public function findOneByCompanyImportSourceExternalId(string $companyId, string $importSource, string $externalId): ?CashTransaction

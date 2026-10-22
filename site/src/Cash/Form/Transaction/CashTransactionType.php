@@ -21,6 +21,7 @@ use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -98,6 +99,10 @@ class CashTransactionType extends AbstractType
             ])
             ->add('description', TextareaType::class, ['required' => false]);
 
+        if ($options['idempotency_key']) {
+            $builder->add('idempotencyKey', HiddenType::class);
+        }
+
         $builder->addEventListener(FormEvents::SUBMIT, static function (FormEvent $event) use ($company) {
             /** @var CashTransactionDTO $data */
             $data = $event->getData();
@@ -148,7 +153,10 @@ class CashTransactionType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => CashTransactionDTO::class,
+            // Только форма создания: ключ повтора = ID будущей транзакции.
+            'idempotency_key' => false,
         ]);
+        $resolver->setAllowedTypes('idempotency_key', 'bool');
         // company обязателен: виджет контрагента требует валидный company_id,
         // а пустая строка раньше молча давала пустой список.
         $resolver->setRequired('company');
