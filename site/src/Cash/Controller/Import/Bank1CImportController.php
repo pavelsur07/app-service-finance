@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Controller\Import;
 
 use App\Cash\Domain\Identifier\CanonicalUuid;
+use App\Cash\Exception\CashImportAccountBusyException;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountMasker;
 use App\Cash\Service\Import\ClientBank1CImportService;
@@ -372,6 +373,11 @@ class Bank1CImportController extends AbstractController
                 'preview' => false,
                 'import_log' => $importLog,
             ]);
+        } catch (CashImportAccountBusyException $exception) {
+            // Предпросмотр в сессии сохраняется: импорт можно повторить, когда счёт освободится.
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute('cash_bank1c_import_preview', [], 303);
         } finally {
             $this->importLogger->finish($importLog);
         }

@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Cash\Service\Import;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
@@ -88,6 +89,7 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
             $this->em,
             $this->accountBalanceService,
             self::getContainer()->get(CashTransactionResponsibilityCenterResolver::class),
+            self::getContainer()->get(CashImportAccountLock::class),
         );
     }
 }

@@ -10,6 +10,7 @@ use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Bank\BankImportCursor;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -21,6 +22,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -29,8 +31,60 @@ use Ramsey\Uuid\Uuid;
 
 final class BankImportServiceTest extends TestCase
 {
+    private string $projectId;
+    private string $centerId;
+
+    protected function setUp(): void
+    {
+        $this->projectId = Uuid::uuid4()->toString();
+        $this->centerId = Uuid::uuid4()->toString();
+    }
+
     #[DataProvider('currencyProvider')]
     public function testProviderImportValidatesCurrencyAgainstAccount(string $currency, int $expectedTransactions): void
+    {
+        $persistedTransactions = $this->import([[$this->bankTransaction('bank-tx-1', $currency)]]);
+
+        self::assertCount($expectedTransactions, $persistedTransactions);
+        if (1 === $expectedTransactions) {
+            self::assertSame($this->projectId, $persistedTransactions[0]->getProjectDirection()?->getId());
+            self::assertSame($this->centerId, $persistedTransactions[0]->getResponsibilityCenterId());
+        }
+    }
+
+    /**
+     * Регрессия: строка дня, записанная с первой страницы, до flush() дня не видна в БД — тот же
+     * uuid на второй странице создавался повторно, flush() падал на уникальном индексе импорта, и
+     * день с курсором повторялся на каждом прогоне.
+     */
+    public function testSameUuidOnNextPageOfDayIsImportedOnce(): void
+    {
+        $persistedTransactions = $this->import([
+            [$this->bankTransaction('bank-tx-1')],
+            [$this->bankTransaction('bank-tx-1'), $this->bankTransaction('bank-tx-2')],
+        ]);
+
+        self::assertSame(['bank-tx-1', 'bank-tx-2'], array_map(
+            static fn (CashTransaction $transaction): ?string => $transaction->getExternalId(),
+            $persistedTransactions,
+        ));
+    }
+
+    public function testAccountBeingImportedIsSkipped(): void
+    {
+        $persistedTransactions = $this->import([[$this->bankTransaction('bank-tx-1')]], accountFree: false);
+
+        self::assertSame([], $persistedTransactions);
+    }
+
+    /**
+     * Импорт одного счёта за сегодня: страницы дня отдаются по порядку, затем пусто.
+     *
+     * @param list<list<array<string, mixed>>> $pages
+     *
+     * @return list<CashTransaction>
+     */
+    private function import(array $pages, bool $accountFree = true): array
     {
         $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
         $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Основной', 'RUB');
@@ -39,9 +93,7 @@ final class BankImportServiceTest extends TestCase
         $cursor = new BankImportCursor(Uuid::uuid4()->toString(), $company, 'alfa', '40702810900000000001');
         $cursor->setLastImportedDate(new \DateTimeImmutable('today'));
 
-        $projectId = Uuid::uuid4()->toString();
-        $centerId = Uuid::uuid4()->toString();
-        $systemProject = new ProjectDirection($projectId, $company, 'Общий', ProjectDirection::CODE_GENERAL);
+        $systemProject = new ProjectDirection($this->projectId, $company, 'Общий', ProjectDirection::CODE_GENERAL);
         $persistedTransactions = [];
 
         $cursorRepository = $this->getMockBuilder(BankImportCursorRepository::class)
@@ -80,28 +132,24 @@ final class BankImportServiceTest extends TestCase
                     ]],
                 ],
             ]);
+        $responses = [];
+        foreach ($pages as $index => $transactions) {
+            $response = ['transactions' => $transactions];
+            if ($index < \count($pages) - 1) {
+                $response['_links'] = [['rel' => 'next', 'href' => 'https://bank.test/next']];
+            }
+            $responses[] = $response;
+        }
+        $responses[] = ['transactions' => []];
         $provider
+            ->expects($accountFree ? self::atLeastOnce() : self::never())
             ->method('getTransactions')
-            ->willReturnOnConsecutiveCalls(
-                [
-                    'transactions' => [[
-                        'uuid' => 'bank-tx-1',
-                        'operationDate' => '2026-07-18T10:00:00+00:00',
-                        'amount' => [
-                            'amount' => 1000,
-                            'currencyName' => $currency,
-                        ],
-                        'direction' => 'CREDIT',
-                        'paymentPurpose' => 'Bank import',
-                    ]],
-                ],
-                ['transactions' => []],
-            );
+            ->willReturnOnConsecutiveCalls(...$responses);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager
             ->method('getReference')
-            ->with(ProjectDirection::class, $projectId)
+            ->with(ProjectDirection::class, $this->projectId)
             ->willReturn($systemProject);
         $entityManager
             ->method('persist')
@@ -111,6 +159,9 @@ final class BankImportServiceTest extends TestCase
                 }
             });
 
+        $lockConnection = $this->createMock(Connection::class);
+        $lockConnection->method('fetchOne')->willReturn($accountFree);
+
         $service = new BankImportService(
             $cursorRepository,
             $moneyAccountRepository,
@@ -118,16 +169,30 @@ final class BankImportServiceTest extends TestCase
             $entityManager,
             new NullLogger(),
             new ImportLogger($entityManager),
-            $this->createResolver($projectId, $centerId),
+            $this->createResolver($this->projectId, $this->centerId),
+            new CashImportAccountLock($lockConnection),
         );
 
         $service->importCompany('alfa', $company, $connection, $provider);
 
-        self::assertCount($expectedTransactions, $persistedTransactions);
-        if (1 === $expectedTransactions) {
-            self::assertSame($projectId, $persistedTransactions[0]->getProjectDirection()?->getId());
-            self::assertSame($centerId, $persistedTransactions[0]->getResponsibilityCenterId());
-        }
+        return $persistedTransactions;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function bankTransaction(string $uuid, string $currency = 'RUB'): array
+    {
+        return [
+            'uuid' => $uuid,
+            'operationDate' => '2026-07-18T10:00:00+00:00',
+            'amount' => [
+                'amount' => 1000,
+                'currencyName' => $currency,
+            ],
+            'direction' => 'CREDIT',
+            'paymentPurpose' => 'Bank import',
+        ];
     }
 
     /**

@@ -24,8 +24,8 @@ final readonly class UpdateManualDocumentAction
     }
 
     /**
-     * @param DocumentStatus     $initialStatus статус до применения формы
-     * @param \DateTimeImmutable $initialDate   дата до применения формы
+     * @param DocumentStatus $initialStatus статус до применения формы
+     * @param \DateTimeImmutable $initialDate дата до применения формы
      *
      * @throws \DomainException сумма документа больше остатка транзакции ДДС; транзакция откатывается
      */

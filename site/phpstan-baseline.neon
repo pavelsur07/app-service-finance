@@ -13510,18 +13510,6 @@ parameters:
 			path: src/Deals/Service/DealManager.php
 
 		-
-			message: '#^flush\(\) в App\\Finance\\Application\\Service\\PLSnapshotBuilder\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Finance/Application/Service/PLSnapshotBuilder.php
-
-		-
-			message: '#^flush\(\) в App\\Finance\\Controller\\DocumentController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 3
-			path: src/Finance/Controller/DocumentController.php
-
-		-
 			message: '#^Действие App\\Finance\\Controller\\DocumentController\:\:copy\(\) принимает сущность компании App\\Finance\\Entity\\Document аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
 			identifier: vashfindir.controllerEntityArgument
 			count: 1
@@ -13552,12 +13540,6 @@ parameters:
 			path: src/Finance/Controller/DocumentController.php
 
 		-
-			message: '#^flush\(\) в App\\Finance\\Controller\\PLCategoryController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 2
-			path: src/Finance/Controller/PLCategoryController.php
-
-		-
 			message: '#^Действие App\\Finance\\Controller\\PLCategoryController\:\:delete\(\) принимает сущность компании App\\Finance\\Entity\\PLCategory аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
 			identifier: vashfindir.controllerEntityArgument
 			count: 1
@@ -13568,12 +13550,6 @@ parameters:
 			identifier: vashfindir.controllerEntityArgument
 			count: 1
 			path: src/Finance/Controller/PLCategoryController.php
-
-		-
-			message: '#^flush\(\) в App\\Finance\\Repository\\DocumentRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Finance/Repository/DocumentRepository.php
 
 		-
 			message: '#^flush\(\) в App\\Ingestion\\Application\\Service\\OzonAccrualListingRelinker\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

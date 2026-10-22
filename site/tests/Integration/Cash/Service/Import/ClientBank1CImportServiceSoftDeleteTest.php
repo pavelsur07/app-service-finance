@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Cash\Service\Import;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
@@ -102,6 +103,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
             $this->entityManager,
             $this->accountBalanceService,
             self::getContainer()->get(CashTransactionResponsibilityCenterResolver::class),
+            self::getContainer()->get(CashImportAccountLock::class),
         );
     }
 

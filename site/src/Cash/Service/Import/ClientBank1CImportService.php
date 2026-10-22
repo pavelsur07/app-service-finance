@@ -10,6 +10,8 @@ use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Exception\CashImportAccountBusyException;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
@@ -40,6 +42,7 @@ class ClientBank1CImportService
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
+        private readonly CashImportAccountLock $accountLock,
         #[Autowire(service: 'monolog.logger.import.bank1c')]
         private ?LoggerInterface $logger = null,
     ) {
@@ -197,6 +200,9 @@ class ClientBank1CImportService
     }
 
     // --- import (с добавлением очистки кэша в начале) ---
+    /**
+     * @throws CashImportAccountBusyException в счёт уже идёт другой импорт выписки
+     */
     public function import(array $preview, MoneyAccount $account, bool $overwrite, array $context = []): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -205,6 +211,46 @@ class ClientBank1CImportService
         }
         FiatCurrency::fromCode($account->getCurrency());
 
+        if ((bool) ($context['preview'] ?? false)) {
+            return $this->importRows($preview, $company, $account, $overwrite, $context);
+        }
+
+        // Импорт в счёт сериализован с файловым и банковским: поиск дубля по externalId и вставка
+        // не атомарны, а уникальный индекс импорта 1С не защищает (import_source пуст).
+        $companyId = (string) $company->getId();
+        $accountId = (string) $account->getId();
+        if (!$this->accountLock->tryAcquire($companyId, $accountId)) {
+            $this->logger?->warning('Bank1C import rejected: another import of the account is running', [
+                'company' => $companyId,
+                'account' => $accountId,
+            ]);
+
+            throw new CashImportAccountBusyException('В этот счёт уже идёт импорт выписки. Повторите через минуту.');
+        }
+
+        try {
+            return $this->importRows($preview, $company, $account, $overwrite, $context);
+        } finally {
+            try {
+                $this->accountLock->release($companyId, $accountId);
+            } catch (\Throwable $exception) {
+                // Соединение потеряно — PostgreSQL снял сессионную блокировку сам.
+                $this->logger?->warning('Bank1C import: account lock release failed', [
+                    'company' => $companyId,
+                    'exceptionClass' => $exception::class,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param array<int, mixed>    $preview
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>
+     */
+    private function importRows(array $preview, Company $company, MoneyAccount $account, bool $overwrite, array $context): array
+    {
         // Очистим кэш контрагентов перед стартом импорта
         $this->cpCache = [];
 
