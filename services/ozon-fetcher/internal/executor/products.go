@@ -169,6 +169,8 @@ func (r *taskRun) catalogProductIDs(ctx context.Context, cabinet connections.Cab
 	if err != nil {
 		return nil, err
 	}
+	// Число товаров снимка — для сверки с листингами Symfony (raw на проде не читается).
+	r.log.Info("product list read", slog.String("stage", "fetch"), slog.Int("listed", listed), slog.Int("unique", len(set)), slog.Int64("total", total))
 	if total >= 0 && int64(listed) != total {
 		// Каталог менялся во время обхода; повтор зациклился бы у активного продавца.
 		r.log.Warn("product list: item count differs from total", slog.String("stage", "fetch"),

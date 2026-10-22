@@ -4151,6 +4151,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.54 | 2026-10-22 | Marketplace: каталог товаров Ozon — всем кабинетам с ключом seller (`ozon_fetcher.products_companies: ['*']`) |
 | 2.53 | 2026-10-21 | Marketplace: ресурсы каталога `ozon.products.list` / `ozon.products.info` в снимке кабинетов (параметр `ozon_fetcher.products_companies`); ServiceGateway: строки «Каталог: список товаров», «Каталог: подробности» карты покрытия — только при задачах |
 | 2.52 | 2026-10-21 | Marketplace: ресурс `ozon.finance.accrual-postings` в снимке кабинетов (параметр `ozon_fetcher.accrual_postings_companies`, только с заказами); ServiceGateway: строка «Начисления по отправлениям» карты покрытия |
 | 2.51 | 2026-10-21 | Ingestion: сняты инкрементальные стратегии и cron заказов Ozon (`ozon_orders_fbo`/`ozon_orders_fbs`) — методы списков отключены Ozon (#439, #442), отправления грузит `ozon-fetcher`; обновление статусов (`refresh-statuses`) остаётся |

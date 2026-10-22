@@ -210,6 +210,7 @@ func TestProductInfoUsesListIDsSortedDedupedInChunks(t *testing.T) {
 	assert.Equal(t, []string{numbersFingerprint(idsKeys(all)) + ":" + fmt.Sprint(o.infoCalls[0][999]), ""}, h.tasks.cursors)
 	assert.Equal(t, ResourceProductsInfo, h.raw.puts[0].ResourceType)
 	assert.Contains(t, h.logs.String(), "item count differs from total", "1502 строки против total 1501")
+	assert.Contains(t, h.logs.String(), `"listed":1502,"unique":1501,"total":1501`, "число товаров снимка — в журнале")
 
 	h2, _ := productsHarness(t, &fakeOzon{}, []string{listPage(2, 1, 2), `{"result":{"items":[],"total":0,"last_id":""}}`})
 	assert.Equal(t, "done", h2.exec.Run(context.Background(), task(ResourceProductsInfo, today), productsCabinet, "trace").Outcome)
