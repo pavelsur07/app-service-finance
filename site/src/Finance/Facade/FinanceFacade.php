@@ -341,4 +341,13 @@ final class FinanceFacade
 
         $this->plRegisterUpdater->updateForDocument($document);
     }
+
+    /**
+     * Сбросить кэш дашборда компании после commit транзакции, в которой вызывался
+     * updatePLRegisterForDocument(): сброс внутри транзакции виден раньше новых сумм.
+     */
+    public function invalidatePLRegisterCache(string $companyId): void
+    {
+        $this->plRegisterUpdater->invalidateCacheForCompanyId($companyId);
+    }
 }

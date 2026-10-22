@@ -64,5 +64,9 @@ final class DeletePLDocumentAction
 
             $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
         });
+
+        if (null !== $company) {
+            $this->plRegisterUpdater->invalidateCacheForCompanyId($companyId);
+        }
     }
 }

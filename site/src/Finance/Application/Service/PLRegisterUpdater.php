@@ -68,7 +68,7 @@ final class PLRegisterUpdater
      * Замена окна регистра: DELETE, чтение документов и upsert — одной транзакцией под блокировкой
      * регистра компании. Во внешней транзакции вызывающего (документ + регистр одним commit)
      * DBAL вкладывает её точкой сохранения, блокировка держится до внешнего commit. Без внешней
-     * транзакции окно всё равно заменяется атомарно. flush() здесь нет: записи — DBAL, а UnitOfWork
+     * транзакции окно всё равно заменяется атомарно, и кэш сбрасывается уже после commit. flush() здесь нет: записи — DBAL, а UnitOfWork
      * вызывающего сохраняет он сам.
      */
     private function recalcDays(Company $company, \DateTimeImmutable $fromDay, \DateTimeImmutable $toDay): void
@@ -84,7 +84,18 @@ final class PLRegisterUpdater
             ));
         });
 
+        // Во внешней транзакции это ещё до её commit: владелец сценария повторяет сброс
+        // после commit (invalidateCacheForCompanyId), иначе параллельный запрос дашборда
+        // закеширует старые суммы под новой версией.
         $this->snapshotCacheInvalidator->invalidateForCompany($company);
+    }
+
+    /**
+     * Сброс кэша дашборда после commit транзакции, в которой пересчитан регистр.
+     */
+    public function invalidateCacheForCompanyId(string $companyId): void
+    {
+        $this->snapshotCacheInvalidator->invalidateForCompanyId($companyId);
     }
 
     /**

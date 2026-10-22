@@ -30,7 +30,7 @@ final class CreateDocumentFromTransactionAction
         $companyId = (string) $tx->getCompany()->getId();
         $transactionId = (string) $tx->getId();
 
-        return $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId, $confirmed): CreateDocumentResult {
+        $result = $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId, $confirmed): CreateDocumentResult {
             // Остаток считается по документам транзакции. Вызывающий уже загрузил транзакцию и,
             // возможно, её документы до блокировки — сбрасываем identity map и читаем заново
             // под FOR UPDATE, иначе ожидавший запрос проверит остаток по устаревшей коллекции.
@@ -40,6 +40,12 @@ final class CreateDocumentFromTransactionAction
 
             return $this->create($tx, $confirmed);
         });
+
+        if (null !== $result->documentId) {
+            $this->financeFacade->invalidatePLRegisterCache($companyId);
+        }
+
+        return $result;
     }
 
     private function create(CashTransaction $tx, bool $confirmed): CreateDocumentResult

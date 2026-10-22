@@ -9,6 +9,7 @@ use App\Finance\Application\DTO\PLRegisterRow;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Infrastructure\Query\PLRegisterCompanyRangesQuery;
 use App\Finance\Repository\PLDailyTotalRepository;
+use Doctrine\DBAL\TransactionIsolationLevel;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -21,8 +22,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Сверка регистра ОПиУ с документами без записи: окно компании пересчитывается в памяти тем же
  * кодом, что и `PLRegisterUpdater::recalcRange()`, и сравнивается с `pl_daily_totals` по ключу
- * (день, статья, проект, ЦФО). Обход — по компании и календарному месяцу, после месяца
- * EntityManager очищается.
+ * (день, статья, проект, ЦФО). Обход — по компании и календарному месяцу; месяц читается одним
+ * снимком БД (REPEATABLE READ, откат после чтения), после месяца EntityManager очищается.
  *
  * Строка регистра без статьи, которой нет в документах, — след удаления статьи
  * (`DeletePLCategoryAction` переносит её суммы в «без статьи»): печатается отдельно и сверку не
@@ -94,14 +95,7 @@ final class VerifyPlRegisterCommand extends Command
             $company = ['missing' => 0, 'extra' => 0, 'mismatch' => 0, 'uncategorized' => 0, 'diff' => '0.00', 'days' => []];
 
             foreach ($this->monthWindows($windowFrom, $windowTo) as [$monthFrom, $monthTo]) {
-                $expected = $this->index($this->registerUpdater->calculateRows(
-                    $this->em->getReference(Company::class, $range->companyId)
-                        ?? throw new \LogicException(sprintf('Компания %s не найдена.', $range->companyId)),
-                    $monthFrom,
-                    $monthTo,
-                ));
-                $actual = $this->index($this->dailyTotals->findRowsForRange($range->companyId, $monthFrom, $monthTo));
-                $this->em->clear();
+                [$expected, $actual] = $this->readMonth($range->companyId, $monthFrom, $monthTo);
 
                 $totals['expected'] += \count($expected);
                 $totals['actual'] += \count($actual);
@@ -190,6 +184,40 @@ final class VerifyPlRegisterCommand extends Command
         $io->success('Регистр ОПиУ совпадает с документами.');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Документы и строки регистра месяца — из одного снимка БД (REPEATABLE READ): иначе документ
+     * с регистром, закоммиченные между двумя чтениями, дали бы ложное расхождение. Транзакция
+     * только читает и откатывается; прежний уровень изоляции соединения возвращается.
+     *
+     * @return array{0: array<string, PLRegisterRow>, 1: array<string, PLRegisterRow>}
+     */
+    private function readMonth(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $connection = $this->em->getConnection();
+        $previousIsolation = $connection->getTransactionIsolation();
+
+        $connection->setTransactionIsolation(TransactionIsolationLevel::REPEATABLE_READ);
+        try {
+            $connection->beginTransaction();
+            try {
+                $expected = $this->index($this->registerUpdater->calculateRows(
+                    $this->em->getReference(Company::class, $companyId)
+                        ?? throw new \LogicException(sprintf('Компания %s не найдена.', $companyId)),
+                    $from,
+                    $to,
+                ));
+                $actual = $this->index($this->dailyTotals->findRowsForRange($companyId, $from, $to));
+
+                return [$expected, $actual];
+            } finally {
+                $connection->rollBack();
+                $this->em->clear();
+            }
+        } finally {
+            $connection->setTransactionIsolation($previousIsolation);
+        }
     }
 
     private function parseDay(mixed $value): \DateTimeImmutable|false|null

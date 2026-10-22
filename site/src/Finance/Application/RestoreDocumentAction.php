@@ -50,5 +50,7 @@ final readonly class RestoreDocumentAction
             $day = $document->getDate()->setTime(0, 0);
             $this->plRegisterUpdater->recalcRange($document->getCompany(), $day, $day);
         });
+
+        $this->plRegisterUpdater->invalidateCacheForCompanyId($companyId);
     }
 }

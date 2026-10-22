@@ -30,7 +30,7 @@ final class CreatePnlDocumentFromTransactionAction
         $companyId = (string) $transaction->getCompany()->getId();
         $transactionId = (string) $transaction->getId();
 
-        return $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId): Document {
+        $document = $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId): Document {
             // Вызывающий проверял остаток до блокировки — сбрасываем identity map и читаем
             // транзакцию с документами заново под FOR UPDATE.
             $this->entityManager->clear();
@@ -46,5 +46,9 @@ final class CreatePnlDocumentFromTransactionAction
 
             return $document;
         });
+
+        $this->documents->invalidatePlRegisterCache($companyId);
+
+        return $document;
     }
 }

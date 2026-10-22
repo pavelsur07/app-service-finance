@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Finance;
 
+use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\ProjectDirection;
@@ -151,6 +152,18 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
             'SELECT allocated_amount FROM cash_transaction WHERE id = :id',
             ['id' => $this->transaction->getId()],
         ));
+    }
+
+    public function testDashboardCacheIsInvalidatedAfterCommit(): void
+    {
+        $cache = self::getContainer()->get(SnapshotCacheInvalidator::class);
+        $before = $cache->resolveVersionForCompany($this->document->getCompany());
+
+        $this->softDeleteAction()(self::COMPANY_ID, (string) $this->document->getId());
+
+        // Сброс внутри пересчёта (+1) виден до commit; версия после commit должна уйти дальше,
+        // чтобы кэш, собранный параллельным запросом по старым суммам, стал недостижим.
+        self::assertGreaterThanOrEqual($before + 2, $cache->resolveVersionForCompany($this->document->getCompany()));
     }
 
     public function testSoftDeleteAndRestoreRemoveAndReturnRegisterTotals(): void
