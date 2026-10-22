@@ -7,18 +7,42 @@ namespace App\Cash\Application;
 use App\Cash\Application\DTO\CreateDocumentCommand;
 use App\Cash\Application\DTO\CreateDocumentResult;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Finance\Facade\FinanceFacade;
 use Doctrine\ORM\EntityManagerInterface;
 
+/**
+ * Документ ОПиУ на остаток транзакции ДДС. Проверка остатка, документ и пересчёт регистра — одна
+ * транзакция под блокировкой строки транзакции ДДС: параллельный или повторный запрос ждёт
+ * commit первого и видит остаток 0, а не создаёт второй документ на тот же остаток.
+ */
 final class CreateDocumentFromTransactionAction
 {
     public function __construct(
         private readonly FinanceFacade $financeFacade,
         private readonly EntityManagerInterface $entityManager,
+        private readonly CashTransactionRepository $transactions,
     ) {
     }
 
     public function __invoke(CashTransaction $tx, bool $confirmed): CreateDocumentResult
+    {
+        $companyId = (string) $tx->getCompany()->getId();
+        $transactionId = (string) $tx->getId();
+
+        return $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId, $confirmed): CreateDocumentResult {
+            // Остаток считается по документам транзакции. Вызывающий уже загрузил транзакцию и,
+            // возможно, её документы до блокировки — сбрасываем identity map и читаем заново
+            // под FOR UPDATE, иначе ожидавший запрос проверит остаток по устаревшей коллекции.
+            $this->entityManager->clear();
+            $tx = $this->transactions->findOneByIdAndCompanyIdForUpdate($transactionId, $companyId)
+                ?? throw new \DomainException('Транзакция ДДС не найдена.');
+
+            return $this->create($tx, $confirmed);
+        });
+    }
+
+    private function create(CashTransaction $tx, bool $confirmed): CreateDocumentResult
     {
         if ($tx->isTransfer()) {
             throw new \DomainException('Для переводов нельзя создать документ ОПиУ.');

@@ -13516,12 +13516,6 @@ parameters:
 			path: src/Deals/Service/DealManager.php
 
 		-
-			message: '#^flush\(\) в App\\Finance\\Application\\Service\\PLRegisterUpdater\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 2
-			path: src/Finance/Application/Service/PLRegisterUpdater.php
-
-		-
 			message: '#^flush\(\) в App\\Finance\\Application\\Service\\PLSnapshotBuilder\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1

@@ -33,17 +33,9 @@ final class PLRegisterUpdater
 
     public function updateForDocument(Document $document): void
     {
-        $company = $document->getCompany();
         $day = $document->getDate()->setTime(0, 0);
 
-        $this->clearTotals($company, $day, $day);
-
-        $aggregated = $this->aggregateDocuments($this->loadDocuments($company, $day, $day));
-        $this->persistRows($company, $this->flattenRows($aggregated));
-
-        $this->em->flush();
-
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->recalcDays($document->getCompany(), $day, $day);
     }
 
     public function recalcRange(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
@@ -52,17 +44,7 @@ final class PLRegisterUpdater
             [$from, $to] = [$to, $from];
         }
 
-        $fromDay = $from->setTime(0, 0);
-        $toDay = $to->setTime(0, 0);
-
-        $this->clearTotals($company, $fromDay, $toDay);
-
-        $aggregated = $this->aggregateDocuments($this->loadDocuments($company, $fromDay, $toDay));
-        $this->persistRows($company, $this->flattenRows($aggregated));
-
-        $this->em->flush();
-
-        $this->snapshotCacheInvalidator->invalidateForCompany($company);
+        $this->recalcDays($company, $from->setTime(0, 0), $to->setTime(0, 0));
     }
 
     /**
@@ -80,6 +62,29 @@ final class PLRegisterUpdater
         return $this->flattenRows($this->aggregateDocuments(
             $this->loadDocuments($company, $from->setTime(0, 0), $to->setTime(0, 0)),
         ));
+    }
+
+    /**
+     * Замена окна регистра: DELETE, чтение документов и upsert — одной транзакцией под блокировкой
+     * регистра компании. Во внешней транзакции вызывающего (документ + регистр одним commit)
+     * DBAL вкладывает её точкой сохранения, блокировка держится до внешнего commit. Без внешней
+     * транзакции окно всё равно заменяется атомарно. flush() здесь нет: записи — DBAL, а UnitOfWork
+     * вызывающего сохраняет он сам.
+     */
+    private function recalcDays(Company $company, \DateTimeImmutable $fromDay, \DateTimeImmutable $toDay): void
+    {
+        $companyId = $company->getId()
+            ?? throw new \LogicException('Unable to recalculate PL register without company id.');
+
+        $this->em->getConnection()->transactional(function () use ($company, $companyId, $fromDay, $toDay): void {
+            $this->dailyTotals->acquireRecalculationLock($companyId);
+            $this->clearTotals($company, $fromDay, $toDay);
+            $this->persistRows($company, $this->flattenRows(
+                $this->aggregateDocuments($this->loadDocuments($company, $fromDay, $toDay)),
+            ));
+        });
+
+        $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
     /**

@@ -113,6 +113,46 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
         self::assertSame(100.0, $this->transaction->getAllocatedAmount());
     }
 
+    public function testRestoreSeesDocumentCreatedByConcurrentRequest(): void
+    {
+        $this->softDeleteAction()(self::COMPANY_ID, (string) $this->document->getId());
+        // Коллекция документов транзакции загружена; второй запрос создаёт документ на весь
+        // остаток в обход этого EntityManager.
+        self::assertSame(100.0, $this->transaction->getRemainingAmount());
+        $this->insertDocumentViaDbal((string) $this->transaction->getId(), '100.00');
+
+        try {
+            $this->restoreAction()(self::COMPANY_ID, (string) $this->document->getId());
+            self::fail('Restore must see the concurrently created document and reject over-allocation.');
+        } catch (\DomainException $exception) {
+            self::assertSame('Сумма документа превышает доступный остаток транзакции ДДС.', $exception->getMessage());
+        }
+
+        self::assertNotNull($this->connection->fetchOne(
+            'SELECT deleted_at FROM documents WHERE id = :id',
+            ['id' => $this->document->getId()],
+        ));
+    }
+
+    public function testSoftDeleteRecalculatesAllocationFromFreshDocuments(): void
+    {
+        $operation = $this->document->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        $operation->setAmount('40.00');
+        $this->transaction->recalculateAllocatedAmount();
+        $this->em->flush();
+        self::assertSame(60.0, $this->transaction->getRemainingAmount());
+
+        $this->insertDocumentViaDbal((string) $this->transaction->getId(), '60.00');
+
+        $this->softDeleteAction()(self::COMPANY_ID, (string) $this->document->getId());
+
+        self::assertSame('60.00', $this->connection->fetchOne(
+            'SELECT allocated_amount FROM cash_transaction WHERE id = :id',
+            ['id' => $this->transaction->getId()],
+        ));
+    }
+
     public function testSoftDeleteAndRestoreRemoveAndReturnRegisterTotals(): void
     {
         $project = new ProjectDirection(
@@ -181,6 +221,27 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
         $document->addOperation($operation);
 
         return $document;
+    }
+
+    /**
+     * Документ, созданный «другим запросом»: в БД есть, в коллекции текущего EntityManager — нет.
+     */
+    private function insertDocumentViaDbal(string $transactionId, string $amount): void
+    {
+        $documentId = Uuid::uuid4()->toString();
+        $this->connection->insert('documents', [
+            'id' => $documentId,
+            'company_id' => self::COMPANY_ID,
+            'date' => '2026-08-01 00:00:00',
+            'type' => 'OTHER',
+            'status' => 'ACTIVE',
+            'cash_transaction_id' => $transactionId,
+        ]);
+        $this->connection->insert('document_operations', [
+            'id' => Uuid::uuid4()->toString(),
+            'document_id' => $documentId,
+            'amount' => $amount,
+        ]);
     }
 
     private function softDeleteAction(): SoftDeleteDocumentAction

@@ -350,6 +350,13 @@
 - Exit code ≠ 0 — есть строки «нет в регистре», «лишние со статьёй» или «расходятся суммы». Строка без статьи, которой нет в документах, — след `DeletePLCategoryAction` (суммы удалённой статьи переносятся в «без статьи»): печатается отдельно и сверку не валит.
 - На проде — через `codex-console` (блок команды в `docs/maintenance/codex-console.sh`, аргументы только `--company`/`--from`/`--to` строгого формата).
 
+### Finance: пересчёт регистра ОПиУ — транзакция и блокировка
+
+- `PLRegisterUpdater::updateForDocument()` / `recalcRange()` заменяют окно (DELETE → чтение активных документов → upsert) в `Connection::transactional()` под `PLDailyTotalRepository::acquireRecalculationLock()` — `pg_advisory_xact_lock(hashtext('pl_register'), hashtext(company_id))`. Во внешней транзакции вызывающего DBAL вкладывает её точкой сохранения, блокировка держится до внешнего commit; без внешней транзакции окно всё равно заменяется атомарно. Собственного `flush()` нет: записи регистра — DBAL, UnitOfWork вызывающего сохраняет вызывающий (до вызова — документ читается из БД).
+- Документ и регистр — один commit: `SoftDeleteDocumentAction`, `RestoreDocumentAction`, `DeletePLDocumentAction` (`wrapInTransaction`), Cash-пути — см. «Cash: документ ОПиУ из транзакции ДДС».
+- Удаление и восстановление документа с основанием ДДС берут строку транзакции под `PESSIMISTIC_WRITE` и `refresh()` — распределённая сумма и проверка остатка считаются по свежей коллекции документов.
+- Порядок блокировок: источник (строка `cash_transaction`) → регистр ОПиУ компании. Регистр-блокировку раньше строки транзакции ДДС не берёт никто.
+
 ### Finance: списки «Документы ОПиУ» и «Операции»
 
 - Вкладки раздела: `document_index` (`GET /documents/`, документы), `document_operation_index` (`GET /documents/operations`, `DocumentOperationIndexController`, одна строка — одна `DocumentOperation`), `document_deleted_index`. У роута операций `priority: 10`: у роутов документа `{id}` без требования формата, и `/documents/operations` иначе ушёл бы в `document_show`.
@@ -1750,6 +1757,12 @@ dry-run; каждая компания — своя транзакция; ост
   `Cash\Infrastructure\Twig\MaskingExtension` (`mask_account`) и `MoneyTotalsExtension`
   (`money_totals_widget`, `is_funds_feature_enabled`); аудит изменений `CashTransaction` —
   `Cash\EventSubscriber\Audit\AuditLogSubscriber` (пишет `Shared\Entity\AuditLog`).
+
+### Cash: документ ОПиУ из транзакции ДДС
+
+- `CreateDocumentFromTransactionAction` и `CreatePnlDocumentFromTransactionAction` выполняют проверку остатка, создание документа, `flush()` и `FinanceFacade::updatePLRegisterForDocument()` одним `wrapInTransaction()`.
+- Внутри: `EntityManager::clear()` и `CashTransactionRepository::findOneByIdAndCompanyIdForUpdate()` — вызывающий загрузил транзакцию (и коллекцию документов) до блокировки, поэтому она перечитывается под `FOR UPDATE`. Параллельный или повторный запрос ждёт commit первого и видит остаток 0: отказ «Транзакция уже полностью разнесена» / «Сумма документа должна быть больше нуля», второй документ не создаётся. Ключа повтора нет: оба пути создают документ на весь остаток.
+- Сущность, переданная в Action, после вызова отсоединена (`clear()`): вызывающий использует только её id.
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
@@ -4162,6 +4175,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.63 | 2026-10-22 | Finance/Cash: пересчёт регистра ОПиУ атомарен под `pg_advisory_xact_lock`, без `flush()`; документ из ДДС, удаление и восстановление документа — один commit с регистром под блокировкой строки транзакции ДДС |
 | 2.62 | 2026-10-22 | Finance: read-only сверка регистра ОПиУ `app:finance:verify-pl-register`, `PLRegisterUpdater::calculateRows()`, `PLRegisterRow`, `PLRegisterCompanyRangesQuery` |
 | 2.61 | 2026-10-22 | Marketplace / ServiceGateway: снят `ozon.stocks.week-close` и его строка карты покрытия (подсчёт «только воскресенья» убран) — конец недели — снимок понедельника, «неделя готова» в понедельник 06:00 |
 | 2.60 | 2026-10-22 | Marketplace: реклама Ozon (кампании, расход, дневная статистика) — всем кабинетам с ключом performance (`ozon_fetcher.ads_companies: ['*']`) |
