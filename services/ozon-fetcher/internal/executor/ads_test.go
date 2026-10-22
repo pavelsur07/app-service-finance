@@ -17,9 +17,10 @@ import (
 const perfSecret = "perf-secret-xyz"
 
 type fakePerf struct {
-	creds []ozonperf.Credentials
-	days  []string
-	err   error
+	creds   []ozonperf.Credentials
+	days    []string
+	err     error
+	reports *reportFake
 }
 
 func (f *fakePerf) FetchCampaigns(_ context.Context, creds ozonperf.Credentials, _ string) (ozon.Page, error) {

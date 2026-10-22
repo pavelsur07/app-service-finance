@@ -31,7 +31,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
         self::assertSame('ozon', $cabinet['provider']);
         self::assertSame(['client_id' => 'seller-client', 'api_key' => 'seller-key'], $cabinet['credentials']['seller']);
         self::assertSame(['client_id' => 'perf-client', 'client_secret' => 'perf-secret'], $cabinet['credentials']['performance']);
-        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES], $cabinet['resource_types']);
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES], $cabinet['resource_types']);
         self::assertSame((new \DateTimeImmutable('2026-10-05 10:00:00'))->format(\DateTimeInterface::ATOM), $cabinet['updated_at']);
     }
 
@@ -41,7 +41,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         self::assertSame(self::PERF_B, $cabinet['connection_ref']);
         self::assertNull($cabinet['credentials']['seller']);
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $cabinet['resource_types']);
+        self::assertSame([], $cabinet['resource_types']);
     }
 
     public function testUnusableSellerKeepsItsRefButLosesFinanceResources(): void
@@ -53,7 +53,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         self::assertSame(self::SELLER_A, $cabinet['connection_ref']);
         self::assertNull($cabinet['credentials']['seller']);
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $cabinet['resource_types']);
+        self::assertSame([], $cabinet['resource_types']);
     }
 
     public function testCabinetWithoutUsableCredentialsIsNotServed(): void
@@ -90,7 +90,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         $one = $this->build($rows, [self::COMPANY_A, self::COMPANY_B])['connections'];
         self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ORDERS_RESOURCE_TYPES], $one[0]['resource_types']);
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $one[1]['resource_types'], 'без ключа seller заказов нет');
+        self::assertSame([], $one[1]['resource_types'], 'без ключа seller заказов нет');
     }
 
     public function testAccrualPostingsOnlyForListedCompaniesThatHaveOrders(): void
@@ -128,7 +128,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         $one = array_column($this->build($rows, [], [], [self::COMPANY_A, self::COMPANY_B])['connections'], 'resource_types', 'company_id');
         self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::PRODUCTS_RESOURCE_TYPES], $one[self::COMPANY_A], 'не зависит от заказов');
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $one[self::COMPANY_B], 'без ключа seller каталога нет');
+        self::assertSame([], $one[self::COMPANY_B], 'без ключа seller каталога нет');
         self::assertNotContains('ozon.products.info', $one['dddddddd-0000-7000-8000-00000000000d'], 'компания не в списке');
 
         foreach ($this->build($rows, [], [], [MarketplaceConnectionsSnapshotBuilder::ORDERS_ALL_COMPANIES])['connections'] as $cabinet) {
@@ -153,7 +153,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         $one = array_column($this->build($rows, [], [], [], [self::COMPANY_A, self::COMPANY_B])['connections'], 'resource_types', 'company_id');
         self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::STOCKS_RESOURCE_TYPES], $one[self::COMPANY_A]);
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, $one[self::COMPANY_B], 'без ключа seller остатков нет');
+        self::assertSame([], $one[self::COMPANY_B], 'без ключа seller остатков нет');
         self::assertNotContains('ozon.stocks.week-close', $one['dddddddd-0000-7000-8000-00000000000d'], 'компания не в списке');
     }
 
@@ -170,7 +170,21 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         $one = array_column($this->build($rows, [], [], [], [], [self::COMPANY_A, self::COMPANY_B])['connections'], 'resource_types', 'company_id');
         self::assertSame(MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, $one[self::COMPANY_A], 'без ключа performance рекламы нет');
-        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::PERFORMANCE_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES], $one[self::COMPANY_B]);
+        self::assertSame(MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES, $one[self::COMPANY_B]);
+    }
+
+    public function testAdsReportsOnlyWithAdsForListedCompanies(): void
+    {
+        $rows = [$this->performance(self::PERF_B, self::COMPANY_B)];
+
+        $none = $this->build($rows, [], [], [], [], [self::COMPANY_B])['connections'][0]['resource_types'];
+        self::assertSame(MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES, $none, 'отчёты — по своему списку');
+
+        $reports = $this->build($rows, [], [], [], [], [self::COMPANY_B], [self::COMPANY_B])['connections'][0]['resource_types'];
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_REPORTS_RESOURCE_TYPES], $reports);
+
+        $withoutAds = $this->build($rows, [], [], [], [], [], [self::COMPANY_B])['connections'][0]['resource_types'];
+        self::assertSame([], $withoutAds, 'без рекламы этапа 6 отчётов нет: порции — из её кампаний');
     }
 
     public function testOrdersResourcesForAllCompanies(): void
@@ -193,12 +207,13 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
      * @param list<string> $productsCompanyIds
      * @param list<string> $stocksCompanyIds
      * @param list<string> $adsCompanyIds
+     * @param list<string> $adsReportsCompanyIds
      *
      * @return array<string, mixed>
      */
-    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = [], array $productsCompanyIds = [], array $stocksCompanyIds = [], array $adsCompanyIds = []): array
+    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = [], array $productsCompanyIds = [], array $stocksCompanyIds = [], array $adsCompanyIds = [], array $adsReportsCompanyIds = []): array
     {
-        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds, $productsCompanyIds, $stocksCompanyIds, $adsCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
+        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds, $productsCompanyIds, $stocksCompanyIds, $adsCompanyIds, $adsReportsCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
     }
 
     private function seller(string $id, string $companyId, ?string $clientId = 'seller-client', ?string $secret = 'seller-key', string $updatedAt = '2026-10-01 10:00:00'): ActiveConnectionCredentials

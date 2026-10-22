@@ -13,6 +13,13 @@ import (
 // labelSnapshotMissed — снимок за прошедший день не загружен (WARNING, не ERROR).
 const labelSnapshotMissed = "snapshot_missed"
 
+// Ожидания отчётов рекламы — штатные исходы (INFO).
+const (
+	labelReportPending = "report_pending"
+	labelReportWait    = "report_wait"
+	labelReportBusy    = "report_busy"
+)
+
 // outcome сопоставляет результат загрузки строке таблицы исходов (stage-9.md).
 // Побочные действия (пауза кабинета, стоп ресурса, обновление кабинетов)
 // выполняются здесь же — до записи итога задачи.
@@ -65,6 +72,29 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 	if errors.Is(err, errOrdersRawInvalid) {
 		log.Error("stored orders page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "orders_raw_invalid", ErrorClass: "orders_raw_invalid", NextRunAt: now}
+	}
+	var wait *adsReportWait
+	if errors.As(err, &wait) {
+		return store.Outcome{Status: store.StatusPending, Label: labelReportWait, ErrorClass: labelReportWait, KeepCursor: true, NextRunAt: wait.at}
+	}
+	if errors.Is(err, errAdsReportBusy) {
+		return store.Outcome{Status: store.StatusPending, Label: labelReportBusy, ErrorClass: labelReportBusy, KeepCursor: true, NextRunAt: now.Add(e.cfg.AdsReportBusy)}
+	}
+	if errors.Is(err, errAdsReportPending) {
+		return store.Outcome{Status: store.StatusPending, Label: labelReportPending, ErrorClass: labelReportPending, KeepCursor: true, NextRunAt: now.Add(e.cfg.AdsReportBusy)}
+	}
+	if errors.Is(err, errAdsCampaignsNotLoaded) {
+		return store.Outcome{Status: store.StatusPending, Label: "ads_campaigns_not_loaded", ErrorClass: "ads_campaigns_not_loaded", KeepCursor: true, NextRunAt: now.Add(e.cfg.AdsCampaignsWait)}
+	}
+	if errors.Is(err, errAdsCampaignsRevised) {
+		return e.retryable(task, "ads_campaigns_revised", now, false)
+	}
+	if errors.Is(err, errAdsReportFailed) {
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "report_failed", ErrorClass: "report_failed", NextRunAt: now}
+	}
+	if errors.Is(err, errAdsRawInvalid) {
+		log.Error("stored ads campaigns page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "ads_raw_invalid", ErrorClass: "ads_raw_invalid", NextRunAt: now}
 	}
 	var early *snapshotEarlyError
 	if errors.As(err, &early) {

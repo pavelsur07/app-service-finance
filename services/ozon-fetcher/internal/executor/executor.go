@@ -79,6 +79,8 @@ type TaskStore interface {
 	StopResource(ctx context.Context, resourceType, reason string) error
 	ContentPages(ctx context.Context, key store.TaskKey) (store.Content, error)
 	ReloadWithoutContent(ctx context.Context, key store.TaskKey, now time.Time) (bool, error)
+	SaveCursor(ctx context.Context, key store.TaskKey, attemptID, cursor string) error
+	AdsReportInFlight(ctx context.Context, except store.TaskKey) (bool, error)
 }
 
 // RawReader — чтение сохранённой страницы (зависимые ресурсы).
@@ -122,19 +124,42 @@ type Config struct {
 	NotReadyDelay   map[string]time.Duration
 	ReportPoll      ozon.ReportPoll
 	Location        *time.Location // границы дня отправлений (Europe/Moscow)
+
+	// Отчёты рекламы (ozon-7-ads-reports.md): окно заказа [From; To) после
+	// полуночи МСК, опрос, длина попытки, срок до отказа от отчёта, повтор
+	// после ошибки Ozon, ожидание чужого отчёта аккаунта, ожидание кампаний дня.
+	AdsReportWindowFrom time.Duration
+	AdsReportWindowTo   time.Duration
+	AdsReportPoll       time.Duration
+	AdsReportAttempt    time.Duration
+	AdsReportAbandon    time.Duration
+	AdsReportRetry      time.Duration
+	AdsReportBusy       time.Duration
+	// AdsReportReservation — срок резерва заказа без номера отчёта (исход заказа неизвестен).
+	AdsReportReservation time.Duration
+	AdsCampaignsWait     time.Duration
 }
 
 // DefaultConfig — значения плана (stage-9.md).
 func DefaultConfig() Config {
 	return Config{
-		Lease:           2 * time.Minute,
-		FinishTimeout:   10 * time.Second,
-		BackoffBase:     time.Minute,
-		BackoffMax:      time.Hour,
-		RateLimitPause:  30 * time.Second,
-		AuthRetryPause:  time.Minute,
-		AuthSuspend:     time.Hour,
-		NoCredentialsIn: time.Hour,
+		Lease:                2 * time.Minute,
+		FinishTimeout:        10 * time.Second,
+		BackoffBase:          time.Minute,
+		BackoffMax:           time.Hour,
+		RateLimitPause:       30 * time.Second,
+		AuthRetryPause:       time.Minute,
+		AuthSuspend:          time.Hour,
+		NoCredentialsIn:      time.Hour,
+		AdsReportWindowFrom:  30 * time.Minute,
+		AdsReportWindowTo:    4 * time.Hour,
+		AdsReportPoll:        30 * time.Second,
+		AdsReportAttempt:     20 * time.Minute,
+		AdsReportAbandon:     3 * time.Hour,
+		AdsReportRetry:       30 * time.Minute,
+		AdsReportBusy:        5 * time.Minute,
+		AdsReportReservation: time.Hour,
+		AdsCampaignsWait:     30 * time.Minute,
 		NotReadyDelay: map[string]time.Duration{
 			ResourceAccrualByDay:     time.Hour,
 			ResourceAccrualTypes:     time.Hour,
@@ -239,6 +264,9 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 		level = slog.LevelWarn
 	case out.Status == store.StatusFailedPermanent:
 		level = slog.LevelError
+	case out.Label == labelReportPending, out.Label == labelReportWait, out.Label == labelReportBusy:
+		// Ожидание отчёта рекламы — штатно.
+		level = slog.LevelInfo
 	}
 	if result.Outcome == "lease_lost" {
 		level = slog.LevelWarn

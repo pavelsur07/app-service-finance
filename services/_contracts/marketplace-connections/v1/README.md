@@ -32,8 +32,9 @@
   `ozon.finance.accrual-postings` — из них компаниям `ozon_fetcher.accrual_postings_companies`;
   `ozon.products.list`, `ozon.products.info` — компаниям `ozon_fetcher.products_companies`;
   `ozon.stocks`, `ozon.stocks.week-close` — компаниям `ozon_fetcher.stocks_companies`;
-  performance → `ozon.ads.statistics`; `ozon.ads.campaigns`, `ozon.ads.expense`,
-  `ozon.ads.daily` — компаниям `ozon_fetcher.ads_companies`.
+  performance → `ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily` — компаниям
+  `ozon_fetcher.ads_companies`; `ozon.ads.statistics`, `ozon.ads.statistics.tail` — из них
+  компаниям `ozon_fetcher.ads_reports_companies`.
 - `updated_at` — максимум из подключений кабинета.
 
 ## Правила

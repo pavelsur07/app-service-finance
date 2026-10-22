@@ -58,6 +58,12 @@ func DefaultConfig() Config {
 			ozonperf.EndpointCampaigns: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozonperf.EndpointExpense:   {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			ozonperf.EndpointDaily:     {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Заказ отчёта — 1 в 120 с на кабинет (разнос как у Symfony); 429 на
+			// заказ исполнитель переносит на следующее окно.
+			ozonperf.EndpointStatistics: {Start: 1.0 / 120, Floor: 1.0 / 120, Ceiling: 1.0 / 120, DefaultPause: 120 * time.Second},
+			// Опрос статуса лимитом Ozon не ограничен (опыт Symfony); скачивание — редко.
+			ozonperf.EndpointStatisticsStatus: {Start: 0.5, Floor: 0.1, Ceiling: 1, DefaultPause: 30 * time.Second},
+			ozonperf.EndpointStatisticsReport: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			// Остатки: 2 запроса на снимок.
 			ozon.EndpointStocks: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		},

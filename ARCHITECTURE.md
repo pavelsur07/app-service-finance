@@ -3527,7 +3527,8 @@ internal_api → stateless, /internal/* для сервисов services/
   `ozon.products.info`) — компаниям `ozon_fetcher.products_companies`, снимки остатков
   (`ozon.stocks`, `ozon.stocks.week-close`) — компаниям `ozon_fetcher.stocks_companies`; ресурсы
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
-  `ozon_fetcher.ads_companies`.
+  `ozon_fetcher.ads_companies`, отчёты по товарам (`ozon.ads.statistics`,
+  `ozon.ads.statistics.tail`) — из них компаниям `ozon_fetcher.ads_reports_companies`.
   Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
@@ -4154,6 +4155,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.60 | 2026-10-22 | Marketplace: реклама Ozon (кампании, расход, дневная статистика) — всем кабинетам с ключом performance (`ozon_fetcher.ads_companies: ['*']`) |
+| 2.59 | 2026-10-22 | Marketplace: `ozon.ads.statistics` и новый `ozon.ads.statistics.tail` — только компаниям `ozon_fetcher.ads_reports_companies` (из тех, кому выдана реклама), не всем кабинетам с performance; ServiceGateway: строки «Реклама: отчёт по товарам», «Реклама: отчёт, хвост 14 дней» |
 | 2.58 | 2026-10-22 | Marketplace: снимки остатков Ozon — всем кабинетам с ключом seller (`ozon_fetcher.stocks_companies: ['*']`) |
 | 2.57 | 2026-10-22 | Marketplace: ресурсы рекламы `ozon.ads.campaigns` / `ozon.ads.expense` / `ozon.ads.daily` в снимке кабинетов (параметр `ozon_fetcher.ads_companies`, ключ performance); ServiceGateway: строки «Реклама: кампании», «Реклама: расход», «Реклама: статистика по дням» карты покрытия — только при задачах |
 | 2.56 | 2026-10-22 | Marketplace: ресурсы остатков `ozon.stocks` / `ozon.stocks.week-close` в снимке кабинетов (параметр `ozon_fetcher.stocks_companies`); ServiceGateway: строки «Остатки: снимок 05:00», «Остатки: отсечка недели» карты покрытия — только при задачах, у отсечки недели считаются только воскресенья |

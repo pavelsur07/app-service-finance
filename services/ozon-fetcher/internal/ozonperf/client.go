@@ -67,8 +67,20 @@ type Client struct {
 }
 
 // NewClient — httpClient с таймаутом настраивает вызывающий (DefaultTimeout).
+// Редирект — только на хост Performance: Bearer не уходит дальше.
 func NewClient(baseURL string, httpClient *http.Client, logger *slog.Logger, now func() time.Time) *Client {
-	return &Client{baseURL: baseURL, http: httpClient, logger: logger, now: now, limiter: noLimit{}, tokens: map[string]*tokenEntry{}}
+	hc := *httpClient
+	base, _ := url.Parse(baseURL)
+	hc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if base == nil || !strings.EqualFold(req.URL.Host, base.Host) || !strings.EqualFold(req.URL.Scheme, base.Scheme) {
+			return errors.New("ozonperf: redirect to another host or scheme")
+		}
+		if len(via) >= 5 {
+			return errors.New("ozonperf: too many redirects")
+		}
+		return nil
+	}
+	return &Client{baseURL: baseURL, http: &hc, logger: logger, now: now, limiter: noLimit{}, tokens: map[string]*tokenEntry{}}
 }
 
 // WithLimiter задаёт ограничение скорости (вызывать до использования).
