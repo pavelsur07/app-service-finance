@@ -1093,14 +1093,19 @@ public function __invoke(string $id, string $companyId, int $expectedVersion, Up
 
 try {
     $this->em->wrapInTransaction(fn () => $this->create($companyId, $key, $cmd));
-} catch (UniqueConstraintViolationException) {
+} catch (UniqueConstraintViolationException $e) {
     // EM закрыт, транзакция откачена. Существующую запись ищем DBAL-запросом,
     // прежний UnitOfWork не используем.
     $id = $this->connection->fetchOne(
         'SELECT id FROM cash_transfer WHERE company_id = :c AND idempotency_key = :k',
         ['c' => $companyId, 'k' => $key],
     );
-    return CreateResult::duplicate($id);
+    if (false === $id) {
+        // Сработал другой unique (например, нога перевода) — это не повтор.
+        throw $e;
+    }
+
+    return CreateResult::duplicate((string) $id);
 }
 ```
 
@@ -1114,7 +1119,10 @@ try {
 Handler сначала проверяет состояние; работа уже сделана — `info` и выход.
 Многофазный Handler — захват статуса отдельным commit, обработка порциями,
 финализация; зависший промежуточный статус снимается по таймауту.
-Образец — `CashFileImportHandler` (`queued` → `processing` → `done/failed`).
+Фазы есть в `CashFileImportHandler` (`queued` → `processing` → `done/failed`),
+но образец неполный: таймаута/lease нет, повторная доставка выходит на любом
+статусе, кроме `queued`, и job, оставшийся в `processing` после падения
+процесса, сам не восстановится.
 
 **3. Повтор эффекта** (событие или пересчёт после commit). `dispatch()` после
 commit теряется при падении между ними, а повтор сценария уходит в ветку

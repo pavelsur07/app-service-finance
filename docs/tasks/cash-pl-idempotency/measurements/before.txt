@@ -335,3 +335,19 @@ group by 1,2 order by 1;
 (2 rows)
 
 
+===== 54_r5_dedupe_docnum.sql [2026-10-22 18:42:21 МСК]
+select coalesce(import_source,'∅') src,
+       case when spread_s <= 60 then '<=60s' else '>60s' end spread,
+       count(*) key_groups, sum(n-1) extra_rows, sum(amount*(n-1)) extra_sum, count(distinct company_id) companies
+from (select company_id, import_source, dedupe_hash, doc_number, count(*) n, max(amount) amount,
+             extract(epoch from max(created_at)-min(created_at)) spread_s
+      from cash_transaction where deleted_at is null and dedupe_hash is not null and coalesce(doc_number,'')<>''
+      group by 1,2,3,4 having count(*)>1) g
+group by 1,2 order by 1,2;
+----- result
+ src | spread | key_groups | extra_rows | extra_sum | companies 
+-----+--------+------------+------------+-----------+-----------
+ ∅   | >60s   |          1 |          1 |  24000.00 |         1
+(1 row)
+
+
