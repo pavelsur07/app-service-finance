@@ -17,7 +17,8 @@ S3, журнал загрузок в своей БД; выдача фактов 
 снимок каталога товаров дня (`ozon.products.list`, `ozon.products.info`) и снимки остатков
 (`ozon.stocks` — 05:00, `ozon.stocks.week-close` — воскресенье 23:30) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
 план загрузки Ozon — [`docs/tasks/marketplace-data-ingestion/plan-ozon.md`](../../docs/tasks/marketplace-data-ingestion/plan-ozon.md).
-Ozon Performance (другой API и авторизация) и другие маркетплейсы — не здесь.
+Реклама Ozon Performance — свой ключ, токен и слот очереди кабинета (`ozon.ads.*`,
+[`docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md`](../../docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md)). Другие маркетплейсы — не здесь.
 
 Статус: **загрузка raw** — кабинеты из Symfony, планировщик, диспетчер,
 исполнитель, raw в S3, журнал в своей БД, `/internal/fetch-status`. Прод —
@@ -97,6 +98,7 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 | `SENTRY_DSN`, `SENTRY_RELEASE`, `SENTRY_ENVIRONMENT` | GlitchTip (на проде — свой проект, секрет `OZON_FETCHER_SENTRY_DSN`): записи ERROR уходят событием (теги `service`, `stage`, `error_class`, `connection_ref`, `resource_type`); пустой DSN — только лог | нет |
 | `CONNECTION_ALLOWLIST` | Только эти кабинеты: `connection_ref` или `company_id` через запятую; пусто — все | этап 14 |
 | `OZON_BASE_URL` | Seller API, по умолчанию `https://api-seller.ozon.ru` (на стенде — мок) | этап 11 |
+| `OZON_PERFORMANCE_BASE_URL` | Performance API (реклама), по умолчанию `https://api-performance.ozon.ru` | этап 6 Ozon |
 | `TAIL_DAYS`, `RECONCILE_WEEKDAY`, `FINAL_DAY`, `PLAN_EVERY` | Окна планировщика: 3, 1 (пн), 10, 1h | этап 11 |
 | `ACCRUAL_POSTINGS_DAYS` | Начисления по отправлениям: сколько дней перед сегодня перечитывать (45, 1…90) | этап 3 Ozon |
 | `ACCRUAL_POSTINGS_DAILY_DAYS` | Из них перечитываются каждые сутки (14, 1…90); старшие — раз в неделю | этап 3 Ozon |

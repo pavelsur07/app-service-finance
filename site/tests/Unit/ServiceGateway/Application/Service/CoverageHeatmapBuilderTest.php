@@ -95,6 +95,11 @@ final class CoverageHeatmapBuilderTest extends TestCase
         }
         self::assertSame('Остатки: снимок 05:00', $rows['ozon.stocks']->title);
         self::assertSame('Остатки: отсечка недели', $rows['ozon.stocks.week-close']->title);
+
+        $ads = $builder->build(self::month('2026-10', [self::cell('ozon.ads.expense', '2026-10-18', 1, 1)]), self::now());
+        $titles = array_map(static fn ($r) => $r->title, $ads->rows);
+        self::assertContains('Реклама: расход', $titles);
+        self::assertNotContains('Реклама: кампании', $titles, 'строка — только при задачах');
         self::assertSame(CoverageHeatmapCell::OK, $rows['ozon.stocks.week-close']->cells[17]->state);
 
         // Один загруженный снимок 18.10 (вес 1000 кабинетов — перевешивает обязательные строки), сейчас 21.10: у ежедневного снимка 19–20.10 — пропуски,

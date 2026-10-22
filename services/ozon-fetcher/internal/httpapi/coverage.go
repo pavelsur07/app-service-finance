@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 )
 
@@ -52,16 +53,27 @@ func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
 		return
 	}
 
-	// Кабинет без ключа Seller API планировщик не загружает — и не ожидается.
+	// Ресурс ожидается у кабинета, только если есть его ключ: seller-ресурсы —
+	// с ключом Seller API, реклама — с ключом Performance.
 	var refs []string
 	expected := map[string]int{}
+	// cabinets_total — кабинеты с ключом Seller: запасное «ожидается» карты
+	// Symfony для отчётов продаж без строк.
+	sellerCabinets := 0
 	for _, cab := range d.Cabinets() {
-		if cab.Seller == nil {
+		if cab.Seller == nil && !cab.HasPerformance {
 			continue
+		}
+		if cab.Seller != nil {
+			sellerCabinets++
 		}
 		refs = append(refs, cab.Ref)
 		seen := map[string]bool{}
 		for _, rt := range cab.ResourceTypes {
+			ads := executor.IsAdsResource(rt)
+			if (ads && !cab.HasPerformance) || (!ads && cab.Seller == nil) {
+				continue
+			}
 			if !seen[rt] {
 				seen[rt] = true
 				expected[rt]++
@@ -81,7 +93,7 @@ func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
 		GeneratedAt:   now.UTC().Format(time.RFC3339),
 		From:          from.Format(time.DateOnly),
 		To:            to.Format(time.DateOnly),
-		CabinetsTotal: len(refs),
+		CabinetsTotal: sellerCabinets,
 		Rows:          toCoverageRows(rows, expected),
 	})
 }

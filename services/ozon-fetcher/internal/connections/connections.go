@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
 )
 
 const (
@@ -27,12 +28,13 @@ const (
 	ForceRefreshMinInterval = 30 * time.Second
 )
 
-// Cabinet — кабинет Ozon. Секрет performance в памяти не держим: сервису он не нужен.
+// Cabinet — кабинет Ozon. Ключи — только в памяти, при печати скрыты.
 type Cabinet struct {
 	Ref            string
 	CompanyID      string
 	UpdatedAt      time.Time
-	Seller         *ozon.Credentials // nil — ключа Seller API нет
+	Seller         *ozon.Credentials     // nil — ключа Seller API нет
+	Performance    *ozonperf.Credentials // nil — ключа Performance API нет
 	HasPerformance bool
 	ResourceTypes  []string
 }
@@ -163,6 +165,7 @@ func toCabinet(w wireCabinet) (Cabinet, bool) {
 		if p.ClientID == "" || p.ClientSecret == "" {
 			return Cabinet{}, false
 		}
+		cab.Performance = &ozonperf.Credentials{ClientID: p.ClientID, ClientSecret: p.ClientSecret}
 		cab.HasPerformance = true
 	}
 	return cab, true
@@ -237,6 +240,10 @@ func (c Cabinet) clone() Cabinet {
 	if c.Seller != nil {
 		seller := *c.Seller
 		c.Seller = &seller
+	}
+	if c.Performance != nil {
+		perf := *c.Performance
+		c.Performance = &perf
 	}
 	c.ResourceTypes = append([]string(nil), c.ResourceTypes...)
 	return c

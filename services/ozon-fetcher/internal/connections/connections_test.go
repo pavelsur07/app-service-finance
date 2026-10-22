@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -53,6 +54,10 @@ func TestParseValidSnapshot(t *testing.T) {
 	b := cabinets[1]
 	assert.Nil(t, b.Seller)
 	assert.True(t, b.HasPerformance)
+	require.NotNil(t, b.Performance)
+	assert.Equal(t, "perf-b", b.Performance.ClientID)
+	assert.Equal(t, "perf-secret-b", b.Performance.ClientSecret, "секрет нужен для токена рекламы")
+	assert.NotContains(t, fmt.Sprintf("%v %+v %#v", b, b, b), "perf-secret-b", "при печати кабинета секрет скрыт")
 }
 
 func TestParseRejectsInvalidSnapshots(t *testing.T) {

@@ -38,6 +38,8 @@ type Config struct {
 
 	// OzonBaseURL — Seller API (на стенде — мок).
 	OzonBaseURL string
+	// OzonPerformanceBaseURL — Performance API (реклама).
+	OzonPerformanceBaseURL string
 	// Планировщик (stage-11.md).
 	TailDays         int
 	ReconcileWeekday time.Weekday
@@ -74,6 +76,7 @@ func Load() (Config, error) {
 		ConnectionsPollInterval:  defaultPollInterval,
 		MaxParallelConnections:   defaultMaxParallel,
 		OzonBaseURL:              envOr("OZON_BASE_URL", "https://api-seller.ozon.ru"),
+		OzonPerformanceBaseURL:   envOr("OZON_PERFORMANCE_BASE_URL", "https://api-performance.ozon.ru"),
 		TailDays:                 3,
 		ReconcileWeekday:         time.Monday,
 		FinalDay:                 10,
@@ -122,6 +125,9 @@ func Load() (Config, error) {
 	}
 	if u, err := url.Parse(cfg.OzonBaseURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return Config{}, errors.New("config: OZON_BASE_URL must be an http(s) URL")
+	}
+	if u, err := url.Parse(cfg.OzonPerformanceBaseURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return Config{}, errors.New("config: OZON_PERFORMANCE_BASE_URL must be an http(s) URL")
 	}
 
 	if cfg.SymfonyBaseURL != "" {

@@ -154,7 +154,7 @@ func TestLoadMaxParallel(t *testing.T) {
 
 func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 	clear := func(t *testing.T) {
-		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "ACCRUAL_POSTINGS_DAYS", "ACCRUAL_POSTINGS_DAILY_DAYS", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
+		for _, k := range []string{"ORDERS_FROM", "ORDERS_TAIL_DAYS", "ACCRUAL_POSTINGS_DAYS", "ACCRUAL_POSTINGS_DAILY_DAYS", "OZON_PERFORMANCE_BASE_URL", "TAIL_DAYS", "FINAL_DAY", "RECONCILE_WEEKDAY", "PLAN_EVERY", "OZON_BASE_URL", "SYMFONY_INTERNAL_BASE_URL", "INTERNAL_AUTH_TOKEN", "S3_BUCKET", "DB_DSN", "CONNECTIONS_POLL_INTERVAL", "MAX_PARALLEL_CONNECTIONS"} {
 			t.Setenv(k, "")
 		}
 	}
@@ -183,6 +183,7 @@ func TestLoadPlannerAndIngestionSettings(t *testing.T) {
 		"weekday 7":         {"RECONCILE_WEEKDAY", "7"},
 		"plan every short":  {"PLAN_EVERY", "10s"},
 		"ozon url":          {"OZON_BASE_URL", "api-seller.ozon.ru"},
+		"perf url":          {"OZON_PERFORMANCE_BASE_URL", "api-performance.ozon.ru"},
 		"orders from bad":   {"ORDERS_FROM", "18.10.2026"},
 		"orders from next":  {"ORDERS_FROM", time.Now().AddDate(0, 0, 2).Format(time.DateOnly)},
 		"orders tail big":   {"ORDERS_TAIL_DAYS", "61"},

@@ -157,6 +157,7 @@ type Executor struct {
 	raw       RawStore
 	rawReader RawReader
 	ozon      Ozon
+	perf      Performance
 	refresher Refresher
 	logger    *slog.Logger
 	now       func() time.Time
@@ -305,6 +306,9 @@ var errNoCredentials = errors.New("executor: no seller credentials")
 var errResourceNotEnabled = errors.New("executor: resource is not enabled for cabinet")
 
 func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error {
+	if IsAdsResource(r.task.ResourceType) {
+		return r.fetchAds(ctx, cabinet)
+	}
 	if cabinet.Seller == nil {
 		return errNoCredentials
 	}
