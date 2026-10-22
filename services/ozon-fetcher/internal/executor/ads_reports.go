@@ -249,8 +249,8 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 			// Окно закончилось в ожидании лимитера или ответа — резерв
 			// остаётся: запрос мог уйти.
 			return &adsReportWait{at: e.nextAdsWindow(e.now()), reason: "order window ended"}
-		case errors.As(err, &apiErr) && apiErr.Status != 0 && apiErr.Class != ozon.ClassTransient:
-			// Ozon ответил отказом — заказа нет, резерв снимается.
+		case errors.As(err, &apiErr) && apiErr.Status >= 400 && apiErr.Status < 500:
+			// Ozon ответил отказом (4xx) — заказа нет, резерв снимается.
 			cur.uuid, cur.orderedAt = "", 0
 			if saveErr := r.saveCursor(ctx, *cur); saveErr != nil {
 				return saveErr
@@ -261,6 +261,11 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 				return &adsReportWait{at: start.AddDate(0, 0, 1), reason: "report order rate limited"}
 			}
 			return err
+		case errors.As(err, &apiErr) && apiErr.Status >= 200 && apiErr.Status < 300:
+			// 2xx без номера отчёта: заказ, вероятно, принят — резерв до срока,
+			// затем заказ заново.
+			r.log.Warn("ads report order accepted without UUID", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+			return &adsReportWait{at: time.Unix(cur.orderedAt, 0).Add(e.cfg.AdsReportReservation), reason: "order outcome unknown"}
 		default:
 			// Сбой сети, 5xx: Ozon мог принять заказ — резерв до срока.
 			return err

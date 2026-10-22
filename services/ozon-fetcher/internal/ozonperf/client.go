@@ -72,8 +72,8 @@ func NewClient(baseURL string, httpClient *http.Client, logger *slog.Logger, now
 	hc := *httpClient
 	base, _ := url.Parse(baseURL)
 	hc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if base == nil || !strings.EqualFold(req.URL.Host, base.Host) {
-			return errors.New("ozonperf: redirect to another host")
+		if base == nil || !strings.EqualFold(req.URL.Host, base.Host) || !strings.EqualFold(req.URL.Scheme, base.Scheme) {
+			return errors.New("ozonperf: redirect to another host or scheme")
 		}
 		if len(via) >= 5 {
 			return errors.New("ozonperf: too many redirects")

@@ -119,3 +119,11 @@ func TestActiveCampaignsNeedKnownNumericMetrics(t *testing.T) {
 	assert.True(t, ok, "пустой день — известная форма")
 	assert.Empty(t, empty)
 }
+
+func TestRedirectSchemeDowngradeIsRefused(t *testing.T) {
+	c := NewClient("https://api-performance.ozon.ru", &http.Client{}, nil, time.Now)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://api-performance.ozon.ru/file.zip", nil)
+	assert.Error(t, c.http.CheckRedirect(req, nil), "https → http — Bearer открытым текстом")
+	same, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api-performance.ozon.ru/file.zip", nil)
+	assert.NoError(t, c.http.CheckRedirect(same, nil))
+}

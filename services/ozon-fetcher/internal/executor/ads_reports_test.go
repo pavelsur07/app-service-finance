@@ -396,3 +396,14 @@ func TestAdsReportEmptyListWithSavedBatchesIsRevision(t *testing.T) {
 	assert.Equal(t, "ads_campaigns_revised", res.Outcome, "служебная страница не дописывается к прежним порциям")
 	assert.Empty(t, h.raw.puts)
 }
+
+func TestAdsReportOrderAcceptedWithoutUUIDKeepsReservation(t *testing.T) {
+	h, p, _ := reportsHarness(t, "2026-10-18 01:30", campaignsBody(3), nil)
+	p.reports.orderErr = &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: ozonperf.EndpointStatistics, Status: 200}
+
+	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
+
+	assert.Equal(t, labelReportWait, res.Outcome, "не постоянный отказ")
+	assert.True(t, h.tasks.finished.NextRunAt.Equal(msk(t, "2026-10-18 02:30")), "до срока резерва")
+	assert.Contains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved)
+}
