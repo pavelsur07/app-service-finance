@@ -315,8 +315,9 @@ func TestAdsReportOrderWithUnknownOutcomeKeepsReservation(t *testing.T) {
 
 	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
 
-	assert.Equal(t, "transient", res.Outcome)
+	assert.Equal(t, labelReportWait, res.Outcome)
 	assert.True(t, h.tasks.finished.KeepCursor)
+	assert.True(t, h.tasks.finished.NextRunAt.Equal(msk(t, "2026-10-18 02:30")))
 	reserved := h.tasks.savedCursors[len(h.tasks.savedCursors)-1]
 	assert.Contains(t, reserved, ":"+reportReserved+":", "Ozon мог принять заказ — аккаунт занят")
 
@@ -405,5 +406,17 @@ func TestAdsReportOrderAcceptedWithoutUUIDKeepsReservation(t *testing.T) {
 
 	assert.Equal(t, labelReportWait, res.Outcome, "не постоянный отказ")
 	assert.True(t, h.tasks.finished.NextRunAt.Equal(msk(t, "2026-10-18 02:30")), "до срока резерва")
+	assert.Contains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved)
+}
+
+func TestAdsReportOrderOversized5xxKeepsReservation(t *testing.T) {
+	h, p, _ := reportsHarness(t, "2026-10-18 01:30", campaignsBody(3), nil)
+	p.reports.orderErr = &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: ozonperf.EndpointStatistics, Status: 500, Err: ozon.ErrBodyTooLarge}
+
+	res := h.exec.Run(context.Background(), reportTask(ResourceAdsStatistics, "2026-10-17"), reportsCabinet, "trace")
+
+	assert.Equal(t, labelReportWait, res.Outcome)
+	assert.NotEqual(t, store.StatusFailedPermanent, h.tasks.finished.Status)
+	assert.True(t, h.tasks.finished.KeepCursor)
 	assert.Contains(t, h.tasks.savedCursors[len(h.tasks.savedCursors)-1], reportReserved)
 }
