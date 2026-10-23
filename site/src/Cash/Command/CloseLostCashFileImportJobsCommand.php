@@ -74,7 +74,8 @@ final class CloseLostCashFileImportJobsCommand extends Command
                     return $result;
                 })
                 : ($this->closeLostJobs)($companyId, $createdBefore, false);
-        } catch (\DomainException $exception) {
+        } catch (\DomainException|\RuntimeException $exception) {
+            // RuntimeException — очередь Redis недоступна: потерю сообщения не доказать.
             $io->error($exception->getMessage().' Изменений нет.');
 
             return Command::FAILURE;

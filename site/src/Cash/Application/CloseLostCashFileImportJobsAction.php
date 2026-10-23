@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Cash\Application;
 
 use App\Cash\Entity\Import\CashFileImportJob;
+use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Закрывает задания файлового импорта, чьё сообщение Messenger потеряно: `queued` дольше порога
- * и сообщения с ID задания нет в failed-транспорте. Само задание такое уже не поднимется.
+ * Закрывает задания файлового импорта, чьё сообщение Messenger потеряно: `queued` дольше порога,
+ * сообщения с ID задания нет ни в failed-транспорте, ни в живой очереди (stream и отложенные
+ * повторы Redis). Само задание такое уже не поднимется. Очередь недоступна — отказ.
  *
  * Транзакцией владеет вызывающая консольная команда: в режиме execute кандидаты берутся
  * под FOR UPDATE.
@@ -24,6 +26,7 @@ final class CloseLostCashFileImportJobsAction
         private readonly Connection $connection,
         private readonly EntityManagerInterface $entityManager,
         private readonly ImportLogger $importLogger,
+        private readonly ImportQueueProbeInterface $queueProbe,
     ) {
     }
 
@@ -55,6 +58,10 @@ final class CloseLostCashFileImportJobsAction
             ],
         );
 
+        $ids = array_map('strval', $ids);
+        $queued = $this->queueProbe->findQueued($ids);
+        $ids = array_values(array_diff($ids, $queued));
+
         if (!$execute) {
             return ['candidates' => \count($ids), 'closed' => 0];
         }
@@ -63,7 +70,7 @@ final class CloseLostCashFileImportJobsAction
         }
 
         foreach ($ids as $id) {
-            $job = $this->entityManager->find(CashFileImportJob::class, (string) $id);
+            $job = $this->entityManager->find(CashFileImportJob::class, $id);
             \assert($job instanceof CashFileImportJob);
             $job->fail(self::FAILURE_MESSAGE);
             $importLog = $job->getImportLog();

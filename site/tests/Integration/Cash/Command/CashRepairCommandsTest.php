@@ -9,6 +9,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
@@ -35,6 +36,27 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 final class CashRepairCommandsTest extends IntegrationTestCase
 {
+    /** @var list<string> ID заданий, чьё сообщение «лежит» в живой очереди */
+    private array $queuedInRedis = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $queued = &$this->queuedInRedis;
+        self::getContainer()->set(ImportQueueProbeInterface::class, new class($queued) implements ImportQueueProbeInterface {
+            /** @param list<string> $queued */
+            public function __construct(private array &$queued)
+            {
+            }
+
+            public function findQueued(array $jobIds): array
+            {
+                return array_values(array_intersect($jobIds, $this->queued));
+            }
+        });
+    }
+
     public function testLostJobsDryRunChangesNothing(): void
     {
         $company = $this->company();
@@ -55,9 +77,10 @@ final class CashRepairCommandsTest extends IntegrationTestCase
         $lost = $this->job($company);
         $fresh = $this->job($company);
         $retryable = $this->job($company);
+        $waitingRetry = $this->job($company);
         $foreign = $this->job($this->company());
         $this->em->flush();
-        foreach ([$lost, $retryable, $foreign] as $job) {
+        foreach ([$lost, $retryable, $waitingRetry, $foreign] as $job) {
             $this->age($job, '-3 days');
         }
         // Сообщение задания лежит в failed-транспорте: его можно повторить, задание не потеряно.
@@ -68,6 +91,9 @@ final class CashRepairCommandsTest extends IntegrationTestCase
             'created_at' => '2026-02-08 00:00:00',
             'available_at' => '2026-02-08 00:00:00',
         ]);
+
+        // Сообщение задания ждёт повтора в Redis (счёт был занят): задание живое.
+        $this->queuedInRedis = [(string) $waitingRetry->getId()];
 
         $tester = $this->runCommand('app:cash:close-lost-import-jobs', $company, ['--execute' => true, '--expected-count' => '1']);
 
@@ -83,6 +109,7 @@ final class CashRepairCommandsTest extends IntegrationTestCase
         ), 'Журнал потерянного задания закрывается вместе с ним.');
         self::assertSame(CashFileImportJob::STATUS_QUEUED, $this->jobStatus($fresh));
         self::assertSame(CashFileImportJob::STATUS_QUEUED, $this->jobStatus($retryable));
+        self::assertSame(CashFileImportJob::STATUS_QUEUED, $this->jobStatus($waitingRetry));
         self::assertSame(CashFileImportJob::STATUS_QUEUED, $this->jobStatus($foreign));
 
         $repeat = $this->runCommand('app:cash:close-lost-import-jobs', $company);
