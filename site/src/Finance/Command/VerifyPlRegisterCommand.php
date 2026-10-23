@@ -11,6 +11,7 @@ use App\Finance\Infrastructure\Query\PLRegisterCompanyRangesQuery;
 use App\Finance\Repository\PLDailyTotalRepository;
 use Doctrine\DBAL\TransactionIsolationLevel;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -27,7 +28,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Строка регистра без статьи, которой нет в документах, — след удаления статьи
  * (`DeletePLCategoryAction` переносит её суммы в «без статьи»): печатается отдельно и сверку не
- * валит. Ненулевой exit code — только при недостающих, лишних или расходящихся строках со статьёй.
+ * валит. Ненулевой exit code и один агрегированный `error` (GlitchTip) — только при недостающих,
+ * лишних или расходящихся строках со статьёй.
  */
 #[AsCommand(
     name: 'app:finance:verify-pl-register',
@@ -42,6 +44,7 @@ final class VerifyPlRegisterCommand extends Command
         private readonly PLDailyTotalRepository $dailyTotals,
         private readonly PLRegisterCompanyRangesQuery $companyRanges,
         private readonly EntityManagerInterface $em,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -176,6 +179,16 @@ final class VerifyPlRegisterCommand extends Command
         );
 
         if ($totals['missing'] + $totals['extra'] + $totals['mismatch'] > 0) {
+            // Один агрегированный event на запуск со стабильным текстом; починка —
+            // app:finance:recalc-pl-register по компании и окну.
+            $this->logger->error('PL register differs from documents', [
+                'companies_checked' => $totals['companies'],
+                'missing' => $totals['missing'],
+                'extra' => $totals['extra'],
+                'mismatch' => $totals['mismatch'],
+                'diff_sum' => $diffSum,
+                'companies' => array_column(array_filter($tableRows, static fn (array $row): bool => $row[1] + $row[2] + $row[3] > 0), 0),
+            ]);
             $io->error('Регистр ОПиУ расходится с документами.');
 
             return Command::FAILURE;
