@@ -40,6 +40,9 @@ final class PaymentPlanDTO
 
     public ?string $externalId = null;
 
+    /** Ключ повтора формы создания = ID плана (UUIDv7 из скрытого поля). */
+    public ?string $idempotencyKey = null;
+
     public function __construct()
     {
         $this->plannedAt = new \DateTimeImmutable();

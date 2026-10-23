@@ -13,11 +13,13 @@ use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
+use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanDtoApplier;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -50,7 +52,7 @@ final class PaymentPlanActionsTest extends TestCase
             ->expects(self::once())
             ->method('flush');
 
-        $plan = (new CreatePaymentPlanAction($entityManager, new PaymentPlanDtoApplier($paymentPlanService)))($company, $dto);
+        $plan = (new CreatePaymentPlanAction($entityManager, new PaymentPlanDtoApplier($paymentPlanService), $this->createMock(PaymentPlanRepository::class), $this->createMock(ManagerRegistry::class)))($company, $dto);
 
         self::assertSame(50, $plan->getProbability());
         self::assertTrue($plan->isFrozen());
@@ -147,7 +149,7 @@ final class PaymentPlanActionsTest extends TestCase
 
         $this->expectException(\ValueError::class);
 
-        (new CreatePaymentPlanAction($entityManager, new PaymentPlanDtoApplier(new PaymentPlanService())))($company, $dto);
+        (new CreatePaymentPlanAction($entityManager, new PaymentPlanDtoApplier(new PaymentPlanService()), $this->createMock(PaymentPlanRepository::class), $this->createMock(ManagerRegistry::class)))($company, $dto);
     }
 
     private function createCategory(Company $company, string $name): CashflowCategory

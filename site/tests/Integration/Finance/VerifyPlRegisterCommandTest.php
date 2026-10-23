@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
 use App\Finance\Application\Service\PLRegisterUpdater;
+use App\Finance\Command\VerifyPlRegisterCommand;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
@@ -15,9 +16,12 @@ use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Infrastructure\Query\PLRegisterCompanyRangesQuery;
+use App\Finance\Repository\PLDailyTotalRepository;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use Ramsey\Uuid\Uuid;
-use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -26,6 +30,7 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
     private const DAY = '2026-01-10';
 
     private CommandTester $tester;
+    private TestHandler $log;
     private Company $company;
     private ProjectDirection $project;
 
@@ -33,8 +38,14 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $application = new Application(self::$kernel ?? throw new \LogicException('Kernel is not booted.'));
-        $this->tester = new CommandTester($application->find('app:finance:verify-pl-register'));
+        $this->log = new TestHandler();
+        $this->tester = new CommandTester(new VerifyPlRegisterCommand(
+            self::getContainer()->get(PLRegisterUpdater::class),
+            self::getContainer()->get(PLDailyTotalRepository::class),
+            self::getContainer()->get(PLRegisterCompanyRangesQuery::class),
+            $this->em,
+            new Logger('test', [$this->log]),
+        ));
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail(Uuid::uuid4()->toString().'@example.com');
@@ -82,6 +93,7 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $exitCode, $this->tester->getDisplay());
         self::assertStringContainsString('Регистр ОПиУ совпадает с документами', $this->tester->getDisplay());
+        self::assertFalse($this->log->hasErrorRecords());
     }
 
     public function testChangedAmountFailsAndNothingIsWritten(): void
@@ -98,6 +110,9 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
         self::assertMatchesRegularExpression('/Расходятся суммы\s+1/u', $this->tester->getDisplay());
         self::assertStringContainsString('10.00', $this->tester->getDisplay());
         self::assertSame($before, $this->registerSnapshot());
+        self::assertCount(1, $this->log->getRecords());
+        self::assertTrue($this->log->hasErrorThatContains('PL register differs from documents'));
+        self::assertSame([(string) $this->company->getId()], $this->log->getRecords()[0]->context['companies']);
     }
 
     public function testMissingRowFails(): void
@@ -118,6 +133,7 @@ final class VerifyPlRegisterCommandTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $this->verify(), $this->tester->getDisplay());
         self::assertStringContainsString('1 (Σ 25.00)', $this->tester->getDisplay());
+        self::assertFalse($this->log->hasErrorRecords());
     }
 
     public function testWindowOutsideDocumentsChecksNothing(): void

@@ -16,6 +16,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -109,6 +110,15 @@ class DocumentType extends AbstractType
                 'by_reference' => false,
                 'label' => 'Операции',
             ]);
+
+        // Ключ повтора формы создания = ID документа: повторная отправка той же формы
+        // возвращает уже созданный документ (CreateManualDocumentAction).
+        if ($options['idempotency_key']) {
+            $builder->add('idempotencyKey', HiddenType::class, [
+                'mapped' => false,
+                'data' => $document?->getId(),
+            ]);
+        }
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -117,7 +127,9 @@ class DocumentType extends AbstractType
             'data_class' => Document::class,
             'categories' => [],
             'project_directions' => [],
+            'idempotency_key' => false,
         ]);
+        $resolver->setAllowedTypes('idempotency_key', 'bool');
         $resolver->setRequired('company');
         $resolver->setAllowedTypes('company', Company::class);
     }

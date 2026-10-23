@@ -133,7 +133,7 @@ class DocumentController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        $document = new Document(Uuid::uuid4()->toString(), $company);
+        $document = new Document($this->creationKey($request), $company);
         $document->setStatus(DocumentStatus::ACTIVE);
 
         $categories = $catRepo->findTreeByCompany($company);
@@ -142,6 +142,7 @@ class DocumentController extends AbstractController
             'categories' => $categories,
             'project_directions' => $projectDirections,
             'company' => $company,
+            'idempotency_key' => true,
         ]);
         $form->handleRequest($request);
         $initialStatus = $document->getStatus();
@@ -185,7 +186,7 @@ class DocumentController extends AbstractController
         }
         $this->denyDeletedDocument($document);
 
-        $copy = $this->duplicateDocument($document, $company);
+        $copy = $this->duplicateDocument($document, $company, $this->creationKey($request));
 
         $categories = $catRepo->findTreeByCompany($company);
         $projectDirections = $projectDirectionRepo->findByCompany($company);
@@ -193,6 +194,7 @@ class DocumentController extends AbstractController
             'categories' => $categories,
             'project_directions' => $projectDirections,
             'company' => $company,
+            'idempotency_key' => true,
         ]);
         $form->handleRequest($request);
 
@@ -473,9 +475,20 @@ class DocumentController extends AbstractController
         ];
     }
 
-    private function duplicateDocument(Document $source, Company $company): Document
+    /**
+     * ID создаваемого документа: ключ повтора из отправленной формы, иначе новый UUIDv7 —
+     * он уходит в форму скрытым полем, и повтор той же отправки несёт тот же ключ.
+     */
+    private function creationKey(Request $request): string
     {
-        $copy = new Document(Uuid::uuid4()->toString(), $company);
+        $key = $request->request->all('document')['idempotencyKey'] ?? null;
+
+        return \is_string($key) && Uuid::isValid($key) ? Uuid::fromString($key)->toString() : Uuid::uuid7()->toString();
+    }
+
+    private function duplicateDocument(Document $source, Company $company, string $id): Document
+    {
+        $copy = new Document($id, $company);
         $copy->setDate($source->getDate());
         $copy->setNumber($source->getNumber());
         $copy->setType($source->getType());

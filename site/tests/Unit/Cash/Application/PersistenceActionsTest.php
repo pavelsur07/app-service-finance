@@ -15,6 +15,7 @@ use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -23,6 +24,7 @@ use App\Tests\Builders\Cash\MoneyFundMovementBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
@@ -65,7 +67,11 @@ final class PersistenceActionsTest extends TestCase
             ->build();
         $this->expectPersistAndFlush($movement);
 
-        (new CreateMoneyFundMovementAction($this->entityManager))($movement);
+        (new CreateMoneyFundMovementAction(
+            $this->entityManager,
+            $this->createMock(MoneyFundMovementRepository::class),
+            $this->createMock(ManagerRegistry::class),
+        ))($movement);
     }
 
     public function testSaveBankConnectionPersistsAndFlushes(): void
