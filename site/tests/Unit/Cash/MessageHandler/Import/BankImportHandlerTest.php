@@ -9,6 +9,7 @@ use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Exception\BankApiRequestFailedException;
 use App\Cash\Exception\BankApiUnavailableException;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\MessageHandler\Import\BankImportHandler;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -203,6 +204,7 @@ final class BankImportHandlerTest extends TestCase
             new ImportLogger($entityManager),
             new CashTransactionResponsibilityCenterResolver($responsibilityCenters),
             new CashImportAccountLock($this->createMock(Connection::class)),
+            new CashImportLogLease($this->createMock(Connection::class), new NullLogger()),
         );
     }
 

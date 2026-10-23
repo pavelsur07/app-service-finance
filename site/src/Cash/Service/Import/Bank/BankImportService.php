@@ -12,6 +12,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -34,6 +35,7 @@ final class BankImportService
         private readonly ImportLogger $importLogger,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
         private readonly CashImportAccountLock $accountLock,
+        private readonly CashImportLogLease $importLogLease,
     ) {
     }
 
@@ -57,6 +59,8 @@ final class BankImportService
         $transactionsErrors = 0;
 
         $importLog = $this->importLogger->start($company, 'bank:'.$bankCode, false, null, null);
+        // Пока импорт идёт, ремонт и ночной гейт не считают журнал брошенным.
+        $this->importLogLease->acquire($importLog->getId());
 
         try {
             $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($company->getId(), null, null);
@@ -148,6 +152,8 @@ final class BankImportService
             }
 
             throw $exception;
+        } finally {
+            $this->importLogLease->release($importLog->getId());
         }
     }
 

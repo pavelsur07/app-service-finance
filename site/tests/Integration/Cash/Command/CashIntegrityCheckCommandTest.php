@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Command;
 
 use App\Cash\Application\CloseLostCashFileImportJobsAction;
+use App\Cash\Application\CloseOpenImportLogsAction;
 use App\Cash\Application\RecalculateAllocatedAmountsAction;
 use App\Cash\Command\CashIntegrityCheckCommand;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Infrastructure\Query\CashIntegrityCompaniesQuery;
 use App\Cash\Service\Import\ImportLogger;
@@ -88,6 +90,29 @@ final class CashIntegrityCheckCommandTest extends IntegrationTestCase
         ));
     }
 
+    public function testOpenImportLogFailsGateButLogOfLiveJobDoesNot(): void
+    {
+        $company = $this->company();
+        $orphan = self::getContainer()->get(ImportLogger::class)->start($company, 'bank1c', false, null, 'a.txt');
+        $queued = $this->job($company);
+        $queued->setImportLog(self::getContainer()->get(ImportLogger::class)->start($company, 'cash:file', false, null, 'a.csv'));
+        $running = self::getContainer()->get(ImportLogger::class)->start($company, 'bank:alfa', false, null, null);
+        $this->em->flush();
+        self::getContainer()->get(CashImportLogLease::class)->acquire($running->getId());
+        $this->connection->executeStatement(
+            'UPDATE import_log SET started_at = :at WHERE company_id = :company',
+            ['at' => (new \DateTimeImmutable('-3 days', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'), 'company' => $company->getId()],
+        );
+
+        // Задание в очереди и идущий импорт банка под lease — не находки.
+        $tester = $this->runGate();
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('open import logs: 1', $tester->getDisplay());
+        self::assertSame([(string) $company->getId() => 1], $this->log->getRecords()[0]->context['open_import_logs_by_company']);
+        self::assertNull($this->connection->fetchOne('SELECT finished_at FROM import_log WHERE id = :id', ['id' => $orphan->getId()]));
+    }
+
     public function testUnavailableQueueIsSeparateError(): void
     {
         $company = $this->company();
@@ -133,6 +158,7 @@ final class CashIntegrityCheckCommandTest extends IntegrationTestCase
                 $probe,
             ),
             $container->get(RecalculateAllocatedAmountsAction::class),
+            $container->get(CloseOpenImportLogsAction::class),
             new Logger('test', [$this->log]),
         );
         $tester = new CommandTester($command);
