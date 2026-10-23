@@ -203,11 +203,8 @@ final class BankImportServiceTest extends TestCase
                     $this->events[] = 'detach:cursor';
                 }
             });
-        $entityManager
-            ->method('flush')
-            ->willReturnCallback(function (): void {
-                $this->events[] = 'flush';
-            });
+        // Коммитит точка входа через callback, сервис сам flush() не вызывает.
+        $entityManager->expects(self::never())->method('flush');
 
         $lockConnection = $this->createMock(Connection::class);
         $lockConnection->method('fetchOne')->willReturnCallback(function (string $sql) use ($accountFree): bool {
@@ -227,7 +224,9 @@ final class BankImportServiceTest extends TestCase
             new CashImportAccountLock($lockConnection),
         );
 
-        $service->importCompany('alfa', $company, $connection, $provider);
+        $service->importCompany('alfa', $company, $connection, $provider, function (): void {
+            $this->events[] = 'flush';
+        });
 
         return $persistedTransactions;
     }

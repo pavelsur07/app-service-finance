@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\ImportBank1CStatementAction;
 use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Cash\Exception\CashImportAccountBusyException;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountMasker;
 use App\Cash\Service\Import\ClientBank1CImportService;
-use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -30,7 +30,7 @@ class Bank1CImportController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly ClientBank1CImportService $clientBank1CImportService,
-        private readonly ImportLogger $importLogger,
+        private readonly ImportBank1CStatementAction $importStatement,
         private readonly AccountMasker $accountMasker,
     ) {
     }
@@ -361,25 +361,19 @@ class Bank1CImportController extends AbstractController
         $periodStart = is_string($state['statement_period_start'] ?? null) ? $state['statement_period_start'] : null;
         $periodEnd = is_string($state['statement_period_end'] ?? null) ? $state['statement_period_end'] : null;
 
-        $importLog = $this->importLogger->start($company, 'bank1c', false, $userIdentifier, $fileName);
-
         try {
-            $summary = $this->clientBank1CImportService->import($preview, $account, $overwrite, [
+            $result = ($this->importStatement)($company, $preview, $account, $overwrite, $userIdentifier, $fileName, [
                 'user' => $userIdentifier,
                 'file' => $fileName,
                 'statement_account' => $statementAccount,
                 'date_start' => $periodStart,
                 'date_end' => $periodEnd,
-                'preview' => false,
-                'import_log' => $importLog,
             ]);
         } catch (CashImportAccountBusyException $exception) {
             // Предпросмотр в сессии сохраняется: импорт можно повторить, когда счёт освободится.
             $this->addFlash('danger', $exception->getMessage());
 
             return $this->redirectToRoute('cash_bank1c_import_preview', [], 303);
-        } finally {
-            $this->importLogger->finish($importLog);
         }
 
         $session->remove('bank1c_import');
@@ -387,8 +381,8 @@ class Bank1CImportController extends AbstractController
         return $this->render('cash/bank1c_import_result.html.twig', [
             'filename' => $fileName,
             'selectedAccount' => $account,
-            'summary' => $summary,
-            'importLog' => $importLog,
+            'summary' => $result['summary'],
+            'importLog' => $result['importLog'],
         ]);
     }
 

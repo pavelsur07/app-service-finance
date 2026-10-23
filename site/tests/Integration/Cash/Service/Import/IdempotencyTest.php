@@ -29,7 +29,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         $secondRow['docNumber'] = '924374';
         $rows = [$firstRow, $secondRow];
 
-        $firstSummary = $this->service->import($rows, $this->account, false);
+        $firstSummary = $this->service->import($rows, $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(2, $firstSummary['created']);
         self::assertSame(0, $firstSummary['duplicates']);
@@ -41,7 +41,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
             self::assertSame($this->systemCenter->getId(), $transaction->getResponsibilityCenterId());
         }
 
-        $secondSummary = $this->service->import($rows, $this->account, false);
+        $secondSummary = $this->service->import($rows, $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(0, $secondSummary['created']);
         self::assertSame(2, $secondSummary['duplicates']);
@@ -72,14 +72,14 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         ];
         $rows = [$row, $row];
 
-        $firstSummary = $this->service->import($rows, $this->account, false);
+        $firstSummary = $this->service->import($rows, $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(2, $firstSummary['created'], 'Оба ордера — реальные списания, второй не дубликат');
         self::assertSame(0, $firstSummary['duplicates']);
         self::assertSame(0, $firstSummary['errors']);
         self::assertCount(2, $this->transactionRepository->findAll());
 
-        $secondSummary = $this->service->import($rows, $this->account, false);
+        $secondSummary = $this->service->import($rows, $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(0, $secondSummary['created'], 'Повторная загрузка того же файла обязана остаться идемпотентной');
         self::assertSame(2, $secondSummary['duplicates']);
@@ -105,10 +105,10 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
             'direction' => 'outflow',
         ];
 
-        $this->service->import([$row], $this->account, false);
+        $this->service->import([$row], $this->account, false, fn () => $this->em->flush());
         $legacyExternalId = $this->transactionRepository->findAll()[0]->getExternalId();
 
-        $summary = $this->service->import([$row, $row], $this->account, false);
+        $summary = $this->service->import([$row, $row], $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(1, $summary['created'], 'Добираем только недостающее второе списание');
         self::assertSame(1, $summary['duplicates']);
@@ -141,7 +141,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
             'direction' => 'outflow',
         ];
 
-        $summary = $this->service->import([$row, $row], $this->account, false);
+        $summary = $this->service->import([$row, $row], $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(1, $summary['created']);
         self::assertSame(1, $summary['duplicates']);
@@ -167,7 +167,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
             'direction' => 'outflow',
         ];
 
-        $summaryFirst = $this->service->import([$row], $this->account, false);
+        $summaryFirst = $this->service->import([$row], $this->account, false, fn () => $this->em->flush());
         self::assertSame(1, $summaryFirst['created']);
         self::assertSame(0, $summaryFirst['duplicates']);
         self::assertSame(0, $summaryFirst['errors']);
@@ -175,7 +175,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         self::assertSame($this->systemProject->getId(), $transaction->getProjectDirection()?->getId());
         self::assertSame($this->systemCenter->getId(), $transaction->getResponsibilityCenterId());
 
-        $summarySecond = $this->service->import([$row], $this->account, false);
+        $summarySecond = $this->service->import([$row], $this->account, false, fn () => $this->em->flush());
         self::assertSame(0, $summarySecond['created']);
         self::assertSame(1, $summarySecond['duplicates']);
         self::assertSame(0, $summarySecond['errors']);
@@ -199,7 +199,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         $transaction->setResponsibilityCenterId($alternateCenter->getId());
         $this->em->flush();
 
-        $summaryOverwrite = $this->service->import([$row], $this->account, true);
+        $summaryOverwrite = $this->service->import([$row], $this->account, true, fn () => $this->em->flush());
         self::assertSame(0, $summaryOverwrite['created']);
         self::assertSame(1, $summaryOverwrite['duplicates']);
         self::assertSame(0, $summaryOverwrite['errors']);

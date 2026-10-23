@@ -37,11 +37,18 @@ final class BankImportService
     ) {
     }
 
+    /**
+     * Каждый день счёта и журнал коммитит $commit точки входа (BankImportHandler); сервис сам не
+     * коммитит.
+     *
+     * @param \Closure(): void $commit
+     */
     public function importCompany(
         string $bankCode,
         Company $company,
         BankConnection $connection,
         BankStatementsProviderInterface $provider,
+        \Closure $commit,
     ): void {
         $totalAccountsFound = 0;
         $matchedAccounts = 0;
@@ -99,6 +106,7 @@ final class BankImportService
                         $systemProject,
                         $responsibilityPair->responsibilityCenterId,
                         $importLog,
+                        $commit,
                         $transactionsCreated,
                         $transactionsSkippedDuplicates,
                         $transactionsErrors,
@@ -123,10 +131,21 @@ final class BankImportService
                 'transactions_created' => $transactionsCreated,
                 'transactions_skipped_duplicates' => $transactionsSkippedDuplicates,
             ], $transactionsCreated, $transactionsSkippedDuplicates, $transactionsErrors);
+            $commit();
         } catch (\Throwable $exception) {
             $this->finishImportLog($importLog, [
                 'error' => $exception->getMessage(),
             ], $transactionsCreated, $transactionsSkippedDuplicates, $transactionsErrors + 1);
+            try {
+                $commit();
+            } catch (\Throwable $commitException) {
+                // Ошибка БД закрыла EM: журнал не сохранить, исходное исключение важнее.
+                $this->logger->warning('Bank import: import log was not saved after failure', [
+                    'company' => $company->getId(),
+                    'bank_code' => $bankCode,
+                    'exception_class' => $commitException::class,
+                ]);
+            }
 
             throw $exception;
         }
@@ -135,6 +154,8 @@ final class BankImportService
     /**
      * Выписка одного счёта с курсора по сегодня; вызывается под блокировкой счёта. Счётчики
      * копятся в переменных вызывающего: при сбое на середине сводка учитывает записанные дни.
+     *
+     * @param \Closure(): void $commit
      */
     private function importAccount(
         string $bankCode,
@@ -146,6 +167,7 @@ final class BankImportService
         ?ProjectDirection $systemProject,
         ?string $responsibilityCenterId,
         ImportLog $importLog,
+        \Closure $commit,
         int &$transactionsCreated,
         int &$transactionsSkippedDuplicates,
         int &$transactionsErrors,
@@ -264,10 +286,10 @@ final class BankImportService
                     ++$page;
                 }
 
-                // Транзакции дня и курсор — одним flush(): курсор не обгоняет данные.
+                // Транзакции дня и курсор — одним коммитом: курсор не обгоняет данные.
                 $cursor->setLastImportedDate(new \DateTimeImmutable($date->format('Y-m-d')));
                 $this->cursorRepository->save($cursor);
-                $this->entityManager->flush();
+                $commit();
                 $pending = [];
             }
         } catch (\Throwable $exception) {

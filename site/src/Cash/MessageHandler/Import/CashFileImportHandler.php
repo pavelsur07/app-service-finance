@@ -130,7 +130,7 @@ final class CashFileImportHandler
         $importException = null;
 
         try {
-            $this->importService->import($job);
+            $this->importService->import($job, fn () => $this->entityManager->flush());
             if ($resumed) {
                 // Прежний воркер мог умереть после последней пачки, но до пересчёта остатков:
                 // тогда импорт выше ничего не создаёт и пересчёт пропускает. Добираем диапазон

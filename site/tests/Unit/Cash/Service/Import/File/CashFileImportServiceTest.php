@@ -151,7 +151,7 @@ final class CashFileImportServiceTest extends TestCase
             ['stored_ext' => 'csv'],
         );
 
-        $service->import($job);
+        $service->import($job, static function (): void {});
 
         self::assertCount(1, $persistedTransactions);
         self::assertSame($projectId, $persistedTransactions[0]->getProjectDirection()?->getId());
@@ -198,7 +198,7 @@ final class CashFileImportServiceTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Счёт импорта принадлежит другой компании.');
 
-        $service->import($job);
+        $service->import($job, static function (): void {});
     }
 
     private function createResolver(string $projectId, string $centerId): CashTransactionResponsibilityCenterResolver

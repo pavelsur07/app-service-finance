@@ -47,7 +47,7 @@ class SignAndDateTest extends ClientBank1CImportServiceTestCase
             ],
         ];
 
-        $summary = $this->service->import($rows, $this->account, false);
+        $summary = $this->service->import($rows, $this->account, false, fn () => $this->em->flush());
         self::assertSame(3, $summary['created']);
         self::assertSame(0, $summary['errors']);
 

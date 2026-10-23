@@ -84,7 +84,7 @@ final class CashFileImportWorkerStorageTest extends IntegrationTestCase
 
         /** @var CashFileImportService $service */
         $service = self::getContainer()->get(CashFileImportService::class);
-        $service->import($job);
+        $service->import($job, fn () => $this->em->flush());
 
         $transactions = $this->em->getRepository(CashTransaction::class)->findBy(['company' => $company]);
         self::assertCount(1, $transactions, 'Воркер должен был прочитать файл из хранилища и создать транзакцию.');

@@ -25,7 +25,7 @@ class InternalTransferTest extends ClientBank1CImportServiceTestCase
             'direction' => 'self-transfer',
         ];
 
-        $summary = $this->service->import([$row], $this->account, false);
+        $summary = $this->service->import([$row], $this->account, false, fn () => $this->em->flush());
         self::assertSame(1, $summary['created']);
         self::assertSame(0, $summary['duplicates']);
 
