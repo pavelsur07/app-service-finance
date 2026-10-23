@@ -82,6 +82,20 @@ final class RedisImportQueueProbeTest extends TestCase
         self::assertSame([$jobId], $this->probe()->findQueued([$jobId]));
     }
 
+    public function testStreamFromPathWinsOverQuery(): void
+    {
+        $jobId = Uuid::uuid4()->toString();
+        $this->redis->xAdd($this->stream, '*', ['message' => $jobId]);
+        $base = strstr($this->dsn, '/'.$this->stream, true);
+
+        // Путь важнее query, как у Symfony; query — запасной вариант без пути.
+        $pathAndQuery = sprintf('%s/%s?dbindex=%d&stream=other', $base, $this->stream, self::DB_INDEX);
+        $queryOnly = sprintf('%s?dbindex=%d&stream=%s', $base, self::DB_INDEX, $this->stream);
+
+        self::assertSame([$jobId], (new RedisImportQueueProbe($pathAndQuery, static function (): void {}))->findQueued([$jobId]));
+        self::assertSame([$jobId], (new RedisImportQueueProbe($queryOnly, static function (): void {}))->findQueued([$jobId]));
+    }
+
     public function testUnreachableRedisRefuses(): void
     {
         $this->expectException(\RuntimeException::class);

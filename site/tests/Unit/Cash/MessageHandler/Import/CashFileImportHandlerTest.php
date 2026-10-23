@@ -72,6 +72,37 @@ final class CashFileImportHandlerTest extends TestCase
         self::assertStringNotContainsString('DBG:', $error);
     }
 
+    /**
+     * Ремонт закрыл задание как потерянное, а воркер держал его сообщение в переносе между
+     * очередями Redis: доставленное сообщение запускает задание, а не пропускает его.
+     */
+    public function testJobClosedAsLostIsStartedByItsMessage(): void
+    {
+        $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));
+        $foreignAccount = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString())),
+            MoneyAccountType::BANK,
+            'Foreign account',
+            'RUB',
+        );
+        $job = new CashFileImportJob(Uuid::uuid4()->toString(), $company, $foreignAccount, 'file', 'a.csv', 'hash', []);
+        $job->failAsLost();
+        self::assertTrue($job->isClosedAsLost());
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('find')->willReturn($job);
+        $entityManager->method('isOpen')->willReturn(true);
+
+        $this->createHandler($entityManager)(new CashFileImportMessage((string) $job->getId()));
+
+        // Импорт запущен (start) и дошёл до проверки счёта: ошибка уже не «сообщение потеряно».
+        self::assertNotNull($job->getStartedAt());
+        self::assertSame(CashFileImportJob::STATUS_FAILED, $job->getStatus());
+        self::assertStringContainsString('Счёт импорта принадлежит другой компании.', (string) $job->getErrorMessage());
+        self::assertFalse($job->isClosedAsLost());
+    }
+
     public function testJobOfBusyAccountIsDeferredUntouched(): void
     {
         $company = new Company(Uuid::uuid4()->toString(), new User(Uuid::uuid4()->toString()));

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Command;
 
-use App\Cash\Application\CloseLostCashFileImportJobsAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -99,7 +98,7 @@ final class CashRepairCommandsTest extends IntegrationTestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame(CashFileImportJob::STATUS_FAILED, $this->jobStatus($lost));
-        self::assertSame(CloseLostCashFileImportJobsAction::FAILURE_MESSAGE, $this->connection->fetchOne(
+        self::assertSame(CashFileImportJob::LOST_MESSAGE_ERROR, $this->connection->fetchOne(
             'SELECT error_message FROM cash_file_import_jobs WHERE id = :id',
             ['id' => $lost->getId()],
         ));

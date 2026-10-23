@@ -20,6 +20,7 @@ class CashFileImportJob
     public const STATUS_PROCESSING = 'processing';
     public const STATUS_DONE = 'done';
     public const STATUS_FAILED = 'failed';
+    public const LOST_MESSAGE_ERROR = 'Сообщение очереди потеряно: задание не было обработано и закрыто командой app:cash:close-lost-import-jobs. Загрузите файл заново.';
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -95,6 +96,31 @@ class CashFileImportJob
     {
         $this->status = self::STATUS_PROCESSING;
         $this->startedAt = new \DateTimeImmutable();
+        $this->errorMessage = null;
+        $this->finishedAt = null;
+    }
+
+    /**
+     * Закрытие ремонтом задания, чьё сообщение не нашлось ни в одной очереди. Обратимо: если
+     * сообщение всё же доставят (воркер держал его в переносе между очередями), Handler
+     * запустит задание, а не пропустит.
+     */
+    public function failAsLost(): void
+    {
+        if (self::STATUS_QUEUED !== $this->status || null !== $this->startedAt) {
+            throw new \DomainException('Потерянным закрывается только не начатое задание в очереди.');
+        }
+        $this->fail(self::LOST_MESSAGE_ERROR);
+    }
+
+    /**
+     * Задание закрыто как потерянное и ни разу не начиналось — его сообщение может его запустить.
+     */
+    public function isClosedAsLost(): bool
+    {
+        return self::STATUS_FAILED === $this->status
+            && null === $this->startedAt
+            && self::LOST_MESSAGE_ERROR === $this->errorMessage;
     }
 
     public function finishOk(): void

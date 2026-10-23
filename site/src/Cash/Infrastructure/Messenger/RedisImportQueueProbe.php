@@ -74,7 +74,8 @@ final readonly class RedisImportQueueProbe implements ImportQueueProbeInterface
         }
         parse_str($parts['query'] ?? '', $query);
         $path = explode('/', trim($parts['path'] ?? '', '/'))[0];
-        $stream = \is_string($query['stream'] ?? null) ? $query['stream'] : ('' === $path ? 'messages' : $path);
+        // Как Symfony Redis Connection: stream из пути, иначе из query, иначе по умолчанию.
+        $stream = '' !== $path ? $path : (\is_string($query['stream'] ?? null) && '' !== $query['stream'] ? $query['stream'] : 'messages');
         $dbIndex = $query['dbindex'] ?? 0;
         if (!\is_string($dbIndex) && !\is_int($dbIndex) || !ctype_digit((string) $dbIndex)) {
             throw new \RuntimeException('Некорректный dbindex в DSN очереди импорта.');

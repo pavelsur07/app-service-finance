@@ -13,15 +13,14 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Закрывает задания файлового импорта, чьё сообщение Messenger потеряно: `queued` дольше порога,
  * сообщения с ID задания нет ни в failed-транспорте, ни в живой очереди (stream и отложенные
- * повторы Redis). Само задание такое уже не поднимется. Очередь недоступна — отказ.
+ * повторы Redis). Очередь недоступна — отказ. Закрытие обратимо (`CashFileImportJob::failAsLost()`):
+ * сообщение, которое всё же доставят, запустит задание.
  *
  * Транзакцией владеет вызывающая консольная команда: в режиме execute кандидаты берутся
  * под FOR UPDATE.
  */
 final class CloseLostCashFileImportJobsAction
 {
-    public const FAILURE_MESSAGE = 'Сообщение очереди потеряно: задание не было обработано и закрыто командой app:cash:close-lost-import-jobs. Загрузите файл заново.';
-
     public function __construct(
         private readonly Connection $connection,
         private readonly EntityManagerInterface $entityManager,
@@ -72,7 +71,7 @@ final class CloseLostCashFileImportJobsAction
         foreach ($ids as $id) {
             $job = $this->entityManager->find(CashFileImportJob::class, $id);
             \assert($job instanceof CashFileImportJob);
-            $job->fail(self::FAILURE_MESSAGE);
+            $job->failAsLost();
             $importLog = $job->getImportLog();
             if (null !== $importLog && null === $importLog->getFinishedAt()) {
                 $this->importLogger->finish($importLog);
