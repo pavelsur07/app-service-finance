@@ -86,7 +86,10 @@ final readonly class RedisImportQueueProbe implements ImportQueueProbeInterface
             throw new \RuntimeException('Redis очереди импорта недоступен.');
         }
         if (isset($parts['pass'])) {
-            $redis->auth(isset($parts['user']) ? [urldecode($parts['user']), urldecode($parts['pass'])] : urldecode($parts['pass']));
+            // `redis://:password@host` — авторизация одним паролем, как у Symfony.
+            $redis->auth('' !== ($parts['user'] ?? '')
+                ? [rawurldecode($parts['user']), rawurldecode($parts['pass'])]
+                : rawurldecode($parts['pass']));
         }
         if (!$redis->select((int) $dbIndex)) {
             throw new \RuntimeException('Redis очереди импорта: база dbindex недоступна.');
