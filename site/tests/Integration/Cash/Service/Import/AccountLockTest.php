@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Cash\Service\Import;
 
 use App\Cash\Application\ImportBank1CStatementAction;
 use App\Cash\Exception\CashImportAccountBusyException;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\DriverManager;
 
@@ -80,6 +81,10 @@ final class AccountLockTest extends ClientBank1CImportServiceTestCase
             $this->storedLog($result['importLog']->getId()),
         );
         self::assertCount(1, $this->transactionRepository->findAll());
+        self::assertFalse((bool) $this->connection->fetchOne(
+            'SELECT '.CashImportLogLease::heldCondition(':id'),
+            ['id' => $result['importLog']->getId()],
+        ), 'lease журнала снят после импорта');
     }
 
     public function testActionSavesImportLogWhenAccountIsBusy(): void
@@ -107,7 +112,7 @@ final class AccountLockTest extends ClientBank1CImportServiceTestCase
 
     private function action(): ImportBank1CStatementAction
     {
-        return new ImportBank1CStatementAction($this->service, self::getContainer()->get(ImportLogger::class), $this->em);
+        return new ImportBank1CStatementAction($this->service, self::getContainer()->get(ImportLogger::class), self::getContainer()->get(CashImportLogLease::class), $this->em);
     }
 
     /**

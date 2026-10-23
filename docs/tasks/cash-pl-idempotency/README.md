@@ -40,13 +40,14 @@
 |---|---|---|---|
 | 07:43 | `app:cash:integrity-check` | потерянное задание импорта (`queued` > 24 ч без сообщения в очереди) | dry-run, затем `--execute`: `app:cash:close-lost-import-jobs --company=…`. Сначала выяснить, почему потерялось сообщение |
 | 07:43 | то же | `allocated_amount` транзакции ≠ сумме её живых документов ОПиУ | `app:cash:recalculate-allocated-amounts --company=…`. Найти путь, который изменил документы мимо пересчёта |
-| 07:43 | то же | журнал импорта без времени завершения > 24 ч | `app:cash:close-open-import-logs --company=…`. Данные импорта проверить по транзакциям |
+| 07:43 | то же | журнал импорта без времени завершения > 24 ч, не ведомый живым импортом | `app:cash:close-open-import-logs --company=…`. Данные импорта проверить по транзакциям |
 | 07:43 | то же | «Cash integrity check unavailable» | Redis очереди импорта недоступен — проверить `site-redis`; это не «чисто» |
-| 07:44 | `app:finance:verify-pl-register` | регистр ОПиУ расходится с документами | `app:finance:recalc-pl-register` по компании и окну из вывода сверки, затем повторить сверку |
+| 07:44 | `app:finance:verify-pl-register` | регистр ОПиУ расходится с документами | `app:finance:recalc-pl-register <companyId> --from=… --to=… --dry-run` по компании и дням из вывода сверки; запуск без `--dry-run` **пишет** регистр — только Владелец. Затем повторить сверку |
 
-Сигнал — одна ошибка в GlitchTip на запуск. Все ремонты по умолчанию dry-run;
-`--execute` требует `--expected-count` из dry-run и на проде запускается только
-Владельцем.
+Сигнал — одна ошибка в GlitchTip на запуск. Три ремонта ДДС (`app:cash:…`) по
+умолчанию dry-run; `--execute` требует `--expected-count` из dry-run и на проде
+запускается только Владельцем. `app:finance:recalc-pl-register` устроен иначе:
+без `--dry-run` сразу пишет, `--execute` и `--expected-count` у него нет.
 
 ## Что осталось вне задачи
 

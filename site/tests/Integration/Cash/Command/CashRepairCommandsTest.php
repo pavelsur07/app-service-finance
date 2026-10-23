@@ -8,6 +8,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
@@ -153,23 +154,29 @@ final class CashRepairCommandsTest extends IntegrationTestCase
         $queuedJob = $this->job($company);
         $fresh = $this->openLog($company, '-1 hour');
         $foreign = $this->openLog($this->company(), '-3 days');
+        $legacyJob = $this->job($company);
+        $legacyJob->start();
+        $legacyJob->fail('сбой');
+        $leased = $this->openLog($company, '-3 days');
         $this->em->flush();
-        $this->connection->executeStatement(
-            "UPDATE cash_file_import_jobs SET finished_at = '2026-02-08 06:40:00' WHERE id = :id",
-            ['id' => $failedJob->getId()],
-        );
-        foreach ([$failedJob, $queuedJob] as $job) {
-            $this->ageLog((string) $job->getImportLog()?->getId(), '-3 days');
-        }
+        self::getContainer()->get(CashImportLogLease::class)->acquire($leased);
+        // Журнал — UTC; задание — МСК (с 12.04.2026) или UTC (раньше).
+        $this->ageLog((string) $failedJob->getImportLog()?->getId(), '2026-10-20 09:00:00');
+        $this->setJobFinishedAt($failedJob, '2026-10-20 12:30:00');
+        $this->ageLog((string) $legacyJob->getImportLog()?->getId(), '2026-02-08 06:37:20');
+        $this->setJobFinishedAt($legacyJob, '2026-02-08 06:37:20');
+        $this->ageLog((string) $queuedJob->getImportLog()?->getId(), '-3 days');
 
         $dryRun = $this->runCommand('app:cash:close-open-import-logs', $company);
-        self::assertMatchesRegularExpression('/candidates\s+2/', $dryRun->getDisplay());
+        self::assertMatchesRegularExpression('/candidates\s+3/', $dryRun->getDisplay());
 
-        $tester = $this->runCommand('app:cash:close-open-import-logs', $company, ['--execute' => true, '--expected-count' => '2']);
+        $tester = $this->runCommand('app:cash:close-open-import-logs', $company, ['--execute' => true, '--expected-count' => '3']);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame($this->logStartedAt($orphan), $this->logFinishedAt($orphan));
-        self::assertSame('2026-02-08 06:40:00', $this->logFinishedAt((string) $failedJob->getImportLog()?->getId()));
+        self::assertSame('2026-10-20 09:30:00', $this->logFinishedAt((string) $failedJob->getImportLog()?->getId()));
+        self::assertSame('2026-02-08 06:37:20', $this->logFinishedAt((string) $legacyJob->getImportLog()?->getId()));
+        self::assertNull($this->logFinishedAt($leased), 'журнал идущего импорта 1С/банка не закрывается');
         self::assertNull($this->logFinishedAt((string) $queuedJob->getImportLog()?->getId()));
         self::assertNull($this->logFinishedAt($fresh));
         self::assertNull($this->logFinishedAt($foreign));
@@ -322,6 +329,14 @@ final class CashRepairCommandsTest extends IntegrationTestCase
         $this->connection->executeStatement(
             'UPDATE import_log SET started_at = :at WHERE id = :id',
             ['at' => (new \DateTimeImmutable($startedAt, new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'), 'id' => $logId],
+        );
+    }
+
+    private function setJobFinishedAt(CashFileImportJob $job, string $finishedAt): void
+    {
+        $this->connection->executeStatement(
+            'UPDATE cash_file_import_jobs SET finished_at = :at WHERE id = :id',
+            ['at' => $finishedAt, 'id' => $job->getId()],
         );
     }
 

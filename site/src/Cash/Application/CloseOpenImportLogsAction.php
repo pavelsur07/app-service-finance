@@ -6,14 +6,19 @@ namespace App\Cash\Application;
 
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\ImportLog;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Закрывает журналы импорта ДДС, оставшиеся без `finished_at`: импорт начат раньше порога, и
- * журнал не ждёт живого задания файлового импорта (`queued`/`processing` закроет само задание
- * или ремонт потерянных заданий). Время завершения — `finished_at` задания, если оно есть,
- * иначе время старта: настоящее неизвестно. Счётчики журнала не меняются.
+ * его никто не ведёт — нет задания файлового импорта в `queued`/`processing` (его закроет само
+ * задание или ремонт потерянных заданий) и не держится lease журнала (`CashImportLogLease`,
+ * идущий импорт 1С или банка). Время завершения — `finished_at` задания, если оно есть, иначе
+ * время старта: настоящее неизвестно. Счётчики журнала не меняются.
+ *
+ * `import_log` пишется в UTC, задание — в часовом поясе PHP (МСК с 12.04.2026, раньше UTC): время
+ * задания переводится из МСК в UTC и не бывает раньше старта журнала.
  *
  * Транзакцией владеет вызывающая консольная команда: в режиме execute кандидаты берутся
  * под FOR UPDATE.
@@ -39,10 +44,11 @@ final class CloseOpenImportLogsAction
 
         /** @var list<array{id: string, finished_at: string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
-            <<<'SQL'
+            \sprintf(<<<'SQL'
                 SELECT l.id::text AS id,
-                       COALESCE(
-                           (SELECT MAX(j.finished_at) FROM cash_file_import_jobs j WHERE j.import_log_id = l.id),
+                       GREATEST(
+                           (SELECT MAX(j.finished_at) FROM cash_file_import_jobs j WHERE j.import_log_id = l.id)
+                               AT TIME ZONE 'Europe/Moscow' AT TIME ZONE 'UTC',
                            l.started_at
                        )::text AS finished_at
                 FROM import_log l
@@ -53,8 +59,9 @@ final class CloseOpenImportLogsAction
                       SELECT 1 FROM cash_file_import_jobs j
                       WHERE j.import_log_id = l.id AND j.status IN (:queued, :processing)
                   )
+                  AND NOT %s
                 ORDER BY l.id
-                SQL.($execute ? ' FOR UPDATE OF l' : ''),
+                SQL, CashImportLogLease::heldCondition('l.id')).($execute ? ' FOR UPDATE OF l' : ''),
             [
                 'company' => $companyId,
                 'before' => $startedBefore->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),

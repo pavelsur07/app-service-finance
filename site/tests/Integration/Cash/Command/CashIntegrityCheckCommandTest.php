@@ -12,6 +12,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Infrastructure\Query\CashIntegrityCompaniesQuery;
 use App\Cash\Service\Import\ImportLogger;
@@ -95,13 +96,15 @@ final class CashIntegrityCheckCommandTest extends IntegrationTestCase
         $orphan = self::getContainer()->get(ImportLogger::class)->start($company, 'bank1c', false, null, 'a.txt');
         $queued = $this->job($company);
         $queued->setImportLog(self::getContainer()->get(ImportLogger::class)->start($company, 'cash:file', false, null, 'a.csv'));
+        $running = self::getContainer()->get(ImportLogger::class)->start($company, 'bank:alfa', false, null, null);
         $this->em->flush();
+        self::getContainer()->get(CashImportLogLease::class)->acquire($running->getId());
         $this->connection->executeStatement(
             'UPDATE import_log SET started_at = :at WHERE company_id = :company',
             ['at' => (new \DateTimeImmutable('-3 days', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'), 'company' => $company->getId()],
         );
 
-        // Задание свежее и в очереди: его журнал не находка.
+        // Задание в очереди и идущий импорт банка под lease — не находки.
         $tester = $this->runGate();
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());

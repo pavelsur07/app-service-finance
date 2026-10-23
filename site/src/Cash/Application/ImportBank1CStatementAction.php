@@ -7,6 +7,7 @@ namespace App\Cash\Application;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Exception\CashImportAccountBusyException;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
@@ -21,6 +22,7 @@ final class ImportBank1CStatementAction
     public function __construct(
         private readonly ClientBank1CImportService $importService,
         private readonly ImportLogger $importLogger,
+        private readonly CashImportLogLease $importLogLease,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -43,6 +45,8 @@ final class ImportBank1CStatementAction
         array $context,
     ): array {
         $importLog = $this->importLogger->start($company, 'bank1c', false, $userId, $fileName);
+        // Пока импорт идёт, ремонт и ночной гейт не считают журнал брошенным.
+        $this->importLogLease->acquire($importLog->getId());
 
         try {
             $summary = $this->importService->import(
@@ -58,6 +62,7 @@ final class ImportBank1CStatementAction
                 $this->importLogger->finish($importLog);
                 $this->entityManager->flush();
             }
+            $this->importLogLease->release($importLog->getId());
         }
 
         return ['summary' => $summary, 'importLog' => $importLog];

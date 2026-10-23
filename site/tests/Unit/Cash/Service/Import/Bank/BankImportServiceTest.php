@@ -11,6 +11,7 @@ use App\Cash\Entity\Bank\BankImportCursor;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -222,6 +223,7 @@ final class BankImportServiceTest extends TestCase
             new ImportLogger($entityManager),
             $this->createResolver($this->projectId, $this->centerId),
             new CashImportAccountLock($lockConnection),
+            new CashImportLogLease($this->createMock(Connection::class), new NullLogger()),
         );
 
         $service->importCompany('alfa', $company, $connection, $provider, function (): void {
