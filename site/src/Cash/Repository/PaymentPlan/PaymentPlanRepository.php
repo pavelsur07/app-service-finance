@@ -170,4 +170,30 @@ class PaymentPlanRepository extends ServiceEntityRepository
 
         return null !== $result;
     }
+
+    /**
+     * Строка плана компании под `FOR UPDATE` (до конца транзакции вызывающего) и проверка, что
+     * план ещё можно сопоставить: не оплачен, не отменён, сопоставления нет. Параллельное
+     * сопоставление того же плана ждёт commit первого и видит его сопоставление.
+     */
+    public function lockIfAvailableForMatch(string $planId, string $companyId): bool
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Payment plan match lock requires an active transaction.');
+        }
+
+        $status = $connection->fetchOne(
+            'SELECT status FROM payment_plan WHERE id = :id AND company_id = :company_id FOR UPDATE',
+            ['id' => $planId, 'company_id' => $companyId],
+        );
+        if (false === $status || \in_array($status, [PaymentPlanStatus::PAID->value, PaymentPlanStatus::CANCELED->value], true)) {
+            return false;
+        }
+
+        return false === $connection->fetchOne(
+            'SELECT 1 FROM payment_plan_match WHERE plan_id = :id',
+            ['id' => $planId],
+        );
+    }
 }

@@ -120,7 +120,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         $transactionFromDb = $this->em->getRepository(CashTransaction::class)->find($transactionA->getId());
         self::assertNotNull($transactionFromDb);
 
-        $result = $this->matcher->matchForTransaction($transactionFromDb);
+        $result = $this->match($transactionFromDb);
 
         self::assertNull($result);
         self::assertNull($this->matchRepository->findOneByTransactionAndCompanyId($transactionFromDb, (string) $transactionFromDb->getCompany()->getId()));
@@ -165,7 +165,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         }
         $this->em->flush();
 
-        self::assertNull($this->matcher->matchForTransaction($transaction));
+        self::assertNull($this->match($transaction));
         self::assertNull($this->matchRepository->findOneByTransactionAndCompanyId($transaction, (string) $transaction->getCompany()->getId()));
         self::assertSame(PaymentPlanStatusEnum::APPROVED, $plan->getStatus());
     }
@@ -204,7 +204,7 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         }
         $this->em->flush();
 
-        $result = $this->matcher->matchForTransaction($transaction);
+        $result = $this->match($transaction);
 
         if ($matches) {
             self::assertSame($plan->getId(), $result?->getId());
@@ -217,5 +217,13 @@ final class PaymentPlanMatcherTest extends IntegrationTestCase
         } else {
             self::assertNull($result);
         }
+    }
+
+    /**
+     * Сопоставление берёт план под блокировкой: как в AddCashTransactionAction — в транзакции.
+     */
+    private function match(CashTransaction $transaction): ?PaymentPlan
+    {
+        return $this->em->wrapInTransaction(fn (): ?PaymentPlan => $this->matcher->matchForTransaction($transaction));
     }
 }

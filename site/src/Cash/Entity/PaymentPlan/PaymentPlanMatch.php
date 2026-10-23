@@ -13,6 +13,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: PaymentPlanMatchRepository::class)]
 #[ORM\Table(name: 'payment_plan_match')]
 #[ORM\UniqueConstraint(name: 'uniq_payment_plan_match_transaction', columns: ['transaction_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_payment_plan_match_plan', columns: ['plan_id'])]
 #[ORM\Index(name: 'idx_payment_plan_match_company_plan', columns: ['company_id', 'plan_id'])]
 #[ORM\Index(name: 'idx_payment_plan_match_company_transaction', columns: ['company_id', 'transaction_id'])]
 class PaymentPlanMatch
