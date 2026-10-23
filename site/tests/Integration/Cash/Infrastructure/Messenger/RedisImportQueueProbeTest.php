@@ -14,6 +14,8 @@ use Ramsey\Uuid\Uuid;
  */
 final class RedisImportQueueProbeTest extends TestCase
 {
+    private const DB_INDEX = 3;
+
     private \Redis $redis;
     private string $stream;
     private string $dsn;
@@ -28,8 +30,10 @@ final class RedisImportQueueProbeTest extends TestCase
 
         $this->redis = new \Redis();
         $this->redis->connect($parts['host'], $parts['port'] ?? 6379);
+        // Ненулевая база, как при `?dbindex=` в DSN транспорта.
+        $this->redis->select(self::DB_INDEX);
         $this->stream = 'test_import_probe_'.bin2hex(random_bytes(4));
-        $this->dsn = sprintf('redis://%s:%d/%s', $parts['host'], $parts['port'] ?? 6379, $this->stream);
+        $this->dsn = sprintf('redis://%s:%d/%s?dbindex=%d', $parts['host'], $parts['port'] ?? 6379, $this->stream, self::DB_INDEX);
     }
 
     protected function tearDown(): void
@@ -48,7 +52,7 @@ final class RedisImportQueueProbeTest extends TestCase
         $this->redis->xAdd($this->stream, '*', ['message' => json_encode(['body' => 's:5:"jobId";s:36:"'.$inStream.'";', 'headers' => []])]);
         $this->redis->zAdd($this->stream.'__queue', (float) (microtime(true) * 1000 + 60_000), json_encode(['body' => 's:5:"jobId";s:36:"'.$delayed.'";', 'headers' => [], 'uniqid' => 'x']));
 
-        $found = (new RedisImportQueueProbe($this->dsn))->findQueued([$inStream, $delayed, $lost]);
+        $found = $this->probe()->findQueued([$inStream, $delayed, $lost]);
         sort($found);
         $expected = [$inStream, $delayed];
         sort($expected);
@@ -56,10 +60,37 @@ final class RedisImportQueueProbeTest extends TestCase
         self::assertSame($expected, $found);
     }
 
+    public function testMessageInTransitBetweenPassesIsFound(): void
+    {
+        $jobId = Uuid::uuid4()->toString();
+        // Первый проход: сообщение между ZPOPMIN и XADD — ни в __queue, ни в stream. К второму
+        // проходу Messenger дописал его в stream.
+        $probe = new RedisImportQueueProbe($this->dsn, function () use ($jobId): void {
+            $this->redis->xAdd($this->stream, '*', ['message' => json_encode(['body' => 's:36:"'.$jobId.'";', 'headers' => []])]);
+        });
+
+        self::assertSame([$jobId], $probe->findQueued([$jobId]));
+    }
+
+    public function testMessageInOtherDatabaseIsNotSeen(): void
+    {
+        $jobId = Uuid::uuid4()->toString();
+        $this->redis->xAdd($this->stream, '*', ['message' => $jobId]);
+        $otherDb = str_replace('dbindex='.self::DB_INDEX, 'dbindex=0', $this->dsn);
+
+        self::assertSame([], (new RedisImportQueueProbe($otherDb, static function (): void {}))->findQueued([$jobId]));
+        self::assertSame([$jobId], $this->probe()->findQueued([$jobId]));
+    }
+
     public function testUnreachableRedisRefuses(): void
     {
         $this->expectException(\RuntimeException::class);
 
         (new RedisImportQueueProbe('doctrine://default'))->findQueued([Uuid::uuid4()->toString()]);
+    }
+
+    private function probe(): RedisImportQueueProbe
+    {
+        return new RedisImportQueueProbe($this->dsn, static function (): void {});
     }
 }
