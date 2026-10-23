@@ -7,6 +7,7 @@ namespace App\Cash\Form\Accounts;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -35,6 +36,12 @@ class MoneyFundMovementType extends AbstractType
                 'label' => 'Комментарий',
                 'required' => false,
                 'attr' => ['rows' => 3],
+            ])
+            // Ключ повтора = ID движения: повтор той же отправки возвращает уже созданное
+            // движение (CreateMoneyFundMovementAction).
+            ->add('idempotencyKey', HiddenType::class, [
+                'mapped' => false,
+                'data' => $builder->getData()?->getId(),
             ]);
     }
 

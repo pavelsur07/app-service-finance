@@ -102,7 +102,7 @@ class FundController extends AbstractController
             ?? throw $this->createNotFoundException();
 
         $movement = new MoneyFundMovement(
-            Uuid::uuid4()->toString(),
+            $this->creationKey($request),
             $company,
             $fund,
             new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
@@ -134,6 +134,17 @@ class FundController extends AbstractController
             'fund' => $fund,
             'form' => $form->createView(),
         ]);
+    }
+
+    /**
+     * ID создаваемого движения: ключ повтора из отправленной формы, иначе новый UUIDv7 — он
+     * уходит в форму скрытым полем, и повтор той же отправки несёт тот же ключ.
+     */
+    private function creationKey(Request $request): string
+    {
+        $key = $request->request->all('money_fund_movement')['idempotencyKey'] ?? null;
+
+        return \is_string($key) && Uuid::isValid($key) ? strtolower($key) : Uuid::uuid7()->toString();
     }
 
     private function assertFeatureEnabled(): void

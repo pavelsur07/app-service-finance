@@ -9,6 +9,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Application\CreateManualDocumentAction;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Application\UpdateManualDocumentAction;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -16,12 +17,15 @@ use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Repository\DocumentRepository;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\PersistentCollection;
+use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -81,6 +85,60 @@ final class ManualDocumentActionsTest extends IntegrationTestCase
         }
 
         self::assertSame(0, $this->countDocuments());
+    }
+
+    public function testRepeatedSubmissionReturnsFirstDocument(): void
+    {
+        $first = $this->makeDocument('2026-03-05', '250.00');
+        self::getContainer()->get(CreateManualDocumentAction::class)($first);
+
+        // Повтор той же формы: тот же ключ (= ID), новый объект из повторной отправки.
+        $this->nextRequest();
+        $result = self::getContainer()->get(CreateManualDocumentAction::class)(
+            $this->makeDocument('2026-03-05', '250.00', (string) $first->getId()),
+        );
+
+        self::assertSame($first->getId(), $result->getId());
+        self::assertSame(1, $this->countDocuments());
+        self::assertSame(['2026-03-05' => '250.00'], $this->registerExpenseByDay());
+    }
+
+    public function testConcurrentSubmissionReturnsDocumentOfFirst(): void
+    {
+        $first = $this->makeDocument('2026-03-05', '250.00');
+        self::getContainer()->get(CreateManualDocumentAction::class)($first);
+
+        // Вторая отправка проверила ключ до commit первой: не нашла документ и упёрлась в PK.
+        $this->nextRequest();
+        $result = $this->actionMissingRepeat()($this->makeDocument('2026-03-05', '250.00', (string) $first->getId()));
+
+        self::assertSame($first->getId(), $result->getId());
+        self::assertSame(1, $this->countDocuments());
+        self::assertSame(['2026-03-05' => '250.00'], $this->registerExpenseByDay());
+    }
+
+    public function testKeyOfForeignCompanyDocumentIsRejected(): void
+    {
+        $user = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail(Uuid::uuid4()->toString().'@test.com')
+            ->withPasswordHash('hash')
+            ->build();
+        $foreignCompany = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($user)->build();
+        $this->em->persist($user);
+        $this->em->persist($foreignCompany);
+        $this->em->flush();
+        $foreign = new Document(Uuid::uuid7()->toString(), $foreignCompany);
+        $foreign->setStatus(DocumentStatus::ACTIVE);
+        $foreign->setDate(new \DateTimeImmutable('2026-03-05'));
+        $foreign->setType(DocumentType::OTHER);
+        $this->em->persist($foreign);
+        $this->em->flush();
+        $this->nextRequest();
+
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        $this->actionMissingRepeat()($this->makeDocument('2026-03-05', '250.00', (string) $foreign->getId()));
     }
 
     public function testUpdateMovesRegisterToNewDay(): void
@@ -308,9 +366,42 @@ final class ManualDocumentActionsTest extends IntegrationTestCase
         return $transaction;
     }
 
-    private function makeDocument(string $day, string $amount): Document
+    /**
+     * Следующий HTTP-запрос — свой EntityManager: созданное раньше в нём не висит.
+     */
+    private function nextRequest(): void
     {
-        $document = new Document(Uuid::uuid4()->toString(), $this->company);
+        $this->em->clear();
+        $company = $this->em->find(Company::class, $this->company->getId());
+        $project = $this->em->find(ProjectDirection::class, $this->project->getId());
+        $category = $this->em->find(PLCategory::class, $this->category->getId());
+        \assert($company instanceof Company && $project instanceof ProjectDirection && $category instanceof PLCategory);
+        [$this->company, $this->project, $this->category] = [$company, $project, $category];
+    }
+
+    /**
+     * Action, чья проверка повтора не видит документ: как вторая из двух одновременных отправок.
+     */
+    private function actionMissingRepeat(): CreateManualDocumentAction
+    {
+        $repository = new class(self::getContainer()->get(ManagerRegistry::class)) extends DocumentRepository {
+            public function findByIdAndCompany(string $id, string $companyId): ?Document
+            {
+                return null;
+            }
+        };
+
+        return new CreateManualDocumentAction(
+            $this->em,
+            self::getContainer()->get(PLRegisterUpdater::class),
+            $repository,
+            self::getContainer()->get(ManagerRegistry::class),
+        );
+    }
+
+    private function makeDocument(string $day, string $amount, ?string $id = null): Document
+    {
+        $document = new Document($id ?? Uuid::uuid7()->toString(), $this->company);
         $document->setStatus(DocumentStatus::ACTIVE);
         $document->setDate(new \DateTimeImmutable($day));
         $document->setType(DocumentType::OTHER);

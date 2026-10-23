@@ -41,6 +41,27 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
         self::assertSame($graph['systemCenter']->getId(), $operation->getResponsibilityCenterId());
     }
 
+    public function testNewDocumentSubmittedTwiceCreatesOneDocument(): void
+    {
+        [$client, , $graph] = $this->bootClientWithGraph('twice');
+
+        $this->submitDocumentFormTwice($client, '/documents/new', $graph);
+    }
+
+    public function testCopySubmittedTwiceCreatesOneCopy(): void
+    {
+        [$client, $em, $graph] = $this->bootClientWithGraph('copy-twice');
+        $source = new Document(Uuid::uuid7()->toString(), $graph['company']);
+        $source->setDate(new \DateTimeImmutable('2026-07-18'))->setNumber('SRC-copy-twice')->setType(DocumentType::OTHER);
+        $operation = new DocumentOperation();
+        $operation->setCategory($graph['category'])->setAmount('100.00');
+        $source->addOperation($operation);
+        $em->persist($source);
+        $em->flush();
+
+        $this->submitDocumentFormTwice($client, sprintf('/documents/%s/copy', $source->getId()), $graph, 1);
+    }
+
     public function testNewDocumentRejectsCustomProjectWithoutResponsibilityCenter(): void
     {
         [$client, $em, $graph] = $this->bootClientWithGraph('partial');
@@ -159,6 +180,39 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
             'customCenter' => $customCenter,
             'suffix' => $suffix,
         ]];
+    }
+
+    /**
+     * Двойная отправка формы создания: ключ повтора из показанной формы становится ID документа,
+     * вторая отправка того же ключа документ не создаёт.
+     *
+     * @param array<string, mixed> $graph
+     * @param int $existing документов компании до отправки
+     */
+    private function submitDocumentFormTwice(KernelBrowser $client, string $path, array $graph, int $existing = 0): void
+    {
+        $crawler = $client->request('GET', $path);
+        self::assertResponseIsSuccessful();
+        $token = (string) $crawler->filter('input[name="document[_token]"]')->attr('value');
+        $key = $crawler->filter('input[name="document[idempotencyKey]"]')->attr('value');
+        self::assertTrue(Uuid::isValid((string) $key));
+
+        $payload = ['document' => $this->documentPayload($token, $graph, sprintf('DOC-%s', $graph['suffix']), null, null, null, null)
+            + ['idempotencyKey' => $key]];
+        $client->request('POST', $path, $payload);
+        self::assertResponseRedirects('/documents/resume');
+        $client->request('POST', $path, $payload);
+        self::assertResponseRedirects('/documents/resume');
+
+        $ids = $this->em()->getConnection()->fetchFirstColumn(
+            'SELECT id FROM documents WHERE company_id = :company AND number = :number',
+            ['company' => $graph['company']->getId(), 'number' => sprintf('DOC-%s', $graph['suffix'])],
+        );
+        self::assertSame([$key], $ids);
+        self::assertSame($existing + 1, (int) $this->em()->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :company',
+            ['company' => $graph['company']->getId()],
+        ));
     }
 
     private function submitDocumentForm(

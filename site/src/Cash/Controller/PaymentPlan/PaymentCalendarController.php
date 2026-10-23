@@ -27,6 +27,7 @@ use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -73,9 +74,11 @@ final class PaymentCalendarController extends AbstractController
         $filters = $this->extractFilters($request);
 
         $dto = new PaymentPlanDTO();
+        $dto->idempotencyKey = Uuid::uuid7()->toString();
         $form = $this->createForm(PaymentPlanType::class, $dto, [
             'company' => $company,
             'action' => $this->generateUrl('payment_calendar_new', $this->buildFilterQuery($filters)),
+            'idempotency_key' => true,
         ]);
         $form->handleRequest($request);
 

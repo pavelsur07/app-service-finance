@@ -20,6 +20,17 @@ class MoneyFundMovementRepository extends ServiceEntityRepository
         parent::__construct($registry, MoneyFundMovement::class);
     }
 
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?MoneyFundMovement
+    {
+        return $this->createQueryBuilder('m')
+            ->andWhere('m.id = :id')
+            ->andWhere('IDENTITY(m.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
     {
         $maxOccurredAt = $this->createQueryBuilder('m')
