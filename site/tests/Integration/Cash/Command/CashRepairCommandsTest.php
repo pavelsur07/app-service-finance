@@ -131,6 +131,64 @@ final class CashRepairCommandsTest extends IntegrationTestCase
         self::assertSame(Command::INVALID, $withoutCount->getStatusCode());
     }
 
+    public function testOpenLogsDryRunChangesNothing(): void
+    {
+        $company = $this->company();
+        $log = $this->openLog($company, '-3 days');
+
+        $tester = $this->runCommand('app:cash:close-open-import-logs', $company);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertMatchesRegularExpression('/candidates\s+1/', $tester->getDisplay());
+        self::assertNull($this->logFinishedAt($log));
+    }
+
+    public function testOpenLogsExecuteClosesOnlyLogsWithoutLiveJob(): void
+    {
+        $company = $this->company();
+        $orphan = $this->openLog($company, '-3 days');
+        $failedJob = $this->job($company);
+        $failedJob->start();
+        $failedJob->fail('сбой');
+        $queuedJob = $this->job($company);
+        $fresh = $this->openLog($company, '-1 hour');
+        $foreign = $this->openLog($this->company(), '-3 days');
+        $this->em->flush();
+        $this->connection->executeStatement(
+            "UPDATE cash_file_import_jobs SET finished_at = '2026-02-08 06:40:00' WHERE id = :id",
+            ['id' => $failedJob->getId()],
+        );
+        foreach ([$failedJob, $queuedJob] as $job) {
+            $this->ageLog((string) $job->getImportLog()?->getId(), '-3 days');
+        }
+
+        $dryRun = $this->runCommand('app:cash:close-open-import-logs', $company);
+        self::assertMatchesRegularExpression('/candidates\s+2/', $dryRun->getDisplay());
+
+        $tester = $this->runCommand('app:cash:close-open-import-logs', $company, ['--execute' => true, '--expected-count' => '2']);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertSame($this->logStartedAt($orphan), $this->logFinishedAt($orphan));
+        self::assertSame('2026-02-08 06:40:00', $this->logFinishedAt((string) $failedJob->getImportLog()?->getId()));
+        self::assertNull($this->logFinishedAt((string) $queuedJob->getImportLog()?->getId()));
+        self::assertNull($this->logFinishedAt($fresh));
+        self::assertNull($this->logFinishedAt($foreign));
+
+        $repeat = $this->runCommand('app:cash:close-open-import-logs', $company);
+        self::assertMatchesRegularExpression('/candidates\s+0/', $repeat->getDisplay());
+    }
+
+    public function testOpenLogsExecuteWithStaleExpectedCountIsRejected(): void
+    {
+        $company = $this->company();
+        $log = $this->openLog($company, '-3 days');
+
+        $tester = $this->runCommand('app:cash:close-open-import-logs', $company, ['--execute' => true, '--expected-count' => '2']);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertNull($this->logFinishedAt($log));
+    }
+
     public function testAllocatedDryRunChangesNothing(): void
     {
         $company = $this->company();
@@ -245,6 +303,38 @@ final class CashRepairCommandsTest extends IntegrationTestCase
             'UPDATE cash_file_import_jobs SET created_at = :at WHERE id = :id',
             ['at' => (new \DateTimeImmutable($createdAt))->format('Y-m-d H:i:s'), 'id' => $job->getId()],
         );
+    }
+
+    /**
+     * Журнал синхронного импорта (1С) без задания, начатый `$startedAt` назад.
+     */
+    private function openLog(Company $company, string $startedAt): string
+    {
+        $log = self::getContainer()->get(ImportLogger::class)->start($company, 'bank1c', false, null, 'a.txt');
+        $this->em->flush();
+        $this->ageLog($log->getId(), $startedAt);
+
+        return $log->getId();
+    }
+
+    private function ageLog(string $logId, string $startedAt): void
+    {
+        $this->connection->executeStatement(
+            'UPDATE import_log SET started_at = :at WHERE id = :id',
+            ['at' => (new \DateTimeImmutable($startedAt, new \DateTimeZone('UTC')))->format('Y-m-d H:i:s'), 'id' => $logId],
+        );
+    }
+
+    private function logStartedAt(string $logId): string
+    {
+        return (string) $this->connection->fetchOne('SELECT started_at FROM import_log WHERE id = :id', ['id' => $logId]);
+    }
+
+    private function logFinishedAt(string $logId): ?string
+    {
+        $value = $this->connection->fetchOne('SELECT finished_at FROM import_log WHERE id = :id', ['id' => $logId]);
+
+        return false === $value || null === $value ? null : (string) $value;
     }
 
     private function jobStatus(CashFileImportJob $job): string

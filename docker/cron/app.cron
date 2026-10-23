@@ -316,8 +316,9 @@
 
 # Раз в сутки в 07:43 (read-only гейт целостности ДДС, cash-pl-idempotency этап 5): задания файлового импорта
 # в `queued` дольше 24 ч без сообщения в failed и в очереди Redis; `allocated_amount` транзакции ≠ сумме живых
-# документов ОПиУ. Предикаты — те же, что у ремонта: app:cash:close-lost-import-jobs и
-# app:cash:recalculate-allocated-amounts (запуск --execute — с разрешения Владельца). Находки — один агрегированный
+# документов ОПиУ; журнал импорта без времени завершения дольше 24 ч. Предикаты — те же, что у ремонта:
+# app:cash:close-lost-import-jobs, app:cash:recalculate-allocated-amounts, app:cash:close-open-import-logs
+# (запуск --execute — с разрешения Владельца). Находки — один агрегированный
 # error (GlitchTip) + exit 1; Redis очереди недоступен — отдельный error, а не «0 потерянных».
 43 7 * * * cd /app && php bin/console app:cash:integrity-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 

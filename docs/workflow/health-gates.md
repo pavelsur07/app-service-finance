@@ -59,7 +59,8 @@
 в очереди. Exit code не меняется.
 
 Восьмой пример — `app:cash:integrity-check`: потерянные задания импорта ДДС и устаревший `allocated_amount` считаются
-dry-run самих команд ремонта (`app:cash:close-lost-import-jobs`, `app:cash:recalculate-allocated-amounts`) — один предикат на
+dry-run самих команд ремонта (`app:cash:close-lost-import-jobs`, `app:cash:recalculate-allocated-amounts`,
+`app:cash:close-open-import-logs`) — один предикат на
 гейт и починку, порог 24 ч тот же. Очередь Redis недоступна — отдельный `error`: без неё потерю сообщения не доказать, и «0
 потерянных» было бы ложным «чисто».
 
