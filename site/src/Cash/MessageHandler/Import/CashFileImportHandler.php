@@ -47,7 +47,8 @@ final class CashFileImportHandler
             return;
         }
 
-        if (!\in_array($job->getStatus(), [CashFileImportJob::STATUS_QUEUED, CashFileImportJob::STATUS_PROCESSING], true)) {
+        if (!\in_array($job->getStatus(), [CashFileImportJob::STATUS_QUEUED, CashFileImportJob::STATUS_PROCESSING], true)
+            && !$job->isClosedAsLost()) {
             $this->logSkipped($message, $job);
 
             return;
@@ -100,7 +101,9 @@ final class CashFileImportHandler
             // Сущность загружена до блокировки счёта: статус мог смениться, пока ждали.
             $this->entityManager->refresh($job);
 
-            if (CashFileImportJob::STATUS_QUEUED === $job->getStatus()) {
+            // Закрытое ремонтом как потерянное, а сообщение доставлено — задание живое, запускаем.
+            if (CashFileImportJob::STATUS_QUEUED === $job->getStatus() || $job->isClosedAsLost()) {
+                $job->getImportLog()?->setFinishedAt(null);
                 $job->start();
                 $this->entityManager->flush();
             } elseif (CashFileImportJob::STATUS_PROCESSING === $job->getStatus()) {
@@ -130,7 +133,7 @@ final class CashFileImportHandler
         $importException = null;
 
         try {
-            $this->importService->import($job);
+            $this->importService->import($job, fn () => $this->entityManager->flush());
             if ($resumed) {
                 // Прежний воркер мог умереть после последней пачки, но до пересчёта остатков:
                 // тогда импорт выше ничего не создаёт и пересчёт пропускает. Добираем диапазон

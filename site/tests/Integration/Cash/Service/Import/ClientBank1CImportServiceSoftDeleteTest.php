@@ -109,7 +109,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
 
     public function testImportCreatesNewTransactionWhenOnlySoftDeletedExistsWithSameExternalId(): void
     {
-        $firstSummary = $this->service->import([$this->buildRow('Первичное назначение')], $this->account, false);
+        $firstSummary = $this->service->import([$this->buildRow('Первичное назначение')], $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(1, $firstSummary['created']);
         self::assertSame(0, $firstSummary['duplicates']);
@@ -122,7 +122,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
 
         self::assertNotNull($originalDeletedAt);
 
-        $secondSummary = $this->service->import([$this->buildRow('Новое назначение')], $this->account, false);
+        $secondSummary = $this->service->import([$this->buildRow('Новое назначение')], $this->account, false, fn () => $this->em->flush());
 
         self::assertSame(1, $secondSummary['created']);
         self::assertSame(0, $secondSummary['duplicates']);

@@ -49,8 +49,7 @@ final class ImportLogger
         if (null === $log->getFinishedAt()) {
             $log->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
         }
+        // Без flush(): журнал сохраняет точка входа вместе со своим UnitOfWork.
         $this->entityManager->persist($log);
-        // ORM 3 игнорирует аргумент flush(): сбрасывается весь UnitOfWork.
-        $this->entityManager->flush();
     }
 }

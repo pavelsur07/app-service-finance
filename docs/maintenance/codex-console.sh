@@ -370,6 +370,19 @@ case "$cmd" in
     done
     if [ "$seen_dry_run" -ne 1 ]; then echo "--dry-run is required for $cmd" >&2; exit 2; fi
     ;;
+  app:cash:close-lost-import-jobs|app:cash:recalculate-allocated-amounts)
+    # Только dry-run ремонта ДДС (docs/tasks/cash-pl-idempotency, этап 4): SELECT кандидатов по
+    # компании, ничего не пишет, внешних вызовов нет. --execute через wrapper не пропускается —
+    # запись на проде запускает Владелец. --company обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^--company=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then seen_company=1
+      elif [ "$cmd" = "app:cash:close-lost-import-jobs" ] && [[ "$arg" =~ ^--older-than-hours=[0-9]{1,5}$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "--company is required for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 

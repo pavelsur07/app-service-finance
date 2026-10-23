@@ -35,6 +35,6 @@ final class ClientBank1CImportCurrencySafetyTest extends ClientBank1CImportServi
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Счёт импорта принадлежит другой компании.');
 
-        $this->service->import([], $foreignAccount, false);
+        $this->service->import([], $foreignAccount, false, fn () => $this->em->flush());
     }
 }

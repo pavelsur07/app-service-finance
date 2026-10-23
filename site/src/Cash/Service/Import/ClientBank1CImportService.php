@@ -201,9 +201,14 @@ class ClientBank1CImportService
 
     // --- import (с добавлением очистки кэша в начале) ---
     /**
+     * Строки пишутся по одной: после каждой вызывается $commit точки входа (Action), сервис сам
+     * не коммитит.
+     *
+     * @param \Closure(): void $commit
+     *
      * @throws CashImportAccountBusyException в счёт уже идёт другой импорт выписки
      */
-    public function import(array $preview, MoneyAccount $account, bool $overwrite, array $context = []): array
+    public function import(array $preview, MoneyAccount $account, bool $overwrite, \Closure $commit, array $context = []): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
         if ($account->getCompany()->getId() !== $company->getId()) {
@@ -212,7 +217,7 @@ class ClientBank1CImportService
         FiatCurrency::fromCode($account->getCurrency());
 
         if ((bool) ($context['preview'] ?? false)) {
-            return $this->importRows($preview, $company, $account, $overwrite, $context);
+            return $this->importRows($preview, $company, $account, $overwrite, $commit, $context);
         }
 
         // Импорт в счёт сериализован с файловым и банковским: поиск дубля по externalId и вставка
@@ -229,7 +234,7 @@ class ClientBank1CImportService
         }
 
         try {
-            return $this->importRows($preview, $company, $account, $overwrite, $context);
+            return $this->importRows($preview, $company, $account, $overwrite, $commit, $context);
         } finally {
             try {
                 $this->accountLock->release($companyId, $accountId);
@@ -245,11 +250,12 @@ class ClientBank1CImportService
 
     /**
      * @param array<int, mixed> $preview
+     * @param \Closure(): void $commit
      * @param array<string, mixed> $context
      *
      * @return array<string, mixed>
      */
-    private function importRows(array $preview, Company $company, MoneyAccount $account, bool $overwrite, array $context): array
+    private function importRows(array $preview, Company $company, MoneyAccount $account, bool $overwrite, \Closure $commit, array $context): array
     {
         // Очистим кэш контрагентов перед стартом импорта
         $this->cpCache = [];
@@ -469,7 +475,7 @@ class ClientBank1CImportService
             }
 
             try {
-                $this->entityManager->flush();
+                $commit();
 
                 if ($isNewTransaction) {
                     ++$created;

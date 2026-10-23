@@ -11,6 +11,7 @@ use App\Cash\Repository\Bank\BankConnectionRepository;
 use App\Cash\Service\Import\Bank\BankImportService;
 use App\Cash\Service\Import\Bank\Provider\Alfa\AlfaStatementsProvider;
 use App\Company\Facade\CompanyFacade;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
@@ -24,6 +25,7 @@ final class BankImportHandler
         private readonly BankImportService $importService,
         private readonly AlfaStatementsProvider $alfaStatementsProvider,
         private readonly LoggerInterface $logger,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -48,7 +50,13 @@ final class BankImportHandler
         };
 
         try {
-            $this->importService->importCompany($message->getBankCode(), $company, $connection, $provider);
+            $this->importService->importCompany(
+                $message->getBankCode(),
+                $company,
+                $connection,
+                $provider,
+                fn () => $this->entityManager->flush(),
+            );
         } catch (BankApiUnavailableException $exception) {
             // Обычное исключение, а не RecoverableMessageHandlingException:
             // Symfony ретраит Recoverable бесконечно, в обход max_retries.

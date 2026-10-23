@@ -13378,30 +13378,6 @@ parameters:
 			path: src/Billing/Fixture/BillingFixture.php
 
 		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Import\\Bank\\BankImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Import\\ClientBank1CImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/Import/ClientBank1CImportService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Import\\File\\CashFileImportService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
-
-		-
-			message: '#^flush\(\) в App\\Cash\\Service\\Import\\ImportLogger\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Cash/Service/Import/ImportLogger.php
-
-		-
 			message: '#^flush\(\) в App\\Catalog\\Infrastructure\\Repository\\ProductImportRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1

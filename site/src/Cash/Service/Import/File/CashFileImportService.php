@@ -60,7 +60,13 @@ final class CashFileImportService
     ) {
     }
 
-    public function import(CashFileImportJob $job): void
+    /**
+     * Строки пишутся пачками: после каждой вызывается $commitBatch точки входа (Handler), сервис
+     * сам не коммитит.
+     *
+     * @param \Closure(): void $commitBatch
+     */
+    public function import(CashFileImportJob $job, \Closure $commitBatch): void
     {
         $company = $job->getCompany();
         $account = $job->getMoneyAccount();
@@ -80,12 +86,15 @@ final class CashFileImportService
             // и раньше задача молча умирала в очереди фатальной ошибкой.
             fn (string $filePath) => $this->xlsConverter->withReadablePath(
                 $filePath,
-                fn (string $readablePath) => $this->readAndPersist($readablePath, $job),
+                fn (string $readablePath) => $this->readAndPersist($readablePath, $job, $commitBatch),
             ),
         );
     }
 
-    private function readAndPersist(string $filePath, CashFileImportJob $job): void
+    /**
+     * @param \Closure(): void $commitBatch
+     */
+    private function readAndPersist(string $filePath, CashFileImportJob $job, \Closure $commitBatch): void
     {
         $company = $job->getCompany();
         $moneyAccount = $job->getMoneyAccount();
@@ -208,13 +217,13 @@ final class CashFileImportService
 
                     ++$batchCount;
                     if ($batchCount >= $batchSize) {
-                        $this->flushBatch();
+                        $this->flushBatch($commitBatch);
                         $batchCount = 0;
                     }
                 }
             } finally {
                 if ($batchCount > 0) {
-                    $this->flushBatch();
+                    $this->flushBatch($commitBatch);
                 }
             }
 
@@ -558,10 +567,12 @@ final class CashFileImportService
      * Отсоединяет только сущности пачки. clear() в ORM 3 не принимает класс и
      * очищает весь UnitOfWork: компания, счёт, журнал и job отсоединялись, и
      * импорт падал после первой пачки или на закрытии журнала.
+     *
+     * @param \Closure(): void $commitBatch
      */
-    private function flushBatch(): void
+    private function flushBatch(\Closure $commitBatch): void
     {
-        $this->entityManager->flush();
+        $commitBatch();
         foreach ($this->batchTransactions as $transaction) {
             $this->entityManager->detach($transaction);
         }

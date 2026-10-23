@@ -79,7 +79,7 @@ final class PaymentPlanMatcher
         $txCategory = $transaction->getSingleSplitCategory();
         $txCounterparty = $transaction->getCounterparty();
 
-        $best = null;
+        $ranked = [];
 
         foreach ($candidates as $plan) {
             $planAmount = Money::fromString($plan->getAmount(), FiatCurrency::RUB->value)->abs()->amountMinor();
@@ -102,52 +102,36 @@ final class PaymentPlanMatcher
                 ++$score;
             }
 
-            $dateDiff = (int) $plan->getPlannedAt()->diff($txDate)->format('%a');
-
-            $candidateData = [
+            $ranked[] = [
                 'plan' => $plan,
                 'score' => $score,
                 'amountDiff' => $amountDiff,
-                'dateDiff' => $dateDiff,
+                'dateDiff' => (int) $plan->getPlannedAt()->diff($txDate)->format('%a'),
             ];
+        }
 
-            if (null === $best) {
-                $best = $candidateData;
+        // Лучший — больше совпадений (статья, контрагент), затем меньше разница сумм, затем дат;
+        // при равенстве — порядок выборки (usort стабилен).
+        usort($ranked, static fn (array $a, array $b): int => [$b['score'], $a['amountDiff'], $a['dateDiff']]
+            <=> [$a['score'], $b['amountDiff'], $b['dateDiff']]);
 
-                continue;
-            }
-
-            if ($candidateData['score'] > $best['score']) {
-                $best = $candidateData;
-
-                continue;
-            }
-
-            if ($candidateData['score'] < $best['score']) {
-                continue;
-            }
-
-            if ($candidateData['amountDiff'] < $best['amountDiff']) {
-                $best = $candidateData;
-
-                continue;
-            }
-
-            if ($candidateData['amountDiff'] > $best['amountDiff']) {
-                continue;
-            }
-
-            if ($candidateData['dateDiff'] < $best['dateDiff']) {
-                $best = $candidateData;
+        // Выборка кандидатов — без блокировки: план, который параллельная транзакция уже заняла,
+        // под FOR UPDATE оказывается сопоставленным — берётся следующий. Один план — одно
+        // сопоставление (уникальный индекс по plan_id — страховка).
+        $bestPlan = null;
+        foreach ($ranked as $candidate) {
+            if ($this->paymentPlanRepository->lockIfAvailableForMatch(
+                (string) $candidate['plan']->getId(),
+                (string) $company->getId(),
+            )) {
+                $bestPlan = $candidate['plan'];
+                break;
             }
         }
 
-        if (null === $best) {
+        if (null === $bestPlan) {
             return null;
         }
-
-        /** @var PaymentPlan $bestPlan */
-        $bestPlan = $best['plan'];
 
         $match = new PaymentPlanMatch(
             Uuid::uuid4()->toString(),

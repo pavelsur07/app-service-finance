@@ -175,7 +175,14 @@ final class BankImportHandlerTest extends TestCase
 
         $logger = new Logger('test', [$this->logs]);
 
-        return new BankImportHandler($companyFacade, $connections, $this->importService(), $provider, $logger);
+        return new BankImportHandler(
+            $companyFacade,
+            $connections,
+            $this->importService(),
+            $provider,
+            $logger,
+            $this->createMock(EntityManagerInterface::class),
+        );
     }
 
     private function importService(): BankImportService
