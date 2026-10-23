@@ -48,6 +48,13 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
         $this->submitDocumentFormTwice($client, '/documents/new', $graph);
     }
 
+    public function testNonCanonicalKeyIsNormalized(): void
+    {
+        [$client, , $graph] = $this->bootClientWithGraph('urn-key');
+
+        $this->submitDocumentFormTwice($client, '/documents/new', $graph, 0, static fn (string $key): string => 'urn:uuid:'.strtoupper($key));
+    }
+
     public function testCopySubmittedTwiceCreatesOneCopy(): void
     {
         [$client, $em, $graph] = $this->bootClientWithGraph('copy-twice');
@@ -188,8 +195,9 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
      *
      * @param array<string, mixed> $graph
      * @param int $existing документов компании до отправки
+     * @param (\Closure(string): string)|null $submitted как ключ записан в отправке (клиент мог изменить запись UUID)
      */
-    private function submitDocumentFormTwice(KernelBrowser $client, string $path, array $graph, int $existing = 0): void
+    private function submitDocumentFormTwice(KernelBrowser $client, string $path, array $graph, int $existing = 0, ?\Closure $submitted = null): void
     {
         $crawler = $client->request('GET', $path);
         self::assertResponseIsSuccessful();
@@ -198,7 +206,7 @@ final class DocumentResponsibilityCenterControllerTest extends WebTestCaseBase
         self::assertTrue(Uuid::isValid((string) $key));
 
         $payload = ['document' => $this->documentPayload($token, $graph, sprintf('DOC-%s', $graph['suffix']), null, null, null, null)
-            + ['idempotencyKey' => $key]];
+            + ['idempotencyKey' => null !== $submitted ? $submitted((string) $key) : $key]];
         $client->request('POST', $path, $payload);
         self::assertResponseRedirects('/documents/resume');
         $client->request('POST', $path, $payload);

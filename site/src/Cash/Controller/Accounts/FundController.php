@@ -144,7 +144,7 @@ class FundController extends AbstractController
     {
         $key = $request->request->all('money_fund_movement')['idempotencyKey'] ?? null;
 
-        return \is_string($key) && Uuid::isValid($key) ? strtolower($key) : Uuid::uuid7()->toString();
+        return \is_string($key) && Uuid::isValid($key) ? Uuid::fromString($key)->toString() : Uuid::uuid7()->toString();
     }
 
     private function assertFeatureEnabled(): void

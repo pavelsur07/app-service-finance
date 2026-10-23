@@ -483,7 +483,7 @@ class DocumentController extends AbstractController
     {
         $key = $request->request->all('document')['idempotencyKey'] ?? null;
 
-        return \is_string($key) && Uuid::isValid($key) ? strtolower($key) : Uuid::uuid7()->toString();
+        return \is_string($key) && Uuid::isValid($key) ? Uuid::fromString($key)->toString() : Uuid::uuid7()->toString();
     }
 
     private function duplicateDocument(Document $source, Company $company, string $id): Document
