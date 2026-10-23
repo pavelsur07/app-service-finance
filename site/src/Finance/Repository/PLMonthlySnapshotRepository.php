@@ -17,6 +17,23 @@ class PLMonthlySnapshotRepository extends ServiceEntityRepository
         parent::__construct($registry, PLMonthlySnapshot::class);
     }
 
+    /**
+     * Сериализует пересборку снимка месяца компании до конца текущей транзакции: две пересборки
+     * пустого месяца иначе обе вставили бы строку «без статьи» (NULL в уникальном индексе различны).
+     */
+    public function acquireRebuildLock(string $companyId, string $period): void
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('PL monthly snapshot rebuild lock requires an active transaction.');
+        }
+
+        $connection->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:key))',
+            ['namespace' => 'pl_monthly_snapshot', 'key' => $companyId.':'.$period],
+        );
+    }
+
     public function upsert(
         string $companyId,
         ?string $categoryId,

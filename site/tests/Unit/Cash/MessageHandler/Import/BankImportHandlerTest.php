@@ -8,6 +8,7 @@ use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Exception\BankApiRequestFailedException;
 use App\Cash\Exception\BankApiUnavailableException;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\MessageHandler\Import\BankImportHandler;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -28,6 +29,7 @@ use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Repository\UserRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
@@ -193,6 +195,7 @@ final class BankImportHandlerTest extends TestCase
             new NullLogger(),
             new ImportLogger($entityManager),
             new CashTransactionResponsibilityCenterResolver($responsibilityCenters),
+            new CashImportAccountLock($this->createMock(Connection::class)),
         );
     }
 

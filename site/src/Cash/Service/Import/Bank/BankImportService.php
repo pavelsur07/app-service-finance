@@ -11,6 +11,7 @@ use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -32,6 +33,7 @@ final class BankImportService
         private readonly LoggerInterface $logger,
         private readonly ImportLogger $importLogger,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
+        private readonly CashImportAccountLock $accountLock,
     ) {
     }
 
@@ -73,115 +75,44 @@ final class BankImportService
 
                 ++$matchedAccounts;
 
-                $cursor = $this->cursorRepository->getOrCreate($company, $bankCode, $accountNumber);
-                $today = new \DateTimeImmutable('today');
-                $start = $cursor->getLastImportedDate()
-                    ? $cursor->getLastImportedDate()->modify('-1 day')
-                    : $today->modify('-7 days');
-                $end = $today;
+                // Импорт в счёт сериализован с файловым и 1С: занятый счёт догрузится следующим
+                // прогоном с курсора.
+                $companyId = (string) $company->getId();
+                $moneyAccountId = (string) $moneyAccount->getId();
+                if (!$this->accountLock->tryAcquire($companyId, $moneyAccountId)) {
+                    $this->logger->warning('Bank import skipped: another import of the account is running', [
+                        'company' => $companyId,
+                        'bank_code' => $bankCode,
+                        'money_account' => $moneyAccountId,
+                    ]);
+                    continue;
+                }
 
-                for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
-                    $page = 1;
-                    while (true) {
-                        $response = $provider->getTransactions($connection, $accountNumber, $date, $page);
-                        $transactions = $this->extractTransactions($response);
-                        if ([] === $transactions) {
-                            break;
-                        }
-
-                        foreach ($transactions as $transaction) {
-                            if (!is_array($transaction)) {
-                                continue;
-                            }
-
-                            $externalId = $transaction['uuid'] ?? null;
-                            if (!is_string($externalId) || '' === $externalId) {
-                                $this->logger->warning('Bank import skipped transaction without uuid', [
-                                    'company' => $company->getId(),
-                                    'bank_code' => $bankCode,
-                                    'account_number' => $accountNumber,
-                                    'transaction' => $transaction,
-                                ]);
-                                continue;
-                            }
-
-                            if ($this->cashTransactionRepository->findOneByImport($company->getId(), $bankCode, $externalId)) {
-                                ++$transactionsSkippedDuplicates;
-                                continue;
-                            }
-
-                            $occurredAt = $this->resolveOccurredAt($transaction);
-                            if (!$occurredAt instanceof \DateTimeImmutable) {
-                                $this->logger->warning('Bank import skipped transaction without date', [
-                                    'company' => $company->getId(),
-                                    'bank_code' => $bankCode,
-                                    'account_number' => $accountNumber,
-                                    'external_id' => $externalId,
-                                ]);
-                                continue;
-                            }
-
-                            $amount = $this->resolveAmount($transaction);
-                            if (null === $amount) {
-                                $this->logger->warning('Bank import skipped transaction without amount', [
-                                    'company' => $company->getId(),
-                                    'bank_code' => $bankCode,
-                                    'account_number' => $accountNumber,
-                                    'external_id' => $externalId,
-                                ]);
-                                continue;
-                            }
-
-                            $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
-                            if (null === FiatCurrency::tryFrom($currency) || $currency !== $moneyAccount->getCurrency()) {
-                                ++$transactionsErrors;
-                                $this->importLogger->incError($importLog);
-                                $this->logger->warning('Bank import skipped transaction with invalid currency', [
-                                    'company' => $company->getId(),
-                                    'bank_code' => $bankCode,
-                                    'external_id' => $externalId,
-                                    'expected_currency' => $moneyAccount->getCurrency(),
-                                    'actual_currency' => $currency,
-                                ]);
-                                continue;
-                            }
-                            $direction = $this->resolveDirection($transaction);
-                            if (!$direction instanceof CashDirection) {
-                                continue;
-                            }
-                            $description = $this->resolveDescription($transaction);
-
-                            $cashTransaction = new CashTransaction(
-                                Uuid::uuid4()->toString(),
-                                $company,
-                                $moneyAccount,
-                                $direction,
-                                $amount,
-                                $currency,
-                                $occurredAt,
-                            );
-                            $cashTransaction
-                                ->setExternalId($externalId)
-                                ->setImportSource($bankCode)
-                                ->setProjectDirection($systemProject)
-                                ->setResponsibilityCenterId($responsibilityPair->responsibilityCenterId)
-                                ->setDescription($description);
-
-                            $this->entityManager->persist($cashTransaction);
-                            ++$transactionsCreated;
-                        }
-
-                        if (!$this->hasNextPage($response)) {
-                            break;
-                        }
-
-                        ++$page;
+                try {
+                    $this->importAccount(
+                        $bankCode,
+                        $company,
+                        $connection,
+                        $provider,
+                        $accountNumber,
+                        $moneyAccount,
+                        $systemProject,
+                        $responsibilityPair->responsibilityCenterId,
+                        $importLog,
+                        $transactionsCreated,
+                        $transactionsSkippedDuplicates,
+                        $transactionsErrors,
+                    );
+                } finally {
+                    try {
+                        $this->accountLock->release($companyId, $moneyAccountId);
+                    } catch (\Throwable $exception) {
+                        // Соединение потеряно — PostgreSQL снял сессионную блокировку сам.
+                        $this->logger->warning('Bank import: account lock release failed', [
+                            'company' => $companyId,
+                            'exception_class' => $exception::class,
+                        ]);
                     }
-
-                    // Транзакции дня и курсор — одним flush(): курсор не обгоняет данные.
-                    $cursor->setLastImportedDate(new \DateTimeImmutable($date->format('Y-m-d')));
-                    $this->cursorRepository->save($cursor);
-                    $this->entityManager->flush();
                 }
             }
 
@@ -196,6 +127,160 @@ final class BankImportService
             $this->finishImportLog($importLog, [
                 'error' => $exception->getMessage(),
             ], $transactionsCreated, $transactionsSkippedDuplicates, $transactionsErrors + 1);
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * Выписка одного счёта с курсора по сегодня; вызывается под блокировкой счёта. Счётчики
+     * копятся в переменных вызывающего: при сбое на середине сводка учитывает записанные дни.
+     */
+    private function importAccount(
+        string $bankCode,
+        Company $company,
+        BankConnection $connection,
+        BankStatementsProviderInterface $provider,
+        string $accountNumber,
+        MoneyAccount $moneyAccount,
+        ?ProjectDirection $systemProject,
+        ?string $responsibilityCenterId,
+        ImportLog $importLog,
+        int &$transactionsCreated,
+        int &$transactionsSkippedDuplicates,
+        int &$transactionsErrors,
+    ): void {
+        /** @var array<string, CashTransaction> $pending строки дня, ещё не записанные flush() */
+        $pending = [];
+        $cursor = $this->cursorRepository->getOrCreate($company, $bankCode, $accountNumber);
+        $today = new \DateTimeImmutable('today');
+        $start = $cursor->getLastImportedDate()
+            ? $cursor->getLastImportedDate()->modify('-1 day')
+            : $today->modify('-7 days');
+        $end = $today;
+
+        try {
+            for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
+                $page = 1;
+                while (true) {
+                    $response = $provider->getTransactions($connection, $accountNumber, $date, $page);
+                    $transactions = $this->extractTransactions($response);
+                    if ([] === $transactions) {
+                        break;
+                    }
+
+                    foreach ($transactions as $transaction) {
+                        if (!is_array($transaction)) {
+                            continue;
+                        }
+
+                        $externalId = $transaction['uuid'] ?? null;
+                        if (!is_string($externalId) || '' === $externalId) {
+                            $this->logger->warning('Bank import skipped transaction without uuid', [
+                                'company' => $company->getId(),
+                                'bank_code' => $bankCode,
+                                'account_number' => $accountNumber,
+                                'transaction' => $transaction,
+                            ]);
+                            continue;
+                        }
+
+                        // Строка, уже записанная этим прогоном, ещё не в БД до flush() дня: тот же
+                        // uuid на другой странице упал бы на уникальном индексе импорта, и день
+                        // повторялся бы без конца.
+                        if (isset($pending[$externalId])
+                            || $this->cashTransactionRepository->findOneByImport($company->getId(), $bankCode, $externalId)
+                        ) {
+                            ++$transactionsSkippedDuplicates;
+                            continue;
+                        }
+
+                        $occurredAt = $this->resolveOccurredAt($transaction);
+                        if (!$occurredAt instanceof \DateTimeImmutable) {
+                            $this->logger->warning('Bank import skipped transaction without date', [
+                                'company' => $company->getId(),
+                                'bank_code' => $bankCode,
+                                'account_number' => $accountNumber,
+                                'external_id' => $externalId,
+                            ]);
+                            continue;
+                        }
+
+                        $amount = $this->resolveAmount($transaction);
+                        if (null === $amount) {
+                            $this->logger->warning('Bank import skipped transaction without amount', [
+                                'company' => $company->getId(),
+                                'bank_code' => $bankCode,
+                                'account_number' => $accountNumber,
+                                'external_id' => $externalId,
+                            ]);
+                            continue;
+                        }
+
+                        $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
+                        if (null === FiatCurrency::tryFrom($currency) || $currency !== $moneyAccount->getCurrency()) {
+                            ++$transactionsErrors;
+                            $this->importLogger->incError($importLog);
+                            $this->logger->warning('Bank import skipped transaction with invalid currency', [
+                                'company' => $company->getId(),
+                                'bank_code' => $bankCode,
+                                'external_id' => $externalId,
+                                'expected_currency' => $moneyAccount->getCurrency(),
+                                'actual_currency' => $currency,
+                            ]);
+                            continue;
+                        }
+                        $direction = $this->resolveDirection($transaction);
+                        if (!$direction instanceof CashDirection) {
+                            continue;
+                        }
+                        $description = $this->resolveDescription($transaction);
+
+                        $cashTransaction = new CashTransaction(
+                            Uuid::uuid4()->toString(),
+                            $company,
+                            $moneyAccount,
+                            $direction,
+                            $amount,
+                            $currency,
+                            $occurredAt,
+                        );
+                        $cashTransaction
+                            ->setExternalId($externalId)
+                            ->setImportSource($bankCode)
+                            ->setProjectDirection($systemProject)
+                            ->setResponsibilityCenterId($responsibilityCenterId)
+                            ->setDescription($description);
+
+                        $this->entityManager->persist($cashTransaction);
+                        $pending[$externalId] = $cashTransaction;
+                        ++$transactionsCreated;
+                    }
+
+                    if (!$this->hasNextPage($response)) {
+                        break;
+                    }
+
+                    ++$page;
+                }
+
+                // Транзакции дня и курсор — одним flush(): курсор не обгоняет данные.
+                $cursor->setLastImportedDate(new \DateTimeImmutable($date->format('Y-m-d')));
+                $this->cursorRepository->save($cursor);
+                $this->entityManager->flush();
+                $pending = [];
+            }
+        } catch (\Throwable $exception) {
+            // Строки недогруженного дня и курсор не должны дожить до flush() журнала импорта после
+            // снятия блокировки счёта: следующий импорт их не видит и вставил бы те же. День
+            // повторится с курсора.
+            foreach ($pending as $cashTransaction) {
+                $this->entityManager->detach($cashTransaction);
+            }
+            // Курсор тоже: новый (первый импорт счёта) иначе вставился бы без блокировки и
+            // столкнулся бы на уникальном ключе с курсором следующего импорта.
+            $this->entityManager->detach($cursor);
+            $transactionsCreated -= \count($pending);
 
             throw $exception;
         }
