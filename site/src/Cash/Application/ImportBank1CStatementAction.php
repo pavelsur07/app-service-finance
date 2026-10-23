@@ -57,12 +57,15 @@ final class ImportBank1CStatementAction
                 ['preview' => false, 'import_log' => $importLog] + $context,
             );
         } finally {
-            // На закрытом EM flush() бросил бы и подменил исходное исключение.
-            if ($this->entityManager->isOpen()) {
-                $this->importLogger->finish($importLog);
-                $this->entityManager->flush();
+            try {
+                // На закрытом EM flush() бросил бы и подменил исходное исключение.
+                if ($this->entityManager->isOpen()) {
+                    $this->importLogger->finish($importLog);
+                    $this->entityManager->flush();
+                }
+            } finally {
+                $this->importLogLease->release($importLog->getId());
             }
-            $this->importLogLease->release($importLog->getId());
         }
 
         return ['summary' => $summary, 'importLog' => $importLog];
