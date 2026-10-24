@@ -211,6 +211,19 @@ type fakeOzon struct {
 	whCalls     [][]int64
 	whErr       error
 	whFailAfter int
+	// Поисковая аналитика: ответ на страницу и вызовы.
+	searchFn    func(details bool, day time.Time, skus []int64, page int) (ozon.SearchPage, error)
+	searchCalls []searchCall
+	// searchSameBody — каждая страница с телом страницы 0 (повтор выдачи).
+	searchSameBody bool
+}
+
+type searchCall struct {
+	details  bool
+	day      string
+	firstSKU int64
+	skus     int
+	page     int
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {

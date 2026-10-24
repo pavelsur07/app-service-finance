@@ -99,3 +99,45 @@ func TestWarehouseStocksNeedStocksResource(t *testing.T) {
 	assert.Empty(t, periods(p.Ensure, executor.ResourceStocksWarehouses), "без снимка остатков нет SKU")
 	assert.Equal(t, []string{"2026-10-25"}, periods(p.Ensure, executor.ResourcePrices), "цены от остатков не зависят")
 }
+
+func TestSearchAnalyticsBackfillFromDefaultAndTail(t *testing.T) {
+	cabs := []connections.Cabinet{seller("a", executor.ResourceStocks, executor.ResourceSearchQueries, executor.ResourceSearchDetails)}
+
+	p := Build(at("2026-10-24 12:00"), cabs, DefaultConfig(msk))
+
+	for _, resource := range []string{executor.ResourceSearchQueries, executor.ResourceSearchDetails} {
+		days := periods(p.Ensure, resource)
+		require.NotEmpty(t, days, resource)
+		assert.Equal(t, "2026-09-21", days[0], "догон с самого раннего дня")
+		assert.Equal(t, "2026-10-22", days[len(days)-1], "до D−2")
+		s := specFor(p.Ensure, resource, "2026-10-01")
+		require.NotNil(t, s)
+		assert.Equal(t, PriorityBackfill, s.Priority)
+	}
+	var tail *Refresh
+	for i := range p.Refreshes {
+		if p.Refreshes[i].Kind == KindSearchTail {
+			tail = &p.Refreshes[i]
+		}
+	}
+	require.NotNil(t, tail)
+	assert.Len(t, tail.Specs, 2*SearchTailDays)
+	assert.Equal(t, "2026-10-21", tail.Specs[0].PeriodKey)
+	assert.True(t, tail.Specs[0].Refresh)
+}
+
+func TestSearchAnalyticsBackfillNotDeeperThanHistory(t *testing.T) {
+	cabs := []connections.Cabinet{seller("a", executor.ResourceStocks, executor.ResourceSearchQueries)}
+	p := Build(at("2026-11-30 12:00"), cabs, DefaultConfig(msk))
+	days := periods(p.Ensure, executor.ResourceSearchQueries)
+	require.NotEmpty(t, days)
+	assert.Equal(t, "2026-10-28", days[0], "не глубже D−33")
+}
+
+func TestSearchAnalyticsNeedStocks(t *testing.T) {
+	p := Build(at("2026-10-24 12:00"), []connections.Cabinet{seller("a", executor.ResourceSearchQueries)}, DefaultConfig(msk))
+	assert.Empty(t, periods(p.Ensure, executor.ResourceSearchQueries))
+	for _, r := range p.Refreshes {
+		assert.NotEqual(t, KindSearchTail, r.Kind)
+	}
+}

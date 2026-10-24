@@ -52,6 +52,8 @@ final readonly class CoverageHeatmapBuilder
         'ozon.stocks' => ['Остатки: снимок 05:00', self::STEP_DAY],
         'ozon.stocks.warehouses' => ['Остатки по складам: снимок 05:00', self::STEP_DAY],
         'ozon.prices' => ['Цены: снимок 05:00', self::STEP_DAY],
+        'ozon.analytics.queries' => ['Поиск: сводка по товарам', self::STEP_DAY],
+        'ozon.analytics.queries.details' => ['Поиск: запросы по товарам', self::STEP_DAY],
         'ozon.ads.campaigns' => ['Реклама: кампании', self::STEP_DAY],
         'ozon.ads.expense' => ['Реклама: расход', self::STEP_DAY],
         'ozon.ads.daily' => ['Реклама: статистика по дням', self::STEP_DAY],

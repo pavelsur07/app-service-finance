@@ -44,7 +44,7 @@ func (r *taskRun) warehouseStocks(ctx context.Context, creds ozon.Credentials, c
 }
 
 func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	skus, err := r.snapshotSKUs(ctx, cabinet)
+	skus, err := r.snapshotSKUs(ctx, cabinet, r.task.PeriodKey)
 	if err != nil {
 		return err
 	}
@@ -104,13 +104,13 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 	return nil
 }
 
-// snapshotSKUs — SKU текущей ревизии снимка ozon.stocks того же дня, без дублей по возрастанию.
-func (r *taskRun) snapshotSKUs(ctx context.Context, cabinet connections.Cabinet) ([]int64, error) {
+// snapshotSKUs — SKU текущей ревизии снимка ozon.stocks дня periodKey, без дублей по возрастанию.
+func (r *taskRun) snapshotSKUs(ctx context.Context, cabinet connections.Cabinet, periodKey string) ([]int64, error) {
 	if !cabinet.Supports(ResourceStocks) {
 		// Остатки сняты с кабинета — не из чего брать SKU.
 		return nil, errResourceNotEnabled
 	}
-	key := store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceStocks, PeriodKey: r.task.PeriodKey}
+	key := store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceStocks, PeriodKey: periodKey}
 	content, err := r.exec.tasks.ContentPages(ctx, key)
 	if errors.Is(err, store.ErrNoContent) {
 		return nil, errStocksNotLoaded
