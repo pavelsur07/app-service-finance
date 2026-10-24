@@ -4206,6 +4206,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.70 | 2026-10-24 | Marketplace: снимки цен и остатков по складам Ozon — всем кабинетам с ключом seller (`ozon_fetcher.snapshots_companies: ['*']`) |
 | 2.69 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы `ozon.prices` и `ozon.stocks.warehouses` (параметр `ozon_fetcher.snapshots_companies`, остатки по складам — только с `ozon.stocks`), строки карты покрытия «Цены: снимок 05:00», «Остатки по складам: снимок 05:00» |
 | 2.68 | 2026-10-23 | Cash: ремонт `app:cash:close-open-import-logs` (журналы импорта без `finished_at`), гейт `app:cash:integrity-check` считает и их |
 | 2.67 | 2026-10-23 | Cash/Finance: ключ повтора в формах документа ОПиУ (создание, копия), планового платежа и движения по фонду; ночной гейт `app:cash:integrity-check` (07:43); `app:finance:verify-pl-register` пишет `error` и стоит в cron (07:44) |
