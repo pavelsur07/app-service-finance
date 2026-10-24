@@ -25,7 +25,7 @@ func (r *taskRun) returns(ctx context.Context, creds ozon.Credentials) error {
 	var drift ozon.Drift
 	defer func() { r.warnDrift(ozon.EndpointReturns, drift) }()
 	err = r.exec.ozon.FetchReturns(ctx, creds, r.task.ConnectionRef, from, to, r.cursor, r.nextPage, func(p ozon.Page) error {
-		if page, err := ozon.ParseReturnsPage(p.Body, 0, from, to); err == nil {
+		if page, err := ozon.ParseReturnsPage(p.Body, nil, from, to); err == nil {
 			count += page.Returns
 			pages++
 		}

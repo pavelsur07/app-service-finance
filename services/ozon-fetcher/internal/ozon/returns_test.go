@@ -70,7 +70,7 @@ func TestFetchReturnsKeepsLastFractionalSecond(t *testing.T) {
 	from, to := returnsDay()
 	got := 0
 	err := clientFor(t, handler).FetchReturns(context.Background(), testCreds, "conn-1", from, to, "", 1, func(p Page) error {
-		page, err := ParseReturnsPage(p.Body, 0, from, to)
+		page, err := ParseReturnsPage(p.Body, nil, from, to)
 		got += page.Returns
 		return err
 	})
@@ -100,8 +100,9 @@ func TestFetchReturnsRejectsBrokenPages(t *testing.T) {
 		"no has_next":       `{"returns":[]}`,
 		"no returns":        `{"has_next":false}`,
 		"empty with next":   `{"returns":[],"has_next":true}`,
-		"id not above last": returnsBody(false, "2026-10-10T10:00:00Z", 5),
-		"ids not ascending": returnsBody(false, "2026-10-10T10:00:00Z", 9, 8),
+		"repeated id":       returnsBody(false, "2026-10-10T10:00:00Z", 9, 9),
+		"zero id":           returnsBody(false, "2026-10-10T10:00:00Z", 0),
+		"last_id not moved": returnsBody(true, "2026-10-10T10:00:00Z", 5),
 		"day before":        returnsBody(false, "2026-10-09T20:59:59Z", 9),
 		"day after":         returnsBody(false, "2026-10-10T21:00:00Z", 9),
 		"no return date":    `{"returns":[{"id":9,"logistic":{}}],"has_next":false}`,
@@ -126,4 +127,35 @@ func TestFetchReturnsPageLimitIsAbsolute(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, ClassInvalidResponse, apiErr.Class)
 	assert.Empty(t, *bodies)
+}
+
+// Прод 24.10.2026 (кабинет с FBS): id внутри страницы не по возрастанию — это не ошибка.
+func TestFetchReturnsAcceptsUnorderedIDsAndRejectsCrossPageRepeat(t *testing.T) {
+	handler, bodies := productServer(t, EndpointReturns, func(body map[string]any) (int, string) {
+		if body["last_id"] == float64(0) {
+			return http.StatusOK, returnsBody(true, "2026-10-10T10:00:00Z", 1002653789, 1002600001, 1002700000)
+		}
+		return http.StatusOK, returnsBody(false, "2026-10-10T11:00:00Z", 1002500000)
+	})
+	from, to := returnsDay()
+	var pages []Page
+	err := clientFor(t, handler).FetchReturns(context.Background(), testCreds, "conn-1", from, to, "", 1, func(p Page) error {
+		pages = append(pages, p)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Len(t, pages, 2)
+	assert.Equal(t, "1002700000", pages[0].Cursor, "курсор — id последнего возврата страницы")
+	assert.Equal(t, float64(1002700000), (*bodies)[1]["last_id"])
+
+	repeat, _ := productServer(t, EndpointReturns, func(body map[string]any) (int, string) {
+		if body["last_id"] == float64(0) {
+			return http.StatusOK, returnsBody(true, "2026-10-10T10:00:00Z", 3, 7)
+		}
+		return http.StatusOK, returnsBody(false, "2026-10-10T11:00:00Z", 3)
+	})
+	err = clientFor(t, repeat).FetchReturns(context.Background(), testCreds, "conn-1", from, to, "", 1, func(Page) error { return nil })
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr, "возврат следующей страницы уже был — страницы пересекаются")
+	assert.Equal(t, ClassInvalidResponse, apiErr.Class)
 }
