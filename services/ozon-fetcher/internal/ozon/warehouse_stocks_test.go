@@ -78,3 +78,14 @@ func TestWarehouseStocksErrorClasses(t *testing.T) {
 		assert.Equal(t, tc.class, apiErr.Class)
 	}
 }
+
+func TestShapeDriftNamesFieldsOnly(t *testing.T) {
+	assert.True(t, PricesDrift([]byte(pricesBody("", 0))).Empty(), "пустая концевая страница — та же форма")
+	assert.True(t, PricesDrift([]byte(pricesBody("C", 1, 1))).Empty())
+	assert.True(t, PricesDrift([]byte(`not json`)).Empty(), "неразборчивое отвергает разбор страницы")
+
+	d := WarehouseStocksDrift([]byte(`{"items":[{"sku":1,"secret_value":5}],"extra":true}`))
+	assert.Equal(t, []string{"extra", "items[].secret_value"}, d.Unknown())
+	assert.Contains(t, d.Missing(), "items[].warehouse_id")
+	assert.NotContains(t, d.Missing(), "items[].sku")
+}

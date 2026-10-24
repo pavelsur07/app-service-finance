@@ -46,7 +46,8 @@ var pricesCabinet = func() connections.Cabinet {
 func pricesPage(total int, cursor string, ids ...int64) ozon.Page {
 	items := make([]string, len(ids))
 	for i, id := range ids {
-		items[i] = fmt.Sprintf(`{"product_id":%d,"offer_id":"A-%d","price":{"price":"100"}}`, id, id)
+		items[i] = fmt.Sprintf(`{"product_id":%d,"offer_id":"A-%d","acquiring":0,"commissions":{},"marketing_actions":{},`+
+			`"price":{"price":"100"},"price_indexes":{},"volume_weight":0.1}`, id, id)
 	}
 	return page(fmt.Sprintf(`{"items":[%s],"total":%d,"cursor":%q,"total_items":%d}`, strings.Join(items, ","), total, cursor, total), cursor)
 }
@@ -120,4 +121,16 @@ func TestPricesDisabledDoNotCallOzon(t *testing.T) {
 
 	assert.Equal(t, "resource_disabled", res.Outcome)
 	assert.Empty(t, o.priceFrom)
+}
+
+func TestPricesShapeChangeIsWarnedOnce(t *testing.T) {
+	changed := page(`{"items":[{"product_id":1,"offer_id":"A","acquiring":0,"commissions":{},"marketing_actions":{},"price":{},"price_indexes":{},"new_field":1}],"total":1,"cursor":"C1","total_items":1}`, "C1")
+	o := &fakeOzon{pricePages: map[string]ozon.Page{"": changed, "C1": pricesPage(1, "")}}
+	h := newHarness(o)
+
+	res := h.exec.Run(context.Background(), task(ResourcePrices, today), pricesCabinet, "trace")
+
+	assert.Equal(t, "done", res.Outcome, "raw сохраняется, задача не падает")
+	assert.Equal(t, 1, strings.Count(h.logs.String(), `"msg":"ozon response shape changed"`))
+	assert.Contains(t, h.logs.String(), `"unknown_fields":["items[].new_field"],"missing_fields":["items[].volume_weight"]`)
 }

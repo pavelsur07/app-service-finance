@@ -28,13 +28,16 @@ var (
 	errStocksRevised = errors.New("executor: stocks snapshot of the day changed since the saved chunk")
 )
 
+// warehouseEnd — индекс курсора последней сохранённой порции: итог задачи не
+// записан (сбой), а все порции уже в raw.
+const warehouseEnd = "end"
+
 // warehouseStocks — остатки по складам по SKU снимка ozon.stocks того же дня,
 // по возрастанию, порции по ozon.MaxWarehouseStocksSKUs; курсор —
-// «отпечаток списка SKU:индекс следующей порции».
+// «отпечаток списка SKU:индекс следующей порции», у последней порции —
+// «отпечаток:end»: повтор после несостоявшейся записи итога сверяет отпечаток
+// со снимком остатков, а не принимает сохранённое молча.
 func (r *taskRun) warehouseStocks(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
-		return nil
-	}
 	return r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
 		return r.loadWarehouseStocks(ctx, creds, cabinet)
 	})
@@ -51,18 +54,28 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 	}
 	fp := numbersFingerprint(keys)
 
+	end := fp + ":" + warehouseEnd
+
 	start := 0
-	if r.cursor != "" {
+	switch {
+	case r.cursor == end:
+		// Все порции этого набора SKU уже сохранены прежней попыткой.
+		return nil
+	case r.cursor != "":
 		cursorFP, idx, ok := strings.Cut(r.cursor, ":")
 		n, parseErr := strconv.Atoi(idx)
 		if !ok || cursorFP != fp || parseErr != nil || n <= 0 || n >= len(skus) {
 			return errStocksRevised
 		}
 		start = n
+	case len(r.hashes) > 0:
+		// Страницы без курсора — не от этого набора SKU.
+		return errStocksRevised
 	}
 	if len(skus) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyWarehouseStocksPage), ContentType: "application/json"})
+		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyWarehouseStocksPage), Cursor: end, ContentType: "application/json"})
 	}
+	var drift ozon.Drift
 	var rows, withRows int
 	for i := start; i < len(skus); i += ozon.MaxWarehouseStocksSKUs {
 		chunk := skus[i:min(i+ozon.MaxWarehouseStocksSKUs, len(skus))]
@@ -72,7 +85,9 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 		}
 		rows += stats.Rows
 		withRows += stats.SKUs
+		drift.Add(ozon.WarehouseStocksDrift(page.Body))
 		page.No = r.nextPage
+		page.Cursor = end
 		if next := i + len(chunk); next < len(skus) {
 			page.Cursor = fp + ":" + strconv.Itoa(next)
 		}
@@ -84,6 +99,7 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 	r.log.Info("warehouse stocks read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
 		slog.Int("requested", len(skus)-start), slog.Int("skus_with_rows", withRows), slog.Int("rows", rows),
 		slog.Bool("continued", start > 0))
+	r.warnDrift(ozon.EndpointWarehouseStocks, drift)
 	return nil
 }
 
@@ -109,6 +125,11 @@ func (r *taskRun) snapshotSKUs(ctx context.Context, cabinet connections.Cabinet)
 		page, err := ozon.ParseStocksPage(body)
 		if err != nil {
 			return err
+		}
+		if page.BadSKUs > 0 {
+			// Строка остатков без SKU — неполный список: успешный снимок по
+			// складам без части товаров выглядел бы полным.
+			return fmt.Errorf("%d stock rows without positive sku", page.BadSKUs)
 		}
 		for _, sku := range page.SKUs {
 			set[sku] = true

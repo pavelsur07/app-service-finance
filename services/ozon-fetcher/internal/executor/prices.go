@@ -15,6 +15,7 @@ func (r *taskRun) prices(ctx context.Context, creds ozon.Credentials) error {
 		return nil
 	}
 	items, total, pages := 0, int64(-1), 0
+	var drift ozon.Drift
 	err := r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
 		return r.exec.ozon.FetchPrices(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
 			if page, err := ozon.ParsePricesPage(p.Body); err == nil {
@@ -23,6 +24,7 @@ func (r *taskRun) prices(ctx context.Context, creds ozon.Credentials) error {
 				if page.Items > 0 || total < 0 {
 					total = page.Total
 				}
+				drift.Add(ozon.PricesDrift(p.Body))
 			}
 			return r.store(ctx, p)
 		})
@@ -36,5 +38,16 @@ func (r *taskRun) prices(ctx context.Context, creds ozon.Credentials) error {
 		r.log.Warn("prices snapshot: items differ from total", slog.String("stage", "fetch"),
 			slog.Int("items", items), slog.Int64("total", total))
 	}
+	r.warnDrift(ozon.EndpointPrices, drift)
 	return nil
+}
+
+// warnDrift — один WARNING на задачу при изменении набора полей ответа
+// (spec-ozon.md п. 14): только имена полей, raw сохранён как пришёл.
+func (r *taskRun) warnDrift(endpoint string, d ozon.Drift) {
+	if d.Empty() {
+		return
+	}
+	r.log.Warn("ozon response shape changed", slog.String("stage", "fetch"), slog.String("endpoint", endpoint),
+		slog.Any("unknown_fields", d.Unknown()), slog.Any("missing_fields", d.Missing()))
 }

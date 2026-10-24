@@ -83,7 +83,7 @@ func TestWarehouseStocksUseSnapshotSKUsSortedInChunks(t *testing.T) {
 	assert.Equal(t, int64(10), o.whCalls[0][0], "по возрастанию")
 	all := append(append(append([]int64(nil), o.whCalls[0]...), o.whCalls[1]...), o.whCalls[2]...)
 	fp := numbersFingerprint(skuKeys(all))
-	assert.Equal(t, []string{fp + ":100", fp + ":200", ""}, h.tasks.cursors)
+	assert.Equal(t, []string{fp + ":100", fp + ":200", fp + ":end"}, h.tasks.cursors, "последняя порция — отпечаток:end")
 	assert.Equal(t, ResourceStocksWarehouses, h.raw.puts[0].ResourceType)
 	assert.Contains(t, h.logs.String(), `"msg":"warehouse stocks read"`)
 	assert.Contains(t, h.logs.String(), `"skus":250,"requested":250,"skus_with_rows":247,"rows":494`)
@@ -167,6 +167,53 @@ func TestWarehouseStocksEmptySnapshotStoresMarkerWithoutRequest(t *testing.T) {
 	assert.Empty(t, o.whCalls)
 	require.Len(t, h.raw.puts, 1)
 	assert.JSONEq(t, `{"items":[]}`, string(h.raw.puts[0].Body))
+	assert.Equal(t, []string{numbersFingerprint(nil) + ":end"}, h.tasks.cursors)
+}
+
+// Все порции сохранены, итог не записан (сбой FinishTask), затем повтор:
+// тот же набор SKU — done без запросов; снимок остатков дня перечитан — заново.
+func TestWarehouseStocksTerminalResumeChecksSnapshot(t *testing.T) {
+	ids := []int64{1, 2, 3}
+	skus := []int64{10, 20, 30}
+	tk := task(ResourceStocksWarehouses, today)
+	tk.Cursor, tk.NextPageNo, tk.PageHashes = numbersFingerprint(skuKeys(skus))+":end", 2, []string{"h1"}
+
+	o := &fakeOzon{}
+	h, _ := warehouseHarness(t, o, snapshot(3, ids...))
+	assert.Equal(t, "done", h.exec.Run(context.Background(), tk, warehouseCabinet, "trace").Outcome)
+	assert.Empty(t, o.whCalls)
+	assert.Empty(t, h.raw.puts)
+
+	o2 := &fakeOzon{}
+	h2, _ := warehouseHarness(t, o2, snapshot(4, append(ids, 4)...))
+	res := h2.exec.Run(context.Background(), tk, warehouseCabinet, "trace")
+	assert.Equal(t, "stocks_revised", res.Outcome)
+	assert.False(t, h2.tasks.finished.KeepCursor, "день заново")
+	assert.Empty(t, o2.whCalls)
+
+	tkNoCursor := tk
+	tkNoCursor.Cursor = ""
+	h3, _ := warehouseHarness(t, &fakeOzon{}, snapshot(3, ids...))
+	assert.Equal(t, "stocks_revised", h3.exec.Run(context.Background(), tkNoCursor, warehouseCabinet, "trace").Outcome, "страницы без курсора не принимаются")
+
+	emptyDone := tk
+	emptyDone.Cursor = numbersFingerprint(nil) + ":end"
+	h4, _ := warehouseHarness(t, &fakeOzon{}, snapshot(1, 7))
+	assert.Equal(t, "stocks_revised", h4.exec.Run(context.Background(), emptyDone, warehouseCabinet, "trace").Outcome, "служебная пустая страница — тоже по отпечатку")
+}
+
+func TestWarehouseStocksRejectSnapshotRowsWithoutSKU(t *testing.T) {
+	for name, body := range map[string]string{
+		"mixed":    `{"items":[{"product_id":1,"stocks":[{"type":"fbo","sku":10},{"type":"fbs"}]}],"total":1,"cursor":"C1"}`,
+		"all zero": `{"items":[{"product_id":1,"stocks":[{"type":"fbo","sku":0}]}],"total":1,"cursor":"C1"}`,
+	} {
+		o := &fakeOzon{}
+		h, _ := warehouseHarness(t, o, []ozon.Page{page(body, "C1"), stocksPage(1, "")})
+		res := h.exec.Run(context.Background(), task(ResourceStocksWarehouses, today), warehouseCabinet, "trace")
+		assert.Equal(t, "stocks_raw_invalid", res.Outcome, name)
+		assert.Empty(t, o.whCalls, name)
+		assert.Empty(t, h.raw.puts, name)
+	}
 }
 
 func TestWarehouseStocksDisabledDoNotCallOzon(t *testing.T) {

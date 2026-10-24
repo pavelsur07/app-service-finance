@@ -30,12 +30,14 @@ type stocksItem struct {
 	} `json:"stocks"`
 }
 
-// StocksPage — счётчики страницы: товаров, разных SKU в stocks[] и total.
+// StocksPage — счётчики страницы: товаров, SKU по строкам stocks[] и total;
+// BadSKUs — строки stocks[] без положительного sku (в SKUs не входят).
 type StocksPage struct {
-	Items int
-	SKUs  []int64
-	Total int64
-	Next  string
+	Items   int
+	SKUs    []int64
+	BadSKUs int
+	Total   int64
+	Next    string
 }
 
 // ParseStocksPage проверяет страницу снимка. Конец снимка Ozon сообщает
@@ -63,6 +65,8 @@ func ParseStocksPage(body []byte) (StocksPage, error) {
 		for _, s := range *it.Stocks {
 			if s.SKU != nil && *s.SKU > 0 {
 				page.SKUs = append(page.SKUs, *s.SKU)
+			} else {
+				page.BadSKUs++
 			}
 		}
 	}
