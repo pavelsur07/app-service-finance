@@ -4210,6 +4210,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.75 | 2026-10-24 | Marketplace: возвраты и снимки акций, поставок, кластеров Ozon — всем кабинетам с ключом seller (`ozon_fetcher.returns_companies`, `ozon_fetcher.reference_companies`: `['*']`) |
 | 2.74 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы `ozon.actions`, `ozon.supplies`, `ozon.clusters` (параметр `ozon_fetcher.reference_companies`), строки карты «Акции», «Поставки в пути», «Кластеры и склады» |
 | 2.73 | 2026-10-24 | Marketplace / ServiceGateway: ресурс возвратов `ozon.returns` (параметр `ozon_fetcher.returns_companies`), строка карты покрытия «Возвраты» |
 | 2.72 | 2026-10-24 | Marketplace: поисковая аналитика Ozon — всем кабинетам с остатками (`ozon_fetcher.search_analytics_companies: ['*']`) |
