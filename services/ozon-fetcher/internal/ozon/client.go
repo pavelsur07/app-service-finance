@@ -70,10 +70,19 @@ func (c *Client) WithLimiter(l Limiter) *Client {
 
 // Post отправляет JSON на endpoint. Неуспех — *APIError; отмена ctx — ctx.Err().
 func (c *Client) Post(ctx context.Context, creds Credentials, connectionRef, endpoint string, body any) (Response, error) {
+	return c.call(ctx, creds, connectionRef, http.MethodPost, endpoint, body)
+}
+
+// Get — запрос без тела (список акций).
+func (c *Client) Get(ctx context.Context, creds Credentials, connectionRef, endpoint string) (Response, error) {
+	return c.call(ctx, creds, connectionRef, http.MethodGet, endpoint, nil)
+}
+
+func (c *Client) call(ctx context.Context, creds Credentials, connectionRef, method, endpoint string, body any) (Response, error) {
 	if err := c.limiter.Wait(ctx, connectionRef, endpoint); err != nil {
 		return Response{}, err
 	}
-	resp, err := c.post(ctx, creds, connectionRef, endpoint, body)
+	resp, err := c.post(ctx, creds, connectionRef, method, endpoint, body)
 	if err == nil {
 		c.limiter.Observe(connectionRef, endpoint, nil)
 		return resp, nil
@@ -85,13 +94,17 @@ func (c *Client) Post(ctx context.Context, creds Credentials, connectionRef, end
 	return resp, err
 }
 
-func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, endpoint string, body any) (Response, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return Response{}, fmt.Errorf("ozon: encode request %s: %w", endpoint, err)
+func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, method, endpoint string, body any) (Response, error) {
+	var payload io.Reader = http.NoBody
+	if method != http.MethodGet {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return Response{}, fmt.Errorf("ozon: encode request %s: %w", endpoint, err)
+		}
+		payload = bytes.NewReader(raw)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+endpoint, payload)
 	if err != nil {
 		return Response{}, fmt.Errorf("ozon: build request %s: %w", endpoint, err)
 	}

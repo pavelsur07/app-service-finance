@@ -221,6 +221,18 @@ type fakeOzon struct {
 	returnErr   error
 	returnFrom  []string
 	returnDays  []string
+	// Снимки акций, поставок, кластеров: ответы и вызовы по endpoint.
+	refCalls    []string
+	actionIDs   []int64
+	productsN   map[string]int // "id:candidates:last_id" → товаров на странице (0 — конец)
+	supplyPages map[string][]int64
+	supplyNext  map[string]string
+	bundles     map[int64][]string
+	bundleErr   error
+	refErr      map[string]error
+	// productsNoLast — страница без last_id: ключ → total.
+	productsNoLast map[string]int
+	supplyGetErr   error
 }
 
 type searchCall struct {

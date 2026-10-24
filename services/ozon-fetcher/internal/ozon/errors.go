@@ -96,8 +96,15 @@ func Classify(endpoint string, status int, header http.Header, body []byte, now 
 	return apiErr
 }
 
+// isObsolete — снятый метод: «obsolete method» в теле или code 9 без иного
+// текста. code 9 — общий FAILED_PRECONDITION Ozon: состав поставок отвечает им
+// на неизвестный bundle_id («Bundles … not found», 24.10.2026) — это не снятие
+// метода, а остановка ресурса у всех кабинетов была бы ложной.
 func isObsolete(env errorEnvelope, body []byte) bool {
-	return env.Code == obsoleteCode || bytes.Contains(bytes.ToLower(body), []byte("obsolete method"))
+	if bytes.Contains(bytes.ToLower(body), []byte("obsolete")) {
+		return true
+	}
+	return env.Code == obsoleteCode && strings.TrimSpace(env.Message) == ""
 }
 
 // parseRetryAfter понимает секунды и HTTP-date; битое или прошедшее — 0.

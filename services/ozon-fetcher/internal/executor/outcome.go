@@ -138,6 +138,9 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 	if errors.Is(err, errSearchShifted) {
 		return e.retryable(task, "search_shifted", now, false)
 	}
+	if errors.Is(err, errSnapshotRestart) {
+		return e.retryable(task, "snapshot_restart", now, false)
+	}
 	if errors.Is(err, errStocksNotLoaded) {
 		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]
 		if !ok {

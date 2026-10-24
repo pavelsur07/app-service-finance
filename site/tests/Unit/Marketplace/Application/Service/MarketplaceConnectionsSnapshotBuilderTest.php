@@ -225,6 +225,22 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
         self::assertSame([], $with[self::COMPANY_B], 'без ключа seller возвратов нет');
     }
 
+    public function testReferenceSnapshotsOnlyForListedCompaniesWithSellerKey(): void
+    {
+        $rows = [
+            $this->seller(self::SELLER_A, self::COMPANY_A),
+            $this->performance(self::PERF_B, self::COMPANY_B),
+        ];
+
+        foreach ($this->build($rows)['connections'] as $cabinet) {
+            self::assertNotContains('ozon.actions', $cabinet['resource_types'], 'по умолчанию — никому');
+        }
+
+        $with = array_column($this->build($rows, [], [], [], [], [], [], [], [], [], [self::COMPANY_A, self::COMPANY_B])['connections'], 'resource_types', 'company_id');
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::REFERENCE_RESOURCE_TYPES], $with[self::COMPANY_A]);
+        self::assertSame([], $with[self::COMPANY_B], 'без ключа seller снимков нет');
+    }
+
     public function testAdsOnlyForListedCompaniesWithPerformanceKey(): void
     {
         $rows = [
@@ -279,12 +295,13 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
      * @param list<string> $snapshotsCompanyIds
      * @param list<string> $searchAnalyticsCompanyIds
      * @param list<string> $returnsCompanyIds
+     * @param list<string> $referenceCompanyIds
      *
      * @return array<string, mixed>
      */
-    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = [], array $productsCompanyIds = [], array $stocksCompanyIds = [], array $adsCompanyIds = [], array $adsReportsCompanyIds = [], array $snapshotsCompanyIds = [], array $searchAnalyticsCompanyIds = [], array $returnsCompanyIds = []): array
+    private function build(array $rows, array $ordersCompanyIds = [], array $accrualPostingsCompanyIds = [], array $productsCompanyIds = [], array $stocksCompanyIds = [], array $adsCompanyIds = [], array $adsReportsCompanyIds = [], array $snapshotsCompanyIds = [], array $searchAnalyticsCompanyIds = [], array $returnsCompanyIds = [], array $referenceCompanyIds = []): array
     {
-        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds, $productsCompanyIds, $stocksCompanyIds, $adsCompanyIds, $adsReportsCompanyIds, $snapshotsCompanyIds, $searchAnalyticsCompanyIds, $returnsCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
+        return (new MarketplaceConnectionsSnapshotBuilder($ordersCompanyIds, $accrualPostingsCompanyIds, $productsCompanyIds, $stocksCompanyIds, $adsCompanyIds, $adsReportsCompanyIds, $snapshotsCompanyIds, $searchAnalyticsCompanyIds, $returnsCompanyIds, $referenceCompanyIds))->build($rows, new \DateTimeImmutable('2026-10-17 12:00:00 UTC'))->toArray();
     }
 
     private function seller(string $id, string $companyId, ?string $clientId = 'seller-client', ?string $secret = 'seller-key', string $updatedAt = '2026-10-01 10:00:00'): ActiveConnectionCredentials

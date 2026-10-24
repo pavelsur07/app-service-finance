@@ -15,9 +15,13 @@ var StocksWindowStart = map[string]time.Duration{
 	ResourceStocks:           5 * time.Hour,
 	ResourcePrices:           5 * time.Hour,
 	ResourceStocksWarehouses: 5 * time.Hour,
+	ResourceActions:          5 * time.Hour,
+	ResourceSupplies:         5 * time.Hour,
+	ResourceClusters:         5 * time.Hour,
 }
 
-// IsStocksResource — ресурс утренних снимков (остатки, цены, остатки по складам).
+// IsStocksResource — ресурс утренних снимков (остатки, цены, остатки по
+// складам, акции, поставки, кластеры).
 func IsStocksResource(resourceType string) bool {
 	_, ok := StocksWindowStart[resourceType]
 	return ok

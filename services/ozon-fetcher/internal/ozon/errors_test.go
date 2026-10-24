@@ -39,6 +39,8 @@ func TestClassify(t *testing.T) {
 		{name: "bad request", status: 400, body: `{"code":3,"message":"invalid date"}`, wantClass: ClassInvalidRequest, wantCode: 3},
 		{name: "not found", status: 404, wantClass: ClassInvalidRequest},
 		{name: "code 9 on non-400 is not obsolete", status: 404, body: `{"code":9}`, wantClass: ClassInvalidRequest, wantCode: 9},
+		{name: "code 9 without text is obsolete", status: 400, body: `{"code":9}`, wantClass: ClassObsoleteEndpoint, wantCode: 9},
+		{name: "code 9 with other text is not obsolete", status: 400, body: `{"code":9,"message":"Bundles 87ff5dcb-dbe1-4dbb-9538-46f1b5e953f4 not found"}`, wantClass: ClassInvalidRequest, wantCode: 9},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

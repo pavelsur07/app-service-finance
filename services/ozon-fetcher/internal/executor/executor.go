@@ -58,6 +58,12 @@ const (
 	// (ozon-10-returns.md), перечитывается 30 дней.
 	ResourceReturns = "ozon.returns"
 
+	// Снимки дня с 05:00 (ozon-11-actions-supplies-clusters.md): акции с
+	// товарами, активные поставки с составом, кластеры и склады Ozon.
+	ResourceActions  = "ozon.actions"
+	ResourceSupplies = "ozon.supplies"
+	ResourceClusters = "ozon.clusters"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -75,7 +81,7 @@ var gatedResources = map[string]bool{
 	ResourceProductsList: true, ResourceProductsInfo: true,
 	ResourceStocks: true, ResourcePrices: true, ResourceStocksWarehouses: true,
 	ResourceSearchQueries: true, ResourceSearchDetails: true,
-	ResourceReturns: true,
+	ResourceReturns: true, ResourceActions: true, ResourceSupplies: true, ResourceClusters: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -124,6 +130,12 @@ type Ozon interface {
 	FetchWarehouseStocks(ctx context.Context, creds ozon.Credentials, connectionRef string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error)
 	FetchSearchPage(ctx context.Context, creds ozon.Credentials, connectionRef string, details bool, day time.Time, skus []int64, page int) (ozon.Page, ozon.SearchPage, error)
 	FetchReturns(ctx context.Context, creds ozon.Credentials, connectionRef string, from, to time.Time, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
+	FetchActions(ctx context.Context, creds ozon.Credentials, connectionRef string) (ozon.Page, []int64, error)
+	FetchActionProducts(ctx context.Context, creds ozon.Credentials, connectionRef string, candidates bool, actionID int64, lastID string) (ozon.Page, ozon.ActionProductsPage, error)
+	FetchSupplyOrderList(ctx context.Context, creds ozon.Credentials, connectionRef, lastID string) (ozon.Page, []int64, string, error)
+	FetchSupplyOrders(ctx context.Context, creds ozon.Credentials, connectionRef string, ids []int64) (ozon.Page, []string, error)
+	FetchSupplyBundle(ctx context.Context, creds ozon.Credentials, connectionRef string, bundleIDs []string, lastID string) (ozon.Page, ozon.SupplyBundlePage, error)
+	FetchClusters(ctx context.Context, creds ozon.Credentials, connectionRef, clusterType string) (ozon.Page, ozon.ClustersPage, error)
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -416,6 +428,8 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.searchAnalytics(ctx, creds, cabinet)
 		case ResourceReturns:
 			return r.returns(ctx, creds)
+		case ResourceActions, ResourceSupplies, ResourceClusters:
+			return r.referenceSnapshot(ctx, creds)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

@@ -42,6 +42,9 @@ parameters:
     # Компании, которым ozon-fetcher грузит возвраты и отмены построчно:
     # docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md.
     ozon_fetcher.returns_companies: ['3f4d87cc-a967-43a7-9b5e-8a9113c0a910']
+    # Компании, которым ozon-fetcher грузит снимки акций, поставок в пути, кластеров и складов (05:00):
+    # docs/tasks/marketplace-data-ingestion/stages/ozon-11-actions-supplies-clusters.md.
+    ozon_fetcher.reference_companies: ['3f4d87cc-a967-43a7-9b5e-8a9113c0a910']
     feature_funds_and_widget: '%env(bool:FEATURE_FUNDS_AND_WIDGET)%'
     app.storage_root: '%kernel.project_dir%/var/storage'
     app.encryption.key_file: '%env(string:APP_ENCRYPTION_KEY_FILE)%'
@@ -141,6 +144,7 @@ services:
             $snapshotsCompanyIds: '%ozon_fetcher.snapshots_companies%'
             $searchAnalyticsCompanyIds: '%ozon_fetcher.search_analytics_companies%'
             $returnsCompanyIds: '%ozon_fetcher.returns_companies%'
+            $referenceCompanyIds: '%ozon_fetcher.reference_companies%'
 
     App\Marketplace\Wildberries\Infrastructure\Redis\WbFinanceRedisCooldownStorage:
         arguments:

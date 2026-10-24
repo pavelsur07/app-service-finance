@@ -71,6 +71,12 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
     /** Возвраты и отмены построчно (`docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md`); по списку компаний. */
     public const RETURNS_RESOURCE_TYPE = 'ozon.returns';
 
+    /**
+     * Снимки акций, поставок в пути, кластеров и складов 05:00
+     * (`docs/tasks/marketplace-data-ingestion/stages/ozon-11-actions-supplies-clusters.md`); по списку компаний.
+     */
+    public const REFERENCE_RESOURCE_TYPES = ['ozon.actions', 'ozon.supplies', 'ozon.clusters'];
+
     /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';
 
@@ -99,6 +105,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      * @param list<string> $snapshotsCompanyIds то же для снимков цен и остатков по складам
      * @param list<string> $searchAnalyticsCompanyIds то же для поисковой аналитики (только с остатками)
      * @param list<string> $returnsCompanyIds то же для возвратов
+     * @param list<string> $referenceCompanyIds то же для снимков акций, поставок и кластеров
      */
     public function __construct(
         private array $ordersCompanyIds = [],
@@ -110,6 +117,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
         private array $snapshotsCompanyIds = [],
         private array $searchAnalyticsCompanyIds = [],
         private array $returnsCompanyIds = [],
+        private array $referenceCompanyIds = [],
     ) {
     }
 
@@ -180,6 +188,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                 ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) && self::listed($this->searchAnalyticsCompanyIds, $companyId)
                     ? self::SEARCH_ANALYTICS_RESOURCE_TYPES : []),
                 ...(null !== $sellerCredentials && self::listed($this->returnsCompanyIds, $companyId) ? [self::RETURNS_RESOURCE_TYPE] : []),
+                ...(null !== $sellerCredentials && self::listed($this->referenceCompanyIds, $companyId) ? self::REFERENCE_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) ? self::ADS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) && self::listed($this->adsReportsCompanyIds, $companyId)
                     ? self::ADS_REPORTS_RESOURCE_TYPES : []),
