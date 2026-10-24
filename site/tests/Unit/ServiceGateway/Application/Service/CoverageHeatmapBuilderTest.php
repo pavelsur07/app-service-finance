@@ -106,6 +106,10 @@ final class CoverageHeatmapBuilderTest extends TestCase
         $titles = array_map(static fn ($r) => $r->title, $search->rows);
         self::assertContains('Поиск: сводка по товарам', $titles);
         self::assertContains('Поиск: запросы по товарам', $titles);
+        self::assertNotContains('Возвраты', $titles, 'строка — только при задачах');
+
+        $returns = $builder->build(self::month('2026-10', [self::cell('ozon.returns', '2026-10-18', 1, 1)]), self::now());
+        self::assertContains('Возвраты', array_map(static fn ($r) => $r->title, $returns->rows));
 
         $ads = $builder->build(self::month('2026-10', [self::cell('ozon.ads.expense', '2026-10-18', 1, 1)]), self::now());
         $titles = array_map(static fn ($r) => $r->title, $ads->rows);

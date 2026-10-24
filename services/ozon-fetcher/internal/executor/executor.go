@@ -54,6 +54,10 @@ const (
 	ResourceSearchQueries = "ozon.analytics.queries"
 	ResourceSearchDetails = "ozon.analytics.queries.details"
 
+	// Возвраты и отмены построчно — день МСК логистического возврата
+	// (ozon-10-returns.md), перечитывается 30 дней.
+	ResourceReturns = "ozon.returns"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -71,6 +75,7 @@ var gatedResources = map[string]bool{
 	ResourceProductsList: true, ResourceProductsInfo: true,
 	ResourceStocks: true, ResourcePrices: true, ResourceStocksWarehouses: true,
 	ResourceSearchQueries: true, ResourceSearchDetails: true,
+	ResourceReturns: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -118,6 +123,7 @@ type Ozon interface {
 	FetchPrices(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchWarehouseStocks(ctx context.Context, creds ozon.Credentials, connectionRef string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error)
 	FetchSearchPage(ctx context.Context, creds ozon.Credentials, connectionRef string, details bool, day time.Time, skus []int64, page int) (ozon.Page, ozon.SearchPage, error)
+	FetchReturns(ctx context.Context, creds ozon.Credentials, connectionRef string, from, to time.Time, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -408,6 +414,8 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.warehouseStocks(ctx, creds, cabinet)
 		case ResourceSearchQueries, ResourceSearchDetails:
 			return r.searchAnalytics(ctx, creds, cabinet)
+		case ResourceReturns:
+			return r.returns(ctx, creds)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

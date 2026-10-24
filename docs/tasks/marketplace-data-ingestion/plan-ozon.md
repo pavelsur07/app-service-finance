@@ -40,6 +40,7 @@
 |---|---|---|---|---|
 | 8 | Цены и остатки по складам и кластерам | `/v5/product/info/prices`, `/v1/analytics/stocks` | снимок раз в сутки 05:00 | `stages/ozon-8-prices-warehouse-stocks.md` |
 | 9 | Поисковая аналитика Premium по SKU (воронка `/v1/analytics/data` снята Ozon) | `/v1/analytics/product-queries`, `/details` | D−2 ежедневно, хвост D−3…D−7, история ~33 дня | `stages/ozon-9-search-analytics.md` |
+| 10 | Возвраты и отмены построчно | `/v1/returns/list` | догон с 01.08, перечитывание 30 дней | `stages/ozon-10-returns.md` |
 
 **Дальше — новые данные**, которых нет и в Symfony (`spec-ozon.md` §2–3), — отдельным планом после
 этапа 7 или раньше по решению Владельца: остатки по складам и цены (снимки — каждый пропущенный день

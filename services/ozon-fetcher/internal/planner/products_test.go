@@ -141,3 +141,21 @@ func TestSearchAnalyticsNeedStocks(t *testing.T) {
 		assert.NotEqual(t, KindSearchTail, r.Kind)
 	}
 }
+
+func TestReturnsBackfillAndTail(t *testing.T) {
+	p := Build(at("2026-10-24 12:00"), []connections.Cabinet{seller("a", executor.ResourceReturns)}, DefaultConfig(msk))
+
+	days := periods(p.Ensure, executor.ResourceReturns)
+	require.NotEmpty(t, days)
+	assert.Equal(t, "2026-08-01", days[0])
+	assert.Equal(t, "2026-10-23", days[len(days)-1], "сегодня не грузится")
+	tail := refresh(p, KindReturnsTail)
+	require.NotNil(t, tail)
+	assert.Len(t, tail.Specs, ReturnsTailDays)
+	assert.Equal(t, "2026-10-23", tail.Specs[0].PeriodKey)
+	assert.True(t, tail.Specs[0].Refresh)
+
+	none := Build(at("2026-10-24 12:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
+	assert.Empty(t, periods(none.Ensure, executor.ResourceReturns))
+	assert.Nil(t, refresh(none, KindReturnsTail))
+}
