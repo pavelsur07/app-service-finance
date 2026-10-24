@@ -55,14 +55,17 @@ func TestFetchSearchPageBodiesAndLiveShapes(t *testing.T) {
 
 func TestFetchSearchPageRejectsBrokenResponses(t *testing.T) {
 	cases := map[string]string{
-		"not object":      `[]`,
-		"no items":        `{` + searchPeriod + `,"total":0,"page_count":0}`,
-		"no page_count":   `{"items":[],` + searchPeriod + `,"total":0}`,
-		"neg total":       `{"items":[],` + searchPeriod + `,"total":-1,"page_count":0}`,
-		"no period":       `{"items":[],"total":0,"page_count":0}`,
-		"other day":       `{"items":[],"analytics_period":{"date_from":"2026-10-20 00:00:00 +0000 UTC","date_to":"2026-10-20 23:59:59 +0000 UTC"},"total":0,"page_count":0}`,
-		"foreign sku":     `{"items":[{"sku":99}],` + searchPeriod + `,"total":1,"page_count":1}`,
-		"row without sku": `{"items":[{"query":"x"}],` + searchPeriod + `,"total":1,"page_count":1}`,
+		"not object":       `[]`,
+		"no items":         `{` + searchPeriod + `,"total":0,"page_count":0}`,
+		"no page_count":    `{"items":[],` + searchPeriod + `,"total":0}`,
+		"neg total":        `{"items":[],` + searchPeriod + `,"total":-1,"page_count":0}`,
+		"string pages":     `{"items":[],` + searchPeriod + `,"total":0,"page_count":"2"}`,
+		"fractional total": `{"items":[],` + searchPeriod + `,"total":1.5,"page_count":0}`,
+		"overflow pages":   `{"items":[],` + searchPeriod + `,"total":0,"page_count":1e40}`,
+		"no period":        `{"items":[],"total":0,"page_count":0}`,
+		"other day":        `{"items":[],"analytics_period":{"date_from":"2026-10-20 00:00:00 +0000 UTC","date_to":"2026-10-20 23:59:59 +0000 UTC"},"total":0,"page_count":0}`,
+		"foreign sku":      `{"items":[{"sku":99}],` + searchPeriod + `,"total":1,"page_count":1}`,
+		"row without sku":  `{"items":[{"query":"x"}],` + searchPeriod + `,"total":1,"page_count":1}`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
