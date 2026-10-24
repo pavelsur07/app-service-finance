@@ -61,6 +61,9 @@ func (f *fakeOzon) FetchSupplyBundle(_ context.Context, _ ozon.Credentials, _ st
 	if f.bundleErr != nil {
 		return ozon.Page{}, ozon.SupplyBundlePage{}, f.bundleErr
 	}
+	if lastID == "" && f.bundleTwoPages[bundleIDs[0]] {
+		return p, ozon.SupplyBundlePage{Items: 3, HasNext: true, LastID: "P2"}, err
+	}
 	return p, ozon.SupplyBundlePage{Items: 3}, err
 }
 
@@ -110,8 +113,9 @@ func TestSuppliesSnapshotListDetailsAndBundles(t *testing.T) {
 	res := h.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace")
 
 	assert.Equal(t, "done", res.Outcome)
-	assert.Equal(t, []string{"supply list ", "supply list L1", "supply get 50", "supply get 10", "bundle [b1 b2] "}, o.refCalls)
-	assert.Contains(t, h.logs.String(), `"bundles":2,"items":3,"orders":60`)
+	assert.Equal(t, []string{"supply list ", "supply list L1", "supply get 50", "supply get 10", "bundle [b1] ", "bundle [b2] "}, o.refCalls,
+		"состав — по одной поставке: вместе Ozon сводит позиции по SKU")
+	assert.Contains(t, h.logs.String(), `"bundles":2,"items":6,"orders":60`)
 }
 
 func TestSuppliesMissingBundleRestartsSnapshot(t *testing.T) {
@@ -196,4 +200,12 @@ func TestActionsEndWithoutLastIDNeedsTotal(t *testing.T) {
 	o3 := &fakeOzon{actionIDs: []int64{3}, productsN: map[string]int{"3:false:": 4}, productsNoLast: map[string]int{"3:false:": 2}}
 	h3 := newHarness(o3)
 	assert.Equal(t, "invalid_response", h3.exec.Run(context.Background(), task(ResourceActions, today), refCabinet(ResourceActions), "trace").Outcome, "4 при total 2 — перекрытие страниц")
+}
+
+func TestSuppliesBundlePagesResetPerSupply(t *testing.T) {
+	o := &fakeOzon{supplyPages: map[string][]int64{"": {1}}, bundles: map[int64][]string{1: {"b1", "b2"}}, bundleTwoPages: map[string]bool{"b1": true}}
+	h := newHarness(o)
+	assert.Equal(t, "done", h.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace").Outcome)
+	assert.Equal(t, []string{"supply list ", "supply get 1", "bundle [b1] ", "bundle [b1] P2", "bundle [b2] "}, o.refCalls,
+		"вторая страница первой поставки — по её last_id, следующая поставка — с пустого")
 }
