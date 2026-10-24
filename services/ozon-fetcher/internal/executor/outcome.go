@@ -117,6 +117,20 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		log.Error("stored product list page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "catalog_raw_invalid", ErrorClass: "catalog_raw_invalid", NextRunAt: now}
 	}
+	if errors.Is(err, errStocksNotLoaded) {
+		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]
+		if !ok {
+			delay = time.Hour
+		}
+		return store.Outcome{Status: store.StatusNotReady, Label: "stocks_not_loaded", ErrorClass: "stocks_not_loaded", NextRunAt: now.Add(delay)}
+	}
+	if errors.Is(err, errStocksRevised) {
+		return e.retryable(task, "stocks_revised", now, false)
+	}
+	if errors.Is(err, errStocksRawInvalid) {
+		log.Error("stored stocks page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "stocks_raw_invalid", ErrorClass: "stocks_raw_invalid", NextRunAt: now}
+	}
 	if errors.Is(err, errUnknownResource) || errors.Is(err, errBadPeriod) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "invalid_task", ErrorClass: "invalid_task", NextRunAt: now}
 	}
@@ -204,7 +218,7 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		return store.Outcome{Status: store.StatusNotReady, Label: string(apiErr.Class), ErrorClass: string(apiErr.Class), HTTPStatus: apiErr.Status, NextRunAt: now.Add(delay)}
 
 	case ozon.ClassInvalidRequest:
-		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList || IsStocksResource(task.ResourceType)) && (task.Cursor != "" || run.cursor != "") {
+		if (IsPostingResource(task.ResourceType) || task.ResourceType == ResourceProductsList || isCursorSnapshot(task.ResourceType)) && (task.Cursor != "" || run.cursor != "") {
 			// Запрос шёл с курсором — прежней попытки (после паузы 429, backoff,
 			// рестарта) или своей предыдущей страницы: курсор Ozon мог истечь.
 			// Повтор окна с первой страницы, а не потеря дня.

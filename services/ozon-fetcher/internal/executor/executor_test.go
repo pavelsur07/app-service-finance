@@ -203,6 +203,14 @@ type fakeOzon struct {
 	stockPages map[string]ozon.Page
 	stockErr   error
 	stockFrom  []string
+	// Цены: то же, что остатки.
+	pricePages map[string]ozon.Page
+	priceErr   error
+	priceFrom  []string
+	// Остатки по складам: порции SKU запросов, ошибка после whFailAfter вызовов.
+	whCalls     [][]int64
+	whErr       error
+	whFailAfter int
 }
 
 func (f *fakeOzon) FetchAccrualByDay(_ context.Context, creds ozon.Credentials, _, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {

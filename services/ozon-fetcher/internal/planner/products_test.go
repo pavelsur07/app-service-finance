@@ -75,3 +75,27 @@ func TestStocksNotPlannedWithoutResource(t *testing.T) {
 	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
 	assert.Empty(t, periods(p.Ensure, executor.ResourceStocks))
 }
+
+func TestPricesAndWarehouseStocksSnapshotsFrom0500(t *testing.T) {
+	cabs := []connections.Cabinet{seller("a", executor.ResourceStocks, executor.ResourceStocksWarehouses, executor.ResourcePrices)}
+
+	p := Build(at("2026-10-25 00:05"), cabs, DefaultConfig(msk))
+
+	day := "2026-10-25"
+	assert.Equal(t, []string{day}, periods(p.Ensure, executor.ResourcePrices))
+	assert.Equal(t, []string{day}, periods(p.Ensure, executor.ResourceStocksWarehouses))
+	prices := specFor(p.Ensure, executor.ResourcePrices, day)
+	require.NotNil(t, prices)
+	assert.Equal(t, at(day+" 05:00"), prices.RunAt)
+	assert.False(t, prices.Refresh)
+	wh := specFor(p.Ensure, executor.ResourceStocksWarehouses, day)
+	require.NotNil(t, wh)
+	assert.Equal(t, at(day+" 05:01"), wh.RunAt, "минутой позже снимка остатков: SKU берутся из него")
+	assert.Empty(t, p.Refreshes)
+}
+
+func TestWarehouseStocksNeedStocksResource(t *testing.T) {
+	p := Build(at("2026-10-25 12:00"), []connections.Cabinet{seller("a", executor.ResourceStocksWarehouses, executor.ResourcePrices)}, DefaultConfig(msk))
+	assert.Empty(t, periods(p.Ensure, executor.ResourceStocksWarehouses), "без снимка остатков нет SKU")
+	assert.Equal(t, []string{"2026-10-25"}, periods(p.Ensure, executor.ResourcePrices), "цены от остатков не зависят")
+}

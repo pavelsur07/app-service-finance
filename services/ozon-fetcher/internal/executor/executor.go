@@ -43,6 +43,12 @@ const (
 	// недели — снимок понедельника («неделя готова» в понедельник 06:00).
 	ResourceStocks = "ozon.stocks"
 
+	// Цены и остатки по складам — снимки дня с 05:00
+	// (ozon-8-prices-warehouse-stocks.md): цены — по всем товарам, остатки по
+	// складам — по SKU снимка ozon.stocks того же дня.
+	ResourcePrices           = "ozon.prices"
+	ResourceStocksWarehouses = "ozon.stocks.warehouses"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -58,7 +64,7 @@ var postingResources = map[string]ozon.PostingScheme{
 var gatedResources = map[string]bool{
 	ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true,
 	ResourceProductsList: true, ResourceProductsInfo: true,
-	ResourceStocks: true,
+	ResourceStocks: true, ResourcePrices: true, ResourceStocksWarehouses: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -103,6 +109,8 @@ type Ozon interface {
 	FetchProductList(ctx context.Context, creds ozon.Credentials, connectionRef, fromLastID string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchProductInfo(ctx context.Context, creds ozon.Credentials, connectionRef string, ids []int64) (ozon.Page, int, error)
 	FetchStocks(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
+	FetchPrices(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
+	FetchWarehouseStocks(ctx context.Context, creds ozon.Credentials, connectionRef string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error)
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -166,6 +174,7 @@ func DefaultConfig() Config {
 			ResourceMutualSettlement: 24 * time.Hour,
 			ResourceAccrualPostings:  time.Hour,        // заказы дня ещё не загружены
 			ResourceProductsInfo:     10 * time.Minute, // список дня грузится за секунды
+			ResourceStocksWarehouses: 10 * time.Minute, // снимок остатков дня — секунды после 05:00
 		},
 		ReportPoll: ozon.DefaultReportPoll,
 		// Москва без перехода на летнее время с 2014 г.; приложение передаёт
@@ -384,6 +393,10 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.productInfo(ctx, creds, cabinet)
 		case ResourceStocks:
 			return r.stocks(ctx, creds)
+		case ResourcePrices:
+			return r.prices(ctx, creds)
+		case ResourceStocksWarehouses:
+			return r.warehouseStocks(ctx, creds, cabinet)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

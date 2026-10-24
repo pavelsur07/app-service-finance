@@ -8,16 +8,25 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 )
 
-// StocksWindowStart — начало окна снимка остатков после полуночи МСК
-// (docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md §3).
+// StocksWindowStart — начало окна утренних снимков после полуночи МСК
+// (docs/tasks/marketplace-data-ingestion/stages/ozon-5-stocks.md §3,
+// ozon-8-prices-warehouse-stocks.md §3).
 var StocksWindowStart = map[string]time.Duration{
-	ResourceStocks: 5 * time.Hour,
+	ResourceStocks:           5 * time.Hour,
+	ResourcePrices:           5 * time.Hour,
+	ResourceStocksWarehouses: 5 * time.Hour,
 }
 
-// IsStocksResource — ресурс снимков остатков.
+// IsStocksResource — ресурс утренних снимков (остатки, цены, остатки по складам).
 func IsStocksResource(resourceType string) bool {
 	_, ok := StocksWindowStart[resourceType]
 	return ok
+}
+
+// isCursorSnapshot — снимок с курсором Ozon (400 на курсоре — stale_cursor);
+// у остатков по складам курсор свой (порции SKU).
+func isCursorSnapshot(resourceType string) bool {
+	return resourceType == ResourceStocks || resourceType == ResourcePrices
 }
 
 // stocks — снимок остатков по cursor до пустой страницы, только в окне снимка

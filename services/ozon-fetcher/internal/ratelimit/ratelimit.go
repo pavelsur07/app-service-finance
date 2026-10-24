@@ -66,6 +66,11 @@ func DefaultConfig() Config {
 			ozonperf.EndpointStatisticsReport: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 			// Остатки: 2 запроса на снимок.
 			ozon.EndpointStocks: {Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
+			// Цены и остатки по складам: 2–5 запросов на снимок; квота ключа общая
+			// с другими клиентами (замер 24.10.2026: ratelimit-remaining скачет
+			// 49 → 21 → 44) — 429 только пауза (ozon-8-prices-warehouse-stocks.md).
+			ozon.EndpointPrices:          {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointWarehouseStocks: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,
