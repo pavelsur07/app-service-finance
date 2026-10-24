@@ -38,7 +38,7 @@ parameters:
     ozon_fetcher.snapshots_companies: ['*']
     # Компании, которым ozon-fetcher грузит поисковую аналитику Premium по товарам (только с остатками):
     # docs/tasks/marketplace-data-ingestion/stages/ozon-9-search-analytics.md.
-    ozon_fetcher.search_analytics_companies: ['3f4d87cc-a967-43a7-9b5e-8a9113c0a910']
+    ozon_fetcher.search_analytics_companies: ['*']
     feature_funds_and_widget: '%env(bool:FEATURE_FUNDS_AND_WIDGET)%'
     app.storage_root: '%kernel.project_dir%/var/storage'
     app.encryption.key_file: '%env(string:APP_ENCRYPTION_KEY_FILE)%'
