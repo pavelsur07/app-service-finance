@@ -133,7 +133,7 @@ func TestFetchReturnsPageLimitIsAbsolute(t *testing.T) {
 func TestFetchReturnsAcceptsUnorderedIDsAndRejectsCrossPageRepeat(t *testing.T) {
 	handler, bodies := productServer(t, EndpointReturns, func(body map[string]any) (int, string) {
 		if body["last_id"] == float64(0) {
-			return http.StatusOK, returnsBody(true, "2026-10-10T10:00:00Z", 1002653789, 1002600001, 1002700000)
+			return http.StatusOK, returnsBody(true, "2026-10-10T10:00:00Z", 1002700000, 1002653789, 1002600001)
 		}
 		return http.StatusOK, returnsBody(false, "2026-10-10T11:00:00Z", 1002500000)
 	})
@@ -145,8 +145,8 @@ func TestFetchReturnsAcceptsUnorderedIDsAndRejectsCrossPageRepeat(t *testing.T) 
 	})
 	require.NoError(t, err)
 	require.Len(t, pages, 2)
-	assert.Equal(t, "1002700000", pages[0].Cursor, "курсор — id последнего возврата страницы")
-	assert.Equal(t, float64(1002700000), (*bodies)[1]["last_id"])
+	assert.Equal(t, "1002600001", pages[0].Cursor, "курсор — id последнего возврата страницы, не наибольший")
+	assert.Equal(t, float64(1002600001), (*bodies)[1]["last_id"])
 
 	repeat, _ := productServer(t, EndpointReturns, func(body map[string]any) (int, string) {
 		if body["last_id"] == float64(0) {

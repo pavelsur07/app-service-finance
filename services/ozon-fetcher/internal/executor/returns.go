@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -9,12 +10,20 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 )
 
+// errReturnsRestart — прерванный день возвратов: уникальность id проверяется
+// по всем страницам дня, а id прежней попытки не восстановить — день заново
+// (почти всегда одна страница).
+var errReturnsRestart = errors.New("executor: interrupted returns day restarts from the first page")
+
 // returns — возвраты дня МСК по дате логистического возврата постранично
 // (ozon-10-returns.md); журнал — число возвратов этой попытки.
 func (r *taskRun) returns(ctx context.Context, creds ozon.Credentials) error {
 	if r.cursor == "" && len(r.hashes) > 0 {
 		// Все страницы дня уже сохранены прежней попыткой.
 		return nil
+	}
+	if r.cursor != "" {
+		return errReturnsRestart
 	}
 	from, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, r.exec.cfg.Location)
 	if err != nil {
