@@ -287,7 +287,8 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 (`docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md`).
 
 - **Запрос:** `{"filter": {"logistic_return_date": {"time_from": "DT00:00:00+03:00", "time_to":
-  "DT23:59:59+03:00"}}, "limit": 500, "last_id": 0}`; `limit` в `(0, 500]`.
+  "DT23:59:59.999999999+03:00"}}, "limit": 500, "last_id": 0}`; `limit` в `(0, 500]`. Границы фильтра
+  включительные, с миллисекундами (живая проверка): `23:59:59` отрезал бы последнюю секунду суток.
 - **Ответ** (живой, 24.10.2026): `{"returns": [...], "has_next": bool}`; возврат — `id`, `type`,
   `schema`, `return_reason_name`, `order_id`, `order_number`, `posting_number`, `product`, `logistic`,
   `visual`, `compensation_status`, `storage`, `place`, `target_place`, `exemplars`, `additional_info`,

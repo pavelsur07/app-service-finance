@@ -48,11 +48,34 @@ func TestFetchReturnsWalksLastIDForMoscowDay(t *testing.T) {
 	require.Len(t, pages, 2)
 	assert.Equal(t, []string{"1001853268", ""}, []string{pages[0].Cursor, pages[1].Cursor})
 	assert.Equal(t, map[string]any{
-		"filter": map[string]any{"logistic_return_date": map[string]any{"time_from": "2026-10-10T00:00:00+03:00", "time_to": "2026-10-10T23:59:59+03:00"}},
+		"filter": map[string]any{"logistic_return_date": map[string]any{"time_from": "2026-10-10T00:00:00+03:00", "time_to": "2026-10-10T23:59:59.999999999+03:00"}},
 		"limit":  float64(ReturnsPageLimit), "last_id": float64(0),
 	}, (*bodies)[0])
 	assert.Equal(t, float64(1001853268), (*bodies)[1]["last_id"])
 	assert.True(t, ReturnsDrift([]byte(`{"returns":[],"has_next":false}`)).Empty())
+}
+
+func TestFetchReturnsKeepsLastFractionalSecond(t *testing.T) {
+	// Мок применяет фильтр как Ozon (включительно): возврат 23:59:59.647 входит в день.
+	handler, _ := productServer(t, EndpointReturns, func(body map[string]any) (int, string) {
+		f := body["filter"].(map[string]any)["logistic_return_date"].(map[string]any)
+		to, err := time.Parse(time.RFC3339Nano, f["time_to"].(string))
+		require.NoError(t, err)
+		at := time.Date(2026, 10, 10, 23, 59, 59, 647_000_000, returnsMSK)
+		if at.After(to) {
+			return http.StatusOK, returnsBody(false, "")
+		}
+		return http.StatusOK, returnsBody(false, at.UTC().Format(time.RFC3339Nano), 9)
+	})
+	from, to := returnsDay()
+	got := 0
+	err := clientFor(t, handler).FetchReturns(context.Background(), testCreds, "conn-1", from, to, "", 1, func(p Page) error {
+		page, err := ParseReturnsPage(p.Body, 0, from, to)
+		got += page.Returns
+		return err
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, got)
 }
 
 func TestFetchReturnsResumesFromCursor(t *testing.T) {

@@ -88,3 +88,26 @@ func TestReturnsResumeAndDisabled(t *testing.T) {
 	assert.Equal(t, "rate_limit", h3.exec.Run(context.Background(), tk3, returnsCabinet, "trace").Outcome)
 	assert.True(t, h3.tasks.finished.KeepCursor)
 }
+
+func TestReturnsRecoveryAndRefreshRevision(t *testing.T) {
+	// Все страницы сохранены, итог не записан: без запросов.
+	o := &fakeOzon{returnPages: map[string]ozon.Page{}}
+	h := newHarness(o)
+	tk := task(ResourceReturns, today)
+	tk.NextPageNo, tk.PageHashes = 3, []string{"h1", "h2"}
+	assert.Equal(t, "done", h.exec.Run(context.Background(), tk, returnsCabinet, "trace").Outcome)
+	assert.Empty(t, o.returnFrom)
+
+	// Перечитывание: то же содержимое — unchanged, другой статус возврата — done (новая ревизия).
+	same := returnsPage("", 1)
+	o2 := &fakeOzon{returnPages: map[string]ozon.Page{"": same}}
+	h2 := newHarness(o2)
+	tk2 := task(ResourceReturns, today)
+	tk2.ContentHash = contentHash([]string{sha256Hex(same.Body)})
+	assert.Equal(t, "unchanged", h2.exec.Run(context.Background(), tk2, returnsCabinet, "trace").Outcome)
+
+	changed := page(strings.Replace(string(same.Body), `"visual":{}`, `"visual":{"status":{"sys_name":"ReturnedToSeller"}}`, 1), "")
+	h3 := newHarness(&fakeOzon{returnPages: map[string]ozon.Page{"": changed}})
+	assert.Equal(t, "done", h3.exec.Run(context.Background(), tk2, returnsCabinet, "trace").Outcome)
+	assert.NotEqual(t, tk2.ContentHash, h3.tasks.finished.ContentHash)
+}

@@ -85,7 +85,9 @@ func (c *Client) FetchReturns(ctx context.Context, creds Credentials, connection
 		body := map[string]any{
 			"filter": map[string]any{"logistic_return_date": map[string]string{
 				"time_from": from.Format(time.RFC3339),
-				"time_to":   to.Add(-time.Second).Format(time.RFC3339),
+				// Границы фильтра включительные, с миллисекундами (живая проверка
+				// 24.10.2026): 23:59:59 отрезал бы возвраты последней секунды.
+				"time_to": to.Add(-time.Nanosecond).Format(time.RFC3339Nano),
 			}},
 			"limit":   ReturnsPageLimit,
 			"last_id": lastID,
