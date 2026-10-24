@@ -321,7 +321,9 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   `DATA_FILLING`, `READY_TO_SUPPLY`, `ACCEPTED_AT_SUPPLY_WAREHOUSE`, `IN_TRANSIT`,
   `ACCEPTANCE_AT_STORAGE_WAREHOUSE`, `REPORTS_CONFIRMATION_AWAITING`, `REPORT_REJECTED`; `limit` 100;
   `last_id` до `""`); детали — `POST /v3/supply-order/get` (≤ 50 `order_ids`); состав —
-  `POST /v1/supply-order/bundle` (≤ 100 `bundle_ids`, `limit` ≤ 100, до `has_next: false`).
+  `POST /v1/supply-order/bundle` (`limit` ≤ 100, до `has_next: false`) — **по одной поставке**: на
+  несколько `bundle_ids` (до 100) Ozon сводит позиции по SKU без разбивки по поставкам (3 поставки —
+  9 строк вместе, 4 + 6 + 6 по отдельности, количество то же; 24.10.2026).
   Неизвестный `bundle_id` — 400 `code 9` «Bundles … not found» (поставку отменили) — снимок заново.
 - **`ozon.clusters`:** `POST /v1/cluster/list` с `cluster_type` `CLUSTER_TYPE_OZON` и
   `CLUSTER_TYPE_CIS` (без типа — 400) → кластеры, логистические кластеры, склады Ozon (Россия — 22 и

@@ -110,8 +110,9 @@ func TestSuppliesSnapshotListDetailsAndBundles(t *testing.T) {
 	res := h.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace")
 
 	assert.Equal(t, "done", res.Outcome)
-	assert.Equal(t, []string{"supply list ", "supply list L1", "supply get 50", "supply get 10", "bundle [b1 b2] "}, o.refCalls)
-	assert.Contains(t, h.logs.String(), `"bundles":2,"items":3,"orders":60`)
+	assert.Equal(t, []string{"supply list ", "supply list L1", "supply get 50", "supply get 10", "bundle [b1] ", "bundle [b2] "}, o.refCalls,
+		"состав — по одной поставке: вместе Ozon сводит позиции по SKU")
+	assert.Contains(t, h.logs.String(), `"bundles":2,"items":6,"orders":60`)
 }
 
 func TestSuppliesMissingBundleRestartsSnapshot(t *testing.T) {

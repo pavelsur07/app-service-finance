@@ -153,8 +153,11 @@ func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, em
 		slices.Sort(bundles)
 		bundles = slices.Compact(bundles)
 		stats["bundles"] = len(bundles)
-		for i := 0; i < len(bundles); i += ozon.SupplyBundleLimit {
-			chunk := bundles[i:min(i+ozon.SupplyBundleLimit, len(bundles))]
+		// Состав — по одной поставке: на несколько bundle_id Ozon отдаёт позиции,
+		// сведённые по SKU, без разбивки по поставкам (3 поставки: 9 строк вместе
+		// против 4 + 6 + 6 по отдельности, количество то же — проверка 24.10.2026).
+		for _, bundle := range bundles {
+			chunk := []string{bundle}
 			for last := ""; ; {
 				p, page, err := e.ozon.FetchSupplyBundle(ctx, creds, ref, chunk, last)
 				if ozon.IsUnknownBundle(err) {

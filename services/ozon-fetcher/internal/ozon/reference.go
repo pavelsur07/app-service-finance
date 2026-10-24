@@ -209,7 +209,9 @@ type SupplyBundlePage struct {
 	LastID  string
 }
 
-// FetchSupplyBundle — страница состава поставок bundleIDs после lastID.
+// FetchSupplyBundle — страница состава поставок bundleIDs после lastID. На
+// несколько bundle_id Ozon сводит позиции по SKU — для разбивки по поставкам
+// исполнитель запрашивает по одной.
 func (c *Client) FetchSupplyBundle(ctx context.Context, creds Credentials, connectionRef string, bundleIDs []string, lastID string) (Page, SupplyBundlePage, error) {
 	resp, err := c.Post(ctx, creds, connectionRef, EndpointSupplyOrderBundle,
 		map[string]any{"bundle_ids": bundleIDs, "is_asc": true, "limit": SupplyBundleLimit, "last_id": lastID})
