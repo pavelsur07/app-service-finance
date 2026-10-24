@@ -3576,7 +3576,8 @@ internal_api → stateless, /internal/* для сервисов services/
   остатков по складам (`ozon.stocks.warehouses`, только вместе с `ozon.stocks`) — компаниям
   `ozon_fetcher.snapshots_companies`, поисковая аналитика (`ozon.analytics.queries`,
   `ozon.analytics.queries.details`, только вместе с `ozon.stocks`) — компаниям
-  `ozon_fetcher.search_analytics_companies`; ресурсы
+  `ozon_fetcher.search_analytics_companies`, возвраты (`ozon.returns`) — компаниям
+  `ozon_fetcher.returns_companies`; ресурсы
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
   `ozon_fetcher.ads_companies`, отчёты по товарам (`ozon.ads.statistics`,
   `ozon.ads.statistics.tail`) — из них компаниям `ozon_fetcher.ads_reports_companies`.
@@ -4208,6 +4209,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.73 | 2026-10-24 | Marketplace / ServiceGateway: ресурс возвратов `ozon.returns` (параметр `ozon_fetcher.returns_companies`), строка карты покрытия «Возвраты» |
 | 2.72 | 2026-10-24 | Marketplace: поисковая аналитика Ozon — всем кабинетам с остатками (`ozon_fetcher.search_analytics_companies: ['*']`) |
 | 2.71 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы поисковой аналитики `ozon.analytics.queries`, `ozon.analytics.queries.details` (параметр `ozon_fetcher.search_analytics_companies`, только с `ozon.stocks`), строки карты «Поиск: сводка по товарам», «Поиск: запросы по товарам» |
 | 2.70 | 2026-10-24 | Marketplace: снимки цен и остатков по складам Ozon — всем кабинетам с ключом seller (`ozon_fetcher.snapshots_companies: ['*']`) |

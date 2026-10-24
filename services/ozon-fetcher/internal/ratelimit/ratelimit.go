@@ -75,6 +75,8 @@ func DefaultConfig() Config {
 			// (429 code 8, замер 24.10.2026) — ozon-9-search-analytics.md.
 			ozon.EndpointSearchQueries:        {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 			ozon.EndpointSearchQueriesDetails: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			// Возвраты: страница на день, ключ общий (ozon-10-returns.md).
+			ozon.EndpointReturns: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

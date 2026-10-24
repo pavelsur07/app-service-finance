@@ -216,6 +216,11 @@ type fakeOzon struct {
 	searchCalls []searchCall
 	// searchSameBody — каждая страница с телом страницы 0 (повтор выдачи).
 	searchSameBody bool
+	// Возвраты: страницы по курсору last_id, ошибка при отсутствии, курсоры и окна запросов.
+	returnPages map[string]ozon.Page
+	returnErr   error
+	returnFrom  []string
+	returnDays  []string
 }
 
 type searchCall struct {

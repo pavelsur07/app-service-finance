@@ -28,6 +28,7 @@ const (
 	KindAccrualPostings = "accrual_postings_tail"
 	KindAdsTail         = "ads_tail"
 	KindSearchTail      = "search_tail"
+	KindReturnsTail     = "returns_tail"
 )
 
 // DefaultAdsFrom — первый день расхода и статистики рекламы
@@ -45,6 +46,14 @@ const SearchDepthDays = 33
 // SearchTailDays — день D−3…D−(2+SearchTailDays) перечитывается раз в сутки:
 // Ozon может досчитывать дни.
 const SearchTailDays = 5
+
+// DefaultReturnsFrom — первый день возвратов (начало витрины покрытия;
+// история API глубже) — ozon-10-returns.md.
+const DefaultReturnsFrom = "2026-08-01"
+
+// ReturnsTailDays — дней до сегодня, перечитываемых раз в сутки: статус и
+// компенсация возврата меняются неделями.
+const ReturnsTailDays = 30
 
 // AdsTailDays — дней перед сегодня, в которых раз в сутки перечитываются
 // расход и статистика рекламы: Ozon дописывает атрибуцию задним числом.
@@ -247,7 +256,8 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 				today.Add(executor.StocksWindowStart[executor.ResourcePrices])))
 		}
 		search := planSearch(&plan, cab, today, runDate, now, cfg)
-		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings, search} {
+		returns := planReturns(&plan, cab, today, runDate, now, cfg)
+		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings, search, returns} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
 			}
@@ -349,6 +359,27 @@ func planSearch(plan *Plan, cab connections.Cabinet, today time.Time, runDate st
 			}
 			tail.Specs = append(tail.Specs, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, true, now))
 		}
+	}
+	return tail
+}
+
+// planReturns — возвраты: догон с DefaultReturnsFrom до вчера, перечитывание
+// ReturnsTailDays раз в сутки; сегодня не грузится (день неполный).
+func planReturns(plan *Plan, cab connections.Cabinet, today time.Time, runDate string, now time.Time, cfg Config) Refresh {
+	tail := Refresh{Kind: KindReturnsTail, RunDate: runDate, ConnectionRef: cab.Ref}
+	if !cab.Supports(executor.ResourceReturns) {
+		return tail
+	}
+	from, _ := time.ParseInLocation(time.DateOnly, DefaultReturnsFrom, cfg.Location)
+	for d := from; d.Before(today); d = d.AddDate(0, 0, 1) {
+		plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceReturns, d.Format(time.DateOnly), PriorityBackfill, false, now))
+	}
+	for i := 1; i <= ReturnsTailDays; i++ {
+		d := today.AddDate(0, 0, -i)
+		if d.Before(from) {
+			break
+		}
+		tail.Specs = append(tail.Specs, spec(cab.Ref, executor.ResourceReturns, d.Format(time.DateOnly), PriorityBackfill, true, now))
 	}
 	return tail
 }

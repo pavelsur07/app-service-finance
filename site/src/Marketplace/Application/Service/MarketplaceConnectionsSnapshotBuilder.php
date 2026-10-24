@@ -68,6 +68,9 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      */
     public const SEARCH_ANALYTICS_RESOURCE_TYPES = ['ozon.analytics.queries', 'ozon.analytics.queries.details'];
 
+    /** Возвраты и отмены построчно (`docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md`); по списку компаний. */
+    public const RETURNS_RESOURCE_TYPE = 'ozon.returns';
+
     /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';
 
@@ -95,6 +98,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      * @param list<string> $adsReportsCompanyIds то же для отчётов по товарам (из тех, кому выдана реклама)
      * @param list<string> $snapshotsCompanyIds то же для снимков цен и остатков по складам
      * @param list<string> $searchAnalyticsCompanyIds то же для поисковой аналитики (только с остатками)
+     * @param list<string> $returnsCompanyIds то же для возвратов
      */
     public function __construct(
         private array $ordersCompanyIds = [],
@@ -105,6 +109,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
         private array $adsReportsCompanyIds = [],
         private array $snapshotsCompanyIds = [],
         private array $searchAnalyticsCompanyIds = [],
+        private array $returnsCompanyIds = [],
     ) {
     }
 
@@ -174,6 +179,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                     ? [self::WAREHOUSE_STOCKS_RESOURCE_TYPE] : []),
                 ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) && self::listed($this->searchAnalyticsCompanyIds, $companyId)
                     ? self::SEARCH_ANALYTICS_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && self::listed($this->returnsCompanyIds, $companyId) ? [self::RETURNS_RESOURCE_TYPE] : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) ? self::ADS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) && self::listed($this->adsReportsCompanyIds, $companyId)
                     ? self::ADS_REPORTS_RESOURCE_TYPES : []),

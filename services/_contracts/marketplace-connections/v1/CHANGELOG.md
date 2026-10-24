@@ -1,5 +1,10 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-24) — возвраты
+
+- Новое значение `resource_types` у seller: `ozon.returns` (`/v1/returns/list`). Выдаётся по списку
+  `ozon_fetcher.returns_companies`. Схема не менялась.
+
 ## Правка (2026-10-24) — поисковая аналитика
 
 - Новые значения `resource_types` у seller: `ozon.analytics.queries` и

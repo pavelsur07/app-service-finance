@@ -281,6 +281,27 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   формы ответа — WARNING.
 - **Включение:** Symfony `ozon_fetcher.search_analytics_companies` — только вместе с `ozon.stocks`.
 
+### `ozon.returns` — `POST /v1/returns/list`
+
+Возвраты и отмены построчно по дню МСК логистического возврата
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md`).
+
+- **Запрос:** `{"filter": {"logistic_return_date": {"time_from": "DT00:00:00+03:00", "time_to":
+  "DT23:59:59.999999999+03:00"}}, "limit": 500, "last_id": 0}`; `limit` в `(0, 500]`. Границы фильтра
+  включительные, с миллисекундами (живая проверка): `23:59:59` отрезал бы последнюю секунду суток.
+- **Ответ** (живой, 24.10.2026): `{"returns": [...], "has_next": bool}`; возврат — `id`, `type`,
+  `schema`, `return_reason_name`, `order_id`, `order_number`, `posting_number`, `product`, `logistic`,
+  `visual`, `compensation_status`, `storage`, `place`, `target_place`, `exemplars`, `additional_info`,
+  `clearing_id`, `return_clearing_id`, `source_id`, `courier_delivery`, `company_id`. Персональных
+  данных покупателя нет (адреса — складов Ozon).
+- **Пагинация:** `last_id` = `id` последнего возврата, `id` по возрастанию, до `has_next: false`;
+  курсор задачи — `last_id`. Пустая страница с `has_next`, повтор или откат `id`, возврат вне
+  запрошенного дня МСК, нет `returns`/`has_next` — `invalid_response`; потолок 1000 страниц.
+- **План:** догон с 01.08.2026 до вчера (история API глубже), перечитывание 30 дней раз в сутки
+  (статус и компенсация меняются неделями); сегодня не грузится.
+- **Журнал:** INFO «returns read» — страниц, возвратов; смена формы ответа — WARNING.
+- **Включение:** Symfony `ozon_fetcher.returns_companies` (ключ seller).
+
 ## Ozon Performance API (реклама)
 
 Хост `https://api-performance.ozon.ru` (`OZON_PERFORMANCE_BASE_URL`), пакет `internal/ozonperf`
@@ -391,6 +412,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
 | `/v1/analytics/product-queries`, `/v1/analytics/product-queries/details` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: квота общая, у детализации — предел «в секунду» (429 code 8 `You have reached request rate limit per second`); `SharedQuota` |
+| `/v1/returns/list` | 0.2 | 0.2 | 0.2 | 5 с | `SharedQuota`: ключ общий; страница на день |
 | `/v5/product/info/prices`, `/v1/analytics/stocks` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: `ratelimit-remaining` между соседними запросами скачет 49 → 21 → 44 → 32 — квота ключа общая с другими клиентами; `SharedQuota` — 429 только пауза; 2–5 запросов на снимок |
 | `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |
 | `/api/client/statistics` (заказ отчёта) | 1/120 | 1/120 | 1/120 | 120 с | разнос заказов как у Symfony; 429 — следующее окно |

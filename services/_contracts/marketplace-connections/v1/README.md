@@ -34,7 +34,8 @@
   `ozon.stocks` — компаниям `ozon_fetcher.stocks_companies`;
   `ozon.prices` — компаниям `ozon_fetcher.snapshots_companies`, `ozon.stocks.warehouses` — им же,
   если выдан `ozon.stocks`; `ozon.analytics.queries`, `ozon.analytics.queries.details` — компаниям
-  `ozon_fetcher.search_analytics_companies`, если выдан `ozon.stocks`;
+  `ozon_fetcher.search_analytics_companies`, если выдан `ozon.stocks`; `ozon.returns` — компаниям
+  `ozon_fetcher.returns_companies`;
   performance → `ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily` — компаниям
   `ozon_fetcher.ads_companies`; `ozon.ads.statistics`, `ozon.ads.statistics.tail` — из них
   компаниям `ozon_fetcher.ads_reports_companies`.
