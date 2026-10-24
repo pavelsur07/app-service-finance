@@ -27,10 +27,12 @@ type ReturnsPage struct {
 }
 
 // ParseReturnsPage проверяет страницу: массив returns и has_next; id —
-// положительные, по возрастанию и больше afterID (повтор или откат —
-// invalid_response); logistic.return_date — внутри [from; to); has_next при
-// пустой странице — тихая обрезка.
-func ParseReturnsPage(body []byte, afterID int64, from, to time.Time) (ReturnsPage, error) {
+// положительные и без повторов в дне (seen — id прежних страниц, дополняется;
+// nil — без учёта прежних); logistic.return_date — внутри [from; to); has_next
+// при пустой странице — тихая обрезка. Порядок id не проверяется: у кабинета с
+// FBS id внутри страницы не по возрастанию (прод 24.10.2026). LastID — id
+// последнего возврата страницы, курсор следующей (документация Ozon).
+func ParseReturnsPage(body []byte, seen map[int64]bool, from, to time.Time) (ReturnsPage, error) {
 	var shape struct {
 		Returns *[]struct {
 			ID       *int64 `json:"id"`
@@ -46,11 +48,15 @@ func ParseReturnsPage(body []byte, afterID int64, from, to time.Time) (ReturnsPa
 	if shape.Returns == nil || shape.HasNext == nil {
 		return ReturnsPage{}, invalidResponse(EndpointReturns, `response has no "returns" array and "has_next"`)
 	}
-	page := ReturnsPage{Returns: len(*shape.Returns), LastID: afterID, HasNext: *shape.HasNext}
+	page := ReturnsPage{Returns: len(*shape.Returns), HasNext: *shape.HasNext}
+	if seen == nil {
+		seen = map[int64]bool{}
+	}
 	for _, r := range *shape.Returns {
-		if r.ID == nil || *r.ID <= page.LastID {
-			return ReturnsPage{}, invalidResponse(EndpointReturns, fmt.Sprintf("return id is missing or not above %d", page.LastID))
+		if r.ID == nil || *r.ID <= 0 || seen[*r.ID] {
+			return ReturnsPage{}, invalidResponse(EndpointReturns, "return id is missing or repeated within the day")
 		}
+		seen[*r.ID] = true
 		page.LastID = *r.ID
 		if r.Logistic == nil || r.Logistic.ReturnDate == nil || r.Logistic.ReturnDate.Before(from) || !r.Logistic.ReturnDate.Before(to) {
 			// Фильтр, молча проигнорированный Ozon, сохранил бы чужие дни.
@@ -78,6 +84,9 @@ func (c *Client) FetchReturns(ctx context.Context, creds Credentials, connection
 		}
 		lastID = v
 	}
+	// id прежних страниц этой попытки: повтор между страницами — обход не
+	// продвигается или Ozon отдаёт пересекающиеся страницы.
+	seen := map[int64]bool{}
 	for no := firstPageNo; ; no++ {
 		if no > MaxReturnsPages {
 			return invalidResponse(EndpointReturns, fmt.Sprintf("more than %d pages with has_next", MaxReturnsPages))
@@ -96,9 +105,12 @@ func (c *Client) FetchReturns(ctx context.Context, creds Credentials, connection
 		if err != nil {
 			return err
 		}
-		page, err := ParseReturnsPage(resp.Body, lastID, from, to)
+		page, err := ParseReturnsPage(resp.Body, seen, from, to)
 		if err != nil {
 			return err
+		}
+		if page.HasNext && page.LastID == lastID {
+			return invalidResponse(EndpointReturns, fmt.Sprintf("last_id %d did not advance", lastID))
 		}
 		next := ""
 		if page.HasNext {

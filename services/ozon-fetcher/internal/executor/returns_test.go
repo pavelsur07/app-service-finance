@@ -68,25 +68,24 @@ func TestReturnsStoresEveryPageForMoscowDay(t *testing.T) {
 }
 
 func TestReturnsResumeAndDisabled(t *testing.T) {
+	// Прерванный день — заново с первой страницы: id прежней попытки для
+	// проверки уникальности не восстановить.
 	o := &fakeOzon{returnPages: map[string]ozon.Page{"2": returnsPage("", 3)}}
 	h := newHarness(o)
 	tk := task(ResourceReturns, today)
 	tk.Cursor, tk.NextPageNo, tk.PageHashes = "2", 2, []string{"h1"}
-	assert.Equal(t, "done", h.exec.Run(context.Background(), tk, returnsCabinet, "trace").Outcome)
-	assert.Equal(t, []string{"2"}, o.returnFrom)
-	assert.Equal(t, 2, h.tasks.pages[0].PageNo)
+	assert.Equal(t, "returns_restart", h.exec.Run(context.Background(), tk, returnsCabinet, "trace").Outcome)
+	assert.False(t, h.tasks.finished.KeepCursor, "курсор и сохранённые страницы сбрасываются")
+	assert.Empty(t, o.returnFrom)
 
 	o2 := &fakeOzon{returnPages: map[string]ozon.Page{"": returnsPage("", 1)}}
 	h2 := newHarness(o2)
 	assert.Equal(t, "resource_disabled", h2.exec.Run(context.Background(), task(ResourceReturns, today), cabinet, "trace").Outcome)
 	assert.Empty(t, o2.returnFrom)
 
-	o3 := &fakeOzon{returnPages: map[string]ozon.Page{}, returnErr: &ozon.APIError{Class: ozon.ClassRateLimit, Endpoint: ozon.EndpointReturns, Status: 429}}
+	o3 := &fakeOzon{returnPages: map[string]ozon.Page{"": returnsPage("2", 1)}, returnErr: &ozon.APIError{Class: ozon.ClassRateLimit, Endpoint: ozon.EndpointReturns, Status: 429}}
 	h3 := newHarness(o3)
-	tk3 := task(ResourceReturns, today)
-	tk3.Cursor, tk3.NextPageNo = "2", 2
-	assert.Equal(t, "rate_limit", h3.exec.Run(context.Background(), tk3, returnsCabinet, "trace").Outcome)
-	assert.True(t, h3.tasks.finished.KeepCursor)
+	assert.Equal(t, "rate_limit", h3.exec.Run(context.Background(), task(ResourceReturns, today), returnsCabinet, "trace").Outcome)
 }
 
 func TestReturnsRecoveryAndRefreshRevision(t *testing.T) {

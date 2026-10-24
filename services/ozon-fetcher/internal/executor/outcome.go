@@ -152,6 +152,9 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 		log.Error("stored stocks page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "stocks_raw_invalid", ErrorClass: "stocks_raw_invalid", NextRunAt: now}
 	}
+	if errors.Is(err, errReturnsRestart) {
+		return e.retryable(task, "returns_restart", now, false)
+	}
 	if errors.Is(err, errUnknownResource) || errors.Is(err, errBadPeriod) {
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "invalid_task", ErrorClass: "invalid_task", NextRunAt: now}
 	}
