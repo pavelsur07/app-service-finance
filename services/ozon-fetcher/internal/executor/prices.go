@@ -16,6 +16,8 @@ func (r *taskRun) prices(ctx context.Context, creds ozon.Credentials) error {
 	}
 	items, total, pages := 0, int64(-1), 0
 	var drift ozon.Drift
+	// И при обрыве попытки (429 после изменённой страницы): продолжение её не перечитает.
+	defer func() { r.warnDrift(ozon.EndpointPrices, drift) }()
 	err := r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
 		return r.exec.ozon.FetchPrices(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
 			if page, err := ozon.ParsePricesPage(p.Body); err == nil {
@@ -38,7 +40,6 @@ func (r *taskRun) prices(ctx context.Context, creds ozon.Credentials) error {
 		r.log.Warn("prices snapshot: items differ from total", slog.String("stage", "fetch"),
 			slog.Int("items", items), slog.Int64("total", total))
 	}
-	r.warnDrift(ozon.EndpointPrices, drift)
 	return nil
 }
 

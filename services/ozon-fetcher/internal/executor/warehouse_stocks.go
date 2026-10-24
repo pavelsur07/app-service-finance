@@ -76,6 +76,8 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyWarehouseStocksPage), Cursor: end, ContentType: "application/json"})
 	}
 	var drift ozon.Drift
+	// И при обрыве попытки: продолжение сохранённую порцию не перечитает.
+	defer func() { r.warnDrift(ozon.EndpointWarehouseStocks, drift) }()
 	var rows, withRows int
 	for i := start; i < len(skus); i += ozon.MaxWarehouseStocksSKUs {
 		chunk := skus[i:min(i+ozon.MaxWarehouseStocksSKUs, len(skus))]
@@ -99,7 +101,6 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 	r.log.Info("warehouse stocks read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
 		slog.Int("requested", len(skus)-start), slog.Int("skus_with_rows", withRows), slog.Int("rows", rows),
 		slog.Bool("continued", start > 0))
-	r.warnDrift(ozon.EndpointWarehouseStocks, drift)
 	return nil
 }
 

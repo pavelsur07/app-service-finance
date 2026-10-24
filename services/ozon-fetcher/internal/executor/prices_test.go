@@ -134,3 +134,14 @@ func TestPricesShapeChangeIsWarnedOnce(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(h.logs.String(), `"msg":"ozon response shape changed"`))
 	assert.Contains(t, h.logs.String(), `"unknown_fields":["items[].new_field"],"missing_fields":["items[].volume_weight"]`)
 }
+
+func TestPricesShapeChangeIsWarnedWhenAttemptBreaks(t *testing.T) {
+	changed := page(`{"items":[{"product_id":1,"new_field":1}],"total":2,"cursor":"C1","total_items":2}`, "C1")
+	o := &fakeOzon{pricePages: map[string]ozon.Page{"": changed}, priceErr: &ozon.APIError{Class: ozon.ClassRateLimit, Endpoint: ozon.EndpointPrices, Status: 429}}
+	h := newHarness(o)
+
+	res := h.exec.Run(context.Background(), task(ResourcePrices, today), pricesCabinet, "trace")
+
+	assert.Equal(t, "rate_limit", res.Outcome)
+	assert.Contains(t, h.logs.String(), `"msg":"ozon response shape changed"`, "продолжение сохранённую страницу не перечитает")
+}
