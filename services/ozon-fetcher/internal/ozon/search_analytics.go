@@ -109,9 +109,9 @@ func parseSearchPage(endpoint, array string, body []byte, requested map[int64]bo
 		return SearchPage{}, invalidResponse(endpoint, fmt.Sprintf("response has no %q array", array))
 	}
 	var pageCount, total *int
-	_ = json.Unmarshal(root["page_count"], &pageCount)
-	_ = json.Unmarshal(root["total"], &total)
-	if pageCount == nil || *pageCount < 0 || total == nil || *total < 0 {
+	errPages := json.Unmarshal(root["page_count"], &pageCount)
+	errTotal := json.Unmarshal(root["total"], &total)
+	if errPages != nil || errTotal != nil || pageCount == nil || *pageCount < 0 || total == nil || *total < 0 {
 		return SearchPage{}, invalidResponse(endpoint, `response has no non-negative "page_count" and "total"`)
 	}
 	var period struct {
