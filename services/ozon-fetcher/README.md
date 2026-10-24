@@ -16,7 +16,8 @@ S3, журнал загрузок в своей БД; выдача фактов 
 создания), начисления по ним (`ozon.finance.accrual-postings`, номера — из raw заказов; `docs/ozon-api.md`)
 снимок каталога товаров дня (`ozon.products.list`, `ozon.products.info`), снимки остатков
 (`ozon.stocks`, 05:00), цен (`ozon.prices`) и остатков по складам (`ozon.stocks.warehouses`), поисковая аналитика Premium
-(`ozon.analytics.queries`, `ozon.analytics.queries.details`), возвраты (`ozon.returns`) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
+(`ozon.analytics.queries`, `ozon.analytics.queries.details`), возвраты (`ozon.returns`), снимки акций, поставок в пути и кластеров (`ozon.actions`, `ozon.supplies`,
+`ozon.clusters`) — [`docs/tasks/ozon-orders-posting-list/stages/stage-1.md`](../../docs/tasks/ozon-orders-posting-list/stages/stage-1.md);
 план загрузки Ozon — [`docs/tasks/marketplace-data-ingestion/plan-ozon.md`](../../docs/tasks/marketplace-data-ingestion/plan-ozon.md).
 Реклама Ozon Performance — свой ключ, токен и слот очереди кабинета (`ozon.ads.*`,
 [`docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md`](../../docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md)). Другие маркетплейсы — не здесь.

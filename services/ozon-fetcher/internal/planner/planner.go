@@ -250,10 +250,12 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 					today.Add(executor.StocksWindowStart[executor.ResourceStocksWarehouses]+time.Minute)))
 			}
 		}
-		// Цены — снимок дня с 05:00, как остатки.
-		if cab.Supports(executor.ResourcePrices) {
-			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourcePrices, today.Format(time.DateOnly), PriorityRoutine, false,
-				today.Add(executor.StocksWindowStart[executor.ResourcePrices])))
+		// Цены, акции, поставки и кластеры — снимки дня с 05:00, как остатки.
+		for _, resource := range []string{executor.ResourcePrices, executor.ResourceActions, executor.ResourceSupplies, executor.ResourceClusters} {
+			if cab.Supports(resource) {
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, today.Format(time.DateOnly), PriorityRoutine, false,
+					today.Add(executor.StocksWindowStart[resource])))
+			}
 		}
 		search := planSearch(&plan, cab, today, runDate, now, cfg)
 		returns := planReturns(&plan, cab, today, runDate, now, cfg)

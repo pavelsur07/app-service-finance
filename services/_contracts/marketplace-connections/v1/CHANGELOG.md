@@ -1,5 +1,10 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-24) — акции, поставки, кластеры
+
+- Новые значения `resource_types` у seller: `ozon.actions`, `ozon.supplies`, `ozon.clusters`
+  (снимки 05:00). Выдаются по списку `ozon_fetcher.reference_companies`. Схема не менялась.
+
 ## Правка (2026-10-24) — возвраты
 
 - Новое значение `resource_types` у seller: `ozon.returns` (`/v1/returns/list`). Выдаётся по списку

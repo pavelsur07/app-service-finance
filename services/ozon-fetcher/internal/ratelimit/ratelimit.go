@@ -77,6 +77,15 @@ func DefaultConfig() Config {
 			ozon.EndpointSearchQueriesDetails: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 			// Возвраты: страница на день, ключ общий (ozon-10-returns.md).
 			ozon.EndpointReturns: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			// Акции, поставки, кластеры: единицы запросов на снимок, ключ общий
+			// (ozon-11-actions-supplies-clusters.md).
+			ozon.EndpointActions:           {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointActionProducts:    {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointActionCandidates:  {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointSupplyOrderList:   {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointSupplyOrderGet:    {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointSupplyOrderBundle: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
+			ozon.EndpointClusters:          {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 		},
 		Fallback:     EndpointLimit{Start: 0.2, Floor: 0.05, Ceiling: 1, DefaultPause: 60 * time.Second},
 		GrowAfter:    20,

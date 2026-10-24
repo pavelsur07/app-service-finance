@@ -304,6 +304,33 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 - **Журнал:** INFO «returns read» — страниц, возвратов; смена формы ответа — WARNING.
 - **Включение:** Symfony `ozon_fetcher.returns_companies` (ключ seller).
 
+### `ozon.actions`, `ozon.supplies`, `ozon.clusters` — снимки акций, поставок в пути, кластеров
+
+Снимки дня с 05:00 (`docs/tasks/marketplace-data-ingestion/stages/ozon-11-actions-supplies-clusters.md`).
+Все ответы снимка — страницы raw по порядку; прерванный снимок (429, сбой) начинается заново
+(`snapshot_restart`), страницы разных моментов не смешиваются; потолок 1000 страниц на снимок.
+
+- **`ozon.actions`:** `GET /v1/actions` (`POST` — 405) → `{"result": [...]}` (акция — `id`, `title`,
+  `action_type`, даты, `is_participating`, счётчики товаров, скидка, …); по каждой акции (по
+  возрастанию `id`) `POST /v1/actions/products` (участники) и `/v1/actions/candidates` (кандидаты):
+  `{"action_id", "limit": 1000, "last_id"}` → `{"result": {"products", "total", "last_id"}}`. Конец —
+  пустая страница: последняя страница с товарами отдаёт непустой `last_id`; товары без нового
+  `last_id` — `invalid_response`.
+- **`ozon.supplies`:** активные заявки — `POST /v3/supply-order/list` (`filter.states` обязательны:
+  `DATA_FILLING`, `READY_TO_SUPPLY`, `ACCEPTED_AT_SUPPLY_WAREHOUSE`, `IN_TRANSIT`,
+  `ACCEPTANCE_AT_STORAGE_WAREHOUSE`, `REPORTS_CONFIRMATION_AWAITING`, `REPORT_REJECTED`; `limit` 100;
+  `last_id` до `""`); детали — `POST /v3/supply-order/get` (≤ 50 `order_ids`); состав —
+  `POST /v1/supply-order/bundle` (≤ 100 `bundle_ids`, `limit` ≤ 100, до `has_next: false`).
+  Неизвестный `bundle_id` — 400 `code 9` «Bundles … not found» (поставку отменили) — снимок заново.
+- **`ozon.clusters`:** `POST /v1/cluster/list` с `cluster_type` `CLUSTER_TYPE_OZON` и
+  `CLUSTER_TYPE_CIS` (без типа — 400) → кластеры, логистические кластеры, склады Ozon (Россия — 22 и
+  1340, СНГ — 5 и 39 на 24.10). `/v1/warehouse/list` — 400 `obsolete method`.
+- **`code 9`:** снятым методом считается только `code 9` с текстом «obsolete» или без текста:
+  `code 9` — общий FAILED_PRECONDITION Ozon.
+- **Журнал:** INFO «reference snapshot read» — страниц и числа (акций, участников, кандидатов;
+  заявок, поставок, позиций; кластеров, складов).
+- **Включение:** Symfony `ozon_fetcher.reference_companies` (ключ seller).
+
 ## Ozon Performance API (реклама)
 
 Хост `https://api-performance.ozon.ru` (`OZON_PERFORMANCE_BASE_URL`), пакет `internal/ozonperf`
@@ -414,6 +441,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
 | `/v1/analytics/product-queries`, `/v1/analytics/product-queries/details` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: квота общая, у детализации — предел «в секунду» (429 code 8 `You have reached request rate limit per second`); `SharedQuota` |
+| `/v1/actions*`, `/v3/supply-order/*`, `/v1/supply-order/bundle`, `/v1/cluster/list` | 0.2 | 0.2 | 0.2 | 5 с | `SharedQuota`: ключ общий; единицы запросов на снимок |
 | `/v1/returns/list` | 0.2 | 0.2 | 0.2 | 5 с | `SharedQuota`: ключ общий; страница на день |
 | `/v5/product/info/prices`, `/v1/analytics/stocks` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: `ratelimit-remaining` между соседними запросами скачет 49 → 21 → 44 → 32 — квота ключа общая с другими клиентами; `SharedQuota` — 429 только пауза; 2–5 запросов на снимок |
 | `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |

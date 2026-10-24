@@ -159,3 +159,16 @@ func TestReturnsBackfillAndTail(t *testing.T) {
 	assert.Empty(t, periods(none.Ensure, executor.ResourceReturns))
 	assert.Nil(t, refresh(none, KindReturnsTail))
 }
+
+func TestReferenceSnapshotsTodayFrom0500(t *testing.T) {
+	cabs := []connections.Cabinet{seller("a", executor.ResourceActions, executor.ResourceSupplies, executor.ResourceClusters)}
+	p := Build(at("2026-10-24 01:00"), cabs, DefaultConfig(msk))
+	for _, resource := range []string{executor.ResourceActions, executor.ResourceSupplies, executor.ResourceClusters} {
+		assert.Equal(t, []string{"2026-10-24"}, periods(p.Ensure, resource), resource)
+		s := specFor(p.Ensure, resource, "2026-10-24")
+		require.NotNil(t, s, resource)
+		assert.Equal(t, at("2026-10-24 05:00"), s.RunAt, resource)
+	}
+	none := Build(at("2026-10-24 01:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
+	assert.Empty(t, periods(none.Ensure, executor.ResourceActions))
+}
