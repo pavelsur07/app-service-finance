@@ -15,10 +15,12 @@ var ErrSupplyOrderMissing = errors.New("ozon: supply order of the list is missin
 
 // IsUnknownBundle — 400 code 9 «Bundles … not found» состава поставок:
 // поставку отменили между деталями и составом (живая проверка 24.10.2026).
+// Сверка по началу текста: Message обрезан до messageLimit, и при нескольких
+// bundle_id хвост «not found» теряется.
 func IsUnknownBundle(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Endpoint == EndpointSupplyOrderBundle && apiErr.Status == http.StatusBadRequest &&
-		apiErr.Code == obsoleteCode && strings.Contains(strings.ToLower(apiErr.Message), "not found")
+		apiErr.Code == obsoleteCode && strings.HasPrefix(strings.ToLower(strings.TrimSpace(apiErr.Message)), "bundles ")
 }
 
 // Снимки акций, поставок в пути и кластеров

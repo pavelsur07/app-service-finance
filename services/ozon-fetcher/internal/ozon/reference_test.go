@@ -108,6 +108,13 @@ func TestFetchSupplyListDetailsAndBundle(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, ClassInvalidRequest, apiErr.Class, "code 9 «not found» — не снятый метод")
 	assert.True(t, IsUnknownBundle(err))
+	six, _ := productServer(t, EndpointSupplyOrderBundle, func(map[string]any) (int, string) {
+		return http.StatusBadRequest, `{"code":9,"message":"Bundles 87ff5dcb-dbe1-4dbb-9538-46f1b5e953f4, 923d7cbb-024f-4476-a601-82602cabb51c, ` +
+			`489cf6b2-fea5-40db-bbd8-0fa8602c19ff, b0807854-b19f-4d87-ac5b-358ade771bec, 3b93d967-c9db-4c32-8a10-d76dbe952e08, ` +
+			`66e00979-1c97-466d-8047-232e31d00000 not found"}`
+	})
+	_, _, err = clientFor(t, six).FetchSupplyBundle(context.Background(), testCreds, "conn-1", []string{"x"}, "")
+	assert.True(t, IsUnknownBundle(err), "длинный текст обрезан до 200 символов — хвоста «not found» нет")
 	other, _ := productServer(t, EndpointSupplyOrderBundle, func(map[string]any) (int, string) {
 		return http.StatusBadRequest, `{"code":3,"message":"Request validation error: invalid GetSupplyOrderBundleRequest.Limit"}`
 	})

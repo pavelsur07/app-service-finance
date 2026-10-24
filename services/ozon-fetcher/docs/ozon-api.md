@@ -314,8 +314,9 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   `action_type`, даты, `is_participating`, счётчики товаров, скидка, …); по каждой акции (по
   возрастанию `id`) `POST /v1/actions/products` (участники) и `/v1/actions/candidates` (кандидаты):
   `{"action_id", "limit": 1000, "last_id"}` → `{"result": {"products", "total", "last_id"}}`. Конец —
-  пустая страница: последняя страница с товарами отдаёт непустой `last_id`; товары без нового
-  `last_id` — `invalid_response`.
+  пустая страница (у малого кабинета последняя страница с товарами отдаёт непустой `last_id`) или
+  страница без `last_id`, если набрано ровно `total`; без `last_id` при другом числе и `last_id`, не
+  сдвинувшийся, — `invalid_response`.
 - **`ozon.supplies`:** активные заявки — `POST /v3/supply-order/list` (`filter.states` обязательны:
   `DATA_FILLING`, `READY_TO_SUPPLY`, `ACCEPTED_AT_SUPPLY_WAREHOUSE`, `IN_TRANSIT`,
   `ACCEPTANCE_AT_STORAGE_WAREHOUSE`, `REPORTS_CONFIRMATION_AWAITING`, `REPORT_REJECTED`; `limit` 100;
