@@ -197,6 +197,52 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   — WARNING.
 - **Включение:** Symfony `ozon_fetcher.stocks_companies` (ключ seller).
 
+### `ozon.prices` — `POST /v5/product/info/prices`
+
+Снимок цен всех товаров кабинета
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-8-prices-warehouse-stocks.md`).
+
+- **Запрос:** `{"filter": {"visibility": "ALL"}, "limit": 1000}`, со второй страницы — `"cursor"`;
+  `limit` в `(0, 1000]`, 1001 → 400 `code 3`.
+- **Ответ** (живой, 24.10.2026): `{"items": [...], "cursor": "...", "total": N, "total_items": N}` —
+  без `result`; товар — `product_id`, `offer_id`, `price{price, old_price, marketing_seller_price,
+  min_price, net_price, retail_price, vat, currency_code, auto_action_enabled, …}`,
+  `commissions{sales_percent_fbo/fbs/…, fbo_*_amount, fbs_*_amount}`, `marketing_actions`,
+  `price_indexes`, `acquiring`, `volume_weight`.
+- **Пагинация:** как у `ozon.stocks` (общий обход): `cursor` до пустой страницы; непустая страница
+  без курсора, повтор курсора, нет `items` / `cursor` / `total`, товар без `product_id` —
+  `invalid_response`; потолок 1000 страниц; 400 на курсоре — `stale_cursor`.
+- **`period_key`:** день МСК снимка, окно с 05:00 — как `ozon.stocks`.
+- **Журнал:** INFO «prices snapshot read» — страниц, товаров, `total`; товаров ≠ `total` — WARNING.
+- **Включение:** Symfony `ozon_fetcher.snapshots_companies` (ключ seller).
+
+### `ozon.stocks.warehouses` — `POST /v1/analytics/stocks`
+
+Остатки по складам и кластерам Ozon по SKU снимка `ozon.stocks` того же дня
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-8-prices-warehouse-stocks.md`).
+`/v2/analytics/stock_on_warehouses` Ozon пометил устаревшим: в нём нет `warehouse_id`, кластера,
+брака и транзита.
+
+- **Запрос:** `{"skus": ["…", …]}` — от 1 до 100 SKU строками; 101 или `{}` → 400 `code 3`
+  `value must contain between 1 and 100 items, inclusive`. Пагинации нет.
+- **Ответ** (живой, 24.10.2026): `{"items": [...]}`; строка — SKU × склад: `sku`, `offer_id`, `name`,
+  `warehouse_id`, `warehouse_name`, `cluster_id`, `cluster_name`, `macrolocal_cluster_id`,
+  `placement_zone`, `available_stock_count`, `valid_stock_count`, `transit_stock_count`,
+  `requested_stock_count`, `waiting_docs_stock_count`, `expiring_stock_count`,
+  `stock_defect_stock_count`, `transit_defect_stock_count`, `excess_stock_count`,
+  `other_stock_count`, `return_from_customer_stock_count`, `return_to_seller_stock_count`,
+  `outbound_*`, `ads`, `ads_cluster`, `idc`, `idc_cluster`, `days_without_sales*`,
+  `turnover_grade*`, `item_tags`. SKU без строк — товар нигде не лежит (60 SKU → 1350 строк по 49 SKU).
+- **Порции:** SKU снимка `ozon.stocks` дня (`stocks[].sku`) без дублей по возрастанию, по 100;
+  порция — страница raw; курсор — `отпечаток списка SKU:индекс следующей порции`. Снимок остатков
+  не загружен — `stocks_not_loaded` (`not_ready`, 10 мин); перечитан между попытками —
+  `stocks_revised`, день заново; повреждён — `stocks_raw_invalid` (ERROR). Пустой снимок —
+  служебная страница `{"items":[]}` без запроса.
+- **Проверка:** нет `items`, строка без `sku`, SKU вне порции — `invalid_response`.
+- **`period_key`:** день МСК снимка, окно с 05:00 (задача — минутой позже `ozon.stocks`).
+- **Журнал:** INFO «warehouse stocks read» — SKU снимка, запрошено, SKU со строками, строк.
+- **Включение:** Symfony `ozon_fetcher.snapshots_companies` — только вместе с `ozon.stocks`.
+
 ## Ozon Performance API (реклама)
 
 Хост `https://api-performance.ozon.ru` (`OZON_PERFORMANCE_BASE_URL`), пакет `internal/ozonperf`
@@ -306,6 +352,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
+| `/v5/product/info/prices`, `/v1/analytics/stocks` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: `ratelimit-remaining` между соседними запросами скачет 49 → 21 → 44 → 32 — квота ключа общая с другими клиентами; `SharedQuota` — 429 только пауза; 2–5 запросов на снимок |
 | `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |
 | `/api/client/statistics` (заказ отчёта) | 1/120 | 1/120 | 1/120 | 120 с | разнос заказов как у Symfony; 429 — следующее окно |
 | `/api/client/statistics/{UUID}`, `/statistics/report` | 0.5 / 0.2 | 0.1 / 0.05 | 1 | 30 / 60 с | опрос статуса не ограничен Ozon (опыт Symfony) |

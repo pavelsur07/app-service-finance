@@ -55,6 +55,13 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      */
     public const STOCKS_RESOURCE_TYPES = ['ozon.stocks'];
 
+    /**
+     * Снимки цен и остатков по складам 05:00 (`docs/tasks/marketplace-data-ingestion/stages/ozon-8-prices-warehouse-stocks.md`);
+     * включаются по списку компаний. Остатки по складам берут SKU из снимка остатков дня — только вместе с STOCKS_RESOURCE_TYPES.
+     */
+    public const PRICES_RESOURCE_TYPE = 'ozon.prices';
+    public const WAREHOUSE_STOCKS_RESOURCE_TYPE = 'ozon.stocks.warehouses';
+
     /** Значение списка компаний: все кабинеты с ключом seller. */
     public const ORDERS_ALL_COMPANIES = '*';
 
@@ -80,6 +87,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      * @param list<string> $stocksCompanyIds то же для остатков
      * @param list<string> $adsCompanyIds то же для рекламы (ключ performance)
      * @param list<string> $adsReportsCompanyIds то же для отчётов по товарам (из тех, кому выдана реклама)
+     * @param list<string> $snapshotsCompanyIds то же для снимков цен и остатков по складам
      */
     public function __construct(
         private array $ordersCompanyIds = [],
@@ -88,6 +96,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
         private array $stocksCompanyIds = [],
         private array $adsCompanyIds = [],
         private array $adsReportsCompanyIds = [],
+        private array $snapshotsCompanyIds = [],
     ) {
     }
 
@@ -152,6 +161,9 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                     ? [self::ACCRUAL_POSTINGS_RESOURCE_TYPE] : []),
                 ...(null !== $sellerCredentials && self::listed($this->productsCompanyIds, $companyId) ? self::PRODUCTS_RESOURCE_TYPES : []),
                 ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) ? self::STOCKS_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && self::listed($this->snapshotsCompanyIds, $companyId) ? [self::PRICES_RESOURCE_TYPE] : []),
+                ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) && self::listed($this->snapshotsCompanyIds, $companyId)
+                    ? [self::WAREHOUSE_STOCKS_RESOURCE_TYPE] : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) ? self::ADS_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) && self::listed($this->adsReportsCompanyIds, $companyId)
                     ? self::ADS_REPORTS_RESOURCE_TYPES : []),

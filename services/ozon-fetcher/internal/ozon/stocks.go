@@ -84,42 +84,54 @@ func ParseStocksPage(body []byte) (StocksPage, error) {
 // отдаётся в onPage до запроса следующей; Page.Cursor — курсор следующей
 // страницы, "" у последней.
 func (c *Client) FetchStocks(ctx context.Context, creds Credentials, connectionRef, fromCursor string, firstPageNo int, onPage PageHandler) error {
+	return c.walkSnapshot(ctx, creds, connectionRef, EndpointStocks, StocksPageLimit, MaxStocksPages, fromCursor, firstPageNo,
+		func(body []byte) (string, error) {
+			page, err := ParseStocksPage(body)
+			return page.Next, err
+		}, onPage)
+}
+
+// walkSnapshot — обход снимка по cursor в корне ответа (остатки, цены):
+// filter.visibility=ALL, limit, cursor со второй страницы; next разбирает
+// страницу и отдаёт курсор следующей ("" — конец снимка).
+func (c *Client) walkSnapshot(ctx context.Context, creds Credentials, connectionRef, endpoint string, limit, maxPages int,
+	fromCursor string, firstPageNo int, next func(body []byte) (string, error), onPage PageHandler) error {
 	cursor := strings.TrimSpace(fromCursor)
 	seen := map[string]bool{}
 	if cursor != "" {
 		seen[cursor] = true
 	}
 	for no := firstPageNo; ; no++ {
-		if no > MaxStocksPages {
-			return invalidResponse(EndpointStocks, fmt.Sprintf("more than %d pages with a continuation marker", MaxStocksPages))
+		if no > maxPages {
+			return invalidResponse(endpoint, fmt.Sprintf("more than %d pages with a continuation marker", maxPages))
 		}
 		body := map[string]any{
 			"filter": map[string]string{"visibility": "ALL"},
-			"limit":  StocksPageLimit,
+			"limit":  limit,
 		}
 		if cursor != "" {
 			body["cursor"] = cursor
 		}
-		resp, err := c.Post(ctx, creds, connectionRef, EndpointStocks, body)
+		resp, err := c.Post(ctx, creds, connectionRef, endpoint, body)
 		if err != nil {
 			return err
 		}
-		page, err := ParseStocksPage(resp.Body)
+		nextCursor, err := next(resp.Body)
 		if err != nil {
 			return err
 		}
-		if page.Next != "" && seen[page.Next] {
+		if nextCursor != "" && seen[nextCursor] {
 			// Курсор не продвинулся при непустой странице — обход крутился бы вечно.
-			return invalidResponse(EndpointStocks, fmt.Sprintf("repeated cursor on page %d", no))
+			return invalidResponse(endpoint, fmt.Sprintf("repeated cursor on page %d", no))
 		}
-		seen[page.Next] = true
+		seen[nextCursor] = true
 
-		if err := onPage(Page{No: no, Body: resp.Body, Cursor: page.Next, ContentType: "application/json"}); err != nil {
+		if err := onPage(Page{No: no, Body: resp.Body, Cursor: nextCursor, ContentType: "application/json"}); err != nil {
 			return err
 		}
-		if page.Next == "" {
+		if nextCursor == "" {
 			return nil
 		}
-		cursor = page.Next
+		cursor = nextCursor
 	}
 }

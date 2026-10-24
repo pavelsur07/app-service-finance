@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-24) — снимки цен и остатков по складам
+
+- Новые значения `resource_types` у seller: `ozon.prices` (`/v5/product/info/prices`) и
+  `ozon.stocks.warehouses` (`/v1/analytics/stocks`, только вместе с `ozon.stocks`), снимки 05:00.
+  Выдаются по списку `ozon_fetcher.snapshots_companies`. Схема не менялась.
+
 ## Правка (2026-10-22) — остатки: без снимка конца недели
 
 - `ozon.stocks.week-close` снят до первой выдачи задач (воскресенье 26.10): решение Владельца —

@@ -221,6 +221,17 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 		if cab.Supports(executor.ResourceStocks) {
 			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceStocks, today.Format(time.DateOnly), PriorityRoutine, false,
 				today.Add(executor.StocksWindowStart[executor.ResourceStocks])))
+			// Остатки по складам — по SKU снимка остатков того же дня: минутой
+			// позже, иначе задача может быть взята первой и уйти в not_ready.
+			if cab.Supports(executor.ResourceStocksWarehouses) {
+				plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceStocksWarehouses, today.Format(time.DateOnly), PriorityRoutine, false,
+					today.Add(executor.StocksWindowStart[executor.ResourceStocksWarehouses]+time.Minute)))
+			}
+		}
+		// Цены — снимок дня с 05:00, как остатки.
+		if cab.Supports(executor.ResourcePrices) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourcePrices, today.Format(time.DateOnly), PriorityRoutine, false,
+				today.Add(executor.StocksWindowStart[executor.ResourcePrices])))
 		}
 		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {
 			if len(r.Specs) > 0 {

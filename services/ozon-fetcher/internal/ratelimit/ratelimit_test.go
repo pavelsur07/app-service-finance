@@ -411,3 +411,13 @@ func TestSharedQuotaSavedRateBelowFloorIsRaised(t *testing.T) {
 	r.Seed(refA, ep3, 0, 0.05)
 	assert.InDelta(t, 0.2, r.Rate(refA, ep3), 1e-9, "темп, сохранённый до общей квоты, поднимается до пола")
 }
+
+func TestDefaultConfigSnapshotsShareKeyQuota(t *testing.T) {
+	cfg := DefaultConfig()
+	for _, endpoint := range []string{ozon.EndpointPrices, ozon.EndpointWarehouseStocks} {
+		limit, ok := cfg.Endpoints[endpoint]
+		require.True(t, ok, endpoint)
+		assert.True(t, limit.SharedQuota, "квота ключа общая — 429 только пауза: %s", endpoint)
+		assert.LessOrEqual(t, limit.Start, 0.2, endpoint)
+	}
+}
