@@ -49,6 +49,11 @@ const (
 	ResourcePrices           = "ozon.prices"
 	ResourceStocksWarehouses = "ozon.stocks.warehouses"
 
+	// Поисковая аналитика Premium по SKU за день МСК (ozon-9-search-analytics.md):
+	// сводка и топ запросов; SKU — из снимка ozon.stocks дня исполнения.
+	ResourceSearchQueries = "ozon.analytics.queries"
+	ResourceSearchDetails = "ozon.analytics.queries.details"
+
 	// PeriodRef — period_key справочников.
 	PeriodRef = "ref"
 )
@@ -65,6 +70,7 @@ var gatedResources = map[string]bool{
 	ResourceOrdersFBO: true, ResourceOrdersFBS: true, ResourceAccrualPostings: true,
 	ResourceProductsList: true, ResourceProductsInfo: true,
 	ResourceStocks: true, ResourcePrices: true, ResourceStocksWarehouses: true,
+	ResourceSearchQueries: true, ResourceSearchDetails: true,
 }
 
 // IsPostingResource — ресурс списков отправлений.
@@ -111,6 +117,7 @@ type Ozon interface {
 	FetchStocks(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchPrices(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchWarehouseStocks(ctx context.Context, creds ozon.Credentials, connectionRef string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error)
+	FetchSearchPage(ctx context.Context, creds ozon.Credentials, connectionRef string, details bool, day time.Time, skus []int64, page int) (ozon.Page, ozon.SearchPage, error)
 }
 
 // Refresher — обновление снимка кабинетов после 401.
@@ -175,6 +182,8 @@ func DefaultConfig() Config {
 			ResourceAccrualPostings:  time.Hour,        // заказы дня ещё не загружены
 			ResourceProductsInfo:     10 * time.Minute, // список дня грузится за секунды
 			ResourceStocksWarehouses: 10 * time.Minute, // снимок остатков дня — секунды после 05:00
+			ResourceSearchQueries:    6 * time.Hour,    // Ozon ещё не посчитал день
+			ResourceSearchDetails:    6 * time.Hour,
 		},
 		ReportPoll: ozon.DefaultReportPoll,
 		// Москва без перехода на летнее время с 2014 г.; приложение передаёт
@@ -266,7 +275,7 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 
 	level := slog.LevelInfo
 	switch {
-	case out.Status == store.StatusFailedRetryable, out.Label == labelSnapshotMissed:
+	case out.Status == store.StatusFailedRetryable, out.Label == labelSnapshotMissed, out.Label == labelHistoryUnavailable:
 		// Пропущенный снимок — следствие простоя, о котором уже сигналят;
 		// пропуск виден в покрытии.
 		level = slog.LevelWarn
@@ -397,6 +406,8 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.prices(ctx, creds)
 		case ResourceStocksWarehouses:
 			return r.warehouseStocks(ctx, creds, cabinet)
+		case ResourceSearchQueries, ResourceSearchDetails:
+			return r.searchAnalytics(ctx, creds, cabinet)
 		}
 		return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
 	}

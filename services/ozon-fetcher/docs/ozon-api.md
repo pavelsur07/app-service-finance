@@ -247,6 +247,39 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   один WARNING «ozon response shape changed» с именами полей, raw сохраняется. То же у `ozon.prices`.
 - **Включение:** Symfony `ozon_fetcher.snapshots_companies` — только вместе с `ozon.stocks`.
 
+### `ozon.analytics.queries`, `ozon.analytics.queries.details` — поисковая аналитика Premium
+
+Сводка и топ поисковых запросов по SKU за день МСК
+(`docs/tasks/marketplace-data-ingestion/stages/ozon-9-search-analytics.md`).
+
+**Воронка `/v1/analytics/data` снята Ozon** (живая проверка 24.10.2026, Premium включён): метрики
+`hits_view*`, `session_view*`, `hits_tocart*`, `returns`, `cancellations`, `delivered_units`,
+`position_category`, `conv_tocart`, `adv_view_all` — 400 `deprecated metrics used`; работают только
+`ordered_units` и `revenue` (дублируют заказы). Метод не грузится.
+
+- **`POST /v1/analytics/product-queries`:** `{"date_from": "DT00:00:00+03:00", "date_to":
+  "DT23:59:59+03:00", "skus": ["…"], "page": 0, "page_size": 1000}`; `skus` обязательны (1–1000).
+  Ответ — `items[]` (`sku`, `name`, `offer_id`, `category`, `unique_search_users`, `position`,
+  `unique_view_users` — строка, `view_conversion`, `gmv`, `currency`), `total`, `page_count`,
+  `analytics_period`. Только SKU с данными.
+- **`POST /v1/analytics/product-queries/details`:** то же + `"limit_by_sku": 15` (максимум),
+  `page_size` ≤ 100; ответ — `queries[]` (`sku`, `query`, `query_index`, `position`,
+  `unique_search_users`, `unique_view_users`, `view_conversion`, `order_count`, `gmv`, `currency`).
+- **Данные дневные**: диапазон по UTC и по МСК за день дают одно и то же, час — пусто. **Задержка** —
+  день доступен с D−2 (D−1 — 400 `There is no data for the specified period`). **Глубина** — около
+  33 дней (24.10 — с 21.09).
+- **SKU** — из снимка `ozon.stocks` дня исполнения (до 05:00 — вчерашнего), порции по 1000; страницы
+  `page` с 0 до `page_count − 1`; курсор — `отпечаток:порция:страница:page_count`, последняя страница —
+  `отпечаток:end`. Сдвиг `page_count` между страницами — `search_shifted` (день заново); пустая
+  страница до конца, страница за `page_count`, SKU вне порции, чужой `analytics_period` —
+  `invalid_response`.
+- **«Нет данных»**: день старше D−30 — `history_unavailable` (`failed_permanent`, WARNING); младше —
+  `search_not_ready` (`not_ready`, 6 ч). День младше D−2 — `data_early`, без запроса.
+- **План:** догон с 21.09 (не глубже D−33) до D−2, приоритет догона; хвост D−3…D−7 раз в сутки.
+- **Журнал:** INFO «search analytics read» — SKU, страниц, строк; строк ≠ `total` — WARNING; смена
+  формы ответа — WARNING.
+- **Включение:** Symfony `ozon_fetcher.search_analytics_companies` — только вместе с `ozon.stocks`.
+
 ## Ozon Performance API (реклама)
 
 Хост `https://api-performance.ozon.ru` (`OZON_PERFORMANCE_BASE_URL`), пакет `internal/ozonperf`
@@ -356,6 +389,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v1/report/info` | 0.5 | 0.1 | 2 | 30 с | **консервативно**; опрос статуса, backoff 2→60 с |
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
+| `/v1/analytics/product-queries`, `/v1/analytics/product-queries/details` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: квота общая, у детализации — предел «в секунду» (429 code 8 `You have reached request rate limit per second`); `SharedQuota` |
 | `/v5/product/info/prices`, `/v1/analytics/stocks` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: `ratelimit-remaining` между соседними запросами скачет 49 → 21 → 44 → 32 — квота ключа общая с другими клиентами; `SharedQuota` — 429 только пауза; 2–5 запросов на снимок |
 | `/api/client/campaign`, `/api/client/statistics/expense/json`, `/api/client/statistics/daily/json` (Performance) | 0.2 | 0.05 | 1 | 60 с | **консервативно**; лимиты не опубликованы, единицы запросов на кабинет в сутки; пары лимитера — свои (другие endpoint’ы) |
 | `/api/client/statistics` (заказ отчёта) | 1/120 | 1/120 | 1/120 | 120 с | разнос заказов как у Symfony; 429 — следующее окно |

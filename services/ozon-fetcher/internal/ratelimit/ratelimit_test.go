@@ -414,7 +414,7 @@ func TestSharedQuotaSavedRateBelowFloorIsRaised(t *testing.T) {
 
 func TestDefaultConfigSnapshotsShareKeyQuota(t *testing.T) {
 	cfg := DefaultConfig()
-	for _, endpoint := range []string{ozon.EndpointPrices, ozon.EndpointWarehouseStocks} {
+	for _, endpoint := range []string{ozon.EndpointPrices, ozon.EndpointWarehouseStocks, ozon.EndpointSearchQueries, ozon.EndpointSearchQueriesDetails} {
 		limit, ok := cfg.Endpoints[endpoint]
 		require.True(t, ok, endpoint)
 		assert.True(t, limit.SharedQuota, "квота ключа общая — 429 только пауза: %s", endpoint)

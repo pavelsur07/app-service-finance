@@ -13,6 +13,10 @@ import (
 // labelSnapshotMissed — снимок за прошедший день не загружен (WARNING, не ERROR).
 const labelSnapshotMissed = "snapshot_missed"
 
+// labelHistoryUnavailable — день вне глубины истории Ozon (WARNING, не ERROR):
+// данные ушли до загрузки, пропуск виден в покрытии.
+const labelHistoryUnavailable = "history_unavailable"
+
 // Ожидания отчётов рекламы — штатные исходы (INFO).
 const (
 	labelReportPending = "report_pending"
@@ -116,6 +120,23 @@ func (e *Executor) outcome(parent, taskCtx context.Context, task store.Task, run
 	if errors.Is(err, errCatalogRawInvalid) {
 		log.Error("stored product list page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "catalog_raw_invalid", ErrorClass: "catalog_raw_invalid", NextRunAt: now}
+	}
+	var fresh *dataEarlyError
+	if errors.As(err, &fresh) {
+		return store.Outcome{Status: store.StatusPending, Label: "data_early", ErrorClass: "data_early", KeepCursor: true, NextRunAt: fresh.at}
+	}
+	if errors.Is(err, errHistoryUnavailable) {
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: labelHistoryUnavailable, ErrorClass: labelHistoryUnavailable, NextRunAt: now}
+	}
+	if errors.Is(err, errSearchNotReady) {
+		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]
+		if !ok {
+			delay = time.Hour
+		}
+		return store.Outcome{Status: store.StatusNotReady, Label: "search_not_ready", ErrorClass: "search_not_ready", KeepCursor: true, NextRunAt: now.Add(delay)}
+	}
+	if errors.Is(err, errSearchShifted) {
+		return e.retryable(task, "search_shifted", now, false)
 	}
 	if errors.Is(err, errStocksNotLoaded) {
 		delay, ok := e.cfg.NotReadyDelay[task.ResourceType]

@@ -1,5 +1,11 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-10-24) — поисковая аналитика
+
+- Новые значения `resource_types` у seller: `ozon.analytics.queries` и
+  `ozon.analytics.queries.details` (`/v1/analytics/product-queries[/details]`, Premium), только
+  вместе с `ozon.stocks`. Выдаются по списку `ozon_fetcher.search_analytics_companies`. Схема не менялась.
+
 ## Правка (2026-10-24) — снимки цен и остатков по складам
 
 - Новые значения `resource_types` у seller: `ozon.prices` (`/v5/product/info/prices`) и

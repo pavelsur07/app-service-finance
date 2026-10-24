@@ -37,6 +37,10 @@ type Page struct {
 // PageHandler сохраняет страницу до запроса следующей. Ошибка останавливает обход.
 type PageHandler func(Page) error
 
+// InvalidResponse — invalid_response для проверок ответа вне пакета
+// (пагинация, которую ведёт исполнитель).
+func InvalidResponse(endpoint, reason string) *APIError { return invalidResponse(endpoint, reason) }
+
 func invalidResponse(endpoint, reason string) *APIError {
 	return &APIError{Class: ClassInvalidResponse, Endpoint: endpoint, Status: http.StatusOK, Err: errors.New(reason)}
 }

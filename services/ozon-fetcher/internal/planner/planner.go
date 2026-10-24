@@ -27,11 +27,24 @@ const (
 	KindOrders          = "orders_tail"
 	KindAccrualPostings = "accrual_postings_tail"
 	KindAdsTail         = "ads_tail"
+	KindSearchTail      = "search_tail"
 )
 
 // DefaultAdsFrom — первый день расхода и статистики рекламы
 // (docs/tasks/marketplace-data-ingestion/stages/ozon-6-ads-sync.md §3).
 const DefaultAdsFrom = "2026-10-01"
+
+// DefaultSearchFrom — самый ранний день поисковой аналитики на 24.10.2026
+// (ozon-9-search-analytics.md); догон не глубже SearchDepthDays — старше
+// Ozon данных не хранит.
+const DefaultSearchFrom = "2026-09-21"
+
+// SearchDepthDays — глубина истории поисковой аналитики Ozon (D−33).
+const SearchDepthDays = 33
+
+// SearchTailDays — день D−3…D−(2+SearchTailDays) перечитывается раз в сутки:
+// Ozon может досчитывать дни.
+const SearchTailDays = 5
 
 // AdsTailDays — дней перед сегодня, в которых раз в сутки перечитываются
 // расход и статистика рекламы: Ozon дописывает атрибуцию задним числом.
@@ -233,7 +246,8 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourcePrices, today.Format(time.DateOnly), PriorityRoutine, false,
 				today.Add(executor.StocksWindowStart[executor.ResourcePrices])))
 		}
-		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings} {
+		search := planSearch(&plan, cab, today, runDate, now, cfg)
+		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings, search} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
 			}
@@ -306,4 +320,35 @@ func planAds(plan *Plan, cab connections.Cabinet, today time.Time, runDate strin
 			plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceAdsStatisticsTail, today.Format(time.DateOnly), PriorityRoutine, false, reports))
 		}
 	}
+}
+
+// planSearch — поисковая аналитика: догон с DefaultSearchFrom (не глубже
+// SearchDepthDays) до D−2, хвост раз в сутки. Только вместе со снимком
+// остатков: SKU берутся из него.
+func planSearch(plan *Plan, cab connections.Cabinet, today time.Time, runDate string, now time.Time, cfg Config) Refresh {
+	tail := Refresh{Kind: KindSearchTail, RunDate: runDate, ConnectionRef: cab.Ref}
+	if !cab.Supports(executor.ResourceStocks) {
+		return tail
+	}
+	from, _ := time.ParseInLocation(time.DateOnly, DefaultSearchFrom, cfg.Location)
+	if oldest := today.AddDate(0, 0, -SearchDepthDays); from.Before(oldest) {
+		from = oldest
+	}
+	last := today.AddDate(0, 0, -executor.SearchLagDays)
+	for _, resource := range []string{executor.ResourceSearchQueries, executor.ResourceSearchDetails} {
+		if !cab.Supports(resource) {
+			continue
+		}
+		for d := from; !d.After(last); d = d.AddDate(0, 0, 1) {
+			plan.Ensure = append(plan.Ensure, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, false, now))
+		}
+		for i := 1; i <= SearchTailDays; i++ {
+			d := last.AddDate(0, 0, -i)
+			if d.Before(from) {
+				break
+			}
+			tail.Specs = append(tail.Specs, spec(cab.Ref, resource, d.Format(time.DateOnly), PriorityBackfill, true, now))
+		}
+	}
+	return tail
 }
