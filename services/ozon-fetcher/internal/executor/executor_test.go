@@ -214,6 +214,8 @@ type fakeOzon struct {
 	// Поисковая аналитика: ответ на страницу и вызовы.
 	searchFn    func(details bool, day time.Time, skus []int64, page int) (ozon.SearchPage, error)
 	searchCalls []searchCall
+	// searchSameBody — каждая страница с телом страницы 0 (повтор выдачи).
+	searchSameBody bool
 }
 
 type searchCall struct {

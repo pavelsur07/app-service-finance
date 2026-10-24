@@ -21,6 +21,9 @@ func (f *fakeOzon) FetchSearchPage(_ context.Context, creds ozon.Credentials, _ 
 	if err != nil {
 		return ozon.Page{}, ozon.SearchPage{}, err
 	}
+	if f.searchSameBody {
+		page = 0 // Ozon отдаёт одну и ту же страницу
+	}
 	array := "items"
 	if details {
 		array = "queries"
@@ -162,10 +165,12 @@ func TestSearchAnalyticsEmptyDayAndMismatchedTotal(t *testing.T) {
 	assert.Equal(t, "done", h2.exec.Run(context.Background(), task(ResourceSearchQueries, searchDay), searchCabinet, "trace").Outcome)
 	assert.Contains(t, h2.logs.String(), `"msg":"search analytics: rows differ from total"`)
 
-	h3, _ := warehouseHarness(t, &fakeOzon{searchFn: pagesBy(nil)}, []ozon.Page{stocksPage(0, "")})
-	assert.Equal(t, "done", h3.exec.Run(context.Background(), task(ResourceSearchQueries, searchDay), searchCabinet, "trace").Outcome)
-	require.Len(t, h3.raw.puts, 1)
-	assert.JSONEq(t, `{"items":[]}`, string(h3.raw.puts[0].Body))
+	for resource, marker := range map[string]string{ResourceSearchQueries: `{"items":[]}`, ResourceSearchDetails: `{"queries":[]}`} {
+		h3, _ := warehouseHarness(t, &fakeOzon{searchFn: pagesBy(nil)}, []ozon.Page{stocksPage(0, "")})
+		assert.Equal(t, "done", h3.exec.Run(context.Background(), task(resource, searchDay), searchCabinet, "trace").Outcome)
+		require.Len(t, h3.raw.puts, 1)
+		assert.JSONEq(t, marker, string(h3.raw.puts[0].Body), "служебная страница — в форме выдачи ресурса")
+	}
 }
 
 func TestSearchAnalyticsNoDataAndFreshness(t *testing.T) {
@@ -222,4 +227,21 @@ func TestSearchAnalyticsSKUsFromExecutionDaySnapshot(t *testing.T) {
 		assert.Equal(t, "resource_disabled", h3.exec.Run(context.Background(), task(ResourceSearchQueries, searchDay), c, "trace").Outcome, name)
 		assert.Empty(t, o3.searchCalls, name)
 	}
+}
+
+func TestSearchAnalyticsRepeatedPageIsRejected(t *testing.T) {
+	o := &fakeOzon{searchFn: pagesBy(map[int64]int{10: 3}), searchSameBody: true}
+	h, _ := warehouseHarness(t, o, snapshot(2, 1, 2))
+	res := h.exec.Run(context.Background(), task(ResourceSearchQueries, searchDay), searchCabinet, "trace")
+	assert.Equal(t, "invalid_response", res.Outcome, "страница 1 повторяет страницу 0")
+	assert.Len(t, h.tasks.pages, 1)
+
+	// После рестарта на странице 1: хеш сохранённой страницы 0 — последний в загрузке.
+	_, skus := searchSKUs(2)
+	o2 := &fakeOzon{searchFn: pagesBy(map[int64]int{10: 3}), searchSameBody: true}
+	h2, _ := warehouseHarness(t, o2, snapshot(2, 2, 1))
+	body := fmt.Sprintf(`{"items":[],"total":%d,"page_count":3,"analytics_period":{}}`, 10*1000)
+	tk := task(ResourceSearchQueries, searchDay)
+	tk.Cursor, tk.NextPageNo, tk.PageHashes = numbersFingerprint(skuKeys(skus))+":0:1:3", 2, []string{"other", sha(body)}
+	assert.Equal(t, "invalid_response", h2.exec.Run(context.Background(), tk, searchCabinet, "trace").Outcome)
 }

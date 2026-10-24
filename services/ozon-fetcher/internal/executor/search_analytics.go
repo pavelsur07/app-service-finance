@@ -22,8 +22,14 @@ const (
 	SearchHistoryDays = 30
 )
 
-// emptySearchPage — служебная страница дня без SKU: Ozon отвергает запрос без skus.
-const emptySearchPage = `{"items":[]}`
+// emptySearchPage — служебная страница дня без SKU (Ozon отвергает запрос без
+// skus) в форме выдачи ресурса.
+func emptySearchPage(details bool) string {
+	if details {
+		return `{"queries":[]}`
+	}
+	return `{"items":[]}`
+}
 
 // dataEarlyError — день ещё не доступен в Ozon: задача ждёт at.
 type dataEarlyError struct{ at time.Time }
@@ -106,7 +112,7 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 		return errStocksRevised
 	}
 	if len(skus) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptySearchPage), Cursor: end, ContentType: "application/json"})
+		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptySearchPage(details)), Cursor: end, ContentType: "application/json"})
 	}
 
 	var drift ozon.Drift
@@ -120,6 +126,14 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 			page, expected = at.page, at.pageCount
 		}
 		chunkRows, total := 0, -1
+		// Хеши страниц порции: страницы порции сохраняются подряд, поэтому
+		// после рестарта на странице N это последние N хешей загрузки.
+		seen := map[string]bool{}
+		if resumed && at.page > 0 && at.page <= len(r.hashes) {
+			for _, h := range r.hashes[len(r.hashes)-at.page:] {
+				seen[h] = true
+			}
+		}
 		for {
 			p, stats, err := r.exec.ozon.FetchSearchPage(ctx, creds, r.task.ConnectionRef, details, day, part, page)
 			if ozon.IsSearchNoData(err) {
@@ -143,6 +157,12 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 			case stats.PageCount > 0 && stats.Rows == 0:
 				// Пустая страница до конца выдачи — тихая обрезка.
 				return ozon.InvalidResponse(endpoint, fmt.Sprintf("empty page %d of %d", page, stats.PageCount))
+			}
+			if sum := sha256Hex(p.Body); seen[sum] {
+				// Повтор страницы: настоящая страница потеряна, хотя число строк сходится.
+				return ozon.InvalidResponse(endpoint, fmt.Sprintf("page %d repeats an earlier page of the chunk", page))
+			} else {
+				seen[sum] = true
 			}
 			drift.Add(ozon.SearchDrift(details, p.Body))
 			chunkRows += stats.Rows
