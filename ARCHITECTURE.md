@@ -4208,6 +4208,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.72 | 2026-10-24 | Marketplace: поисковая аналитика Ozon — всем кабинетам с остатками (`ozon_fetcher.search_analytics_companies: ['*']`) |
 | 2.71 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы поисковой аналитики `ozon.analytics.queries`, `ozon.analytics.queries.details` (параметр `ozon_fetcher.search_analytics_companies`, только с `ozon.stocks`), строки карты «Поиск: сводка по товарам», «Поиск: запросы по товарам» |
 | 2.70 | 2026-10-24 | Marketplace: снимки цен и остатков по складам Ozon — всем кабинетам с ключом seller (`ozon_fetcher.snapshots_companies: ['*']`) |
 | 2.69 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы `ozon.prices` и `ozon.stocks.warehouses` (параметр `ozon_fetcher.snapshots_companies`, остатки по складам — только с `ozon.stocks`), строки карты покрытия «Цены: снимок 05:00», «Остатки по складам: снимок 05:00» |
