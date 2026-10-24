@@ -46,6 +46,9 @@ func (f *fakeOzon) FetchSupplyOrderList(_ context.Context, _ ozon.Credentials, _
 
 func (f *fakeOzon) FetchSupplyOrders(_ context.Context, _ ozon.Credentials, _ string, ids []int64) (ozon.Page, []string, error) {
 	p, err := f.refPage(fmt.Sprintf("supply get %d", len(ids)))
+	if f.supplyGetErr != nil {
+		return ozon.Page{}, nil, f.supplyGetErr
+	}
 	var b []string
 	for _, id := range ids {
 		b = append(b, f.bundles[id]...)
@@ -114,6 +117,18 @@ func TestSuppliesSnapshotListDetailsAndBundles(t *testing.T) {
 func TestSuppliesMissingBundleRestartsSnapshot(t *testing.T) {
 	o := &fakeOzon{supplyPages: map[string][]int64{"": {1}}, bundles: map[int64][]string{1: {"b"}},
 		bundleErr: &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozon.EndpointSupplyOrderBundle, Status: 400, Code: 9, Message: "Bundles b not found"}}
+	defer func() {
+		// Прочие 400 состава — постоянная ошибка, не снимок заново.
+		o2 := &fakeOzon{supplyPages: map[string][]int64{"": {1}}, bundles: map[int64][]string{1: {"b"}},
+			bundleErr: &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozon.EndpointSupplyOrderBundle, Status: 400, Code: 3, Message: "invalid limit"}}
+		h2 := newHarness(o2)
+		assert.Equal(t, "invalid_request", h2.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace").Outcome)
+
+		// Заявка пропала между списком и деталями — снимок заново.
+		o3 := &fakeOzon{supplyPages: map[string][]int64{"": {1}}, supplyGetErr: fmt.Errorf("%w: 1 of 1", ozon.ErrSupplyOrderMissing)}
+		h3 := newHarness(o3)
+		assert.Equal(t, "snapshot_restart", h3.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace").Outcome)
+	}()
 	h := newHarness(o)
 
 	res := h.exec.Run(context.Background(), task(ResourceSupplies, today), refCabinet(ResourceSupplies), "trace")
@@ -177,4 +192,8 @@ func TestActionsEndWithoutLastIDNeedsTotal(t *testing.T) {
 	o2 := &fakeOzon{actionIDs: []int64{3}, productsN: map[string]int{"3:false:": 2}, productsNoLast: map[string]int{"3:false:": 5}}
 	h2 := newHarness(o2)
 	assert.Equal(t, "invalid_response", h2.exec.Run(context.Background(), task(ResourceActions, today), refCabinet(ResourceActions), "trace").Outcome, "2 из 5 без last_id — обрезка")
+
+	o3 := &fakeOzon{actionIDs: []int64{3}, productsN: map[string]int{"3:false:": 4}, productsNoLast: map[string]int{"3:false:": 2}}
+	h3 := newHarness(o3)
+	assert.Equal(t, "invalid_response", h3.exec.Run(context.Background(), task(ResourceActions, today), refCabinet(ResourceActions), "trace").Outcome, "4 при total 2 — перекрытие страниц")
 }

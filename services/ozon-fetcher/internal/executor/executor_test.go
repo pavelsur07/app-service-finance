@@ -232,6 +232,7 @@ type fakeOzon struct {
 	refErr      map[string]error
 	// productsNoLast — страница без last_id: ключ → total.
 	productsNoLast map[string]int
+	supplyGetErr   error
 }
 
 type searchCall struct {

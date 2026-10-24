@@ -86,6 +86,13 @@ func TestFetchSupplyListDetailsAndBundle(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr, "заявка не из запрошенных")
 	_, _, err = clientFor(t, get).FetchSupplyOrders(context.Background(), testCreds, "conn-1", make([]int64, MaxSupplyOrderGet+1))
 	assert.Error(t, err)
+	_, _, err = clientFor(t, get).FetchSupplyOrders(context.Background(), testCreds, "conn-1", []int64{134649642, 7})
+	assert.ErrorIs(t, err, ErrSupplyOrderMissing, "заявка 7 не пришла")
+	dup, _ := productServer(t, EndpointSupplyOrderGet, func(map[string]any) (int, string) {
+		return http.StatusOK, `{"orders":[{"order_id":1,"supplies":[]},{"order_id":1,"supplies":[]}]}`
+	})
+	_, _, err = clientFor(t, dup).FetchSupplyOrders(context.Background(), testCreds, "conn-1", []int64{1})
+	require.ErrorAs(t, err, &apiErr, "повтор заявки")
 
 	bundle, _ := productServer(t, EndpointSupplyOrderBundle, func(map[string]any) (int, string) {
 		return http.StatusOK, `{"items":[{"sku":286031076,"quantity":4}],"has_next":false,"last_id":"2029269084","total_count":1}`
@@ -100,6 +107,12 @@ func TestFetchSupplyListDetailsAndBundle(t *testing.T) {
 	_, _, err = clientFor(t, missing).FetchSupplyBundle(context.Background(), testCreds, "conn-1", []string{"x"}, "")
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, ClassInvalidRequest, apiErr.Class, "code 9 «not found» — не снятый метод")
+	assert.True(t, IsUnknownBundle(err))
+	other, _ := productServer(t, EndpointSupplyOrderBundle, func(map[string]any) (int, string) {
+		return http.StatusBadRequest, `{"code":3,"message":"Request validation error: invalid GetSupplyOrderBundleRequest.Limit"}`
+	})
+	_, _, err = clientFor(t, other).FetchSupplyBundle(context.Background(), testCreds, "conn-1", []string{"x"}, "")
+	assert.False(t, IsUnknownBundle(err), "прочие 400 — не снимок заново")
 }
 
 func TestFetchClustersCountsWarehouses(t *testing.T) {

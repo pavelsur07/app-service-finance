@@ -3,9 +3,23 @@ package ozon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 )
+
+// ErrSupplyOrderMissing — заявка из списка не пришла в деталях (пропала между
+// запросами): снимок поставок — заново.
+var ErrSupplyOrderMissing = errors.New("ozon: supply order of the list is missing in details")
+
+// IsUnknownBundle — 400 code 9 «Bundles … not found» состава поставок:
+// поставку отменили между деталями и составом (живая проверка 24.10.2026).
+func IsUnknownBundle(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Endpoint == EndpointSupplyOrderBundle && apiErr.Status == http.StatusBadRequest &&
+		apiErr.Code == obsoleteCode && strings.Contains(strings.ToLower(apiErr.Message), "not found")
+}
 
 // Снимки акций, поставок в пути и кластеров
 // (docs/tasks/marketplace-data-ingestion/stages/ozon-11-actions-supplies-clusters.md §2).
@@ -168,15 +182,20 @@ func (c *Client) FetchSupplyOrders(ctx context.Context, creds Credentials, conne
 		return Page{}, nil, invalidResponse(EndpointSupplyOrderGet, `response has no "orders" array`)
 	}
 	var bundles []string
+	got := map[int64]bool{}
 	for _, o := range *shape.Orders {
-		if o.OrderID == nil || !requested[*o.OrderID] {
-			return Page{}, nil, invalidResponse(EndpointSupplyOrderGet, "order outside the requested ids")
+		if o.OrderID == nil || !requested[*o.OrderID] || got[*o.OrderID] {
+			return Page{}, nil, invalidResponse(EndpointSupplyOrderGet, "order outside the requested ids or repeated")
 		}
+		got[*o.OrderID] = true
 		for _, s := range o.Supplies {
 			if s.BundleID != "" {
 				bundles = append(bundles, s.BundleID)
 			}
 		}
+	}
+	if len(got) != len(requested) {
+		return Page{}, nil, fmt.Errorf("%w: %d of %d", ErrSupplyOrderMissing, len(requested)-len(got), len(requested))
 	}
 	return jsonPage(resp), bundles, nil
 }

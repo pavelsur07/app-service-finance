@@ -108,7 +108,7 @@ func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, em
 					if page.LastID == "" {
 						// Конец без пустой страницы допустим, только если набран total:
 						// иначе обход оборвался бы молча.
-						if got < page.Total {
+						if got != page.Total {
 							return nil, ozon.InvalidResponse(endpoint(candidates), fmt.Sprintf("action %d: %d of %d products without last_id", id, got, page.Total))
 						}
 						break
@@ -139,6 +139,9 @@ func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, em
 		var bundles []string
 		for i := 0; i < len(ids); i += ozon.MaxSupplyOrderGet {
 			p, b, err := e.ozon.FetchSupplyOrders(ctx, creds, ref, ids[i:min(i+ozon.MaxSupplyOrderGet, len(ids))])
+			if errors.Is(err, ozon.ErrSupplyOrderMissing) {
+				return nil, fmt.Errorf("%w: %v", errSnapshotRestart, err)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -154,8 +157,7 @@ func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, em
 			chunk := bundles[i:min(i+ozon.SupplyBundleLimit, len(bundles))]
 			for last := ""; ; {
 				p, page, err := e.ozon.FetchSupplyBundle(ctx, creds, ref, chunk, last)
-				var apiErr *ozon.APIError
-				if errors.As(err, &apiErr) && apiErr.Class == ozon.ClassInvalidRequest {
+				if ozon.IsUnknownBundle(err) {
 					// Поставку отменили между деталями и составом (400 «Bundles … not found»).
 					return nil, fmt.Errorf("%w: %v", errSnapshotRestart, err)
 				}
