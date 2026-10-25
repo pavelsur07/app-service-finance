@@ -123,7 +123,10 @@ Handler на каждый день счёта: собрать все стран�
   строкой без `float`, направление, валюта, назначение). Unit-тесты на фикстурах
   ответов, которые сейчас лежат в `BankImportServiceTest`.
 - **1.5** `AlfaApiClient` и `AlfaBankProvider` в `BankSync`; `AlfaApiClientTest`
-  переносится как есть.
+  переносится. Исправление по спецификации (`plan.md` §3a): путь выписки
+  `/api/jp/v1/statement/transactions` (сейчас без `/api` — запрос уходит мимо
+  API) и явный `limit` на страницу; `ErrorDescription` банка в лог и сообщения
+  исключений не попадает (в нём номер счёта).
 - **1.6** Методы `CashFacade` и Input/DTO; внутренний сервис импорта дня в `Cash`
   (создание транзакций из `BankImportService::importAccount`) +
   `AccountBalanceService::recalculateDailyRange` за дни дня. Проверить, как импорт
@@ -149,6 +152,8 @@ Handler на каждый день счёта: собрать все стран�
       неизвестное направление, нет `uuid`/даты/суммы → строка пропущена с
       причиной.
 - [ ] `BankProviderRegistry`: известный код → адаптер, неизвестный → исключение.
+- [ ] **Регрессия** `AlfaApiClient`: URL выписки — `{base}/api/jp/v1/statement/transactions`
+      с `limit` (красный на `a9eb74206`); тело ошибки банка не попадает в лог.
 - [ ] `CashFacade::importBankStatementDay`: happy path; повторный вызов того же дня →
       те же транзакции, число строк не меняется; дубль `uuid` внутри дня → одна
       строка; чужая валюта → ошибка в результате, строка не создана; счёт чужой
