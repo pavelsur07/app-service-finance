@@ -48,6 +48,12 @@
 - `Ingestion`: `SourceConnectorInterface` и `ConnectorRegistry` как образец реестра.
   `IngestionCredential` не подходит: `EncryptedJsonType` настроен на
   `PlaintextSecretCodec` (`config/services.yaml:171`), секреты лежат открытым JSON.
+- `Shared\Security` — шифрование полей: `SodiumFieldEncryptionService`,
+  `FileBasedSecretKeyProvider` (версии ключей из файла, `APP_ENCRYPTION_KEYS_JSON`
+  или `APP_ENCRYPTION_FALLBACK_KEY`), `SecretRotationService`. Используют
+  `Marketplace` (`ConnectionApiKeyCodec`, команды шифрования и ротации) и `MoySklad`
+  (`ConnectionTokenCodec`, без команды ротации). Порядок смены ключа —
+  `docs/maintenance/encryption-key-rotation.md` (описывает только маркетплейсы).
 - `Shared\Service\Storage\ObjectStorageInterface` — для сырых ответов банка.
   `RawStorageFacade` требует `IngestSource` и запускает нормализацию маркетплейсов,
   поэтому не используется.
@@ -64,7 +70,7 @@
 | День выписки | Все страницы дня собираются в память, потом один вызов `CashFacade` и коммит | HTTP-сбой случается до первого `persist()`, отсоединять недописанные строки больше не нужно |
 | Вебхук или опрос | Опрос — источник правды; вебхук только ставит задание на загрузку | Вебхуки теряются и есть не у всех банков |
 | Окно перечитывания | Последние 3 дня от курсора (настраивается на банк) | Задним числом и корректировки |
-| Учётные данные | Своё шифрование: libsodium `secretbox`, ключ `BANK_SYNC_SECRET_KEY` из `.env`, `key_version` для ротации | Ingestion шифрования не даёт |
+| Учётные данные | Общий `Shared\Security` (`FieldEncryptionServiceInterface`, sodium `secretbox`, ключи `APP_ENCRYPTION_*`, `key_version`); кодек по образцу `MoySklad\Infrastructure\Security\ConnectionTokenCodec`, ротация — команда по образцу `app:marketplace:rotate-connection-keys` | Механизм и ключи на проде уже есть; своего ключа не заводим |
 | Старые таблицы | Новые таблицы `bank_sync_*` со `string $companyId`, старые удаляются, если на проде пусты | Не тащить `ManyToOne Company` в новый модуль |
 | Сверка | Две проверки на день: полнота данных банка (входящий + приход − расход = исходящий) и совпадение остатка с учётом, допуск 0 | Первая ловит недогрузку, вторая — расхождение учёта |
 | Исправление расхождений | Автоматически не исправляем; показываем и поднимаем гейт | Прод-деньги |
@@ -73,8 +79,6 @@
 - Партнёрский доступ к API Альфа-Бизнес: договор, тестовая среда, документация,
   сертификат mTLS, если нужен. Без этого Stage 2 закрывает только общую часть, а
   OAuth Альфы ждёт документации.
-- Ключ `BANK_SYNC_SECRET_KEY` на проде (сгенерировать и положить в `.env` прода) —
-  к деплою Stage 2.
 
 **Принятые по умолчанию — поправить, если не так:**
 - Ручной импорт (1С, файл) в счёт, привязанный к банку по API, не запрещается, а
