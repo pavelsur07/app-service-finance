@@ -93,6 +93,10 @@ Handler на каждый день счёта: собрать все стран�
 - Конфиги: `routes.yaml`, `doctrine.yaml`, `twig.yaml`, `messenger.yaml`
   (routing `SyncBankConnectionMessage` → `async_sync`, старая строка удалена),
   `MessengerRoutingTest` зелёный.
+- Режим «токен клиента» Альфы переносится как есть ради неизменного поведения, но
+  по документации это Alfa API Direct (только собственная организация партнёра,
+  `plan.md` §3a): новых подключений Альфы в этом режиме не ждём, замена — Alfa ID в
+  Stage 2.
 - Явно не входит: OAuth, статусы подключения и ротация ключей (Stage 2), cron и
   окно перечитывания (Stage 3), остатки банка и сверка (Stage 4), новый UI
   (Stage 5).
