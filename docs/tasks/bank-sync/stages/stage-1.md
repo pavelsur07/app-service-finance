@@ -31,6 +31,8 @@ site/src/BankSync/
     Alfa/AlfaApiClient.php               перенесён без изменения поведения
     Alfa/AlfaStatementMapper.php         сырой ответ Альфы → DTO (разбор из BankImportService)
     Alfa/AlfaBankProvider.php
+  Infrastructure/Security/
+    BankCredentialsCodec.php             учётные данные ↔ EncryptedPayload (Shared\Security)
   Entity/   BankConnection (bank_sync_connection), BankImportCursor (bank_sync_import_cursor)
   Repository/, Exception/ (BankApiUnavailableException, BankApiRequestFailedException)
   Message/SyncBankConnectionMessage.php  → async_sync
@@ -71,7 +73,15 @@ Handler на каждый день счёта: собрать все стран�
   (`company_id` строкой, индекс `(company_id, bank_code)`, unique курсора как
   сейчас), удаление `cash_bank_connection`, `cash_bank_import_cursor`. `down()`
   восстанавливает старые таблицы пустыми. Удаление — только при подтверждённых 0
-  строк на проде (п. 1.1), иначе перенос данных в той же миграции.
+  строк на проде (п. 1.1), иначе перенос данных в той же миграции с
+  шифрованием токена.
+- Учётные данные зашифрованы с первого дня: в `bank_sync_connection` нет колонки с
+  открытым токеном. `credentials_encrypted` (JSON `EncryptedPayload`: шифротекст,
+  версия ключа, время) + `credentials_key_version` для выборки при ротации; внутри
+  шифротекста — JSON `{type: "static_token", token}`, в Stage 2 добавится тип
+  `oauth2`. Шифрует и расшифровывает только `BankCredentialsCodec` через
+  `FieldEncryptionServiceInterface`, после шифрования — контрольная расшифровка
+  (как `MoySklad\…\ConnectionTokenCodec`). Сущность хранит только шифротекст.
 - Импорт банка пересчитывает остатки счёта — регрессионный тест, красный на
   старом коде.
 - Тесты переписаны на новые классы, покрытие не меньше прежнего (см. чек-лист).
@@ -83,8 +93,9 @@ Handler на каждый день счёта: собрать все стран�
 - Конфиги: `routes.yaml`, `doctrine.yaml`, `twig.yaml`, `messenger.yaml`
   (routing `SyncBankConnectionMessage` → `async_sync`, старая строка удалена),
   `MessengerRoutingTest` зелёный.
-- Явно не входит: шифрование и OAuth (Stage 2), cron и окно перечитывания
-  (Stage 3), остатки банка и сверка (Stage 4), новый UI (Stage 5).
+- Явно не входит: OAuth, статусы подключения и ротация ключей (Stage 2), cron и
+  окно перечитывания (Stage 3), остатки банка и сверка (Stage 4), новый UI
+  (Stage 5).
 
 ## 4. Work items
 
@@ -92,7 +103,11 @@ Handler на каждый день счёта: собрать все стран�
   `cash_bank_import_cursor`, `import_log` с `source LIKE 'bank:%'`, сообщения
   `BankImportMessage` в `messenger_messages` и в Redis-очереди `async_sync`.
   Записать в `stages/stage-1.md`. Не ноль — перенос данных вместо удаления и
-  обработчик старого класса сообщения до опустения очереди.
+  обработчик старого класса сообщения до опустения очереди. Там же: активная
+  версия ключа шифрования на проде —
+  `bin/console app:marketplace:rotate-connection-keys` без `--execute` (печатает
+  только версию и счётчики). Ключи на прод доставляет `deploy.yml`
+  (`APP_ENCRYPTION_*`), проверка подтверждает, что они доехали.
 - **1.2** Baseline: `make site-stan` (число ошибок), тесты
   `tests/Unit/Cash/Service/Import/Bank`, `tests/Unit/Cash/MessageHandler/Import`,
   `tests/Functional/Cash/Controller/CashCompanyIsolationTest.php` — записать.
@@ -111,6 +126,9 @@ Handler на каждый день счёта: собрать все стран�
   1С уведомляет Analytics (`CashTransactionsChanged`), и сделать так же.
 - **1.7** Сущности и репозитории `BankSync`, миграция; `findActiveByBankCode` —
   `@companyScopeExempt` (cron по всем компаниям), остальное — с `companyId`.
+  `BankCredentialsCodec`; форма подключения пишет токен через кодек,
+  `AlfaApiClient` получает токен от кодека, а не из сущности; при редактировании
+  пустое поле токена оставляет прежний.
 - **1.8** `SyncCompanyBankAccountsAction`, `SyncBankConnectionMessage`,
   handler (логи старта и финиша с `companyId`, временный сбой → `warning` и
   исходное исключение, отказ банка → `error` + `Unrecoverable…` — как сейчас),
@@ -138,6 +156,9 @@ Handler на каждый день счёта: собрать все стран�
       счёт → пропуск с `warning`, курсор не сдвинут.
 - [ ] Сбой посреди второго дня: первый день сохранён вместе с курсором, второй —
       ничего (functional, реальная БД).
+- [ ] `BankCredentialsCodec`: шифрование и расшифровка возвращают исходное; в
+      колонке нет открытого токена (functional: строка из БД не содержит токена);
+      неизвестная версия ключа → исключение без токена в сообщении.
 - [ ] Изоляция: подключение другой компании — 404 на `edit`/`delete`/`sync`
       (перенос из `CashCompanyIsolationTest`).
 
@@ -162,7 +183,9 @@ Reviewer focus:
   пересчёта счёта;
 - IDOR в новых репозиториях и контроллере;
 - ничего из ответа банка (номер счёта, назначение) не уходит в `error`-логи и
-  сообщения исключений.
+  сообщения исключений;
+- токен не появляется в логах, исключениях, дампе формы и шаблонах
+  (`#[\SensitiveParameter]` на параметрах с токеном).
 
 ## Итог этапа
 
