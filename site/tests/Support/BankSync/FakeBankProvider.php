@@ -25,6 +25,8 @@ final class FakeBankProvider implements BankProviderInterface
     public array $fetchedDays = [];
     public bool $accountsListed = false;
     public ?string $lastToken = null;
+    /** @var (\Closure(): void)|null вызывается внутри запроса списка счетов — «пока банк отвечал» */
+    public ?\Closure $duringAccountsRequest = null;
 
     /**
      * @param list<BankAccountDTO> $accounts
@@ -42,6 +44,9 @@ final class FakeBankProvider implements BankProviderInterface
     {
         $this->accountsListed = true;
         $this->lastToken = $access->token;
+        if (null !== $this->duringAccountsRequest) {
+            ($this->duringAccountsRequest)();
+        }
         if (null !== $this->accountsFailure) {
             throw $this->accountsFailure;
         }

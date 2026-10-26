@@ -27,11 +27,16 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
 
     public static int $refreshCalls = 0;
     public static ?\Throwable $refreshFailure = null;
+    public static int $exchangeCalls = 0;
+    /** @var (\Closure(): void)|null вызывается в момент обмена кода */
+    public static ?\Closure $duringExchange = null;
 
     public static function reset(): void
     {
         self::$refreshCalls = 0;
         self::$refreshFailure = null;
+        self::$exchangeCalls = 0;
+        self::$duringExchange = null;
     }
 
     public static function codeFor(string $authorizationUrl): string
@@ -63,6 +68,10 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
 
     public function exchangeCode(string $baseUrl, #[\SensitiveParameter] string $code, #[\SensitiveParameter] string $codeVerifier, string $redirectUri): OAuthTokens
     {
+        ++self::$exchangeCalls;
+        if (null !== self::$duringExchange) {
+            (self::$duringExchange)();
+        }
         if ('unavailable' === $code) {
             throw new BankApiUnavailableException('alfa', 503);
         }

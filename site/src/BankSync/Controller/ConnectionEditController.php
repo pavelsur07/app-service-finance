@@ -6,11 +6,13 @@ namespace App\BankSync\Controller;
 
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Application\SaveBankConnectionAction;
+use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Form\BankConnectionType;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -43,9 +45,13 @@ final class ConnectionEditController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            ($this->saveConnection)($companyId, $data, $connection->getId());
+            try {
+                ($this->saveConnection)($companyId, $data, $connection->getId());
 
-            return $this->redirectToRoute('bank_sync_connection_index');
+                return $this->redirectToRoute('bank_sync_connection_index');
+            } catch (BankConnectionBusyException) {
+                $form->addError(new FormError('Подключение сейчас обновляется. Сохраните ещё раз через минуту.'));
+            }
         }
 
         return $this->render('@BankSync/connection/edit.html.twig', [

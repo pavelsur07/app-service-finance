@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace App\BankSync\Infrastructure\OAuth;
 
-use App\BankSync\Exception\BankConnectionLockOutsideTransactionException;
 use Doctrine\DBAL\Connection;
 
 /**
- * Один процесс меняет токены подключения: обновление refresh (воркер) и новый вход
- * (callback) под одним ключом. У Альфы refresh годится на два обновления — параллельное
- * обновление его сожжёт.
+ * Один процесс меняет учётные данные и статус подключения: обновление refresh и перевод
+ * в `needs_reauth` (воркер), новый вход (callback) и сохранение формы — под одним ключом.
+ * У Альфы refresh годится на два обновления — параллельное обновление его сожжёт.
  *
- * - `acquire()` / `release()` — сессионная блокировка воркера: HTTP обновления идёт под
- *   ней, но вне транзакции; умер воркер — PostgreSQL снял блокировку.
- * - `lockInTransaction()` — транзакционная, для записи нового входа; с сессионной того же
- *   ключа конфликтует.
+ * Блокировка сессионная: HTTP к банку идёт под ней, но вне транзакции; умер процесс —
+ * PostgreSQL снял блокировку. Держатель перечитывает строку подключения после захвата.
  *
  * Порядок: блокировка подключения берётся раньше блокировки счёта импорта (Cash).
  */
@@ -64,21 +61,6 @@ final class BankConnectionTokenLock
     {
         $this->connection->fetchOne(
             'SELECT pg_advisory_unlock(hashtext(:namespace), hashtext(:key))',
-            ['namespace' => self::NAMESPACE, 'key' => $connectionId],
-        );
-    }
-
-    /**
-     * Только внутри транзакции: вне её PostgreSQL снимет блокировку сразу после запроса.
-     */
-    public function lockInTransaction(string $connectionId): void
-    {
-        if (!$this->connection->isTransactionActive()) {
-            throw new BankConnectionLockOutsideTransactionException();
-        }
-
-        $this->connection->fetchOne(
-            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:key))',
             ['namespace' => self::NAMESPACE, 'key' => $connectionId],
         );
     }

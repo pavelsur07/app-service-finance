@@ -20,6 +20,7 @@ use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
+use App\BankSync\Infrastructure\Security\EncryptedBankCredentials;
 use App\BankSync\Message\SyncBankConnectionMessage;
 use App\BankSync\MessageHandler\SyncBankConnectionHandler;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -331,6 +332,47 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         self::assertNotNull($this->requireLastImportLog()['finished_at'], 'журнал закрыт');
     }
 
+    public function testUnauthorizedStaticTokenReplacedDuringRunKeepsConnectionActive(): void
+    {
+        // Пользователь сохранил новый токен, пока банк отвечал 401 на прежний.
+        $this->bank->duringAccountsRequest = function (): void {
+            $this->replaceStoredCredentials($this->codec()->encryptStaticToken('new-static-token'));
+        };
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+
+        $this->handle();
+
+        $connection = $this->reloadConnection();
+        self::assertSame(BankConnectionStatus::ACTIVE, $connection->getStatus(), '401 на прежний токен не гасит новый');
+        self::assertSame('new-static-token', $this->codec()->token($connection));
+        self::assertTrue($this->logs->hasInfoThatContains('already replaced'));
+        self::assertFalse($this->logs->hasWarningThatContains('needs reauthorization'));
+    }
+
+    public function testUnauthorizedOAuthAfterReauthorizationRetriesWithNewTokensWithoutRefresh(): void
+    {
+        $this->useOAuth('+30 minutes');
+        // Клиент заново вошёл в банк, пока шёл запрос с прежним access; прежний refresh отвергнут бы.
+        $this->bank->duringAccountsRequest = function (): void {
+            $this->replaceStoredCredentials($this->codec()->encryptOAuthTokens(
+                new OAuthTokens('reauthorized-access', 'reauthorized-refresh', new \DateTimeImmutable('+1 hour')),
+            ));
+        };
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+        StubBankAuthorizationProvider::$refreshFailure = new BankAuthorizationRejectedException('alfa', 400, 'invalid_grant');
+
+        try {
+            $this->handle();
+            self::fail('retry with the new tokens is expected');
+        } catch (BankApiUnavailableException $exception) {
+            self::assertSame(401, $exception->getStatusCode());
+        }
+
+        self::assertSame(0, StubBankAuthorizationProvider::$refreshCalls, 'новые токены не обновляются');
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus());
+        self::assertSame('reauthorized-access', $this->storedTokens()->accessToken);
+    }
+
     public function testUnauthorizedOAuthAccessIsRefreshedAndRetried(): void
     {
         $this->useOAuth('+30 minutes');
@@ -383,6 +425,17 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         ));
         $this->bankConnection->reauthorize($credentials->storageJson, $credentials->keyVersion);
         $this->em->flush();
+    }
+
+    /**
+     * Запись другого процесса мимо EntityManager handler'а.
+     */
+    private function replaceStoredCredentials(EncryptedBankCredentials $credentials): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE bank_sync_connection SET credentials_encrypted = :credentials, credentials_key_version = :key_version WHERE id = :id',
+            ['credentials' => $credentials->storageJson, 'key_version' => $credentials->keyVersion, 'id' => $this->bankConnection->getId()],
+        );
     }
 
     private function storedTokens(): OAuthTokens
