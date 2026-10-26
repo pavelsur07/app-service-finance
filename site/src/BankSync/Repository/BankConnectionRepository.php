@@ -6,6 +6,7 @@ namespace App\BankSync\Repository;
 
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Enum\BankConnectionStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
@@ -61,12 +62,13 @@ final class BankConnectionRepository extends ServiceEntityRepository
      *
      * @return list<BankConnection>
      */
-    public function findActiveByBankCode(BankCode $bankCode): array
+    public function findSyncableByBankCode(BankCode $bankCode): array
     {
         /* @var list<BankConnection> */
         return $this->createQueryBuilder('c')
             ->andWhere('c.bankCode = :bankCode')
-            ->andWhere('c.isActive = true')
+            ->andWhere('c.status = :status')
+            ->setParameter('status', BankConnectionStatus::ACTIVE->value)
             ->setParameter('bankCode', $bankCode->value)
             ->orderBy('c.companyId', \SortDirection::Ascending)
             ->getQuery()

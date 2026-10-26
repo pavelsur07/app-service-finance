@@ -6,6 +6,7 @@ namespace App\BankSync\Application;
 
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Entity\BankConnection;
+use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\BankTokenRequiredException;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
@@ -49,21 +50,39 @@ final readonly class SaveBankConnectionAction
                 $data->baseUrl,
                 $credentials->storageJson,
                 $credentials->keyVersion,
-                $data->isActive,
             );
+            if (!$data->isActive) {
+                $connection->disable();
+            }
             $this->connections->add($connection);
         } else {
             $connection = $this->connections->findOneByIdAndCompanyId($connectionId, $companyId)
                 ?? throw new BankConnectionNotFoundException($connectionId);
-            $connection->changeSettings($data->baseUrl, $data->isActive);
+            $connection->changeBaseUrl($data->baseUrl);
             if (null !== $token) {
+                // Новый токен — новый доступ: подключение снова активно, флажок ниже решает дальше.
                 $credentials = $this->credentialsCodec->encryptStaticToken($token);
-                $connection->replaceCredentials($credentials->storageJson, $credentials->keyVersion);
+                $connection->reauthorize($credentials->storageJson, $credentials->keyVersion);
             }
+            $this->applyEnabledFlag($connection, $data->isActive);
         }
 
         $this->entityManager->flush();
 
         return $connection->getId();
+    }
+
+    /**
+     * Флажок «Активно» переключает только `active` ↔ `disabled`; отвергнутое банком или
+     * отозванное подключение он не включает — для этого нужен новый токен или вход.
+     */
+    private function applyEnabledFlag(BankConnection $connection, bool $enabled): void
+    {
+        $status = $connection->getStatus();
+        if ($enabled && BankConnectionStatus::DISABLED === $status) {
+            $connection->enable();
+        } elseif (!$enabled && \in_array($status, [BankConnectionStatus::ACTIVE, BankConnectionStatus::NEEDS_REAUTH], true)) {
+            $connection->disable();
+        }
     }
 }

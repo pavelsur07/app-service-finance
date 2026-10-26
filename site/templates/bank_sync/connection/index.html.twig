@@ -23,7 +23,7 @@
                         <tr>
                             <th>Банк</th>
                             <th>Base URL</th>
-                            <th>Активно</th>
+                            <th>Статус</th>
                             <th>Обновлено</th>
                             <th class="w-1"></th>
                         </tr>
@@ -34,10 +34,9 @@
                             <td>{{ connection.bankCode.label }}</td>
                             <td>{{ connection.baseUrl }}</td>
                             <td>
-                                {% if connection.isActive %}
-                                    <span class="badge bg-green">Да</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Нет</span>
+                                <span class="badge {{ connection.status.value == 'active' ? 'bg-green' : (connection.status.value == 'disabled' ? 'bg-secondary' : 'bg-red') }}">{{ connection.status.label }}</span>
+                                {% if connection.statusReason %}
+                                    <div class="text-secondary small">{{ connection.statusReason }} · {{ connection.statusChangedAt|date('d.m.Y H:i') }}</div>
                                 {% endif %}
                             </td>
                             <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>

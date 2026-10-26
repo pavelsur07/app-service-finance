@@ -229,7 +229,7 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
 
     public function testInactiveConnectionIsSkipped(): void
     {
-        $this->bankConnection->changeSettings($this->bankConnection->getBaseUrl(), false);
+        $this->bankConnection->disable();
         $this->em->flush();
 
         $this->handle();

@@ -68,8 +68,8 @@ final readonly class SyncBankConnectionHandler
 
         $connection = $this->connections->findOneByIdAndCompanyId($message->connectionId, $message->companyId)
             ?? throw $this->unrecoverable('Bank sync: connection not found', $context);
-        if (!$connection->isActive()) {
-            $this->logger->info('Bank sync skipped: connection is inactive', $context);
+        if (!$connection->canSync()) {
+            $this->logger->info('Bank sync skipped: connection is not active', $context + ['status' => $connection->getStatus()->value]);
 
             return;
         }

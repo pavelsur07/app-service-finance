@@ -6,6 +6,7 @@ namespace App\BankSync\Application\DTO;
 
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Enum\BankConnectionStatus;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -34,7 +35,7 @@ final class BankConnectionFormData
         $data = new self();
         $data->bankCode = $connection->getBankCode();
         $data->baseUrl = $connection->getBaseUrl();
-        $data->isActive = $connection->isActive();
+        $data->isActive = BankConnectionStatus::DISABLED !== $connection->getStatus();
 
         return $data;
     }
