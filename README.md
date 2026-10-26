@@ -26,10 +26,10 @@
 
 ## Обновление ключей шифрования
 
-`api_key` подключений маркетплейсов хранится в БД зашифрованным (sodium secretbox, версии ключей). Ключи задаются через GitHub Secrets: карта версий `APP_ENCRYPTION_KEYS_JSON` + активная версия `APP_ENCRYPTION_CURRENT_KEY_VERSION`.
+Секреты подключений (`api_key` маркетплейсов, токены МойСклад, учётные данные банков) хранятся в БД зашифрованными (sodium secretbox, версии ключей). Ключи задаются через GitHub Secrets: карта версий `APP_ENCRYPTION_KEYS_JSON` + активная версия `APP_ENCRYPTION_CURRENT_KEY_VERSION`.
 
-* Ротация ключа (v1 → v2): строго по runbook'у `docs/maintenance/encryption-key-rotation.md` — секреты → деплой → `app:marketplace:rotate-connection-keys` (dry-run → `--execute` → контроль) → уборка старой версии.
-* Никогда не удалять версию ключа из секрета, пока в БД есть строки на ней — данные станут нечитаемыми.
+* Ротация ключа (v1 → v2): строго по runbook'у `docs/maintenance/encryption-key-rotation.md` — секреты → деплой → `app:security:rotate-keys` (dry-run → `--execute` → контроль, все модули) → уборка старой версии.
+* Никогда не удалять версию ключа из секрета, пока `app:security:rotate-keys` показывает записи на ней — данные станут нечитаемыми.
 * Ключ — base64 от 32 байт: `openssl rand -base64 32`.
 
 ## Документация
