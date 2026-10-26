@@ -13,6 +13,7 @@ use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
@@ -494,6 +495,15 @@ final readonly class SyncBankConnectionHandler
             ]);
 
             return $exception;
+        }
+
+        if ($exception instanceof BankChannelNotConfiguredException) {
+            // Сертификат канала не настроен или не подходит: чинит человек, ретраи бесполезны.
+            $this->logger->error('Bank sync: bank TLS channel is not configured', $context + [
+                'problem' => $exception->getMessage(),
+            ]);
+
+            return new UnrecoverableMessageHandlingException($exception->getMessage(), 0, $exception);
         }
 
         if ($exception instanceof BankApiRequestFailedException) {

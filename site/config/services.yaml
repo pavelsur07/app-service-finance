@@ -567,3 +567,14 @@ services:
     App\MoySklad\Infrastructure\Api\MoySkladClient:
         arguments:
             $httpClient: '@moysklad.http_client'
+
+    # Клиент Альфы: mTLS и CA Минцифры только у него (AlfaTlsConfig). Ленивый — без
+    # сертификата в окружении приложение работает, падает только запрос к Альфе.
+    bank_sync.alfa.http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['@App\BankSync\Infrastructure\Bank\Alfa\AlfaHttpClientFactory', 'create']
+        lazy: Symfony\Contracts\HttpClient\HttpClientInterface
+
+    App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient:
+        arguments:
+            $httpClient: '@bank_sync.alfa.http_client'

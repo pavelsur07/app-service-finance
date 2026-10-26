@@ -1,33 +1,32 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 — OAuth-подключение, общая часть
-**Status:** done — handoff
-**Stage base commit:** `6f9d4fe90`
+**Phase:** Stage 4 — канал Альфы: mTLS, доверенные CA, гейт сроков сертификатов
+**Status:** done — handoff (кроме пробы песочницы: ждёт `test_cert.zip`)
+**Stage base commit:** `ed20f5e70`
 
 ### Completed
-- Stage 1 — на проде 26.10 (PR #2798, миграция `Version20261026120000`).
-- Stage 2 — на проде 26.10 (PR #2799).
-- `stages/stage-3.md` — план, чек-лист приёмки, итог.
-- `4b8cb2c9f` статус подключения вместо `is_active`, миграция `Version20261026170000`.
-- `fd44574d0` токены OAuth, PKCE, клиент token endpoint, тип `oauth2` в кодеке.
-- `f7f85d386` вход: start/callback, `state` и PKCE в сессии.
-- `f036a21bc` обновление токена в Handler под блокировкой подключения.
-- `007bd0327` `ARCHITECTURE.md` 2.78, «История плана».
-- `cb1cad19f`, `5d76acd42`, `abd8ffd40` — замечания Codex (раунды 1–3).
+- Stage 1–3 — на проде 26.10 (PR #2798, #2799, #2800).
+- `stages/stage-4.md` — план, чек-лист приёмки, итог.
+- `2928af7c6` отметки прода Stage 3.
+- `270f65cc3` `bank_sync.alfa.http_client`: mTLS, CA Минцифры, `BankChannelNotConfiguredException`.
+- `51e6e6e66` гейт `bank-sync:alfa:certificates-check` (cron 07:50), проба `bank-sync:alfa:channel-probe`.
+- `eb7d5b669` документация: runbook `alfa-demo.md`, `ARCHITECTURE.md` 2.79, `health-gates.md`, «История плана».
+- `78f967667` замечания Codex (раунд 1).
 
 ### Checks and baseline
 - Локальные тесты: БД `app_test_banksync` в контейнере `asf1-pg`, Redis `asf1-redis`.
-- PHPStan 0, baseline не изменён; CS чисто; unit 4052 OK, integration + functional 3234 OK.
+- PHPStan 0, baseline не изменён; CS и strict_types чисто; unit 4094 OK; integration + functional 3238 OK (до правок ревью), BankSync 167 OK.
 
 ### Review status
 - internal: done
-- external: раунд 4 — REVIEW_GREEN
+- external: раунд 1 — 3 IMPORTANT исправлены; раунд 2 — REVIEW_GREEN
 
 ### Exact next action
-- Handoff Stage 3: push, PR, вопрос «run the migration and deploy #N»; после деплоя —
-  §5 «Прод» в `stage-3.md`. Затем Stage 4 по `plan.md` §5.
+- Handoff Stage 4: push, PR, вопрос «merge and deploy #N»; после деплоя — §5 «Прод» в `stage-4.md`.
+- Получив `test_cert.zip` и пароль: по `alfa-demo.md` → `bank-sync:alfa:channel-probe --target=sandbox`, отметить 4.9.
+- Затем Stage 5 (Alfa ID) по `plan.md` §5.
 
 ### Files to inspect first on resume
-- `docs/tasks/bank-sync/stages/stage-3.md`
-- `site/src/BankSync/MessageHandler/SyncBankConnectionHandler.php`
-- `site/src/BankSync/Application/CompleteBankAuthorizationAction.php`
+- `docs/tasks/bank-sync/stages/stage-4.md`
+- `docs/tasks/bank-sync/alfa-demo.md`
+- `site/src/BankSync/Infrastructure/Bank/Alfa/AlfaTlsConfig.php`

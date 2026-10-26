@@ -1,45 +1,43 @@
-# bank-sync — handoff Stage 3
+# bank-sync — handoff Stage 4
 
-**Branch:** `feat/bank-sync-stage3` · **PR:** см. описание PR · **CI:** см. PR
+**Branch:** `feat/bank-sync-stage4` · **PR:** см. описание PR · **CI:** см. PR
 
-Поставка — Stage 3 из плана (`plan.md` §5). Пользователь видит статус подключения
-вместо «активно/нет»; вход в банк по OAuth появится в интерфейсе только с провайдером
-банка (Альфа — Stage 5), сейчас провайдеров на проде нет.
+Поставка B (Stage 4–10, Альфа на проде скрыта). Для пользователей ничего не меняется:
+на проде нет клиентского сертификата Альфы и подключений к ней.
 
 ## Summary of stages
-- Stage 3 — общая часть OAuth-подключения: статусы `active`/`needs_reauth`/`revoked`/
-  `disabled`, вход Authorization Code + PKCE, хранение и обновление токенов под
-  блокировкой подключения, 401 и отказ обновления → `needs_reauth`. Подробно —
-  `stages/stage-3.md`, «Итог этапа».
+- Stage 4 — канал до API Альфы по двустороннему TLS: отдельный HTTP-клиент с нашим
+  сертификатом и доверием только к УЦ Минцифры, понятная ошибка, если сертификат не
+  настроен, ночной гейт сроков сертификатов, проба канала, runbook замены без простоя.
+  Подробно — `stages/stage-4.md`, «Итог этапа».
 
 ## Files changed
-- `site/src/BankSync/{Enum,Entity}` — `BankConnectionStatus`, переходы в `BankConnection`.
-- `site/src/BankSync/Domain/OAuth`, `Infrastructure/OAuth` — токены, PKCE, контракт
-  провайдера, клиент token endpoint, сессия входа, одноразовый `state`, блокировка токенов.
-- `site/src/BankSync/Application` — старт/завершение входа, обновление токенов, форма под блокировкой.
-- `site/src/BankSync/Controller`, шаблоны — маршруты входа, статус в списке.
-- `SyncBankConnectionHandler` — обновление токена, 401, `needs_reauth`.
-- Тесты unit/integration/functional, `ARCHITECTURE.md` 2.78, `plan.md`.
+- `site/src/BankSync/Infrastructure/Bank/Alfa/{AlfaTlsConfig,AlfaHttpClientFactory}.php`,
+  `Infrastructure/Security/PemCertificates.php`, `Exception/BankChannelNotConfiguredException.php`.
+- `site/src/BankSync/Command/{CheckAlfaCertificatesCommand,ProbeAlfaChannelCommand}.php`,
+  `Domain/Certificate/CertificateExpiryPolicy.php`, `Enum/CertificateExpiryLevel.php`.
+- `SyncBankConnectionHandler` — канал не настроен → error без ретраев.
+- `site/config/bank_sync/alfa/ca-bundle.pem` (публичные CA Минцифры), `config/services.yaml`, `site/.env`.
+- `docker/cron/app.cron` — гейт 07:50; `.gitignore` — ключи и архивы сертификатов.
+- Тесты unit/integration; `ARCHITECTURE.md` 2.79, `health-gates.md`, `alfa-demo.md`, `plan.md`.
 
 ## Migrations
-- `Version20261026170000`: `status` (+ CHECK), `status_reason`, `status_changed_at`
-  вместо `is_active`; обратима (`down` — `is_active = status = 'active'`). На проде
-  в `bank_sync_connection` 0 строк.
+- Нет.
 
 ## Public API / contract changes
-- Маршруты `bank_sync_oauth_start` (POST, CSRF, `FINANCE_WRITE`), `bank_sync_oauth_callback` (GET).
-- Тег `bank_sync.authorization_provider` (`BankAuthorizationProviderInterface`).
-- Тип учётных данных `oauth2` в `BankCredentialsCodec`.
-- `BankConnectionRepository::findSyncableByBankCode()` вместо выборки по `is_active`.
+- Сервис `bank_sync.alfa.http_client` (ленивый) — у `AlfaApiClient`.
+- Переменные окружения `ALFA_TLS_CERT_PATH`, `ALFA_TLS_KEY_PATH`, `ALFA_TLS_KEY_PASSPHRASE` (необязательные).
+- Команды `bank-sync:alfa:certificates-check` (cron), `bank-sync:alfa:channel-probe --target=sandbox|production`.
 
 ## Checks
 - PHPStan полный — 0 ошибок, baseline не изменён; CS и `strict_types` — чисто.
-- Полный прогон: unit 4052 — OK, integration + functional 3234 — OK.
+- unit 4094 — OK; integration + functional 3238 — OK; BankSync 167 — OK.
+- Вживую: mTLS со своим тестовым сервером (TLS 1.2, ключ под паролем) проходит, без сертификата — нет.
 
 ## Reviews
 - internal: done.
-- external: раунды 1–3 — 6 IMPORTANT, исправлены с тестами; раунд 4 — REVIEW_GREEN.
+- external: раунд 1 — 3 IMPORTANT, исправлены с тестами; раунд 2 — REVIEW_GREEN.
 
 ## Risks, limitations, follow-ups
-- Провайдера банка нет: кнопки входа на проде не показываются до Stage 5.
-- Одноразовость `state` держится на Redis сессий (`SET NX`, 15 минут).
+- Проба песочницы Альфы ждёт `test_cert.zip` и пароль от Владельца.
+- На проде гейт проверяет только CA (клиентского сертификата нет до Stage 11).
