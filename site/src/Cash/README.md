@@ -11,7 +11,10 @@
 `Application/DTO`) и `Infrastructure` Cash недоступны другим модулям —
 `test_module_internals_are_closed_to_other_modules` в
 `site/tests/Architecture/ModuleBoundaryRules.php`; Cash не зависит от
-`App\Analytics` — `test_cash_does_not_depend_on_analytics`. Симметрично Cash не
+`App\Analytics` — `test_cash_does_not_depend_on_analytics`, и от `App\BankSync` —
+`test_cash_does_not_depend_on_bank_sync`: подключения к банкам и их протоколы живут в
+модуле `BankSync`, выписку он грузит методами `CashFacade` (`importBankStatementDay()`
+и др., `ARCHITECTURE.md`, «BankSync → Cash: загрузка выписки»). Симметрично Cash не
 импортирует `Service`, `Repository`, `Application` (кроме DTO) и `Infrastructure`
 модулей Company и Finance.
 

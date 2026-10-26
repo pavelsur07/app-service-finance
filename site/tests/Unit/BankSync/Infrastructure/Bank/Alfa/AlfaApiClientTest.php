@@ -54,8 +54,8 @@ final class AlfaApiClientTest extends TestCase
     }
 
     /**
-     * Регрессия: выписка Альфы — под `/api`, как и список счетов; без префикса банк отвечает
-     * 404, и загрузка не работала ни дня.
+     * Регрессия: по спецификации Альфы выписка — под `/api`, как и список счетов; старый
+     * клиент ходил на `/jp/v1/statement/transactions` без префикса.
      */
     public function testStatementUrlHasApiPrefixAndQuery(): void
     {

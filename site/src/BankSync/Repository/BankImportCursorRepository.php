@@ -33,17 +33,21 @@ final class BankImportCursorRepository extends ServiceEntityRepository
     }
 
     /**
-     * Без flush(): новый курсор сохраняется в транзакции первого загруженного дня. Вставку
-     * сериализует блокировка импорта счёта, которую держит вызывающий.
+     * Новый курсор не передаётся в persist(): его сохраняет `add()` в транзакции первого
+     * загруженного дня. Иначе сбой HTTP до неё оставил бы курсор в UnitOfWork, и коммит
+     * журнала после сбоя вставил бы его уже без блокировки счёта.
      */
-    public function getOrCreate(string $companyId, BankCode $bankCode, string $accountNumber): BankImportCursor
+    public function findOrNew(string $companyId, BankCode $bankCode, string $accountNumber): BankImportCursor
     {
-        $cursor = $this->findOneByAccount($companyId, $bankCode, $accountNumber);
-        if (null === $cursor) {
-            $cursor = new BankImportCursor($companyId, $bankCode, $accountNumber);
-            $this->getEntityManager()->persist($cursor);
-        }
+        return $this->findOneByAccount($companyId, $bankCode, $accountNumber)
+            ?? new BankImportCursor($companyId, $bankCode, $accountNumber);
+    }
 
-        return $cursor;
+    /**
+     * Только persist(): коммитит точка входа.
+     */
+    public function add(BankImportCursor $cursor): void
+    {
+        $this->getEntityManager()->persist($cursor);
     }
 }

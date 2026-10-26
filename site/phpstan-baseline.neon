@@ -721,18 +721,6 @@ parameters:
 			path: src/Cash/Entity/Accounts/MoneyFundMovement.php
 
 		-
-			message: '#^Property App\\Cash\\Entity\\Bank\\BankConnection\:\:\$id type mapping mismatch\: property can contain string\|null but database expects string\.$#'
-			identifier: doctrine.columnType
-			count: 1
-			path: src/Cash/Entity/Bank/BankConnection.php
-
-		-
-			message: '#^Property App\\Cash\\Entity\\Bank\\BankImportCursor\:\:\$id type mapping mismatch\: property can contain string\|null but database expects string\.$#'
-			identifier: doctrine.columnType
-			count: 1
-			path: src/Cash/Entity/Bank/BankImportCursor.php
-
-		-
 			message: '#^Method App\\Cash\\Entity\\Import\\CashFileImportJob\:\:__construct\(\) has parameter \$mapping with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -955,12 +943,6 @@ parameters:
 			path: src/Cash/Form/Accounts/MoneyFundType.php
 
 		-
-			message: '#^Class App\\Cash\\Form\\Bank\\BankConnectionType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/Cash/Form/Bank/BankConnectionType.php
-
-		-
 			message: '#^Class App\\Cash\\Form\\PaymentPlan\\PaymentPlanType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
@@ -1176,102 +1158,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Service/Accounts/MoneyTotalsWidgetProvider.php
-
-		-
-			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:extractAccountNumbers\(\) has parameter \$response with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:extractTransactions\(\) has parameter \$response with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:finishImportLog\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:hasNextPage\(\) has parameter \$response with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:resolveAmount\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:resolveCurrency\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:resolveDescription\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:resolveDirection\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\BankImportService\:\:resolveOccurredAt\(\) has parameter \$transaction with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\CashTransactionResponsibilityCenterResolver\:\:resolveForCreate\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:findOneByImport\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Service/Import/Bank/BankImportService.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaStatementsProvider\:\:getAccounts\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaStatementsProvider.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\Alfa\\AlfaStatementsProvider\:\:getTransactions\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/Alfa/AlfaStatementsProvider.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\BankStatementsProviderInterface\:\:getAccounts\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/BankStatementsProviderInterface.php
-
-		-
-			message: '#^Method App\\Cash\\Service\\Import\\Bank\\Provider\\BankStatementsProviderInterface\:\:getTransactions\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Service/Import/Bank/Provider/BankStatementsProviderInterface.php
 
 		-
 			message: '#^Cannot call method info\(\) on Psr\\Log\\LoggerInterface\|null\.$#'

@@ -10,7 +10,7 @@
                     <h2 class="page-title">Подключения банков</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('cash_bank_connection_new') }}" class="btn btn-primary">Добавить</a>
+                    <a href="{{ path('bank_sync_connection_new') }}" class="btn btn-primary">Добавить</a>
                 </div>
             </div>
         </div>
@@ -31,7 +31,7 @@
                     <tbody>
                     {% for connection in connections %}
                         <tr>
-                            <td>{{ connection.bankCode }}</td>
+                            <td>{{ connection.bankCode.label }}</td>
                             <td>{{ connection.baseUrl }}</td>
                             <td>
                                 {% if connection.isActive %}
@@ -42,16 +42,16 @@
                             </td>
                             <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>
                             <td class="text-end">
-                                <a href="{{ path('cash_bank_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
+                                <a href="{{ path('bank_sync_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>
-                                <form method="post" action="{{ path('cash_bank_connection_enqueue_import', {'id': connection.id}) }}" class="d-inline">
+                                <form method="post" action="{{ path('bank_sync_connection_enqueue_sync', {'id': connection.id}) }}" class="d-inline">
                                     <input type="hidden" name="_token" value="{{ csrf_token('enqueue_import_' ~ connection.id) }}">
                                     <button class="btn btn-sm btn-outline-primary" title="Запустить импорт сейчас">
                                         Запустить импорт сейчас
                                     </button>
                                 </form>
-                                <form method="post" action="{{ path('cash_bank_connection_delete', {'id': connection.id}) }}" class="d-inline" onsubmit="return confirm('Удалить подключение?');">
+                                <form method="post" action="{{ path('bank_sync_connection_delete', {'id': connection.id}) }}" class="d-inline" onsubmit="return confirm('Удалить подключение?');">
                                     <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
                                     <button class="btn btn-icon btn-danger" title="Удалить">
                                         <i class="ti ti-trash"></i>

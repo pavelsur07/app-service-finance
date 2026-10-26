@@ -153,7 +153,7 @@ final readonly class SyncBankConnectionHandler
         array $context,
     ): void {
         $bankCode = $connection->getBankCode();
-        $cursor = $this->cursors->getOrCreate($connection->getCompanyId(), $bankCode, $accountNumber);
+        $cursor = $this->cursors->findOrNew($connection->getCompanyId(), $bankCode, $accountNumber);
         $today = new \DateTimeImmutable('today');
 
         for ($date = $cursor->nextStartDate($today, self::FIRST_RUN_DAYS); $date <= $today; $date = $date->modify('+1 day')) {
@@ -177,6 +177,7 @@ final readonly class SyncBankConnectionHandler
                 );
                 // Курсор — в той же транзакции, что строки дня: не обгоняет данные.
                 $cursor->markImported($date);
+                $this->cursors->add($cursor);
 
                 return $result;
             });

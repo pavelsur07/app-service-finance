@@ -148,6 +148,27 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         self::assertSame(BankApiUnavailableException::class, json_decode((string) $log['file_name'], true, 512, \JSON_THROW_ON_ERROR)['error']);
     }
 
+    /**
+     * Регрессия: новый курсор, переданный в persist() до HTTP, сохранялся коммитом журнала
+     * после сбоя — уже без блокировки счёта.
+     */
+    public function testFirstDayHttpFailureDoesNotStoreNewCursor(): void
+    {
+        $this->bank->failures[$this->daysAgo(SyncBankConnectionHandler::FIRST_RUN_DAYS)] = new BankApiUnavailableException('alfa', 503);
+
+        try {
+            $this->handle();
+            self::fail('Temporary bank failure must be rethrown for retry.');
+        } catch (BankApiUnavailableException) {
+        }
+
+        self::assertNotNull($this->requireLastImportLog()['finished_at']);
+        self::assertSame(0, (int) $this->em->getConnection()->fetchOne(
+            'SELECT count(*) FROM bank_sync_import_cursor WHERE company_id = :companyId',
+            ['companyId' => $this->companyId],
+        ));
+    }
+
     public function testDatabaseFailureInsideDayRollsBackDayAndCursor(): void
     {
         // Сумма, которую БД не примет: сбой внутри транзакции дня закрывает EntityManager.
