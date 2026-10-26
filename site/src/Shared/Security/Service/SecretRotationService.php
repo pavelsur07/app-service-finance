@@ -7,6 +7,7 @@ namespace App\Shared\Security\Service;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
 use App\Shared\Security\Contract\SecretKeyProviderInterface;
 use App\Shared\Security\Contract\SecretRotationServiceInterface;
+use App\Shared\Security\Exception\EncryptionException;
 use App\Shared\Security\ValueObject\EncryptedPayload;
 
 final readonly class SecretRotationService implements SecretRotationServiceInterface
@@ -34,7 +35,12 @@ final readonly class SecretRotationService implements SecretRotationServiceInter
         }
 
         $plaintext = $this->fieldEncryptionService->decrypt($payload);
+        $rotated = $this->fieldEncryptionService->encrypt($plaintext);
+        // Старый шифротекст заменяется новым: новый обязан расшифровываться в то же значение.
+        if (!hash_equals($plaintext, $this->fieldEncryptionService->decrypt($rotated))) {
+            throw new EncryptionException('Re-encrypted value verification failed.');
+        }
 
-        return $this->fieldEncryptionService->encrypt($plaintext);
+        return $rotated;
     }
 }

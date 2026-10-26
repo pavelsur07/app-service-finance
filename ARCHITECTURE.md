@@ -3493,10 +3493,13 @@ App\Shared\Service\AppLogger
 App\Shared\Infrastructure\Performance\PerformanceRecorder
 
 // Шифрование sensitive-полей (токены, ключи API)
-App\Shared\Service\SodiumFieldEncryptionService
+App\Shared\Security\Service\SodiumFieldEncryptionService
 
-// Ротация ключей шифрования
-App\Shared\Service\SecretRotationService
+// Перешифровка значения активной версией ключа (с проверкой расшифровкой)
+App\Shared\Security\Service\SecretRotationService
+
+// Ротатор секретов модуля для app:security:rotate-keys (тег app.security.secret_rotator)
+App\Shared\Security\Contract\SecretRotatorInterface
 ```
 
 ### Shared Value Objects — `Money`
@@ -3556,6 +3559,7 @@ $money->amountMinor(): int;  $money->currency(): string
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 | `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |
+| `app.security.secret_rotator` | Ротаторы секретов модулей для `app:security:rotate-keys`: `MarketplaceSecretRotator` (`api_key`), `MoySkladSecretRotator` (`access_token`, `refresh_token`), `BankSyncSecretRotator` (`credentials`) |
 | `marketplace_ads.platform_client` | API-клиенты рекламных площадок. `OzonAdClient` работает с Ozon Performance API (OAuth2, async-репорты, CSV). `WildberriesAdClient` читает текущие `/adv/v1/upd` и `/adv/v3/fullstats` с точным JSON-number boundary |
 
 ---
@@ -4209,7 +4213,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 ## Чувствительные данные — шифрование
 
-Сервис: `App\Shared\Service\SodiumFieldEncryptionService`
+Сервис: `App\Shared\Security\Service\SodiumFieldEncryptionService`
 
 **Что шифруется обязательно:** API-ключи маркетплейсов, OAuth client_secret, токены банков.
 
@@ -4226,12 +4230,21 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 - Шифровать в Action до `flush()`, не в Controller
 - Расшифровывать только в Infrastructure-слое (API-клиент), не в Controller / Facade
 - Не логировать plaintext — ни в DEBUG, ни в Sentry контексте
-- Ротация ключей — через `SecretRotationService`, не вручную
+- Ротация ключей — `app:security:rotate-keys` (dry-run по умолчанию, `--execute`,
+  `--module=<имя>`), порядок — `docs/maintenance/encryption-key-rotation.md`.
+  Команда собирает `SecretRotatorInterface` по тегу; ротатор живёт в модуле-владельце,
+  читает и пишет через DBAL с условием «значение не изменилось с момента чтения», не
+  коммитит — порция из 100 секретов = транзакция команды.
+  `app:marketplace:rotate-connection-keys` — устаревшая обёртка над
+  `--module=marketplace`
 
 **Как добавить зашифрованное поле в новую Entity:**
 1. Хранить как `string` в БД (не отдельный тип)
 2. Getter возвращает зашифрованную строку — расшифровка на стороне вызывающего
 3. Добавить в `ARCHITECTURE.md` в список чувствительных полей
+4. Реализовать `SecretRotatorInterface` в модуле (образец — `BankSyncSecretRotator`) и
+   добавить строку в таблицу тега `app.security.secret_rotator`: поле без ротатора
+   станет нечитаемым после удаления старого ключа
 
 ---
 
@@ -4239,6 +4252,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.77 | 2026-10-26 | `Shared\Security`: общая ротация ключа шифрования `app:security:rotate-keys` с ротаторами Marketplace, MoySklad, BankSync (тег `app.security.secret_rotator`); `SecretRotationService::rotate()` проверяет новый шифротекст расшифровкой; `app:marketplace:rotate-connection-keys` — обёртка |
 | 2.76 | 2026-10-26 | BankSync: банковская интеграция вынесена из Cash — модуль `BankSync` (подключения с шифрованным токеном, адаптер Альфы с путём выписки `/api/jp/v1/…`, `SyncBankConnectionHandler`, `bank-sync:enqueue`); `CashFacade` — методы загрузки выписки, импорт дня пересчитывает остатки; таблицы `cash_bank_*` заменены `bank_sync_*`; правило границы Cash ↛ BankSync |
 | 2.75 | 2026-10-24 | Marketplace: возвраты и снимки акций, поставок, кластеров Ozon — всем кабинетам с ключом seller (`ozon_fetcher.returns_companies`, `ozon_fetcher.reference_companies`: `['*']`) |
 | 2.74 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы `ozon.actions`, `ozon.supplies`, `ozon.clusters` (параметр `ozon_fetcher.reference_companies`), строки карты «Акции», «Поставки в пути», «Кластеры и склады» |

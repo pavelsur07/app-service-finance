@@ -11,7 +11,6 @@ use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Ozon\Infrastructure\Api\OzonAccrualByDayClient;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
-use App\Shared\Security\Contract\SecretRotationServiceInterface;
 use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -176,7 +175,6 @@ final class OzonAccrualByDayClientTest extends TestCase
             $dbal,
             new ConnectionApiKeyCodec(
                 $this->createMock(FieldEncryptionServiceInterface::class),
-                $this->createMock(SecretRotationServiceInterface::class),
             ),
         );
     }
