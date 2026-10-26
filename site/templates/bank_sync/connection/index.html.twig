@@ -10,6 +10,14 @@
                     <h2 class="page-title">Подключения банков</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
+                    {% for bank in oauth_banks %}
+                        <form method="post" action="{{ path('bank_sync_oauth_start') }}" class="d-inline">
+                            <input type="hidden" name="_token" value="{{ csrf_token(oauth_start_csrf_id) }}">
+                            <input type="hidden" name="bank_code" value="{{ bank.value }}">
+                            <input type="hidden" name="base_url" value="{{ production_url }}">
+                            <button class="btn btn-outline-primary">Подключить через {{ bank.label }}</button>
+                        </form>
+                    {% endfor %}
                     <a href="{{ path('bank_sync_connection_new') }}" class="btn btn-primary">Добавить</a>
                 </div>
             </div>
@@ -41,6 +49,13 @@
                             </td>
                             <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>
                             <td class="text-end">
+                                {% if connection.status.value != 'active' and connection.status.value != 'disabled' and connection.bankCode in oauth_banks %}
+                                    <form method="post" action="{{ path('bank_sync_oauth_start') }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token(oauth_start_csrf_id) }}">
+                                        <input type="hidden" name="connection_id" value="{{ connection.id }}">
+                                        <button class="btn btn-sm btn-outline-warning">Переподключить</button>
+                                    </form>
+                                {% endif %}
                                 <a href="{{ path('bank_sync_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>
