@@ -8,6 +8,8 @@ use App\BankSync\Entity\BankConnection;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
 use App\Shared\Security\Exception\DecryptionException;
 use App\Shared\Security\Exception\EncryptionException;
+use App\Shared\Security\Exception\InvalidEncryptedPayloadException;
+use App\Shared\Security\Exception\MissingEncryptionKeyException;
 use App\Shared\Security\ValueObject\EncryptedPayload;
 
 /**
@@ -40,7 +42,11 @@ final readonly class BankCredentialsCodec
     }
 
     /**
-     * @throws DecryptionException ключ недоступен или шифротекст повреждён; токена в сообщении нет
+     * Сообщения исключений токена не содержат.
+     *
+     * @throws DecryptionException шифротекст не расшифровывается или формат неожиданный
+     * @throws InvalidEncryptedPayloadException шифротекст повреждён
+     * @throws MissingEncryptionKeyException ключа этой версии нет
      */
     public function token(BankConnection $connection): string
     {

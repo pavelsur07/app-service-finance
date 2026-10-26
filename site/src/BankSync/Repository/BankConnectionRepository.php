@@ -51,7 +51,7 @@ final class BankConnectionRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->andWhere('c.companyId = :companyId')
             ->setParameter('companyId', $companyId)
-            ->orderBy('c.createdAt', 'ASC')
+            ->orderBy('c.createdAt', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -68,7 +68,7 @@ final class BankConnectionRepository extends ServiceEntityRepository
             ->andWhere('c.bankCode = :bankCode')
             ->andWhere('c.isActive = true')
             ->setParameter('bankCode', $bankCode->value)
-            ->orderBy('c.companyId', 'ASC')
+            ->orderBy('c.companyId', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
