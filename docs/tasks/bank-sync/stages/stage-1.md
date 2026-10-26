@@ -164,48 +164,48 @@ site/templates/bank_sync/connection/        перенесены из templates/
 ## 5. Чек-лист приёмки
 
 Тесты (в том же Stage):
-- [ ] `AlfaStatementMapper` — unit: счета (уникальные, пустые пропущены); строки
+- [x] `AlfaStatementMapper` — unit: счета (уникальные, пустые пропущены); строки
       приход/расход; следующая страница по `_links`; строка без `uuid`/даты/суммы/с
       неизвестным направлением пропущена и посчитана; `transactionId` разобран;
       сумма строкой и числом.
-- [ ] `BankProviderRegistry` — unit: известный код → адаптер; неизвестный →
+- [x] `BankProviderRegistry` — unit: известный код → адаптер; неизвестный →
       `UnknownBankCodeException`.
-- [ ] **Регрессия** `AlfaApiClient` — unit: URL выписки содержит `/api/jp/v1/…`
+- [x] **Регрессия** `AlfaApiClient` — unit: URL выписки содержит `/api/jp/v1/…`
       (красный на старом коде); 429/5xx → `BankApiUnavailableException`; 401 →
       `BankApiRequestFailedException`; тело ответа и query не попадают в лог;
       `X-TraceId` в логе.
-- [ ] `AlfaBankProvider` — unit: собирает все страницы дня, останавливается без
+- [x] `AlfaBankProvider` — unit: собирает все страницы дня, останавливается без
       `next`.
-- [ ] `CashFacade::importBankStatementDay` — integration: happy path; повтор того
+- [x] `CashFacade::importBankStatementDay` — integration: happy path; повтор того
       же дня → то же число строк; дубль `externalId` внутри дня → одна строка;
       чужая валюта → ошибка в результате, строка не создана; счёт чужой компании →
       исключение; вызов без открытой транзакции → исключение.
-- [ ] **Регрессия** — integration: после импорта дня `money_account_daily_balance`
+- [x] **Регрессия** — integration: после импорта дня `money_account_daily_balance`
       пересчитан (красный на старом коде: старый `BankImportService` не
       пересчитывал).
-- [ ] Handler — unit: временный сбой → исходное исключение для retry; отказ банка →
+- [x] Handler — **integration** вместо unit (`SyncBankConnectionHandlerTest`: фейковый банк, настоящие `CashFacade` и БД; моки final `CashFacade`/репозиториев раздули бы baseline): временный сбой → исходное исключение для retry; отказ банка →
       `Unrecoverable…`; нет подключения → `Unrecoverable…`; неизвестный банк →
       `Unrecoverable…`; занятый счёт → пропуск с `warning`; счёт без денежного
       счёта → пропуск.
-- [ ] Сбой на втором дне — integration: первый день и курсор сохранены, второго
+- [x] Сбой на втором дне — integration: первый день и курсор сохранены, второго
       дня нет, журнал закрыт с ошибкой.
-- [ ] `BankCredentialsCodec` — unit + integration: шифрование и расшифровка
+- [x] `BankCredentialsCodec` — unit + integration: шифрование и расшифровка
       сходятся; в строке БД нет токена; неизвестная версия ключа → исключение без
       токена в сообщении.
-- [ ] Контроллеры — functional: страницы открываются; создание шифрует токен;
+- [x] Контроллеры — functional: страницы открываются; создание шифрует токен;
       редактирование с пустым токеном оставляет прежний; чужое подключение → 404
       на `edit`/`delete`/`enqueue`; запись без `FINANCE_WRITE` → 403.
-- [ ] `MessengerRoutingTest` зелёный.
+- [x] `MessengerRoutingTest` зелёный.
 
 Гейты и проверки:
-- [ ] PHPStan по изменённым файлам без новых ошибок; baseline только сократился.
-- [ ] `make site-cs-check`, `make site-cs-strict-types` по изменённым файлам.
-- [ ] Модульные тесты `BankSync` и затронутые `Cash`; `ModuleBoundaryRules`.
-- [ ] Миграция `up` → `down` → `up`; `doctrine:schema:validate`.
-- [ ] Ручной smoke на стенде: страница подключений, создание, редактирование,
+- [x] PHPStan по изменённым файлам без новых ошибок; baseline только сократился.
+- [x] `make site-cs-check`, `make site-cs-strict-types` по изменённым файлам.
+- [x] Модульные тесты `BankSync` и затронутые `Cash`; `ModuleBoundaryRules`.
+- [x] Миграция `up` → `down` → `up`; abort при строках в старых таблицах. `doctrine:schema:validate` по проекту не пуст исторически; по `bank_sync_*` расхождение только FK на `companies` (он в миграции, как у `moysklad_*`).
+- [ ] ~~Ручной smoke на стенде~~ — стенд не поднимался; заменён functional-тестом полного сценария страниц и `debug:router`, `lint:twig`, `lint:container`, `debug:messenger`: страница подключений, создание, редактирование,
       удаление, «Запустить импорт сейчас» ставит сообщение (без боевого банка).
-- [ ] `ARCHITECTURE.md`, `site/src/Cash/README.md`, `Changelog`.
-- [ ] Внутреннее ревью полного diff от `stage_base_commit`; внешнее ревью (HIGH-LOCAL,
+- [x] `ARCHITECTURE.md`, `site/src/Cash/README.md`, `Changelog`.
+- [x] Внутреннее ревью полного diff от `stage_base_commit`; внешнее ревью (HIGH-LOCAL,
       diff > 500 строк).
 
 Reviewer focus:
@@ -221,4 +221,34 @@ Reviewer focus:
 
 ## Итог этапа
 
-Дописывается после выполнения.
+**Статус:** код готов, гейты зелёные, внешнее ревью — `REVIEW_GREEN` (раунд 2). Ждёт
+handoff поставки A (Stages 1–3) либо отдельного merge+deploy по решению Владельца.
+
+**Коммиты:** `31956ba5f` (1.3–1.5), `febafcc38` (1.6), `ab7fa1efb` (1.7), `0f3953c90` (1.8),
+`659b73d98` (1.9–1.10), `0a023ee6e` (замечание внешнего ревью).
+
+**Проверки:**
+- PHPStan полный (2 процесса) — 0 ошибок; baseline −19 записей (удалённые файлы Cash).
+- CS (`.php-cs-fixer.php`, без кеша) и `strict_types` по изменённым файлам — чисто.
+- Unit 4005 — OK; integration + functional 3199 — OK (первый прогон дал одну ошибку из-за
+  моего отката миграции во время прогона; чистый повтор — OK).
+- Регрессии красные на старом поведении: путь `/api` выписки; пересчёт остатков; курсор
+  нового счёта после сбоя HTTP.
+
+**Отклонения от плана:**
+- Handler проверен integration-тестами, а не unit (см. чек-лист).
+- Ручной smoke на стенде не выполнялся — заменён functional-тестом и lint-проверками.
+- Код `RUR` нормализуется в `RUB` в маппере Альфы (иначе рублёвые строки шли бы в ошибки
+  валюты); удалённые пользователем строки не загружаются повторно (уникальный индекс их
+  держит — иначе день падал бы бесконечно). Обе правки — сверх плана, в scope этапа.
+- Найдено самопроверкой: новый курсор сохранялся коммитом журнала после сбоя без
+  блокировки счёта — исправлено (`findOrNew` + `add()` в транзакции дня).
+- Внешнее ревью раунд 1: проверка пустоты старых таблиц в миграции гонялась с записью —
+  `LOCK TABLE … ACCESS EXCLUSIVE` до подсчёта.
+
+**Для деплоя:** миграция `Version20261026120000` — отдельный dispatch миграции на прод
+(`docs/workflow/release.md`); обратима (`down` восстанавливает пустые `cash_bank_*`).
+Команда `cash:bank:enqueue` переименована в `bank-sync:enqueue` (в cron её нет).
+
+**FOLLOW-UP:** событие `CashTransactionsChanged` из импортов выписок (1С и банк) —
+отдельное решение для всех импортов.

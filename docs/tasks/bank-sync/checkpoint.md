@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Stage 1 — модуль BankSync и граница с Cash
-**Status:** in progress — код 1.3–1.10 готов, идут гейты и ревью
+**Status:** done — handoff
 **Stage base commit:** `23491e8cf`
 
 ### Completed
@@ -21,15 +21,15 @@
 - Локальные тесты: БД `app_test_banksync` в контейнере `asf1-pg`, сеть `asf1-net`
   (стек `app-service-finance` остановлен).
 - Миграция up → down → up локально — OK.
-- Unit-набор 4005 — OK.
+- Unit-набор 4005 — OK; integration + functional 3199 — OK; PHPStan полный — 0 ошибок.
 
 ### Review status
-- internal: —
-- external: —
+- internal: done (найден и исправлен курсор нового счёта)
+- external: раунд 1 — 1 IMPORTANT (миграция, исправлено `0a023ee6e`); раунд 2 — REVIEW_GREEN
 
 ### Exact next action
-- Полный PHPStan, integration/functional наборы, smoke, внутреннее и внешнее ревью,
-  Stage Report.
+- Handoff Stage 1: push, PR, вопрос «merge and deploy» (с dispatch миграции).
+  Затем Stage 2 (ротация ключа) — план в `plan.md` §5.
 
 ### Files to inspect first on resume
 - `docs/tasks/bank-sync/stages/stage-1.md`
