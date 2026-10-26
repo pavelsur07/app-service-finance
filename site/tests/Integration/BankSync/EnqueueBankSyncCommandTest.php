@@ -17,16 +17,22 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class EnqueueBankSyncCommandTest extends IntegrationTestCase
 {
-    public function testActiveConnectionsAreEnqueuedWithCompany(): void
+    public function testOnlyActiveConnectionsAreEnqueuedWithCompany(): void
     {
         $companyId = Uuid::uuid4()->toString();
         $active = BankConnectionBuilder::aConnection()->withId(Uuid::uuid7()->toString())->withCompanyId($companyId)->build();
         $inactive = BankConnectionBuilder::aConnection()->withId(Uuid::uuid7()->toString())->withCompanyId($companyId)->inactive()->build();
+        $needsReauth = BankConnectionBuilder::aConnection()->withId(Uuid::uuid7()->toString())->withCompanyId($companyId)->build();
+        $needsReauth->markNeedsReauth('refresh_rejected');
+        $revoked = BankConnectionBuilder::aConnection()->withId(Uuid::uuid7()->toString())->withCompanyId($companyId)->build();
+        $revoked->markRevoked('consent_expired');
         $owner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('bank-enqueue-'.$companyId.'@example.test')->build();
         $this->em->persist($owner);
         $this->em->persist(CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build());
         $this->em->persist($active);
         $this->em->persist($inactive);
+        $this->em->persist($needsReauth);
+        $this->em->persist($revoked);
         $this->em->flush();
 
         /** @var InMemoryTransport $transport */

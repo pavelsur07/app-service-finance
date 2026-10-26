@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\BankSync\Infrastructure\Security;
 
+use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
 use App\BankSync\Infrastructure\Security\EncryptedBankCredentials;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
@@ -30,6 +31,37 @@ final class BankCredentialsCodecTest extends TestCase
         self::assertStringNotContainsString(self::TOKEN, $credentials->storageJson);
         $connection = BankConnectionBuilder::aConnection()->withCredentials($credentials)->build();
         self::assertSame(self::TOKEN, $codec->token($connection));
+    }
+
+    public function testOAuthTokensRoundTripAndAccessTokenServesRequests(): void
+    {
+        $codec = new BankCredentialsCodec($this->encryption());
+        $tokens = new OAuthTokens('access-secret', 'refresh-secret', new \DateTimeImmutable('2026-10-26T12:00:00+03:00'), new \DateTimeImmutable('2027-10-26T00:00:00+03:00'));
+
+        $credentials = $codec->encryptOAuthTokens($tokens);
+
+        self::assertStringNotContainsString('access-secret', $credentials->storageJson);
+        self::assertStringNotContainsString('refresh-secret', $credentials->storageJson);
+        $connection = BankConnectionBuilder::aConnection()->withCredentials($credentials)->build();
+        self::assertSame('access-secret', $codec->token($connection));
+        self::assertEquals($tokens, $codec->oauthTokens($connection));
+    }
+
+    public function testStaticTokenHasNoOAuthTokens(): void
+    {
+        $codec = new BankCredentialsCodec($this->encryption());
+        $connection = BankConnectionBuilder::aConnection()->withCredentials($codec->encryptStaticToken(self::TOKEN))->build();
+
+        self::assertNull($codec->oauthTokens($connection));
+    }
+
+    public function testOAuthWithoutRefreshTokenRoundTrips(): void
+    {
+        $codec = new BankCredentialsCodec($this->encryption());
+        $tokens = new OAuthTokens('access-only', null, new \DateTimeImmutable('2026-10-26T12:00:00+00:00'));
+        $connection = BankConnectionBuilder::aConnection()->withCredentials($codec->encryptOAuthTokens($tokens))->build();
+
+        self::assertNull($codec->oauthTokens($connection)?->refreshToken);
     }
 
     public function testEmptyTokenIsRejected(): void

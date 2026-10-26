@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\BankSync\Controller;
 
+use App\BankSync\Application\DTO\BankConnectionFormData;
+use App\BankSync\Enum\BankCode;
+use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -17,6 +20,7 @@ final class ConnectionIndexController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly BankConnectionRepository $connections,
+        private readonly BankAuthorizationProviderRegistry $authorizationProviders,
     ) {
     }
 
@@ -24,9 +28,19 @@ final class ConnectionIndexController extends AbstractController
     public function __invoke(): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        $oauthBanks = [];
+        foreach (BankCode::cases() as $bankCode) {
+            if ($this->authorizationProviders->has($bankCode)) {
+                $oauthBanks[] = $bankCode;
+            }
+        }
 
         return $this->render('@BankSync/connection/index.html.twig', [
             'connections' => $this->connections->findByCompanyId((string) $company->getId()),
+            // Вход через банк — только у банков с провайдером авторизации; полноценный UI — Stage 10.
+            'oauth_banks' => $oauthBanks,
+            'oauth_start_csrf_id' => OAuthStartController::CSRF_ID,
+            'production_url' => BankConnectionFormData::PRODUCTION_URL,
         ]);
     }
 }

@@ -38,7 +38,7 @@ final class EnqueueBankSyncCommand extends Command
             return Command::INVALID;
         }
 
-        $connections = $this->connections->findActiveByBankCode($bankCode);
+        $connections = $this->connections->findSyncableByBankCode($bankCode);
         foreach ($connections as $connection) {
             $this->bus->dispatch(new SyncBankConnectionMessage($connection->getCompanyId(), $connection->getId()));
         }

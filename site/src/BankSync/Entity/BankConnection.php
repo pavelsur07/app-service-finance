@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\BankSync\Entity;
 
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Enum\BankConnectionStatus;
+use App\BankSync\Exception\BankConnectionStatusTransitionException;
 use App\BankSync\Repository\BankConnectionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -38,8 +40,15 @@ class BankConnection
     #[ORM\Column(length: 32)]
     private string $credentialsKeyVersion;
 
-    #[ORM\Column(type: 'boolean')]
-    private bool $isActive;
+    #[ORM\Column(length: 16, enumType: BankConnectionStatus::class)]
+    private BankConnectionStatus $status;
+
+    /** Машинная причина последнего перехода (`refresh_rejected`, `token_rejected`…), без данных банка. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $statusReason = null;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $statusChangedAt;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -53,7 +62,6 @@ class BankConnection
         string $baseUrl,
         string $credentialsEncrypted,
         string $credentialsKeyVersion,
-        bool $isActive = true,
         ?string $id = null,
     ) {
         if (null !== $id) {
@@ -64,22 +72,26 @@ class BankConnection
         $this->id = $id ?? Uuid::uuid7()->toString();
         $this->companyId = $companyId;
         $this->bankCode = $bankCode;
-        $this->changeSettings($baseUrl, $isActive);
+        $this->changeBaseUrl($baseUrl);
         $this->replaceCredentials($credentialsEncrypted, $credentialsKeyVersion);
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = $this->createdAt;
+        $this->status = BankConnectionStatus::ACTIVE;
+        $this->statusChangedAt = $this->createdAt;
     }
 
-    public function changeSettings(string $baseUrl, bool $isActive): void
+    public function changeBaseUrl(string $baseUrl): void
     {
         Assert::startsWith($baseUrl, 'https://', 'Адрес API банка должен начинаться с https://.');
         Assert::maxLength($baseUrl, 255);
 
         $this->baseUrl = $baseUrl;
-        $this->isActive = $isActive;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Те же права доступа, новые токены (обновление OAuth): статус не меняется.
+     */
     public function replaceCredentials(string $credentialsEncrypted, string $credentialsKeyVersion): void
     {
         Assert::notEmpty($credentialsEncrypted);
@@ -88,6 +100,80 @@ class BankConnection
         $this->credentialsEncrypted = $credentialsEncrypted;
         $this->credentialsKeyVersion = $credentialsKeyVersion;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Новый вход клиента (новое согласие или новый токен): из любого статуса в `ACTIVE`.
+     */
+    public function reauthorize(string $credentialsEncrypted, string $credentialsKeyVersion): void
+    {
+        $this->replaceCredentials($credentialsEncrypted, $credentialsKeyVersion);
+        $this->changeStatus(BankConnectionStatus::ACTIVE, null);
+    }
+
+    /**
+     * @return bool false — подключение уже ждало повторного входа (warning не повторяется)
+     */
+    public function markNeedsReauth(string $reason): bool
+    {
+        if (BankConnectionStatus::NEEDS_REAUTH === $this->status) {
+            return false;
+        }
+        $this->assertTransition([BankConnectionStatus::ACTIVE], BankConnectionStatus::NEEDS_REAUTH);
+        $this->changeStatus(BankConnectionStatus::NEEDS_REAUTH, $reason);
+
+        return true;
+    }
+
+    public function markRevoked(string $reason): void
+    {
+        $this->assertTransition(
+            [BankConnectionStatus::ACTIVE, BankConnectionStatus::NEEDS_REAUTH, BankConnectionStatus::DISABLED],
+            BankConnectionStatus::REVOKED,
+        );
+        $this->changeStatus(BankConnectionStatus::REVOKED, $reason);
+    }
+
+    public function disable(): void
+    {
+        $this->assertTransition([BankConnectionStatus::ACTIVE, BankConnectionStatus::NEEDS_REAUTH], BankConnectionStatus::DISABLED);
+        $this->changeStatus(BankConnectionStatus::DISABLED, null);
+    }
+
+    /**
+     * Только из `DISABLED`: отозванное или отвергнутое банком подключение включается
+     * новым входом (`reauthorize()`), а не флажком.
+     */
+    public function enable(): void
+    {
+        $this->assertTransition([BankConnectionStatus::DISABLED], BankConnectionStatus::ACTIVE);
+        $this->changeStatus(BankConnectionStatus::ACTIVE, null);
+    }
+
+    public function canSync(): bool
+    {
+        return BankConnectionStatus::ACTIVE === $this->status;
+    }
+
+    /**
+     * @param list<BankConnectionStatus> $allowedFrom
+     */
+    private function assertTransition(array $allowedFrom, BankConnectionStatus $to): void
+    {
+        if (!\in_array($this->status, $allowedFrom, true)) {
+            throw new BankConnectionStatusTransitionException($this->status, $to);
+        }
+    }
+
+    private function changeStatus(BankConnectionStatus $status, ?string $reason): void
+    {
+        if (null !== $reason) {
+            Assert::maxLength($reason, 64);
+        }
+        $this->status = $status;
+        $this->statusReason = $reason;
+        $this->statusChangedAt = new \DateTimeImmutable();
+        $this->updatedAt = $this->statusChangedAt;
     }
 
     public function getId(): string
@@ -120,9 +206,19 @@ class BankConnection
         return $this->credentialsKeyVersion;
     }
 
-    public function isActive(): bool
+    public function getStatus(): BankConnectionStatus
     {
-        return $this->isActive;
+        return $this->status;
+    }
+
+    public function getStatusReason(): ?string
+    {
+        return $this->statusReason;
+    }
+
+    public function getStatusChangedAt(): \DateTimeImmutable
+    {
+        return $this->statusChangedAt;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

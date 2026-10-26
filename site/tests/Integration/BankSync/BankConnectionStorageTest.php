@@ -38,7 +38,7 @@ final class BankConnectionStorageTest extends IntegrationTestCase
         $this->em->clear();
 
         $row = $this->em->getConnection()->fetchAssociative(
-            'SELECT id, company_id, bank_code, base_url, credentials_encrypted, credentials_key_version, is_active, created_at, updated_at
+            'SELECT id, company_id, bank_code, base_url, credentials_encrypted, credentials_key_version, status, status_reason, status_changed_at, created_at, updated_at
              FROM bank_sync_connection WHERE id = :id',
             ['id' => $connection->getId()],
         );

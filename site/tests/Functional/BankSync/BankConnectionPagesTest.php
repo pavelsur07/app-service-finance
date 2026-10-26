@@ -160,7 +160,7 @@ final class BankConnectionPagesTest extends WebTestCaseBase
     private function connectionRowOrFalse(): array|false
     {
         return $this->em()->getConnection()->fetchAssociative(
-            'SELECT id, base_url, credentials_encrypted, credentials_key_version, is_active FROM bank_sync_connection WHERE company_id = :companyId',
+            'SELECT id, base_url, credentials_encrypted, credentials_key_version, status FROM bank_sync_connection WHERE company_id = :companyId',
             ['companyId' => $this->company->getId()],
         );
     }

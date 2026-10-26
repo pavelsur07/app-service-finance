@@ -84,14 +84,18 @@ final class BankConnectionBuilder
 
     public function build(): BankConnection
     {
-        return new BankConnection(
+        $connection = new BankConnection(
             $this->companyId,
             BankCode::ALFA,
             $this->baseUrl,
             $this->credentials->storageJson,
             $this->credentials->keyVersion,
-            $this->isActive,
             $this->id,
         );
+        if (!$this->isActive) {
+            $connection->disable();
+        }
+
+        return $connection;
     }
 }

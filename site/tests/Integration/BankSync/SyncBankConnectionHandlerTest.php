@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace App\Tests\Integration\BankSync;
 
 use App\BankSync\Application\DTO\BankAccountDTO;
-use App\BankSync\Application\DTO\BankStatementDayDTO;
 use App\BankSync\Application\DTO\BankStatementLineDTO;
-use App\BankSync\Domain\BankAccess;
-use App\BankSync\Domain\BankProviderInterface;
+use App\BankSync\Application\OAuthTokenRefresher;
+use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Entity\BankImportCursor;
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
+use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
+use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
+use App\BankSync\Infrastructure\Security\EncryptedBankCredentials;
 use App\BankSync\Message\SyncBankConnectionMessage;
 use App\BankSync\MessageHandler\SyncBankConnectionHandler;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -30,11 +34,14 @@ use App\Tests\Builders\BankSync\BankConnectionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\BankSync\FakeBankProvider;
+use App\Tests\Support\BankSync\StubBankAuthorizationProvider;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\DriverManager;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
@@ -79,6 +86,7 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
 
         $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER), new BankAccountDTO('40702810900000009999')]);
         $this->logs = new TestHandler();
+        StubBankAuthorizationProvider::reset();
     }
 
     public function testFirstRunLoadsWeekByDaysRecalculatesBalancesAndMovesCursor(): void
@@ -191,7 +199,8 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
 
     public function testBankRejectionIsUnrecoverable(): void
     {
-        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+        // 403 — у токена нет scope: повторный вход того же набора не поможет. 401 — отдельно.
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 403);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
 
@@ -229,7 +238,7 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
 
     public function testInactiveConnectionIsSkipped(): void
     {
-        $this->bankConnection->changeSettings($this->bankConnection->getBaseUrl(), false);
+        $this->bankConnection->disable();
         $this->em->flush();
 
         $this->handle();
@@ -253,6 +262,210 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         self::assertTrue($this->logs->hasWarningThatContains('another import of the account is running'));
     }
 
+    public function testExpiringOAuthAccessIsRefreshedBeforeBankRequest(): void
+    {
+        $this->useOAuth('+2 minutes');
+
+        $this->handle();
+
+        self::assertSame(1, StubBankAuthorizationProvider::$refreshCalls);
+        self::assertSame('refreshed-access-1', $this->bank->lastToken);
+        $tokens = $this->storedTokens();
+        self::assertSame('refreshed-access-1', $tokens->accessToken);
+        self::assertSame('refreshed-refresh-1', $tokens->refreshToken, 'новый refresh сохранён');
+        self::assertNotNull($tokens->consentExpiresAt, 'срок согласия переживает обновление');
+        self::assertTrue($this->logs->hasInfoThatContains('OAuth tokens refreshed'));
+        $this->assertNoSensitiveDataInLogs();
+    }
+
+    public function testFreshOAuthAccessIsNotRefreshed(): void
+    {
+        $this->useOAuth('+30 minutes');
+
+        $this->handle();
+
+        self::assertSame(0, StubBankAuthorizationProvider::$refreshCalls);
+        self::assertSame('oauth-access', $this->bank->lastToken);
+    }
+
+    public function testRejectedRefreshMarksNeedsReauthOnceWithoutErrors(): void
+    {
+        $this->useOAuth('-1 minute');
+        StubBankAuthorizationProvider::$refreshFailure = new BankAuthorizationRejectedException('alfa', 400, 'invalid_grant');
+
+        $this->handle();
+        $this->handle();
+
+        self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $this->reloadConnection()->getStatus());
+        self::assertSame('refresh_rejected', $this->reloadConnection()->getStatusReason());
+        self::assertFalse($this->bank->accountsListed, 'с отвергнутым токеном к банку не ходим');
+        self::assertFalse($this->lastImportLog());
+        self::assertSame(1, StubBankAuthorizationProvider::$refreshCalls, 'второй прогон не трогает банк');
+        self::assertCount(1, array_filter($this->logs->getRecords(), static fn ($record): bool => str_contains($record->message, 'needs reauthorization')));
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testTemporaryRefreshFailureIsRetriedAndKeepsStatus(): void
+    {
+        $this->useOAuth('-1 minute');
+        StubBankAuthorizationProvider::$refreshFailure = new BankApiUnavailableException('alfa', 503);
+
+        try {
+            $this->handle();
+            self::fail('temporary failure must reach the transport retry');
+        } catch (BankApiUnavailableException) {
+        }
+
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus());
+        self::assertFalse($this->bank->accountsListed);
+    }
+
+    public function testUnauthorizedStaticTokenMarksNeedsReauth(): void
+    {
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+
+        $this->handle();
+
+        self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $this->reloadConnection()->getStatus());
+        self::assertSame('token_rejected', $this->reloadConnection()->getStatusReason());
+        self::assertFalse($this->logs->hasErrorRecords());
+        self::assertNotNull($this->requireLastImportLog()['finished_at'], 'журнал закрыт');
+    }
+
+    public function testUnauthorizedStaticTokenReplacedDuringRunKeepsConnectionActive(): void
+    {
+        // Пользователь сохранил новый токен, пока банк отвечал 401 на прежний.
+        $this->bank->duringAccountsRequest = function (): void {
+            $this->replaceStoredCredentials($this->codec()->encryptStaticToken('new-static-token'));
+        };
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+
+        $this->handle();
+
+        $connection = $this->reloadConnection();
+        self::assertSame(BankConnectionStatus::ACTIVE, $connection->getStatus(), '401 на прежний токен не гасит новый');
+        self::assertSame('new-static-token', $this->codec()->token($connection));
+        self::assertTrue($this->logs->hasInfoThatContains('already replaced'));
+        self::assertFalse($this->logs->hasWarningThatContains('needs reauthorization'));
+    }
+
+    public function testUnauthorizedOAuthAfterReauthorizationRetriesWithNewTokensWithoutRefresh(): void
+    {
+        $this->useOAuth('+30 minutes');
+        // Клиент заново вошёл в банк, пока шёл запрос с прежним access; прежний refresh отвергнут бы.
+        $this->bank->duringAccountsRequest = function (): void {
+            $this->replaceStoredCredentials($this->codec()->encryptOAuthTokens(
+                new OAuthTokens('reauthorized-access', 'reauthorized-refresh', new \DateTimeImmutable('+1 hour')),
+            ));
+            $this->bank->duringAccountsRequest = null;
+        };
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+        $this->bank->accountsFailuresLeft = 1;
+        StubBankAuthorizationProvider::$refreshFailure = new BankAuthorizationRejectedException('alfa', 400, 'invalid_grant');
+
+        $this->handle();
+
+        self::assertSame(0, StubBankAuthorizationProvider::$refreshCalls, 'новые токены не обновляются');
+        self::assertSame('reauthorized-access', $this->bank->lastToken, 'повтор — с токенами нового входа');
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus());
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testUnauthorizedOAuthAccessIsRefreshedAndRetriedInTheSameRun(): void
+    {
+        $this->useOAuth('+30 minutes');
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+        $this->bank->accountsFailuresLeft = 1;
+
+        $this->handle();
+
+        self::assertSame(1, StubBankAuthorizationProvider::$refreshCalls, 'не истёкший, но отвергнутый access обновлён');
+        self::assertSame('refreshed-access-1', $this->bank->lastToken, 'повтор — с обновлённым токеном');
+        self::assertSame('refreshed-access-1', $this->storedTokens()->accessToken);
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus());
+        self::assertNotNull($this->requireLastImportLog()['finished_at']);
+        self::assertTrue($this->logs->hasInfoThatContains('Bank sync finished'));
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testRefreshedAccessRejectedAgainMarksNeedsReauthWithoutFurtherRefresh(): void
+    {
+        $this->useOAuth('+30 minutes');
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+
+        $this->handle();
+
+        self::assertSame(1, StubBankAuthorizationProvider::$refreshCalls, 'одно обновление за прогон');
+        $connection = $this->reloadConnection();
+        self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $connection->getStatus());
+        self::assertSame('token_rejected', $connection->getStatusReason());
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testUnauthorizedOAuthWithRejectedRefreshMarksNeedsReauth(): void
+    {
+        $this->useOAuth('+30 minutes');
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 401);
+        StubBankAuthorizationProvider::$refreshFailure = new BankAuthorizationRejectedException('alfa', 400, 'invalid_grant');
+
+        $this->handle();
+
+        self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $this->reloadConnection()->getStatus());
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testNeedsReauthConnectionIsSkipped(): void
+    {
+        $this->bankConnection->markNeedsReauth('refresh_rejected');
+        $this->em->flush();
+
+        $this->handle();
+
+        self::assertFalse($this->bank->accountsListed);
+        self::assertTrue($this->logs->hasInfoThatContains('connection is not active'));
+        self::assertFalse($this->logs->hasWarningRecords());
+    }
+
+    private function useOAuth(string $accessExpiresIn): void
+    {
+        $credentials = $this->codec()->encryptOAuthTokens(new OAuthTokens(
+            'oauth-access',
+            'oauth-refresh',
+            new \DateTimeImmutable($accessExpiresIn),
+            new \DateTimeImmutable('+300 days'),
+        ));
+        $this->bankConnection->reauthorize($credentials->storageJson, $credentials->keyVersion);
+        $this->em->flush();
+    }
+
+    /**
+     * Запись другого процесса мимо EntityManager handler'а.
+     */
+    private function replaceStoredCredentials(EncryptedBankCredentials $credentials): void
+    {
+        $this->em->getConnection()->executeStatement(
+            'UPDATE bank_sync_connection SET credentials_encrypted = :credentials, credentials_key_version = :key_version WHERE id = :id',
+            ['credentials' => $credentials->storageJson, 'key_version' => $credentials->keyVersion, 'id' => $this->bankConnection->getId()],
+        );
+    }
+
+    private function storedTokens(): OAuthTokens
+    {
+        $tokens = $this->codec()->oauthTokens($this->reloadConnection());
+        self::assertNotNull($tokens);
+
+        return $tokens;
+    }
+
+    private function reloadConnection(): BankConnection
+    {
+        $this->em->clear();
+        $connection = $this->em->find(BankConnection::class, $this->bankConnection->getId());
+        self::assertNotNull($connection);
+
+        return $connection;
+    }
+
     private function handle(?SyncBankConnectionMessage $message = null): void
     {
         $this->handler(new BankProviderRegistry([$this->bank]))(
@@ -267,6 +480,8 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             $this->em->getRepository(BankImportCursor::class),
             $registry,
             $this->codec(),
+            new OAuthTokenRefresher($this->codec(), new BankAuthorizationProviderRegistry([new StubBankAuthorizationProvider()]), new NativeClock()),
+            new BankConnectionTokenLock($this->em->getConnection()),
             self::getContainer()->get(CashFacade::class),
             $this->em,
             new Logger('test', [$this->logs]),
@@ -349,56 +564,9 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             self::assertStringNotContainsString(self::TOKEN, $serialized);
             self::assertStringNotContainsString(self::ACCOUNT_NUMBER, $serialized);
             self::assertStringNotContainsString('Назначение', $serialized);
+            foreach (['oauth-access', 'oauth-refresh', 'refreshed-access', 'refreshed-refresh'] as $token) {
+                self::assertStringNotContainsString($token, $serialized);
+            }
         }
-    }
-}
-
-/**
- * Банк для теста: выписка по дням, сбои по дням или на списке счетов.
- */
-final class FakeBankProvider implements BankProviderInterface
-{
-    /** @var array<string, list<BankStatementLineDTO>> */
-    public array $days = [];
-    /** @var array<string, \Throwable> */
-    public array $failures = [];
-    public ?\Throwable $accountsFailure = null;
-    /** @var list<string> */
-    public array $fetchedDays = [];
-    public bool $accountsListed = false;
-    public ?string $lastToken = null;
-
-    /**
-     * @param list<BankAccountDTO> $accounts
-     */
-    public function __construct(private readonly array $accounts)
-    {
-    }
-
-    public function code(): BankCode
-    {
-        return BankCode::ALFA;
-    }
-
-    public function listAccounts(BankAccess $access): array
-    {
-        $this->accountsListed = true;
-        $this->lastToken = $access->token;
-        if (null !== $this->accountsFailure) {
-            throw $this->accountsFailure;
-        }
-
-        return $this->accounts;
-    }
-
-    public function fetchStatementDay(BankAccess $access, string $accountNumber, \DateTimeImmutable $date): BankStatementDayDTO
-    {
-        $key = $date->format('Y-m-d');
-        $this->fetchedDays[] = $key;
-        if (isset($this->failures[$key])) {
-            throw $this->failures[$key];
-        }
-
-        return new BankStatementDayDTO($date, $this->days[$key] ?? []);
     }
 }

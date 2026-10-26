@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\BankSync\MessageHandler;
 
 use App\BankSync\Application\DTO\BankStatementDayDTO;
+use App\BankSync\Application\OAuthTokenRefresher;
 use App\BankSync\Domain\BankAccess;
 use App\BankSync\Domain\BankProviderInterface;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationRejectedException;
+use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
+use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
 use App\BankSync\Message\SyncBankConnectionMessage;
 use App\BankSync\Repository\BankConnectionRepository;
@@ -32,11 +36,19 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * Загрузка выписки по подключению. Точка входа владеет транзакциями:
+ * 0. OAuth: access истекает — обновление под блокировкой токенов подключения (сессионная,
+ *    HTTP вне транзакции), новые токены — commit сразу; отказ банка → `needs_reauth`,
+ *    одно warning, сообщение завершается без ретрая. Любая смена учётных данных или
+ *    статуса здесь — под этой блокировкой на перечитанной строке;
  * 1. журнал импорта — свой commit, чтобы загрузку было видно, пока она идёт;
  * 2. счета банка (HTTP) → денежный счёт по номеру → сессионная блокировка импорта счёта;
  * 3. каждый день от курсора: все страницы (HTTP, вне транзакции) → одна транзакция со
  *    строками дня, пересчётом остатков и курсором;
  * 4. итог в журнал — свой commit; при сбое журнал закрывается с ошибкой, если EM открыт.
+ *
+ * 401 API данных: статический токен → `needs_reauth`; OAuth → принудительное обновление
+ * и один повтор в этом же прогоне; 401 и на обновлённый токен или отказ обновления →
+ * `needs_reauth`. Учётные данные, заменённые за время прогона, не гасятся.
  *
  * Номер счёта и строки выписки в warning/error не пишутся.
  */
@@ -46,11 +58,17 @@ final readonly class SyncBankConnectionHandler
     /** Глубина первой загрузки счёта, дней. */
     public const FIRST_RUN_DAYS = 7;
 
+    /** Сколько ждать блокировку токенов подключения, секунд. */
+    private const MAX_SYNC_ATTEMPTS = 2;
+    private const TOKEN_LOCK_TIMEOUT_SECONDS = 30;
+
     public function __construct(
         private BankConnectionRepository $connections,
         private BankImportCursorRepository $cursors,
         private BankProviderRegistry $providers,
         private BankCredentialsCodec $credentialsCodec,
+        private OAuthTokenRefresher $tokenRefresher,
+        private BankConnectionTokenLock $tokenLock,
         private CashFacade $cashFacade,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
@@ -68,8 +86,8 @@ final readonly class SyncBankConnectionHandler
 
         $connection = $this->connections->findOneByIdAndCompanyId($message->connectionId, $message->companyId)
             ?? throw $this->unrecoverable('Bank sync: connection not found', $context);
-        if (!$connection->isActive()) {
-            $this->logger->info('Bank sync skipped: connection is inactive', $context);
+        if (!$connection->canSync()) {
+            $this->logger->info('Bank sync skipped: connection is not active', $context + ['status' => $connection->getStatus()->value]);
 
             return;
         }
@@ -80,20 +98,36 @@ final readonly class SyncBankConnectionHandler
         } catch (UnknownBankCodeException) {
             throw $this->unrecoverable('Bank sync: no provider for the bank', $context);
         }
-        $access = $this->access($connection, $context);
-
-        $counters = new SyncCounters();
-        $importLogId = $this->cashFacade->startStatementImportLog($message->companyId, 'bank:'.$connection->getBankCode()->value);
-        $this->entityManager->flush();
-
-        try {
-            $this->syncAccounts($connection, $provider, $access, $counters, $context);
-            $this->cashFacade->finishStatementImportLog($message->companyId, $importLogId, $counters->summary());
+        $access = $this->freshAccess($connection, $context);
+        if (null === $access) {
+            return;
+        }
+        // 401 → не больше одного обновления и повтора за прогон, в этом же сообщении: на
+        // ретраях транспорта счётчика нет, и токен, отвергаемый и после обновления, крутил
+        // бы обновления до failed-очереди вместо `needs_reauth`.
+        for ($attempt = 1;; ++$attempt) {
+            // Учётные данные, с которыми идут запросы: 401 на них не должен погасить новые,
+            // сохранённые пользователем или другим процессом за время загрузки.
+            $usedCredentials = $connection->getCredentialsEncrypted();
+            $counters = new SyncCounters();
+            $importLogId = $this->cashFacade->startStatementImportLog($message->companyId, 'bank:'.$connection->getBankCode()->value);
             $this->entityManager->flush();
-        } catch (\Throwable $exception) {
-            $this->closeFailedLog($message->companyId, $importLogId, $counters, $exception, $context);
 
-            throw $this->translate($exception, $context + $counters->toLogContext());
+            try {
+                $this->syncAccounts($connection, $provider, $access, $counters, $context);
+                $this->cashFacade->finishStatementImportLog($message->companyId, $importLogId, $counters->summary());
+                $this->entityManager->flush();
+                break;
+            } catch (\Throwable $exception) {
+                $this->closeFailedLog($message->companyId, $importLogId, $counters, $exception, $context);
+                if (!$this->isUnauthorized($exception)) {
+                    throw $this->translate($exception, $context + $counters->toLogContext());
+                }
+                $access = $this->handleUnauthorized($connection, $access, $usedCredentials, self::MAX_SYNC_ATTEMPTS > $attempt, $context);
+                if (null === $access) {
+                    return;
+                }
+            }
         }
 
         $this->logger->info('Bank sync finished', $context + $counters->toLogContext());
@@ -206,6 +240,94 @@ final readonly class SyncBankConnectionHandler
     }
 
     /**
+     * Токен для запросов к банку; OAuth-токены, истекающие скоро (или отвергнутый
+     * `$rejectedAccessToken`), обновляются под блокировкой токенов подключения. Отказ
+     * обновления переводит подключение в `needs_reauth` там же, под блокировкой.
+     *
+     * @param array<string, string> $context
+     *
+     * @return BankAccess|null null — загружать нечего: нужен повторный вход или подключение
+     *                         перестало быть активным
+     *
+     * @throws BankConnectionBusyException
+     */
+    private function freshAccess(BankConnection $connection, array $context, #[\SensitiveParameter] ?string $rejectedAccessToken = null): ?BankAccess
+    {
+        try {
+            if (null === $rejectedAccessToken && !$this->tokenRefresher->needsRefresh($connection)) {
+                return $this->access($connection, $context);
+            }
+        } catch (DecryptionException|InvalidEncryptedPayloadException|MissingEncryptionKeyException $exception) {
+            throw $this->undecryptable($connection, $exception, $context);
+        }
+
+        return $this->underTokenLock($connection, $context, function () use ($connection, $context, $rejectedAccessToken): ?BankAccess {
+            try {
+                $refreshed = $this->tokenRefresher->refreshIfNeeded($connection, $rejectedAccessToken);
+            } catch (BankAuthorizationRejectedException $exception) {
+                $this->markNeedsReauth($connection, 'refresh_rejected', $exception, $context);
+
+                return null;
+            } catch (DecryptionException|InvalidEncryptedPayloadException|MissingEncryptionKeyException $exception) {
+                throw $this->undecryptable($connection, $exception, $context);
+            } catch (UnknownBankCodeException) {
+                throw $this->unrecoverable('Bank sync: OAuth credentials without authorization provider', $context);
+            }
+
+            if ($refreshed) {
+                try {
+                    $this->entityManager->flush();
+                } catch (\Throwable $exception) {
+                    // Банк уже выдал новый refresh и мог погасить прежний: подключению, скорее
+                    // всего, понадобится повторный вход.
+                    $this->logger->error('Bank sync: refreshed OAuth tokens were not saved', $context + ['exception_class' => $exception::class]);
+
+                    throw $exception;
+                }
+                $this->logger->info('Bank sync: OAuth tokens refreshed', $context);
+            }
+
+            return $this->access($connection, $context);
+        });
+    }
+
+    /**
+     * Смена учётных данных или статуса подключения — только под блокировкой токенов, на
+     * перечитанной строке: её держат и callback входа, и сохранение формы. Неактивное к
+     * этому моменту подключение не трогается.
+     *
+     * @template T
+     *
+     * @param array<string, string> $context
+     * @param \Closure(): (T|null) $change
+     *
+     * @return T|null
+     *
+     * @throws BankConnectionBusyException
+     */
+    private function underTokenLock(BankConnection $connection, array $context, \Closure $change): mixed
+    {
+        if (!$this->tokenLock->acquire($connection->getId(), self::TOKEN_LOCK_TIMEOUT_SECONDS)) {
+            $this->logger->warning('Bank sync: connection tokens are locked by another process', $context);
+
+            throw new BankConnectionBusyException($connection->getId());
+        }
+
+        try {
+            $this->entityManager->refresh($connection);
+            if (!$connection->canSync()) {
+                $this->logger->info('Bank sync skipped: connection stopped being active', $context + ['status' => $connection->getStatus()->value]);
+
+                return null;
+            }
+
+            return $change();
+        } finally {
+            $this->releaseTokenLock($connection->getId(), $context);
+        }
+    }
+
+    /**
      * @param array<string, string> $context
      */
     private function access(BankConnection $connection, array $context): BankAccess
@@ -213,10 +335,106 @@ final readonly class SyncBankConnectionHandler
         try {
             $token = $this->credentialsCodec->token($connection);
         } catch (DecryptionException|InvalidEncryptedPayloadException|MissingEncryptionKeyException $exception) {
-            throw $this->unrecoverable('Bank sync: connection credentials cannot be decrypted', $context + ['exception_class' => $exception::class, 'credentials_key_version' => $connection->getCredentialsKeyVersion()]);
+            throw $this->undecryptable($connection, $exception, $context);
         }
 
         return new BankAccess($connection->getId(), $connection->getBankCode(), $connection->getBaseUrl(), $token);
+    }
+
+    /**
+     * @param array<string, string> $context
+     */
+    private function undecryptable(BankConnection $connection, \Throwable $exception, array $context): UnrecoverableMessageHandlingException
+    {
+        return $this->unrecoverable('Bank sync: connection credentials cannot be decrypted', $context + [
+            'exception_class' => $exception::class,
+            'credentials_key_version' => $connection->getCredentialsKeyVersion(),
+        ]);
+    }
+
+    private function isUnauthorized(\Throwable $exception): bool
+    {
+        return $exception instanceof BankApiRequestFailedException && 401 === $exception->getStatusCode();
+    }
+
+    /**
+     * Банк ответил 401 на запрос данных. Статический токен не обновить — нужен новый, если
+     * его ещё не заменили. OAuth, если повтор ещё разрешён: access могли отозвать раньше
+     * срока — обновление (или токены уже заменил другой процесс) и доступ для повтора.
+     * Отвергнут и обновлённый — `needs_reauth`, если его тем временем не заменили.
+     *
+     * @param array<string, string> $context
+     *
+     * @return BankAccess|null доступ для повтора; null — загрузка завершена
+     */
+    private function handleUnauthorized(BankConnection $connection, BankAccess $access, string $usedCredentials, bool $mayRetry, array $context): ?BankAccess
+    {
+        if (!$this->entityManager->isOpen()) {
+            $this->logger->error('Bank sync: access rejected but the entity manager is closed', $context);
+
+            return null;
+        }
+
+        try {
+            $isOAuth = null !== $this->credentialsCodec->oauthTokens($connection);
+        } catch (DecryptionException|InvalidEncryptedPayloadException|MissingEncryptionKeyException $exception) {
+            throw $this->undecryptable($connection, $exception, $context);
+        }
+
+        if (!$isOAuth || !$mayRetry) {
+            $this->underTokenLock($connection, $context, function () use ($connection, $usedCredentials, $context): null {
+                if ($connection->getCredentialsEncrypted() === $usedCredentials) {
+                    $this->markNeedsReauth($connection, 'token_rejected', null, $context);
+                } else {
+                    $this->logger->info('Bank sync: rejected token was already replaced', $context);
+                }
+
+                return null;
+            });
+
+            return null;
+        }
+
+        $fresh = $this->freshAccess($connection, $context, $access->token);
+        if (null !== $fresh) {
+            $this->logger->warning('Bank sync: access token rejected, retrying with refreshed token', $context);
+        }
+
+        return $fresh;
+    }
+
+    /**
+     * Банк больше не принимает учётные данные подключения: загрузка останавливается до
+     * нового входа. Вызывается под блокировкой токенов на перечитанной строке. Одно
+     * warning на переход; в очередь такое подключение больше не ставится.
+     *
+     * @param array<string, string> $context
+     */
+    private function markNeedsReauth(BankConnection $connection, string $reason, ?BankAuthorizationRejectedException $exception, array $context): void
+    {
+        if (!$connection->markNeedsReauth($reason)) {
+            return;
+        }
+        $this->entityManager->flush();
+
+        $this->logger->warning('Bank sync: connection needs reauthorization', $context + [
+            'reason' => $reason,
+            'status_code' => $exception?->getStatusCode() ?? 'none',
+            'oauth_error' => $exception?->getOauthError() ?? 'none',
+        ]);
+    }
+
+    /**
+     * @param array<string, string> $context
+     */
+    private function releaseTokenLock(string $connectionId, array $context): void
+    {
+        try {
+            $this->tokenLock->release($connectionId);
+        } catch (\Throwable $exception) {
+            // Соединение потеряно — PostgreSQL снял сессионную блокировку сам.
+            $this->logger->warning('Bank sync: connection token lock release failed', $context + ['exception_class' => $exception::class]);
+        }
     }
 
     /**

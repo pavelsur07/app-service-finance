@@ -38,6 +38,12 @@ final class ConnectionEnqueueSyncController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
+        if (!$connection->canSync()) {
+            $this->addFlash('warning', sprintf('Импорт не запущен: %s.', mb_strtolower($connection->getStatus()->label())));
+
+            return $this->redirectToRoute('bank_sync_connection_index');
+        }
+
         $this->bus->dispatch(new SyncBankConnectionMessage($companyId, $connection->getId()));
         $this->addFlash('success', 'Импорт поставлен в очередь');
 
