@@ -125,8 +125,9 @@ Handler на каждый день счёта: собрать все стран�
 - **1.5** `AlfaApiClient` и `AlfaBankProvider` в `BankSync`; `AlfaApiClientTest`
   переносится. Исправление по спецификации (`plan.md` §3a): путь выписки
   `/api/jp/v1/statement/transactions` (сейчас без `/api` — запрос уходит мимо
-  API) и явный `limit` на страницу; `ErrorDescription` банка в лог и сообщения
-  исключений не попадает (в нём номер счёта).
+  API); `limit` у JSON-выписки нет (страница до 1000, дальше `_links` `next`) —
+  не добавлять; `ErrorDescription` банка в лог и сообщения исключений не попадает
+  (в нём номер счёта); `X-TraceId` ответа — в лог запроса.
 - **1.6** Методы `CashFacade` и Input/DTO; внутренний сервис импорта дня в `Cash`
   (создание транзакций из `BankImportService::importAccount`) +
   `AccountBalanceService::recalculateDailyRange` за дни дня. Проверить, как импорт
