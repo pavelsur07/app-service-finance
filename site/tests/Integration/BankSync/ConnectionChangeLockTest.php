@@ -13,8 +13,10 @@ use App\BankSync\Domain\OAuth\Pkce;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankConnectionStatus;
+use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
+use App\BankSync\Infrastructure\OAuth\AuthorizationStateClaims;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
@@ -105,6 +107,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         self::assertTrue((new BankConnectionTokenLock($this->worker))->acquire($this->bankConnection->getId(), 0));
         $action = new CompleteBankAuthorizationAction(
             $this->sessionStore,
+            self::getContainer()->get(AuthorizationStateClaims::class),
             self::getContainer()->get(BankAuthorizationProviderRegistry::class),
             self::getContainer()->get(BankConnectionRepository::class),
             $this->codec(),
@@ -121,6 +124,43 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         }
 
         self::assertSame(0, StubBankAuthorizationProvider::$exchangeCalls, 'код не обменян — банк не выдал пару, которую некуда сохранить');
+        self::assertSame('old-access', $this->storedTokens()->accessToken);
+    }
+
+    public function testSameStateFromTwoConcurrentRequestsExchangesCodeOnce(): void
+    {
+        // Сессии в Redis без блокировки: второй запрос прочитал запись до того, как первый её удалил.
+        $pending = $this->pendingReconnect();
+        $action = self::getContainer()->get(CompleteBankAuthorizationAction::class);
+        $action($this->companyId, $pending->state, $pending->code, null);
+        $this->sessionStore->save($pending->authorization, new \DateTimeImmutable());
+
+        try {
+            $action($this->companyId, $pending->state, $pending->code, null);
+            self::fail('the second request with the same state must be rejected');
+        } catch (BankAuthorizationStateInvalidException $exception) {
+            self::assertSame('unknown', $exception->reason);
+        }
+
+        self::assertSame(1, StubBankAuthorizationProvider::$exchangeCalls, 'код обменян один раз');
+    }
+
+    public function testEnvironmentChangedDuringAuthorizationRejectsCallbackBeforeExchange(): void
+    {
+        $pending = $this->pendingReconnect();
+        $this->connection->executeStatement(
+            'UPDATE bank_sync_connection SET base_url = :url WHERE id = :id',
+            ['url' => BankConnectionFormData::SANDBOX_URL, 'id' => $this->bankConnection->getId()],
+        );
+
+        try {
+            self::getContainer()->get(CompleteBankAuthorizationAction::class)($this->companyId, $pending->state, $pending->code, null);
+            self::fail('tokens of another environment must not be stored');
+        } catch (BankAuthorizationStateInvalidException $exception) {
+            self::assertSame('connection_changed', $exception->reason);
+        }
+
+        self::assertSame(0, StubBankAuthorizationProvider::$exchangeCalls);
         self::assertSame('old-access', $this->storedTokens()->accessToken);
     }
 
@@ -160,6 +200,18 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
 
     private function completeReconnect(CompleteBankAuthorizationAction $action): void
     {
+        $pending = $this->pendingReconnect();
+
+        $action($this->companyId, $pending->state, $pending->code, null);
+    }
+
+    /**
+     * Начатый вход в существующее подключение: запись в сессии и код, выданный банком.
+     *
+     * @return object{state: string, code: string, authorization: PendingAuthorization}
+     */
+    private function pendingReconnect(): object
+    {
         $pkce = Pkce::generate();
         $pending = new PendingAuthorization(
             Uuid::uuid4()->toString(),
@@ -174,7 +226,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         );
         $this->sessionStore->save($pending, new \DateTimeImmutable());
 
-        $action($this->companyId, $pending->state, 'ok:'.$pkce->challenge, null);
+        return (object) ['state' => $pending->state, 'code' => 'ok:'.$pkce->challenge, 'authorization' => $pending];
     }
 
     private function saveAction(): SaveBankConnectionAction

@@ -6,7 +6,8 @@ namespace App\BankSync\Exception;
 
 /**
  * Callback входа в банк без действующего `state` этой сессии и компании: неизвестный,
- * уже использованный, просроченный или начатый в другой компании. Ничего не сохраняется.
+ * уже использованный, просроченный, начатый в другой компании или для подключения, чьи
+ * банк и среда с тех пор изменились (`connection_changed`). Ничего не сохраняется.
  */
 final class BankAuthorizationStateInvalidException extends \RuntimeException
 {

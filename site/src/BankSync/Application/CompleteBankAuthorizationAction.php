@@ -14,6 +14,7 @@ use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
+use App\BankSync\Infrastructure\OAuth\AuthorizationStateClaims;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
@@ -37,6 +38,7 @@ final readonly class CompleteBankAuthorizationAction
 
     public function __construct(
         private AuthorizationSessionStore $sessionStore,
+        private AuthorizationStateClaims $stateClaims,
         private BankAuthorizationProviderRegistry $providers,
         private BankConnectionRepository $connections,
         private BankCredentialsCodec $credentialsCodec,
@@ -66,6 +68,10 @@ final readonly class CompleteBankAuthorizationAction
         }
         if ($pending->isExpired($this->clock->now())) {
             throw new BankAuthorizationStateInvalidException('expired');
+        }
+        if (!$this->stateClaims->claim($pending->state)) {
+            // Параллельный callback с тем же state уже обменивает код.
+            throw new BankAuthorizationStateInvalidException('unknown');
         }
         $context = [
             'company_id' => $pending->companyId,
@@ -105,6 +111,21 @@ final readonly class CompleteBankAuthorizationAction
      */
     private function exchangeAndSave(PendingAuthorization $pending, #[\SensitiveParameter] string $code, array $context): void
     {
+        // До обмена: код одноразовый, и пару, которую некуда сохранить, у банка лучше не брать.
+        $existing = $this->connections->findOneByIdAndCompanyId($pending->connectionId, $pending->companyId);
+        if (null !== $existing) {
+            $this->entityManager->refresh($existing);
+            if ($existing->getBaseUrl() !== $pending->baseUrl) {
+                // Среду подключения сменили, пока клиент был в банке: токены песочницы не
+                // должны лечь в боевое подключение и наоборот.
+                $this->logger->info('Bank authorization: connection environment changed during authorization', $context);
+
+                throw new BankAuthorizationStateInvalidException('connection_changed');
+            }
+        } elseif (!$pending->isNewConnection) {
+            throw new BankConnectionNotFoundException($pending->connectionId);
+        }
+
         try {
             $tokens = $this->providers->get($pending->bankCode)
                 ->exchangeCode($pending->baseUrl, $code, $pending->codeVerifier, $pending->redirectUri);
@@ -117,10 +138,10 @@ final readonly class CompleteBankAuthorizationAction
         $credentials = $this->credentialsCodec->encryptOAuthTokens($tokens);
 
         $this->entityManager->wrapInTransaction(function () use ($pending, $credentials): void {
+            // Под блокировкой строку никто не менял с проверки выше; удалить подключение
+            // блокировка не мешает — тогда NotFound и откат.
             $connection = $this->connections->findOneByIdAndCompanyId($pending->connectionId, $pending->companyId);
             if (null !== $connection) {
-                // Строка могла измениться, пока клиент был в банке (воркер, форма).
-                $this->entityManager->refresh($connection);
                 $connection->reauthorize($credentials->storageJson, $credentials->keyVersion);
 
                 return;

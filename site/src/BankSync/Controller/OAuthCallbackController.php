@@ -49,9 +49,11 @@ final class OAuthCallbackController extends AbstractController
             );
             $this->addFlash('success', 'Банк подключён.');
         } catch (BankAuthorizationStateInvalidException $exception) {
-            $this->addFlash('danger', 'company_mismatch' === $exception->reason
-                ? 'Вход в банк начат в другой компании. Переключитесь на неё или начните вход заново.'
-                : 'Сеанс входа в банк устарел. Начните подключение заново.');
+            $this->addFlash('danger', match ($exception->reason) {
+                'company_mismatch' => 'Вход в банк начат в другой компании. Переключитесь на неё или начните вход заново.',
+                'connection_changed' => 'Настройки подключения изменились, пока шёл вход в банк. Начните вход заново.',
+                default => 'Сеанс входа в банк устарел. Начните подключение заново.',
+            });
         } catch (BankAuthorizationDeniedException) {
             $this->addFlash('warning', 'Банк не выдал доступ: вход отменён или истёк. Начните подключение заново.');
         } catch (BankAuthorizationRejectedException) {
