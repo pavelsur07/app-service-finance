@@ -147,6 +147,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MoySklad/Entity'
                 prefix: 'App\MoySklad\Entity'
                 alias: MoySklad
+            BankSync:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/BankSync/Entity'
+                prefix: 'App\BankSync\Entity'
+                alias: BankSync
         filters:
             company:
                 class: App\Ingestion\Infrastructure\Doctrine\CompanyFilter
