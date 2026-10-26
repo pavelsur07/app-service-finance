@@ -62,3 +62,9 @@ reports/
 
 # Сборочные артефакты монорепо services/ (локальный go build -o bin/ и т.п.)
 /services/*/bin/
+
+# Сертификаты и ключи TLS банков (BankSync): только вне git, см. docs/tasks/bank-sync/alfa-demo.md
+test_cert.zip
+*.p12
+*.pfx
+*.key

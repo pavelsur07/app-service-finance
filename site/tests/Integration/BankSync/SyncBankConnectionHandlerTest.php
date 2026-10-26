@@ -16,6 +16,7 @@ use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
@@ -205,6 +206,24 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         $this->expectException(UnrecoverableMessageHandlingException::class);
 
         $this->handle();
+    }
+
+    public function testUnconfiguredBankChannelIsUnrecoverableWithOneErrorAndClosedLog(): void
+    {
+        $this->bank->accountsFailure = new BankChannelNotConfiguredException('alfa', 'ALFA_TLS_CERT_PATH is not set');
+
+        try {
+            $this->handle();
+            self::fail('misconfigured channel must not be retried');
+        } catch (UnrecoverableMessageHandlingException $exception) {
+            self::assertInstanceOf(BankChannelNotConfiguredException::class, $exception->getPrevious());
+        }
+
+        $errors = array_filter($this->logs->getRecords(), static fn ($record): bool => 'ERROR' === $record->level->getName());
+        self::assertCount(1, $errors);
+        self::assertStringContainsString('ALFA_TLS_CERT_PATH', (string) array_values($errors)[0]->context['problem']);
+        self::assertNotNull($this->requireLastImportLog()['finished_at'], 'журнал импорта закрыт');
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus(), 'подключение клиента не виновато');
     }
 
     public function testMissingConnectionIsUnrecoverable(): void
