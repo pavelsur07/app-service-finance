@@ -47,7 +47,8 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
  * 4. итог в журнал — свой commit; при сбое журнал закрывается с ошибкой, если EM открыт.
  *
  * 401 API данных: статический токен → `needs_reauth`; OAuth → принудительное обновление
- * и ретрай с новым токеном, отказ обновления → `needs_reauth`.
+ * и один повтор в этом же прогоне; 401 и на обновлённый токен или отказ обновления →
+ * `needs_reauth`. Учётные данные, заменённые за время прогона, не гасятся.
  *
  * Номер счёта и строки выписки в warning/error не пишутся.
  */
@@ -58,6 +59,7 @@ final readonly class SyncBankConnectionHandler
     public const FIRST_RUN_DAYS = 7;
 
     /** Сколько ждать блокировку токенов подключения, секунд. */
+    private const MAX_SYNC_ATTEMPTS = 2;
     private const TOKEN_LOCK_TIMEOUT_SECONDS = 30;
 
     public function __construct(
@@ -100,27 +102,32 @@ final readonly class SyncBankConnectionHandler
         if (null === $access) {
             return;
         }
-        // Учётные данные, с которыми идут запросы: 401 на них не должен погасить новые,
-        // сохранённые пользователем или другим процессом за время загрузки.
-        $usedCredentials = $connection->getCredentialsEncrypted();
-
-        $counters = new SyncCounters();
-        $importLogId = $this->cashFacade->startStatementImportLog($message->companyId, 'bank:'.$connection->getBankCode()->value);
-        $this->entityManager->flush();
-
-        try {
-            $this->syncAccounts($connection, $provider, $access, $counters, $context);
-            $this->cashFacade->finishStatementImportLog($message->companyId, $importLogId, $counters->summary());
+        // 401 → не больше одного обновления и повтора за прогон, в этом же сообщении: на
+        // ретраях транспорта счётчика нет, и токен, отвергаемый и после обновления, крутил
+        // бы обновления до failed-очереди вместо `needs_reauth`.
+        for ($attempt = 1;; ++$attempt) {
+            // Учётные данные, с которыми идут запросы: 401 на них не должен погасить новые,
+            // сохранённые пользователем или другим процессом за время загрузки.
+            $usedCredentials = $connection->getCredentialsEncrypted();
+            $counters = new SyncCounters();
+            $importLogId = $this->cashFacade->startStatementImportLog($message->companyId, 'bank:'.$connection->getBankCode()->value);
             $this->entityManager->flush();
-        } catch (\Throwable $exception) {
-            $this->closeFailedLog($message->companyId, $importLogId, $counters, $exception, $context);
-            if ($this->isUnauthorized($exception)) {
-                $this->handleUnauthorized($connection, $access, $usedCredentials, $context);
 
-                return;
+            try {
+                $this->syncAccounts($connection, $provider, $access, $counters, $context);
+                $this->cashFacade->finishStatementImportLog($message->companyId, $importLogId, $counters->summary());
+                $this->entityManager->flush();
+                break;
+            } catch (\Throwable $exception) {
+                $this->closeFailedLog($message->companyId, $importLogId, $counters, $exception, $context);
+                if (!$this->isUnauthorized($exception)) {
+                    throw $this->translate($exception, $context + $counters->toLogContext());
+                }
+                $access = $this->handleUnauthorized($connection, $access, $usedCredentials, self::MAX_SYNC_ATTEMPTS > $attempt, $context);
+                if (null === $access) {
+                    return;
+                }
             }
-
-            throw $this->translate($exception, $context + $counters->toLogContext());
         }
 
         $this->logger->info('Bank sync finished', $context + $counters->toLogContext());
@@ -352,17 +359,20 @@ final readonly class SyncBankConnectionHandler
 
     /**
      * Банк ответил 401 на запрос данных. Статический токен не обновить — нужен новый, если
-     * его ещё не заменили. OAuth: access могли отозвать раньше срока — обновление; удалось
-     * (или токены уже заменил другой процесс) — исключение для ретрая с новым токеном.
+     * его ещё не заменили. OAuth, если повтор ещё разрешён: access могли отозвать раньше
+     * срока — обновление (или токены уже заменил другой процесс) и доступ для повтора.
+     * Отвергнут и обновлённый — `needs_reauth`, если его тем временем не заменили.
      *
      * @param array<string, string> $context
+     *
+     * @return BankAccess|null доступ для повтора; null — загрузка завершена
      */
-    private function handleUnauthorized(BankConnection $connection, BankAccess $access, string $usedCredentials, array $context): void
+    private function handleUnauthorized(BankConnection $connection, BankAccess $access, string $usedCredentials, bool $mayRetry, array $context): ?BankAccess
     {
         if (!$this->entityManager->isOpen()) {
             $this->logger->error('Bank sync: access rejected but the entity manager is closed', $context);
 
-            return;
+            return null;
         }
 
         try {
@@ -371,7 +381,7 @@ final readonly class SyncBankConnectionHandler
             throw $this->undecryptable($connection, $exception, $context);
         }
 
-        if (!$isOAuth) {
+        if (!$isOAuth || !$mayRetry) {
             $this->underTokenLock($connection, $context, function () use ($connection, $usedCredentials, $context): null {
                 if ($connection->getCredentialsEncrypted() === $usedCredentials) {
                     $this->markNeedsReauth($connection, 'token_rejected', null, $context);
@@ -382,16 +392,15 @@ final readonly class SyncBankConnectionHandler
                 return null;
             });
 
-            return;
+            return null;
         }
 
-        if (null === $this->freshAccess($connection, $context, $access->token)) {
-            return;
+        $fresh = $this->freshAccess($connection, $context, $access->token);
+        if (null !== $fresh) {
+            $this->logger->warning('Bank sync: access token rejected, retrying with refreshed token', $context);
         }
 
-        $this->logger->warning('Bank sync: access token rejected, retrying with refreshed token', $context);
-
-        throw new BankApiUnavailableException($connection->getBankCode()->value, 401);
+        return $fresh;
     }
 
     /**

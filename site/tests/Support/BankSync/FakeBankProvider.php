@@ -21,6 +21,8 @@ final class FakeBankProvider implements BankProviderInterface
     /** @var array<string, \Throwable> */
     public array $failures = [];
     public ?\Throwable $accountsFailure = null;
+    /** @var int|null сколько запросов списка счетов падают с `$accountsFailure`; null — все */
+    public ?int $accountsFailuresLeft = null;
     /** @var list<string> */
     public array $fetchedDays = [];
     public bool $accountsListed = false;
@@ -47,7 +49,7 @@ final class FakeBankProvider implements BankProviderInterface
         if (null !== $this->duringAccountsRequest) {
             ($this->duringAccountsRequest)();
         }
-        if (null !== $this->accountsFailure) {
+        if (null !== $this->accountsFailure && (null === $this->accountsFailuresLeft || $this->accountsFailuresLeft-- > 0)) {
             throw $this->accountsFailure;
         }
 
