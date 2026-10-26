@@ -5,7 +5,8 @@
 **Stage base commit:** —
 
 ### Completed
-- `plan.md` — задача, решения, этапы 1–6 (2026-10-25).
+- `plan.md` — задача, решения, этапы 1–13 (пересобраны 2026-10-26), поставки A/B/C.
+- `alfa-letter.md` — письмо в поддержку Alfa API (черновик).
 - `stages/stage-1.md` — план Stage 1 из четырёх частей.
 
 ### Checks and baseline
