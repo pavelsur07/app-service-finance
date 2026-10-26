@@ -83,8 +83,9 @@ migrations/Version2026102615…php      status (+ CHECK), status_reason, status_
   блокировки, перечитывает и видит свежий токен — второго запроса к банку нет.
   Та же блокировка (тот же ключ) у входа: переподключение не перетрётся обновлением.
 - **Отказ обновления** (`invalid_grant`, 400/401 token endpoint) →
-  `markNeedsReauth('refresh_rejected')`, commit, одно `warning`,
-  `UnrecoverableMessageHandlingException` без `error`. 5xx/сеть — обычный ретрай.
+  `markNeedsReauth('refresh_rejected')`, commit, одно `warning`, сообщение
+  завершается без ретрая и без `error` (в очередь `failed` не попадает). 5xx/сеть —
+  обычный ретрай.
 - **401 от API данных**: OAuth → принудительное обновление под блокировкой; успех →
   исключение для ретрая транспорта с новым токеном; отказ → `needs_reauth`.
   Статический токен → сразу `needs_reauth('token_rejected')`.

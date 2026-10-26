@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\BankSync;
 
 use App\BankSync\Application\DTO\BankAccountDTO;
-use App\BankSync\Application\DTO\BankStatementDayDTO;
 use App\BankSync\Application\DTO\BankStatementLineDTO;
 use App\BankSync\Application\OAuthTokenRefresher;
-use App\BankSync\Domain\BankAccess;
 use App\BankSync\Domain\OAuth\OAuthTokens;
-use App\BankSync\Domain\BankProviderInterface;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Entity\BankImportCursor;
 use App\BankSync\Enum\BankCode;

@@ -24,7 +24,7 @@ final class PkceAndTokensTest extends TestCase
         self::assertMatchesRegularExpression('/^[A-Za-z0-9\-_]{43,128}$/', $first->verifier);
         self::assertNotSame($first->verifier, $second->verifier);
         self::assertSame(Pkce::challengeFor($first->verifier), $first->challenge);
-        self::assertStringNotContainsString($first->verifier, print_r($first, true));
+        self::assertStringNotContainsString($first->verifier, json_encode($first->__debugInfo(), \JSON_THROW_ON_ERROR));
     }
 
     public function testAccessExpiresWithinWindow(): void
@@ -46,7 +46,7 @@ final class PkceAndTokensTest extends TestCase
 
     public function testDebugOutputHasNoTokens(): void
     {
-        $dump = print_r(new OAuthTokens('access-secret', 'refresh-secret', new \DateTimeImmutable()), true);
+        $dump = json_encode((new OAuthTokens('access-secret', 'refresh-secret', new \DateTimeImmutable()))->__debugInfo(), \JSON_THROW_ON_ERROR);
 
         self::assertStringNotContainsString('access-secret', $dump);
         self::assertStringNotContainsString('refresh-secret', $dump);

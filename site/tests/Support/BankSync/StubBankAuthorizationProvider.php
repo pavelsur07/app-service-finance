@@ -38,7 +38,9 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
     {
         parse_str((string) parse_url($authorizationUrl, \PHP_URL_QUERY), $query);
 
-        return 'ok:'.(string) ($query['code_challenge'] ?? '');
+        $challenge = $query['code_challenge'] ?? '';
+
+        return 'ok:'.(\is_string($challenge) ? $challenge : '');
     }
 
     public function code(): BankCode

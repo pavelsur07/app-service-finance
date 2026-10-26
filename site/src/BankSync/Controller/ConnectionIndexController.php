@@ -28,11 +28,17 @@ final class ConnectionIndexController extends AbstractController
     public function __invoke(): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        $oauthBanks = [];
+        foreach (BankCode::cases() as $bankCode) {
+            if ($this->authorizationProviders->has($bankCode)) {
+                $oauthBanks[] = $bankCode;
+            }
+        }
 
         return $this->render('@BankSync/connection/index.html.twig', [
             'connections' => $this->connections->findByCompanyId((string) $company->getId()),
             // Вход через банк — только у банков с провайдером авторизации; полноценный UI — Stage 10.
-            'oauth_banks' => array_values(array_filter(BankCode::cases(), $this->authorizationProviders->has(...))),
+            'oauth_banks' => $oauthBanks,
             'oauth_start_csrf_id' => OAuthStartController::CSRF_ID,
             'production_url' => BankConnectionFormData::PRODUCTION_URL,
         ]);

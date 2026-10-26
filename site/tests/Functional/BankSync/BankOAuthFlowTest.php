@@ -210,8 +210,14 @@ final class BankOAuthFlowTest extends WebTestCaseBase
     {
         parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
 
-        /* @var array<string, string> $query */
-        return $query;
+        $strings = [];
+        foreach ($query as $name => $value) {
+            if (\is_string($value)) {
+                $strings[(string) $name] = $value;
+            }
+        }
+
+        return $strings;
     }
 
     private function switchCompany(Company $company): void
