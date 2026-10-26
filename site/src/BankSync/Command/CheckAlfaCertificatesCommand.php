@@ -6,6 +6,7 @@ namespace App\BankSync\Command;
 
 use App\BankSync\Domain\Certificate\CertificateExpiryPolicy;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaTlsConfig;
+use App\BankSync\Infrastructure\Security\PemCertificates;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -51,7 +52,7 @@ final class CheckAlfaCertificatesCommand extends Command
         foreach ($sources as $source => $path) {
             $certificates = $this->readCertificates($path);
             if ([] === $certificates) {
-                $line = sprintf('%s: file is not readable or has no PEM certificates', $source);
+                $line = sprintf('%s: file is not readable or not a complete PEM certificate chain', $source);
                 $byLevel['error'][] = $line;
                 $output->writeln('[error] '.$line);
                 continue;
@@ -104,24 +105,23 @@ final class CheckAlfaCertificatesCommand extends Command
      */
     private function readCertificates(string $path): array
     {
-        $pem = is_readable($path) ? file_get_contents($path) : false;
-        if (false === $pem || !preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $blocks)) {
+        $parsed = PemCertificates::parse(PemCertificates::readFile($path) ?? '');
+        if (null === $parsed) {
             return [];
         }
 
         $certificates = [];
-        foreach ($blocks[0] as $block) {
-            // @ — openssl пишет warning о неразобранном блоке; false проверяется ниже.
-            $parsed = @openssl_x509_parse($block);
-            if (false === $parsed || !\is_int($parsed['validTo_time_t'] ?? null)) {
+        foreach ($parsed as $certificate) {
+            $info = openssl_x509_parse($certificate);
+            if (false === $info || !\is_int($info['validTo_time_t'] ?? null)) {
                 return [];
             }
-            $subject = $parsed['subject'] ?? [];
+            $subject = $info['subject'] ?? [];
             $commonName = \is_array($subject) ? ($subject['CN'] ?? 'unknown') : 'unknown';
             $certificates[] = [
                 'name' => \is_string($commonName) ? $commonName : 'unknown',
-                'serial' => \is_string($parsed['serialNumberHex'] ?? null) ? $parsed['serialNumberHex'] : 'unknown',
-                'notAfter' => (new \DateTimeImmutable())->setTimestamp($parsed['validTo_time_t']),
+                'serial' => \is_string($info['serialNumberHex'] ?? null) ? $info['serialNumberHex'] : 'unknown',
+                'notAfter' => (new \DateTimeImmutable())->setTimestamp($info['validTo_time_t']),
             ];
         }
 

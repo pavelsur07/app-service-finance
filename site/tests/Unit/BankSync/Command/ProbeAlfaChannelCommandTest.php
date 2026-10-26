@@ -57,7 +57,18 @@ final class ProbeAlfaChannelCommandTest extends TestCase
         $tester = $this->runProbe($client, ['--target' => 'production']);
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());
-        self::assertStringContainsString('TLS channel to https://baas.alfabank.ru FAILED', $tester->getDisplay());
+        self::assertStringContainsString('TLS channel to https://baas.alfabank.ru FAILED: bank requires a client certificate', $tester->getDisplay());
+    }
+
+    public function testTransportMessageWithLocalPathsIsNotPrinted(): void
+    {
+        $client = new MockHttpClient(static fn (): MockResponse => new MockResponse('', ['error' => 'unable to set private key file: \'/secret/dir/client.key\' type PEM']));
+
+        $tester = $this->runProbe($client, ['--target' => 'sandbox']);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('client key cannot be loaded', $tester->getDisplay());
+        self::assertStringNotContainsString('/secret/dir', $tester->getDisplay());
     }
 
     public function testNotConfiguredChannelFailsWithoutRequest(): void

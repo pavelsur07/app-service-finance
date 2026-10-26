@@ -102,6 +102,16 @@ final class CheckAlfaCertificatesCommandTest extends TestCase
         self::assertStringContainsString('client #2', $tester->getDisplay());
     }
 
+    public function testTruncatedChainInClientFileFails(): void
+    {
+        $chain = self::$certificates->write('client-truncated.crt', self::$client['certPem']."-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAKHBfpegPj\n");
+
+        $tester = $this->runCheck($chain, self::$caBundle, 40);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('client: file is not readable or not a complete PEM certificate chain', $tester->getDisplay());
+    }
+
     public function testClientSubjectIsNotPrinted(): void
     {
         $tester = $this->runCheck(self::$client['cert'], self::$caBundle, 14);
@@ -126,7 +136,7 @@ final class CheckAlfaCertificatesCommandTest extends TestCase
         $tester = $this->runCheck(self::$client['cert'].'.missing', self::$caBundle, 40);
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());
-        self::assertStringContainsString('client: file is not readable or has no PEM certificates', $tester->getDisplay());
+        self::assertStringContainsString('client: file is not readable or not a complete PEM certificate chain', $tester->getDisplay());
         self::assertCount(1, $this->errors());
     }
 

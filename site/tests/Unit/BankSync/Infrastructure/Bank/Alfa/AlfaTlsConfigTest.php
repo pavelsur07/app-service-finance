@@ -89,7 +89,11 @@ final class AlfaTlsConfigTest extends TestCase
         yield 'certificate not set' => [static fn (): array => ['', self::$client['key'], self::PASSPHRASE], 'ALFA_TLS_CERT_PATH is not set'];
         yield 'key not set' => [static fn (): array => [self::$client['cert'], ' ', self::PASSPHRASE], 'ALFA_TLS_KEY_PATH is not set'];
         yield 'certificate file missing' => [static fn (): array => [self::$client['cert'].'.missing', self::$client['key'], self::PASSPHRASE], 'file from ALFA_TLS_CERT_PATH is not readable'];
-        yield 'certificate file is a key' => [static fn (): array => [self::$other['key'], self::$client['key'], self::PASSPHRASE], 'is not a PEM certificate'];
+        yield 'certificate file is a key' => [static fn (): array => [self::$other['key'], self::$client['key'], self::PASSPHRASE], 'is not a complete PEM certificate chain'];
+        yield 'certificate path is a directory' => [static fn (): array => [\dirname(self::$client['cert']), self::$client['key'], self::PASSPHRASE], 'file from ALFA_TLS_CERT_PATH is not readable'];
+        yield 'chain with truncated intermediate' => [static fn (): array => [self::$certificates->write('truncated.crt', self::$client['certPem']."-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAKHBfpegPj\n"), self::$client['key'], self::PASSPHRASE], 'is not a complete PEM certificate chain'];
+        yield 'chain with malformed intermediate' => [static fn (): array => [self::$certificates->write('malformed.crt', self::$client['certPem']."-----BEGIN CERTIFICATE-----\nbm90IGEgY2VydA==\n-----END CERTIFICATE-----\n"), self::$client['key'], self::PASSPHRASE], 'is not a complete PEM certificate chain'];
+        yield 'key path is a directory' => [static fn (): array => [self::$client['cert'], \dirname(self::$client['key']), self::PASSPHRASE], 'file from ALFA_TLS_KEY_PATH is not readable'];
         yield 'key file missing' => [static fn (): array => [self::$client['cert'], self::$client['key'].'.missing', self::PASSPHRASE], 'file from ALFA_TLS_KEY_PATH is not readable'];
         yield 'wrong passphrase' => [static fn (): array => [self::$client['cert'], self::$client['key'], 'wrong-passphrase'], 'check ALFA_TLS_KEY_PASSPHRASE'];
         yield 'key of another certificate' => [static fn (): array => [self::$client['cert'], self::$other['key'], ''], 'does not match the certificate'];

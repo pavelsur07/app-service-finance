@@ -26,6 +26,20 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final class ProbeAlfaChannelCommand extends Command
 {
     private const TIMEOUT_SECONDS = 15;
+    /** Признак в сообщении curl → текст для оператора; порядок важен. */
+    private const FAILURE_CATEGORIES = [
+        'certificate required' => 'bank requires a client certificate (none was sent)',
+        'bad certificate' => 'bank rejected the client certificate',
+        'unknown ca' => 'bank does not trust the client certificate issuer',
+        'certificate expired' => 'certificate expired',
+        'verify result' => 'bank server certificate is not trusted by the CA bundle',
+        'unable to set private key' => 'client key cannot be loaded',
+        'could not load pem client certificate' => 'client certificate cannot be loaded',
+        'handshake failure' => 'TLS handshake failure (client certificate missing or rejected)',
+        'could not resolve' => 'DNS resolution failed',
+        'timed out' => 'connection timed out',
+        'connection refused' => 'connection refused',
+    ];
     private const BASE_URLS = [
         'sandbox' => BankConnectionFormData::SANDBOX_URL,
         'production' => BankConnectionFormData::PRODUCTION_URL,
@@ -69,7 +83,8 @@ final class ProbeAlfaChannelCommand extends Command
             $statusCode = $response->getStatusCode();
             $traceId = $response->getHeaders(false)['x-traceid'][0] ?? 'none';
         } catch (TransportExceptionInterface $exception) {
-            $output->writeln(sprintf('<error>TLS channel to %s FAILED: %s</error>', $baseUrl, $exception->getMessage()));
+            // Не исходный текст curl: в его диагностике загрузки сертификата бывают пути к файлам.
+            $output->writeln(sprintf('<error>TLS channel to %s FAILED: %s (%s)</error>', $baseUrl, $this->failureCategory($exception), $exception::class));
 
             return Command::FAILURE;
         }
@@ -77,5 +92,17 @@ final class ProbeAlfaChannelCommand extends Command
         $output->writeln(sprintf('TLS channel to %s OK: bank answered HTTP %d, X-TraceId %s.', $baseUrl, $statusCode, $traceId));
 
         return Command::SUCCESS;
+    }
+
+    private function failureCategory(TransportExceptionInterface $exception): string
+    {
+        $message = strtolower($exception->getMessage());
+        foreach (self::FAILURE_CATEGORIES as $marker => $category) {
+            if (str_contains($message, $marker)) {
+                return $category;
+            }
+        }
+
+        return 'transport error';
     }
 }

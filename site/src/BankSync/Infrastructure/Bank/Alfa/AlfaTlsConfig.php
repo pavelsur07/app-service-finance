@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\BankSync\Infrastructure\Bank\Alfa;
 
 use App\BankSync\Exception\BankChannelNotConfiguredException;
+use App\BankSync\Infrastructure\Security\PemCertificates;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -72,8 +73,8 @@ final readonly class AlfaTlsConfig
     {
         $certificate = $this->readCertificate();
         $this->assertKeyMatches($certificate);
-        if (!is_readable($this->caBundlePath)) {
-            throw new BankChannelNotConfiguredException(self::BANK_CODE, 'CA bundle config/bank_sync/alfa/ca-bundle.pem is not readable');
+        if (null === PemCertificates::parse(PemCertificates::readFile($this->caBundlePath) ?? '')) {
+            throw new BankChannelNotConfiguredException(self::BANK_CODE, 'CA bundle config/bank_sync/alfa/ca-bundle.pem is not readable or broken');
         }
 
         $options = [
@@ -101,23 +102,24 @@ final readonly class AlfaTlsConfig
         if ('' === trim($this->keyPath)) {
             throw new BankChannelNotConfiguredException(self::BANK_CODE, self::KEY_PATH_ENV.' is not set');
         }
-        $pem = is_readable($this->certPath) ? file_get_contents($this->certPath) : false;
-        if (false === $pem) {
+        $pem = PemCertificates::readFile($this->certPath);
+        if (null === $pem) {
             throw new BankChannelNotConfiguredException(self::BANK_CODE, 'file from '.self::CERT_PATH_ENV.' is not readable');
         }
-        // @ — openssl пишет warning о неразобранных данных; ответ — false, он и проверяется.
-        $certificate = @openssl_x509_read($pem);
-        if (false === $certificate) {
-            throw new BankChannelNotConfiguredException(self::BANK_CODE, 'file from '.self::CERT_PATH_ENV.' is not a PEM certificate');
+        // Цепочка проверяется целиком: оборванный промежуточный дал бы на запросе ошибку
+        // транспорта, которую воркер ретраил бы как недоступность банка.
+        $certificates = PemCertificates::parse($pem);
+        if (null === $certificates) {
+            throw new BankChannelNotConfiguredException(self::BANK_CODE, 'file from '.self::CERT_PATH_ENV.' is not a complete PEM certificate chain');
         }
 
-        return $certificate;
+        return $certificates[0];
     }
 
     private function assertKeyMatches(\OpenSSLCertificate $certificate): void
     {
-        $pem = is_readable($this->keyPath) ? file_get_contents($this->keyPath) : false;
-        if (false === $pem) {
+        $pem = PemCertificates::readFile($this->keyPath);
+        if (null === $pem) {
             throw new BankChannelNotConfiguredException(self::BANK_CODE, 'file from '.self::KEY_PATH_ENV.' is not readable');
         }
         $key = @openssl_pkey_get_private($pem, $this->keyPassphrase);
