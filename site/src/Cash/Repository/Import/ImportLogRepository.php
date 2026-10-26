@@ -10,6 +10,7 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
+use Webmozart\Assert\Assert;
 
 /**
  * @extends ServiceEntityRepository<ImportLog>
@@ -19,6 +20,20 @@ class ImportLogRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, ImportLog::class);
+    }
+
+    public function findOneByIdAndCompanyId(string $id, string $companyId): ?ImportLog
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('l')
+            ->andWhere('l.id = :id')
+            ->andWhere('IDENTITY(l.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

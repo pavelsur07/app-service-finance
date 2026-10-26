@@ -92,12 +92,17 @@ final readonly class AlfaStatementMapper
         }
 
         $currency = $this->nonEmptyString($amountBlock['currencyName'] ?? null);
+        if (null !== $currency) {
+            $currency = strtoupper($currency);
+            // RUR — код рубля до деноминации 1998 года, банки иногда присылают его; счёт в ДДС — RUB.
+            $currency = 'RUR' === $currency ? 'RUB' : $currency;
+        }
 
         return new BankStatementLineDTO(
             externalId: $externalId,
             direction: $direction,
             amount: $amount,
-            currency: null !== $currency ? strtoupper($currency) : null,
+            currency: $currency,
             occurredAt: $occurredAt,
             description: $this->nonEmptyString($transaction['paymentPurpose'] ?? null),
             transactionId: $this->nonEmptyString($transaction['transactionId'] ?? null),

@@ -59,7 +59,7 @@ final class AlfaStatementMapperTest extends TestCase
                 $this->transaction([
                     'uuid' => 'uuid-2',
                     'direction' => 'DEBIT',
-                    'amount' => ['amount' => '99.9'],
+                    'amount' => ['amount' => '99.9', 'currencyName' => ''],
                     'paymentPurpose' => '   ',
                 ]),
             ],
@@ -75,7 +75,7 @@ final class AlfaStatementMapperTest extends TestCase
         self::assertSame('1211206MOCO#DS0000017', $inflow->transactionId);
         self::assertSame(BankDirection::CREDIT, $inflow->direction);
         self::assertSame('1500.50', $inflow->amount);
-        self::assertSame('RUR', $inflow->currency);
+        self::assertSame('RUB', $inflow->currency, 'RUR — старый код рубля');
         self::assertSame('Оплата по счёту 15', $inflow->description);
         self::assertSame('2026-10-01 10:15:00', $inflow->occurredAt->format('Y-m-d H:i:s'));
 
