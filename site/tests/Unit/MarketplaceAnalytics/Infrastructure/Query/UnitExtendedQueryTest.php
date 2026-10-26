@@ -64,6 +64,10 @@ final class UnitExtendedQueryTest extends TestCase
     private ?array $lastAdSpendCall = null;
     /** @var array{string, \DateTimeImmutable, \DateTimeImmutable, ?string}|null */
     private ?array $lastTotalAdSpendCall = null;
+    /** @var array<string, string> listingId => себестоимость по истории цен */
+    private array $historyCostByListing = [];
+    /** @var array{array<array-key, mixed>, \DateTimeImmutable}|null */
+    private ?array $lastHistoryCostCall = null;
 
     protected function setUp(): void
     {
@@ -150,6 +154,12 @@ final class UnitExtendedQueryTest extends TestCase
                 $this->lastTotalAdSpendCall = [$companyId, $from, $to, $marketplace];
 
                 return $this->totalAdSpend;
+            });
+        $this->marketplaceFacade->method('getCostPricesForListingsOnDate')
+            ->willReturnCallback(function (string $companyId, array $listingIds, \DateTimeImmutable $date): array {
+                $this->lastHistoryCostCall = [$listingIds, $date];
+
+                return array_intersect_key($this->historyCostByListing, array_flip($listingIds));
             });
     }
 
@@ -689,6 +699,69 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(0.0, $row['stockCapitalRub']);
         self::assertSame(0.0, $summary['stockCapitalRub']);
         self::assertSame(0, $summary['stockCapitalUnknownCount']);
+    }
+
+    public function testStockCapitalUsesCostHistoryWhenNoSoldUnitHasCost(): void
+    {
+        // Регрессия 26.10.2026 (К43): остаток 775 шт., продаж в периоде нет — капитал
+        // был «—», хотя себестоимость листинга задана в истории цен.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-sold', 'Проданный', 'SKU-SOLD', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-no-cost', 'Без себестоимости в продажах', 'SKU-NC', 'ozon', '100.00', 1, '0.00', 0),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-sold' => 2.0, 'l-no-cost' => 4.0, 'l-dead-stock' => 775.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-dead-stock', 'Грязь в баллончике', 'SKU-K43', 'ozon', 'К43'),
+        ]);
+        $this->historyCostByListing = ['l-sold' => '999.00', 'l-no-cost' => '80.00', 'l-dead-stock' => '201.00'];
+        $this->stubTags(['l-sold' => ['t'], 'l-no-cost' => ['t'], 'l-dead-stock' => ['t']]);
+
+        $result = $this->execute(withTagSummary: true);
+        $deadStock = $this->findRow($result['items'], 'l-dead-stock');
+        $noCost = $this->findRow($result['items'], 'l-no-cost');
+        $sold = $this->findRow($result['items'], 'l-sold');
+        $summary = $this->findTagSummaryRow($result['tagSummary'], 't');
+
+        self::assertNotNull($deadStock);
+        self::assertNotNull($noCost);
+        self::assertNotNull($sold);
+        self::assertNotNull($summary);
+        self::assertSame(155775.0, $deadStock['stockCapitalRub']);
+        self::assertSame(320.0, $noCost['stockCapitalRub']);
+        // Себестоимость единицы проданного не подменяется историей: продаж с ценой не было.
+        self::assertNull($deadStock['costPriceUnit']);
+        self::assertNull($noCost['costPriceUnit']);
+        // Известная по продажам себестоимость (300 / 5 = 60) главнее истории.
+        self::assertSame(120.0, $sold['stockCapitalRub']);
+        self::assertSame(156215.0, $summary['stockCapitalRub']);
+        self::assertSame(0, $summary['stockCapitalUnknownCount']);
+
+        // История запрашивается одним вызовом, только для листингов без цены из продаж,
+        // на последний день периода.
+        self::assertNotNull($this->lastHistoryCostCall);
+        [$requestedIds, $date] = $this->lastHistoryCostCall;
+        sort($requestedIds);
+        self::assertSame(['l-dead-stock', 'l-no-cost'], $requestedIds);
+        self::assertSame(self::PERIOD_TO, $date->format('Y-m-d'));
+    }
+
+    public function testStockCapitalStaysUnknownWithoutCostHistory(): void
+    {
+        $this->stubSales([]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->stubStockQty(['l-no-history' => 79.0]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-no-history', 'Без истории цен', 'SKU-NH', 'ozon'),
+        ]);
+
+        $row = $this->findRow($this->execute()['items'], 'l-no-history');
+
+        self::assertNotNull($row);
+        self::assertSame(79.0, $row['stockQty']);
+        self::assertNull($row['stockCapitalRub']);
     }
 
     public function testEmptyEverythingProducesZeroTotals(): void

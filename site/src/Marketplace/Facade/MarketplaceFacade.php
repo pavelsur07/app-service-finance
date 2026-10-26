@@ -21,6 +21,7 @@ use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
+use App\Marketplace\Inventory\Infrastructure\Query\CostPriceByListingsOnDateQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
@@ -52,6 +53,7 @@ final readonly class MarketplaceFacade
         private RefreshWbListingCatalogAction $refreshWbListingCatalogAction,
         private RecordConnectionAuthResultAction $recordConnectionAuthResultAction,
         private BrokenConnectionsQuery $brokenConnectionsQuery,
+        private CostPriceByListingsOnDateQuery $costPriceByListingsOnDateQuery,
     ) {
     }
 
@@ -427,6 +429,28 @@ final readonly class MarketplaceFacade
         $result = $this->costPriceResolver->resolve($companyId, $listingId, $date);
 
         return 0 === bccomp($result, '0.00', 2) ? null : $result;
+    }
+
+    /**
+     * Себестоимость набора листингов на дату одним запросом, по правилам
+     * getCostPriceForListing(): листинг без записей или с нулевой ценой в результат
+     * не попадает.
+     *
+     * @param list<string> $listingIds
+     *
+     * @return array<string, string> listingId => decimal-string
+     */
+    public function getCostPricesForListingsOnDate(
+        string $companyId,
+        array $listingIds,
+        \DateTimeImmutable $date,
+    ): array {
+        $prices = $this->costPriceByListingsOnDateQuery->execute($companyId, $listingIds, $date);
+
+        return array_filter(
+            $prices,
+            static fn (string $price): bool => 0 !== bccomp($price, '0.00', 2),
+        );
     }
 
     /**
