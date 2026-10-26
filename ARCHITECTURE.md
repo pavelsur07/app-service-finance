@@ -11,7 +11,8 @@
 
 | Модуль | Назначение | companyId паттерн |
 |---|---|---|
-| `Cash` | Денежные счета, транзакции, банковский импорт, план платежей | `Company $company` (legacy) |
+| `Cash` | Денежные счета, транзакции, импорт выписок (файл, 1С, контракт для банков), план платежей | `Company $company` (legacy) |
+| `BankSync` | Подключения к API банков (Альфа), загрузка выписки в ДДС через `CashFacade` | `string $companyId` ✅ |
 | `Marketplace` | WB/Ozon: продажи, возвраты, расходы, закрытие месяца | смешанный |
 | `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (`Product` ещё на `Company $company`) |
 | `Deals` | Сделки | `Company $company` (legacy) |
@@ -1776,13 +1777,26 @@ dry-run; каждая компания — своя транзакция; ост
 - `CashFileImportService` считает дубль по количеству: каждая транзакция, бывшая в БД до импорта, закрывает не больше одной строки файла. Импорт — два прохода по файлу: первый считает строки по ключу (`dedupe_hash` — дата, сумма, назначение — и номер документа) и для каждого хеша распределяет совпадения с `CashTransactionRepository::countActiveByCompanyDedupeGroupedByDocNumber()`: строки с номером — сначала тот же номер, оставшиеся — транзакции без номера; строки без номера — всё, что осталось (максимум совпадений, пустой номер совпадает с любым); второй проход пишет строки сверх квоты. Результат не зависит от порядка строк, нарезки на пачки (200 строк) и закоммиченных пачек самого импорта: повтор файла не создаёт ничего, прерванный импорт дописывает недостающее.
 - `CashFileImportHandler` — фазы захват (queued → processing, свой commit) → импорт пачками → финализация под `Infrastructure\Lock\CashImportAccountLock` — сессионным `pg_try_advisory_lock(hashtext('cash_import_account'), hashtext(company:account))`, снимается в `finally`. Занято — задание не трогается, `RecoverableMessageHandlingException` с `retryDelay` 60 с (Messenger повторяет recoverable без лимита `max_retries`). Задание в `processing` при свободной блокировке — воркер умер (сессионная блокировка снялась с его соединением): импорт продолжается, затем `recalculateCommittedRows()` пересчитывает остатки по всем строкам задания с первого старта, `warning`. `done`/`failed` — пропуск без блокировки.
 - Форма создания транзакции ДДС (`cash_transaction_new`) выдаёт `CashTransactionDTO::$idempotencyKey` (UUIDv7, скрытое поле, опция формы `idempotency_key`); `AddCashTransactionAction` использует его как ID: транзакция компании с этим ID уже есть — возвращается она (событие `CashTransactionsChanged` повторяется). Транзакция, совпадение с плановым платежом и пересчёт остатков — один `wrapInTransaction()`, событие — после commit. Гонку одновременных отправок останавливает PK: проигравший ловит `UniqueConstraintViolationException`, проверяет DBAL-запросом, что ключ принадлежит той же компании, и возвращает транзакцию через свежий EntityManager; ключ чужой компании — исключение.
-- Коммитами импортов владеет точка входа: `ClientBank1CImportService::import()`, `CashFileImportService::import()` и `BankImportService::importCompany()` получают замыкание коммита (строка 1С, пачка файла, день банка и журнал) и сами `flush()` не вызывают; `ImportLogger::finish()` только помечает журнал. Коммитят `ImportBank1CStatementAction` (журнал 1С сохраняется и при отказе, если EM открыт), `CashFileImportHandler` и `BankImportHandler`.
-- Блокировка счёта `CashImportAccountLock` общая для всех импортов выписок: файловый (выше), `ClientBank1CImportService` (синхронный импорт 1С; занято — `CashImportAccountBusyException`, контроллер — flash и возврат к предпросмотру, предпросмотр блокировку не берёт) и `BankImportService` (банк по API; занятый счёт пропускается с `warning` и догружается следующим прогоном с курсора).
+- Коммитами импортов владеет точка входа: `ClientBank1CImportService::import()` и `CashFileImportService::import()` получают замыкание коммита (строка 1С, пачка файла) и сами `flush()` не вызывают; `ImportLogger::finish()` только помечает журнал. Коммитят `ImportBank1CStatementAction` (журнал 1С сохраняется и при отказе, если EM открыт), `CashFileImportHandler`; банковскую выписку — `BankSync\MessageHandler\SyncBankConnectionHandler` (раздел «BankSync → Cash: загрузка выписки»).
+- Блокировка счёта `CashImportAccountLock` общая для всех импортов выписок: файловый (выше), `ClientBank1CImportService` (синхронный импорт 1С; занято — `CashImportAccountBusyException`, контроллер — flash и возврат к предпросмотру, предпросмотр блокировку не берёт) и загрузка выписки банка по API (`CashFacade::tryLockAccountForStatementImport()`; занятый счёт пропускается с `warning` и догружается следующим прогоном с курсора).
 - Импорт 1С дедуплицирует по `external_id` с номером вхождения в файле (вне правила «по количеству»): одинаковые платёжные ордера одного файла — разные строки (ФНС взыскивает одним решением несколькими ордерами).
-- `BankImportService` помнит `external_id` строк, записанных прогоном до `flush()` дня: тот же `uuid` на следующей странице дня пропускается, а не роняет `flush()` на `uniq_cashflow_import`. Сбой посреди дня отсоединяет незаписанные строки дня и курсор до снятия блокировки счёта: коммит журнала импорта их не сохранит, день повторится с курсора.
 - Ремонт: `app:cash:close-lost-import-jobs --company=… [--older-than-hours=24]` закрывает в `failed` задания `queued` старше порога, чьего ID нет ни в `messenger_messages` (failed-транспорт), ни в Redis-очереди `async_sync` (stream и отложенные повторы, `Infrastructure\Messenger\RedisImportQueueProbe`: `__queue` раньше stream, два прохода, `dbindex`/stream как у Symfony; Redis недоступен — отказ). Закрытие обратимо: `CashFileImportJob::failAsLost()` ставит маркер, и доставленное позже сообщение (воркер держал его между `ZPOPMIN` и `XADD`) запускает задание — `CashFileImportHandler` принимает `isClosedAsLost()` как `queued`); `app:cash:recalculate-allocated-amounts --company=…` пересчитывает `allocated_amount`, разошедшийся с суммой операций живых документов, под `FOR UPDATE` строки транзакции. Обе по умолчанию dry-run; `--execute` требует `--expected-count` из dry-run, транзакция — в команде.
-- `app:cash:close-open-import-logs --company=… [--older-than-hours=24]` проставляет `finished_at` журналам импорта (`import_log`), открытым дольше порога, без задания в `queued`/`processing` и без lease журнала (`Infrastructure\Lock\CashImportLogLease` — сессионная advisory-блокировка по ID журнала, её держат `ImportBank1CStatementAction` и `BankImportService::importCompany()` до конца импорта): время завершения задания (МСК → UTC, не раньше старта), иначе время старта; счётчики не меняются. Dry-run по умолчанию, `--execute` с `--expected-count`, кандидаты под `FOR UPDATE`. `started_at` журнала — UTC (`ImportLogger`), порог считается в UTC.
+- `app:cash:close-open-import-logs --company=… [--older-than-hours=24]` проставляет `finished_at` журналам импорта (`import_log`), открытым дольше порога, без задания в `queued`/`processing` и без lease журнала (`Infrastructure\Lock\CashImportLogLease` — сессионная advisory-блокировка по ID журнала, её держат `ImportBank1CStatementAction` и загрузка выписки банка от `CashFacade::startStatementImportLog()` до `finishStatementImportLog()`/`abandonStatementImportLog()`): время завершения задания (МСК → UTC, не раньше старта), иначе время старта; счётчики не меняются. Dry-run по умолчанию, `--execute` с `--expected-count`, кандидаты под `FOR UPDATE`. `started_at` журнала — UTC (`ImportLogger`), порог считается в UTC.
 - Ночной гейт `app:cash:integrity-check` (cron 07:43, read-only): dry-run трёх ремонтов по компаниям из `Infrastructure\Query\CashIntegrityCompaniesQuery` (задания `queued` старше 24 ч; живые транзакции ДДС; журналы без `finished_at` старше 24 ч). Находки — exit 1 и один `error` «Cash integrity check failed» (счётчики по компаниям); Redis очереди недоступен — отдельный `error` «Cash integrity check unavailable».
+
+### BankSync → Cash: загрузка выписки
+
+- `BankSync` хранит подключения (`bank_sync_connection`: `company_id`, `bank_code`, `base_url`, учётные данные только шифротекстом `credentials_encrypted` + `credentials_key_version`; внутри — JSON `{type, token}`, `Infrastructure\Security\BankCredentialsCodec`) и курсоры счетов (`bank_sync_import_cursor`, unique `(company_id, bank_code, account_number)`, последний загруженный день). FK на `companies` с `ON DELETE CASCADE` — только в миграции.
+- Адаптер банка — `Domain\BankProviderInterface` (тег `bank_sync.provider`, выбор по `BankCode` в `Infrastructure\Bank\BankProviderRegistry`): `listAccounts()` и `fetchStatementDay()` (все страницы дня) отдают DTO `Application\DTO\*`; формат банка дальше адаптера не выходит. Альфа: `GET {base}/api/jp/open-banking/v1.3/accounts`, `GET {base}/api/jp/v1/statement/transactions` (`accountNumber`, `statementDate`, `page`; следующая страница — `_links` rel `next`), ключ операции — `uuid`; `RUR` → `RUB`. В лог запроса — метод, путь без query, статус, время, `X-TraceId`; тело и номер счёта — нет. 408/429/5xx/сеть — `BankApiUnavailableException`, прочие отказы и нечитаемый ответ — `BankApiRequestFailedException`.
+- Транзакциями владеет `MessageHandler\SyncBankConnectionHandler` (`SyncBankConnectionMessage` → `async_sync`; ставят `bank-sync:enqueue --bank=alfa` и кнопка «Запустить импорт сейчас»):
+  1. `CashFacade::startStatementImportLog()` → `flush()` (журнал `bank:alfa` и его lease);
+  2. счета банка (HTTP) → `findStatementImportAccount()` по цифрам номера → `tryLockAccountForStatementImport()` (сессионная `CashImportAccountLock`, общая с файлом и 1С; занято — пропуск с `warning`);
+  3. каждый день от «курсор − 1» (первый раз — 7 дней назад) по сегодня: страницы дня по HTTP вне транзакции → `wrapInTransaction()`: `CashFacade::importBankStatementDay()` + сдвиг курсора;
+  4. `finishStatementImportLog()` → `flush()`. При сбое журнал закрывается с ошибкой, если EM открыт, иначе только снимается lease (`abandonStatementImportLog()`, журнал закроет `app:cash:close-open-import-logs`).
+- `importBankStatementDay()` (`Cash\Application\ImportBankStatementDayAction`) работает только внутри транзакции вызывающего (иначе `StatementImportOutsideTransactionException`): строки → `CashTransaction` (UUID v7, `import_source` = код банка, `external_id` = ключ операции, системный проект и ЦФО), дубли — одним запросом по пачке, включая удалённые пользователем строки (их держит `uniq_cashflow_import`), и внутри дня; строка не в валюте счёта — ошибка в результате, не создаётся. Затем `flush()` и пересчёт `money_account_daily_balance` от первого дня строк по сегодня.
+- Порядок блокировок: блокировка импорта счёта (сессионная) → транзакция дня → блокировка пересчёта остатков счёта.
+- Повторы: временный сбой банка — исходное исключение, повтор по `retry_strategy` транспорта (день повторится с курсора); отказ банка, нет подключения, неизвестный банк, нерасшифровываемые учётные данные — `UnrecoverableMessageHandlingException` и `error`. Номер счёта и строки выписки в `warning`/`error` не пишутся.
+- Cash не зависит от BankSync (`ModuleBoundaryRules::test_cash_does_not_depend_on_bank_sync`). UI — `/bank-connections/` (маршруты `bank_sync_connection_*`, модуль доступа FINANCE, запись — `FINANCE_WRITE`).
 
 ### Cash: плановые платежи — сопоставление и правила повтора
 
@@ -1808,6 +1822,21 @@ dry-run; каждая компания — своя транзакция; ост
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
+// Загрузка банковской выписки (вызывает BankSync; раздел «BankSync → Cash: загрузка выписки»)
+// Чтение: денежный счёт компании по номеру банковского счёта (только цифры) — id и валюта
+findStatementImportAccount(string $companyId, string $accountNumber): ?StatementImportAccount
+// Сессионная блокировка импорта в счёт (общая с файлом и 1С); снимает release…
+tryLockAccountForStatementImport(string $companyId, string $moneyAccountId): bool
+releaseAccountStatementImportLock(string $companyId, string $moneyAccountId): void
+// Журнал импорта + lease; коммитит вызывающий
+startStatementImportLog(string $companyId, string $source): string
+// Счётчики и итог в журнал, finished_at, снятие lease; коммитит вызывающий
+finishStatementImportLog(string $companyId, string $importLogId, StatementImportSummary $summary): void
+// Только снятие lease, когда EM закрыт сбоем
+abandonStatementImportLog(string $importLogId): void
+// Строки дня → ДДС и пересчёт остатков; только внутри транзакции вызывающего, коммитит он
+importBankStatementDay(string $companyId, string $moneyAccountId, string $source, BankStatementDayInput $day): BankStatementDayResult
+
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
 
@@ -4210,6 +4239,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.76 | 2026-10-26 | BankSync: банковская интеграция вынесена из Cash — модуль `BankSync` (подключения с шифрованным токеном, адаптер Альфы с путём выписки `/api/jp/v1/…`, `SyncBankConnectionHandler`, `bank-sync:enqueue`); `CashFacade` — методы загрузки выписки, импорт дня пересчитывает остатки; таблицы `cash_bank_*` заменены `bank_sync_*`; правило границы Cash ↛ BankSync |
 | 2.75 | 2026-10-24 | Marketplace: возвраты и снимки акций, поставок, кластеров Ozon — всем кабинетам с ключом seller (`ozon_fetcher.returns_companies`, `ozon_fetcher.reference_companies`: `['*']`) |
 | 2.74 | 2026-10-24 | Marketplace / ServiceGateway: ресурсы `ozon.actions`, `ozon.supplies`, `ozon.clusters` (параметр `ozon_fetcher.reference_companies`), строки карты «Акции», «Поставки в пути», «Кластеры и склады» |
 | 2.73 | 2026-10-24 | Marketplace / ServiceGateway: ресурс возвратов `ozon.returns` (параметр `ozon_fetcher.returns_companies`), строка карты покрытия «Возвраты» |

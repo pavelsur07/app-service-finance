@@ -16,6 +16,7 @@ twig:
         '%kernel.project_dir%/templates/inventory': Inventory
         '%kernel.project_dir%/templates/ingestion': Ingestion
         '%kernel.project_dir%/templates/partials': Partials
+        '%kernel.project_dir%/templates/bank_sync': BankSync
 
 when@test:
     twig:

@@ -176,5 +176,6 @@ services:
         arguments:
             namespacePrefixes:
                 - 'App\Cash\'
+                - 'App\BankSync\'
         tags:
             - phpstan.rules.rule

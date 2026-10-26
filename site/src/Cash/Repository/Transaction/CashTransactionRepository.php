@@ -18,6 +18,7 @@ use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
+use Webmozart\Assert\Assert;
 
 class CashTransactionRepository extends ServiceEntityRepository
 {
@@ -249,6 +250,41 @@ SQL,
     public function findOneByImport(string $companyId, string $source, string $externalId): ?CashTransaction
     {
         return $this->findOneByCompanyImportSourceExternalId($companyId, $source, $externalId);
+    }
+
+    /**
+     * Какие из внешних идентификаторов источника уже загружены, включая удалённые
+     * пользователем строки: уникальный индекс `uniq_cashflow_import` удалённые тоже держит.
+     *
+     * @param list<string> $externalIds
+     *
+     * @return list<string>
+     */
+    public function findImportedExternalIds(string $companyId, string $importSource, array $externalIds): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        $found = [];
+        foreach (array_chunk(array_values(array_unique($externalIds)), 1000) as $chunk) {
+            $rows = $this->createQueryBuilder('t')
+                ->select('t.externalId')
+                ->andWhere('IDENTITY(t.company) = :companyId')
+                ->andWhere('t.importSource = :importSource')
+                ->andWhere('t.externalId IN (:externalIds)')
+                ->setParameter('companyId', $companyId)
+                ->setParameter('importSource', $importSource)
+                ->setParameter('externalIds', $chunk)
+                ->getQuery()
+                ->getSingleColumnResult();
+            foreach ($rows as $externalId) {
+                $found[] = (string) $externalId;
+            }
+        }
+
+        return $found;
     }
 
     public function findAnyByCompanyImportSourceExternalId(string $companyId, string $importSource, string $externalId): ?CashTransaction

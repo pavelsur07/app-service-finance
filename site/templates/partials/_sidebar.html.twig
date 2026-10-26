@@ -260,7 +260,7 @@
                 current_route starts with 'ozon_'
                 or current_route starts with 'wildberries_'
                 or current_route starts with 'telegram_integration_'
-                or current_route starts with 'cash_bank_connection_'
+                or current_route starts with 'bank_sync_connection_'
                 or current_route starts with 'integrations_marketplace_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
@@ -278,8 +278,8 @@
                             </a>
                             {% endif %}
                             {% if is_granted('module.finance.read') %}
-                            {% set bank_connections_active = current_route starts with 'cash_bank_connection_' %}
-                            <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
+                            {% set bank_connections_active = current_route starts with 'bank_sync_connection_' %}
+                            <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('bank_sync_connection_index') }}">
                                 <span>Банки / Подключения</span>
                             </a>
                             {% endif %}

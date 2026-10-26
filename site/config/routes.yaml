@@ -71,6 +71,12 @@ moysklad_controllers:
         namespace: App\MoySklad\Controller
     type: attribute
 
+bank_sync_controllers:
+    resource:
+        path: ../src/BankSync/Controller/
+        namespace: App\BankSync\Controller
+    type: attribute
+
 analytics_controllers:
     resource:
         path: ../src/Analytics/Controller/

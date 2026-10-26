@@ -269,6 +269,23 @@ final class ModuleBoundaryRules
     }
 
     /**
+     * Банковская интеграция вынесена из Cash в BankSync (Stage 1 `docs/tasks/bank-sync`):
+     * BankSync загружает выписку через `CashFacade`, а Cash о банках не знает. Обратная
+     * ссылка вернула бы круговую зависимость и протокол банка в ДДС.
+     *
+     * На момент добавления в `src/Cash/` ноль ссылок на `App\BankSync`.
+     */
+    public function test_cash_does_not_depend_on_bank_sync(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\Cash'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(Selector::inNamespace('App\BankSync'))
+            ->because('Cash принимает выписку контрактом CashFacade; банки и их протоколы — в BankSync.');
+    }
+
+    /**
      * Обратное направление: Finance не потребляет сообщения и события Ingestion.
      *
      * Правило выше закрывает путь «Ingestion зовёт Finance», но исторически

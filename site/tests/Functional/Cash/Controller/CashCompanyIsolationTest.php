@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Cash\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Tests\Builders\BankSync\BankConnectionBuilder;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -281,7 +281,10 @@ final class CashCompanyIsolationTest extends WebTestCaseBase
             ->withMoneyAccount($account)
             ->build();
         $profile = new CashFileImportProfile(Uuid::uuid4()->toString(), $company, $prefix.' профиль');
-        $connection = new BankConnection(Uuid::uuid4()->toString(), $company, 'alfa', 'api-key', 'https://bank.test');
+        $connection = BankConnectionBuilder::aConnection()
+            ->withId(Uuid::uuid7()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->build();
         $plan = new PaymentPlan(Uuid::uuid4()->toString(), $company, $category, new \DateTimeImmutable('today'), '100.00');
 
         foreach ([$account, $category, $transaction, $profile, $connection, $plan] as $entity) {

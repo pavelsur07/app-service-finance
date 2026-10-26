@@ -6,12 +6,9 @@ namespace App\Tests\Unit\Cash\Application;
 
 use App\Cash\Application\ChangeCashTransactionAutoRuleActivityAction;
 use App\Cash\Application\CreateMoneyFundMovementAction;
-use App\Cash\Application\DeleteBankConnectionAction;
 use App\Cash\Application\DeleteCashflowCategoryAction;
-use App\Cash\Application\SaveBankConnectionAction;
 use App\Cash\Application\SaveMoneyAccountAction;
 use App\Cash\Application\SaveMoneyFundAction;
-use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
@@ -74,24 +71,6 @@ final class PersistenceActionsTest extends TestCase
         ))($movement);
     }
 
-    public function testSaveBankConnectionPersistsAndFlushes(): void
-    {
-        $connection = $this->connection();
-        $this->expectPersistAndFlush($connection);
-
-        (new SaveBankConnectionAction($this->entityManager))($connection);
-    }
-
-    public function testDeleteBankConnectionRemovesAndFlushes(): void
-    {
-        $connection = $this->connection();
-        $this->entityManager->expects(self::never())->method('persist');
-        $this->entityManager->expects(self::once())->method('remove')->with($connection);
-        $this->entityManager->expects(self::once())->method('flush');
-
-        (new DeleteBankConnectionAction($this->entityManager))($connection);
-    }
-
     public function testDeleteCashflowCategoryRemovesAndFlushes(): void
     {
         $category = CashflowCategoryBuilder::aCashflowCategory()->withCompany($this->company())->build();
@@ -149,11 +128,6 @@ final class PersistenceActionsTest extends TestCase
     private function company(): Company
     {
         return CompanyBuilder::aCompany()->withOwner(UserBuilder::aUser()->build())->build();
-    }
-
-    private function connection(): BankConnection
-    {
-        return new BankConnection(Uuid::uuid4()->toString(), $this->company(), 'alfa', 'api-key', 'https://bank.test');
     }
 
     private function rule(): CashTransactionAutoRule

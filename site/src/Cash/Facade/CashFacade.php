@@ -9,6 +9,8 @@ use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\AutoRuleConditionInput;
 use App\Cash\Application\DTO\AutoRuleInput;
+use App\Cash\Application\DTO\BankStatementDayInput;
+use App\Cash\Application\DTO\BankStatementDayResult;
 use App\Cash\Application\DTO\CashCategoryAmount;
 use App\Cash\Application\DTO\CashCategoryTurnover;
 use App\Cash\Application\DTO\CashDailyAmount;
@@ -25,6 +27,9 @@ use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
 use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
 use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Application\DTO\PlannedPaymentSummary;
+use App\Cash\Application\DTO\StatementImportAccount;
+use App\Cash\Application\DTO\StatementImportSummary;
+use App\Cash\Application\ImportBankStatementDayAction;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
@@ -40,15 +45,21 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Exception\StatementImportOutsideTransactionException;
+use App\Cash\Exception\StatementImportTargetNotFoundException;
+use App\Cash\Infrastructure\Lock\CashImportAccountLock;
+use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Infrastructure\Query\CashReportQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
+use App\Cash\Repository\Import\ImportLogRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
+use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Facade\CompanyFacade;
@@ -77,7 +88,103 @@ final readonly class CashFacade
         private CashReportQuery $reportQuery,
         private DailyBalanceRecalculator $dailyBalanceRecalculator,
         private PaymentPlanRepository $paymentPlanRepository,
+        private ImportBankStatementDayAction $importBankStatementDay,
+        private CashImportAccountLock $importAccountLock,
+        private CashImportLogLease $importLogLease,
+        private ImportLogger $importLogger,
+        private ImportLogRepository $importLogRepository,
     ) {
+    }
+
+    /**
+     * Денежный счёт компании по номеру банковского счёта (сравниваются только цифры).
+     */
+    public function findStatementImportAccount(string $companyId, string $accountNumber): ?StatementImportAccount
+    {
+        $account = $this->moneyAccountRepository->findOneByCompanyAndAccountNumber(
+            $this->requireCompany($companyId),
+            $accountNumber,
+        );
+
+        return null === $account
+            ? null
+            : new StatementImportAccount((string) $account->getId(), $account->getCurrency());
+    }
+
+    /**
+     * Сессионная блокировка импорта в счёт — та же, что у файлового импорта и 1С. Держится
+     * до `releaseAccountStatementImportLock()` или обрыва соединения.
+     */
+    public function tryLockAccountForStatementImport(string $companyId, string $moneyAccountId): bool
+    {
+        return $this->importAccountLock->tryAcquire($companyId, $moneyAccountId);
+    }
+
+    public function releaseAccountStatementImportLock(string $companyId, string $moneyAccountId): void
+    {
+        $this->importAccountLock->release($companyId, $moneyAccountId);
+    }
+
+    /**
+     * Открывает журнал импорта и берёт его lease: пока загрузка идёт, ремонт и ночной гейт
+     * не считают журнал брошенным. Коммитит вызывающий; lease снимает
+     * `finishStatementImportLog()` или `abandonStatementImportLog()`.
+     */
+    public function startStatementImportLog(string $companyId, string $source): string
+    {
+        $importLog = $this->importLogger->start($this->requireCompany($companyId), $source, false, null, null);
+        $this->importLogLease->acquire($importLog->getId());
+
+        return $importLog->getId();
+    }
+
+    /**
+     * Счётчики и итог в журнал, `finished_at`, снятие lease. Коммитит вызывающий.
+     */
+    public function finishStatementImportLog(string $companyId, string $importLogId, StatementImportSummary $summary): void
+    {
+        try {
+            $importLog = $this->importLogRepository->findOneByIdAndCompanyId($importLogId, $companyId)
+                ?? throw StatementImportTargetNotFoundException::importLog($importLogId);
+
+            $importLog->setCreatedCount($summary->created);
+            $importLog->setSkippedDuplicates($summary->skippedDuplicates);
+            $importLog->setErrorsCount($summary->errors + (null !== $summary->failure ? 1 : 0));
+            $importLog->setFileName(json_encode(array_filter([
+                'accounts_found' => $summary->accountsFound,
+                'accounts_matched' => $summary->accountsMatched,
+                'transactions_created' => $summary->created,
+                'transactions_skipped_duplicates' => $summary->skippedDuplicates,
+                'error' => $summary->failure,
+            ], static fn (mixed $value): bool => null !== $value), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES));
+            $this->importLogger->finish($importLog);
+        } finally {
+            $this->importLogLease->release($importLogId);
+        }
+    }
+
+    /**
+     * Только снимает lease журнала, когда записать итог нельзя (EntityManager закрыт сбоем).
+     */
+    public function abandonStatementImportLog(string $importLogId): void
+    {
+        $this->importLogLease->release($importLogId);
+    }
+
+    /**
+     * Строки выписки за день → операции ДДС, пересчёт остатков счёта. Только внутри
+     * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
+     *
+     * @throws StatementImportOutsideTransactionException транзакция не открыта
+     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
+     */
+    public function importBankStatementDay(
+        string $companyId,
+        string $moneyAccountId,
+        string $source,
+        BankStatementDayInput $day,
+    ): BankStatementDayResult {
+        return ($this->importBankStatementDay)($companyId, $moneyAccountId, $source, $day);
     }
 
     public function createTransfer(CreateCashTransferCommand $command): CreateCashTransferResult
