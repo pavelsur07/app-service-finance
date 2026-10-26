@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Security\Service;
 
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
 use App\Shared\Security\Contract\SecretKeyProviderInterface;
+use App\Shared\Security\Exception\EncryptionException;
 use App\Shared\Security\Service\SecretRotationService;
 use App\Shared\Security\ValueObject\EncryptedPayload;
 use PHPUnit\Framework\TestCase;
@@ -82,5 +83,39 @@ final class SecretRotationServiceTest extends TestCase
 
         self::assertFalse($service->needsRotation($payload));
         self::assertSame($payload, $service->rotate($payload));
+    }
+
+    public function testRotateRejectsCiphertextThatDoesNotDecryptBack(): void
+    {
+        $payload = new EncryptedPayload('legacy', 'v1', new \DateTimeImmutable('-1 day'));
+
+        // Новый шифротекст расшифровывается не в исходное значение — писать его нельзя.
+        $encryptionService = new class implements FieldEncryptionServiceInterface {
+            public function encrypt(string $plaintext): EncryptedPayload
+            {
+                return new EncryptedPayload('corrupted', 'v2', new \DateTimeImmutable());
+            }
+
+            public function decrypt(EncryptedPayload $payload): string
+            {
+                return 'legacy' === $payload->ciphertext() ? 'plain' : 'other';
+            }
+        };
+
+        $provider = new class implements SecretKeyProviderInterface {
+            public function getActiveKeyVersion(): string
+            {
+                return 'v2';
+            }
+
+            public function getKeyByVersion(string $keyVersion): string
+            {
+                return 'unused';
+            }
+        };
+
+        $this->expectException(EncryptionException::class);
+
+        (new SecretRotationService($provider, $encryptionService))->rotate($payload);
     }
 }
