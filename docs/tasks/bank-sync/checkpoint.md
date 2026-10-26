@@ -1,37 +1,31 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 — модуль BankSync и граница с Cash
+**Phase:** Stage 2 — общая ротация ключей шифрования
 **Status:** done — handoff
-**Stage base commit:** `ac7615bce`
+**Stage base commit:** `fc3143e20`
 
 ### Completed
-- `plan.md` — задача, решения, этапы 1–13 (пересобраны 2026-10-26), поставки A/B/C.
-- `alfa-letter.md` — письмо в поддержку Alfa API (черновик).
-- `stages/stage-1.md` — подробный план Stage 1.
-- 1.1 прод read-only: старые банковские таблицы и очереди пусты, ключ `v1` работает.
-- 1.2 baseline: 99 тестов банковского импорта и изоляции — OK.
-- 1.3–1.5 `6c332535e`: каркас, адаптер Альфы (`/api`, `X-TraceId`), маппер.
-- 1.6 `97722ec01`: `CashFacade` — импорт дня с пересчётом остатков, журнал, блокировка.
-- 1.7 `94e6892e8`: сущности, кодек токена, миграция `Version20261026120000`.
-- 1.8 `d7ab3707c`: сообщение, handler, `bank-sync:enqueue`.
-- 1.9–1.10: UI (5 контроллеров, форма на DTO), удаление старого кода Cash, baseline,
-  правило границы, `ARCHITECTURE.md` 2.76, README Cash.
+- Stage 1 — на проде 26.10 (PR #2798, миграция `Version20261026120000`).
+- `stages/stage-2.md` — план, чек-лист приёмки, итог.
+- 2.1 прод read-only: Marketplace 11 × `v1`, MoySklad access 2 × `v1`, refresh пусто, BankSync 0.
+- 2.3 `e4cb0675e`: `SecretRotatorInterface`, `KeyVersionCount`, `RotationBatchResult`,
+  проверка расшифровкой в `SecretRotationService::rotate()`.
+- 2.4 `53898351d`: ротаторы Marketplace, MoySklad, BankSync (DBAL, условие на старый шифротекст).
+- 2.5–2.6 `1268b2f56`: `app:security:rotate-keys`, обёртка старой команды, тесты, baseline −5.
+- 2.7 `997e00a4b`: инструкция смены ключа, `ARCHITECTURE.md` 2.77, README.
 
 ### Checks and baseline
-- Локальные тесты: БД `app_test_banksync` в контейнере `asf1-pg`, сеть `asf1-net`
-  (стек `app-service-finance` остановлен).
-- Миграция up → down → up локально — OK.
-- Unit-набор 4005 — OK; integration + functional 3199 — OK; PHPStan полный — 0 ошибок.
+- Локальные тесты: БД `app_test_banksync` в контейнере `asf1-pg`, сеть `asf1-net`.
+- PHPStan 0, unit 4010 OK, integration + functional 3204 OK.
 
 ### Review status
-- internal: done (найден и исправлен курсор нового счёта)
-- external: раунд 1 — 1 IMPORTANT (миграция, исправлено `f94643213`); раунд 2 — REVIEW_GREEN
+- internal: done
+- external: раунд 1 — REVIEW_GREEN
 
 ### Exact next action
-- Handoff Stage 1: push, PR, вопрос «merge and deploy» (с dispatch миграции).
-  Затем Stage 2 (ротация ключа) — план в `plan.md` §5.
+- Handoff Stage 2: push, PR, вопрос «merge and deploy» (миграций нет).
+  Затем Stage 3 (OAuth-подключение, общая часть) — план в `plan.md` §5.
 
 ### Files to inspect first on resume
-- `docs/tasks/bank-sync/stages/stage-1.md`
-- `site/src/BankSync/MessageHandler/SyncBankConnectionHandler.php`
-- `site/src/Cash/Application/ImportBankStatementDayAction.php`
+- `docs/tasks/bank-sync/stages/stage-2.md`
+- `site/src/Shared/Command/RotateEncryptionKeysCommand.php`

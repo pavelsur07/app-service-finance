@@ -1,57 +1,44 @@
-# bank-sync — handoff Stage 1
+# bank-sync — handoff Stage 2
 
-**Branch:** `feat/bank-sync` · **PR:** см. описание PR · **CI:** см. PR
+**Branch:** `feat/bank-sync-stage2` · **PR:** см. описание PR · **CI:** см. PR
 
-Поставка — Stage 1 из плана (`plan.md` §5). Для пользователя поведение не меняется:
-страница «Банки / Подключения» по тому же адресу; Альфа на проде не подключена.
+Поставка — Stage 2 из плана (`plan.md` §5). Для пользователя поведение не меняется.
 
 ## Summary of stages
-- Stage 1 — модуль `BankSync`: банковская интеграция вынесена из Cash; Cash получает
-  выписку только через `CashFacade`; импорт дня пересчитывает остатки счёта; токен
-  хранится только шифротекстом; путь выписки Альфы исправлен на `/api/jp/v1/…`.
-  Подробно — `stages/stage-1.md`, «Итог этапа».
+- Stage 2 — общая ротация ключа шифрования: `app:security:rotate-keys` видит и
+  перешифровывает секреты Marketplace, MoySklad (access и refresh) и BankSync; раньше
+  ротация была только у маркетплейсов, и смена ключа по инструкции сделала бы токены
+  MoySklad нечитаемыми. Подробно — `stages/stage-2.md`, «Итог этапа».
 
 ## Files changed
-- `site/src/BankSync/**` — новый модуль (адаптер Альфы, сущности, handler, команда, UI).
-- `site/src/Cash/{Application,Facade,Repository,Exception}` — контракт загрузки выписки;
-  старый банковский код Cash удалён.
-- `site/migrations/Version20261026120000.php`, `site/templates/bank_sync/**`, сайдбар,
-  `config/{routes,packages/doctrine,packages/twig,packages/messenger}.yaml`,
-  `ModuleAccessMap`, `ModuleBoundaryRules`, `phpstan.dist.neon`, baseline (−19).
-- `ARCHITECTURE.md` 2.76, `site/src/Cash/README.md`.
+- `site/src/Shared/Security/{Contract,ValueObject,Service}` — контракт ротатора, проверка перешифровки.
+- `site/src/Shared/Command/RotateEncryptionKeysCommand.php` — общая команда.
+- `site/src/{Marketplace,MoySklad,BankSync}/Infrastructure/Security/*SecretRotator.php`.
+- `site/src/Marketplace/Command/RotateConnectionKeysCommand.php` — обёртка;
+  `ConnectionApiKeyCodec::rotateIfNeeded()` удалён (вызовов нет).
+- Тесты, baseline (−5), `docs/maintenance/encryption-key-rotation.md`, `ARCHITECTURE.md` 2.77, README.
 
 ## Migrations
-- `Version20261026120000` — создаёт `bank_sync_connection`, `bank_sync_import_cursor`;
-  удаляет `cash_bank_connection`, `cash_bank_import_cursor` (на проде пусты, проверено
-  26.10; миграция блокирует их и останавливается, если строки появились). Обратима:
-  `down` возвращает старые таблицы пустыми. Бэкап не нужен — данных нет.
+- Нет.
 
 ## Public API / contract changes
-- `CashFacade`: `findStatementImportAccount`, `tryLockAccountForStatementImport`,
-  `releaseAccountStatementImportLock`, `startStatementImportLog`,
-  `finishStatementImportLog`, `abandonStatementImportLog`, `importBankStatementDay`.
-- Messenger: `SyncBankConnectionMessage` → `async_sync` вместо `BankImportMessage`
-  (очереди на проде пусты).
-- Команда `cash:bank:enqueue` → `bank-sync:enqueue --bank=alfa` (в cron нет).
-- Маршруты `cash_bank_connection_*` → `bank_sync_connection_*`, пути прежние.
+- Новая команда `app:security:rotate-keys [--execute] [--module=…]`.
+- Тег `app.security.secret_rotator` (`SecretRotatorInterface`).
+- `app:marketplace:rotate-connection-keys` — тот же результат через общую команду.
+- `ConnectionApiKeyCodec` — без `SecretRotationServiceInterface` в конструкторе.
 
 ## Checks
-- PHPStan полный — 0 ошибок (до rebase); после rebase — CI.
-- Unit 4009 — OK; integration + functional 3199 — OK (до rebase); после rebase
-  BankSync + Cash integration/functional 455 — OK.
-- CS, `strict_types` по изменённым файлам — чисто; миграция up → down → up, abort при
-  строках — OK.
+- PHPStan полный — 0 ошибок, baseline −5; CS и `strict_types` — чисто.
+- Unit 4010 — OK; integration + functional 3204 — OK.
 
 ## Reviews
-- internal: найден и исправлен курсор нового счёта (сохранялся без блокировки после сбоя).
-- external: 2 раунда; раунд 1 — гонка проверки пустоты в миграции (исправлено),
-  раунд 2 — REVIEW_GREEN.
+- internal: замечаний, требующих правок, нет.
+- external: раунд 1 — REVIEW_GREEN.
 
 ## Risks, limitations, follow-ups
-- Ручной smoke на стенде не выполнялся — заменён functional-тестом полного сценария.
-- `CashTransactionsChanged` из импортов выписок — FOLLOW-UP для всех импортов.
-- Дальше Stage 2 (ротация ключа шифрования), затем OAuth/mTLS (Stage 3–4).
+- Ротация на проде не запускается этим PR — действие Владельца по инструкции.
+- Dry-run на проде доступен только через Владельца: команды нет в `codex-console`.
+- Удалить `app:marketplace:rotate-connection-keys` после первой смены ключа по новой инструкции.
 
 ## Owner decision
-Ready: PR с миграцией `Version20261026120000` (обратима, данных не трогает, бэкап не
-нужен). Run the production migration and deploy?
+Ready: PR без миграций — merge into master with automatic production deploy?
