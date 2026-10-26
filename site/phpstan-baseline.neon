@@ -5931,18 +5931,6 @@ parameters:
 			path: src/Marketplace/Infrastructure/Security/ConnectionApiKeyCodec.php
 
 		-
-			message: '#^Parameter \$ciphertext of class App\\Shared\\Security\\ValueObject\\EncryptedPayload constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Infrastructure/Security/ConnectionApiKeyCodec.php
-
-		-
-			message: '#^Parameter \$keyVersion of class App\\Shared\\Security\\ValueObject\\EncryptedPayload constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Infrastructure/Security/ConnectionApiKeyCodec.php
-
-		-
 			message: '#^Method App\\Marketplace\\Infrastructure\\Writer\\DefaultCostMappingWriter\:\:createMapping\(\) should return int but returns int\|string\.$#'
 			identifier: return.type
 			count: 1
@@ -10801,24 +10789,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Integration/Marketplace/Infrastructure/Security/ConnectionApiKeyEncryptionTest.php
-
-		-
-			message: '#^Cannot call method getApiKeyKeyVersion\(\) on App\\Marketplace\\Entity\\MarketplaceConnection\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Integration/Marketplace/Infrastructure/Security/ConnectionApiKeyRotationTest.php
-
-		-
-			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Infrastructure\\Security\\ConnectionApiKeyCodec\:\:apiKeyFor\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, App\\Marketplace\\Entity\\MarketplaceConnection\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Marketplace/Infrastructure/Security/ConnectionApiKeyRotationTest.php
-
-		-
-			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Infrastructure\\Security\\ConnectionApiKeyCodec\:\:rotateIfNeeded\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, App\\Marketplace\\Entity\\MarketplaceConnection\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Marketplace/Infrastructure/Security/ConnectionApiKeyRotationTest.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Marketplace\\Infrastructure\\Query\\MarketplaceCostExistingExternalIdsQuery\:\:execute\(\) expects string, string\|null given\.$#'
