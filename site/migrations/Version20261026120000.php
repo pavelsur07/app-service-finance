@@ -21,6 +21,10 @@ final class Version20261026120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Блокировка до подсчёта и до DROP в той же транзакции миграции: строка, вставленная
+        // работающим приложением после проверки, иначе молча исчезла бы вместе с таблицей.
+        $this->abortIf(!$this->connection->isTransactionActive(), 'Migration must run in a transaction.');
+        $this->connection->executeStatement('LOCK TABLE cash_bank_connection, cash_bank_import_cursor IN ACCESS EXCLUSIVE MODE');
         $this->abortIf(
             (int) $this->connection->fetchOne('SELECT (SELECT COUNT(*) FROM cash_bank_connection) + (SELECT COUNT(*) FROM cash_bank_import_cursor)') > 0,
             'cash_bank_connection or cash_bank_import_cursor has rows: move them to BankSync before dropping.',
