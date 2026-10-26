@@ -1,202 +1,223 @@
 # Stage 1: модуль BankSync и граница с Cash
 
-Risk: HIGH-LOCAL (миграция, routing Messenger, граница модулей, перенос кода из `Cash`).
-stage_base_commit: записать перед первым Work item.
+Risk: HIGH-LOCAL (миграция, routing Messenger, граница модулей, перенос кода из
+`Cash`, секреты).
+stage_base_commit: `23491e8cf` (ветка `feat/bank-sync`, база с `master` —
+`a9eb74206`).
+Поставка: A (Stage 1–3, `plan.md` §5).
 
-## 1. Какую задачу решаем
+## 1. Цель этапа
 
-Банковская загрузка сейчас живёт внутри `Cash` и завязана на формат Альфы:
-`BankImportService` разбирает сырой ответ Альфы, handler выбирает банк через
-`match ('alfa')`, сущности держат `#[ManyToOne] Company`. Второй банк в эту схему не
-встанет, а учёт ДДС смешан с интеграцией. Кроме того, импорт из банка не
-пересчитывает `money_account_daily_balance`: остатки по счёту после загрузки
-устаревают, и сверка из Stage 9 показала бы ложные расхождения.
+Отделить интеграцию с банками от учёта ДДС: новый модуль `BankSync` получает
+выписку из банка и отдаёт её `Cash` через `CashFacade`, а `Cash` больше ничего не
+знает о банках. Второй банк после этого добавляется новой папкой адаптера.
+Попутно закрываются два дефекта старого кода:
+- импорт из банка не пересчитывал остатки счёта (`money_account_daily_balance`);
+- путь выписки Альфы без `/api` (запрос уходил мимо API).
 
-## 2. Что будет результатом
+Учётные данные банка с первого дня хранятся только зашифрованными.
 
-Поведение для пользователя не меняется: подключение Альфы с токеном и загрузка
-выписки по команде работают как сейчас. Меняется устройство:
+Для пользователя поведение не меняется: страница «Банки / Подключения» по тому же
+адресу, подключение Альфы с токеном, загрузка по кнопке и командой.
+
+## 2. Результат
 
 ```
 site/src/BankSync/
-  Domain/
-    BankCode.php                         enum: alfa
-    BankProviderInterface.php            code(), getAccounts(), getStatementDay() → DTO
-  Application/
-    DTO/BankAccountDTO, BankStatementLineDTO, BankStatementDayDTO
-    SaveBankConnectionAction, DeleteBankConnectionAction
-    SyncCompanyBankAccountsAction        бывший BankImportService без создания транзакций
-  Infrastructure/Bank/
-    BankProviderRegistry.php             tagged locator по BankCode
-    Alfa/AlfaApiClient.php               перенесён без изменения поведения
-    Alfa/AlfaStatementMapper.php         сырой ответ Альфы → DTO (разбор из BankImportService)
-    Alfa/AlfaBankProvider.php
-  Infrastructure/Security/
-    BankCredentialsCodec.php             учётные данные ↔ EncryptedPayload (Shared\Security)
-  Entity/   BankConnection (bank_sync_connection), BankImportCursor (bank_sync_import_cursor)
-  Repository/, Exception/ (BankApiUnavailableException, BankApiRequestFailedException)
-  Message/SyncBankConnectionMessage.php  → async_sync
-  MessageHandler/SyncBankConnectionHandler.php   точка входа, владеет транзакцией
-  Command/EnqueueBankSyncCommand.php     bank-sync:enqueue --bank=alfa
-  Controller/, Form/                      подключения, маршруты bank_sync_connection_*
-site/templates/bank_sync/connection/     перенесены из templates/cash/bank_connection/
+  Enum/BankCode.php                         alfa
+  Domain/BankProviderInterface.php          code(), listAccounts(), fetchStatementDay() → DTO
+  Domain/BankAccess.php                     baseUrl + токен для адаптера (не логируется)
+  Application/DTO/                          BankAccountDTO, BankStatementLineDTO, BankStatementDayDTO,
+                                            BankConnectionFormData
+  Application/SaveBankConnectionAction.php  создание/изменение, токен — через кодек
+  Application/DeleteBankConnectionAction.php
+  Infrastructure/Bank/BankProviderRegistry.php      tagged locator по BankCode
+  Infrastructure/Bank/Alfa/AlfaApiClient.php        перенесён; путь /api, X-TraceId
+  Infrastructure/Bank/Alfa/AlfaStatementMapper.php  сырой ответ Альфы → DTO
+  Infrastructure/Bank/Alfa/AlfaBankProvider.php
+  Infrastructure/Security/BankCredentialsCodec.php  {type, token} ↔ EncryptedPayload
+  Entity/BankConnection.php                 bank_sync_connection, string $companyId
+  Entity/BankImportCursor.php               bank_sync_import_cursor
+  Repository/                               с companyId; findActiveByBankCode — @companyScopeExempt
+  Exception/                                BankApiUnavailableException, BankApiRequestFailedException,
+                                            UnknownBankCodeException
+  Message/SyncBankConnectionMessage.php     → async_sync
+  MessageHandler/SyncBankConnectionHandler.php      точка входа, владеет транзакциями
+  Command/EnqueueBankSyncCommand.php        bank-sync:enqueue --bank=alfa
+  Controller/Connection*Controller.php      по одному действию; маршруты bank_sync_connection_*
+  Form/BankConnectionType.php               на BankConnectionFormData
+site/templates/bank_sync/connection/        перенесены из templates/cash/bank_connection/
 ```
 
-Новые методы `CashFacade` (типы — `App\Cash\Application\DTO\*`, всё только
-`persist()`, коммитит вызывающий):
+Новое в `Cash` (только контракт для `BankSync`, о банках ничего):
 
-| Метод | Что делает |
-|---|---|
-| `findStatementImportAccount(string $companyId, string $accountNumber): ?StatementImportAccountDTO` | Денежный счёт компании по номеру: id и валюта |
-| `tryLockAccountForStatementImport(string $companyId, string $moneyAccountId): bool` / `releaseAccountStatementImportLock(...)` | Та же `CashImportAccountLock`, что у импорта 1С и файла |
-| `startStatementImportLog(string $companyId, string $source): string` / `finishStatementImportLog(string $importLogId, StatementImportSummaryInput $summary)` | Журнал `import_log` и его lease, как сейчас в `BankImportService` |
-| `importBankStatementDay(string $companyId, string $moneyAccountId, string $source, BankStatementDayInput $day): BankStatementDayResult` | Строки дня → `CashTransaction` (UUID v7, дедупликация в пачке и по `uniq_cashflow_import`, проверка валюты, проект и ЦФО по умолчанию) и пересчёт `money_account_daily_balance` за затронутые дни в той же транзакции |
+| Метод `CashFacade` | Что делает | Кто коммитит |
+|---|---|---|
+| `findStatementImportAccount(companyId, accountNumber): ?StatementImportAccount` | Денежный счёт компании по номеру: id и валюта | — (чтение) |
+| `tryLockAccountForStatementImport(companyId, moneyAccountId): bool` / `releaseAccountStatementImportLock(...)` | Та же сессионная `CashImportAccountLock`, что у 1С и файла | — |
+| `startStatementImportLog(companyId, source): string` | `import_log` + lease журнала | вызывающий |
+| `finishStatementImportLog(companyId, importLogId, StatementImportSummary)` | Счётчики, итог, `finished_at`; снимает lease | вызывающий |
+| `importBankStatementDay(companyId, moneyAccountId, source, BankStatementDayInput): BankStatementDayResult` | Строки дня → `CashTransaction` (UUID v7, дубли в пачке и по `uniq_cashflow_import`, проверка валюты, проект и ЦФО по умолчанию), `flush()` и пересчёт `money_account_daily_balance` от первого дня строк по сегодня. Только внутри транзакции вызывающего | вызывающий (`wrapInTransaction`) |
 
-Handler на каждый день счёта: собрать все страницы через адаптер → один
-`wrapInTransaction()`: `importBankStatementDay()` + сдвиг курсора. День, транзакции,
-пересчёт остатков и курсор фиксируются вместе. HTTP-вызовы до транзакции.
+Реализация импорта дня — `Cash\Application\ImportBankStatementDayAction`
+(Action вызывается из Facade, своей транзакции не открывает; `flush()` внутри
+транзакции вызывающего нужен, потому что пересчёт остатков читает строки из БД).
+
+Поток handler на одно подключение:
+1. журнал импорта — `startStatementImportLog` → `flush()`;
+2. счета банка (HTTP) → для каждого счёта: денежный счёт по номеру, блокировка
+   счёта;
+3. для каждого дня от курсора − 1 (первый раз — 7 дней назад) по сегодня: все
+   страницы дня (HTTP) → `wrapInTransaction`: `importBankStatementDay` + сдвиг
+   курсора;
+4. журнал — `finishStatementImportLog` → `flush()`; при сбое журнал закрывается с
+   ошибкой, если EM открыт, исключение пробрасывается.
 
 Из `Cash` удаляются: `Entity/Bank/*`, `Repository/Bank/*`, `Service/Import/Bank/*`,
 `MessageHandler/Import/BankImportHandler`, `Message/Import/BankImportMessage`,
 `Command/Import/BankEnqueueImportCommand`, `Controller/Import/BankConnectionController`,
-`Form/Bank/*`, `Application/{Save,Delete}BankConnectionAction`, банковские исключения,
-`templates/cash/bank_connection/`.
+`Form/Bank/*`, `Application/{Save,Delete}BankConnectionAction`, банковские
+исключения, `templates/cash/bank_connection/`, их записи в PHPStan baseline.
 
-## 3. Что считаем выполненной работой
+Миграция: создать `bank_sync_connection`, `bank_sync_import_cursor`; удалить
+`cash_bank_connection`, `cash_bank_import_cursor` (на проде пусты — п. 1.1).
+`down()` восстанавливает старые таблицы пустыми и удаляет новые.
 
-- Код из таблицы выше в `BankSync`, в `Cash` банковского кода не осталось
-  (`grep -ri "alfa\|BankConnection" site/src/Cash` пуст, кроме `CashFacade` и DTO
-  импорта выписки без упоминания банка).
-- `BankSync` импортирует из `Cash` только `Facade` и `Application\DTO`; гейт
-  `ModuleBoundaryRules` зелёный.
-- Миграция: новые таблицы `bank_sync_connection`, `bank_sync_import_cursor`
-  (`company_id` строкой, индекс `(company_id, bank_code)`, unique курсора как
-  сейчас), удаление `cash_bank_connection`, `cash_bank_import_cursor`. `down()`
-  восстанавливает старые таблицы пустыми. Удаление — только при подтверждённых 0
-  строк на проде (п. 1.1), иначе перенос данных в той же миграции с
-  шифрованием токена.
-- Учётные данные зашифрованы с первого дня: в `bank_sync_connection` нет колонки с
-  открытым токеном. `credentials_encrypted` (JSON `EncryptedPayload`: шифротекст,
-  версия ключа, время) + `credentials_key_version` для выборки при ротации; внутри
-  шифротекста — JSON `{type: "static_token", token}`, в Stage 3 добавится тип
-  `oauth2`. Шифрует и расшифровывает только `BankCredentialsCodec` через
-  `FieldEncryptionServiceInterface`, после шифрования — контрольная расшифровка
-  (как `MoySklad\…\ConnectionTokenCodec`). Сущность хранит только шифротекст.
-- Импорт банка пересчитывает остатки счёта — регрессионный тест, красный на
-  старом коде.
-- Тесты переписаны на новые классы, покрытие не меньше прежнего (см. чек-лист).
-- `ARCHITECTURE.md`: строка `BankSync` в таблице модулей, раздел «BankSync →
-  Cash: загрузка выписки» (кто коммитит, порядок блокировок: счёт →
-  `wrapInTransaction` дня → пересчёт остатков), новые методы `CashFacade`, правка
-  «Cash: идемпотентность файлового импорта» (абзацы про `BankImportService`),
-  `Changelog`. Таблица «Модули» больше не пишет «банковский импорт» у `Cash`.
-- Конфиги: `routes.yaml`, `doctrine.yaml`, `twig.yaml`, `messenger.yaml`
-  (routing `SyncBankConnectionMessage` → `async_sync`, старая строка удалена),
-  `MessengerRoutingTest` зелёный.
-- Режим «токен клиента» Альфы переносится как есть ради неизменного поведения, но
-  по документации это Alfa API Direct (только собственная организация партнёра,
-  `plan.md` §3a): новых подключений Альфы в этом режиме не ждём, замена — Alfa ID в
-  Stage 5.
-- Явно не входит: ротация ключей (Stage 2), OAuth и статусы подключения
-  (Stage 3), mTLS и Alfa ID (Stage 4–5), привязка счетов (Stage 6), cron и окно
-  перечитывания (Stage 8), остатки банка и сверка (Stage 9), новый UI
-  (Stage 10).
+### Решения, уточнённые при детализации
+
+- **Оркестрация — в handler, а не в `SyncCompanyBankAccountsAction`.** Транзакциями
+  сценария владеет точка входа; Action, вызванный из handler, коммитить не может,
+  а передавать `$commit`-замыкание в сервис (как в старом коде) — непрозрачно.
+  Handler держит шаги 1–4 явно.
+- **Контроллеры — по одному действию** (`CLAUDE.md`, «Слои»): Index, New, Edit,
+  Delete, EnqueueSync. Пути и тексты прежние, имена маршрутов —
+  `bank_sync_connection_*`.
+- **Форма — на `BankConnectionFormData`**, а не на сущности: у сущности нет поля с
+  открытым токеном. Пустой токен при редактировании оставляет прежний.
+- **Логи:** строка выписки и номер счёта в `warning`/`error` не попадают (старый код
+  писал тело операции в `warning` при пропуске строки без `uuid`); в контексте —
+  `bank_connection_id`, `money_account_id`, счётчики. `X-TraceId` ответа банка — в
+  `info`/`warning` запроса.
+- **Analytics:** импорт 1С событие `CashTransactionsChanged` не отправляет; банковский
+  импорт до сих пор тоже. Оставляем так же (поведение не меняется), FOLLOW-UP —
+  отдельно решить для всех импортов.
+- **Сумма строки:** без `(float)` — строка нормализуется `bcadd`, число из JSON —
+  `number_format` (как было).
+- Путь списка счетов `open-banking/v1.3` остаётся до Stage 6 (замена на v3.0 —
+  там, вместе с привязкой счетов).
+
+## 3. Что считаем выполненной работой (Definition of Done)
+
+- Код из раздела 2 в `BankSync`; в `Cash` банковского кода нет:
+  `rg -i "alfa|BankConnection|bank_connection" site/src/Cash site/templates/cash`
+  пуст (кроме DTO и методов импорта выписки без упоминания банка).
+- `BankSync` импортирует из `Cash` только `Facade` и `Application\DTO`;
+  `ModuleBoundaryRules` зелёный; `Cash` не импортирует `BankSync`.
+- Импорт дня атомарен: строки, пересчёт остатков и курсор — одна транзакция; HTTP —
+  до неё.
+- Импорт банка пересчитывает остатки счёта — регрессионный тест красный на старом
+  коде.
+- URL выписки Альфы — `{base}/api/jp/v1/statement/transactions` — регрессионный
+  тест красный на старом коде.
+- Токен хранится только в шифротексте; в строке БД его нет; в логах, исключениях и
+  шаблонах тоже.
+- Конфиги: `routes.yaml`, `doctrine.yaml`, `twig.yaml`, `messenger.yaml` (routing
+  `SyncBankConnectionMessage` → `async_sync`, строки `BankImportMessage` нет),
+  сайдбар на новые маршруты.
+- Миграция `up` → `down` → `up` на локальной БД; схема совпадает с маппингом
+  (`doctrine:schema:validate`).
+- `ARCHITECTURE.md`: модуль `BankSync` в таблице модулей, раздел «BankSync → Cash:
+  загрузка выписки» (кто коммитит, порядок блокировок), новые методы `CashFacade`,
+  правка разделов `Cash` про банковский импорт, `Changelog`;
+  `site/src/Cash/README.md` — без банковского импорта.
 
 ## 4. Work items
 
-- **1.1** Прод, read-only: число строк `cash_bank_connection`,
-  `cash_bank_import_cursor`, `import_log` с `source LIKE 'bank:%'`, сообщения
-  `BankImportMessage` в `messenger_messages` и в Redis-очереди `async_sync`.
-  Записать в `stages/stage-1.md`. Не ноль — перенос данных вместо удаления и
-  обработчик старого класса сообщения до опустения очереди. Там же: активная
-  версия ключа шифрования на проде —
-  `bin/console app:marketplace:rotate-connection-keys` без `--execute` (печатает
-  только версию и счётчики). Ключи на прод доставляет `deploy.yml`
-  (`APP_ENCRYPTION_*`), проверка подтверждает, что они доехали.
-- **1.2** Baseline: `make site-stan` (число ошибок), тесты
-  `tests/Unit/Cash/Service/Import/Bank`, `tests/Unit/Cash/MessageHandler/Import`,
-  `tests/Functional/Cash/Controller/CashCompanyIsolationTest.php` — записать.
-- **1.3** Каркас модуля и конфиги (`docs/workflow/new-module.md`), `BankCode`,
-  `BankProviderInterface`, DTO, `BankProviderRegistry` (тег через
-  `#[AutoconfigureTag]`).
-- **1.4** `AlfaStatementMapper`: перенос разбора из `BankImportService`
-  (`extractAccountNumbers`, `extractTransactions`, `hasNextPage`, даты, суммы
-  строкой без `float`, направление, валюта, назначение). Unit-тесты на фикстурах
-  ответов, которые сейчас лежат в `BankImportServiceTest`.
-- **1.5** `AlfaApiClient` и `AlfaBankProvider` в `BankSync`; `AlfaApiClientTest`
-  переносится. Исправление по спецификации (`plan.md` §3a): путь выписки
-  `/api/jp/v1/statement/transactions` (сейчас без `/api` — запрос уходит мимо
-  API); `limit` у JSON-выписки нет (страница до 1000, дальше `_links` `next`) —
-  не добавлять; `ErrorDescription` банка в лог и сообщения исключений не попадает
-  (в нём номер счёта); `X-TraceId` ответа — в лог запроса.
-- **1.6** Методы `CashFacade` и Input/DTO; внутренний сервис импорта дня в `Cash`
-  (создание транзакций из `BankImportService::importAccount`) +
-  `AccountBalanceService::recalculateDailyRange` за дни дня. Проверить, как импорт
-  1С уведомляет Analytics (`CashTransactionsChanged`), и сделать так же.
-- **1.7** Сущности и репозитории `BankSync`, миграция; `findActiveByBankCode` —
-  `@companyScopeExempt` (cron по всем компаниям), остальное — с `companyId`.
-  `BankCredentialsCodec`; форма подключения пишет токен через кодек,
-  `AlfaApiClient` получает токен от кодека, а не из сущности; при редактировании
-  пустое поле токена оставляет прежний.
-- **1.8** `SyncCompanyBankAccountsAction`, `SyncBankConnectionMessage`,
-  handler (логи старта и финиша с `companyId`, временный сбой → `warning` и
-  исходное исключение, отказ банка → `error` + `Unrecoverable…` — как сейчас),
-  команда `bank-sync:enqueue`.
-- **1.9** Контроллер, форма, шаблоны, Action подключения; маршруты
-  `bank_sync_connection_*`, путь `/bank-connections` прежний; сайдбар;
-  `getActiveCompany()` и поиск подключения только с компанией.
-- **1.10** Удаление старого кода из `Cash`, перенос тестов, документация.
+- **1.1** ✅ Прод, read-only (26.10): `cash_bank_connection` 0, `cash_bank_import_cursor`
+  0, `import_log` с `bank:%` 0, `BankImportMessage` в `messenger_messages` 0;
+  `messenger:stats` — все очереди 0, `failed` 0. Ключ шифрования на проде работает:
+  11 подключений маркетплейсов на версии `v1` (`app:marketplace:rotate-connection-keys`
+  через wrapper не разрешён — проверено SQL по `api_key_key_version`). Вывод:
+  старые таблицы удаляются без переноса, обработчик старого сообщения не нужен.
+- **1.2** ✅ Baseline: тесты банковского импорта, `PersistenceActionsTest`,
+  `CashCompanyIsolationTest`, `AccountStrictMatchTest` — 99 тестов, OK (локальная
+  БД `app_test_banksync`, сеть `asf1-net`). PHPStan — на изменённых файлах в конце
+  этапа; записи baseline старых банковских файлов удаляются вместе с файлами.
+- **1.3** Каркас: конфиги модуля, `BankCode`, `BankProviderInterface`, `BankAccess`,
+  DTO, `BankProviderRegistry`, исключения.
+- **1.4** `AlfaStatementMapper` + unit-тесты (фикстуры — из `BankImportServiceTest`
+  и примеров спецификации).
+- **1.5** `AlfaApiClient` (перенос, `/api`, `X-TraceId`), `AlfaBankProvider` (все
+  страницы дня); перенос `AlfaApiClientTest` + регрессия пути.
+- **1.6** `Cash`: DTO, `ImportBankStatementDayAction`, методы `CashFacade`;
+  integration-тесты импорта дня (happy path, повтор, дубль, валюта, чужой счёт,
+  пересчёт остатков — регрессия).
+- **1.7** Сущности, репозитории, миграция; `BankCredentialsCodec` + тесты.
+- **1.8** `SyncBankConnectionMessage`, `SyncBankConnectionHandler`,
+  `EnqueueBankSyncCommand`; unit-тесты handler и integration «сбой на втором
+  дне».
+- **1.9** Форма, Action подключения, контроллеры, шаблоны, сайдбар; перенос
+  проверок изоляции.
+- **1.10** Удаление старого кода из `Cash`, baseline, `ARCHITECTURE.md`, README,
+  чек-лист, Stage Report.
 
 ## 5. Чек-лист приёмки
 
 Тесты (в том же Stage):
-- [ ] `AlfaStatementMapper`: счета, строки, следующая страница, приход/расход,
-      неизвестное направление, нет `uuid`/даты/суммы → строка пропущена с
-      причиной.
-- [ ] `BankProviderRegistry`: известный код → адаптер, неизвестный → исключение.
-- [ ] **Регрессия** `AlfaApiClient`: URL выписки — `{base}/api/jp/v1/statement/transactions`
-      с `limit` (красный на `a9eb74206`); тело ошибки банка не попадает в лог.
-- [ ] `CashFacade::importBankStatementDay`: happy path; повторный вызов того же дня →
-      те же транзакции, число строк не меняется; дубль `uuid` внутри дня → одна
-      строка; чужая валюта → ошибка в результате, строка не создана; счёт чужой
-      компании → исключение.
-- [ ] **Регрессия:** после импорта дня `money_account_daily_balance` на эти дни
-      пересчитан (тест красный на `a9eb74206`).
-- [ ] Handler: временный сбой банка → исключение для retry, курсор не сдвинут;
-      отказ банка → `Unrecoverable…`; нет подключения → `Unrecoverable…`; занятый
-      счёт → пропуск с `warning`, курсор не сдвинут.
-- [ ] Сбой посреди второго дня: первый день сохранён вместе с курсором, второй —
-      ничего (functional, реальная БД).
-- [ ] `BankCredentialsCodec`: шифрование и расшифровка возвращают исходное; в
-      колонке нет открытого токена (functional: строка из БД не содержит токена);
-      неизвестная версия ключа → исключение без токена в сообщении.
-- [ ] Изоляция: подключение другой компании — 404 на `edit`/`delete`/`sync`
-      (перенос из `CashCompanyIsolationTest`).
+- [ ] `AlfaStatementMapper` — unit: счета (уникальные, пустые пропущены); строки
+      приход/расход; следующая страница по `_links`; строка без `uuid`/даты/суммы/с
+      неизвестным направлением пропущена и посчитана; `transactionId` разобран;
+      сумма строкой и числом.
+- [ ] `BankProviderRegistry` — unit: известный код → адаптер; неизвестный →
+      `UnknownBankCodeException`.
+- [ ] **Регрессия** `AlfaApiClient` — unit: URL выписки содержит `/api/jp/v1/…`
+      (красный на старом коде); 429/5xx → `BankApiUnavailableException`; 401 →
+      `BankApiRequestFailedException`; тело ответа и query не попадают в лог;
+      `X-TraceId` в логе.
+- [ ] `AlfaBankProvider` — unit: собирает все страницы дня, останавливается без
+      `next`.
+- [ ] `CashFacade::importBankStatementDay` — integration: happy path; повтор того
+      же дня → то же число строк; дубль `externalId` внутри дня → одна строка;
+      чужая валюта → ошибка в результате, строка не создана; счёт чужой компании →
+      исключение; вызов без открытой транзакции → исключение.
+- [ ] **Регрессия** — integration: после импорта дня `money_account_daily_balance`
+      пересчитан (красный на старом коде: старый `BankImportService` не
+      пересчитывал).
+- [ ] Handler — unit: временный сбой → исходное исключение для retry; отказ банка →
+      `Unrecoverable…`; нет подключения → `Unrecoverable…`; неизвестный банк →
+      `Unrecoverable…`; занятый счёт → пропуск с `warning`; счёт без денежного
+      счёта → пропуск.
+- [ ] Сбой на втором дне — integration: первый день и курсор сохранены, второго
+      дня нет, журнал закрыт с ошибкой.
+- [ ] `BankCredentialsCodec` — unit + integration: шифрование и расшифровка
+      сходятся; в строке БД нет токена; неизвестная версия ключа → исключение без
+      токена в сообщении.
+- [ ] Контроллеры — functional: страницы открываются; создание шифрует токен;
+      редактирование с пустым токеном оставляет прежний; чужое подключение → 404
+      на `edit`/`delete`/`enqueue`; запись без `FINANCE_WRITE` → 403.
+- [ ] `MessengerRoutingTest` зелёный.
 
 Гейты и проверки:
-- [ ] `make site-stan` — baseline не вырос (переименования учитывает guard, новые
-      ошибки чинятся, а не добавляются).
-- [ ] `make site-cs-check`, `make site-cs-strict-types`.
-- [ ] Модульные тесты `BankSync` и `Cash`; `MessengerRoutingTest`;
-      `ModuleBoundaryRules`.
-- [ ] Миграция: `up` → `down` → `up` на локальной БД.
-- [ ] Ручной smoke на стенде: страница подключений открывается, создание и
-      удаление подключения, `bank-sync:enqueue --bank=alfa` ставит задание
-      (против заглушки HTTP, боевого доступа к Альфе нет).
-- [ ] `ARCHITECTURE.md` и `site/src/Cash/README.md` обновлены, `Changelog`.
-- [ ] Внутреннее ревью полного diff от `stage_base_commit`; внешнее ревью — да
-      (HIGH-LOCAL).
+- [ ] PHPStan по изменённым файлам без новых ошибок; baseline только сократился.
+- [ ] `make site-cs-check`, `make site-cs-strict-types` по изменённым файлам.
+- [ ] Модульные тесты `BankSync` и затронутые `Cash`; `ModuleBoundaryRules`.
+- [ ] Миграция `up` → `down` → `up`; `doctrine:schema:validate`.
+- [ ] Ручной smoke на стенде: страница подключений, создание, редактирование,
+      удаление, «Запустить импорт сейчас» ставит сообщение (без боевого банка).
+- [ ] `ARCHITECTURE.md`, `site/src/Cash/README.md`, `Changelog`.
+- [ ] Внутреннее ревью полного diff от `stage_base_commit`; внешнее ревью (HIGH-LOCAL,
+      diff > 500 строк).
 
 Reviewer focus:
-- граница: в `BankSync` нет импорта `App\Cash\{Entity,Repository,Service,Infrastructure}`;
+- граница: в `BankSync` нет импорта `App\Cash\{Entity,Repository,Service,Infrastructure,Enum}`;
 - транзакция дня: HTTP вне `wrapInTransaction`, пересчёт остатков внутри;
 - порядок блокировок: блокировка счёта (сессионная) → транзакция дня → блокировка
   пересчёта счёта;
-- IDOR в новых репозиториях и контроллере;
-- ничего из ответа банка (номер счёта, назначение) не уходит в `error`-логи и
+- IDOR в репозиториях и контроллерах;
+- ничего из ответа банка (номер счёта, назначение) не уходит в `warning`/`error` и
   сообщения исключений;
-- токен не появляется в логах, исключениях, дампе формы и шаблонах
-  (`#[\SensitiveParameter]` на параметрах с токеном).
+- токен не появляется в логах, исключениях, форме и шаблонах
+  (`#[\SensitiveParameter]`).
 
 ## Итог этапа
 
