@@ -105,6 +105,20 @@ final readonly class UnitExtendedQuery
         $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
         $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
 
+        // Остаток без проданных в периоде единиц с известной себестоимостью оценивается по
+        // истории цен листинга на конец периода — иначе залежавшийся товар, ради которого
+        // остатки и показываются, остаётся без денежной оценки. Один запрос на весь набор.
+        $historyCostListingIds = array_values(array_filter(
+            $allListingIds,
+            static fn (string $listingId): bool => isset($stockQtyByListing[$listingId])
+                && 0 === ($sales[$listingId]->costPriceQuantity ?? 0),
+        ));
+        $historyCostByListing = $this->marketplaceFacade->getCostPricesForListingsOnDate(
+            $companyId,
+            $historyCostListingIds,
+            $to,
+        );
+
         $items = [];
         $summaryRows = [];
         $totals = [
@@ -146,8 +160,10 @@ final readonly class UnitExtendedQuery
             // Отсутствие листинга в карте означает «остаток неизвестен»: снапшота нет
             // или он отброшен как протухший. Ноль здесь был бы утверждением о факте.
             $stockQty = $stockQtyByListing[$listingId] ?? null;
-            $stockCapitalRub = null !== $stockQty && null !== $costPriceUnit
-                ? round($stockQty * $costPriceUnit, 2)
+            $stockUnitCost = $costPriceUnit
+                ?? (isset($historyCostByListing[$listingId]) ? (float) $historyCostByListing[$listingId] : null);
+            $stockCapitalRub = null !== $stockQty && null !== $stockUnitCost
+                ? round($stockQty * $stockUnitCost, 2)
                 : null;
 
             // Listing metadata: prefer sales source, fallback to listings table

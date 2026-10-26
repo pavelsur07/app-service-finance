@@ -2227,6 +2227,12 @@ getSalesQuantitiesForListings(string $companyId, array $listingIds, \DateTimeImm
 // Себестоимость по листингу и дате (null если не задана)
 getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
 
+// Себестоимость набора листингов на дату одним запросом, по правилам getCostPriceForListing():
+// действующая запись, иначе самая ранняя; без записей или с нулевой ценой — нет в результате
+// @param  list<string>          $listingIds
+// @return array<string, string> listingId => decimal-string
+getCostPricesForListingsOnDate(string $companyId, array $listingIds, \DateTimeImmutable $date): array
+
 // Список категорий затрат для формы маппинга юнит-экономики
 // @return array<array{id: string, code: string, name: string}>
 getCostCategoriesForCompany(string $companyId, string $marketplace): array
@@ -4257,6 +4263,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.79 | 2026-10-26 | Unit-экономика: остаток по себестоимости без проданных в периоде единиц с ценой оценивается по истории цен листинга на конец периода; `MarketplaceFacade::getCostPricesForListingsOnDate()` |
 | 2.78 | 2026-10-26 | BankSync: статус подключения (`active`/`needs_reauth`/`revoked`/`disabled`) вместо `is_active`; вход в банк по OAuth 2.0 + PKCE (`BankAuthorizationProviderInterface`, маршруты `bank_sync_oauth_start`/`bank_sync_oauth_callback`), тип учётных данных `oauth2`; обновление токена в `SyncBankConnectionHandler` под `BankConnectionTokenLock`; 401 и отказ обновления → `needs_reauth` без `error` |
 | 2.77 | 2026-10-26 | `Shared\Security`: общая ротация ключа шифрования `app:security:rotate-keys` с ротаторами Marketplace, MoySklad, BankSync (тег `app.security.secret_rotator`); `SecretRotationService::rotate()` проверяет новый шифротекст расшифровкой; `app:marketplace:rotate-connection-keys` — обёртка |
 | 2.76 | 2026-10-26 | BankSync: банковская интеграция вынесена из Cash — модуль `BankSync` (подключения с шифрованным токеном, адаптер Альфы с путём выписки `/api/jp/v1/…`, `SyncBankConnectionHandler`, `bank-sync:enqueue`); `CashFacade` — методы загрузки выписки, импорт дня пересчитывает остатки; таблицы `cash_bank_*` заменены `bank_sync_*`; правило границы Cash ↛ BankSync |
