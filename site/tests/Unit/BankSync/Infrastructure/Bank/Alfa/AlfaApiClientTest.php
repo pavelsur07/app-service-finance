@@ -60,8 +60,10 @@ final class AlfaApiClientTest extends TestCase
     public function testStatementUrlHasApiPrefixAndQuery(): void
     {
         $requested = [];
-        $client = $this->client(static function (string $method, string $url, array $options) use (&$requested): MockResponse {
+        $interactionIds = [];
+        $client = $this->client(static function (string $method, string $url, array $options) use (&$requested, &$interactionIds): MockResponse {
             $requested[] = [$method, $url, $options['normalized_headers']['authorization'][0] ?? null];
+            $interactionIds[] = substr((string) ($options['normalized_headers']['x-fapi-interaction-id'][0] ?? ''), \strlen('x-fapi-interaction-id: '));
 
             return new MockResponse('{"transactions":[]}', ['http_code' => 200]);
         });
@@ -75,8 +77,12 @@ final class AlfaApiClientTest extends TestCase
                 'https://bank.test/api/jp/v1/statement/transactions?accountNumber='.self::ACCOUNT_NUMBER.'&statementDate=2026-10-01&page=2',
                 'Authorization: Bearer '.self::API_KEY,
             ],
-            ['GET', 'https://bank.test/api/jp/open-banking/v1.3/accounts', 'Authorization: Bearer '.self::API_KEY],
+            ['GET', 'https://bank.test/api/jp/open-banking/v3.0/aisp-le/accounts', 'Authorization: Bearer '.self::API_KEY],
         ], $requested);
+        foreach ($interactionIds as $interactionId) {
+            self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $interactionId, 'x-fapi-interaction-id — UUID v4');
+        }
+        self::assertCount(2, array_unique($interactionIds), 'новый идентификатор на каждый запрос');
     }
 
     #[DataProvider('temporaryStatusProvider')]

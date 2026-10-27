@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application\DTO;
 
 /**
- * Денежный счёт компании, найденный по номеру банковского счёта, — цель импорта выписки.
+ * Денежный счёт компании — цель импорта выписки (по привязке счёта банка в BankSync).
  */
 final readonly class StatementImportAccount
 {

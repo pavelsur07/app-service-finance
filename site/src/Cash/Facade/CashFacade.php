@@ -29,6 +29,7 @@ use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Application\DTO\PlannedPaymentSummary;
 use App\Cash\Application\DTO\StatementImportAccount;
 use App\Cash\Application\DTO\StatementImportSummary;
+use App\Cash\Application\DTO\StatementLinkCandidate;
 use App\Cash\Application\ImportBankStatementDayAction;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Application\SaveCashTransactionAutoRuleAction;
@@ -97,18 +98,69 @@ final readonly class CashFacade
     }
 
     /**
-     * Денежный счёт компании по номеру банковского счёта (сравниваются только цифры).
+     * Денежный счёт компании по id — цель импорта выписки по привязке счёта банка.
+     * Чужой, несуществующий или неактивный — null: загрузка пропускает счёт.
      */
-    public function findStatementImportAccount(string $companyId, string $accountNumber): ?StatementImportAccount
+    public function getStatementImportAccount(string $companyId, string $moneyAccountId): ?StatementImportAccount
     {
-        $account = $this->moneyAccountRepository->findOneByCompanyAndAccountNumber(
-            $this->requireCompany($companyId),
-            $accountNumber,
-        );
+        $account = $this->findMoneyAccount($companyId, $moneyAccountId);
 
-        return null === $account
+        return null === $account || !$account->isActive()
             ? null
             : new StatementImportAccount((string) $account->getId(), $account->getCurrency());
+    }
+
+    /**
+     * Активные денежные счета компании в валюте — кандидаты для привязки счёта банка.
+     *
+     * @return list<StatementLinkCandidate>
+     */
+    public function listStatementLinkCandidates(string $companyId, string $currency): array
+    {
+        $accounts = $this->moneyAccountRepository->findByFilters(
+            $this->requireCompany($companyId),
+            null,
+            [$currency],
+            true,
+            null,
+            ['name' => \SortDirection::Ascending],
+        );
+
+        return array_values(array_map(static function (MoneyAccount $account): StatementLinkCandidate {
+            $digits = preg_replace('/\D+/', '', (string) $account->getAccountNumber());
+
+            return new StatementLinkCandidate(
+                (string) $account->getId(),
+                $account->getName(),
+                $account->getCurrency(),
+                '' === $digits ? null : $digits,
+            );
+        }, $accounts));
+    }
+
+    /**
+     * Отметить, что выписка в счёт приходит из банка по API. Только внутри транзакции
+     * вызывающего: счёт перечитывается под `FOR UPDATE` (в памяти мог остаться прежний
+     * признак), коммитит вызывающий (BankSync, в транзакции привязки).
+     *
+     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
+     */
+    public function markBankApiStatementSource(string $companyId, string $moneyAccountId, string $bankCode): void
+    {
+        $account = $this->lockMoneyAccount($companyId, $moneyAccountId)
+            ?? throw StatementImportTargetNotFoundException::moneyAccount($moneyAccountId);
+
+        $account->markBankApiSource($bankCode);
+    }
+
+    /**
+     * Снять отметку «выписка из банка по API»; чужой или исчезнувший счёт — без изменений.
+     * Как `markBankApiStatementSource()`: внутри транзакции, под `FOR UPDATE`, коммитит
+     * вызывающий.
+     */
+    public function clearBankApiStatementSource(string $companyId, string $moneyAccountId): void
+    {
+        $this->lockMoneyAccount($companyId, $moneyAccountId)?->clearBankApiSource();
     }
 
     /**
@@ -517,6 +569,24 @@ final readonly class CashFacade
         }
 
         return $result;
+    }
+
+    private function findMoneyAccount(string $companyId, string $moneyAccountId): ?MoneyAccount
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($moneyAccountId)) {
+            return null;
+        }
+
+        return $this->moneyAccountRepository->findOneByIdAndCompanyId($moneyAccountId, $companyId);
+    }
+
+    private function lockMoneyAccount(string $companyId, string $moneyAccountId): ?MoneyAccount
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($moneyAccountId)) {
+            return null;
+        }
+
+        return $this->moneyAccountRepository->lockOneByIdAndCompanyId($moneyAccountId, $companyId);
     }
 
     private function requireCompany(string $companyId): Company

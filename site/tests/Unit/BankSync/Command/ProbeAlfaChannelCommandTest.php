@@ -46,7 +46,7 @@ final class ProbeAlfaChannelCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringContainsString('OK: bank answered HTTP 401, X-TraceId trace-1', $tester->getDisplay());
-        self::assertSame('https://sandbox.alfabank.ru/api/jp/open-banking/v1.3/accounts', $requests[0]['url']);
+        self::assertSame('https://sandbox.alfabank.ru/api/jp/open-banking/v3.0/aisp-le/accounts', $requests[0]['url']);
         self::assertEmpty(array_filter($requests[0]['headers'], static fn (string $header): bool => str_starts_with(strtolower($header), 'authorization')));
     }
 

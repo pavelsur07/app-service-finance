@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\BankSync;
 
+use App\BankSync\Application\BankAccountCatalog;
 use App\BankSync\Application\DTO\BankAccountDTO;
 use App\BankSync\Application\DTO\BankStatementLineDTO;
 use App\BankSync\Application\OAuthTokenRefresher;
 use App\BankSync\Domain\OAuth\OAuthTokens;
+use App\BankSync\Entity\BankAccount;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Entity\BankImportCursor;
 use App\BankSync\Enum\BankCode;
@@ -32,6 +34,7 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
+use App\Tests\Builders\BankSync\BankAccountBuilder;
 use App\Tests\Builders\BankSync\BankConnectionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -72,7 +75,8 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             ->forCompany($company)
             ->withCurrency('RUB')
             ->build();
-        $this->account->setAccountNumber(self::ACCOUNT_NUMBER);
+        // Номер у денежного счёта другой: загрузка идёт по привязке, а не по совпадению цифр.
+        $this->account->setAccountNumber('40702810900000000555');
         $project = new ProjectDirection(Uuid::uuid4()->toString(), $company, 'Общий', ProjectDirection::CODE_GENERAL);
         $center = new FinancialResponsibilityCenter($this->companyId, FinancialResponsibilityCenter::CODE_GENERAL, FinancialResponsibilityCenter::NAME_GENERAL);
         $this->bankConnection = BankConnectionBuilder::aConnection()
@@ -85,8 +89,15 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             $this->em->persist($entity);
         }
         $this->em->flush();
+        $this->em->persist(BankAccountBuilder::anAccount()
+            ->withId(Uuid::uuid7()->toString())
+            ->forConnection($this->companyId, $this->bankConnection->getId())
+            ->withAccountNumber(self::ACCOUNT_NUMBER)
+            ->linkedTo((string) $this->account->getId())
+            ->build());
+        $this->em->flush();
 
-        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER), new BankAccountDTO('40702810900000009999')]);
+        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER, 'RUB'), new BankAccountDTO('40702810900000009999', 'RUB')]);
         $this->logs = new TestHandler();
         StubBankAuthorizationProvider::reset();
     }
@@ -519,6 +530,143 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         return $connection;
     }
 
+    public function testBankAccountsAreCatalogedAndOnlyLinkedOneIsLoaded(): void
+    {
+        $this->bank->days[$this->daysAgo(0)] = [$this->line('in-1', BankDirection::CREDIT, '10.00', $this->daysAgo(0))];
+
+        $this->handle();
+
+        $rows = $this->bankAccountRows();
+        self::assertSame(['40702810900000000001', '40702810900000009999'], array_column($rows, 'account_number'));
+        self::assertNotNull($rows[0]['money_account_id']);
+        self::assertNull($rows[1]['money_account_id'], 'новый счёт банка — «не привязан»');
+        self::assertSame(1, $this->countTransactions(), 'грузится только привязанный');
+        self::assertTrue($this->logs->hasInfoThatContains('bank account is not loaded'));
+        self::assertFalse($this->logs->hasErrorRecords());
+        self::assertFalse($this->logs->hasWarningRecords());
+        $summary = json_decode((string) $this->requireLastImportLog()['file_name'], true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame([2, 1], [$summary['accounts_found'], $summary['accounts_matched']]);
+        $this->assertNoSensitiveDataInLogs();
+    }
+
+    public function testRepeatedRunUpdatesCatalogWithoutNewRows(): void
+    {
+        $this->handle();
+        $this->bank = new FakeBankProvider([
+            new BankAccountDTO(self::ACCOUNT_NUMBER, 'RUB', true, '044525593', 'Новое описание', 'acc-1'),
+            new BankAccountDTO('40702810900000009999', 'RUB', false),
+        ]);
+
+        $this->handle();
+
+        $rows = $this->bankAccountRows();
+        self::assertCount(2, $rows);
+        self::assertSame('Новое описание', $rows[0]['description']);
+        self::assertFalse((bool) $rows[1]['enabled_in_bank']);
+    }
+
+    public function testAccountMissingFromBankIsNotLoadedAndKeepsLinkUntilItReturns(): void
+    {
+        $this->bank = new FakeBankProvider([new BankAccountDTO('40702810900000009999', 'RUB')]);
+        $this->bank->days[$this->daysAgo(0)] = [$this->line('in-1', BankDirection::CREDIT, '10.00', $this->daysAgo(0))];
+
+        $this->handle();
+
+        self::assertSame([], $this->bank->fetchedDays, 'пропавший счёт не грузится');
+        $linked = $this->bankAccountRows()[0];
+        self::assertFalse((bool) $linked['present_in_bank']);
+        self::assertSame((string) $this->account->getId(), $linked['money_account_id'], 'привязка цела');
+
+        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER, 'RUB')]);
+        $this->bank->days[$this->daysAgo(0)] = [$this->line('in-1', BankDirection::CREDIT, '10.00', $this->daysAgo(0))];
+        $this->handle();
+
+        self::assertTrue((bool) $this->bankAccountRows()[0]['present_in_bank']);
+        self::assertSame(1, $this->countTransactions());
+    }
+
+    public function testAccountDisabledInBankIsNotLoaded(): void
+    {
+        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER, 'RUB', false)]);
+
+        $this->handle();
+
+        self::assertSame([], $this->bank->fetchedDays);
+        self::assertFalse($this->logs->hasWarningRecords());
+    }
+
+    public function testInactiveMoneyAccountOrOtherCurrencyIsSkippedWithWarning(): void
+    {
+        $this->account->setIsActive(false);
+        $this->em->flush();
+
+        $this->handle();
+
+        self::assertSame([], $this->bank->fetchedDays);
+        self::assertTrue($this->logs->hasWarningThatContains('linked money account is inactive or in another currency'));
+        self::assertFalse($this->logs->hasErrorRecords());
+
+        $this->account->setIsActive(true);
+        $this->em->flush();
+        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER, 'USD')]);
+        $this->handle();
+        self::assertSame([], $this->bank->fetchedDays, 'счёт банка в другой валюте не грузится в рублёвый');
+    }
+
+    public function testLinkChangedWhileBankReturnsDayStopsAccountWithoutWritingDay(): void
+    {
+        $this->bank->days[$this->daysAgo(3)] = [$this->line('in-1', BankDirection::CREDIT, '1000.00', $this->daysAgo(3))];
+        $this->bank->duringDayRequest = function (string $date): void {
+            if ($date === $this->daysAgo(3)) {
+                // Клиент отвязал счёт, пока банк отдавал день.
+                $this->em->getConnection()->executeStatement(
+                    'UPDATE bank_sync_account SET money_account_id = NULL, linked_at = NULL WHERE company_id = :companyId',
+                    ['companyId' => $this->companyId],
+                );
+            }
+        };
+
+        $this->handle();
+
+        self::assertSame(0, $this->countTransactions(), 'день не записан в счёт, от которого отвязали');
+        self::assertSame($this->daysAgo(4), $this->cursorDate(), 'курсор не продвинут за отменённый день');
+        self::assertNotContains($this->daysAgo(2), $this->bank->fetchedDays, 'остальные дни счёта не запрашиваются');
+        self::assertTrue($this->logs->hasInfoThatContains('link changed during the load'));
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
+    public function testSameBankAccountInTwoConnectionsHasOwnRows(): void
+    {
+        $second = BankConnectionBuilder::aConnection()
+            ->withId(Uuid::uuid7()->toString())
+            ->withCompanyId($this->companyId)
+            ->withCredentials($this->codec()->encryptStaticToken(self::TOKEN))
+            ->build();
+        $this->em->persist($second);
+        $this->em->flush();
+
+        $this->handle(new SyncBankConnectionMessage($this->companyId, $second->getId()));
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT connection_id, money_account_id FROM bank_sync_account WHERE company_id = :companyId AND account_number = :number',
+            ['companyId' => $this->companyId, 'number' => self::ACCOUNT_NUMBER],
+        );
+        self::assertCount(2, $rows);
+        self::assertCount(1, array_filter(array_column($rows, 'money_account_id')), 'привязка — только у первого подключения');
+        self::assertSame([], $this->bank->fetchedDays, 'во втором подключении счёт не привязан');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function bankAccountRows(): array
+    {
+        return $this->em->getConnection()->fetchAllAssociative(
+            'SELECT account_number, money_account_id, description, enabled_in_bank, present_in_bank FROM bank_sync_account WHERE connection_id = :connectionId ORDER BY account_number',
+            ['connectionId' => $this->bankConnection->getId()],
+        );
+    }
+
     private function handle(?SyncBankConnectionMessage $message = null): void
     {
         $this->handler(new BankProviderRegistry([$this->bank]))(
@@ -536,6 +684,8 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             new OAuthTokenRefresher($this->codec(), new BankAuthorizationProviderRegistry([new StubBankAuthorizationProvider()]), new NativeClock()),
             new BankConnectionTokenLock($this->em->getConnection()),
             self::getContainer()->get(CashFacade::class),
+            new BankAccountCatalog($this->em->getRepository(BankAccount::class), $this->em),
+            $this->em->getRepository(BankAccount::class),
             $this->em,
             new Logger('test', [$this->logs]),
         );

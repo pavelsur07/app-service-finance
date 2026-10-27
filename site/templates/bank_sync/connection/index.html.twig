@@ -72,6 +72,12 @@
                                         <button class="btn btn-sm btn-outline-warning">Переподключить</button>
                                     </form>
                                 {% endif %}
+                                <a href="{{ path('bank_sync_connection_accounts', {'id': connection.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                    Счета банка
+                                    {% if unlinked_accounts[connection.id] ?? 0 %}
+                                        <span class="badge bg-warning text-white ms-1" title="Счета без денежного счёта: выписка по ним не загружается">{{ unlinked_accounts[connection.id] }}</span>
+                                    {% endif %}
+                                </a>
                                 <a href="{{ path('bank_sync_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>

@@ -6,7 +6,9 @@ namespace App\BankSync\Infrastructure\Bank\Alfa;
 
 use App\BankSync\Application\DTO\BankAccountDTO;
 use App\BankSync\Application\DTO\BankStatementLineDTO;
+use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankDirection;
+use App\BankSync\Exception\BankApiRequestFailedException;
 
 /**
  * Разбор ответов Альфы: список счетов (Open Banking) и страница выписки
@@ -15,39 +17,78 @@ use App\BankSync\Enum\BankDirection;
 final readonly class AlfaStatementMapper
 {
     /**
-     * Номера счетов из `Data.Account[].AccountDetails[].identification`, без повторов.
+     * Счета из ответа `open-banking/v3.0/aisp-le/accounts`: номер — первый
+     * `AccountDetails[]` со схемой `RU.CBR.BBAN`, БИК — `Servicer.BankIdentification[]` со
+     * схемой `RU.CBR.BIC`. Повтор номера — один счёт. Владелец счёта (наименование, ИНН)
+     * не читается.
      *
      * @param array<mixed> $response
      *
-     * @return list<BankAccountDTO>
+     * @throws BankApiRequestFailedException нет `Data`, `Data.Account` не список или счетов
+     *                                       больше одной страницы (параметра страницы у
+     *                                       метода нет — часть счетов потерялась бы молча)
      */
-    public function mapAccounts(array $response): array
+    public function mapAccounts(array $response): AlfaAccountList
     {
         $data = $response['Data'] ?? null;
-        $accounts = \is_array($data) ? ($data['Account'] ?? null) : null;
-        if (!\is_array($accounts)) {
-            return [];
+        $accounts = \is_array($data) ? ($data['Account'] ?? []) : null;
+        $totalPages = \is_array($response['Meta'] ?? null) ? ($response['Meta']['totalPages'] ?? 1) : 1;
+        if (!\is_array($accounts) || !array_is_list($accounts) || !\is_int($totalPages) || $totalPages > 1) {
+            throw new BankApiRequestFailedException(BankCode::ALFA->value, null);
         }
 
-        $numbers = [];
+        $mapped = [];
+        $skipped = 0;
         foreach ($accounts as $account) {
-            $details = \is_array($account) ? ($account['AccountDetails'] ?? null) : null;
-            if (!\is_array($details)) {
+            $dto = \is_array($account) ? $this->mapAccount($account) : null;
+            if (null === $dto) {
+                ++$skipped;
                 continue;
             }
+            $mapped[$dto->accountNumber] ??= $dto;
+        }
 
-            foreach ($details as $detail) {
-                $identification = \is_array($detail) ? ($detail['identification'] ?? null) : null;
-                if (\is_string($identification) && '' !== trim($identification)) {
-                    $numbers[trim($identification)] = true;
+        return new AlfaAccountList(array_values($mapped), $skipped);
+    }
+
+    /**
+     * @param array<mixed> $account
+     */
+    private function mapAccount(array $account): ?BankAccountDTO
+    {
+        $number = $this->identification($account['AccountDetails'] ?? null, 'RU.CBR.BBAN');
+        $currency = $this->nonEmptyString($account['currency'] ?? null);
+        if (null === $number || null === $currency) {
+            return null;
+        }
+        $currency = strtoupper($currency);
+        $servicer = $account['Servicer'] ?? null;
+
+        return new BankAccountDTO(
+            accountNumber: $number,
+            currency: 'RUR' === $currency ? 'RUB' : $currency,
+            enabled: 'Enabled' === ($account['status'] ?? null),
+            bic: $this->identification(\is_array($servicer) ? ($servicer['BankIdentification'] ?? null) : null, 'RU.CBR.BIC'),
+            description: $this->nonEmptyString($account['accountDescription'] ?? null),
+            externalId: $this->nonEmptyString($account['accountId'] ?? null),
+        );
+    }
+
+    private function identification(mixed $identifications, string $scheme): ?string
+    {
+        if (!\is_array($identifications)) {
+            return null;
+        }
+        foreach ($identifications as $identification) {
+            if (\is_array($identification) && $scheme === ($identification['schemeName'] ?? null)) {
+                $value = $this->nonEmptyString($identification['identification'] ?? null);
+                if (null !== $value) {
+                    return $value;
                 }
             }
         }
 
-        return array_map(
-            static fn (int|string $number): BankAccountDTO => new BankAccountDTO((string) $number),
-            array_keys($numbers),
-        );
+        return null;
     }
 
     /**

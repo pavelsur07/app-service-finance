@@ -145,19 +145,6 @@ final class ImportBankStatementDayTest extends IntegrationTestCase
         ], $balances);
     }
 
-    public function testAccountIsFoundByNumberDigitsOnlyInOwnCompany(): void
-    {
-        $found = $this->facade->findStatementImportAccount($this->companyId(), '4070 2810 9000 0000 0001');
-
-        self::assertNotNull($found);
-        self::assertSame($this->accountId(), $found->moneyAccountId);
-        self::assertSame('RUB', $found->currency);
-
-        [$otherCompany] = $this->createCompanyWithAccount('40702810900000000003');
-        $this->em->flush();
-        self::assertNull($this->facade->findStatementImportAccount((string) $otherCompany->getId(), '40702810900000000001'));
-    }
-
     public function testImportLogIsStartedAndFinishedWithSummary(): void
     {
         $importLogId = $this->facade->startStatementImportLog($this->companyId(), 'bank:alfa');

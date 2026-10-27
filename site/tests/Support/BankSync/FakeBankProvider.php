@@ -29,6 +29,8 @@ final class FakeBankProvider implements BankProviderInterface
     public ?string $lastToken = null;
     /** @var (\Closure(): void)|null вызывается внутри запроса списка счетов — «пока банк отвечал» */
     public ?\Closure $duringAccountsRequest = null;
+    /** @var (\Closure(string): void)|null вызывается внутри запроса дня с датой Y-m-d */
+    public ?\Closure $duringDayRequest = null;
 
     /**
      * @param list<BankAccountDTO> $accounts
@@ -60,6 +62,9 @@ final class FakeBankProvider implements BankProviderInterface
     {
         $key = $date->format('Y-m-d');
         $this->fetchedDays[] = $key;
+        if (null !== $this->duringDayRequest) {
+            ($this->duringDayRequest)($key);
+        }
         if (isset($this->failures[$key])) {
             throw $this->failures[$key];
         }

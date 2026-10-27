@@ -15,10 +15,13 @@ use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
+use App\BankSync\Repository\BankAccountRepository;
 use App\BankSync\Repository\BankConnectionRepository;
+use App\Cash\Facade\CashFacade;
 use App\Shared\Security\Exception\DecryptionException;
 use App\Shared\Security\Exception\InvalidEncryptedPayloadException;
 use App\Shared\Security\Exception\MissingEncryptionKeyException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityNotFoundException;
 use Psr\Log\LoggerInterface;
@@ -31,6 +34,9 @@ use Psr\Log\LoggerInterface;
  * Отзыв не удался (сеть, отказ банка, нечитаемые учётные данные) — одно `warning`, удаление
  * всё равно проходит: клиент хочет отключиться, а токен банк погасит сам по сроку.
  *
+ * Счета банка подключения удаляются каскадом FK, признак «выписка из банка по API» у
+ * привязанных денежных счетов снимается в той же транзакции.
+ *
  * Курсоры счетов остаются: новое подключение к тому же банку продолжит загрузку с них, а
  * не перечитает неделю.
  */
@@ -40,6 +46,9 @@ final readonly class DeleteBankConnectionAction
 
     public function __construct(
         private BankConnectionRepository $connections,
+        private BankAccountRepository $bankAccounts,
+        private BankAccountCatalog $accountCatalog,
+        private CashFacade $cashFacade,
         private BankCredentialsCodec $credentialsCodec,
         private BankAuthorizationProviderRegistry $authorizationProviders,
         private BankConnectionTokenLock $tokenLock,
@@ -76,8 +85,27 @@ final readonly class DeleteBankConnectionAction
             }
 
             $this->revokeInBank($connection, $context);
-            $this->connections->remove($connection);
-            $this->entityManager->flush();
+            // Подключение, его счета банка (каскад FK) и признак источника у привязанных
+            // денежных счетов — одной транзакцией: признак не переживает привязку.
+            // Блокировка каталога — до чтения списка: параллельная загрузка не создаст счёт,
+            // которого список не увидит, а каскад удалит вместе с привязкой.
+            $this->entityManager->wrapInTransaction(function () use ($connection, $companyId, $connectionId): void {
+                $this->accountCatalog->lockConnection($connectionId);
+                $moneyAccountIds = [];
+                foreach ($this->bankAccounts->findByConnection($companyId, $connectionId) as $account) {
+                    $this->entityManager->refresh($account, LockMode::PESSIMISTIC_WRITE);
+                    $moneyAccountId = $account->getMoneyAccountId();
+                    if (null !== $moneyAccountId) {
+                        $moneyAccountIds[] = $moneyAccountId;
+                    }
+                }
+                // Денежные счета Cash блокирует по одному — в порядке id, как привязка.
+                sort($moneyAccountIds);
+                foreach ($moneyAccountIds as $moneyAccountId) {
+                    $this->cashFacade->clearBankApiStatementSource($companyId, $moneyAccountId);
+                }
+                $this->connections->remove($connection);
+            });
         } finally {
             $this->tokenLock->release($connectionId);
         }

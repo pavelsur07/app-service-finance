@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\BankSync;
 
+use App\BankSync\Application\BankAccountCatalog;
 use App\BankSync\Application\DeleteBankConnectionAction;
 use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
@@ -14,8 +15,13 @@ use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
 use App\BankSync\Infrastructure\Security\EncryptedBankCredentials;
+use App\BankSync\Repository\BankAccountRepository;
 use App\BankSync\Repository\BankConnectionRepository;
+use App\Cash\Facade\CashFacade;
+use App\Company\Entity\Company;
+use App\Tests\Builders\BankSync\BankAccountBuilder;
 use App\Tests\Builders\BankSync\BankConnectionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\BankSync\StubBankAuthorizationProvider;
@@ -33,6 +39,7 @@ use Ramsey\Uuid\Uuid;
 final class DeleteBankConnectionTest extends IntegrationTestCase
 {
     private string $companyId;
+    private Company $company;
     private TestHandler $logs;
     private Connection $worker;
 
@@ -43,7 +50,8 @@ final class DeleteBankConnectionTest extends IntegrationTestCase
         $this->companyId = Uuid::uuid4()->toString();
         $owner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('bank-delete-'.$this->companyId.'@example.test')->build();
         $this->em->persist($owner);
-        $this->em->persist(CompanyBuilder::aCompany()->withId($this->companyId)->withOwner($owner)->build());
+        $this->company = CompanyBuilder::aCompany()->withId($this->companyId)->withOwner($owner)->build();
+        $this->em->persist($this->company);
         $this->em->flush();
         $this->logs = new TestHandler();
         $this->worker = DriverManager::getConnection($this->em->getConnection()->getParams());
@@ -129,6 +137,25 @@ final class DeleteBankConnectionTest extends IntegrationTestCase
         self::assertSame([], StubBankAuthorizationProvider::$revoked);
     }
 
+    public function testLinkedMoneyAccountLosesBankApiSourceAndBankAccountsAreDeleted(): void
+    {
+        $connection = $this->persistConnection($this->codec()->encryptStaticToken('static-token'));
+        $moneyAccount = MoneyAccountBuilder::aMoneyAccount()->withId(Uuid::uuid4()->toString())->forCompany($this->company)->withCurrency('RUB')->build();
+        $moneyAccount->markBankApiSource('alfa');
+        $this->em->persist($moneyAccount);
+        $this->em->persist(BankAccountBuilder::anAccount()
+            ->withId(Uuid::uuid7()->toString())
+            ->forConnection($this->companyId, $connection->getId())
+            ->linkedTo((string) $moneyAccount->getId())
+            ->build());
+        $this->em->flush();
+
+        $this->action()($this->companyId, $connection->getId());
+
+        self::assertNull($this->em->getConnection()->fetchOne('SELECT bank_api_source FROM money_account WHERE id = :id', ['id' => (string) $moneyAccount->getId()]));
+        self::assertSame(0, (int) $this->em->getConnection()->fetchOne('SELECT count(*) FROM bank_sync_account WHERE connection_id = :id', ['id' => $connection->getId()]));
+    }
+
     public function testForeignConnectionIsNotFound(): void
     {
         $connection = $this->persistConnection($this->codec()->encryptStaticToken('static-token'));
@@ -145,6 +172,9 @@ final class DeleteBankConnectionTest extends IntegrationTestCase
     {
         return new DeleteBankConnectionAction(
             self::getContainer()->get(BankConnectionRepository::class),
+            self::getContainer()->get(BankAccountRepository::class),
+            new BankAccountCatalog(self::getContainer()->get(BankAccountRepository::class), $this->em),
+            self::getContainer()->get(CashFacade::class),
             $this->codec(),
             self::getContainer()->get(BankAuthorizationProviderRegistry::class),
             new BankConnectionTokenLock($this->em->getConnection(), $sleep),

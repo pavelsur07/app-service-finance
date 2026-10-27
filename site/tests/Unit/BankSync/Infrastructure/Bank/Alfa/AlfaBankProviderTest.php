@@ -9,6 +9,8 @@ use App\BankSync\Enum\BankCode;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaBankProvider;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaStatementMapper;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
@@ -17,6 +19,13 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class AlfaBankProviderTest extends TestCase
 {
+    private TestHandler $logHandler;
+
+    protected function setUp(): void
+    {
+        $this->logHandler = new TestHandler();
+    }
+
     public function testStatementDayCollectsAllPagesUntilNoNextLink(): void
     {
         $pages = [];
@@ -31,7 +40,7 @@ final class AlfaBankProviderTest extends TestCase
 
             return new MockResponse(json_encode(array_shift($responses), \JSON_THROW_ON_ERROR), ['http_code' => 200]);
         });
-        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper());
+        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper(), $this->logs());
 
         $day = $provider->fetchStatementDay($this->access(), '40702810900000000001', new \DateTimeImmutable('2026-10-01'));
 
@@ -41,17 +50,31 @@ final class AlfaBankProviderTest extends TestCase
         self::assertSame('2026-10-01', $day->date->format('Y-m-d'));
     }
 
-    public function testAccountsAreMapped(): void
+    public function testAccountsAreMappedAndSkippedOnesWarnedWithoutNumbers(): void
     {
         $http = new MockHttpClient(new MockResponse(json_encode([
-            'Data' => ['Account' => [['AccountDetails' => [['identification' => '40702810900000000001']]]]],
+            'Data' => ['Account' => [
+                ['accountId' => 'acc-1', 'status' => 'Enabled', 'currency' => 'RUB', 'accountType' => 'Business', 'accountDescription' => 'Расчётный',
+                    'AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => '40702810900000000001']]],
+                ['accountId' => 'acc-2', 'status' => 'Enabled', 'currency' => 'RUB', 'accountType' => 'Business', 'accountDescription' => 'Без номера'],
+            ]],
+            'Links' => ['self' => 'https://bank.test/accounts'],
+            'Meta' => ['totalPages' => 1],
         ], \JSON_THROW_ON_ERROR), ['http_code' => 200]));
-        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper());
+        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper(), $this->logs());
 
         $accounts = $provider->listAccounts($this->access());
 
         self::assertCount(1, $accounts);
         self::assertSame('40702810900000000001', $accounts[0]->accountNumber);
+        self::assertTrue($this->logHandler->hasWarningThatContains('skipped accounts without number or currency'));
+        self::assertSame(1, $this->logHandler->getRecords()[0]->context['skipped_accounts']);
+        self::assertStringNotContainsString('407028', json_encode($this->logHandler->getRecords()[0]->context, \JSON_THROW_ON_ERROR));
+    }
+
+    private function logs(): Logger
+    {
+        return new Logger('test', [$this->logHandler]);
     }
 
     /**
