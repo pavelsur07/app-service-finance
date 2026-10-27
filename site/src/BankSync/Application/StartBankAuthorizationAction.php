@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\BankSync\Application;
 
+use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Domain\OAuth\AuthorizationRequest;
 use App\BankSync\Domain\OAuth\PendingAuthorization;
 use App\BankSync\Domain\OAuth\Pkce;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankEnvironmentNotAllowedException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
@@ -38,8 +40,9 @@ final readonly class StartBankAuthorizationAction
      * @throws UnknownBankCodeException у банка нет входа по OAuth
      * @throws BankAuthorizationNotConfiguredException вход в этой среде банка не настроен
      * @throws BankConnectionNotFoundException переподключаемое не принадлежит компании
+     * @throws BankEnvironmentNotAllowedException песочница, а `$sandboxAllowed` false (и при переподключении)
      */
-    public function __invoke(string $companyId, BankCode $bankCode, string $baseUrl, ?string $connectionId, string $redirectUri): string
+    public function __invoke(string $companyId, BankCode $bankCode, string $baseUrl, ?string $connectionId, string $redirectUri, bool $sandboxAllowed): string
     {
         Assert::startsWith($baseUrl, 'https://');
         if (null !== $connectionId) {
@@ -48,6 +51,10 @@ final readonly class StartBankAuthorizationAction
             // Переподключение — в тот же банк и ту же среду.
             $bankCode = $connection->getBankCode();
             $baseUrl = $connection->getBaseUrl();
+        }
+        // Среда известна только здесь: при переподключении она берётся из подключения.
+        if (BankConnectionFormData::SANDBOX_URL === $baseUrl && !$sandboxAllowed) {
+            throw new BankEnvironmentNotAllowedException($baseUrl);
         }
         $provider = $this->providers->get($bankCode);
 

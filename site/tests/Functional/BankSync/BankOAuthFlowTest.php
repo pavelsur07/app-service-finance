@@ -180,6 +180,7 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         $this->em()->persist($connection);
         $this->em()->flush();
         $before = $this->rows()[0];
+        $this->becomeAdmin();
 
         $authorizationUrl = $this->startFromIndex('Переподключить');
         $this->returnFromBank($this->query($authorizationUrl)['state'], StubBankAuthorizationProvider::codeFor($authorizationUrl));
@@ -197,11 +198,35 @@ final class BankOAuthFlowTest extends WebTestCaseBase
 
     public function testEachConfiguredEnvironmentHasItsButton(): void
     {
+        $this->becomeAdmin();
         $crawler = $this->client->request('GET', '/bank-connections/');
 
         $forms = $crawler->filter('form[action="/bank-connections/oauth/start"]');
         self::assertSame(['https://baas.alfabank.ru', 'https://sandbox.alfabank.ru'], $forms->filter('input[name="base_url"]')->each(static fn ($input): string => (string) $input->attr('value')));
         self::assertStringContainsString('Альфа-Банк (песочница)', $forms->last()->text());
+    }
+
+    public function testSandboxIsOnlyForAdmin(): void
+    {
+        $sandboxConnection = BankConnectionBuilder::aConnection()
+            ->withId(Uuid::uuid7()->toString())
+            ->withCompanyId((string) $this->company->getId())
+            ->withBaseUrl('https://sandbox.alfabank.ru')
+            ->withCredentials($this->codec()->encryptStaticToken('old-token'))
+            ->build();
+        $sandboxConnection->markNeedsReauth('refresh_rejected');
+        $this->em()->persist($sandboxConnection);
+        $this->em()->flush();
+
+        $crawler = $this->client->request('GET', '/bank-connections/');
+        self::assertSame(['https://baas.alfabank.ru'], $crawler->filter('form[action="/bank-connections/oauth/start"] input[name="base_url"]')->each(static fn ($input): string => (string) $input->attr('value')));
+        self::assertCount(0, $crawler->selectButton('Переподключить'), 'подключение песочницы клиенту не переподключить');
+        $token = $crawler->filter('form[action="/bank-connections/oauth/start"] input[name="_token"]')->attr('value');
+
+        $this->client->request('POST', '/bank-connections/oauth/start', ['_token' => $token, 'bank_code' => 'alfa', 'base_url' => 'https://sandbox.alfabank.ru']);
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('POST', '/bank-connections/oauth/start', ['_token' => $token, 'connection_id' => $sandboxConnection->getId()]);
+        self::assertResponseStatusCodeSame(403, 'переподключение берёт среду из подключения');
     }
 
     public function testUnconfiguredBankHasNoButtonAndStartIsRefused(): void
@@ -266,6 +291,14 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         }
 
         return $strings;
+    }
+
+    private function becomeAdmin(): void
+    {
+        $this->owner->setRoles(['ROLE_COMPANY_OWNER', 'ROLE_ADMIN']);
+        $this->em()->flush();
+        $this->client->loginUser($this->owner);
+        $this->switchCompany($this->company);
     }
 
     private function switchCompany(Company $company): void

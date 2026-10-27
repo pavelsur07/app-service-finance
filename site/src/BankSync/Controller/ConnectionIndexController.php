@@ -34,6 +34,8 @@ final class ConnectionIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
         // Кнопка входа — на каждую настроенную среду банка: на проде без пары приложения её нет.
+        // Песочница — только администратору (проверка и демонстрация банку).
+        $sandboxAllowed = $this->isGranted(OAuthStartController::SANDBOX_ROLE);
         $oauthStarts = [];
         foreach (BankCode::cases() as $bankCode) {
             if (!$this->authorizationProviders->has($bankCode)) {
@@ -41,6 +43,9 @@ final class ConnectionIndexController extends AbstractController
             }
             $environments = $this->authorizationProviders->get($bankCode)->environments();
             foreach ([BankConnectionFormData::PRODUCTION_URL, BankConnectionFormData::SANDBOX_URL] as $baseUrl) {
+                if (BankConnectionFormData::SANDBOX_URL === $baseUrl && !$sandboxAllowed) {
+                    continue;
+                }
                 if (\in_array($baseUrl, $environments, true)) {
                     $oauthStarts[] = [
                         'bank_code' => $bankCode->value,

@@ -32,6 +32,7 @@ final class BankConnectionPagesTest extends WebTestCaseBase
 
     private KernelBrowser $client;
     private Company $company;
+    private User $owner;
 
     protected function setUp(): void
     {
@@ -39,7 +40,7 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         StubBankAuthorizationProvider::reset();
 
         $this->client = static::createClient();
-        $owner = UserBuilder::aUser()
+        $this->owner = $owner = UserBuilder::aUser()
             ->withId(Uuid::uuid4()->toString())
             ->withEmail('bank-pages-owner@example.test')
             ->withRoles(['ROLE_COMPANY_OWNER'])
@@ -132,7 +133,10 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         $connection = $this->persistOAuthConnection();
         $connection->recordAuthorizedSubject('user-1');
         $connection->updateConsentExpiresAt(new \DateTimeImmutable('+10 days'));
+        // Подключение — к песочнице: переподключить её может только администратор.
+        $this->owner->setRoles(['ROLE_COMPANY_OWNER', 'ROLE_ADMIN']);
         $this->em()->flush();
+        $this->loginAs($this->owner);
 
         $crawler = $this->client->request('GET', '/bank-connections/');
 
