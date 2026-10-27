@@ -85,6 +85,23 @@ final class AlfaApiClientTest extends TestCase
         self::assertCount(2, array_unique($interactionIds), 'новый идентификатор на каждый запрос');
     }
 
+    public function testSummaryUrlHasAccountAndDateWithoutLoggingThem(): void
+    {
+        $requested = [];
+        $client = $this->client(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = [$method, $url];
+
+            return new MockResponse('{"openingBalance":{"amount":1,"currencyName":"RUR"}}', ['http_code' => 200, 'response_headers' => ['X-TraceId' => 'trace-7']]);
+        });
+
+        $payload = $client->getSummary($this->connection(), self::ACCOUNT_NUMBER, new \DateTimeImmutable('2026-10-01'));
+
+        self::assertSame(['amount' => 1, 'currencyName' => 'RUR'], $payload['openingBalance']);
+        self::assertSame([['GET', 'https://bank.test/api/jp/v1/statement/summary?accountNumber='.self::ACCOUNT_NUMBER.'&statementDate=2026-10-01']], $requested);
+        self::assertSame('/api/jp/v1/statement/summary', $this->singleRecord()->context['path']);
+        $this->assertLogsHaveNoSensitiveData();
+    }
+
     #[DataProvider('temporaryStatusProvider')]
     public function testTemporaryStatusThrowsUnavailable(int $status): void
     {
