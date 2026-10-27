@@ -246,6 +246,33 @@ final class SyncAlfaConsentsCommandTest extends IntegrationTestCase
         self::assertStringContainsString('0 date(s) updated, 0 expiring', $display);
     }
 
+    public function testImpossibleExpiryDateRejectsTheAnswer(): void
+    {
+        $connection = $this->connection('user-1');
+        $this->bankConsents = [$this->consent('user-1', true, '2026-02-31')];
+
+        [$exit] = $this->runSync();
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertNull($this->reload($connection)->getConsentExpiresAt());
+        self::assertTrue($this->logs->hasWarningThatContains('unreadable consent item'));
+    }
+
+    public function testEachChangeIsCommittedAndDetached(): void
+    {
+        $first = $this->connection('user-1');
+        $second = $this->connection('user-2');
+        $this->bankConsents = [$this->consent('user-1', true, '2027-09-01'), $this->consent('user-2', false, '2027-09-01')];
+        $this->em->clear();
+
+        [$exit] = $this->runSync();
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame(0, $this->em->getUnitOfWork()->size(), 'сверка не держит подключения в EntityManager');
+        self::assertSame('2027-09-01', $this->reload($first)->getConsentExpiresAt()?->format('Y-m-d'));
+        self::assertSame(BankConnectionStatus::REVOKED, $this->reload($second)->getStatus());
+    }
+
     /**
      * @return iterable<string, array{int, int}>
      */

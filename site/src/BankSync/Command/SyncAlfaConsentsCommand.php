@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\BankSync\Command;
 
 use App\BankSync\Domain\Consent\BankConsent;
+use App\BankSync\Domain\Consent\ConsentCheckTarget;
 use App\BankSync\Domain\Consent\ConsentExpiryPolicy;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
@@ -19,7 +20,6 @@ use App\BankSync\Infrastructure\Bank\Alfa\AlfaIdConfig;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Repository\BankConnectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\EntityNotFoundException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -31,13 +31,14 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Ночная сверка сроков согласий Alfa ID: по каждой настроенной среде, где есть подключения
  * с известным пользователем банка, — все согласия приложения одним списком (HTTP до записи
  * в БД), затем по каждому подключению `ConsentExpiryPolicy`:
- * - действует — срок в `consent_expires_at` (новый срок — под блокировкой токенов на
- *   перечитанной строке: вход клиента во время запроса к банку сбрасывает срок, старый
- *   ответ его не перезаписывает); осталось 30 дней и меньше — в агрегированный `warning`
+ * - действует — срок в `consent_expires_at`; осталось 30 дней и меньше — в агрегированный `warning`
  *   (клиент видит предупреждение в списке подключений);
- * - все согласия неактивны или истекли — `revoked` (`consent_expired`) под блокировкой
- *   токенов подключения на перечитанной строке;
+ * - все согласия неактивны или истекли — `revoked` (`consent_expired`);
  * - банк о пользователе не сообщил — ничего не меняем, счётчик «не найдено».
+ *
+ * Подключения читаются снимками до HTTP; срок и статус меняются по одному — под
+ * блокировкой токенов на перечитанной строке, только если учётные данные не сменились
+ * (вход клиента во время запроса сбрасывает срок, старый ответ его не перезаписывает).
  *
  * Отказ в токене приложения или ненастроенный канал — `error`, exit 1; банк недоступен —
  * `warning`, exit 1, данные не тронуты. В логи и вывод — ID подключений и счётчики, без
@@ -76,8 +77,8 @@ final class SyncAlfaConsentsCommand extends Command
         $failed = [];
         $unavailable = [];
         foreach ($configured as $baseUrl) {
-            $connections = $this->connections->findWithExternalSubjectByBankAndBaseUrl(BankCode::ALFA, $baseUrl);
-            if ([] === $connections) {
+            $targets = $this->connections->findConsentCheckTargets(BankCode::ALFA, $baseUrl);
+            if ([] === $targets) {
                 $output->writeln(sprintf('%s: no connections to check', $baseUrl));
                 continue;
             }
@@ -94,8 +95,8 @@ final class SyncAlfaConsentsCommand extends Command
                 continue;
             }
 
-            $this->apply($connections, $this->bySubject($consents), $result);
-            $output->writeln(sprintf('%s: %d connection(s), %d consent(s) from the bank', $baseUrl, \count($connections), \count($consents)));
+            $this->apply($targets, $this->bySubject($consents), $result);
+            $output->writeln(sprintf('%s: %d connection(s), %d consent(s) from the bank', $baseUrl, \count($targets), \count($consents)));
         }
 
         $summary = [
@@ -144,21 +145,27 @@ final class SyncAlfaConsentsCommand extends Command
     }
 
     /**
-     * @param list<BankConnection> $connections
+     * @param list<ConsentCheckTarget> $targets
      * @param array<string, list<BankConsent>> $bySubject
      * @param array{checked: int, updated: int, expiring: list<string>, revoked: list<string>, not_found: list<string>, busy: list<string>} $result
      */
-    private function apply(array $connections, array $bySubject, array &$result): void
+    private function apply(array $targets, array $bySubject, array &$result): void
     {
         $today = $this->clock->now();
-        foreach ($connections as $connection) {
+        foreach ($targets as $target) {
             ++$result['checked'];
-            $decision = $this->policy->decide($bySubject[(string) $connection->getExternalSubject()] ?? [], $today);
+            $decision = $this->policy->decide($bySubject[$target->externalSubject] ?? [], $today);
 
             match ($decision->state) {
-                ConsentState::ACTIVE => $this->recordExpiry($connection, $decision->expiresOn, $decision->expiresSoon, $result),
-                ConsentState::EXPIRED => $this->revoke($connection, $result),
-                ConsentState::NOT_FOUND => $result['not_found'][] = $connection->getId(),
+                ConsentState::ACTIVE => $this->recordExpiry($target, $decision->expiresOn, $decision->expiresSoon, $result),
+                ConsentState::EXPIRED => $this->changeUnderLock($target, function (BankConnection $connection) use ($target, &$result): void {
+                    if (BankConnectionStatus::REVOKED === $connection->getStatus()) {
+                        return;
+                    }
+                    $connection->markRevoked(self::STATUS_REASON);
+                    $result['revoked'][] = $target->connectionId;
+                }, $result),
+                ConsentState::NOT_FOUND => $result['not_found'][] = $target->connectionId,
             };
         }
     }
@@ -166,68 +173,57 @@ final class SyncAlfaConsentsCommand extends Command
     /**
      * @param array{checked: int, updated: int, expiring: list<string>, revoked: list<string>, not_found: list<string>, busy: list<string>} $result
      */
-    private function recordExpiry(BankConnection $connection, ?\DateTimeImmutable $expiresOn, bool $expiresSoon, array &$result): void
+    private function recordExpiry(ConsentCheckTarget $target, ?\DateTimeImmutable $expiresOn, bool $expiresSoon, array &$result): void
     {
         if (null === $expiresOn) {
             return;
         }
-        if ($connection->getConsentExpiresAt()?->format('Y-m-d') !== $expiresOn->format('Y-m-d')) {
-            $usedCredentials = $connection->getCredentialsEncrypted();
-            if (!$this->tokenLock->acquire($connection->getId(), self::TOKEN_LOCK_TIMEOUT_SECONDS)) {
-                $result['busy'][] = $connection->getId();
-
-                return;
-            }
-            try {
-                try {
-                    $this->entityManager->refresh($connection);
-                } catch (EntityNotFoundException) {
-                    return;
-                }
-                if ($connection->getCredentialsEncrypted() !== $usedCredentials) {
-                    // Клиент вошёл заново, пока шёл запрос: срок нового согласия — завтра.
-                    return;
-                }
+        if ($target->consentExpiresOn !== $expiresOn->format('Y-m-d')) {
+            $applied = $this->changeUnderLock($target, static function (BankConnection $connection) use ($expiresOn, &$result): void {
                 $connection->updateConsentExpiresAt($expiresOn);
-                $this->entityManager->flush();
                 ++$result['updated'];
-            } finally {
-                $this->tokenLock->release($connection->getId());
+            }, $result);
+            if (!$applied) {
+                return;
             }
         }
         if ($expiresSoon) {
-            $result['expiring'][] = $connection->getId();
+            $result['expiring'][] = $target->connectionId;
         }
     }
 
     /**
-     * Статус — под блокировкой токенов на перечитанной строке (правило Stage 3): вход
-     * клиента в эту минуту даст новое согласие, его не гасим.
+     * Изменение — под блокировкой токенов на перечитанной строке (правило Stage 3): если
+     * клиент вошёл заново, пока шёл запрос к банку (учётные данные не те, что в снимке),
+     * старый ответ банка к новому входу не применяется. Каждое изменение коммитится сразу и
+     * отсоединяется: в EntityManager не копятся подключения всех компаний.
      *
+     * @param \Closure(BankConnection): void $change
      * @param array{checked: int, updated: int, expiring: list<string>, revoked: list<string>, not_found: list<string>, busy: list<string>} $result
+     *
+     * @return bool изменение применено к той же авторизации
      */
-    private function revoke(BankConnection $connection, array &$result): void
+    private function changeUnderLock(ConsentCheckTarget $target, \Closure $change, array &$result): bool
     {
-        $usedCredentials = $connection->getCredentialsEncrypted();
-        if (!$this->tokenLock->acquire($connection->getId(), self::TOKEN_LOCK_TIMEOUT_SECONDS)) {
-            $result['busy'][] = $connection->getId();
+        if (!$this->tokenLock->acquire($target->connectionId, self::TOKEN_LOCK_TIMEOUT_SECONDS)) {
+            $result['busy'][] = $target->connectionId;
 
-            return;
+            return false;
         }
         try {
-            try {
-                $this->entityManager->refresh($connection);
-            } catch (EntityNotFoundException) {
-                return;
+            // Строка — из БД, а не из identity map: иначе сверка увидит прежние учётные данные.
+            $this->entityManager->clear();
+            $connection = $this->connections->findOneByIdAndCompanyId($target->connectionId, $target->companyId);
+            if (null === $connection || $connection->getCredentialsEncrypted() !== $target->credentialsEncrypted) {
+                return false;
             }
-            if (BankConnectionStatus::REVOKED === $connection->getStatus() || $connection->getCredentialsEncrypted() !== $usedCredentials) {
-                return;
-            }
-            $connection->markRevoked(self::STATUS_REASON);
+            $change($connection);
             $this->entityManager->flush();
-            $result['revoked'][] = $connection->getId();
+
+            return true;
         } finally {
-            $this->tokenLock->release($connection->getId());
+            $this->tokenLock->release($target->connectionId);
+            $this->entityManager->clear();
         }
     }
 

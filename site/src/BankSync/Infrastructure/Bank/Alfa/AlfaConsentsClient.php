@@ -159,6 +159,10 @@ final readonly class AlfaConsentsClient
         $isActive = \is_array($item) ? ($item['isActive'] ?? null) : null;
         $expireDate = \is_array($item) ? ($item['expireDate'] ?? null) : null;
         $expiresOn = \is_string($expireDate) ? \DateTimeImmutable::createFromFormat('!Y-m-d', $expireDate) : false;
+        // createFromFormat переносит невозможную дату (2026-02-31 → 2026-03-03) — такую отвергаем.
+        if (false !== $expiresOn && $expiresOn->format('Y-m-d') !== $expireDate) {
+            $expiresOn = false;
+        }
         if (!\is_string($subject) || '' === $subject || !\is_bool($isActive) || false === $expiresOn) {
             $this->logger->warning('Alfa client consents: unreadable consent item');
 
