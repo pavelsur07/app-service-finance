@@ -6,6 +6,7 @@ namespace App\Tests\Unit\BankSync\Infrastructure\Bank\Alfa;
 
 use App\BankSync\Application\DTO\BankAccountDTO;
 use App\BankSync\Enum\BankDirection;
+use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaStatementMapper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -19,29 +20,99 @@ final class AlfaStatementMapperTest extends TestCase
         $this->mapper = new AlfaStatementMapper();
     }
 
-    public function testAccountsAreUniqueAndEmptyIdentificationsSkipped(): void
+    /**
+     * Ответ по схеме `AccountResponse` из `docs/plan/alfa/accounts-ob.yaml` (значения — из
+     * примеров спецификации).
+     */
+    public function testAccountsOfSpecificationResponseAreMapped(): void
     {
-        $accounts = $this->mapper->mapAccounts([
-            'Data' => [
-                'Account' => [
-                    ['AccountDetails' => [['identification' => '40702810900000000001'], ['identification' => '']]],
-                    ['AccountDetails' => [['identification' => '40702810900000000001'], ['identification' => ' 40702810900000000002 ']]],
-                    ['AccountDetails' => 'broken'],
-                    'broken',
+        $list = $this->mapper->mapAccounts([
+            'Data' => ['Account' => [
+                [
+                    'accountId' => 'this-is-a-slug-format-account-id',
+                    'status' => 'Enabled',
+                    'currency' => 'RUB',
+                    'accountType' => 'Business',
+                    'accountDescription' => 'Розничные операции',
+                    'AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => '40702810621234570000']],
+                    'Owner' => [
+                        'name' => 'Наименование организации или физического лица',
+                        'Identification' => [['schemeName' => 'RU.CBR.TXID', 'identification' => '7728240240']],
+                    ],
+                    'Servicer' => [
+                        'name' => 'АО «АЛЬФА-БАНК»',
+                        'BankIdentification' => [['schemeName' => 'RU.CBR.BIC', 'identification' => '044525593']],
+                    ],
                 ],
-            ],
+                [
+                    'accountId' => 'closed-account',
+                    'status' => 'Disabled',
+                    'currency' => 'rur',
+                    'accountType' => 'Business',
+                    'accountDescription' => 'Закрытый',
+                    'AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => ' 40702810621234570001 ']],
+                ],
+            ]],
+            'Links' => ['self' => 'https://sb.example.ru/v1.3/example?page=1'],
+            'Meta' => ['totalPages' => 1],
         ]);
 
         self::assertEquals([
-            new BankAccountDTO('40702810900000000001'),
-            new BankAccountDTO('40702810900000000002'),
-        ], $accounts);
+            new BankAccountDTO('40702810621234570000', 'RUB', true, '044525593', 'Розничные операции', 'this-is-a-slug-format-account-id'),
+            new BankAccountDTO('40702810621234570001', 'RUB', false, null, 'Закрытый', 'closed-account'),
+        ], $list->accounts);
+        self::assertSame(0, $list->skippedAccounts);
     }
 
-    public function testAccountsOfUnexpectedResponseAreEmpty(): void
+    public function testAccountsWithoutNumberOrCurrencyAreSkippedAndRepeatsMerged(): void
     {
-        self::assertSame([], $this->mapper->mapAccounts([]));
-        self::assertSame([], $this->mapper->mapAccounts(['Data' => 'broken']));
+        $account = static fn (array $override): array => $override + [
+            'accountId' => 'a', 'status' => 'Enabled', 'currency' => 'RUB', 'accountType' => 'Business', 'accountDescription' => 'x',
+            'AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => '40702810900000000001']],
+        ];
+
+        $list = $this->mapper->mapAccounts(['Data' => ['Account' => [
+            $account([]),
+            $account(['accountId' => 'repeat']),
+            $account(['AccountDetails' => [['schemeName' => 'OTHER', 'identification' => '40702810900000000002']]]),
+            $account(['AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => '  ']]]),
+            $account(['AccountDetails' => 'broken']),
+            $account(['currency' => null]),
+            'broken',
+        ]]]);
+
+        self::assertCount(1, $list->accounts);
+        self::assertSame('a', $list->accounts[0]->externalId, 'первый из повторов');
+        self::assertSame(5, $list->skippedAccounts);
+    }
+
+    public function testEmptyAccountListIsValid(): void
+    {
+        self::assertSame([], $this->mapper->mapAccounts(['Data' => []])->accounts);
+        self::assertSame([], $this->mapper->mapAccounts(['Data' => ['Account' => []]])->accounts);
+    }
+
+    /**
+     * @return iterable<string, array{array<mixed>}>
+     */
+    public static function unusableAccountResponses(): iterable
+    {
+        yield 'нет Data' => [[]];
+        yield 'Data не объект' => [['Data' => 'broken']];
+        yield 'Account не список' => [['Data' => ['Account' => ['a' => []]]]];
+        yield 'больше одной страницы' => [['Data' => ['Account' => []], 'Meta' => ['totalPages' => 2]]];
+        yield 'totalPages не число' => [['Data' => ['Account' => []], 'Meta' => ['totalPages' => '1']]];
+    }
+
+    /**
+     * @param array<mixed> $response
+     */
+    #[DataProvider('unusableAccountResponses')]
+    public function testUnusableAccountResponseIsRequestFailure(array $response): void
+    {
+        $this->expectException(BankApiRequestFailedException::class);
+
+        $this->mapper->mapAccounts($response);
     }
 
     public function testInflowAndOutflowLinesAreMapped(): void

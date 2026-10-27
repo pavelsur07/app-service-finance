@@ -9,6 +9,7 @@ use App\BankSync\Domain\BankAccess;
 use App\BankSync\Domain\BankProviderInterface;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankApiRequestFailedException;
+use Psr\Log\LoggerInterface;
 
 final readonly class AlfaBankProvider implements BankProviderInterface
 {
@@ -18,6 +19,7 @@ final readonly class AlfaBankProvider implements BankProviderInterface
     public function __construct(
         private AlfaApiClient $apiClient,
         private AlfaStatementMapper $mapper,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -28,7 +30,16 @@ final readonly class AlfaBankProvider implements BankProviderInterface
 
     public function listAccounts(BankAccess $access): array
     {
-        return $this->mapper->mapAccounts($this->apiClient->getAccounts($access));
+        $list = $this->mapper->mapAccounts($this->apiClient->getAccounts($access));
+        if ($list->skippedAccounts > 0) {
+            // Номера не пишем: счёт без номера или валюты — формат ответа банка, разбирать по trace_id.
+            $this->logger->warning('Alfa accounts: skipped accounts without number or currency', [
+                'bank_connection_id' => $access->connectionId,
+                'skipped_accounts' => $list->skippedAccounts,
+            ]);
+        }
+
+        return $list->accounts;
     }
 
     public function fetchStatementDay(BankAccess $access, string $accountNumber, \DateTimeImmutable $date): BankStatementDayDTO

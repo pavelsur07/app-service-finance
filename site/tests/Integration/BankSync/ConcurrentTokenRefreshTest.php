@@ -74,7 +74,7 @@ final class ConcurrentTokenRefreshTest extends PostgresResetTestCase
     public function testSecondWorkerWaitsAndUsesTokensRefreshedByTheFirst(): void
     {
         self::assertTrue((new BankConnectionTokenLock($this->workerA))->acquire($this->bankConnection->getId(), 1));
-        $bank = new FakeBankProvider([new BankAccountDTO('40702810900000000077')]);
+        $bank = new FakeBankProvider([new BankAccountDTO('40702810900000000077', 'RUB')]);
 
         // Пока воркер B ждёт, воркер A обновляет токены у банка, коммитит и отпускает блокировку.
         $workerAFinishes = function (): void {

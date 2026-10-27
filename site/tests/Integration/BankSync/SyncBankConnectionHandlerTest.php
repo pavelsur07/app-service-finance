@@ -86,7 +86,7 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         }
         $this->em->flush();
 
-        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER), new BankAccountDTO('40702810900000009999')]);
+        $this->bank = new FakeBankProvider([new BankAccountDTO(self::ACCOUNT_NUMBER, 'RUB'), new BankAccountDTO('40702810900000009999', 'RUB')]);
         $this->logs = new TestHandler();
         StubBankAuthorizationProvider::reset();
     }

@@ -17,7 +17,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 final readonly class AlfaApiClient
 {
     private const BANK_CODE = 'alfa';
-    public const ACCOUNTS_PATH = '/api/jp/open-banking/v1.3/accounts';
+    public const ACCOUNTS_PATH = '/api/jp/open-banking/v3.0/aisp-le/accounts';
     public const STATEMENT_PATH = '/api/jp/v1/statement/transactions';
 
     public function __construct(
