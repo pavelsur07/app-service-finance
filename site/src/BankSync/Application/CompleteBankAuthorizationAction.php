@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\BankSync\Application;
 
+use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Domain\OAuth\PendingAuthorization;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Exception\BankApiRequestFailedException;
@@ -15,6 +16,7 @@ use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankEnvironmentNotAllowedException;
 use App\BankSync\Exception\BankIdTokenInvalidException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
 use App\BankSync\Infrastructure\OAuth\AuthorizationStateClaims;
@@ -65,8 +67,9 @@ final readonly class CompleteBankAuthorizationAction
      * @throws BankApiRequestFailedException
      * @throws BankConnectionNotFoundException переподключаемое удалили, пока клиент был в банке
      * @throws BankConnectionBusyException токены подключения меняет другой процесс
+     * @throws BankEnvironmentNotAllowedException вход в песочницу, а `$sandboxAllowed` false — до обмена кода
      */
-    public function __invoke(string $activeCompanyId, string $state, #[\SensitiveParameter] ?string $code, ?string $error): string
+    public function __invoke(string $activeCompanyId, string $state, #[\SensitiveParameter] ?string $code, ?string $error, bool $sandboxAllowed): string
     {
         $pending = '' !== $state ? $this->sessionStore->take($state) : null;
         if (null === $pending) {
@@ -88,6 +91,11 @@ final readonly class CompleteBankAuthorizationAction
             $this->logger->warning('Bank authorization callback for another company', $context + ['active_company_id' => $activeCompanyId]);
 
             throw new BankAuthorizationStateInvalidException('company_mismatch');
+        }
+        if (BankConnectionFormData::SANDBOX_URL === $pending->baseUrl && !$sandboxAllowed) {
+            $this->logger->warning('Bank authorization callback for sandbox by a non-admin user', $context);
+
+            throw new BankEnvironmentNotAllowedException($pending->baseUrl);
         }
         if (null !== $error || null === $code || '' === $code) {
             $denied = new BankAuthorizationDeniedException($error);

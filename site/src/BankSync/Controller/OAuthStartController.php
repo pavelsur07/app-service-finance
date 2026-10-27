@@ -9,6 +9,7 @@ use App\BankSync\Application\StartBankAuthorizationAction;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankEnvironmentNotAllowedException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -28,6 +29,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class OAuthStartController extends AbstractController
 {
     public const CSRF_ID = 'bank_sync_oauth_start';
+    /** Песочница банка на проде — для проверки и демонстрации банку, не для клиентов. */
+    public const SANDBOX_ROLE = 'ROLE_ADMIN';
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
@@ -61,9 +64,12 @@ final class OAuthStartController extends AbstractController
                 $baseUrl,
                 '' === $connectionId ? null : $connectionId,
                 $this->generateUrl('bank_sync_oauth_callback', [], UrlGeneratorInterface::ABSOLUTE_URL),
+                $this->isGranted(self::SANDBOX_ROLE),
             );
         } catch (BankConnectionNotFoundException) {
             throw $this->createNotFoundException();
+        } catch (BankEnvironmentNotAllowedException) {
+            throw $this->createAccessDeniedException();
         } catch (UnknownBankCodeException|BankAuthorizationNotConfiguredException) {
             $this->addFlash('warning', sprintf('Вход через %s пока не подключён.', $bankCode->label()));
 

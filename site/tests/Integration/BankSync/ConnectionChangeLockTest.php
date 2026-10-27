@@ -133,11 +133,11 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         // Сессии в Redis без блокировки: второй запрос прочитал запись до того, как первый её удалил.
         $pending = $this->pendingReconnect();
         $action = self::getContainer()->get(CompleteBankAuthorizationAction::class);
-        $action($this->companyId, $pending->state, $pending->code, null);
+        $action($this->companyId, $pending->state, $pending->code, null, true);
         $this->sessionStore->save($pending->authorization, new \DateTimeImmutable());
 
         try {
-            $action($this->companyId, $pending->state, $pending->code, null);
+            $action($this->companyId, $pending->state, $pending->code, null, true);
             self::fail('the second request with the same state must be rejected');
         } catch (BankAuthorizationStateInvalidException $exception) {
             self::assertSame('unknown', $exception->reason);
@@ -155,7 +155,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         );
 
         try {
-            self::getContainer()->get(CompleteBankAuthorizationAction::class)($this->companyId, $pending->state, $pending->code, null);
+            self::getContainer()->get(CompleteBankAuthorizationAction::class)($this->companyId, $pending->state, $pending->code, null, true);
             self::fail('tokens of another environment must not be stored');
         } catch (BankAuthorizationStateInvalidException $exception) {
             self::assertSame('connection_changed', $exception->reason);
@@ -236,7 +236,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
     {
         $pending = $this->pendingReconnect();
 
-        $action($this->companyId, $pending->state, $pending->code, null);
+        $action($this->companyId, $pending->state, $pending->code, null, true);
     }
 
     /**

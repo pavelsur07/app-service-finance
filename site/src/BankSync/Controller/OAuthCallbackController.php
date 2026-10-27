@@ -14,6 +14,7 @@ use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankEnvironmentNotAllowedException;
 use App\BankSync\Exception\BankIdTokenInvalidException;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -49,6 +50,7 @@ final class OAuthCallbackController extends AbstractController
                 $request->query->getString('state'),
                 $request->query->getString('code'),
                 '' === $error ? null : $error,
+                $this->isGranted(OAuthStartController::SANDBOX_ROLE),
             );
             $this->addFlash('success', 'Банк подключён.');
         } catch (BankAuthorizationStateInvalidException $exception) {
@@ -65,6 +67,8 @@ final class OAuthCallbackController extends AbstractController
             $this->addFlash('danger', 'Банк временно недоступен. Попробуйте подключиться позже.');
         } catch (BankApiRequestFailedException|BankAuthorizationNotConfiguredException|BankChannelNotConfiguredException|BankIdTokenInvalidException) {
             $this->addFlash('danger', 'Не удалось завершить вход в банк. Попробуйте позже или напишите в поддержку.');
+        } catch (BankEnvironmentNotAllowedException) {
+            throw $this->createAccessDeniedException();
         } catch (BankConnectionNotFoundException) {
             $this->addFlash('warning', 'Подключение удалили, пока шёл вход в банк.');
         } catch (BankConnectionBusyException) {

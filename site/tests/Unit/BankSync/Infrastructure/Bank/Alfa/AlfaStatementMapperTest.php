@@ -217,6 +217,74 @@ final class AlfaStatementMapperTest extends TestCase
     }
 
     /**
+     * Ответ по схеме `OK` из `docs/plan/alfa/turnover.yaml` (значения — из примеров схемы).
+     */
+    public function testSummaryOfSpecificationResponseIsMapped(): void
+    {
+        $summary = $this->mapper->mapSummary($this->summaryResponse());
+
+        self::assertSame('RUB', $summary->currency);
+        self::assertSame(['10000.55', '25000.30', '10000.00', '25000.00'], [$summary->openingBalance, $summary->closingBalance, $summary->debitTurnover, $summary->creditTurnover]);
+        self::assertSame([10, 10], [$summary->debitTransactions, $summary->creditTransactions]);
+        self::assertFalse($summary->isConsistent(), '10000.55 + 25000 − 10000 ≠ 25000.30 — пример схемы не сходится');
+
+        $consistent = $this->mapper->mapSummary($this->summaryResponse(['creditTurnover' => ['amount' => 24999.75, 'currencyName' => 'RUR']]));
+        self::assertTrue($consistent->isConsistent());
+    }
+
+    public function testNegativeBalanceIsKeptWithSign(): void
+    {
+        $summary = $this->mapper->mapSummary($this->summaryResponse([
+            'openingBalance' => ['amount' => -150.5, 'currencyName' => 'RUR'],
+            'closingBalance' => ['amount' => '-0.5', 'currencyName' => 'RUR'],
+        ]));
+
+        self::assertSame(['-150.50', '-0.50'], [$summary->openingBalance, $summary->closingBalance]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function unusableSummaries(): iterable
+    {
+        yield 'нет входящего остатка' => [['openingBalance' => null]];
+        yield 'нет оборота' => [['debitTurnover' => ['currencyName' => 'RUR']]];
+        yield 'оборот со знаком' => [['creditTurnover' => ['amount' => -1, 'currencyName' => 'RUR']]];
+        yield 'нет валюты' => [['openingBalance' => ['amount' => 1]]];
+    }
+
+    /**
+     * @param array<string, mixed> $override
+     */
+    #[DataProvider('unusableSummaries')]
+    public function testUnusableSummaryIsRequestFailure(array $override): void
+    {
+        $this->expectException(BankApiRequestFailedException::class);
+
+        $this->mapper->mapSummary($this->summaryResponse($override));
+    }
+
+    /**
+     * @param array<string, mixed> $override
+     *
+     * @return array<string, mixed>
+     */
+    private function summaryResponse(array $override = []): array
+    {
+        return array_merge([
+            'composedDateTime' => '2018-12-31',
+            'lastMovementDate' => '2018-12-31',
+            'openingRate' => null,
+            'openingBalance' => ['amount' => 10000.55, 'currencyName' => 'RUR'],
+            'closingBalance' => ['amount' => 25000.3, 'currencyName' => 'RUR'],
+            'debitTurnover' => ['amount' => 10000, 'currencyName' => 'RUR'],
+            'debitTransactionsNumber' => 10,
+            'creditTransactionsNumber' => 10,
+            'creditTurnover' => ['amount' => 25000, 'currencyName' => 'RUR'],
+        ], $override);
+    }
+
+    /**
      * @param array<string, mixed> $override
      *
      * @return array<string, mixed>

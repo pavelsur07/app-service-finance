@@ -9,6 +9,7 @@ use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaTraceIdRecorder;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use Monolog\LogRecord;
@@ -26,6 +27,7 @@ final class AlfaApiClientTest extends TestCase
     private const BODY_SECRET = 'body-secret-value';
 
     private TestHandler $logs;
+    private AlfaTraceIdRecorder $traceIds;
 
     protected function setUp(): void
     {
@@ -83,6 +85,24 @@ final class AlfaApiClientTest extends TestCase
             self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $interactionId, 'x-fapi-interaction-id — UUID v4');
         }
         self::assertCount(2, array_unique($interactionIds), 'новый идентификатор на каждый запрос');
+    }
+
+    public function testSummaryUrlHasAccountAndDateWithoutLoggingThem(): void
+    {
+        $requested = [];
+        $client = $this->client(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = [$method, $url];
+
+            return new MockResponse('{"openingBalance":{"amount":1,"currencyName":"RUR"}}', ['http_code' => 200, 'response_headers' => ['X-TraceId' => 'trace-7']]);
+        });
+
+        $payload = $client->getSummary($this->connection(), self::ACCOUNT_NUMBER, new \DateTimeImmutable('2026-10-01'));
+
+        self::assertSame(['amount' => 1, 'currencyName' => 'RUR'], $payload['openingBalance']);
+        self::assertSame([['GET', 'https://bank.test/api/jp/v1/statement/summary?accountNumber='.self::ACCOUNT_NUMBER.'&statementDate=2026-10-01']], $requested);
+        self::assertSame('/api/jp/v1/statement/summary', $this->singleRecord()->context['path']);
+        self::assertSame(['trace-7'], $this->traceIds->all(), 'X-TraceId — для отчёта проверки песочницы');
+        $this->assertLogsHaveNoSensitiveData();
     }
 
     #[DataProvider('temporaryStatusProvider')]
@@ -203,7 +223,7 @@ final class AlfaApiClientTest extends TestCase
 
     private function client(MockResponse|callable $response): AlfaApiClient
     {
-        return new AlfaApiClient(new MockHttpClient($response), new Logger('test', [$this->logs]));
+        return new AlfaApiClient(new MockHttpClient($response), new Logger('test', [$this->logs]), $this->traceIds = new AlfaTraceIdRecorder());
     }
 
     private function connection(): BankAccess

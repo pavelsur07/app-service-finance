@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
 final readonly class AlfaBankProvider implements BankProviderInterface
 {
     /** Предохранитель от зацикленного `next`: до 1000 строк на странице — миллион строк за день. */
-    private const MAX_PAGES = 1000;
+    public const MAX_PAGES = 1000;
 
     public function __construct(
         private AlfaApiClient $apiClient,

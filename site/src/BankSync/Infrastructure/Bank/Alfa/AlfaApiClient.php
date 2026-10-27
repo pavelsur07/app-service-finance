@@ -19,10 +19,12 @@ final readonly class AlfaApiClient
     private const BANK_CODE = 'alfa';
     public const ACCOUNTS_PATH = '/api/jp/open-banking/v3.0/aisp-le/accounts';
     public const STATEMENT_PATH = '/api/jp/v1/statement/transactions';
+    public const SUMMARY_PATH = '/api/jp/v1/statement/summary';
 
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private AlfaTraceIdRecorder $traceIds,
     ) {
     }
 
@@ -44,6 +46,21 @@ final readonly class AlfaApiClient
                 'accountNumber' => $accountNumber,
                 'statementDate' => $date->format('Y-m-d'),
                 'page' => $page,
+            ],
+        ]);
+    }
+
+    /**
+     * Обороты по счёту за день.
+     *
+     * @return array<mixed>
+     */
+    public function getSummary(BankAccess $access, string $accountNumber, \DateTimeInterface $date): array
+    {
+        return $this->request($access, 'GET', self::SUMMARY_PATH, [
+            'query' => [
+                'accountNumber' => $accountNumber,
+                'statementDate' => $date->format('Y-m-d'),
             ],
         ]);
     }
@@ -89,6 +106,7 @@ final readonly class AlfaApiClient
 
         $context['status_code'] = $statusCode;
         $context['trace_id'] = $this->traceId($response);
+        $this->traceIds->record($context['trace_id']);
 
         if (200 !== $statusCode) {
             $context['duration_ms'] = $this->elapsedMs($startedAt);

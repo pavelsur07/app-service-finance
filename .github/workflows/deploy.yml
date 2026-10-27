@@ -702,6 +702,12 @@ jobs:
                   OZON_FETCHER_S3_ACCESS_KEY_ID: ${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}
                   OZON_FETCHER_S3_SECRET_ACCESS_KEY: ${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}
                   OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
+                  ALFA_TLS_CERT_PATH: ${{ secrets.ALFA_TLS_CERT_PATH }}
+                  ALFA_TLS_KEY_PATH: ${{ secrets.ALFA_TLS_KEY_PATH }}
+                  ALFA_TLS_KEY_PASSPHRASE: ${{ secrets.ALFA_TLS_KEY_PASSPHRASE }}
+                  ALFA_SANDBOX_CLIENT_ID: ${{ secrets.ALFA_SANDBOX_CLIENT_ID }}
+                  ALFA_SANDBOX_CLIENT_SECRET: ${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}
+                  ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}
               run: |
                   # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
                   # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
@@ -709,6 +715,28 @@ jobs:
                     case "${!v}" in
                       *[!A-Za-z0-9._~-]*)
                         echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
+                        exit 1 ;;
+                    esac
+                  done
+                  # Альфа (BankSync): значения от банка и пароль ключа — любые символы, кроме
+                  # одинарной кавычки и перевода строки (в удалённом скрипте они в '…'); пути —
+                  # внутри контейнера и только под /app/var/secrets/alfa/.
+                  for v in ALFA_TLS_KEY_PASSPHRASE ALFA_SANDBOX_CLIENT_ID ALFA_SANDBOX_CLIENT_SECRET; do
+                    case "${!v}" in
+                      *"'"*|*$'\n'*|*$'\r'*)
+                        echo "❌ Секрет $v содержит одинарную кавычку или перевод строки"
+                        exit 1 ;;
+                    esac
+                  done
+                  for v in ALFA_TLS_CERT_PATH ALFA_TLS_KEY_PATH ALFA_SANDBOX_ID_SIGNING_CERT_PATH; do
+                    case "${!v}" in
+                      '') ;;
+                      *..*|/app/var/secrets/alfa/*[!A-Za-z0-9._/-]*)
+                        echo "❌ Секрет $v: путь из A-Za-z0-9._/- без .."
+                        exit 1 ;;
+                      /app/var/secrets/alfa/?*) ;;
+                      *)
+                        echo "❌ Секрет $v: путь должен начинаться с /app/var/secrets/alfa/"
                         exit 1 ;;
                     esac
                   done
@@ -771,6 +799,17 @@ jobs:
                     # ://@ — но одинарные кавычки, а в DSN их не бывает.
                     export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
+                    # Альфа (BankSync, docs/tasks/bank-sync/alfa-demo.md): секреты не заведены → пусто →
+                    # Альфа не настроена. Символы проверены шагом выше. Сертификаты — в shared/alfa
+                    # рядом с current (current пересоздаётся каждым деплоем), монтируются только для чтения.
+                    export ALFA_TLS_CERT_PATH='${{ secrets.ALFA_TLS_CERT_PATH }}'
+                    export ALFA_TLS_KEY_PATH='${{ secrets.ALFA_TLS_KEY_PATH }}'
+                    export ALFA_TLS_KEY_PASSPHRASE='${{ secrets.ALFA_TLS_KEY_PASSPHRASE }}'
+                    export ALFA_SANDBOX_CLIENT_ID='${{ secrets.ALFA_SANDBOX_CLIENT_ID }}'
+                    export ALFA_SANDBOX_CLIENT_SECRET='${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}'
+                    export ALFA_SANDBOX_ID_SIGNING_CERT_PATH='${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}'
+                    export ALFA_SECRETS_DIR="$(cd .. && pwd)/shared/alfa"
+                    mkdir -p "$ALFA_SECRETS_DIR"
                     for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
                       eval "val=\${$v}"
                       case "$val" in

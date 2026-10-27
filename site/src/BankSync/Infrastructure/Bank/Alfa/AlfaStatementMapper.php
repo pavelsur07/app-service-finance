@@ -180,6 +180,57 @@ final readonly class AlfaStatementMapper
     }
 
     /**
+     * Обороты за день. Без остатков или оборотов в валюте счёта — ответ нечитаем.
+     *
+     * @param array<mixed> $response
+     *
+     * @throws BankApiRequestFailedException
+     */
+    public function mapSummary(array $response): AlfaStatementSummary
+    {
+        $opening = $this->money($response['openingBalance'] ?? null, true);
+        $closing = $this->money($response['closingBalance'] ?? null, true);
+        $debit = $this->money($response['debitTurnover'] ?? null, false);
+        $credit = $this->money($response['creditTurnover'] ?? null, false);
+        $currency = $this->nonEmptyString(\is_array($response['openingBalance'] ?? null) ? ($response['openingBalance']['currencyName'] ?? null) : null);
+        if (null === $opening || null === $closing || null === $debit || null === $credit || null === $currency) {
+            throw new BankApiRequestFailedException(BankCode::ALFA->value, null);
+        }
+
+        return new AlfaStatementSummary(
+            currency: 'RUR' === $currency ? 'RUB' : $currency,
+            openingBalance: $opening,
+            closingBalance: $closing,
+            debitTurnover: $debit,
+            creditTurnover: $credit,
+            debitTransactions: \is_int($response['debitTransactionsNumber'] ?? null) ? $response['debitTransactionsNumber'] : null,
+            creditTransactions: \is_int($response['creditTransactionsNumber'] ?? null) ? $response['creditTransactionsNumber'] : null,
+        );
+    }
+
+    /**
+     * Сумма из блока `{amount, currencyName}`; остатки — со знаком.
+     */
+    private function money(mixed $block, bool $signed): ?string
+    {
+        if (!\is_array($block)) {
+            return null;
+        }
+        $raw = $block['amount'] ?? null;
+        if (!$signed) {
+            return $this->resolveAmount($raw);
+        }
+        if (\is_string($raw) && 1 === preg_match('/^-\d+(\.\d+)?$/', trim($raw))) {
+            return bcadd(trim($raw), '0', 2);
+        }
+        if ((\is_float($raw) || \is_int($raw)) && $raw < 0 && is_finite((float) $raw)) {
+            return number_format((float) $raw, 2, '.', '');
+        }
+
+        return $this->resolveAmount($raw);
+    }
+
+    /**
      * Сумма без знака с двумя знаками после точки. Строку нормализуем без float; число из
      * JSON уже пришло float-ом — его только форматируем.
      */
