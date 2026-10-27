@@ -9,6 +9,7 @@ use App\BankSync\Command\AlfaSandboxCheckCommand;
 use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaBankProvider;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaFixtureAnonymizer;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaStatementMapper;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaTraceIdRecorder;
@@ -40,6 +41,8 @@ final class AlfaSandboxCheckCommandTest extends IntegrationTestCase
     private array $requested = [];
     private int $statementReads = 0;
     private bool $unstableUuid = false;
+    private string $accountStatus = 'Enabled';
+    private bool $endlessPages = false;
 
     protected function setUp(): void
     {
@@ -91,6 +94,28 @@ final class AlfaSandboxCheckCommandTest extends IntegrationTestCase
         self::assertStringContainsString('uuid stable: NO', $tester->getDisplay());
     }
 
+    public function testNoEnabledAccountIsNotASuccess(): void
+    {
+        $this->accountStatus = 'Disabled';
+
+        $tester = $this->check($this->connection('https://sandbox.alfabank.ru'));
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('nothing was verified', $tester->getDisplay());
+        self::assertNotContains(AlfaApiClient::STATEMENT_PATH, $this->requested);
+    }
+
+    public function testPageLimitWithNextPagePendingFailsTheCheck(): void
+    {
+        $this->endlessPages = true;
+
+        $tester = $this->check($this->connection('https://sandbox.alfabank.ru'));
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('Bank request failed', $tester->getDisplay());
+        self::assertSame(AlfaBankProvider::MAX_PAGES, $this->statementReads);
+    }
+
     public function testProductionConnectionIsRefusedWithoutBankRequests(): void
     {
         $tester = $this->check($this->connection('https://baas.alfabank.ru'));
@@ -137,7 +162,7 @@ final class AlfaSandboxCheckCommandTest extends IntegrationTestCase
             return match ($path) {
                 AlfaApiClient::ACCOUNTS_PATH => $this->json(['Data' => ['Account' => [[
                     'accountId' => 'acc-1',
-                    'status' => 'Enabled',
+                    'status' => $this->accountStatus,
                     'currency' => 'RUB',
                     'accountDescription' => 'Ромашка, расчётный',
                     'AccountDetails' => [['schemeName' => 'RU.CBR.BBAN', 'identification' => self::ACCOUNT_NUMBER]],
@@ -177,7 +202,7 @@ final class AlfaSandboxCheckCommandTest extends IntegrationTestCase
         ++$this->statementReads;
         $suffix = $this->unstableUuid ? '-'.$this->statementReads : '';
 
-        return $this->json(['transactions' => [
+        return $this->json(['_links' => $this->endlessPages ? [['rel' => 'next', 'href' => '/next']] : [], 'transactions' => [
             ['uuid' => 'uuid-in'.$suffix, 'transactionId' => 'tx-in', 'direction' => 'CREDIT', 'amount' => ['amount' => 100, 'currencyName' => 'RUR'], 'operationDate' => '2026-10-01T10:00:00Z', 'paymentPurpose' => 'Оплата от ООО Ромашка'],
             ['uuid' => 'uuid-out'.$suffix, 'transactionId' => 'tx-out', 'direction' => 'DEBIT', 'amount' => ['amount' => 30, 'currencyName' => 'RUR'], 'operationDate' => '2026-10-01T11:00:00Z', 'paymentPurpose' => 'Комиссия'],
         ]]);

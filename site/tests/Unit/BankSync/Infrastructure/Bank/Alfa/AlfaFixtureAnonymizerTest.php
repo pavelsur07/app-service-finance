@@ -42,6 +42,16 @@ final class AlfaFixtureAnonymizerTest extends TestCase
         self::assertStringStartsWith('anon-', $line['paymentPurpose']);
     }
 
+    public function testAmountsAndDatesAsStringsAreKept(): void
+    {
+        $response = ['amount' => '100.25', 'amountRub' => '7000.00', 'instructedAmount' => 'USD70,00', 'receiptDate' => '2018-12-31', 'payerName' => 'Иванов'];
+
+        $result = new AlfaFixtureAnonymizer()->anonymize($response, 'salt');
+
+        self::assertSame(['100.25', '7000.00', 'USD70,00', '2018-12-31'], [$result['amount'], $result['amountRub'], $result['instructedAmount'], $result['receiptDate']]);
+        self::assertStringStartsWith('anon-', $result['payerName']);
+    }
+
     public function testDifferentSaltGivesDifferentReplacement(): void
     {
         $response = ['payerName' => 'Иванов'];

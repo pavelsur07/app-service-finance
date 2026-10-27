@@ -7,6 +7,7 @@ namespace App\BankSync\Command;
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Application\OAuthTokenRefresher;
 use App\BankSync\Domain\BankAccess;
+use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
@@ -137,7 +138,9 @@ final class AlfaSandboxCheckCommand extends Command
         $accounts = $this->mapper->mapAccounts($rawAccounts);
         $output->writeln(sprintf('Accounts: %d (skipped without number or currency: %d), pages: %s', \count($accounts->accounts), $accounts->skippedAccounts, $this->totalPages($rawAccounts)));
 
-        $ok = true;
+        // Пропущенный счёт или ни одного проверенного — проверка неполная, не «успех».
+        $ok = 0 === $accounts->skippedAccounts;
+        $checked = 0;
         foreach ($accounts->accounts as $index => $account) {
             $label = '…'.substr($account->accountNumber, -4);
             if (!$account->enabled) {
@@ -166,9 +169,13 @@ final class AlfaSandboxCheckCommand extends Command
             $output->writeln(sprintf('  uuid stable: %s; transactionId stable: %s (with transactionId: %d)', $this->yesNo($uuidStable), $this->yesNo($transactionIdStable), \count($first['transactionId'])));
             $output->writeln(sprintf('  summary: opening + credit − debit = closing: %s; operations count matches: %s; turnover matches lines: %s', $this->yesNo($balanced), $this->yesNo($countsMatch), $this->yesNo($turnoverMatches)));
             $ok = $ok && $uuidStable && $balanced && $countsMatch && $turnoverMatches && 0 === $first['skipped'];
+            ++$checked;
+        }
+        if (0 === $checked) {
+            $output->writeln('<error>No enabled account to check: nothing was verified.</error>');
         }
 
-        return $ok;
+        return $ok && $checked > 0;
     }
 
     /**
@@ -177,7 +184,11 @@ final class AlfaSandboxCheckCommand extends Command
     private function readDay(BankAccess $access, string $accountNumber, \DateTimeImmutable $date, ?\Closure $fixtures, string $fixturePrefix): array
     {
         $day = ['uuid' => [], 'transactionId' => [], 'credits' => 0, 'debits' => 0, 'creditSum' => '0.00', 'debitSum' => '0.00', 'skipped' => 0, 'pages' => 0];
-        for ($pageNumber = 1; $pageNumber <= AlfaBankProvider::MAX_PAGES; ++$pageNumber) {
+        for ($pageNumber = 1;; ++$pageNumber) {
+            if ($pageNumber > AlfaBankProvider::MAX_PAGES) {
+                // Как в загрузке: неполный день не должен пройти сверку.
+                throw new BankApiRequestFailedException(BankCode::ALFA->value, null);
+            }
             $raw = $this->apiClient->getTransactions($access, $accountNumber, $date, $pageNumber);
             null !== $fixtures && $fixtures(sprintf('%s-p%d.json', $fixturePrefix, $pageNumber), $raw);
             $page = $this->mapper->mapStatementPage($raw);

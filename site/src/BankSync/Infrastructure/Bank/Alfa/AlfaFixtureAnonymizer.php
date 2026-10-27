@@ -6,13 +6,16 @@ namespace App\BankSync\Infrastructure\Bank\Alfa;
 
 /**
  * Обезличивает ответ Альфы для фикстур тестов. Числа, логические значения и строки под
- * ключами из `KEPT_KEYS` (даты, валюта, направление, статус, ключи операций, ссылки
- * страниц) сохраняются. Любая другая строка — номер, ИНН, наименование, назначение
+ * ключами из `KEPT_KEYS` (валюта, направление, статус, ключи операций, ссылки страниц), а
+ * также под ключами дат (`…Date`, `…DateTime`) и сумм (`amount…`, `…Amount`) сохраняются. Любая другая строка — номер, ИНН, наименование, назначение
  * платежа, ФИО — заменяется детерминированно: одинаковое значение в разных ответах даёт
  * одинаковую замену, цифры остаются цифрами той же длины (номер счёта остаётся номером).
  */
 final readonly class AlfaFixtureAnonymizer
 {
+    /** Даты (`receiptDate`, `operationDate`…) и суммы строкой (`amount`, `instructedAmount`, `amountRub`). */
+    private const KEPT_KEY_PATTERN = '/(?:Date|DateTime|^amount\w*|Amount\w*)$/';
+
     private const KEPT_KEYS = [
         'uuid', 'transactionId', 'direction', 'status', 'currency', 'currencyName', 'currencyCode',
         'operationDate', 'documentDate', 'valueDate', 'statementDate', 'composedDateTime', 'lastMovementDate',
@@ -32,12 +35,17 @@ final readonly class AlfaFixtureAnonymizer
         foreach ($response as $key => $value) {
             $result[$key] = match (true) {
                 \is_array($value) => $this->anonymize($value, $salt),
-                \is_string($value) && !(\is_string($key) && \in_array($key, self::KEPT_KEYS, true)) => $this->replace($value, $salt),
+                \is_string($value) && !(\is_string($key) && $this->isKept($key)) => $this->replace($value, $salt),
                 default => $value,
             };
         }
 
         return $result;
+    }
+
+    private function isKept(string $key): bool
+    {
+        return \in_array($key, self::KEPT_KEYS, true) || 1 === preg_match(self::KEPT_KEY_PATTERN, $key);
     }
 
     private function replace(string $value, string $salt): string
