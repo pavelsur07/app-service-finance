@@ -1,0 +1,16 @@
+{# «Выйти без сохранения?» (SPEC §2.3 п.3, dds-refs/06): открывает assets/pages/dds_operation.js
+   при уходе со страницы с несохранёнными правками; «Выйти» ведёт по адресу, на который уходили. #}
+<div class="modal fade vf-confirm" id="dds-op-leave" tabindex="-1" aria-hidden="true" aria-labelledby="dds-op-leave-title" aria-describedby="dds-op-leave-body" data-dds-op-leave>
+    <div class="modal-dialog modal-dialog-centered vf-confirm__dialog" role="document">
+        <div class="modal-content">
+            <div class="vf-confirm__head">
+                <h2 class="vf-confirm__title" id="dds-op-leave-title">Выйти без сохранения?</h2>
+            </div>
+            <p class="vf-confirm__body" id="dds-op-leave-body">Внесённые изменения будут потеряны.</p>
+            <div class="vf-confirm__footer">
+                <button type="button" class="btn" data-dds-op-leave-confirm>Выйти без сохранения</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Остаться</button>
+            </div>
+        </div>
+    </div>
+</div>

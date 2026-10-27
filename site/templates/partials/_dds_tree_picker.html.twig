@@ -6,10 +6,14 @@
      tree       [{id, name, children: […]} | {id, name, flow: 'in'|'out'|'both'}], id листа == value option
      direction  null | {source: CSS-селектор поля направления, in: value притока, out: value оттока}
      placeholder  текст пустого значения (по умолчанию «Не распределено»)
+     empty_note   подсказка под пустым полем (по умолчанию — про «Не распределено»)
+     noun         что выбираем, для подписей поиска и очистки (по умолчанию «статью»)
    Для поля CashflowCategoryTreeType подключается сам — тема form/cashflow_category_tree_theme.html.twig. #}
 <div class="dds-picker" data-dds-picker
      data-tree="{{ tree|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"
      data-placeholder="{{ placeholder|default('Не распределено') }}"
+     {%- if empty_note is defined %} data-empty-note="{{ empty_note }}"{% endif %}
+     {%- if noun is defined %} data-noun="{{ noun }}"{% endif %}
      {%- if direction|default(null) %}
      data-direction-source="{{ direction.source }}"
      data-dir-in-value="{{ direction.in }}"

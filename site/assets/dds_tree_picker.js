@@ -57,6 +57,10 @@ export class DdsTreePicker {
     this.select = root.querySelector('select');
     this.tree = JSON.parse(root.dataset.tree || '[]');
     this.placeholder = root.dataset.placeholder || 'Не распределено';
+    // Виджет годится и для плоских справочников (ЦФО): подписи — из data-noun / data-empty-note.
+    this.noun = root.dataset.noun || 'статью';
+    this.emptyNote = root.dataset.emptyNote ?? 'Без статьи операция попадёт в «Не распределено».';
+    this.notFound = root.dataset.noun ? 'Ничего не найдено. Проверьте название' : 'Статья не найдена. Проверьте название';
     this.dirSelector = root.dataset.directionSource || '';
     this.inValue = root.dataset.dirInValue ?? 'in';
     this.outValue = root.dataset.dirOutValue ?? 'out';
@@ -110,7 +114,10 @@ export class DdsTreePicker {
 
   /* ---------- DOM ---------- */
   buildDom() {
-    const labelId = this.select?.id ? document.querySelector(`label[for="${this.select.id}"]`)?.id : null;
+    // Подпись поля указывает на скрытый select: связываем её с кнопкой виджета.
+    this.labelEl = this.select?.id ? document.querySelector(`label[for="${CSS.escape(this.select.id)}"]`) : null;
+    if (this.labelEl && !this.labelEl.id) this.labelEl.id = `${this.uid}-label`;
+    const labelId = this.labelEl?.id || null;
     this.valueEl = el('span', { class: 'dds-field__value' });
     this.pathEl = el('span', { class: 'dds-field__path' });
     this.btn = el(
@@ -130,7 +137,7 @@ export class DdsTreePicker {
     this.valueEl.id = `${this.uid}-value`;
     this.clearBtn = el(
       'button',
-      { type: 'button', class: 'dds-field__clear', 'aria-label': 'Очистить статью', hidden: true },
+      { type: 'button', class: 'dds-field__clear', 'aria-label': `Очистить ${this.noun}`, hidden: true },
       icon('M6 6l12 12M18 6L6 18'),
     );
     this.field = el('div', { class: 'dds-field' }, this.btn, this.clearBtn);
@@ -139,9 +146,9 @@ export class DdsTreePicker {
     this.input = el('input', {
       type: 'search',
       class: 'dds-pop__input',
-      placeholder: 'Найти статью',
+      placeholder: `Найти ${this.noun}`,
       autocomplete: 'off',
-      'aria-label': 'Поиск статьи по названию',
+      'aria-label': `Найти ${this.noun} по названию`,
       role: 'combobox',
       'aria-expanded': 'true',
       'aria-controls': `${this.uid}-tree`,
@@ -152,16 +159,18 @@ export class DdsTreePicker {
     this.dirToggle = el('button', { type: 'button', class: 'dds-link' });
     this.expandBtn = el('button', { type: 'button', class: 'dds-link' }, 'Развернуть всё');
     this.collapseBtn = el('button', { type: 'button', class: 'dds-link' }, 'Свернуть всё');
+    const hasGroups = this.collectGroups(this.tree).length > 0;
     this.meta = el(
       'div',
-      { class: 'dds-pop__meta' },
+      { class: 'dds-pop__meta', hidden: !hasGroups && !this.dirSelector },
       el('span', {}, this.dirNote, ' ', this.dirToggle),
-      el('span', {}, this.expandBtn, ' · ', this.collapseBtn),
+      hasGroups ? el('span', {}, this.expandBtn, ' · ', this.collapseBtn) : '',
     );
-    this.treeEl = el('div', { class: 'dds-tree', role: 'tree', id: `${this.uid}-tree`, 'aria-label': 'Статьи ДДС' });
+    const label = labelId ? document.getElementById(labelId)?.textContent.trim() : '';
+    this.treeEl = el('div', { class: 'dds-tree', role: 'tree', id: `${this.uid}-tree`, 'aria-label': label || 'Статьи ДДС' });
     this.pop = el(
       'div',
-      { class: 'dds-pop', id: `${this.uid}-pop`, role: 'dialog', 'aria-label': 'Выбор статьи ДДС', hidden: true },
+      { class: 'dds-pop', id: `${this.uid}-pop`, role: 'dialog', 'aria-label': label ? `Выбор: ${label}` : 'Выбор статьи ДДС', hidden: true },
       el('div', { class: 'dds-pop__head' }, search, this.meta),
       this.treeEl,
       el('div', { class: 'dds-pop__foot' }, el('span', {}, '↑ ↓ — выбрать · Enter — подтвердить'), el('span', {}, 'Esc — закрыть')),
@@ -210,6 +219,12 @@ export class DdsTreePicker {
       document.querySelectorAll(this.dirSelector).forEach((n) => n.addEventListener('change', this.onDir));
     }
     if (this.select) this.select.addEventListener('change', () => this.syncField());
+    if (this.labelEl) {
+      this.labelEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.btn.focus();
+      });
+    }
   }
 
   destroy() {
@@ -265,7 +280,7 @@ export class DdsTreePicker {
     this.field.classList.toggle('is-disabled', this.disabled);
     this.field.classList.toggle('is-invalid', !!this.select?.classList.contains('is-invalid'));
     this.clearBtn.hidden = !(cur && this.canClear) || this.disabled;
-    const note = this.state.note || (!cur ? 'Без статьи операция попадёт в «Не распределено».' : '');
+    const note = this.state.note || (!cur ? this.emptyNote : '');
     this.noteEl.textContent = note;
     this.noteEl.hidden = !note;
     this.noteEl.classList.toggle('is-warn', !!this.state.note);
@@ -323,7 +338,7 @@ export class DdsTreePicker {
     this.treeEl.replaceChildren();
     if (!rows.length) {
       this.treeEl.append(
-        el('div', { class: 'dds-pop__empty' }, `Статья не найдена. Проверьте название${d && !this.state.showAll ? ' или покажите все статьи.' : '.'}`),
+        el('div', { class: 'dds-pop__empty' }, `${this.notFound}${d && !this.state.showAll ? ' или покажите все статьи.' : '.'}`),
       );
       this.input.removeAttribute('aria-activedescendant');
       return;

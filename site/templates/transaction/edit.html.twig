@@ -1,85 +1,244 @@
 {% extends 'base.html.twig' %}
-{% block title %}Редактирование транзакции{% endblock %}
+
+{#
+  «Операция ДДС» — редактирование. Эталон: docs/design-system/DDS-OPERATION-SPEC.md §2,
+  screens/OperationDds*.dc.html, dds-refs/01–10. Форма создания — transaction/_form.html.twig.
+  Имена полей, роуты и CSRF прежние; серверная валидация — источник истины.
+#}
+{% set opDate = tx.occurredAt|date('d.m.Y') %}
+{% set isInflow = tx.direction.value == 'INFLOW' %}
+{% set isDeleted = tx.deleted %}
+{# Источник: код банка BankSync (alfa) — выписка; file/telegram — импорт; 1С-выписка пишет externalId без importSource. #}
+{% set importSource = tx.importSource %}
+{% set sourceLabels = {file: 'Импорт из файла', telegram: 'Telegram'} %}
+{% if importSource is null %}
+    {% set fromBank = tx.externalId is not null %}
+    {% set sourceName = fromBank ? 'Банковская выписка (1С)' : 'Вручную' %}
+{% elseif sourceLabels[importSource] is defined %}
+    {% set fromBank = false %}
+    {% set sourceName = sourceLabels[importSource] %}
+{% else %}
+    {% set fromBank = true %}
+    {% set sourceName = importSource == 'alfa' ? 'Банковская выписка (Альфа-Банк)' : 'Банковская выписка' %}
+{% endif %}
+{% set currencyNames = {RUB: 'российский рубль', USD: 'доллар США', EUR: 'евро', KZT: 'казахстанский тенге'} %}
+
+{% block title %}Операция ДДС от {{ opDate }}{% endblock %}
 
 {% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
-            {'label':'Главная','path':'app_home_index'},
-            {'label':'Финансы'},
-            {'label':'Транзакции','path':'cash_transaction_index','params': app.request.query.all},
+            {'label':'Деньги'},
+            {'label':'Операции ДДС','path':'cash_transaction_index','params': app.request.query.all},
             {'label':'Редактирование'}
         ]
     } %}
 {% endblock %}
 
 {% block content %}
-    <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-        <h2 class="page-title mb-0">Редактирование транзакции</h2>
-        {% if canCreatePnlDocument %}
-            <form method="post" action="{{ path('cash_transaction_create_pnl_document', {id: tx.id}) }}" class="d-inline">
-                <input type="hidden" name="_token" value="{{ csrf_token('create_pnl_document' ~ tx.id) }}">
-                <button type="submit" class="btn btn-primary">Создать документ ОПиУ</button>
-            </form>
+<div class="dds-op" data-dds-op{% if isDeleted %} data-dds-op-deleted{% endif %}>
+    <div class="dds-op__head">
+        <div class="dds-op__heading">
+            <h1 class="dds-op__title">Операция ДДС от {{ opDate }}</h1>
+            <span class="dds-badge dds-badge--{{ isInflow ? 'in' : 'out' }}">
+                {{- isInflow ? 'Приток' : 'Отток' }} {{ isInflow ? '+' : '−' }}{{ tx.amount|vf_money(currency: tx.currency) -}}
+            </span>
+            {% if fromBank %}<span class="dds-badge dds-badge--bank">Из выписки</span>{% endif %}
+            {% if isDeleted %}<span class="dds-badge dds-badge--deleted">Удалена</span>{% endif %}
+            <span class="dds-badge dds-badge--dirty" data-dds-op-dirty-badge hidden>Есть несохранённые изменения</span>
+        </div>
+        {% if not isDeleted and is_granted('module.finance.write') %}
+            <div class="dropdown">
+                <button type="button" class="btn dds-op__btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    Ещё <i class="ti ti-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    {# Удаление мягкое (DeleteCashTransactionAction → markDeleted): связь с документами ОПиУ не снимается. #}
+                    <button type="button" class="dropdown-item text-danger"
+                            data-bs-toggle="modal" data-bs-target="#dds-op-confirm"
+                            data-confirm-action="{{ path('cash_transaction_delete', {id: tx.id}) }}"
+                            data-confirm-token="{{ csrf_token('tx_delete' ~ tx.id) }}"
+                            data-confirm-title="Удалить операцию?"
+                            data-confirm-body="Операция исчезнет из остатков и отчёта о движении денег.{% if pnlDocuments is not empty %} Документы ОПиУ ({{ pnlDocuments|length }}) останутся без изменений.{% endif %} Операцию можно восстановить во вкладке «Удалённые»."
+                            data-confirm-submit="Удалить"
+                            data-confirm-variant="danger">Удалить операцию</button>
+                </div>
+            </div>
         {% endif %}
     </div>
-    {{ include('transaction/_form.html.twig') }}
-    <div class="card mt-3">
-        <div class="card-header">
-            <div class="card-title mb-0">Документы ОПиУ на основании транзакции</div>
+
+    {% if isDeleted %}
+        <div class="dds-op__banner dds-op__banner--warn" role="status">
+            <div>
+                <strong>Операция удалена и не учитывается в остатках.</strong>
+                Поля доступны только для чтения.
+            </div>
+            {% if is_granted('module.finance.write') %}
+                <form method="post" action="{{ path('cash_transaction_restore', {id: tx.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('tx_restore' ~ tx.id) }}">
+                    <button type="submit" class="btn dds-op__btn">Восстановить</button>
+                </form>
+            {% endif %}
         </div>
-        <div class="card-body">
-            {% if pnlDocuments is not empty %}
-                <div class="table-responsive">
-                    <table class="table card-table align-middle">
-                        <thead>
-                            <tr>
-                                <th class="text-nowrap">Номер / дата</th>
-                                <th>Описание</th>
-                                {# Документ ОПиУ копирует сумму операции без пересчёта — валюта та же. #}
-                                <th class="text-end text-nowrap">Сумма{% if tx.currency == 'RUB' %}, ₽{% endif %}</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for document in pnlDocuments %}
-                                <tr>
-                                    <td class="text-nowrap">
-                                        <div class="fw-semibold">{{ document.number ?: '—' }}</div>
-                                        <div class="text-muted">{{ document.date|date('d.m.Y') }}</div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold">{{ document.counterparty ? document.counterparty.name : '—' }}</div>
-                                        <div class="text-muted">{{ document.description ?: '—' }}</div>
-                                    </td>
-                                    <td class="text-end fw-semibold">{{ document.totalAmount|vf_amount(currency: tx.currency) }}</td>
-                                    <td class="text-end">
-                                        <a href="{{ path('document_edit', {id: document.id}) }}" class="btn btn-link">Открыть</a>
-                                    </td>
-                                </tr>
+    {% elseif fromBank %}
+        {# Сервер не запрещает менять выписочные поля (SPEC §7.2 — вопрос владельцу): предупреждаем, не блокируем. #}
+        <div class="dds-op__banner dds-op__banner--info" role="note">
+            <strong>Операция загружена из банковской выписки.</strong>
+            Дата, счёт, направление и сумма пришли из банка — при их изменении остаток перестанет совпадать с выпиской.
+        </div>
+    {% endif %}
+
+    {% set formErrors = form.vars.errors|length %}
+    {% for child in form.children %}{% set formErrors = formErrors + child.vars.errors|length %}{% endfor %}
+    <div class="dds-op__summary" data-dds-op-summary role="alert" tabindex="-1"{% if formErrors == 0 %} hidden{% endif %}>
+        <strong data-dds-op-summary-title>Не удалось сохранить: {{ formErrors }}. Исправьте отмеченные поля.</strong>
+        <ul data-dds-op-summary-list>
+            {% for error in form.vars.errors %}<li>{{ error.message }}</li>{% endfor %}
+            {% for child in form.children %}{% for error in child.vars.errors %}<li>{{ error.message }}</li>{% endfor %}{% endfor %}
+        </ul>
+    </div>
+
+    <div class="dds-op__grid">
+        <div class="dds-op__main">
+            {{ form_start(form, {attr: {id: 'dds-op-form', class: 'dds-op__form', novalidate: 'novalidate', 'data-dds-op-form': ''}}) }}
+            {{ form_widget(form._token) }}
+            <fieldset class="dds-op__fieldset"{% if isDeleted %} disabled{% endif %}>
+                <section class="dds-card" aria-labelledby="dds-op-main-title">
+                    <h2 class="dds-card__title" id="dds-op-main-title">Операция</h2>
+                    <div class="dds-card__grid">
+                        <div class="dds-op__field">
+                            {{ form_label(form.occurredAt, 'Дата', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {{ form_widget(form.occurredAt, {attr: {class: 'form-control dds-op__input', 'data-dds-op-required': 'Укажите дату операции'}}) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.occurredAt) }}</div>
+                        </div>
+                        <div class="dds-op__field">
+                            {{ form_label(form.moneyAccount, 'Счёт', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {{ form_widget(form.moneyAccount, {attr: {class: 'form-select dds-op__input', 'data-dds-op-required': 'Выберите счёт', 'data-dds-op-account': ''}}) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.moneyAccount) }}</div>
+                        </div>
+                        <fieldset class="dds-op__field">
+                            <legend class="form-label dds-op__label required">Направление</legend>
+                            {# Тот же name и те же value, что у select ChoiceType: сервер разницы не видит. #}
+                            <div class="dds-seg">
+                                {% for choice in form.direction.vars.choices %}
+                                    {% set choiceIn = choice.data.value == 'INFLOW' %}
+                                    <label class="dds-seg__opt dds-seg__opt--{{ choiceIn ? 'in' : 'out' }}">
+                                        <input type="radio" class="dds-seg__input"
+                                               name="{{ form.direction.vars.full_name }}"
+                                               id="{{ form.direction.vars.id }}_{{ loop.index0 }}"
+                                               value="{{ choice.value }}"
+                                               {%- if choice.value == form.direction.vars.value %} checked{% endif %}
+                                               {%- if loop.first %} data-dds-op-required="Выберите направление"{% endif %}>
+                                        <span class="dds-seg__text">
+                                            <i class="ti ti-arrow-{{ choiceIn ? 'down' : 'up' }}" aria-hidden="true"></i>{{ choice.label }}
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            {% do form.direction.setRendered %}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.direction) }}</div>
+                        </fieldset>
+                        <div class="dds-op__field">
+                            {{ form_label(form.amount, 'Сумма', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            <div class="dds-amount" data-dds-op-amount
+                                 data-currency-names="{{ currencyNames|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"
+                                 data-currency-symbols="{{ currencyNames|map((name, code) => vf_currency_symbol(code))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}">
+                                <span class="dds-amount__cur" data-dds-op-currency-symbol aria-hidden="true">{{ vf_currency_symbol(tx.currency) }}</span>
+                                {{ form_widget(form.amount, {attr: {class: 'form-control dds-op__input dds-amount__input', inputmode: 'decimal', autocomplete: 'off', 'aria-describedby': 'dds-op-currency-hint', 'data-dds-op-required': 'Укажите сумму', 'data-dds-op-amount-input': ''}}) }}
+                                <div class="invalid-feedback d-block">{{ form_errors(form.amount) }}</div>
+                            </div>
+                            <div class="dds-op__hint" id="dds-op-currency-hint" data-dds-op-currency-hint>Валюта берётся из счёта: {{ currencyNames[tx.currency] ?? tx.currency }} ({{ tx.currency }})</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dds-card" aria-labelledby="dds-op-analytics-title">
+                    <h2 class="dds-card__title" id="dds-op-analytics-title">Аналитика</h2>
+                    <div class="dds-card__grid">
+                        <div class="dds-op__field dds-op__field--wide">
+                            {{ form_label(form.cashflowCategory, 'Статья ДДС', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {{ form_widget(form.cashflowCategory, {attr: {class: 'form-select'}}) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.cashflowCategory) }}</div>
+                        </div>
+                        <div class="dds-op__field dds-op__picker">
+                            {{ form_label(form.projectDirection, 'Проект', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {{ form_widget(form.projectDirection, {attr: {class: 'form-select'}}) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.projectDirection) }}</div>
+                        </div>
+                        <div class="dds-op__field">
+                            {{ form_label(form.responsibilityCenterId, 'ЦФО', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {# Тот же виджет, что у статьи: плоский список с поиском и очисткой поверх прежнего select. #}
+                            {% set rcTree = [] %}
+                            {% for choice in form.responsibilityCenterId.vars.choices %}
+                                {% set rcTree = rcTree|merge([{id: choice.value, name: choice.label, flow: 'both'}]) %}
                             {% endfor %}
-                        </tbody>
-                    </table>
+                            {{ include('partials/_dds_tree_picker.html.twig', {
+                                select: form_widget(form.responsibilityCenterId, {attr: {class: 'form-select dds-picker__native'}}),
+                                tree: rcTree,
+                                direction: null,
+                                placeholder: 'Без ЦФО',
+                                empty_note: 'Без ЦФО операция не попадёт в разрез по ЦФО.',
+                                noun: 'ЦФО',
+                            }, with_context = false) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.responsibilityCenterId) }}</div>
+                        </div>
+                        <div class="dds-op__field dds-op__field--wide dds-op__picker">
+                            {{ form_label(form.counterpartyId, 'Контрагент', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                            {{ form_widget(form.counterpartyId) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.counterpartyId) }}</div>
+                        </div>
+                        <div class="dds-op__field dds-op__field--wide">
+                            <div class="dds-op__label-row">
+                                {{ form_label(form.description, 'Описание', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                                <span class="dds-op__counter" data-dds-op-counter aria-live="polite">{{ (form.description.vars.value ?? '')|length }} из 500</span>
+                            </div>
+                            {{ form_widget(form.description, {attr: {class: 'form-control dds-op__input', rows: 3, maxlength: 500, 'data-dds-op-description': ''}}) }}
+                            <div class="invalid-feedback d-block">{{ form_errors(form.description) }}</div>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+            {{ form_end(form, {render_rest: false}) }}
+
+            <section class="dds-card" aria-labelledby="dds-op-docs-title">
+                <div class="dds-card__head">
+                    <h2 class="dds-card__title" id="dds-op-docs-title">Документы ОПиУ на основании операции</h2>
+                    {% if canCreatePnlDocument and not isDeleted %}
+                        <form method="post" action="{{ path('cash_transaction_create_pnl_document', {id: tx.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('create_pnl_document' ~ tx.id) }}">
+                            <button type="submit" class="btn dds-op__btn">Создать документ ОПиУ</button>
+                        </form>
+                    {% endif %}
                 </div>
-            {% else %}
-                <p class="text-muted mb-0">Документы ОПиУ на основании этой транзакции ещё не созданы.</p>
+                {{ include('transaction/_edit_pnl_documents.html.twig') }}
+            </section>
+        </div>
+
+        <aside class="dds-op__aside">
+            <section class="dds-card" aria-labelledby="dds-op-info-title">
+                <h2 class="dds-card__title" id="dds-op-info-title">Сведения</h2>
+                <dl class="dds-info">
+                    <div><dt>Источник</dt><dd>{{ sourceName }}</dd></div>
+                    <div><dt>Создана</dt><dd>{{ tx.createdAt|date('d.m.Y, H:i') }}</dd></div>
+                    <div><dt>Изменена</dt><dd>{{ tx.updatedAt|date('d.m.Y, H:i') }}</dd></div>
+                    {% if isDeleted %}<div><dt>Удалена</dt><dd>{{ tx.deletedAt|date('d.m.Y, H:i') }}</dd></div>{% endif %}
+                </dl>
+                <p class="dds-info__note">Статья ДДС определяет, в какой раздел отчёта о движении денег попадёт операция. Без статьи операция остаётся в «Не распределено».</p>
+            </section>
+        </aside>
+    </div>
+
+    <div class="dds-op__bar">
+        <span class="dds-op__status" data-dds-op-status>{{ isDeleted ? 'Операция удалена' : 'Все изменения сохранены' }}</span>
+        <div class="dds-op__actions">
+            <a href="{{ path('cash_transaction_index', app.request.query.all) }}" class="btn dds-op__btn" data-dds-op-cancel>Отмена</a>
+            {% if not isDeleted %}
+                <button type="submit" form="dds-op-form" class="btn btn-primary dds-op__save" data-dds-op-save>Сохранить</button>
             {% endif %}
         </div>
     </div>
-{% endblock %}
+</div>
 
-{% block scripts %}
-    {{ parent() }}
-    <script>
-        const acc = document.querySelector('#form_moneyAccount');
-        const cur = document.querySelector('#form_currency');
-        if (acc && cur) {
-            acc.addEventListener('change', e => {
-                const opt = acc.options[acc.selectedIndex];
-                cur.value = opt.dataset.currency || '';
-            });
-            const initOpt = acc.options[acc.selectedIndex];
-            cur.value = initOpt ? initOpt.dataset.currency : '';
-        }
-    </script>
+{{ include('partials/_confirm_modal.html.twig', {id: 'dds-op-confirm'}) }}
+{{ include('transaction/_edit_leave_modal.html.twig') }}
 {% endblock %}
-

@@ -1,5 +1,6 @@
 import './styles/legacy-app.css';
 import './styles/components/dds-pickers.css';
+import './styles/pages/dds-operation.css';
 import './bootstrap.js';
 import './project_direction_picker.js';
 import './counterparty_picker.js';
