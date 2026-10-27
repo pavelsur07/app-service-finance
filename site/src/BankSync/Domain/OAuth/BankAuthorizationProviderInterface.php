@@ -9,6 +9,7 @@ use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankIdTokenInvalidException;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -40,6 +41,7 @@ interface BankAuthorizationProviderInterface
      * @throws BankAuthorizationRejectedException код или verifier отвергнут — вход заново
      * @throws BankIdTokenInvalidException `id_token` не прошёл проверку — токены не сохранять
      * @throws BankAuthorizationNotConfiguredException среда не настроена
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws BankApiUnavailableException временный сбой
      * @throws BankApiRequestFailedException ошибка настройки или нечитаемый ответ
      */
@@ -54,6 +56,7 @@ interface BankAuthorizationProviderInterface
     /**
      * @throws BankAuthorizationRejectedException refresh отозван, истёк или израсходован — вход заново
      * @throws BankAuthorizationNotConfiguredException среда не настроена
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws BankApiUnavailableException временный сбой
      * @throws BankApiRequestFailedException ошибка настройки или нечитаемый ответ
      */
@@ -63,6 +66,7 @@ interface BankAuthorizationProviderInterface
      * Отзыв refresh-токена в банке (гасит и access) перед удалением подключения.
      *
      * @throws BankAuthorizationNotConfiguredException среда не настроена
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws BankApiUnavailableException временный сбой
      * @throws BankApiRequestFailedException банк отказал или ответ нечитаем
      */

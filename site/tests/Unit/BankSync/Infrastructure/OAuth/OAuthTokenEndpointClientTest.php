@@ -110,7 +110,9 @@ final class OAuthTokenEndpointClientTest extends TestCase
     public static function failures(): iterable
     {
         yield 'invalid_grant 400' => [400, '{"error":"invalid_grant","error_description":"Refresh token reused for client 7701234567"}', BankAuthorizationRejectedException::class];
-        yield '401' => [401, '{"error":"invalid_client"}', BankAuthorizationRejectedException::class];
+        yield '401 без кода' => [401, '{}', BankAuthorizationRejectedException::class];
+        yield '401 invalid_client — наша настройка' => [401, '{"error":"invalid_client"}', BankApiRequestFailedException::class];
+        yield '400 unauthorized_client — наша настройка' => [400, '{"error":"unauthorized_client"}', BankApiRequestFailedException::class];
         yield '403 config' => [403, '{}', BankApiRequestFailedException::class];
         yield '429' => [429, '', BankApiUnavailableException::class];
         yield '503' => [503, '<html>down</html>', BankApiUnavailableException::class];

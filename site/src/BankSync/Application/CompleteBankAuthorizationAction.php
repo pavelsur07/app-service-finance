@@ -12,6 +12,7 @@ use App\BankSync\Exception\BankAuthorizationDeniedException;
 use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\BankIdTokenInvalidException;
@@ -59,6 +60,7 @@ final readonly class CompleteBankAuthorizationAction
      * @throws BankAuthorizationRejectedException код или verifier отвергнут банком
      * @throws BankIdTokenInvalidException `id_token` не прошёл проверку
      * @throws BankAuthorizationNotConfiguredException вход в среде банка не настроен
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws BankApiUnavailableException
      * @throws BankApiRequestFailedException
      * @throws BankConnectionNotFoundException переподключаемое удалили, пока клиент был в банке
@@ -138,7 +140,7 @@ final readonly class CompleteBankAuthorizationAction
             $this->logger->error('Bank authorization: token exchange failed', $context + ['status_code' => $exception->getStatusCode() ?? 'none']);
 
             throw $exception;
-        } catch (BankAuthorizationNotConfiguredException $exception) {
+        } catch (BankAuthorizationNotConfiguredException|BankChannelNotConfiguredException $exception) {
             $this->logger->error('Bank authorization: bank sign-in is not configured', $context + ['problem' => $exception->getMessage()]);
 
             throw $exception;

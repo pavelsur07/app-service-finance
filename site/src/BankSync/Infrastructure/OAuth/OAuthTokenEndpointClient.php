@@ -27,6 +27,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class OAuthTokenEndpointClient
 {
     private const TIMEOUT_SECONDS = 15;
+    /** Ошибки OAuth про наше приложение, а не про код или refresh клиента (RFC 6749 §5.2). */
+    private const CLIENT_ERRORS = ['invalid_client', 'unauthorized_client'];
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -40,7 +42,7 @@ final readonly class OAuthTokenEndpointClient
      *
      * @throws BankAuthorizationRejectedException 400/401: код или refresh отвергнут
      * @throws BankApiUnavailableException сеть, 408, 429, 5xx
-     * @throws BankApiRequestFailedException прочие 4xx или нечитаемый ответ
+     * @throws BankApiRequestFailedException `invalid_client`, прочие 4xx или нечитаемый ответ
      */
     public function requestTokens(string $bankCode, string $tokenUrl, #[\SensitiveParameter] array $form): OAuthTokenResponse
     {
@@ -130,7 +132,9 @@ final readonly class OAuthTokenEndpointClient
 
             $rejected = new BankAuthorizationRejectedException($bankCode, $statusCode, $oauthError);
             $context['oauth_error'] = $rejected->getOauthError() ?? 'none';
-            if (\in_array($statusCode, [400, 401], true)) {
+            // Неверная пара приложения — не «клиенту войти заново»: иначе один неверный
+            // секрет перевёл бы в needs_reauth все подключения банка.
+            if (\in_array($statusCode, [400, 401], true) && !\in_array($rejected->getOauthError(), self::CLIENT_ERRORS, true)) {
                 $this->logger->info('Bank OAuth request rejected', $context);
 
                 throw $rejected;

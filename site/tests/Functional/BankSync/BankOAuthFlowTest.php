@@ -48,6 +48,12 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         $this->switchCompany($this->company);
     }
 
+    protected function tearDown(): void
+    {
+        StubBankAuthorizationProvider::reset();
+        parent::tearDown();
+    }
+
     public function testFullCycleStoresEncryptedTokensForNewConnection(): void
     {
         $authorizationUrl = $this->startFromIndex('Подключить через Альфа-Банк');
@@ -187,6 +193,30 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         self::assertSame(StubBankAuthorizationProvider::SUBJECT, $rows[0]['external_subject'], 'подключение компании, вошёл другой пользователь банка');
         self::assertNull($rows[0]['consent_expires_at'], 'срок прежнего согласия сброшен');
         self::assertSame(StubBankAuthorizationProvider::ACCESS_TOKEN, $codec->token($this->connection($connection->getId())));
+    }
+
+    public function testEachConfiguredEnvironmentHasItsButton(): void
+    {
+        $crawler = $this->client->request('GET', '/bank-connections/');
+
+        $forms = $crawler->filter('form[action="/bank-connections/oauth/start"]');
+        self::assertSame(['https://baas.alfabank.ru', 'https://sandbox.alfabank.ru'], $forms->filter('input[name="base_url"]')->each(static fn ($input): string => (string) $input->attr('value')));
+        self::assertStringContainsString('Альфа-Банк (песочница)', $forms->last()->text());
+    }
+
+    public function testUnconfiguredBankHasNoButtonAndStartIsRefused(): void
+    {
+        $crawler = $this->client->request('GET', '/bank-connections/');
+        $token = $crawler->filter('form[action="/bank-connections/oauth/start"] input[name="_token"]')->attr('value');
+        StubBankAuthorizationProvider::$environments = [];
+
+        $crawler = $this->client->request('GET', '/bank-connections/');
+        self::assertCount(0, $crawler->filter('form[action="/bank-connections/oauth/start"] input[name="base_url"]'));
+
+        $this->client->request('POST', '/bank-connections/oauth/start', ['_token' => $token, 'bank_code' => 'alfa', 'base_url' => 'https://baas.alfabank.ru']);
+        self::assertResponseRedirects('/bank-connections/');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.toast-body', 'пока не подключён');
     }
 
     public function testStartRequiresCsrfToken(): void

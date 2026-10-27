@@ -12,6 +12,7 @@ use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Domain\OAuth\Pkce;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankIdTokenInvalidException;
 
@@ -35,6 +36,8 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
     /** @var list<string> отозванные refresh-токены */
     public static array $revoked = [];
     public static ?\Throwable $revokeFailure = null;
+    /** @var list<string>|null настроенные среды; null — обе */
+    public static ?array $environments = null;
     /** @var (\Closure(): void)|null вызывается в момент отзыва */
     public static ?\Closure $duringRevoke = null;
     /** @var (\Closure(): void)|null вызывается в момент обмена кода */
@@ -49,6 +52,7 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
         self::$revoked = [];
         self::$revokeFailure = null;
         self::$duringRevoke = null;
+        self::$environments = null;
     }
 
     public static function codeFor(string $authorizationUrl): string
@@ -67,11 +71,15 @@ final class StubBankAuthorizationProvider implements BankAuthorizationProviderIn
 
     public function environments(): array
     {
-        return [BankConnectionFormData::SANDBOX_URL, BankConnectionFormData::PRODUCTION_URL];
+        return self::$environments ?? [BankConnectionFormData::SANDBOX_URL, BankConnectionFormData::PRODUCTION_URL];
     }
 
     public function authorizationUrl(AuthorizationRequest $request): string
     {
+        if (!\in_array($request->baseUrl, $this->environments(), true)) {
+            throw new BankAuthorizationNotConfiguredException('alfa', 'ALFA_PROD_CLIENT_ID is not set');
+        }
+
         return self::AUTHORIZE_URL.'?'.http_build_query([
             'response_type' => 'code',
             'client_id' => 'stub-client',
