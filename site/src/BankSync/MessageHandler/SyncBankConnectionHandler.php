@@ -12,6 +12,7 @@ use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
@@ -121,6 +122,12 @@ final readonly class SyncBankConnectionHandler
                 break;
             } catch (\Throwable $exception) {
                 $this->closeFailedLog($message->companyId, $importLogId, $counters, $exception, $context);
+                if ($this->isForbidden($exception)) {
+                    // Сервис не входит в права токена: обновление не поможет, нужен вход с правами.
+                    $this->rejectUsedCredentials($connection, $usedCredentials, 'insufficient_scope', $context);
+
+                    return;
+                }
                 if (!$this->isUnauthorized($exception)) {
                     throw $this->translate($exception, $context + $counters->toLogContext());
                 }
@@ -265,6 +272,9 @@ final readonly class SyncBankConnectionHandler
         return $this->underTokenLock($connection, $context, function () use ($connection, $context, $rejectedAccessToken): ?BankAccess {
             try {
                 $refreshed = $this->tokenRefresher->refreshIfNeeded($connection, $rejectedAccessToken);
+            } catch (BankApiUnavailableException|BankApiRequestFailedException|BankChannelNotConfiguredException|BankAuthorizationNotConfiguredException $exception) {
+                // Обновление токена — те же правила, что для запросов данных.
+                throw $this->translate($exception, $context);
             } catch (BankAuthorizationRejectedException $exception) {
                 $this->markNeedsReauth($connection, 'refresh_rejected', $exception, $context);
 
@@ -353,6 +363,11 @@ final readonly class SyncBankConnectionHandler
         ]);
     }
 
+    private function isForbidden(\Throwable $exception): bool
+    {
+        return $exception instanceof BankApiRequestFailedException && 403 === $exception->getStatusCode();
+    }
+
     private function isUnauthorized(\Throwable $exception): bool
     {
         return $exception instanceof BankApiRequestFailedException && 401 === $exception->getStatusCode();
@@ -383,15 +398,7 @@ final readonly class SyncBankConnectionHandler
         }
 
         if (!$isOAuth || !$mayRetry) {
-            $this->underTokenLock($connection, $context, function () use ($connection, $usedCredentials, $context): null {
-                if ($connection->getCredentialsEncrypted() === $usedCredentials) {
-                    $this->markNeedsReauth($connection, 'token_rejected', null, $context);
-                } else {
-                    $this->logger->info('Bank sync: rejected token was already replaced', $context);
-                }
-
-                return null;
-            });
+            $this->rejectUsedCredentials($connection, $usedCredentials, 'token_rejected', $context);
 
             return null;
         }
@@ -402,6 +409,31 @@ final readonly class SyncBankConnectionHandler
         }
 
         return $fresh;
+    }
+
+    /**
+     * Учётные данные, с которыми шла загрузка, банк не принимает — `needs_reauth`, если их
+     * тем временем не заменили (новый вход, другой процесс).
+     *
+     * @param array<string, string> $context
+     */
+    private function rejectUsedCredentials(BankConnection $connection, string $usedCredentials, string $reason, array $context): void
+    {
+        if (!$this->entityManager->isOpen()) {
+            $this->logger->error('Bank sync: access rejected but the entity manager is closed', $context);
+
+            return;
+        }
+
+        $this->underTokenLock($connection, $context, function () use ($connection, $usedCredentials, $reason, $context): null {
+            if ($connection->getCredentialsEncrypted() === $usedCredentials) {
+                $this->markNeedsReauth($connection, $reason, null, $context);
+            } else {
+                $this->logger->info('Bank sync: rejected token was already replaced', $context);
+            }
+
+            return null;
+        });
     }
 
     /**
@@ -497,9 +529,9 @@ final readonly class SyncBankConnectionHandler
             return $exception;
         }
 
-        if ($exception instanceof BankChannelNotConfiguredException) {
-            // Сертификат канала не настроен или не подходит: чинит человек, ретраи бесполезны.
-            $this->logger->error('Bank sync: bank TLS channel is not configured', $context + [
+        if ($exception instanceof BankChannelNotConfiguredException || $exception instanceof BankAuthorizationNotConfiguredException) {
+            // Сертификат канала или пара приложения не настроены: чинит человек, ретраи бесполезны.
+            $this->logger->error('Bank sync: bank TLS channel or sign-in is not configured', $context + [
                 'problem' => $exception->getMessage(),
             ]);
 

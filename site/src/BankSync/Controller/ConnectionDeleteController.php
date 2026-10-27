@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\BankSync\Controller;
 
 use App\BankSync\Application\DeleteBankConnectionAction;
+use App\BankSync\Exception\BankConnectionBusyException;
+use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -37,7 +39,14 @@ final class ConnectionDeleteController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        ($this->deleteConnection)($companyId, $connection->getId());
+        try {
+            ($this->deleteConnection)($companyId, $connection->getId());
+            $this->addFlash('success', 'Подключение удалено.');
+        } catch (BankConnectionBusyException) {
+            $this->addFlash('warning', 'Подключение сейчас обновляется. Повторите удаление через минуту.');
+        } catch (BankConnectionNotFoundException) {
+            // Удалили параллельно — результат тот же.
+        }
 
         return $this->redirectToRoute('bank_sync_connection_index');
     }
