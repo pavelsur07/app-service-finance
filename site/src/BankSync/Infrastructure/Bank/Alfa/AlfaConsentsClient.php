@@ -18,7 +18,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Согласия пользователей нашего приложения у Альфы: `GET /oidc/client-consents` по токену
- * Client Credentials (уровень приложения, без refresh), все страницы до возврата.
+ * Client Credentials (уровень приложения, без refresh), все страницы до возврата. Пустая или
+ * неполная страница раньше `totalCount` — отказ: решения принимаются только по полному списку.
  *
  * В лог — путь, страница, статус, время, `X-TraceId`; ни `sub`, ни хэша организации, ни
  * тела ответа.
@@ -65,8 +66,19 @@ final readonly class AlfaConsentsClient
             foreach ($items as $item) {
                 $consents[] = $this->consent($item);
             }
-            if ([] === $items || ($page + 1) * self::PAGE_SIZE >= (int) $total) {
+            if (\count($consents) >= (int) $total) {
                 return $consents;
+            }
+            // Неполный список хуже ошибки: пропущенное действующее согласие погасит подключение.
+            if (\count($items) < self::PAGE_SIZE) {
+                $this->logger->warning('Alfa client consents: page ended before totalCount', [
+                    'page' => $page,
+                    'items' => \count($items),
+                    'collected' => \count($consents),
+                    'total' => (int) $total,
+                ]);
+
+                throw new BankApiRequestFailedException(AlfaIdConfig::BANK_CODE, null);
             }
         }
 

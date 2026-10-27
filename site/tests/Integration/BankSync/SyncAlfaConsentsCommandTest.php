@@ -24,6 +24,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
@@ -53,6 +54,9 @@ final class SyncAlfaConsentsCommandTest extends IntegrationTestCase
     private ?MockResponse $tokenFailure = null;
     /** @var array<int, MockResponse> ответ на страницу по offset */
     private array $pageFailures = [];
+    private ?int $totalCountOverride = null;
+    /** @var (\Closure(): void)|null вызывается один раз при первой странице — «клиент вошёл в эту секунду» */
+    private ?\Closure $duringFetch = null;
 
     protected function setUp(): void
     {
@@ -219,6 +223,59 @@ final class SyncAlfaConsentsCommandTest extends IntegrationTestCase
         self::assertSame([], $this->requests, 'платных или лишних запросов к банку нет');
     }
 
+    public function testSignInDuringBankRequestIsNotOverwrittenByOldConsent(): void
+    {
+        $connection = $this->connection('user-old');
+        $this->bankConsents = [$this->consent('user-old', true, '2026-11-01')];
+        $newCredentials = self::getContainer()->get(BankCredentialsCodec::class)->encryptStaticToken('new-token');
+        // Строка теста не закоммичена: «вход клиента» — через то же соединение, мимо UnitOfWork,
+        // в памяти команды остаётся снимок до запроса к банку.
+        $this->duringFetch = function () use ($connection, $newCredentials): void {
+            $this->em->getConnection()->executeStatement(
+                'UPDATE bank_sync_connection SET credentials_encrypted = :credentials, external_subject = :subject, consent_expires_at = NULL WHERE id = :id',
+                ['credentials' => $newCredentials->storageJson, 'subject' => 'user-new', 'id' => $connection->getId()],
+            );
+        };
+
+        [$exit, $display] = $this->runSync();
+
+        self::assertSame(Command::SUCCESS, $exit);
+        $fresh = $this->reload($connection);
+        self::assertSame('user-new', $fresh->getExternalSubject());
+        self::assertNull($fresh->getConsentExpiresAt(), 'срок старого согласия не приписан новому входу');
+        self::assertStringContainsString('0 date(s) updated, 0 expiring', $display);
+    }
+
+    /**
+     * @return iterable<string, array{int, int}>
+     */
+    public static function incompletePages(): iterable
+    {
+        yield 'короткая первая страница' => [1, 5];
+        yield 'пустая вторая страница' => [AlfaConsentsClient::PAGE_SIZE, AlfaConsentsClient::PAGE_SIZE + 500];
+    }
+
+    #[DataProvider('incompletePages')]
+    public function testIncompleteConsentListChangesNothing(int $inactiveConsents, int $totalCount): void
+    {
+        $connection = $this->connection('user-gone');
+        $connection->updateConsentExpiresAt(new \DateTimeImmutable('2027-01-01'));
+        $this->em->flush();
+        for ($i = 0; $i < $inactiveConsents; ++$i) {
+            $this->bankConsents[] = $this->consent('user-gone', false, '2027-09-01');
+        }
+        $this->totalCountOverride = $totalCount;
+
+        [$exit] = $this->runSync();
+
+        self::assertSame(Command::FAILURE, $exit);
+        $fresh = $this->reload($connection);
+        self::assertSame(BankConnectionStatus::ACTIVE, $fresh->getStatus(), 'действующее согласие могло быть на непрочитанной странице');
+        self::assertSame('2027-01-01', $fresh->getConsentExpiresAt()?->format('Y-m-d'));
+        self::assertTrue($this->logs->hasWarningThatContains('page ended before totalCount'));
+        self::assertTrue($this->logs->hasErrorThatContains('Alfa consents sync failed'));
+    }
+
     /**
      * @return array{int, string}
      */
@@ -245,9 +302,13 @@ final class SyncAlfaConsentsCommandTest extends IntegrationTestCase
             }
             parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
             $offset = (int) ($query['offset'] ?? 0);
+            if (null !== $this->duringFetch) {
+                ($this->duringFetch)();
+                $this->duringFetch = null;
+            }
 
             return $this->pageFailures[$offset] ?? new MockResponse(json_encode([
-                'pagination' => ['limit' => AlfaConsentsClient::PAGE_SIZE, 'offset' => $offset, 'totalCount' => \count($this->bankConsents)],
+                'pagination' => ['limit' => AlfaConsentsClient::PAGE_SIZE, 'offset' => $offset, 'totalCount' => $this->totalCountOverride ?? \count($this->bankConsents)],
                 'items' => \array_slice($this->bankConsents, $offset, AlfaConsentsClient::PAGE_SIZE),
             ], \JSON_THROW_ON_ERROR));
         });

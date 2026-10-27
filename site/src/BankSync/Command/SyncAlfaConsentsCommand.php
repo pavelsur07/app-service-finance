@@ -31,8 +31,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Ночная сверка сроков согласий Alfa ID: по каждой настроенной среде, где есть подключения
  * с известным пользователем банка, — все согласия приложения одним списком (HTTP до записи
  * в БД), затем по каждому подключению `ConsentExpiryPolicy`:
- * - действует — срок в `consent_expires_at`; осталось 30 дней и меньше — в агрегированный
- *   `warning` (клиент видит предупреждение в списке подключений);
+ * - действует — срок в `consent_expires_at` (новый срок — под блокировкой токенов на
+ *   перечитанной строке: вход клиента во время запроса к банку сбрасывает срок, старый
+ *   ответ его не перезаписывает); осталось 30 дней и меньше — в агрегированный `warning`
+ *   (клиент видит предупреждение в списке подключений);
  * - все согласия неактивны или истекли — `revoked` (`consent_expired`) под блокировкой
  *   токенов подключения на перечитанной строке;
  * - банк о пользователе не сообщил — ничего не меняем, счётчик «не найдено».
@@ -46,7 +48,6 @@ final class SyncAlfaConsentsCommand extends Command
 {
     public const STATUS_REASON = 'consent_expired';
     private const TOKEN_LOCK_TIMEOUT_SECONDS = 10;
-    private const FLUSH_EVERY = 100;
 
     public function __construct(
         private readonly AlfaIdConfig $config,
@@ -150,7 +151,7 @@ final class SyncAlfaConsentsCommand extends Command
     private function apply(array $connections, array $bySubject, array &$result): void
     {
         $today = $this->clock->now();
-        foreach ($connections as $index => $connection) {
+        foreach ($connections as $connection) {
             ++$result['checked'];
             $decision = $this->policy->decide($bySubject[(string) $connection->getExternalSubject()] ?? [], $today);
 
@@ -159,12 +160,7 @@ final class SyncAlfaConsentsCommand extends Command
                 ConsentState::EXPIRED => $this->revoke($connection, $result),
                 ConsentState::NOT_FOUND => $result['not_found'][] = $connection->getId(),
             };
-
-            if (0 === ($index + 1) % self::FLUSH_EVERY) {
-                $this->entityManager->flush();
-            }
         }
-        $this->entityManager->flush();
     }
 
     /**
@@ -175,10 +171,29 @@ final class SyncAlfaConsentsCommand extends Command
         if (null === $expiresOn) {
             return;
         }
-        $before = $connection->getConsentExpiresAt();
-        $connection->updateConsentExpiresAt($expiresOn);
-        if ($before != $connection->getConsentExpiresAt()) {
-            ++$result['updated'];
+        if ($connection->getConsentExpiresAt()?->format('Y-m-d') !== $expiresOn->format('Y-m-d')) {
+            $usedCredentials = $connection->getCredentialsEncrypted();
+            if (!$this->tokenLock->acquire($connection->getId(), self::TOKEN_LOCK_TIMEOUT_SECONDS)) {
+                $result['busy'][] = $connection->getId();
+
+                return;
+            }
+            try {
+                try {
+                    $this->entityManager->refresh($connection);
+                } catch (EntityNotFoundException) {
+                    return;
+                }
+                if ($connection->getCredentialsEncrypted() !== $usedCredentials) {
+                    // Клиент вошёл заново, пока шёл запрос: срок нового согласия — завтра.
+                    return;
+                }
+                $connection->updateConsentExpiresAt($expiresOn);
+                $this->entityManager->flush();
+                ++$result['updated'];
+            } finally {
+                $this->tokenLock->release($connection->getId());
+            }
         }
         if ($expiresSoon) {
             $result['expiring'][] = $connection->getId();
