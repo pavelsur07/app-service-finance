@@ -65,7 +65,7 @@ site/src/Cash/
   Entity/Accounts/MoneyAccount.php    + bank_api_source (код банка или null)
   Facade/CashFacade.php               + getStatementImportAccount(companyId, moneyAccountId)
                                       + markBankApiStatementSource / clearBankApiStatementSource
-                                      + listLinkableMoneyAccounts (активные, валюта)
+                                      + listStatementLinkCandidates (активные, валюта)
 site/migrations/Version2026102…       bank_sync_account + money_account.bank_api_source
 ```
 
@@ -113,6 +113,12 @@ site/migrations/Version2026102…       bank_sync_account + money_account.bank_a
 - **FK `money_account_id → money_account ON DELETE SET NULL`** только в миграции, как
   FK на `companies`: удаления денежного счёта в Cash сейчас нет, но висячая привязка
   невозможна.
+- **Признак источника — новая колонка `bank_api_source`, а не `meta['bank']`.** Легаси
+  `MoneyAccount::meta['bank']` пользователь правит в форме счёта, и на проде он пуст
+  (0 из 43 счетов, 27.10): признак, который пользователь может стереть, не годится для
+  предупреждения Stage 8. Колонку меняет только BankSync через `CashFacade`.
+- **`findStatementImportAccount` удалён, а не оставлен рядом.** Потребитель был один
+  (загрузка); оставленный метод подбора по номеру позвал бы обратно в неявную привязку.
 - **Подпись ответа `x-jws-signature` не проверяется** — канал mTLS к банку; проверка
   подписи ответов — вопрос Stage 11, если банк её потребует.
 
@@ -137,7 +143,7 @@ site/migrations/Version2026102…       bank_sync_account + money_account.bank_a
 | 6.1 | Baseline: тесты BankSync и Cash зелёные | — |
 | 6.2 | Альфа: путь v3.0, `x-fapi-interaction-id`, полный `BankAccountDTO`, маппер на фикстуре из спецификации, `RUR` → `RUB`, `totalPages > 1` → ошибка + unit | 2 |
 | 6.3 | `BankAccount` + репозиторий + Builder; миграция `bank_sync_account` и `money_account.bank_api_source`; unit Entity | 3 |
-| 6.4 | `CashFacade`: `getStatementImportAccount`, `listLinkableMoneyAccounts`, `mark/clearBankApiStatementSource` (persist, коммитит вызывающий) + тесты | 3 |
+| 6.4 | `CashFacade`: `getStatementImportAccount`, `listStatementLinkCandidates`, `mark/clearBankApiStatementSource` (persist, коммитит вызывающий) + тесты | 3 |
 | 6.5 | Загрузка: каталог счетов в Handler, выбор счёта только по привязке, счётчики, `info` для непривязанных + integration | 4 |
 | 6.6 | `LinkBankAccountAction` / `UnlinkBankAccountAction`: IDOR, валюта, активность, уникальность, идемпотентность, признак источника в той же транзакции + integration | 5 |
 | 6.7 | Удаление подключения снимает признак источника у привязанных счетов + тест | 5 |
@@ -195,7 +201,7 @@ site/migrations/Version2026102…       bank_sync_account + money_account.bank_a
 
 Cash (integration)
 - [ ] `getStatementImportAccount` — только счёт своей компании; неактивный → null.
-- [ ] `listLinkableMoneyAccounts` — только своя компания, активные, нужная валюта.
+- [ ] `listStatementLinkCandidates` — только своя компания, активные, нужная валюта.
 - [ ] `mark/clearBankApiStatementSource` — только своя компания, без `flush()`.
 
 Миграция
