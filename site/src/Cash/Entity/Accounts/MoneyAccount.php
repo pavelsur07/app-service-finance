@@ -98,6 +98,14 @@ class MoneyAccount
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $meta = null;
 
+    /**
+     * Выписка в счёт приходит из банка по API (код банка, например `alfa`); null — нет.
+     * Ставит и снимает только `CashFacade` по привязке счёта банка в BankSync — пользователь
+     * его не правит. По нему ручная загрузка файла предупреждает о дублях.
+     */
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $bankApiSource = null;
+
     public function __construct(string $id, Company $company, MoneyAccountType $type, string $name, string $currency)
     {
         Assert::uuid($id);
@@ -518,6 +526,32 @@ class MoneyAccount
         $this->setMeta($meta);
 
         return $this;
+    }
+
+    public function getBankApiSource(): ?string
+    {
+        return $this->bankApiSource;
+    }
+
+    public function markBankApiSource(string $bankCode): void
+    {
+        Assert::regex($bankCode, '/^[a-z0-9_]{1,32}$/');
+        if ($this->bankApiSource === $bankCode) {
+            return;
+        }
+
+        $this->bankApiSource = $bankCode;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function clearBankApiSource(): void
+    {
+        if (null === $this->bankApiSource) {
+            return;
+        }
+
+        $this->bankApiSource = null;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
