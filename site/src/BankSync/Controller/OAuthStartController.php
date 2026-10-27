@@ -7,6 +7,7 @@ namespace App\BankSync\Controller;
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Application\StartBankAuthorizationAction;
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\Company\Security\ModuleAccess;
@@ -63,7 +64,7 @@ final class OAuthStartController extends AbstractController
             );
         } catch (BankConnectionNotFoundException) {
             throw $this->createNotFoundException();
-        } catch (UnknownBankCodeException) {
+        } catch (UnknownBankCodeException|BankAuthorizationNotConfiguredException) {
             $this->addFlash('warning', sprintf('Вход через %s пока не подключён.', $bankCode->label()));
 
             return $this->redirectToRoute('bank_sync_connection_index');

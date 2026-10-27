@@ -292,7 +292,6 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         $tokens = $this->storedTokens();
         self::assertSame('refreshed-access-1', $tokens->accessToken);
         self::assertSame('refreshed-refresh-1', $tokens->refreshToken, 'новый refresh сохранён');
-        self::assertNotNull($tokens->consentExpiresAt, 'срок согласия переживает обновление');
         self::assertTrue($this->logs->hasInfoThatContains('OAuth tokens refreshed'));
         $this->assertNoSensitiveDataInLogs();
     }
@@ -451,7 +450,6 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             'oauth-access',
             'oauth-refresh',
             new \DateTimeImmutable($accessExpiresIn),
-            new \DateTimeImmutable('+300 days'),
         ));
         $this->bankConnection->reauthorize($credentials->storageJson, $credentials->keyVersion);
         $this->em->flush();

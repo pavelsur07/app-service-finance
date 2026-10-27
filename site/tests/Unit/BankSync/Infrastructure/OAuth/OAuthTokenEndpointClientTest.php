@@ -18,6 +18,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 final class OAuthTokenEndpointClientTest extends TestCase
 {
     private const TOKEN_URL = 'https://auth.bank.example/oidc/token';
+    private const REVOKE_URL = 'https://auth.bank.example/oidc/revoke';
 
     private RecordingLogger $logger;
 
@@ -35,7 +36,8 @@ final class OAuthTokenEndpointClientTest extends TestCase
             return new MockResponse('{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600,"token_type":"Bearer"}');
         });
 
-        $tokens = $this->client($http)->requestTokens('alfa', self::TOKEN_URL, ['grant_type' => 'refresh_token', 'refresh_token' => 'old-refresh', 'client_secret' => 'app-secret']);
+        $response = $this->client($http)->requestTokens('alfa', self::TOKEN_URL, ['grant_type' => 'refresh_token', 'refresh_token' => 'old-refresh', 'client_secret' => 'app-secret']);
+        $tokens = $response->tokens;
 
         self::assertSame('new-access', $tokens->accessToken);
         self::assertSame('new-refresh', $tokens->refreshToken);
@@ -43,12 +45,61 @@ final class OAuthTokenEndpointClientTest extends TestCase
         self::assertSame('POST', $requests[0][0]);
         self::assertSame(self::TOKEN_URL, $requests[0][1]);
         self::assertStringContainsString('grant_type=refresh_token', $requests[0][2]);
+        self::assertNull($response->idToken);
         $this->assertNothingSecretLogged();
+    }
+
+    public function testIdTokenIsReturnedUnverifiedAndNotLogged(): void
+    {
+        $response = $this->client(new MockHttpClient(new MockResponse('{"access_token":"new-access","refresh_token":"new-refresh","id_token":"header.payload.signature-leak","expires_in":3600}')))
+            ->requestTokens('alfa', self::TOKEN_URL, ['grant_type' => 'authorization_code', 'code' => 'leak']);
+
+        self::assertSame('header.payload.signature-leak', $response->idToken);
+        $this->assertNothingSecretLogged();
+    }
+
+    public function testRevokePostsFormAndAcceptsOk(): void
+    {
+        $requests = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$requests): MockResponse {
+            $requests[] = [$method, $url, $options['body']];
+
+            return new MockResponse('{}');
+        });
+
+        $this->client($http)->revokeToken('alfa', self::REVOKE_URL, ['token' => 'old-refresh', 'token_type_hint' => 'refresh_token', 'client_secret' => 'app-secret']);
+
+        self::assertSame(['POST', self::REVOKE_URL], [$requests[0][0], $requests[0][1]]);
+        self::assertStringContainsString('token_type_hint=refresh_token', $requests[0][2]);
+        self::assertSame('Bank OAuth token revoked', $this->logger->records[0][1]);
+        $this->assertNothingSecretLogged();
+    }
+
+    /**
+     * @return iterable<string, array{int, class-string<\Throwable>}>
+     */
+    public static function revokeFailures(): iterable
+    {
+        yield '400 — не «войдите заново», а отказ' => [400, BankApiRequestFailedException::class];
+        yield '401 invalid_client' => [401, BankApiRequestFailedException::class];
+        yield '503' => [503, BankApiUnavailableException::class];
+    }
+
+    /**
+     * @param class-string<\Throwable> $expected
+     */
+    #[DataProvider('revokeFailures')]
+    public function testRevokeFailures(int $status, string $expected): void
+    {
+        $this->expectException($expected);
+
+        $this->client(new MockHttpClient(new MockResponse('{"error":"invalid_client"}', ['http_code' => $status])))
+            ->revokeToken('alfa', self::REVOKE_URL, ['token' => 'old-refresh']);
     }
 
     public function testRefreshTokenIsOptional(): void
     {
-        $tokens = $this->client(new MockHttpClient(new MockResponse('{"access_token":"a","expires_in":60}')))->requestTokens('alfa', self::TOKEN_URL, ['grant_type' => 'refresh_token']);
+        $tokens = $this->client(new MockHttpClient(new MockResponse('{"access_token":"a","expires_in":60}')))->requestTokens('alfa', self::TOKEN_URL, ['grant_type' => 'refresh_token'])->tokens;
 
         self::assertNull($tokens->refreshToken);
     }

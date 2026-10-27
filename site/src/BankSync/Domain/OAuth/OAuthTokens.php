@@ -21,7 +21,6 @@ final readonly class OAuthTokens
         #[\SensitiveParameter]
         public ?string $refreshToken,
         public \DateTimeImmutable $accessExpiresAt,
-        public ?\DateTimeImmutable $consentExpiresAt = null,
     ) {
         Assert::notEmpty($accessToken);
         if (null !== $refreshToken) {
@@ -43,7 +42,7 @@ final readonly class OAuthTokens
             return $this;
         }
 
-        return new self($this->accessToken, $previous, $this->accessExpiresAt, $this->consentExpiresAt);
+        return new self($this->accessToken, $previous, $this->accessExpiresAt);
     }
 
     /**

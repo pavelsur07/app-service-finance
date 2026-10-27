@@ -58,6 +58,7 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         self::assertSame('S256', $query['code_challenge_method']);
         self::assertMatchesRegularExpression('/^[A-Za-z0-9\-_]{43}$/', $query['code_challenge']);
         self::assertSame(self::CALLBACK_URL, $query['redirect_uri']);
+        self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $query['nonce']);
 
         $this->returnFromBank($query['state'], StubBankAuthorizationProvider::codeFor($authorizationUrl));
 
@@ -66,6 +67,8 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         self::assertCount(1, $rows);
         self::assertSame('active', $rows[0]['status']);
         self::assertSame('https://baas.alfabank.ru', $rows[0]['base_url']);
+        self::assertSame(StubBankAuthorizationProvider::SUBJECT, $rows[0]['external_subject'], 'sub из проверенного id_token');
+        self::assertNull($rows[0]['consent_expires_at'], 'срок согласия — со сверкой согласий');
         $raw = json_encode($rows, \JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString(StubBankAuthorizationProvider::ACCESS_TOKEN, $raw);
         self::assertStringNotContainsString(StubBankAuthorizationProvider::REFRESH_TOKEN, $raw);
@@ -117,6 +120,17 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         self::assertSelectorTextContains('.toast-body', 'Банк отклонил вход');
     }
 
+    public function testInvalidIdTokenSavesNothing(): void
+    {
+        $state = $this->query($this->startFromIndex('Подключить через Альфа-Банк'))['state'];
+
+        $this->returnFromBank($state, 'bad-id-token');
+
+        self::assertSame([], $this->rows());
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.toast-body', 'Не удалось завершить вход в банк');
+    }
+
     public function testDeniedByClientSavesNothing(): void
     {
         $state = $this->query($this->startFromIndex('Подключить через Альфа-Банк'))['state'];
@@ -155,6 +169,8 @@ final class BankOAuthFlowTest extends WebTestCaseBase
             ->withCredentials($codec->encryptStaticToken('old-token'))
             ->build();
         $connection->markNeedsReauth('refresh_rejected');
+        $connection->recordAuthorizedSubject('previous-user');
+        $connection->updateConsentExpiresAt(new \DateTimeImmutable('+5 days'));
         $this->em()->persist($connection);
         $this->em()->flush();
         $before = $this->rows()[0];
@@ -168,6 +184,8 @@ final class BankOAuthFlowTest extends WebTestCaseBase
         self::assertSame('active', $rows[0]['status']);
         self::assertSame('https://sandbox.alfabank.ru', $rows[0]['base_url'], 'переподключение — в ту же среду');
         self::assertNotSame($before['credentials_encrypted'], $rows[0]['credentials_encrypted']);
+        self::assertSame(StubBankAuthorizationProvider::SUBJECT, $rows[0]['external_subject'], 'подключение компании, вошёл другой пользователь банка');
+        self::assertNull($rows[0]['consent_expires_at'], 'срок прежнего согласия сброшен');
         self::assertSame(StubBankAuthorizationProvider::ACCESS_TOKEN, $codec->token($this->connection($connection->getId())));
     }
 
@@ -232,7 +250,7 @@ final class BankOAuthFlowTest extends WebTestCaseBase
     {
         /* @var list<array<string, mixed>> */
         return $this->em()->getConnection()->fetchAllAssociative(
-            'SELECT id, base_url, status, credentials_encrypted FROM bank_sync_connection WHERE company_id = :companyId ORDER BY created_at',
+            'SELECT id, base_url, status, credentials_encrypted, external_subject, consent_expires_at FROM bank_sync_connection WHERE company_id = :companyId ORDER BY created_at',
             ['companyId' => ($company ?? $this->company)->getId()],
         );
     }

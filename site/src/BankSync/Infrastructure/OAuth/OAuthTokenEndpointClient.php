@@ -16,8 +16,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Token endpoint OAuth 2.0 (RFC 6749 §4.1.3, §6): POST form-urlencoded, ответ —
- * `access_token`, `expires_in`, необязательный `refresh_token`. Общий для банков;
- * адрес и поля формы (в т.ч. `client_secret`) передаёт провайдер банка.
+ * `access_token`, `expires_in`, необязательные `refresh_token` и `id_token` (OpenID
+ * Connect). Отзыв токена — RFC 7009. Общий для банков; адрес и поля формы (в т.ч.
+ * `client_secret`) передаёт провайдер банка.
  *
  * В лог — метод, адрес без query, статус, время и код ошибки OAuth. Ни тело запроса
  * (код, verifier, refresh, secret), ни тело ответа (токены) не логируются; исключения
@@ -41,18 +42,64 @@ final readonly class OAuthTokenEndpointClient
      * @throws BankApiUnavailableException сеть, 408, 429, 5xx
      * @throws BankApiRequestFailedException прочие 4xx или нечитаемый ответ
      */
-    public function requestTokens(string $bankCode, string $tokenUrl, #[\SensitiveParameter] array $form): OAuthTokens
+    public function requestTokens(string $bankCode, string $tokenUrl, #[\SensitiveParameter] array $form): OAuthTokenResponse
+    {
+        [$payload, $context] = $this->post($bankCode, $tokenUrl, $form, 'token');
+
+        $response = null === $payload ? null : $this->tokenResponse($payload);
+        if (null === $response) {
+            $this->logger->warning('Bank OAuth token endpoint returned an unreadable response', $context);
+
+            throw new BankApiRequestFailedException($bankCode, null);
+        }
+
+        $this->logger->info('Bank OAuth token request', $context);
+
+        return $response;
+    }
+
+    /**
+     * Отзыв токена (RFC 7009): 200 — отозван или уже недействителен.
+     *
+     * @param array<string, string> $form
+     *
+     * @throws BankApiUnavailableException сеть, 408, 429, 5xx
+     * @throws BankApiRequestFailedException банк отказал (в т.ч. 400/401)
+     */
+    public function revokeToken(string $bankCode, string $revokeUrl, #[\SensitiveParameter] array $form): void
+    {
+        try {
+            [, $context] = $this->post($bankCode, $revokeUrl, $form, 'revoke');
+        } catch (BankAuthorizationRejectedException $exception) {
+            // Отказ на отзыв — не «войдите заново», а неверная пара приложения или запрос.
+            throw new BankApiRequestFailedException($bankCode, $exception->getStatusCode());
+        }
+
+        $this->logger->info('Bank OAuth token revoked', $context);
+    }
+
+    /**
+     * @param array<string, string> $form
+     *
+     * @return array{0: array<mixed>|null, 1: array<string, string|int>} разобранный JSON ответа 200 (null — не JSON) и контекст лога
+     *
+     * @throws BankAuthorizationRejectedException
+     * @throws BankApiUnavailableException
+     * @throws BankApiRequestFailedException
+     */
+    private function post(string $bankCode, string $url, #[\SensitiveParameter] array $form, string $purpose): array
     {
         $startedAt = microtime(true);
         $context = [
             'bank_code' => $bankCode,
             'method' => 'POST',
-            'url' => strtok($tokenUrl, '?'),
+            'url' => (string) strtok($url, '?'),
+            'purpose' => $purpose,
             'grant_type' => $form['grant_type'] ?? 'none',
         ];
 
         try {
-            $response = $this->httpClient->request('POST', $tokenUrl, [
+            $response = $this->httpClient->request('POST', $url, [
                 'body' => $form,
                 'headers' => ['Accept' => 'application/json'],
                 'timeout' => self::TIMEOUT_SECONDS,
@@ -60,7 +107,7 @@ final readonly class OAuthTokenEndpointClient
             $statusCode = $response->getStatusCode();
             $payload = $response->toArray(false);
         } catch (TransportExceptionInterface $exception) {
-            $this->logger->warning('Bank OAuth token request failed: transport error', $context + [
+            $this->logger->warning('Bank OAuth request failed: transport error', $context + [
                 'duration_ms' => $this->elapsedMs($startedAt),
                 'exception_class' => $exception::class,
             ]);
@@ -76,7 +123,7 @@ final readonly class OAuthTokenEndpointClient
 
         if (200 !== $statusCode) {
             if (\in_array($statusCode, [408, 429], true) || $statusCode >= 500) {
-                $this->logger->warning('Bank OAuth token endpoint temporarily unavailable', $context);
+                $this->logger->warning('Bank OAuth endpoint temporarily unavailable', $context);
 
                 throw new BankApiUnavailableException($bankCode, $statusCode);
             }
@@ -84,44 +131,39 @@ final readonly class OAuthTokenEndpointClient
             $rejected = new BankAuthorizationRejectedException($bankCode, $statusCode, $oauthError);
             $context['oauth_error'] = $rejected->getOauthError() ?? 'none';
             if (\in_array($statusCode, [400, 401], true)) {
-                $this->logger->info('Bank OAuth token request rejected', $context);
+                $this->logger->info('Bank OAuth request rejected', $context);
 
                 throw $rejected;
             }
 
-            $this->logger->warning('Bank OAuth token request failed', $context);
+            $this->logger->warning('Bank OAuth request failed', $context);
 
             throw new BankApiRequestFailedException($bankCode, $statusCode);
         }
 
-        $tokens = \is_array($payload) ? $this->tokens($payload) : null;
-        if (null === $tokens) {
-            $this->logger->warning('Bank OAuth token endpoint returned an unreadable response', $context);
-
-            throw new BankApiRequestFailedException($bankCode, null);
-        }
-
-        $this->logger->info('Bank OAuth token request', $context);
-
-        return $tokens;
+        return [$payload, $context];
     }
 
     /**
      * @param array<mixed> $payload
      */
-    private function tokens(array $payload): ?OAuthTokens
+    private function tokenResponse(array $payload): ?OAuthTokenResponse
     {
         $access = $payload['access_token'] ?? null;
         $expiresIn = $payload['expires_in'] ?? null;
         $refresh = $payload['refresh_token'] ?? null;
+        $idToken = $payload['id_token'] ?? null;
         if (!\is_string($access) || '' === $access || !\is_int($expiresIn) || $expiresIn <= 0) {
             return null;
         }
-        if (null !== $refresh && (!\is_string($refresh) || '' === $refresh)) {
+        if ((null !== $refresh && (!\is_string($refresh) || '' === $refresh)) || (null !== $idToken && !\is_string($idToken))) {
             return null;
         }
 
-        return new OAuthTokens($access, $refresh, $this->clock->now()->modify(sprintf('+%d seconds', $expiresIn)));
+        return new OAuthTokenResponse(
+            new OAuthTokens($access, $refresh, $this->clock->now()->modify(sprintf('+%d seconds', $expiresIn))),
+            '' === $idToken ? null : $idToken,
+        );
     }
 
     private function elapsedMs(float $startedAt): int

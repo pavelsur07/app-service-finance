@@ -16,7 +16,8 @@ use App\Shared\Security\ValueObject\EncryptedPayload;
 /**
  * Учётные данные подключения ↔ шифротекст. Внутри шифротекста — JSON с полем `type`:
  * - `static_token`: `{type, token}` — токен, выданный клиенту банком;
- * - `oauth2`: `{type, access_token, refresh_token|null, access_expires_at, consent_expires_at|null}`.
+ * - `oauth2`: `{type, access_token, refresh_token|null, access_expires_at}`. Срок согласия —
+ *   колонка подключения (`consent_expires_at`), не шифротекст.
  */
 final readonly class BankCredentialsCodec
 {
@@ -43,7 +44,6 @@ final readonly class BankCredentialsCodec
             'access_token' => $tokens->accessToken,
             'refresh_token' => $tokens->refreshToken,
             'access_expires_at' => $tokens->accessExpiresAt->format(\DATE_ATOM),
-            'consent_expires_at' => $tokens->consentExpiresAt?->format(\DATE_ATOM),
         ], \JSON_THROW_ON_ERROR));
     }
 
@@ -112,9 +112,9 @@ final readonly class BankCredentialsCodec
      */
     private function oauthFromArray(array $credentials): OAuthTokens
     {
+        // `consent_expires_at` писал Stage 3 — поле игнорируется, срок согласия в колонке.
         $refresh = $credentials['refresh_token'] ?? null;
-        $consent = $credentials['consent_expires_at'] ?? null;
-        if ((null !== $refresh && !\is_string($refresh)) || (null !== $consent && !\is_string($consent))) {
+        if (null !== $refresh && !\is_string($refresh)) {
             throw new DecryptionException('Bank credentials have an unexpected format.');
         }
 
@@ -123,7 +123,6 @@ final readonly class BankCredentialsCodec
                 $this->stringField($credentials, 'access_token'),
                 $refresh,
                 new \DateTimeImmutable($this->stringField($credentials, 'access_expires_at')),
-                null === $consent ? null : new \DateTimeImmutable($consent),
             );
         } catch (\Exception) {
             throw new DecryptionException('Bank credentials have an unexpected format.');

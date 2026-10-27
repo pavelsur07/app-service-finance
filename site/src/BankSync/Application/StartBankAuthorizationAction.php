@@ -8,6 +8,7 @@ use App\BankSync\Domain\OAuth\AuthorizationRequest;
 use App\BankSync\Domain\OAuth\PendingAuthorization;
 use App\BankSync\Domain\OAuth\Pkce;
 use App\BankSync\Enum\BankCode;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
@@ -35,6 +36,7 @@ final readonly class StartBankAuthorizationAction
      * @param string|null $connectionId переподключение существующего; null — новое подключение
      *
      * @throws UnknownBankCodeException у банка нет входа по OAuth
+     * @throws BankAuthorizationNotConfiguredException вход в этой среде банка не настроен
      * @throws BankConnectionNotFoundException переподключаемое не принадлежит компании
      */
     public function __invoke(string $companyId, BankCode $bankCode, string $baseUrl, ?string $connectionId, string $redirectUri): string
@@ -61,9 +63,12 @@ final readonly class StartBankAuthorizationAction
             $pkce->verifier,
             $redirectUri,
             $now->modify(sprintf('+%d seconds', PendingAuthorization::TTL_SECONDS)),
+            bin2hex(random_bytes(16)),
         );
+        // URL до записи в сессию: ненастроенная среда не оставляет начатого входа.
+        $url = $provider->authorizationUrl(new AuthorizationRequest($baseUrl, $pending->state, $pkce->challenge, $redirectUri, $pending->nonce));
         $this->sessionStore->save($pending, $now);
 
-        return $provider->authorizationUrl(new AuthorizationRequest($baseUrl, $pending->state, $pkce->challenge, $redirectUri));
+        return $url;
     }
 }

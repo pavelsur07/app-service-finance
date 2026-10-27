@@ -223,6 +223,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
             $pkce->verifier,
             'http://localhost/bank-connections/oauth/callback',
             new \DateTimeImmutable('+10 minutes'),
+            'test-nonce',
         );
         $this->sessionStore->save($pending, new \DateTimeImmutable());
 

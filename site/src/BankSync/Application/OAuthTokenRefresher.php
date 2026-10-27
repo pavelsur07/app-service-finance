@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\BankSync\Application;
 
-use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
@@ -78,7 +77,6 @@ final readonly class OAuthTokenRefresher
         $fresh = $this->providers->get($connection->getBankCode())
             ->refresh($connection->getBaseUrl(), $tokens->refreshToken)
             ->withFallbackRefreshToken($tokens->refreshToken);
-        $fresh = new OAuthTokens($fresh->accessToken, $fresh->refreshToken, $fresh->accessExpiresAt, $fresh->consentExpiresAt ?? $tokens->consentExpiresAt);
 
         $credentials = $this->credentialsCodec->encryptOAuthTokens($fresh);
         $connection->replaceCredentials($credentials->storageJson, $credentials->keyVersion);
