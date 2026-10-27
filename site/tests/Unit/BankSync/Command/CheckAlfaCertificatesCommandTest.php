@@ -6,6 +6,7 @@ namespace App\Tests\Unit\BankSync\Command;
 
 use App\BankSync\Command\CheckAlfaCertificatesCommand;
 use App\BankSync\Domain\Certificate\CertificateExpiryPolicy;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaIdConfig;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaTlsConfig;
 use App\Tests\Support\BankSync\TestCertificates;
 use Monolog\Handler\TestHandler;
@@ -140,10 +141,22 @@ final class CheckAlfaCertificatesCommandTest extends TestCase
         self::assertCount(1, $this->errors());
     }
 
+    public function testIdTokenSigningCertificateIsChecked(): void
+    {
+        // Клиентский сертификат канала не задан; сертификат подписи Alfa ID прода истекает.
+        $tester = $this->runCheck('', self::$caBundle, 10, self::$client['cert']);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('id-signing-sandbox: not configured, not checked', $tester->getDisplay());
+        self::assertStringContainsString('[error] id-signing-production #1', $tester->getDisplay());
+        self::assertCount(1, $this->errors());
+    }
+
     public function testRepositoryCaBundleIsGreenToday(): void
     {
         $command = new CheckAlfaCertificatesCommand(
             new AlfaTlsConfig('', '', '', self::REPOSITORY_CA_BUNDLE),
+            new AlfaIdConfig(null, null, null, null, null, null),
             new CertificateExpiryPolicy(),
             new MockClock(),
             new Logger('test', [$this->logs]),
@@ -158,7 +171,7 @@ final class CheckAlfaCertificatesCommandTest extends TestCase
     /**
      * Запуск на момент, когда до конца клиентского сертификата `$clientDaysLeft` полных суток.
      */
-    private function runCheck(string $clientCertPath, string $caBundlePath, int $clientDaysLeft): CommandTester
+    private function runCheck(string $clientCertPath, string $caBundlePath, int $clientDaysLeft, ?string $prodSigningCertPath = null): CommandTester
     {
         $parsed = openssl_x509_parse(self::$client['certPem']);
         self::assertIsArray($parsed);
@@ -167,6 +180,7 @@ final class CheckAlfaCertificatesCommandTest extends TestCase
 
         $command = new CheckAlfaCertificatesCommand(
             new AlfaTlsConfig($clientCertPath, '', '', $caBundlePath),
+            new AlfaIdConfig(null, null, null, null, null, $prodSigningCertPath),
             new CertificateExpiryPolicy(),
             new MockClock($now),
             new Logger('test', [$this->logs]),

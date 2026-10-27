@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\BankSync\Controller;
 
 use App\BankSync\Application\DTO\BankConnectionFormData;
+use App\BankSync\Domain\Consent\ConsentExpiryPolicy;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -21,6 +23,7 @@ final class ConnectionIndexController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly BankConnectionRepository $connections,
         private readonly BankAuthorizationProviderRegistry $authorizationProviders,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -53,6 +56,9 @@ final class ConnectionIndexController extends AbstractController
             // Переподключение — только там, где вход в эту среду банка настроен.
             'oauth_environments' => array_map(static fn (array $start): string => $start['bank_code'].'|'.$start['base_url'], $oauthStarts),
             'oauth_start_csrf_id' => OAuthStartController::CSRF_ID,
+            'can_add_with_token' => [] !== array_filter(BankCode::cases(), static fn (BankCode $code): bool => $code->supportsStaticToken()),
+            // Согласие кончается через 30 дней и меньше — клиенту пора войти заново.
+            'consent_warning_until' => $this->clock->now()->modify(sprintf('+%d days', ConsentExpiryPolicy::WARNING_DAYS)),
         ]);
     }
 }

@@ -21,9 +21,12 @@ final class BankConnectionType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        // Подключение по входу через банк (Альфа): среда и токены — только новым входом.
+        $staticToken = $options['static_token'];
         $builder
             ->add('bankCode', EnumType::class, [
                 'class' => BankCode::class,
+                'choice_filter' => static fn (?BankCode $code): bool => null === $code || !$options['is_new'] || $code->supportsStaticToken(),
                 'choice_label' => static fn (BankCode $code): string => $code->label(),
                 'label' => 'Банк',
                 'disabled' => !$options['is_new'],
@@ -34,16 +37,19 @@ final class BankConnectionType extends AbstractType
                     'Прод (baas.alfabank.ru)' => BankConnectionFormData::PRODUCTION_URL,
                 ],
                 'label' => 'Base URL',
-            ])
-            ->add('token', PasswordType::class, [
+                'disabled' => !$staticToken,
+            ]);
+        if ($staticToken) {
+            $builder->add('token', PasswordType::class, [
                 'label' => 'API ключ',
                 'required' => $options['is_new'],
                 'help' => $options['is_new'] ? null : 'Оставьте пустым, чтобы не менять ключ.',
-            ])
-            ->add('isActive', CheckboxType::class, [
-                'label' => 'Активно',
-                'required' => false,
             ]);
+        }
+        $builder->add('isActive', CheckboxType::class, [
+            'label' => 'Активно',
+            'required' => false,
+        ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -51,7 +57,9 @@ final class BankConnectionType extends AbstractType
         $resolver->setDefaults([
             'data_class' => BankConnectionFormData::class,
             'is_new' => true,
+            'static_token' => true,
         ]);
         $resolver->setAllowedTypes('is_new', 'bool');
+        $resolver->setAllowedTypes('static_token', 'bool');
     }
 }

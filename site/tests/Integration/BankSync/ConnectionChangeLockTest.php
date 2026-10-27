@@ -15,6 +15,7 @@ use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankConnectionBusyException;
+use App\BankSync\Exception\BankStaticTokenNotSupportedException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
 use App\BankSync\Infrastructure\OAuth\AuthorizationStateClaims;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
@@ -168,7 +169,7 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
     {
         self::assertTrue((new BankConnectionTokenLock($this->worker))->acquire($this->bankConnection->getId(), 0));
         $data = BankConnectionFormData::fromConnection($this->bankConnection);
-        $data->token = 'manual-token';
+        $data->isActive = false;
 
         try {
             $this->saveAction()($this->companyId, $data, $this->bankConnection->getId());
@@ -176,7 +177,40 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         } catch (BankConnectionBusyException) {
         }
 
-        self::assertSame('old-access', $this->storedTokens()->accessToken, 'воркер сохранит свои токены, ручной токен не потерян молча');
+        self::assertSame('old-access', $this->storedTokens()->accessToken);
+        self::assertSame('active', $this->connection->fetchOne('SELECT status FROM bank_sync_connection WHERE id = :id', ['id' => $this->bankConnection->getId()]), 'выключение не потеряно молча — клиент видит «занято»');
+    }
+
+    public function testStaticTokenOrEnvironmentCannotBeSetOnAlfaConnection(): void
+    {
+        $withToken = BankConnectionFormData::fromConnection($this->bankConnection);
+        $withToken->token = 'manual-token';
+        $otherEnvironment = BankConnectionFormData::fromConnection($this->bankConnection);
+        $otherEnvironment->baseUrl = BankConnectionFormData::PRODUCTION_URL === $this->bankConnection->getBaseUrl() ? BankConnectionFormData::SANDBOX_URL : BankConnectionFormData::PRODUCTION_URL;
+
+        foreach (['token' => $withToken, 'environment' => $otherEnvironment] as $case => $data) {
+            try {
+                $this->saveAction()($this->companyId, $data, $this->bankConnection->getId());
+                self::fail($case.': Alfa accepts tokens and environment only through sign-in');
+            } catch (BankStaticTokenNotSupportedException) {
+            }
+        }
+
+        self::assertSame('old-access', $this->storedTokens()->accessToken);
+    }
+
+    public function testNewAlfaConnectionWithStaticTokenIsRejected(): void
+    {
+        $data = BankConnectionFormData::fromConnection($this->bankConnection);
+        $data->token = 'manual-token';
+        $before = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM bank_sync_connection');
+
+        $this->expectException(BankStaticTokenNotSupportedException::class);
+        try {
+            $this->saveAction()($this->companyId, $data);
+        } finally {
+            self::assertSame($before, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM bank_sync_connection'));
+        }
     }
 
     public function testSaveAppliesFormToConnectionStateCommittedMeanwhile(): void
