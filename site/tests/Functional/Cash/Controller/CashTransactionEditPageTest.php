@@ -7,10 +7,15 @@ namespace App\Tests\Functional\Cash\Controller;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\User;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
+use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
@@ -19,6 +24,9 @@ use Symfony\Component\DomCrawler\Crawler;
  */
 final class CashTransactionEditPageTest extends WebTestCaseBase
 {
+    /** @var list<object> сущности, которые tune добавил к операции (документы ОПиУ) */
+    private array $extra = [];
+
     public function testHeaderBreadcrumbsAndInfoComeFromTheTransaction(): void
     {
         $crawler = $this->openEditPage(8201, static fn (CashTransaction $tx) => $tx);
@@ -101,6 +109,62 @@ final class CashTransactionEditPageTest extends WebTestCaseBase
     }
 
     /**
+     * @param list<string> $documentAmounts
+     */
+    #[DataProvider('pnlRestProvider')]
+    public function testPnlDocumentsShowSignedAmountsAndTheRestState(int $index, array $documentAmounts, string $state, string $text): void
+    {
+        $crawler = $this->openEditPage($index, fn (CashTransaction $tx) => $this->attachDocuments($tx, $documentAmounts));
+
+        $rest = $crawler->filter('[data-dds-op-rest]');
+        self::assertSame($state, $rest->attr('data-dds-op-rest'));
+        self::assertSame($text, $this->plain($rest->text()));
+        self::assertCount(count($documentAmounts), $crawler->filter('.dds-docs tbody tr'));
+        // Отток: суммы документов со знаком «−», ссылка «Открыть» на документ.
+        $crawler->filter('.dds-docs tbody td.text-end:not(:last-child)')->each(static fn (Crawler $n) => self::assertStringStartsWith('−', trim($n->text())));
+        $crawler->filter('.dds-docs__open')->each(static fn (Crawler $n) => self::assertMatchesRegularExpression('#/documents/[0-9a-f-]{36}/edit$#', (string) $n->attr('href')));
+    }
+
+    /**
+     * @return iterable<string, array{int, list<string>, string, string}>
+     */
+    public static function pnlRestProvider(): iterable
+    {
+        yield 'нет документов' => [8211, [], 'none', 'Не разнесено в ОПиУ'];
+        yield 'разнесено полностью' => [8212, ['1250.50'], 'full', 'Разнесено полностью'];
+        yield 'разнесено частично' => [8213, ['1000.00'], 'partial', 'Не разнесено 250,50 ₽'];
+        yield 'превышение' => [8214, ['1000.00', '300.00'], 'over', 'Превышение на 49,50 ₽'];
+    }
+
+    /**
+     * @param list<string> $amounts
+     */
+    private function attachDocuments(CashTransaction $tx, array $amounts): CashTransaction
+    {
+        $company = $tx->getCompany();
+        $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Аренда '.$tx->getId())->withFlow(PLFlow::EXPENSE)->build();
+        $this->extra[] = $category;
+        foreach ($amounts as $i => $amount) {
+            $document = new Document(sprintf('77777777-7777-7777-8777-%s%02d', substr((string) $tx->getId(), -10), $i), $company);
+            $document->setNumber('Д-'.($i + 1));
+            $document->setDate(new \DateTimeImmutable('2026-07-18'));
+            $operation = new DocumentOperation();
+            $operation->setCategory($category);
+            $operation->setAmount($amount);
+            $document->addOperation($operation);
+            $tx->addDocument($document);
+            array_push($this->extra, $operation, $document);
+        }
+
+        return $tx;
+    }
+
+    private function plain(string $text): string
+    {
+        return trim((string) preg_replace('/[\s\x{a0}\x{202f}]+/u', ' ', $text));
+    }
+
+    /**
      * @param callable(CashTransaction): CashTransaction $tune
      */
     private function openEditPage(int $index, callable $tune): Crawler
@@ -122,7 +186,7 @@ final class CashTransactionEditPageTest extends WebTestCaseBase
             new \DateTimeImmutable('2026-07-18'),
         ));
 
-        foreach ([$user, $company, $account, $tx] as $entity) {
+        foreach ([$user, $company, $account, $tx, ...$this->extra] as $entity) {
             $this->em()->persist($entity);
         }
         $this->em()->flush();

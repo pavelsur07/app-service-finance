@@ -1,30 +1,32 @@
-{# Документы ОПиУ на основании операции (страница «Операция ДДС»). #}
+{# Документы ОПиУ на основании операции (SPEC §2.3 п.6, dds-refs/01).
+   Суммы — в валюте операции (документ копирует её сумму без пересчёта), со знаком:
+   «−» у оттока, «+» у притока. Итог — pnlAllocated/pnlUnallocated из контроллера (Money). #}
+{% set isInflow = tx.direction.value == 'INFLOW' %}
 {% if pnlDocuments is not empty %}
     <div class="table-responsive">
-        <table class="table card-table align-middle">
+        <table class="table card-table align-middle dds-docs">
             <thead>
                 <tr>
-                    <th class="text-nowrap">Номер / дата</th>
-                    <th>Описание</th>
-                    {# Документ ОПиУ копирует сумму операции без пересчёта — валюта та же. #}
+                    <th class="text-nowrap">Документ</th>
+                    <th class="dds-docs__desc">Описание</th>
                     <th class="text-end text-nowrap">Сумма{% if tx.currency == 'RUB' %}, ₽{% endif %}</th>
-                    <th></th>
+                    <th class="text-end"><span class="visually-hidden">Действия</span></th>
                 </tr>
             </thead>
             <tbody>
                 {% for document in pnlDocuments %}
                     <tr>
                         <td class="text-nowrap">
-                            <div class="fw-semibold">{{ document.number ?: '—' }}</div>
-                            <div class="text-muted">{{ document.date|date('d.m.Y') }}</div>
+                            <div>{{ document.number ?: '—' }}</div>
+                            <div class="dds-docs__muted">{{ document.date|date('d.m.Y') }}</div>
                         </td>
-                        <td>
-                            <div class="fw-semibold">{{ document.counterparty ? document.counterparty.name : '—' }}</div>
-                            <div class="text-muted">{{ document.description ?: '—' }}</div>
+                        <td class="dds-docs__desc">
+                            <div>{{ document.description ?: '—' }}</div>
+                            {% if document.counterparty %}<div class="dds-docs__muted">{{ document.counterparty.name }}</div>{% endif %}
                         </td>
-                        <td class="text-end fw-semibold">{{ document.totalAmount|vf_amount(currency: tx.currency) }}</td>
+                        <td class="text-end">{{ document.totalAmount|vf_amount(currency: tx.currency, signed: isInflow, negate: not isInflow, tone: isInflow ? 'income' : null) }}</td>
                         <td class="text-end">
-                            <a href="{{ path('document_edit', {id: document.id}) }}" class="btn btn-link">Открыть</a>
+                            <a href="{{ path('document_edit', {id: document.id}) }}" class="dds-docs__open">Открыть</a>
                         </td>
                     </tr>
                 {% endfor %}
@@ -32,5 +34,19 @@
         </table>
     </div>
 {% else %}
-    <p class="dds-card__empty">Документы ОПиУ на основании этой операции ещё не созданы.</p>
+    <p class="dds-card__empty">К операции не привязано ни одного документа ОПиУ.</p>
 {% endif %}
+{% set rest = pnlUnallocated + 0 %}
+{% if pnlDocuments is empty %}
+    {% set restState, restText = 'none', 'Не разнесено в ОПиУ' %}
+{% elseif rest == 0 %}
+    {% set restState, restText = 'full', 'Разнесено полностью' %}
+{% elseif rest > 0 %}
+    {% set restState, restText = 'partial', 'Не разнесено ' ~ rest|vf_money(currency: tx.currency) %}
+{% else %}
+    {% set restState, restText = 'over', 'Превышение на ' ~ (0 - rest)|vf_money(currency: tx.currency) %}
+{% endif %}
+<div class="dds-docs__total">
+    <span><span class="dds-docs__muted">Разнесено в ОПиУ</span> <strong>{{ pnlAllocated|vf_money(currency: tx.currency) }}</strong></span>
+    <span class="dds-badge dds-badge--rest-{{ restState }}" data-dds-op-rest="{{ restState }}">{{ restText }}</span>
+</div>
