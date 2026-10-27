@@ -24,6 +24,7 @@ final readonly class AlfaApiClient
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private AlfaTraceIdRecorder $traceIds,
     ) {
     }
 
@@ -105,6 +106,7 @@ final readonly class AlfaApiClient
 
         $context['status_code'] = $statusCode;
         $context['trace_id'] = $this->traceId($response);
+        $this->traceIds->record($context['trace_id']);
 
         if (200 !== $statusCode) {
             $context['duration_ms'] = $this->elapsedMs($startedAt);

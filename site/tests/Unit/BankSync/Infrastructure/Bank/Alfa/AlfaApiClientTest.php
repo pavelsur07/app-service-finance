@@ -9,6 +9,7 @@ use App\BankSync\Enum\BankCode;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaTraceIdRecorder;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use Monolog\LogRecord;
@@ -26,6 +27,7 @@ final class AlfaApiClientTest extends TestCase
     private const BODY_SECRET = 'body-secret-value';
 
     private TestHandler $logs;
+    private AlfaTraceIdRecorder $traceIds;
 
     protected function setUp(): void
     {
@@ -99,6 +101,7 @@ final class AlfaApiClientTest extends TestCase
         self::assertSame(['amount' => 1, 'currencyName' => 'RUR'], $payload['openingBalance']);
         self::assertSame([['GET', 'https://bank.test/api/jp/v1/statement/summary?accountNumber='.self::ACCOUNT_NUMBER.'&statementDate=2026-10-01']], $requested);
         self::assertSame('/api/jp/v1/statement/summary', $this->singleRecord()->context['path']);
+        self::assertSame(['trace-7'], $this->traceIds->all(), 'X-TraceId — для отчёта проверки песочницы');
         $this->assertLogsHaveNoSensitiveData();
     }
 
@@ -220,7 +223,7 @@ final class AlfaApiClientTest extends TestCase
 
     private function client(MockResponse|callable $response): AlfaApiClient
     {
-        return new AlfaApiClient(new MockHttpClient($response), new Logger('test', [$this->logs]));
+        return new AlfaApiClient(new MockHttpClient($response), new Logger('test', [$this->logs]), $this->traceIds = new AlfaTraceIdRecorder());
     }
 
     private function connection(): BankAccess

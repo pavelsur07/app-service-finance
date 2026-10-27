@@ -9,6 +9,7 @@ use App\BankSync\Enum\BankCode;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaBankProvider;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaStatementMapper;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaTraceIdRecorder;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +41,7 @@ final class AlfaBankProviderTest extends TestCase
 
             return new MockResponse(json_encode(array_shift($responses), \JSON_THROW_ON_ERROR), ['http_code' => 200]);
         });
-        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper(), $this->logs());
+        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger(), new AlfaTraceIdRecorder()), new AlfaStatementMapper(), $this->logs());
 
         $day = $provider->fetchStatementDay($this->access(), '40702810900000000001', new \DateTimeImmutable('2026-10-01'));
 
@@ -61,7 +62,7 @@ final class AlfaBankProviderTest extends TestCase
             'Links' => ['self' => 'https://bank.test/accounts'],
             'Meta' => ['totalPages' => 1],
         ], \JSON_THROW_ON_ERROR), ['http_code' => 200]));
-        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger()), new AlfaStatementMapper(), $this->logs());
+        $provider = new AlfaBankProvider(new AlfaApiClient($http, new NullLogger(), new AlfaTraceIdRecorder()), new AlfaStatementMapper(), $this->logs());
 
         $accounts = $provider->listAccounts($this->access());
 
