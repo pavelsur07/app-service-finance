@@ -613,6 +613,28 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         self::assertSame([], $this->bank->fetchedDays, 'счёт банка в другой валюте не грузится в рублёвый');
     }
 
+    public function testLinkChangedWhileBankReturnsDayStopsAccountWithoutWritingDay(): void
+    {
+        $this->bank->days[$this->daysAgo(3)] = [$this->line('in-1', BankDirection::CREDIT, '1000.00', $this->daysAgo(3))];
+        $this->bank->duringDayRequest = function (string $date): void {
+            if ($date === $this->daysAgo(3)) {
+                // Клиент отвязал счёт, пока банк отдавал день.
+                $this->em->getConnection()->executeStatement(
+                    'UPDATE bank_sync_account SET money_account_id = NULL, linked_at = NULL WHERE company_id = :companyId',
+                    ['companyId' => $this->companyId],
+                );
+            }
+        };
+
+        $this->handle();
+
+        self::assertSame(0, $this->countTransactions(), 'день не записан в счёт, от которого отвязали');
+        self::assertSame($this->daysAgo(4), $this->cursorDate(), 'курсор не продвинут за отменённый день');
+        self::assertNotContains($this->daysAgo(2), $this->bank->fetchedDays, 'остальные дни счёта не запрашиваются');
+        self::assertTrue($this->logs->hasInfoThatContains('link changed during the load'));
+        self::assertFalse($this->logs->hasErrorRecords());
+    }
+
     public function testSameBankAccountInTwoConnectionsHasOwnRows(): void
     {
         $second = BankConnectionBuilder::aConnection()
@@ -663,6 +685,7 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             new BankConnectionTokenLock($this->em->getConnection()),
             self::getContainer()->get(CashFacade::class),
             new BankAccountCatalog($this->em->getRepository(BankAccount::class), $this->em),
+            $this->em->getRepository(BankAccount::class),
             $this->em,
             new Logger('test', [$this->logs]),
         );

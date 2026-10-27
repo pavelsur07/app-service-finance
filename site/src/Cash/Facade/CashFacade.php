@@ -139,14 +139,15 @@ final readonly class CashFacade
     }
 
     /**
-     * Отметить, что выписка в счёт приходит из банка по API. Только `persist`-изменение:
-     * коммитит вызывающий (BankSync, в транзакции привязки).
+     * Отметить, что выписка в счёт приходит из банка по API. Только внутри транзакции
+     * вызывающего: счёт перечитывается под `FOR UPDATE` (в памяти мог остаться прежний
+     * признак), коммитит вызывающий (BankSync, в транзакции привязки).
      *
      * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
      */
     public function markBankApiStatementSource(string $companyId, string $moneyAccountId, string $bankCode): void
     {
-        $account = $this->findMoneyAccount($companyId, $moneyAccountId)
+        $account = $this->lockMoneyAccount($companyId, $moneyAccountId)
             ?? throw StatementImportTargetNotFoundException::moneyAccount($moneyAccountId);
 
         $account->markBankApiSource($bankCode);
@@ -154,11 +155,12 @@ final readonly class CashFacade
 
     /**
      * Снять отметку «выписка из банка по API»; чужой или исчезнувший счёт — без изменений.
-     * Коммитит вызывающий.
+     * Как `markBankApiStatementSource()`: внутри транзакции, под `FOR UPDATE`, коммитит
+     * вызывающий.
      */
     public function clearBankApiStatementSource(string $companyId, string $moneyAccountId): void
     {
-        $this->findMoneyAccount($companyId, $moneyAccountId)?->clearBankApiSource();
+        $this->lockMoneyAccount($companyId, $moneyAccountId)?->clearBankApiSource();
     }
 
     /**
@@ -576,6 +578,15 @@ final readonly class CashFacade
         }
 
         return $this->moneyAccountRepository->findOneByIdAndCompanyId($moneyAccountId, $companyId);
+    }
+
+    private function lockMoneyAccount(string $companyId, string $moneyAccountId): ?MoneyAccount
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($moneyAccountId)) {
+            return null;
+        }
+
+        return $this->moneyAccountRepository->lockOneByIdAndCompanyId($moneyAccountId, $companyId);
     }
 
     private function requireCompany(string $companyId): Company

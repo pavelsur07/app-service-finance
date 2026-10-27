@@ -132,6 +132,27 @@ final class BankAccountRepository extends ServiceEntityRepository
     }
 
     /**
+     * Денежный счёт, в который сейчас грузится счёт банка, — под `FOR UPDATE` строки счёта
+     * банка: привязка, отвязка и удаление подключения ждут commit дня. null — счёт банка
+     * удалён, отвязан, закрыт в банке или пропал из ответа. Только внутри транзакции.
+     */
+    public function lockLoadableMoneyAccountId(string $companyId, string $bankAccountId): ?string
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($bankAccountId)) {
+            return null;
+        }
+
+        $moneyAccountId = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT money_account_id FROM bank_sync_account
+             WHERE id = :id AND company_id = :companyId AND enabled_in_bank AND present_in_bank
+             FOR UPDATE',
+            ['id' => $bankAccountId, 'companyId' => $companyId],
+        );
+
+        return \is_string($moneyAccountId) ? $moneyAccountId : null;
+    }
+
+    /**
      * Только persist(): коммитит точка входа.
      */
     public function add(BankAccount $account): void

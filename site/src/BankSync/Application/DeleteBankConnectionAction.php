@@ -47,6 +47,7 @@ final readonly class DeleteBankConnectionAction
     public function __construct(
         private BankConnectionRepository $connections,
         private BankAccountRepository $bankAccounts,
+        private BankAccountCatalog $accountCatalog,
         private CashFacade $cashFacade,
         private BankCredentialsCodec $credentialsCodec,
         private BankAuthorizationProviderRegistry $authorizationProviders,
@@ -86,13 +87,22 @@ final readonly class DeleteBankConnectionAction
             $this->revokeInBank($connection, $context);
             // Подключение, его счета банка (каскад FK) и признак источника у привязанных
             // денежных счетов — одной транзакцией: признак не переживает привязку.
+            // Блокировка каталога — до чтения списка: параллельная загрузка не создаст счёт,
+            // которого список не увидит, а каскад удалит вместе с привязкой.
             $this->entityManager->wrapInTransaction(function () use ($connection, $companyId, $connectionId): void {
+                $this->accountCatalog->lockConnection($connectionId);
+                $moneyAccountIds = [];
                 foreach ($this->bankAccounts->findByConnection($companyId, $connectionId) as $account) {
                     $this->entityManager->refresh($account, LockMode::PESSIMISTIC_WRITE);
                     $moneyAccountId = $account->getMoneyAccountId();
                     if (null !== $moneyAccountId) {
-                        $this->cashFacade->clearBankApiStatementSource($companyId, $moneyAccountId);
+                        $moneyAccountIds[] = $moneyAccountId;
                     }
+                }
+                // Денежные счета Cash блокирует по одному — в порядке id, как привязка.
+                sort($moneyAccountIds);
+                foreach ($moneyAccountIds as $moneyAccountId) {
+                    $this->cashFacade->clearBankApiStatementSource($companyId, $moneyAccountId);
                 }
                 $this->connections->remove($connection);
             });

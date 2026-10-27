@@ -143,6 +143,7 @@ final class ConcurrentTokenRefreshTest extends PostgresResetTestCase
             new BankConnectionTokenLock($this->em->getConnection(), $sleep),
             self::getContainer()->get(CashFacade::class),
             new BankAccountCatalog($this->em->getRepository(BankAccount::class), $this->em),
+            $this->em->getRepository(BankAccount::class),
             $this->em,
             new Logger('test', [new TestHandler()]),
         );

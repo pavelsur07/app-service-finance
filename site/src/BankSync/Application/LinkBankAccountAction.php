@@ -70,10 +70,16 @@ final readonly class LinkBankAccountAction
                 }
 
                 $account->linkTo($moneyAccountId);
+                // Cash блокирует денежный счёт при изменении признака: два счёта — в порядке id,
+                // иначе встречная перепривязка (M1 → M2 и M2 → M1) даёт взаимную блокировку.
+                $changes = [$moneyAccountId => fn () => $this->cashFacade->markBankApiStatementSource($companyId, $moneyAccountId, $bankCode->value)];
                 if (null !== $previous) {
-                    $this->cashFacade->clearBankApiStatementSource($companyId, $previous);
+                    $changes[$previous] = fn () => $this->cashFacade->clearBankApiStatementSource($companyId, $previous);
                 }
-                $this->cashFacade->markBankApiStatementSource($companyId, $moneyAccountId, $bankCode->value);
+                ksort($changes, \SORT_STRING);
+                foreach ($changes as $change) {
+                    $change();
+                }
             });
         } catch (UniqueConstraintViolationException) {
             // Параллельная привязка того же денежного счёта успела раньше: EM закрыт, смотрим

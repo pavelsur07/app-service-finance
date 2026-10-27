@@ -69,6 +69,8 @@ final class StatementLinkFacadeTest extends IntegrationTestCase
         $account = $this->account($this->company, 'Расчётный', 'RUB');
         $this->em->flush();
 
+        // Как в BankSync: только внутри транзакции вызывающего.
+        $this->em->beginTransaction();
         $this->facade->markBankApiStatementSource($this->companyId(), (string) $account->getId(), 'alfa');
         self::assertNull($this->storedSource($account), 'фасад не коммитит — коммитит BankSync');
         $this->em->flush();
@@ -77,6 +79,23 @@ final class StatementLinkFacadeTest extends IntegrationTestCase
         $this->facade->clearBankApiStatementSource($this->companyId(), (string) $account->getId());
         $this->em->flush();
         self::assertNull($this->storedSource($account));
+        $this->em->commit();
+    }
+
+    public function testClearReadsSourceFromDatabaseNotFromStaleEntity(): void
+    {
+        $account = $this->account($this->company, 'Расчётный', 'RUB');
+        $this->em->flush();
+        // Параллельная привязка поставила признак, а в памяти этого запроса счёт без него.
+        $this->em->getConnection()->executeStatement(
+            "UPDATE money_account SET bank_api_source = 'alfa' WHERE id = :id",
+            ['id' => (string) $account->getId()],
+        );
+        self::assertNull($account->getBankApiSource());
+
+        $this->em->wrapInTransaction(fn () => $this->facade->clearBankApiStatementSource($this->companyId(), (string) $account->getId()));
+
+        self::assertNull($this->storedSource($account), 'признак снят, хотя в памяти его не было');
     }
 
     public function testForeignAccountIsNotMarkedAndClearIsNoop(): void
@@ -85,12 +104,11 @@ final class StatementLinkFacadeTest extends IntegrationTestCase
         $foreign->markBankApiSource('alfa');
         $this->em->flush();
 
-        $this->facade->clearBankApiStatementSource($this->companyId(), (string) $foreign->getId());
-        $this->em->flush();
+        $this->em->wrapInTransaction(fn () => $this->facade->clearBankApiStatementSource($this->companyId(), (string) $foreign->getId()));
         self::assertSame('alfa', $this->storedSource($foreign), 'чужой счёт не тронут');
 
         $this->expectException(StatementImportTargetNotFoundException::class);
-        $this->facade->markBankApiStatementSource($this->companyId(), (string) $foreign->getId(), 'alfa');
+        $this->em->wrapInTransaction(fn () => $this->facade->markBankApiStatementSource($this->companyId(), (string) $foreign->getId(), 'alfa'));
     }
 
     private function storedSource(MoneyAccount $account): ?string

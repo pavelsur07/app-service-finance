@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\BankSync;
 
+use App\BankSync\Application\BankAccountCatalog;
 use App\BankSync\Application\DeleteBankConnectionAction;
 use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
@@ -172,6 +173,7 @@ final class DeleteBankConnectionTest extends IntegrationTestCase
         return new DeleteBankConnectionAction(
             self::getContainer()->get(BankConnectionRepository::class),
             self::getContainer()->get(BankAccountRepository::class),
+            new BankAccountCatalog(self::getContainer()->get(BankAccountRepository::class), $this->em),
             self::getContainer()->get(CashFacade::class),
             $this->codec(),
             self::getContainer()->get(BankAuthorizationProviderRegistry::class),

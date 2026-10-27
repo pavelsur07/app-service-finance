@@ -29,16 +29,34 @@ final readonly class BankAccountCatalog
     }
 
     /**
+     * Транзакционная блокировка счетов подключения: её же берёт удаление подключения, чтобы
+     * каталог не создал счёт между чтением списка и каскадным удалением. Только внутри
+     * транзакции вызывающего.
+     */
+    public function lockConnection(string $connectionId): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:key))',
+            ['namespace' => self::LOCK_NAMESPACE, 'key' => $connectionId],
+        );
+    }
+
+    /**
      * @param list<BankAccountDTO> $bankAccounts
      *
      * @return list<BankAccount> все счета подключения после обновления
      */
     public function synchronize(string $companyId, string $connectionId, array $bankAccounts, \DateTimeImmutable $seenAt): array
     {
-        $this->entityManager->getConnection()->executeStatement(
-            'SELECT pg_advisory_xact_lock(hashtext(:namespace), hashtext(:key))',
-            ['namespace' => self::LOCK_NAMESPACE, 'key' => $connectionId],
+        $this->lockConnection($connectionId);
+        // Подключение удалили, пока банк отвечал: счета не создаём — каскад их уже не уберёт.
+        $exists = $this->entityManager->getConnection()->fetchOne(
+            'SELECT 1 FROM bank_sync_connection WHERE id = :id AND company_id = :companyId',
+            ['id' => $connectionId, 'companyId' => $companyId],
         );
+        if (false === $exists) {
+            return [];
+        }
 
         $known = [];
         foreach ($this->accounts->findByConnection($companyId, $connectionId) as $account) {

@@ -8,6 +8,8 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\UuidInterface;
 use Webmozart\Assert\Assert;
@@ -33,6 +35,26 @@ class MoneyAccountRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->setParameter('companyId', $companyId)
             ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Счёт компании под `FOR UPDATE` со свежими полями из БД (управляемая сущность
+     * перезаписывается). Только внутри транзакции вызывающего.
+     */
+    public function lockOneByIdAndCompanyId(string $id, string $companyId): ?MoneyAccount
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->createQueryBuilder('account')
+            ->andWhere('account.id = :id')
+            ->andWhere('IDENTITY(account.company) = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
             ->getOneOrNullResult();
     }
 

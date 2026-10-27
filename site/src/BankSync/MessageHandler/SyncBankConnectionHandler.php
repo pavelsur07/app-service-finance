@@ -23,6 +23,7 @@ use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
 use App\BankSync\Message\SyncBankConnectionMessage;
+use App\BankSync\Repository\BankAccountRepository;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\BankSync\Repository\BankImportCursorRepository;
 use App\Cash\Application\DTO\BankStatementDayInput;
@@ -77,6 +78,7 @@ final readonly class SyncBankConnectionHandler
         private BankConnectionTokenLock $tokenLock,
         private CashFacade $cashFacade,
         private BankAccountCatalog $accountCatalog,
+        private BankAccountRepository $bankAccounts,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
     ) {
@@ -201,7 +203,7 @@ final readonly class SyncBankConnectionHandler
             }
 
             try {
-                $this->syncAccount($connection, $provider, $access, $account->getAccountNumber(), $target, $counters, $context);
+                $this->syncAccount($connection, $provider, $access, $account, $target, $counters, $accountContext);
             } finally {
                 $this->releaseAccountLock($connection->getCompanyId(), $target->moneyAccountId, $context);
             }
@@ -215,12 +217,13 @@ final readonly class SyncBankConnectionHandler
         BankConnection $connection,
         BankProviderInterface $provider,
         BankAccess $access,
-        string $accountNumber,
+        BankAccount $account,
         StatementImportAccount $target,
         SyncCounters $counters,
         array $context,
     ): void {
         $bankCode = $connection->getBankCode();
+        $accountNumber = $account->getAccountNumber();
         $cursor = $this->cursors->findOrNew($connection->getCompanyId(), $bankCode, $accountNumber);
         $today = new \DateTimeImmutable('today');
 
@@ -235,8 +238,13 @@ final readonly class SyncBankConnectionHandler
                 ]);
             }
 
-            /** @var BankStatementDayResult $result */
-            $result = $this->entityManager->wrapInTransaction(function () use ($connection, $target, $day, $cursor, $date): BankStatementDayResult {
+            /** @var BankStatementDayResult|null $result */
+            $result = $this->entityManager->wrapInTransaction(function () use ($connection, $account, $target, $day, $cursor, $date): ?BankStatementDayResult {
+                // Привязку могли сменить, пока банк отдавал день: пишем только в счёт, к
+                // которому счёт банка привязан сейчас, и держим строку до commit.
+                if ($this->bankAccounts->lockLoadableMoneyAccountId($connection->getCompanyId(), $account->getId()) !== $target->moneyAccountId) {
+                    return null;
+                }
                 $result = $this->cashFacade->importBankStatementDay(
                     $connection->getCompanyId(),
                     $target->moneyAccountId,
@@ -249,6 +257,14 @@ final readonly class SyncBankConnectionHandler
 
                 return $result;
             });
+            if (null === $result) {
+                $this->logger->info('Bank sync: bank account link changed during the load, account stopped', $context + [
+                    'money_account_id' => $target->moneyAccountId,
+                    'date' => $date->format('Y-m-d'),
+                ]);
+
+                return;
+            }
 
             $counters->created += $result->created;
             $counters->skippedDuplicates += $result->skippedDuplicates;
