@@ -20,6 +20,9 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Event\PostLoadEventArgs;
+use Doctrine\ORM\Events;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 
@@ -154,6 +157,55 @@ final class LinkBankAccountTest extends IntegrationTestCase
 
         $this->expectException(BankAccountNotFoundException::class);
         $this->action()($this->id($this->company), $foreignBankAccount->getId(), $this->id($this->moneyAccount));
+    }
+
+    public function testLinkAfterConcurrentDeleteDoesNothing(): void
+    {
+        $this->deleteBankAccountRowAfterFirstLoad();
+
+        try {
+            $this->link($this->bankAccount, $this->moneyAccount);
+            self::fail('удалённый счёт банка не привязывается');
+        } catch (BankAccountNotFoundException) {
+        }
+
+        self::assertNull($this->source($this->moneyAccount), 'признак не поставлен без привязки');
+    }
+
+    public function testUnlinkAfterConcurrentDeleteDoesNothing(): void
+    {
+        $this->link($this->bankAccount, $this->moneyAccount);
+        $this->deleteBankAccountRowAfterFirstLoad();
+
+        $this->expectException(BankAccountNotFoundException::class);
+        $this->unlink($this->bankAccount);
+    }
+
+    /**
+     * Удаление подключения коммитится между проверкой счёта банка и блокировкой его строки:
+     * строка исчезает сразу после первой загрузки сущности.
+     */
+    private function deleteBankAccountRowAfterFirstLoad(): void
+    {
+        $this->em->clear();
+        $connection = $this->em->getConnection();
+        $bankAccountId = $this->bankAccount->getId();
+        $this->em->getEventManager()->addEventListener([Events::postLoad], new class($connection, $bankAccountId) {
+            private bool $done = false;
+
+            public function __construct(private readonly Connection $connection, private readonly string $bankAccountId)
+            {
+            }
+
+            public function postLoad(PostLoadEventArgs $args): void
+            {
+                if ($this->done || !$args->getObject() instanceof BankAccount) {
+                    return;
+                }
+                $this->done = true;
+                $this->connection->executeStatement('DELETE FROM bank_sync_account WHERE id = :id', ['id' => $this->bankAccountId]);
+            }
+        });
     }
 
     private function link(BankAccount $bankAccount, MoneyAccount $moneyAccount): void

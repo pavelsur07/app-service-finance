@@ -7,7 +7,6 @@ namespace App\BankSync\Application;
 use App\BankSync\Exception\BankAccountNotFoundException;
 use App\BankSync\Repository\BankAccountRepository;
 use App\Cash\Facade\CashFacade;
-use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -34,8 +33,10 @@ final readonly class UnlinkBankAccountAction
         $account = $this->accounts->findOneByIdAndCompanyId($bankAccountId, $companyId)
             ?? throw new BankAccountNotFoundException($bankAccountId);
 
-        $unlinked = $this->entityManager->wrapInTransaction(function () use ($account, $companyId): ?string {
-            $this->entityManager->refresh($account, LockMode::PESSIMISTIC_WRITE);
+        $unlinked = $this->entityManager->wrapInTransaction(function () use ($bankAccountId, $companyId): ?string {
+            // Строку могли удалить после проверки выше: её признак уже снят удалением.
+            $account = $this->accounts->lockOneByIdAndCompanyId($bankAccountId, $companyId)
+                ?? throw new BankAccountNotFoundException($bankAccountId);
             $previous = $account->getMoneyAccountId();
             if (null === $previous) {
                 return null;

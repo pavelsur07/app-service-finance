@@ -11,7 +11,6 @@ use App\BankSync\Repository\BankAccountRepository;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Cash\Facade\CashFacade;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -58,8 +57,10 @@ final readonly class LinkBankAccountAction
         }
 
         try {
-            $this->entityManager->wrapInTransaction(function () use ($account, $companyId, $moneyAccountId, $bankCode): void {
-                $this->entityManager->refresh($account, LockMode::PESSIMISTIC_WRITE);
+            $this->entityManager->wrapInTransaction(function () use ($bankAccountId, $companyId, $moneyAccountId, $bankCode): void {
+                // Подключение могли удалить после проверок выше: без строки — ни привязки, ни признака.
+                $account = $this->accounts->lockOneByIdAndCompanyId($bankAccountId, $companyId)
+                    ?? throw new BankAccountNotFoundException($bankAccountId);
                 $previous = $account->getMoneyAccountId();
                 if ($previous === $moneyAccountId) {
                     return;

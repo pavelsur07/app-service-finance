@@ -6,6 +6,8 @@ namespace App\BankSync\Repository;
 
 use App\BankSync\Entity\BankAccount;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 
@@ -34,6 +36,28 @@ final class BankAccountRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->setParameter('companyId', $companyId)
             ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Счёт банка под `FOR UPDATE` со свежими полями из БД; null — строку удалили (в т. ч.
+     * каскадом удаления подключения), `refresh()` этого не заметил бы. Только внутри
+     * транзакции вызывающего.
+     */
+    public function lockOneByIdAndCompanyId(string $id, string $companyId): ?BankAccount
+    {
+        if (!Uuid::isValid($id) || !Uuid::isValid($companyId)) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.id = :id')
+            ->andWhere('a.companyId = :companyId')
+            ->setParameter('id', $id)
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
             ->getOneOrNullResult();
     }
 
