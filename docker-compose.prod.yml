@@ -28,6 +28,14 @@ x-php-env: &php-env
     # Карта версий ключей для ротации (JSON в одинарных кавычках) и активная версия.
     APP_ENCRYPTION_KEYS_JSON: ${APP_ENCRYPTION_KEYS_JSON:-}
     APP_ENCRYPTION_CURRENT_KEY_VERSION: ${APP_ENCRYPTION_CURRENT_KEY_VERSION:-v1}
+    # BankSync, Альфа: канал mTLS и вход Alfa ID песочницы (docs/tasks/bank-sync/alfa-demo.md).
+    # Пусто = Альфа не настроена (кнопок входа нет, гейт сертификатов — «не настроено»).
+    ALFA_TLS_CERT_PATH: ${ALFA_TLS_CERT_PATH:-}
+    ALFA_TLS_KEY_PATH: ${ALFA_TLS_KEY_PATH:-}
+    ALFA_TLS_KEY_PASSPHRASE: ${ALFA_TLS_KEY_PASSPHRASE:-}
+    ALFA_SANDBOX_CLIENT_ID: ${ALFA_SANDBOX_CLIENT_ID:-}
+    ALFA_SANDBOX_CLIENT_SECRET: ${ALFA_SANDBOX_CLIENT_SECRET:-}
+    ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${ALFA_SANDBOX_ID_SIGNING_CERT_PATH:-}
     HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
     APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
     APP_MAIL_REPLY_TO: "support@vashfindir.ru"
@@ -199,6 +207,9 @@ services:
                 # ⬇️ FIX: PHP-FPM ждёт, пока Redis пройдёт healthcheck
                 condition: service_healthy
         volumes:
+            # Сертификаты канала и подписи Альфы (BankSync) — вне образа и git, только чтение.
+            # Каталог на хосте — ${SERVER_DIR}/shared/alfa, его создаёт деплой (пустой = Альфа не настроена).
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
             - site_storage:/app/var/storage
             - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
@@ -232,6 +243,9 @@ services:
             site-redis:
                 condition: service_healthy
         volumes:
+            # Сертификаты канала и подписи Альфы (BankSync) — вне образа и git, только чтение.
+            # Каталог на хосте — ${SERVER_DIR}/shared/alfa, его создаёт деплой (пустой = Альфа не настроена).
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
             - site_storage:/app/var/storage
             - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
@@ -265,6 +279,9 @@ services:
             site-redis:
                 condition: service_healthy
         volumes:
+            # Сертификаты канала и подписи Альфы (BankSync) — вне образа и git, только чтение.
+            # Каталог на хосте — ${SERVER_DIR}/shared/alfa, его создаёт деплой (пустой = Альфа не настроена).
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
             - site_storage:/app/var/storage
             - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
@@ -463,6 +480,14 @@ services:
             APP_ENCRYPTION_FALLBACK_KEY: ${APP_ENCRYPTION_FALLBACK_KEY:-}
             APP_ENCRYPTION_KEYS_JSON: ${APP_ENCRYPTION_KEYS_JSON:-}
             APP_ENCRYPTION_CURRENT_KEY_VERSION: ${APP_ENCRYPTION_CURRENT_KEY_VERSION:-v1}
+            # BankSync, Альфа: канал mTLS и вход Alfa ID песочницы (docs/tasks/bank-sync/alfa-demo.md).
+            # Пусто = Альфа не настроена (кнопок входа нет, гейт сертификатов — «не настроено»).
+            ALFA_TLS_CERT_PATH: ${ALFA_TLS_CERT_PATH:-}
+            ALFA_TLS_KEY_PATH: ${ALFA_TLS_KEY_PATH:-}
+            ALFA_TLS_KEY_PASSPHRASE: ${ALFA_TLS_KEY_PASSPHRASE:-}
+            ALFA_SANDBOX_CLIENT_ID: ${ALFA_SANDBOX_CLIENT_ID:-}
+            ALFA_SANDBOX_CLIENT_SECRET: ${ALFA_SANDBOX_CLIENT_SECRET:-}
+            ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${ALFA_SANDBOX_ID_SIGNING_CERT_PATH:-}
             # Heartbeat-монитор GlitchTip (dead man's switch для supercronic).
             # Пусто = мониторинг молчания scheduler выключен.
             GLITCHTIP_SCHEDULER_HEARTBEAT_URL: ${GLITCHTIP_SCHEDULER_HEARTBEAT_URL:-}
@@ -486,6 +511,9 @@ services:
             APP_OBJECT_STORAGE_S3_ACCESS_KEY: ${APP_OBJECT_STORAGE_S3_ACCESS_KEY:-}
             APP_OBJECT_STORAGE_S3_SECRET_KEY: ${APP_OBJECT_STORAGE_S3_SECRET_KEY:-}
         volumes:
+            # Сертификаты канала и подписи Альфы (BankSync) — вне образа и git, только чтение.
+            # Каталог на хосте — ${SERVER_DIR}/shared/alfa, его создаёт деплой (пустой = Альфа не настроена).
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - site_storage:/app/var/storage
         depends_on:
