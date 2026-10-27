@@ -37,14 +37,31 @@ class CashflowCategoryRepository extends ServiceEntityRepository
     /**
      * Возвращает список категорий в порядке вложенности.
      *
+     * Один запрос: дети подгружаются fetch-join'ом, поэтому обход дерева и
+     * `getChildren()` у результата не ходят в БД (раньше — запрос на каждый узел).
+     *
      * @return CashflowCategory[]
      */
     public function findTreeByCompany(Company $company): array
     {
-        $roots = $this->findRootByCompany($company);
+        /** @var CashflowCategory[] $categories */
+        $categories = $this->createQueryBuilder('c')
+            ->leftJoin('c.children', 'ch')
+            ->addSelect('ch')
+            ->andWhere('c.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('c.sort', \SortDirection::Ascending)
+            ->addOrderBy('c.id', \SortDirection::Ascending)
+            ->addOrderBy('ch.sort', \SortDirection::Ascending)
+            ->addOrderBy('ch.id', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+
         $result = [];
-        foreach ($roots as $root) {
-            $this->collectTree($root, $result);
+        foreach ($categories as $category) {
+            if (null === $category->getParent()) {
+                $this->collectTree($category, $result);
+            }
         }
 
         return $result;

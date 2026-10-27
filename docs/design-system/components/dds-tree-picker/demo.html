@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="dds-pickers.css">
+<body style="font-family:Inter,system-ui,sans-serif;padding:24px;width:560px">
+<fieldset><legend>Направление</legend><label><input type="radio" name="dir" value="inflow"> Приток</label> <label><input type="radio" name="dir" value="outflow" checked> Отток</label></fieldset>
+<div class="dds-picker" data-dds-picker id="p" data-direction-source="input[name=dir]" data-dir-in-value="inflow" data-dir-out-value="outflow" data-placeholder="Не распределено"
+ data-tree='[{"id":"g1","name":"Поступления","children":[{"id":"1","name":"Выручка — Прочие","flow":"in"},{"id":"2","name":"Выручка — Маркетплейсы","flow":"in"}]},{"id":"g2","name":"Выбытие","children":[{"id":"3","name":"Комиссия банка","flow":"out"},{"id":"g3","name":"Заработная плата","children":[{"id":"4","name":"Директор","flow":"out"},{"id":"g4","name":"Производство","children":[{"id":"g5","name":"Цех №1","children":[{"id":"5","name":"Сварщики","flow":"out"}]}]}]}]},{"id":"g6","name":"Технические","children":[{"id":"6","name":"Не распределено","flow":"both"}]}]'>
+<select name="cat" class="dds-picker__native"><option value="">—</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+</div>
+<script type="module" src="dds-tree-picker.js"></script>

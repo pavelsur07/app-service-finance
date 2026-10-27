@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Операция ДДС · из выписки</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--primary:#1d4ed8;--bg:#f7f8fc;--surface:#ffffff;--text:#0b1020;--muted:#525b78;--border:#dde1ec;--head-bg:#f4f6fb;--warn-bg:#fff4e5;--warn-text:#9a4a00;--ok-bg:#e4f5e7;--ok-text:#1d7a30;--danger:#9a001b}
+body{margin:0;background:var(--bg)}
+*{box-sizing:border-box}
+button,input,select{font-family:inherit;font-size:14px;color:var(--text)}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;margin:1px 8px;color:#dfe3ef;text-decoration:none;border-radius:4px;font-size:14px;line-height:20px}
+.nav:hover{background:rgba(255,255,255,.07)}
+.nav[aria-current]{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+.nav svg{flex:none}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{background:#eef1f8}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:#1a40b0}
+.btn-sm{height:30px;padding:0 10px;font-size:13px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:rgba(11,16,32,.07);color:var(--text)}
+.tr{display:grid;grid-template-columns:48px minmax(300px,1fr) 150px 170px 120px 120px 88px;align-items:center}
+.row:hover{background:#f4f6fb !important}
+.link{background:none;border:0;padding:0;color:var(--primary);cursor:pointer;font-weight:500;font-size:13px}
+.link:hover{text-decoration:underline}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.nav:focus-visible{outline-color:#fff}
+input[type=checkbox]{accent-color:var(--primary)}
+
+:root{--border-strong:#c3c8d6}
+.grp-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.tr2{display:grid;grid-template-columns:40px 176px 170px minmax(0,1fr) minmax(0,1.2fr) 52px 52px 44px;align-items:center}
+.md-only{display:none}
+@media (max-width:1340px){.tr2{grid-template-columns:40px 150px 160px minmax(0,1fr) 52px 52px 44px}.hide-md{display:none !important}.md-only{display:block}}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:16px;background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap}
+.pill:hover{background:#eef1f8}
+.opt{display:flex;align-items:center;gap:12px;padding:8px 16px;cursor:pointer}
+.opt:hover{background:var(--head-bg)}
+.opt input{margin:0;width:16px;height:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 10px;border-radius:14px;background:#e8effd;color:var(--primary);font-size:13px;font-weight:500}
+.chip button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:50%;background:transparent;color:var(--primary);cursor:pointer}
+.chip button:hover{background:rgba(29,78,216,.15)}
+.pg{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-weight:400;cursor:pointer}
+.pg:hover:not(:disabled):not([aria-current=page]){background:var(--hover,#f4f6fb);color:var(--text)}
+button:disabled{opacity:.45;cursor:not-allowed!important}
+.tr3{display:grid;grid-template-columns:44px 92px minmax(170px,1.4fr) minmax(120px,1.2fr) minmax(110px,.8fr) minmax(120px,1fr) 104px 104px 112px 48px;align-items:center}
+.tr4{display:grid;grid-template-columns:44px 92px minmax(180px,1.5fr) minmax(120px,1.1fr) minmax(110px,.8fr) minmax(120px,1fr) 104px 104px 48px;align-items:center}
+@media (max-width:1340px){.tr4{grid-template-columns:44px 92px minmax(0,1fr) 104px 104px 48px}.tr3{grid-template-columns:44px 92px minmax(0,1fr) 104px 104px 112px 48px}}
+.mi{display:block;width:100%;padding:8px 16px;border:0;background:none;text-align:left;font-size:14px;cursor:pointer}
+.mi:hover{background:var(--head-bg)}
+.inp{font-family:inherit;width:100%;height:36px;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface);font-size:14px;line-height:20px}
+.inp[aria-invalid=true]{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
+.inp:disabled{background:var(--head-bg);color:var(--muted);cursor:not-allowed}
+.lbl{display:block;margin-bottom:6px;font-weight:500;font-size:13px}
+.err{color:var(--danger);font-size:12px;margin-top:4px}
+.hint{color:var(--muted);font-size:12px;margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04)}
+.ln{display:grid;grid-template-columns:104px minmax(160px,1.5fr) minmax(130px,1fr) minmax(130px,1fr) 136px 76px;gap:12px;align-items:start}
+@media (max-width:1180px){.ln{grid-template-columns:96px minmax(120px,1.4fr) minmax(100px,1fr) minmax(100px,1fr) 120px 72px}}
+@media (max-width:1340px){.split{grid-template-columns:minmax(0,1fr) !important}.split aside{position:static !important}}
+
+.wrap{display:flex;align-items:stretch;height:36px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)}
+.wrap:hover{background:#fbfcfe}
+.main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;border:0;background:none;text-align:left;cursor:pointer;border-radius:4px}
+.main:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.x{flex:none;width:34px;border:0;border-left:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:0 3px 3px 0}
+.x:hover{background:rgba(11,16,32,.07);color:var(--text)}
+.row{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;border:0;background:none;text-align:left;cursor:pointer;font-size:14px;line-height:20px}
+.lnk{background:none;border:0;padding:0;color:var(--primary);cursor:pointer;font-weight:500;font-size:13px}
+.lnk:hover{text-decoration:underline}
+.seg{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-weight:500}
+.seg:hover:not(:disabled){background:#eef1f8}
+.grp:hover{background:#f4f6fb !important}
+.grp[data-d="1"]{padding-left:34px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.grp[data-d="2"]{padding-left:56px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.grp[data-d="3"]{padding-left:78px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.grp[data-d="4"]{padding-left:100px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.leaf[data-d="1"]{padding-left:58px;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.leaf[data-d="2"]{padding-left:80px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.leaf[data-d="3"]{padding-left:102px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.leaf[data-d="4"]{padding-left:124px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.leaf[data-d="5"]{padding-left:146px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0,107px 0;background-repeat:no-repeat}
+.grp{font-weight:700;padding-left:12px}
+.grp[data-d="0"]{margin-top:4px}
+.leaf[aria-selected=true]{background-color:#eef3fd;font-weight:600}
+.leaf[data-cur=true]{background-color:#e8effd}
+.oi[aria-selected=true]{background:#f4f6fb}
+.oi[data-cur=true]{background:#e8effd}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px}
+.dr{display:grid;grid-template-columns:150px minmax(0,1fr) 140px 72px;gap:12px;align-items:center}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:760px){.g2{grid-template-columns:minmax(0,1fr)}.dr{grid-template-columns:minmax(0,1fr) 110px 64px}.dr>:nth-child(2){display:none}}
+</style>
+</helmet>
+
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;min-height:1280px;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:var(--text);background:var(--bg);--primary:{{accent}};--row-py:{{rowPy}}px">
+
+  <aside style="flex:0 0 240px;width:240px;background:#0b1020;color:#dfe3ef;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:18px 16px 14px">
+      <div style="width:32px;height:32px;border-radius:8px;background:#b00020;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">ВФ</div>
+      <div style="font-weight:700;font-size:16px;color:#fff">Ваш Финдир</div>
+    </div>
+    <nav aria-label="Основное меню" style="display:flex;flex-direction:column;padding:6px 0;flex:1">
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span style="flex:1">Главная</span></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M16 13h2M3 10h18"/></svg><span style="flex:1">Деньги</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></a><a class="nav" href="Operations.dc.html" aria-current="page" style="margin-left:20px;padding-left:28px"><span style="flex:1">Операции ДДС</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Платёжный календарь</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Остатки и счета</span></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span style="flex:1">Доходы и расходы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Документы ОПиУ</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 004 0M10 20v-5h4v5"/></svg><span style="flex:1">Маркетплейсы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7"/></svg><span style="flex:1">МойСклад</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9h9a9 9 0 11-9-9z"/></svg><span style="flex:1">Отчёты</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4.5 4.5 0 0117 18M12 12v7M9 15l3-3 3 3"/></svg><span style="flex:1">Загрузка данных</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/></svg><span style="flex:1">Баланс</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h5v15H4zM10 5h5v15h-5zM17 6l3 .8-3.7 13.4-3-.8"/></svg><span style="flex:1">Справочники</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span style="flex:1">Импорт</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l8 8M5 19l4-4M12 4l8 8-3 3-8-8z"/></svg><span style="flex:1">Интеграции</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h9v17M14 9h5v12M9 8h1M9 12h1M9 16h1M3 21h18"/></svg><span style="flex:1">Компания и доступы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8a3 3 0 016 0v7a3 3 0 01-6 0zM4 13h5M15 13h5M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"/></svg><span style="flex:1">Отладка</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+    </nav>
+    <div style="border-top:1px solid rgba(255,255,255,.12);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#9aa3bd">КОМПАНИЯ</div>
+      <div style="font-weight:600;color:#fff">ИП Лазарева</div>
+      <a href="#" style="font-size:12px;color:#c3c8d6;text-decoration:none">Переключить →</a>
+    </div>
+  </aside>
+
+  <div style="flex:999 1 720px;min-width:0;display:flex;flex-direction:column">
+
+    <header style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="font-size:18px;font-weight:600">Сервис</div>
+        <select aria-label="Компания" style="height:36px;padding:0 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface)"><option>ИП Лазарева</option></select>
+      </div>
+    </header>
+
+    <main style="padding:24px 32px 32px;display:flex;flex-direction:column;gap:20px;max-width:1500px;width:100%">
+
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+          <nav aria-label="Путь" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)"><a href="#" style="color:var(--muted);text-decoration:none">Деньги</a><span aria-hidden="true">/</span><a href="Operations.dc.html" style="color:var(--muted);text-decoration:none">Операции ДДС</a><span aria-hidden="true">/</span><span aria-current="page" style="color:var(--text);font-weight:500">Редактирование</span></nav>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+            <h1 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Операция ДДС{{dateRu}}</h1>
+            <span style="{{dirBadge}}">{{dirName}} {{amountView}}</span>
+            <sc-if value="{{isBank}}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:4px;background:var(--head-bg);color:var(--muted);font-size:12px;font-weight:600">Из выписки</span></sc-if>
+            <sc-if value="{{deleted}}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;padding:2px 8px;border-radius:4px;background:var(--head-bg);color:var(--muted);font-size:12px;font-weight:600">Удалена</span></sc-if>
+            <sc-if value="{{dirty}}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:4px;background:var(--warn-bg);color:var(--warn-text);font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:var(--warn-text)"></span>Есть несохранённые изменения</span></sc-if>
+          </div>
+        </div>
+        <div style="position:relative">
+          <button class="btn" type="button" aria-haspopup="menu" aria-expanded="{{menuOpen}}" onClick="{{toggleMenu}}">Ещё<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{closeMenu}}" aria-hidden="true" style="position:fixed;inset:0;z-index:25"></div>
+            <div role="menu" aria-label="Действия с операцией" style="position:absolute;top:44px;right:0;z-index:30;min-width:240px;padding:4px 0;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18)">
+              <button role="menuitem" class="mi" type="button" onClick="{{dup}}">Дублировать операцию</button>
+              <button role="menuitem" class="mi" type="button" onClick="{{closeMenu}}">История изменений</button>
+              <div role="separator" style="height:1px;margin:4px 0;background:var(--border)"></div>
+              <button role="menuitem" class="mi" type="button" onClick="{{askDelete}}" style="color:var(--danger)">Удалить операцию</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{isBank}}" hint-placeholder-val="{{ false }}">
+        <div role="note" style="display:flex;gap:12px;align-items:flex-start;padding:12px 16px;background:var(--head-bg);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
+          <div><span style="font-weight:600">Операция загружена из банковской выписки.</span> Дату, счёт, направление и сумму изменить нельзя, чтобы остаток совпадал с банком. Статью, проект, ЦФО, контрагента и описание можно уточнить.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{deleted}}" hint-placeholder-val="{{ false }}">
+        <div role="status" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;background:var(--warn-bg);color:var(--warn-text);border:1px solid #f5d3a8;border-radius:4px"><span style="font-weight:600">Операция удалена и не учитывается в остатках.</span><span>Поля доступны только для чтения.</span><button class="btn btn-sm" type="button" onClick="{{restore}}" style="margin-left:auto;color:var(--text)">Восстановить</button></div>
+      </sc-if>
+
+      <sc-if value="{{showErrors}}" hint-placeholder-val="{{ false }}">
+        <div role="alert" style="padding:12px 16px;background:#fdecee;border:1px solid #f0c2c9;border-radius:4px;color:var(--danger)">
+          <div style="font-weight:600">Не удалось сохранить: {{errCount}}. Исправьте отмеченные поля.</div>
+          <ul style="margin:6px 0 0;padding-left:20px"><sc-for list="{{errList}}" as="e" hint-placeholder-count="2"><li>{{e}}</li></sc-for></ul>
+        </div>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start" class="split">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:20px">
+        <fieldset disabled="{{deleted}}" style="border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:20px">
+
+          <section aria-labelledby="h-op" class="card">
+            <h2 id="h-op" style="margin:0;padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--border)">Операция</h2>
+            <div class="g2" style="padding:20px">
+              <div>
+                <label class="lbl" for="f-date">Дата <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+                <input id="f-date" class="inp" type="date" value="{{date}}" disabled="{{lock}}" aria-invalid="{{dateErr}}" aria-describedby="d-date" onInput="{{onDate}}">
+                <sc-if value="{{dateErr}}" hint-placeholder-val="{{ false }}"><div id="d-date" class="err">Укажите дату операции</div></sc-if>
+              </div>
+              <div>
+                <label class="lbl" for="f-acc">Счёт <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+                <select id="f-acc" class="inp" disabled="{{lock}}" aria-invalid="{{accErr}}" onChange="{{onAcc}}">
+                  <sc-for list="{{accOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for>
+                </select>
+                <sc-if value="{{accErr}}" hint-placeholder-val="{{ false }}"><div class="err">Выберите счёт</div></sc-if>
+              </div>
+              <div>
+                <span class="lbl" id="l-dir">Направление <span aria-hidden="true" style="color:var(--danger)">*</span></span>
+                <div role="radiogroup" aria-labelledby="l-dir" style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+                  <button type="button" role="radio" aria-checked="{{isIn}}" disabled="{{lock}}" class="seg" style="{{segIn}};border-radius:4px 0 0 4px" onClick="{{setIn}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>Приток</button>
+                  <button type="button" role="radio" aria-checked="{{isOut}}" disabled="{{lock}}" class="seg" style="{{segOut}};border-radius:0 4px 4px 0;margin-left:-1px" onClick="{{setOut}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>Отток</button>
+                </div>
+              </div>
+              <div>
+                <label class="lbl" for="f-amt">Сумма <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+                <div style="position:relative">
+                  <input id="f-amt" class="inp" type="text" inputmode="decimal" placeholder="0,00" value="{{amount}}" disabled="{{lock}}" aria-invalid="{{amtErr}}" aria-describedby="d-amt" onInput="{{onAmount}}" onBlur="{{onAmountBlur}}" style="padding-right:44px;text-align:right;font-variant-numeric:tabular-nums">
+                  <span aria-hidden="true" style="position:absolute;right:0;top:0;width:40px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-left:1px solid var(--border)">{{sym}}</span>
+                </div>
+                <sc-if value="{{amtErr}}" hint-placeholder-val="{{ false }}"><div id="d-amt" class="err">{{amtMsg}}</div></sc-if>
+                <sc-if value="{{amtOk}}" hint-placeholder-val="{{ true }}"><div class="hint">Валюта берётся из счёта: {{curName}}</div></sc-if>
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="h-an" class="card">
+            <h2 id="h-an" style="margin:0;padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--border)">Аналитика</h2>
+            <div class="g2" style="padding:20px">
+
+              <div style="grid-column:1 / -1;position:relative">
+                <label class="lbl" for="b-cat">Статья ДДС</label>
+                <div class="wrap" style="{{catWrapStyle}}">
+                  <button id="b-cat" class="main" type="button" aria-haspopup="dialog" aria-expanded="{{catOpen}}" onClick="{{toggleCat}}">
+                    <span style="{{catStyle}};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{catLabel}}</span>
+                    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)">{{catPath}}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M6 9l6 6 6-6"/></svg>
+                  </button>
+                  <sc-if value="{{catCanClear}}" hint-placeholder-val="{{ false }}"><button class="x" type="button" aria-label="Очистить статью" onClick="{{clearCat}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></sc-if>
+                </div>
+                <sc-if value="{{catNote}}" hint-placeholder-val="{{ false }}"><div class="hint" style="{{catNoteStyle}}">{{catNoteText}}</div></sc-if>
+                <sc-if value="{{catOpen}}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{closePop}}" aria-hidden="true" style="position:fixed;inset:0;z-index:25"></div>
+                  <div role="dialog" aria-label="Выбор статьи ДДС" style="position:absolute;top:70px;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18)">
+                    <div style="padding:12px;border-bottom:1px solid var(--border)">
+                      <div style="position:relative">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:12px;top:10px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                        <input id="s-cat" type="search" class="inp" aria-label="Найти статью по названию" placeholder="Найти статью" autocomplete="off" value="{{q}}" onInput="{{onQ}}" onKeyDown="{{catKey}}" style="padding-left:36px">
+                      </div>
+                      <div style="margin-top:8px;font-size:12px;color:var(--muted)">{{dirNote}} <button class="lnk" type="button" onClick="{{toggleAll}}" style="font-size:12px">{{dirAction}}</button></div>
+                    </div>
+                    <div role="tree" aria-label="Статьи ДДС" style="max-height:340px;overflow-y:auto;padding:4px 0">
+                      <sc-for list="{{catRows}}" as="r" hint-placeholder-count="8">
+                        <sc-if value="{{r.isLabel}}" hint-placeholder-val="{{ false }}"><div style="padding:8px 16px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">{{r.name}}</div></sc-if>
+                        <sc-if value="{{r.isGroup}}" hint-placeholder-val="{{ false }}">
+                          <button class="row grp" type="button" role="treeitem" aria-expanded="{{r.open}}" onClick="{{r.toggle}}" data-d="{{r.depth}}" style="color:var(--text);font-size:13px">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;{{r.chev}}"><path d="M9 6l6 6-6 6"/></svg>
+                            <span style="flex:1;min-width:0">{{r.name}}</span><span style="flex:none;margin-right:16px;min-width:20px;padding:0 6px;border-radius:10px;background:#e3e7f1;text-align:center;font-weight:600;font-size:12px;color:var(--muted)">{{r.count}}</span>
+                          </button>
+                        </sc-if>
+                        <sc-if value="{{r.isItem}}" hint-placeholder-val="{{ true }}">
+                          <button class="row leaf" type="button" role="treeitem" aria-selected="{{r.sel}}" data-cur="{{r.cur}}" data-d="{{r.depth}}" onClick="{{r.pick}}">
+                            <span style="flex:1;min-width:0"><span>{{r.pre}}</span><span style="font-weight:700;background:#fff1b8">{{r.hit}}</span><span>{{r.post}}</span></span>
+                            <span style="flex:none;font-size:12px;color:var(--muted)">{{r.tag}}</span>
+                            <span style="flex:none;width:28px;display:inline-flex;justify-content:center;color:var(--primary)">{{r.check}}</span>
+                          </button>
+                        </sc-if>
+                      </sc-for>
+                      <sc-if value="{{catEmpty}}" hint-placeholder-val="{{ false }}"><div style="padding:24px 16px;text-align:center;color:var(--muted)">Статья не найдена. Проверьте название или покажите все статьи.</div></sc-if>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 16px;border-top:1px solid var(--border);background:var(--head-bg);font-size:12px;color:var(--muted);border-radius:0 0 8px 8px"><span>↑ ↓ — выбрать · Enter — подтвердить</span><span>Esc — закрыть</span></div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <sc-for list="{{pickers}}" as="p" hint-placeholder-count="3">
+              <div style="position:relative;{{p.span}}">
+                <label class="lbl" for="{{p.bid}}">{{p.label}}</label>
+                <div class="wrap">
+                  <button id="{{p.bid}}" class="main" type="button" aria-haspopup="dialog" aria-expanded="{{p.open}}" onClick="{{p.toggle}}"><span style="{{p.style}};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{p.text}}</span><span style="flex:1"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M6 9l6 6 6-6"/></svg></button>
+                  <sc-if value="{{p.canClear}}" hint-placeholder-val="{{ false }}"><button class="x" type="button" aria-label="{{p.clearLabel}}" onClick="{{p.clear}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></sc-if>
+                </div>
+                <sc-if value="{{p.hint}}" hint-placeholder-val="{{ false }}"><div class="hint">{{p.hintText}}</div></sc-if>
+                <sc-if value="{{p.open}}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{closePop}}" aria-hidden="true" style="position:fixed;inset:0;z-index:25"></div>
+                  <div role="dialog" aria-label="{{p.dlg}}" style="position:absolute;top:70px;left:0;z-index:30;width:100%;min-width:300px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18)">
+                    <div style="padding:12px;border-bottom:1px solid var(--border)"><input id="{{p.sid}}" type="search" class="inp" aria-label="{{p.searchLabel}}" placeholder="{{p.ph}}" autocomplete="off" value="{{q}}" onInput="{{onQ}}" onKeyDown="{{p.key}}"></div>
+                    <div role="listbox" aria-label="{{p.dlg}}" style="max-height:260px;overflow-y:auto;padding:4px 0">
+                      <sc-for list="{{p.items}}" as="c" hint-placeholder-count="5">
+                        <button type="button" role="option" aria-selected="{{c.sel}}" data-cur="{{c.cur}}" class="mi oi" onClick="{{c.pick}}" style="display:flex;align-items:center;gap:12px"><span style="flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{c.name}}</span><span style="flex:none;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums">{{c.sub}}</span></button>
+                      </sc-for>
+                      <sc-if value="{{p.empty}}" hint-placeholder-val="{{ false }}"><div style="padding:24px 16px;text-align:center;color:var(--muted)">{{p.emptyText}}</div></sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+              </sc-for>
+
+              <div style="grid-column:1 / -1">
+                <label class="lbl" for="f-desc">Описание</label>
+                <textarea id="f-desc" class="inp" rows="3" maxlength="500" value="{{desc}}" onInput="{{onDesc}}" style="height:auto;padding:8px 12px;line-height:20px;resize:vertical">{{desc}}</textarea>
+                <div class="hint" style="text-align:right;font-variant-numeric:tabular-nums">{{descCount}} из 500</div>
+              </div>
+            </div>
+          </section>
+        </fieldset>
+
+          <section aria-labelledby="h-docs" class="card">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border)">
+              <h2 id="h-docs" style="margin:0;font-size:16px;font-weight:600">Документы ОПиУ на основании операции</h2>
+              <a class="btn btn-sm" href="PnlDocument.dc.html" style="text-decoration:none;color:var(--text)">Создать документ ОПиУ</a>
+            </div>
+            <div role="table" aria-label="Документы ОПиУ по операции">
+              <div role="row" class="dr" style="padding:8px 20px;background:var(--head-bg);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted)">
+                <div role="columnheader">Документ</div><div role="columnheader">Описание</div><div role="columnheader" style="text-align:right">Сумма, {{sym}}</div><div role="columnheader"><span class="sr">Действия</span></div>
+              </div>
+              <sc-for list="{{docs}}" as="d" hint-placeholder-count="2">
+                <div role="row" class="dr row" style="padding:10px 20px;border-bottom:1px solid var(--border)">
+                  <div role="cell"><div style="font-weight:500">{{d.num}}</div><div style="font-size:12px;color:var(--muted)">{{d.date}}</div></div>
+                  <div role="cell" style="min-width:0">{{d.desc}}</div>
+                  <div role="cell" style="text-align:right;font-variant-numeric:tabular-nums;font-weight:500">{{d.amount}}</div>
+                  <div role="cell" style="text-align:right"><a class="lnk" href="PnlDocument.dc.html" style="text-decoration:none">Открыть</a></div>
+                </div>
+              </sc-for>
+              <sc-if value="{{noDocs}}" hint-placeholder-val="{{ false }}"><div style="padding:24px 20px;text-align:center;color:var(--muted)">К операции не привязано ни одного документа ОПиУ.</div></sc-if>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding:12px 20px;background:var(--head-bg);border-radius:0 0 4px 4px">
+              <div style="display:flex;align-items:baseline;gap:8px"><span style="color:var(--muted);font-size:13px">Разнесено в ОПиУ</span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{docsSum}}</span></div>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:8px"><span style="{{restBadge}}">{{restText}}</span></div>
+            </div>
+          </section>
+        </div>
+
+        <aside aria-label="Сведения об операции" class="card" style="position:sticky;top:16px">
+          <h2 style="margin:0;padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--border)">Сведения</h2>
+          <dl style="margin:0;padding:8px 20px 16px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 16px;font-size:13px">
+            <dt style="color:var(--muted)">Источник</dt><dd style="margin:0;text-align:right;font-weight:500">{{sourceName}}</dd>
+            <dt style="color:var(--muted)">Создана</dt><dd style="margin:0;text-align:right">14.10.2026, 09:12</dd>
+            <dt style="color:var(--muted)">Изменена</dt><dd style="margin:0;text-align:right">{{changed}}</dd>
+            <dt style="color:var(--muted)">Автор</dt><dd style="margin:0;text-align:right">Лазарева Е.</dd>
+          </dl>
+          <div style="padding:12px 20px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">Статья ДДС определяет, в какой раздел отчёта о движении денег попадёт операция. Без статьи операция остаётся в «Не распределено».</div>
+        </aside>
+      </div>
+    </main>
+
+    <div role="region" aria-label="Сохранение" style="position:sticky;bottom:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 32px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -4px 12px rgba(11,16,32,.05)">
+      <div style="color:var(--muted);font-size:13px">{{barText}}</div>
+      <div style="flex:1 1 0"></div>
+      <button class="btn" type="button" onClick="{{cancel}}">Отмена</button>
+      <button class="btn btn-primary" type="button" disabled="{{saveOff}}" onClick="{{save}}">Сохранить</button>
+    </div>
+
+    <sc-if value="{{modalLeave}}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed;inset:0;z-index:50;background:rgba(11,16,32,.45);display:flex;align-items:center;justify-content:center;padding:16px">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="m-leave" style="width:440px;max-width:100%;background:var(--surface);border-radius:8px;padding:24px;box-shadow:0 24px 48px rgba(11,16,32,.3)">
+          <h2 id="m-leave" style="margin:0 0 8px;font-size:18px;font-weight:600">Выйти без сохранения?</h2>
+          <p style="margin:0 0 20px;color:var(--muted)">Внесённые изменения будут потеряны.</p>
+          <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" type="button" onClick="{{leave}}">Выйти без сохранения</button><button class="btn btn-primary" type="button" onClick="{{stay}}">Остаться</button></div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{modalDelete}}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed;inset:0;z-index:50;background:rgba(11,16,32,.45);display:flex;align-items:center;justify-content:center;padding:16px">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="m-del" style="width:460px;max-width:100%;background:var(--surface);border-radius:8px;padding:24px;box-shadow:0 24px 48px rgba(11,16,32,.3)">
+          <h2 id="m-del" style="margin:0 0 8px;font-size:18px;font-weight:600">Удалить операцию?</h2>
+          <p style="margin:0 0 20px;color:var(--muted)">{{delText}}</p>
+          <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" type="button" onClick="{{stay}}">Отмена</button><button class="btn" type="button" onClick="{{confirmDelete}}" style="background:var(--danger);border-color:var(--danger);color:#fff">Удалить</button></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{hasToast}}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:16px;padding:10px 12px 10px 16px;background:#0b1020;color:#fff;border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.3)">
+        <span>{{toastText}}</span>
+        <button type="button" aria-label="Закрыть уведомление" onClick="{{closeToast}}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:4px;background:transparent;color:#c3c8d6;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1d4ed8","options":["#1d4ed8","#0b1020","#b00020"]},"source":{"editor":"enum","default":"bank","options":["manual","bank"]},"$preview":{"width":1440,"height":1280}}'>
+const TREE = [
+  { id: 'g-in', name: 'Поступления', children: [
+    { id: 'rev-other', name: 'Выручка — Прочие', flow: 'in' },
+    { id: 'rev-shop', name: 'Выручка — Интернет-магазин', flow: 'in' },
+    { id: 'rev-showroom', name: 'Выручка — Шоурум', flow: 'in' },
+    { id: 'rev-mp', name: 'Выручка — Маркетплейсы', flow: 'in' }
+  ] },
+  { id: 'g-out', name: 'Выбытие', children: [
+    { id: 'fee', name: 'Комиссия банка', flow: 'out' },
+    { id: 'subs-ai', name: 'Подписки ИИ', flow: 'out' },
+    { id: 'subs-svc', name: 'Подписки на сервисы', flow: 'out' },
+    { id: 'tax', name: 'Налоги (ЕНП, не ФОТ)', flow: 'out' },
+    { id: 'mkt', name: 'Маркетинг — подрядчики', flow: 'out' },
+    { id: 'host', name: 'Услуги хостинга', flow: 'out' },
+    { id: 'g-pay', name: 'Заработная плата', children: [
+      { id: 'pay-dir', name: 'Директор', flow: 'out' },
+      { id: 'g-prod', name: 'Производство', children: [
+        { id: 'g-c1', name: 'Цех №1', children: [
+          { id: 'pay-c1-w', name: 'Сварщики', flow: 'out' },
+          { id: 'pay-c1-m', name: 'Монтажники', flow: 'out' }
+        ] },
+        { id: 'g-c2', name: 'Цех №2', children: [
+          { id: 'pay-c2-w', name: 'Станочники', flow: 'out' },
+          { id: 'pay-c2-p', name: 'Маляры', flow: 'out' }
+        ] }
+      ] }
+    ] }
+  ] },
+  { id: 'g-fin', name: 'Финансовая деятельность', children: [
+    { id: 'loan-in', name: 'Получение кредитов', flow: 'in' },
+    { id: 'loan-out', name: 'Погашение кредитов', flow: 'out' },
+    { id: 'int-paid', name: 'Проценты уплаченные', flow: 'out' }
+  ] },
+  { id: 'g-inv', name: 'Инвестиционная деятельность', children: [
+    { id: 'dep-out', name: 'Размещение средств на депозитах', flow: 'out' },
+    { id: 'dep-in', name: 'Возврат средств с депозитов', flow: 'in' },
+    { id: 'int-got', name: 'Проценты полученные', flow: 'in' }
+  ] },
+  { id: 'g-tech', name: 'Технические операции', children: [
+    { id: 'tech-in', name: 'Поступления', flow: 'in' },
+    { id: 'tech-out', name: 'Выбытия', flow: 'out' },
+    { id: 'undist', name: 'Не распределено', flow: 'both' }
+  ] }
+];
+const ACCS = [
+  { id: 'a1', name: 'Расчётный счёт · Сбербанк', cur: 'RUB', sym: '₽', curName: 'российский рубль (RUB)' },
+  { id: 'a2', name: 'Касса', cur: 'RUB', sym: '₽', curName: 'российский рубль (RUB)' },
+  { id: 'a3', name: 'Валютный счёт · USD', cur: 'USD', sym: '$', curName: 'доллар США (USD)' }
+];
+const CONS = [
+  { id: 'c1', name: 'ООО «Хостинг-Про»', sub: '7701234567' },
+  { id: 'c2', name: 'ИП Смирнов А. В.', sub: '770412345678' },
+  { id: 'c3', name: 'ООО «Нейро Лаб»', sub: '7814567890' },
+  { id: 'c4', name: 'АО «Облачные сервисы»', sub: '7707083893' },
+  { id: 'c5', name: 'ООО «Ромашка»', sub: '5024123456' }
+];
+const PRJS = [
+  { id: 'p1', name: 'Интернет-магазин', sub: '' },
+  { id: 'p2', name: 'Шоурум', sub: '' },
+  { id: 'p3', name: 'Маркетплейсы', sub: '' },
+  { id: 'p4', name: 'Внутренние расходы', sub: '' }
+];
+const CFOS = [
+  { id: 'f1', name: 'Общий', sub: 'CFO_GENERAL' },
+  { id: 'f2', name: 'Маркетинг', sub: 'CFO_MKT' },
+  { id: 'f3', name: 'Производство', sub: 'CFO_PROD' },
+  { id: 'f4', name: 'Администрация', sub: 'CFO_ADM' }
+];
+const LISTS = {
+  con: { label: 'Контрагент', ph: 'Название или ИНН', sl: 'Найти контрагента по названию или ИНН', dlg: 'Выбор контрагента', none: 'Не выбран', clr: 'Очистить контрагента', empty: 'Никого не нашли. Проверьте название или ИНН.', data: CONS, field: 'cid' },
+  prj: { label: 'Проект', ph: 'Название проекта', sl: 'Найти проект по названию', dlg: 'Выбор проекта', none: 'Без проекта', clr: 'Очистить проект', empty: 'Проект не найден. Проверьте название.', data: PRJS, field: 'pid' },
+  cfo: { label: 'ЦФО', ph: 'Название или код', sl: 'Найти ЦФО по названию или коду', dlg: 'Выбор ЦФО', none: 'Не выбран', clr: 'Очистить ЦФО', empty: 'ЦФО не найден. Проверьте название или код.', data: CFOS, field: 'fid' }
+};
+const INITIAL = { date: '2026-10-14', acc: 'a1', dir: 'out', amount: '5300,00', cat: 'subs-ai', pid: 'p4', fid: 'f1', cid: 'c4', desc: 'Подписки на ИИ-сервисы, октябрь' };
+const DOCS = [
+  { id: 'd1', num: 'ОПиУ-1204', date: '14.10.2026', desc: 'Подписка Claude Team, октябрь', amount: 3800 },
+  { id: 'd2', num: 'ОПиУ-1205', date: '14.10.2026', desc: 'Подписка ChatGPT, октябрь', amount: 1500 }
+];
+const NB = ' ';
+function parseAmt(s) { const t = String(s).replace(/[\s ]/g, '').replace(',', '.'); return /^\d+(\.\d{1,2})?$/.test(t) ? parseFloat(t) : NaN; }
+function money(n) { const p = Math.abs(n).toFixed(2).split('.'); return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, NB) + ',' + p[1]; }
+function find(nodes, id, path) {
+  for (const n of nodes) {
+    if (n.children) { const r = find(n.children, id, (path ? path + ' › ' : '') + n.name); if (r) return r; }
+    else if (n.id === id) return { node: n, path: path || '' };
+  }
+  return null;
+}
+const FLOW = { in: 'Приток', out: 'Отток', both: '' };
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const todayRu = (iso) => iso ? iso.split('-').reverse().join('.') : '—';
+
+class Component extends DCLogic {
+  state = { f: clone(INITIAL), saved: clone(INITIAL), submitted: false, pop: '', q: '', cursor: -1, collapsed: {}, showAll: false, menu: false, modal: '', toast: '', deleted: false, changed: '14.10.2026, 09:12', docs: clone(DOCS), catNote: '' };
+
+  componentDidMount() {
+    this._key = (e) => { if (e.key === 'Escape') this.setState((s) => (s.modal ? { modal: '' } : s.pop ? { pop: '', q: '', cursor: -1 } : s.menu ? { menu: false } : null)); };
+    if (typeof document !== 'undefined') document.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() { if (typeof document !== 'undefined') document.removeEventListener('keydown', this._key); }
+  componentDidUpdate(prevProps, prevState) {
+    if (typeof document === 'undefined') return;
+    if (this.state.pop && this.state.pop !== prevState.pop) setTimeout(() => { const el = document.getElementById('s-' + this.state.pop); if (el) el.focus(); }, 0);
+    if (!this.state.pop && prevState.pop) setTimeout(() => { const el = document.getElementById('b-' + prevState.pop); if (el) el.focus(); }, 0);
+  }
+
+  renderVals() {
+    const s = this.state, f = s.f;
+    const bank = (this.props.source ?? 'bank') === 'bank';
+    const lock = bank || s.deleted;
+    const set = (patch, extra) => this.setState((st) => Object.assign({ f: Object.assign({}, st.f, patch) }, extra || {}));
+    const acc = ACCS.find((a) => a.id === f.acc) || null;
+    const amt = parseAmt(f.amount);
+    const sym = acc ? acc.sym : '₽';
+    const sign = f.dir === 'in' ? '+' : '−';
+    const dirty = JSON.stringify(f) !== JSON.stringify(s.saved);
+    const q = s.q.trim().toLowerCase();
+
+    const errs = {};
+    if (!f.date) errs.date = 'Укажите дату операции';
+    if (!f.acc) errs.acc = 'Выберите счёт';
+    if (f.amount === '' || isNaN(amt)) errs.amt = f.amount === '' ? 'Укажите сумму' : 'Введите число, например 1 250,00';
+    else if (amt <= 0) errs.amt = 'Сумма должна быть больше нуля';
+    const errList = Object.keys(errs).map((k) => ({ date: 'Дата: ', acc: 'Счёт: ', amt: 'Сумма: ' }[k] + errs[k]));
+    const showE = s.submitted && errList.length > 0;
+
+    /* --- статья ДДС --- */
+    const cur = f.cat ? find(TREE, f.cat, '') : null;
+    const flowOk = (n) => s.showAll || n.flow === 'both' || n.flow === f.dir;
+    const matchAt = (name) => (q ? name.toLowerCase().indexOf(q) : -1);
+    const leaves = [];
+    const build = (nodes, depth, force) => {
+      const out = []; let count = 0;
+      nodes.forEach((n) => {
+        if (n.children) {
+          const sub = build(n.children, depth + 1, force || matchAt(n.name) >= 0);
+          if (sub.count === 0) return;
+          const open = q ? true : !s.collapsed[n.id];
+          out.push({ isGroup: true, isItem: false, isLabel: false, depth, name: n.name, count: sub.count, open, chev: open ? 'transform:rotate(90deg)' : '', toggle: () => this.setState((x) => ({ collapsed: Object.assign({}, x.collapsed, { [n.id]: !x.collapsed[n.id] }) })) });
+          if (open) sub.rows.forEach((r) => out.push(r));
+          count += sub.count;
+        } else {
+          if (!flowOk(n)) return;
+          const at = matchAt(n.name);
+          if (q && !force && at < 0) return;
+          count += 1;
+          out.push({ isItem: true, isGroup: false, isLabel: false, id: n.id, node: n, depth, at });
+        }
+      });
+      return { rows: out, count };
+    };
+    const tree = build(TREE, 0, false);
+    tree.rows.forEach((r) => { if (r.isItem) leaves.push(r); });
+    const cc = s.cursor >= 0 ? Math.min(s.cursor, leaves.length - 1) : (q && leaves.length ? 0 : -1);
+    const pickCat = (id) => set({ cat: id }, { pop: '', q: '', cursor: -1, catNote: '' });
+    const catRows = tree.rows.map((r) => {
+      if (!r.isItem) return r;
+      const n = r.node, i = leaves.indexOf(r), isSel = n.id === f.cat, at = r.at;
+      return {
+        isItem: true, isGroup: false, isLabel: false, depth: r.depth,
+        cur: i === cc,
+        pre: at >= 0 ? n.name.slice(0, at) : n.name, hit: at >= 0 ? n.name.slice(at, at + q.length) : '', post: at >= 0 ? n.name.slice(at + q.length) : '',
+        tag: s.showAll ? FLOW[n.flow] : '', sel: isSel, check: isSel ? '✓' : '', pick: () => pickCat(n.id)
+      };
+    });
+    const catKey = (e) => {
+      const n = leaves.length;
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ cursor: n ? (cc + 1) % n : -1 }); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ cursor: n ? (cc <= 0 ? n - 1 : cc - 1) : -1 }); }
+      else if (e.key === 'Enter') { e.preventDefault(); const t = leaves[cc >= 0 ? cc : 0]; if (t && (cc >= 0 || q)) pickCat(t.id); }
+    };
+
+    /* --- списки: контрагент, проект, ЦФО --- */
+    const pickers = ['prj', 'cfo', 'con'].map((k) => {
+      const L = LISTS[k];
+      const list = L.data.filter((x) => !q || (x.name + ' ' + x.sub).toLowerCase().indexOf(q) >= 0);
+      const curId = f[L.field];
+      const sel = L.data.find((x) => x.id === curId);
+      const c2 = s.cursor >= 0 ? Math.min(s.cursor, list.length - 1) : (q && list.length ? 0 : -1);
+      const pick = (id) => set({ [L.field]: id }, { pop: '', q: '', cursor: -1 });
+      return {
+        span: k === 'con' ? 'grid-column:1 / -1' : '', bid: 'b-' + k, sid: 's-' + k, label: L.label, dlg: L.dlg, ph: L.ph, searchLabel: L.sl,
+        open: s.pop === k, toggle: () => this.setState((x) => ({ pop: x.pop === k ? '' : k, q: '', cursor: -1 })),
+        text: sel ? sel.name : L.none, style: sel ? 'font-weight:500' : 'color:var(--muted)',
+        canClear: !!sel, clearLabel: L.clr, clear: () => set({ [L.field]: '' }),
+        hint: k === 'cfo' && !sel, hintText: 'Без ЦФО операция не попадёт в разрез по ЦФО',
+        empty: list.length === 0, emptyText: L.empty,
+        items: list.map((x, i) => ({ name: x.name, sub: x.sub, sel: x.id === curId, cur: i === c2, pick: () => pick(x.id) })),
+        key: (e) => {
+          const n = list.length;
+          if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ cursor: n ? (c2 + 1) % n : -1 }); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ cursor: n ? (c2 <= 0 ? n - 1 : c2 - 1) : -1 }); }
+          else if (e.key === 'Enter') { e.preventDefault(); const t = list[c2 >= 0 ? c2 : 0]; if (t && (c2 >= 0 || q)) pick(t.id); }
+        }
+      };
+    });
+
+    /* --- документы ОПиУ --- */
+    const docSum = s.docs.reduce((a, d) => a + d.amount, 0);
+    const rest = isNaN(amt) ? 0 : Math.round((amt - docSum) * 100) / 100;
+    const badge = (bg, fg, bd) => 'display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;background:' + bg + ';color:' + fg + ';border:1px solid ' + bd;
+    let restText, restBadge;
+    if (s.docs.length === 0) { restText = 'Не разнесено в ОПиУ'; restBadge = badge('var(--head-bg)', 'var(--muted)', 'var(--border)'); }
+    else if (rest === 0) { restText = 'Разнесено полностью'; restBadge = badge('var(--ok-bg)', 'var(--ok-text)', '#b8dfc0'); }
+    else if (rest > 0) { restText = 'Не разнесено ' + money(rest) + NB + sym; restBadge = badge('var(--warn-bg)', 'var(--warn-text)', '#f5d3a8'); }
+    else { restText = 'Превышение на ' + money(-rest) + NB + sym; restBadge = badge('#fdecee', 'var(--danger)', '#f0c2c9'); }
+
+    const doSave = () => {
+      if (errList.length) { this.setState({ submitted: true }); return; }
+      this.setState((st) => ({ saved: clone(st.f), submitted: false, changed: '24.10.2026, ' + new Date().toTimeString().slice(0, 5), toast: 'Операция сохранена' }));
+    };
+    const dirName = f.dir === 'in' ? 'Приток' : 'Отток';
+
+    return {
+      accent: this.props.accent ?? '#1d4ed8', rowPy: 12,
+      isBank: bank, lock, deleted: s.deleted, dirty,
+      dateRu: f.date ? ' от ' + todayRu(f.date) : '', dirName, amountView: isNaN(amt) ? '' : sign + NB + money(amt) + NB + sym,
+      dirBadge: badge(f.dir === 'in' ? 'var(--ok-bg)' : 'var(--head-bg)', f.dir === 'in' ? 'var(--ok-text)' : 'var(--text)', f.dir === 'in' ? '#b8dfc0' : 'var(--border)') + ';font-variant-numeric:tabular-nums',
+      menuOpen: s.menu, toggleMenu: () => this.setState((x) => ({ menu: !x.menu })), closeMenu: () => this.setState({ menu: false }),
+      dup: () => this.setState({ menu: false, toast: 'Создана копия операции (черновик)' }),
+      askDelete: () => this.setState({ menu: false, modal: 'delete' }),
+      restore: () => this.setState({ deleted: false, toast: 'Операция восстановлена' }),
+      showErrors: showE, errCount: errList.length, errList,
+      date: f.date, dateErr: s.submitted && !!errs.date, onDate: (e) => set({ date: e.target.value }),
+      accOpts: [{ v: '', label: 'Выберите счёт', sel: !f.acc }].concat(ACCS.map((a) => ({ v: a.id, label: a.name, sel: a.id === f.acc }))),
+      accErr: s.submitted && !!errs.acc, onAcc: (e) => set({ acc: e.target.value }),
+      isIn: f.dir === 'in', isOut: f.dir === 'out',
+      segIn: f.dir === 'in' ? 'background:#e4f5e7;border-color:#1d7a30;color:#1d7a30;font-weight:600;position:relative;z-index:1' : '',
+      segOut: f.dir === 'out' ? 'background:#e8effd;border-color:var(--primary);color:var(--primary);font-weight:600;position:relative;z-index:1' : '',
+      setIn: () => this.setState((st) => {
+        const c = st.f.cat ? find(TREE, st.f.cat, '') : null; const bad = c && c.node.flow === 'out';
+        return { f: Object.assign({}, st.f, { dir: 'in', cat: bad ? '' : st.f.cat }), catNote: bad ? 'Статья «' + c.node.name + '» не подходит для притока и сброшена. Выберите другую.' : '' };
+      }),
+      setOut: () => this.setState((st) => {
+        const c = st.f.cat ? find(TREE, st.f.cat, '') : null; const bad = c && c.node.flow === 'in';
+        return { f: Object.assign({}, st.f, { dir: 'out', cat: bad ? '' : st.f.cat }), catNote: bad ? 'Статья «' + c.node.name + '» не подходит для оттока и сброшена. Выберите другую.' : '' };
+      }),
+      amount: f.amount, sym, curName: acc ? acc.curName : 'выберите счёт',
+      amtErr: s.submitted && !!errs.amt, amtOk: !(s.submitted && !!errs.amt), amtMsg: errs.amt || '',
+      onAmount: (e) => set({ amount: e.target.value.replace(/[^\d.,\s ]/g, '') }),
+      onAmountBlur: () => { const v = parseAmt(this.state.f.amount); if (!isNaN(v)) set({ amount: money(v).replace(/ /g, '') }); },
+
+      catOpen: s.pop === 'cat', toggleCat: () => this.setState((x) => ({ pop: x.pop === 'cat' ? '' : 'cat', q: '', cursor: -1 })),
+      closePop: () => this.setState({ pop: '', q: '', cursor: -1 }),
+      catLabel: cur ? cur.node.name : 'Не распределено', catPath: cur ? cur.path : '', catStyle: cur ? 'flex:none;max-width:70%;font-weight:500' : 'flex:none;color:var(--muted)',
+      catCanClear: !!cur, clearCat: () => set({ cat: '' }, { catNote: '' }),
+      catWrapStyle: '', catNote: !!s.catNote || !cur, catNoteText: s.catNote || 'Без статьи операция попадёт в «Не распределено».', catNoteStyle: s.catNote ? 'color:var(--warn-text)' : '',
+      catRows, catEmpty: leaves.length === 0, catKey,
+      dirNote: s.showAll ? 'Показаны все статьи.' : 'Статьи для ' + (f.dir === 'in' ? 'притока.' : 'оттока.'),
+      dirAction: s.showAll ? 'Только подходящие' : 'Показать все',
+      toggleAll: () => this.setState((x) => ({ showAll: !x.showAll })),
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value, cursor: -1 }),
+      pickers,
+      desc: f.desc, descCount: f.desc.length, onDesc: (e) => set({ desc: e.target.value }),
+
+      docs: s.docs.map((d) => ({ num: d.num, date: d.date, desc: d.desc, amount: sign + NB + money(d.amount) })),
+      noDocs: s.docs.length === 0, docsSum: money(docSum) + NB + sym, restText, restBadge,
+      sourceName: bank ? 'Банковская выписка' : 'Вручную', changed: s.changed,
+
+      barText: s.deleted ? 'Операция удалена' : (dirty ? 'Есть несохранённые изменения' : 'Все изменения сохранены'),
+      saveOff: s.deleted || !dirty, save: doSave,
+      cancel: () => this.setState((st) => (dirty ? { modal: 'leave' } : { toast: 'Изменений нет, возвращаемся к списку' })),
+      modalLeave: s.modal === 'leave', modalDelete: s.modal === 'delete',
+      stay: () => this.setState({ modal: '' }),
+      leave: () => this.setState((st) => ({ f: clone(st.saved), submitted: false, modal: '', catNote: '', toast: 'Изменения отменены' })),
+      delText: s.docs.length ? 'Операция исчезнет из остатков и отчёта о движении денег. ' + s.docs.length + ' док. ОПиУ останутся, но связь с операцией будет снята. Операцию можно восстановить.' : 'Операция исчезнет из остатков и отчёта о движении денег. Её можно восстановить.',
+      confirmDelete: () => this.setState({ deleted: true, modal: '', submitted: false, toast: 'Операция удалена' }),
+      hasToast: !!s.toast, toastText: s.toast, closeToast: () => this.setState({ toast: '' })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

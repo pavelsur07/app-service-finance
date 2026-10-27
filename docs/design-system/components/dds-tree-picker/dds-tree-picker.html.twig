@@ -1,0 +1,19 @@
+{# Переиспользуемый выбор «Статья ДДС» (дерево + поиск). Эталон: docs/design-system/screens/DdsCategoryPicker.dc.html
+   Параметры:
+     field            FormView поля-ChoiceType (Symfony) со всеми допустимыми значениями (листья)
+     tree             массив дерева: [{id,name,children:[…]} | {id,name,flow:'in'|'out'|'both'}], id == value option
+     direction_source CSS-селектор поля направления (radio/select) — необязательно
+     dir_in_value / dir_out_value  значения этого поля для притока/оттока
+     placeholder      текст пустого значения (по умолчанию «Не распределено»)
+   Серверная валидация не меняется: значение приходит из того же <select name="…">. #}
+{% set _tree_json = tree|json_encode(constant('JSON_UNESCAPED_UNICODE')) %}
+<div class="dds-field-group">
+  {{ form_label(field, null, {label_attr: {class: 'form-label'}}) }}
+  <div class="dds-picker" data-dds-picker
+       data-tree="{{ _tree_json|e('html_attr') }}"
+       data-placeholder="{{ placeholder|default('Не распределено') }}"
+       {% if direction_source is defined and direction_source %}data-direction-source="{{ direction_source }}" data-dir-in-value="{{ dir_in_value|default('in') }}" data-dir-out-value="{{ dir_out_value|default('out') }}"{% endif %}>
+    {{ form_widget(field, {attr: {class: 'dds-picker__native'}}) }}
+  </div>
+  {{ form_errors(field) }}
+</div>
