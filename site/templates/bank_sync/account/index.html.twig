@@ -1,0 +1,86 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Счета банка — {{ connection.bankCode.label }}{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <div class="page-pretitle"><a href="{{ path('bank_sync_connection_index') }}">Подключения банков</a></div>
+                    <h2 class="page-title">Счета банка — {{ connection.bankCode.label }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-secondary">
+                    Выписка загружается только по счетам, привязанным к денежному счёту. Список обновляется при каждой загрузке
+                    («Запустить импорт сейчас» в списке подключений).
+                </p>
+                <table class="table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Счёт в банке</th>
+                            <th>Валюта</th>
+                            <th>Состояние</th>
+                            <th>Денежный счёт</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for account in accounts %}
+                        <tr>
+                            <td>
+                                {{ account.accountNumber }}
+                                {% if account.description %}
+                                    <div class="text-secondary small">{{ account.description }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ account.currency }}</td>
+                            <td>
+                                {% if not account.presentInBank %}
+                                    <span class="badge bg-secondary text-white">нет в ответе банка</span>
+                                    <div class="text-secondary small">последний раз {{ account.lastSeenAt|date('d.m.Y H:i') }}</div>
+                                {% elseif not account.enabledInBank %}
+                                    <span class="badge bg-secondary text-white">закрыт в банке</span>
+                                {% elseif account.moneyAccountId %}
+                                    <span class="badge bg-green text-white">загружается</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-white">не привязан</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if account.moneyAccountId %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>{{ money_account_names[account.moneyAccountId] ?? 'неактивный денежный счёт' }}</span>
+                                        <form method="post" action="{{ path('bank_sync_account_unlink', {'id': connection.id, 'accountId': account.id}) }}" onsubmit="return confirm('Отвязать счёт? Выписка по нему перестанет загружаться.');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('bank_account_unlink_' ~ account.id) }}">
+                                            <button class="btn btn-sm btn-outline-danger">Отвязать</button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    {% set form = forms[account.id] %}
+                                    {% if form.moneyAccountId.vars.choices is empty %}
+                                        <span class="text-secondary">Нет свободного денежного счёта в {{ account.currency }}</span>
+                                    {% else %}
+                                        {{ form_start(form, {'attr': {'class': 'd-flex gap-2'}}) }}
+                                            {{ form_widget(form.moneyAccountId, {'attr': {'class': 'form-select form-select-sm'}}) }}
+                                            <button class="btn btn-sm btn-primary">Привязать</button>
+                                        {{ form_end(form) }}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-secondary">Банк ещё не вернул счетов: запустите импорт в списке подключений.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

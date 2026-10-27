@@ -8,6 +8,7 @@ use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Domain\Consent\ConsentExpiryPolicy;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
+use App\BankSync\Repository\BankAccountRepository;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +25,7 @@ final class ConnectionIndexController extends AbstractController
         private readonly BankConnectionRepository $connections,
         private readonly BankAuthorizationProviderRegistry $authorizationProviders,
         private readonly ClockInterface $clock,
+        private readonly BankAccountRepository $accounts,
     ) {
     }
 
@@ -51,6 +53,8 @@ final class ConnectionIndexController extends AbstractController
 
         return $this->render('@BankSync/connection/index.html.twig', [
             'connections' => $this->connections->findByCompanyId((string) $company->getId()),
+            // Счета банка без денежного счёта: выписка по ним не загружается.
+            'unlinked_accounts' => $this->accounts->countUnlinkedByConnection((string) $company->getId()),
             // Полноценный UI — Stage 10.
             'oauth_starts' => $oauthStarts,
             // Переподключение — только там, где вход в эту среду банка настроен.
