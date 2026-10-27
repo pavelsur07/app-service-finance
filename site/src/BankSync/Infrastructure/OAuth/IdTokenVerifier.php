@@ -28,7 +28,7 @@ final readonly class IdTokenVerifier
 
     /**
      * @param list<\OpenSSLCertificate> $certificates
-     * @param list<string>              $allowedIssuers
+     * @param list<string> $allowedIssuers
      *
      * @return string `sub` — идентификатор пользователя у банка
      *
@@ -66,8 +66,8 @@ final readonly class IdTokenVerifier
     }
 
     /**
-     * @param array<mixed>  $payload
-     * @param list<string>  $allowedIssuers
+     * @param array<mixed> $payload
+     * @param list<string> $allowedIssuers
      *
      * @phpstan-assert array{sub: non-empty-string} $payload
      */

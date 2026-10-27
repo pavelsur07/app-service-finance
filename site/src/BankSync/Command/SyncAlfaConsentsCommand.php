@@ -143,8 +143,8 @@ final class SyncAlfaConsentsCommand extends Command
     }
 
     /**
-     * @param list<BankConnection>                     $connections
-     * @param array<string, list<BankConsent>>         $bySubject
+     * @param list<BankConnection> $connections
+     * @param array<string, list<BankConsent>> $bySubject
      * @param array{checked: int, updated: int, expiring: list<string>, revoked: list<string>, not_found: list<string>, busy: list<string>} $result
      */
     private function apply(array $connections, array $bySubject, array &$result): void

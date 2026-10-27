@@ -44,7 +44,7 @@ final readonly class AlfaConsentsClient
     /**
      * @return list<BankConsent>
      *
-     * @throws BankApiUnavailableException   сеть, 408, 429, 5xx — повторить завтра
+     * @throws BankApiUnavailableException сеть, 408, 429, 5xx — повторить завтра
      * @throws BankApiRequestFailedException отказ в токене приложения, прочие 4xx, нечитаемый ответ
      * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      */

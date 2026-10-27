@@ -12,7 +12,7 @@ final readonly class AlfaIdEnvironment
 {
     /**
      * @param non-empty-list<\OpenSSLCertificate> $signingCertificates
-     * @param non-empty-list<string>              $issuers
+     * @param non-empty-list<string> $issuers
      */
     public function __construct(
         public string $name,

@@ -50,7 +50,7 @@ final readonly class DeleteBankConnectionAction
 
     /**
      * @throws BankConnectionNotFoundException подключение не принадлежит компании или уже удалено
-     * @throws BankConnectionBusyException     токены подключения меняет другой процесс
+     * @throws BankConnectionBusyException токены подключения меняет другой процесс
      */
     public function __invoke(string $companyId, string $connectionId): void
     {

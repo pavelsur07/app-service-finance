@@ -169,13 +169,29 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         self::assertFalse($this->connectionRowOrFalse());
     }
 
-    private function persistOAuthConnection(): BankConnection
+    public function testForeignConnectionDeleteIs404AndNotRevoked(): void
+    {
+        $otherOwner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('bank-pages-other@example.test')->build();
+        $otherCompany = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($otherOwner)->build();
+        $this->em()->persist($otherOwner);
+        $this->em()->persist($otherCompany);
+        $this->em()->flush();
+        $foreign = $this->persistOAuthConnection((string) $otherCompany->getId());
+
+        $this->client->request('POST', sprintf('/bank-connections/%s/delete', $foreign->getId()), ['_token' => 'any']);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame([], StubBankAuthorizationProvider::$revoked);
+        self::assertNotFalse($this->em()->getConnection()->fetchOne('SELECT id FROM bank_sync_connection WHERE id = :id', ['id' => $foreign->getId()]));
+    }
+
+    private function persistOAuthConnection(?string $companyId = null): BankConnection
     {
         /** @var FieldEncryptionServiceInterface $encryption */
         $encryption = self::getContainer()->get(FieldEncryptionServiceInterface::class);
         $connection = BankConnectionBuilder::aConnection()
             ->withId(Uuid::uuid7()->toString())
-            ->withCompanyId((string) $this->company->getId())
+            ->withCompanyId($companyId ?? (string) $this->company->getId())
             ->withBaseUrl('https://sandbox.alfabank.ru')
             ->withCredentials((new BankCredentialsCodec($encryption))->encryptOAuthTokens(new OAuthTokens('oauth-access', 'oauth-refresh', new \DateTimeImmutable('+1 hour'))))
             ->build();
