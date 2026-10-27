@@ -1,9 +1,11 @@
 import './styles/legacy-app.css';
+import './styles/components/dds-pickers.css';
 import './bootstrap.js';
 import './project_direction_picker.js';
 import './counterparty_picker.js';
 import './picker_pill.js';
 import './confirm_modal.js';
+import { initDdsTreePickers } from './dds_tree_picker.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
 document.addEventListener('submit', (event) => {
@@ -49,3 +51,10 @@ document.addEventListener('click', (event) => {
   from.value = button.dataset.periodFrom ?? '';
   to.value = button.dataset.periodTo ?? '';
 });
+
+// Виджет «Статья ДДС» (partials/_dds_tree_picker.html.twig) поверх select формы.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initDdsTreePickers());
+} else {
+  initDdsTreePickers();
+}

@@ -1,0 +1,9 @@
+{# Поле CashflowCategoryTreeType: обычный select внутри виджета «Статья ДДС». #}
+{% block cashflow_category_tree_widget %}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' dds-picker__native')|trim}) -%}
+    {{- include('partials/_dds_tree_picker.html.twig', {
+        select: block('choice_widget'),
+        tree: tree,
+        direction: direction,
+    }, with_context = false) -}}
+{% endblock %}

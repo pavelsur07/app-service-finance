@@ -89,6 +89,41 @@ final class CashTransactionCategoryTreeTest extends WebTestCaseBase
         ], $field->vars['direction']);
     }
 
+    public function testEditPageRendersPickerOverTheFormSelectAndSavesTheLeaf(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $tx] = $this->prepareTransaction(8104);
+        $root = $this->persistCategory($company, 'Выбытие', null, PaymentPlanType::OUTFLOW);
+        $leaf = $this->persistCategory($company, 'Комиссия банка', $root);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/finance/cash-transactions/'.$tx->getId().'/edit');
+        self::assertResponseIsSuccessful();
+
+        $picker = $crawler->filter('[data-dds-picker]');
+        self::assertCount(1, $picker);
+        self::assertCount(1, $picker->filter('select[name="cash_transaction[cashflowCategory]"].dds-picker__native'));
+        self::assertSame('[name="cash_transaction[direction]"]', $picker->attr('data-direction-source'));
+        self::assertSame([[
+            'id' => $root->getId(),
+            'name' => 'Выбытие',
+            'children' => [['id' => $leaf->getId(), 'name' => 'Комиссия банка', 'flow' => 'out']],
+        ]], json_decode((string) $picker->attr('data-tree'), true, flags: \JSON_THROW_ON_ERROR));
+        self::assertSame('disabled', $picker->filter(sprintf('option[value="%s"]', $root->getId()))->attr('disabled'));
+
+        $form = $crawler->selectButton('Сохранить')->form();
+        $form['cash_transaction[cashflowCategory]'] = (string) $leaf->getId();
+        $client->submit($form);
+        self::assertResponseRedirects();
+
+        $this->em()->clear();
+        $saved = $this->em()->find(CashTransaction::class, $tx->getId());
+        self::assertSame($leaf->getId(), $saved?->getCashflowCategory()?->getId());
+    }
+
     private function countEditPageQueries(KernelBrowser $client, User $user, Company $company, CashTransaction $tx): int
     {
         $client->loginUser($user);
