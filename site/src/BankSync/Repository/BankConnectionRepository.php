@@ -76,6 +76,30 @@ final class BankConnectionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Подключения среды банка, у которых известен пользователь банка и есть что сверять
+     * (отозванные ждут нового входа).
+     *
+     * @companyScopeExempt CLI `bank-sync:alfa:consents-sync` сверяет согласия всех компаний одним ответом банка; меняет только срок и статус найденных подключений
+     *
+     * @return list<BankConnection>
+     */
+    public function findWithExternalSubjectByBankAndBaseUrl(BankCode $bankCode, string $baseUrl): array
+    {
+        /* @var list<BankConnection> */
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.bankCode = :bankCode')
+            ->andWhere('c.baseUrl = :baseUrl')
+            ->andWhere('c.externalSubject IS NOT NULL')
+            ->andWhere('c.status <> :revoked')
+            ->setParameter('bankCode', $bankCode->value)
+            ->setParameter('baseUrl', $baseUrl)
+            ->setParameter('revoked', BankConnectionStatus::REVOKED->value)
+            ->orderBy('c.id', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Только persist()/remove(): коммитит точка входа.
      */
     public function add(BankConnection $connection): void
