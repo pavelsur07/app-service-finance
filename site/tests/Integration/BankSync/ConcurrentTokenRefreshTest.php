@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\BankSync;
 
+use App\BankSync\Application\BankAccountCatalog;
 use App\BankSync\Application\DTO\BankAccountDTO;
 use App\BankSync\Application\OAuthTokenRefresher;
 use App\BankSync\Domain\OAuth\OAuthTokens;
+use App\BankSync\Entity\BankAccount;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Entity\BankImportCursor;
 use App\BankSync\Exception\BankConnectionBusyException;
@@ -140,6 +142,7 @@ final class ConcurrentTokenRefreshTest extends PostgresResetTestCase
             new OAuthTokenRefresher($this->codec(), new BankAuthorizationProviderRegistry([new StubBankAuthorizationProvider()]), new NativeClock()),
             new BankConnectionTokenLock($this->em->getConnection(), $sleep),
             self::getContainer()->get(CashFacade::class),
+            new BankAccountCatalog($this->em->getRepository(BankAccount::class), $this->em),
             $this->em,
             new Logger('test', [new TestHandler()]),
         );

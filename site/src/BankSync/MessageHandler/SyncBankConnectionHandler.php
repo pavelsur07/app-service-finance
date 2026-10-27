@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\BankSync\MessageHandler;
 
+use App\BankSync\Application\BankAccountCatalog;
 use App\BankSync\Application\DTO\BankStatementDayDTO;
 use App\BankSync\Application\OAuthTokenRefresher;
 use App\BankSync\Domain\BankAccess;
 use App\BankSync\Domain\BankProviderInterface;
+use App\BankSync\Entity\BankAccount;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
@@ -43,7 +45,9 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
  *    одно warning, сообщение завершается без ретрая. Любая смена учётных данных или
  *    статуса здесь — под этой блокировкой на перечитанной строке;
  * 1. журнал импорта — свой commit, чтобы загрузку было видно, пока она идёт;
- * 2. счета банка (HTTP) → денежный счёт по номеру → сессионная блокировка импорта счёта;
+ * 2. счета банка (HTTP) → каталог `bank_sync_account` (своя транзакция под advisory-
+ *    блокировкой подключения) → только привязанные `Enabled`-счета, денежный счёт — по
+ *    привязке через `CashFacade` → сессионная блокировка импорта счёта;
  * 3. каждый день от курсора: все страницы (HTTP, вне транзакции) → одна транзакция со
  *    строками дня, пересчётом остатков и курсором;
  * 4. итог в журнал — свой commit; при сбое журнал закрывается с ошибкой, если EM открыт.
@@ -72,6 +76,7 @@ final readonly class SyncBankConnectionHandler
         private OAuthTokenRefresher $tokenRefresher,
         private BankConnectionTokenLock $tokenLock,
         private CashFacade $cashFacade,
+        private BankAccountCatalog $accountCatalog,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
     ) {
@@ -151,15 +156,36 @@ final readonly class SyncBankConnectionHandler
         SyncCounters $counters,
         array $context,
     ): void {
-        $accounts = $provider->listAccounts($access);
-        $counters->accountsFound = \count($accounts);
+        $bankAccounts = $provider->listAccounts($access);
+        $counters->accountsFound = \count($bankAccounts);
+        /** @var list<BankAccount> $accounts */
+        $accounts = $this->entityManager->wrapInTransaction(fn (): array => $this->accountCatalog->synchronize(
+            $connection->getCompanyId(),
+            $connection->getId(),
+            $bankAccounts,
+            new \DateTimeImmutable(),
+        ));
 
-        foreach ($accounts as $bankAccount) {
-            $target = $this->cashFacade->findStatementImportAccount($connection->getCompanyId(), $bankAccount->accountNumber);
-            if (null === $target) {
-                // info, не warning: счёт банка без денежного счёта в сервисе — обычное дело.
-                $this->logger->info('Bank sync: bank account is not linked to a money account', $context + [
-                    'account_suffix' => substr($bankAccount->accountNumber, -4),
+        foreach ($accounts as $account) {
+            $accountContext = $context + ['bank_account_id' => $account->getId()];
+            if (!$account->isLoadable()) {
+                // info, не warning: непривязанный или закрытый в банке счёт — обычное дело,
+                // клиент видит его на странице «Счета банка».
+                if ($account->isPresentInBank()) {
+                    ++$counters->accountsUnlinked;
+                    $this->logger->info('Bank sync: bank account is not loaded (not linked or disabled in the bank)', $accountContext + [
+                        'linked' => null !== $account->getMoneyAccountId(),
+                        'enabled_in_bank' => $account->isEnabledInBank(),
+                    ]);
+                }
+                continue;
+            }
+
+            $moneyAccountId = (string) $account->getMoneyAccountId();
+            $target = $this->cashFacade->getStatementImportAccount($connection->getCompanyId(), $moneyAccountId);
+            if (null === $target || $target->currency !== $account->getCurrency()) {
+                $this->logger->warning('Bank sync skipped: linked money account is inactive or in another currency', $accountContext + [
+                    'money_account_id' => $moneyAccountId,
                 ]);
                 continue;
             }
@@ -175,7 +201,7 @@ final readonly class SyncBankConnectionHandler
             }
 
             try {
-                $this->syncAccount($connection, $provider, $access, $bankAccount->accountNumber, $target, $counters, $context);
+                $this->syncAccount($connection, $provider, $access, $account->getAccountNumber(), $target, $counters, $context);
             } finally {
                 $this->releaseAccountLock($connection->getCompanyId(), $target->moneyAccountId, $context);
             }

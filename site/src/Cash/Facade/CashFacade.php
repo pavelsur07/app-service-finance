@@ -98,21 +98,6 @@ final readonly class CashFacade
     }
 
     /**
-     * Денежный счёт компании по номеру банковского счёта (сравниваются только цифры).
-     */
-    public function findStatementImportAccount(string $companyId, string $accountNumber): ?StatementImportAccount
-    {
-        $account = $this->moneyAccountRepository->findOneByCompanyAndAccountNumber(
-            $this->requireCompany($companyId),
-            $accountNumber,
-        );
-
-        return null === $account
-            ? null
-            : new StatementImportAccount((string) $account->getId(), $account->getCurrency());
-    }
-
-    /**
      * Денежный счёт компании по id — цель импорта выписки по привязке счёта банка.
      * Чужой, несуществующий или неактивный — null: загрузка пропускает счёт.
      */
