@@ -546,7 +546,8 @@
     line-height: 28px;
   }
 
-  .dds-op__banner {
+  .dds-op__banner,
+  .dds-card__head {
     flex-wrap: wrap;
   }
 }

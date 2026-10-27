@@ -73,6 +73,33 @@ final class CashTransactionEditPageTest extends WebTestCaseBase
         self::assertCount(0, $crawler->filter('[data-dds-op-save], .dds-op .dropdown-menu'));
     }
 
+    public function testServerErrorsAreListedInTheSummaryAndCommaAmountIsSavedExactly(): void
+    {
+        $crawler = $this->openEditPage(8205, static fn (CashTransaction $tx) => $tx);
+        $client = static::getClient();
+        self::assertNotNull($client);
+
+        $form = $crawler->filter('#dds-op-form')->form();
+        $form['cash_transaction[amount]'] = '';
+        $crawler = $client->submit($form);
+        self::assertResponseStatusCodeSame(422);
+        self::assertCount(0, $crawler->filter('[data-dds-op-summary][hidden]'));
+        self::assertStringStartsWith('Не удалось сохранить: 1.', $crawler->filter('[data-dds-op-summary-title]')->text());
+        self::assertStringContainsString('Укажите сумму', $crawler->filter('[data-dds-op-summary-list]')->text());
+
+        $form = $crawler->filter('#dds-op-form')->form();
+        $form['cash_transaction[amount]'] = '5300,50';
+        $form['cash_transaction[direction]'] = (string) $crawler->filter('.dds-seg__opt--in input')->attr('value');
+        $client->submit($form);
+        self::assertResponseRedirects();
+
+        $this->em()->clear();
+        $saved = $this->em()->find(CashTransaction::class, sprintf('66666666-6666-6666-8666-%012d', 8205));
+        self::assertInstanceOf(CashTransaction::class, $saved);
+        self::assertSame('5300.50', $saved->getAmount());
+        self::assertSame(CashDirection::INFLOW, $saved->getDirection());
+    }
+
     /**
      * @param callable(CashTransaction): CashTransaction $tune
      */
