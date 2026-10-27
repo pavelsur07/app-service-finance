@@ -578,3 +578,9 @@ services:
     App\BankSync\Infrastructure\Bank\Alfa\AlfaApiClient:
         arguments:
             $httpClient: '@bank_sync.alfa.http_client'
+
+    # Token endpoint Альфы (вход, обновление, отзыв, Client Credentials) — тоже по mTLS.
+    bank_sync.alfa.token_endpoint_client:
+        class: App\BankSync\Infrastructure\OAuth\OAuthTokenEndpointClient
+        arguments:
+            $httpClient: '@bank_sync.alfa.http_client'

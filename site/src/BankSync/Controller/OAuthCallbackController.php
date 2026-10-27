@@ -8,10 +8,13 @@ use App\BankSync\Application\CompleteBankAuthorizationAction;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Exception\BankAuthorizationDeniedException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankIdTokenInvalidException;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -60,7 +63,7 @@ final class OAuthCallbackController extends AbstractController
             $this->addFlash('danger', 'Банк отклонил вход. Начните подключение заново.');
         } catch (BankApiUnavailableException) {
             $this->addFlash('danger', 'Банк временно недоступен. Попробуйте подключиться позже.');
-        } catch (BankApiRequestFailedException) {
+        } catch (BankApiRequestFailedException|BankAuthorizationNotConfiguredException|BankChannelNotConfiguredException|BankIdTokenInvalidException) {
             $this->addFlash('danger', 'Не удалось завершить вход в банк. Попробуйте позже или напишите в поддержку.');
         } catch (BankConnectionNotFoundException) {
             $this->addFlash('warning', 'Подключение удалили, пока шёл вход в банк.');

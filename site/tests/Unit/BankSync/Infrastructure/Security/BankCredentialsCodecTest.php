@@ -36,7 +36,7 @@ final class BankCredentialsCodecTest extends TestCase
     public function testOAuthTokensRoundTripAndAccessTokenServesRequests(): void
     {
         $codec = new BankCredentialsCodec($this->encryption());
-        $tokens = new OAuthTokens('access-secret', 'refresh-secret', new \DateTimeImmutable('2026-10-26T12:00:00+03:00'), new \DateTimeImmutable('2027-10-26T00:00:00+03:00'));
+        $tokens = new OAuthTokens('access-secret', 'refresh-secret', new \DateTimeImmutable('2026-10-26T12:00:00+03:00'));
 
         $credentials = $codec->encryptOAuthTokens($tokens);
 
@@ -45,6 +45,17 @@ final class BankCredentialsCodecTest extends TestCase
         $connection = BankConnectionBuilder::aConnection()->withCredentials($credentials)->build();
         self::assertSame('access-secret', $codec->token($connection));
         self::assertEquals($tokens, $codec->oauthTokens($connection));
+    }
+
+    public function testStage3CredentialsWithConsentFieldStillDecode(): void
+    {
+        $encryption = $this->encryption();
+        $payload = $encryption->encrypt('{"type":"oauth2","access_token":"a","refresh_token":"r","access_expires_at":"2026-10-26T12:00:00+00:00","consent_expires_at":"2027-10-26T00:00:00+00:00"}');
+        $connection = BankConnectionBuilder::aConnection()
+            ->withCredentials(new EncryptedBankCredentials($payload->toStorageJson(), $payload->keyVersion()))
+            ->build();
+
+        self::assertSame('r', (new BankCredentialsCodec($encryption))->oauthTokens($connection)?->refreshToken);
     }
 
     public function testStaticTokenHasNoOAuthTokens(): void

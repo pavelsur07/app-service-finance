@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\BankSync\Command;
 
 use App\BankSync\Domain\Certificate\CertificateExpiryPolicy;
+use App\BankSync\Infrastructure\Bank\Alfa\AlfaIdConfig;
 use App\BankSync\Infrastructure\Bank\Alfa\AlfaTlsConfig;
 use App\BankSync\Infrastructure\Security\PemCertificates;
 use Psr\Log\LoggerInterface;
@@ -15,9 +16,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Ночной гейт сроков сертификатов канала Альфы: CA серверов банка из репозитория и
- * клиентский сертификат из окружения (лист и цепочка, если она в том же файле).
- * Read-only, без сети. Действия при срабатывании — `docs/workflow/health-gates.md`.
+ * Ночной гейт сроков сертификатов Альфы: CA серверов банка из репозитория, клиентский
+ * сертификат канала из окружения (лист и цепочка, если она в том же файле) и сертификаты
+ * проверки подписи `id_token` Alfa ID по средам. Read-only, без сети. Действия при срабатывании — `docs/workflow/health-gates.md`.
  *
  * Клиентский сертификат называется по серийному номеру, не по subject: в его CN —
  * ФИО представителя компании.
@@ -27,6 +28,7 @@ final class CheckAlfaCertificatesCommand extends Command
 {
     public function __construct(
         private readonly AlfaTlsConfig $tlsConfig,
+        private readonly AlfaIdConfig $idConfig,
         private readonly CertificateExpiryPolicy $policy,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -48,6 +50,13 @@ final class CheckAlfaCertificatesCommand extends Command
         } else {
             $output->writeln('client: not configured ('.AlfaTlsConfig::CERT_PATH_ENV.' is empty), not checked');
         }
+        foreach ($this->idConfig->signingCertificatePaths() as $environment => $path) {
+            if (null === $path) {
+                $output->writeln(sprintf('id-signing-%s: not configured, not checked', $environment));
+                continue;
+            }
+            $sources['id-signing-'.$environment] = $path;
+        }
 
         foreach ($sources as $source => $path) {
             $certificates = $this->readCertificates($path);
@@ -65,7 +74,7 @@ final class CheckAlfaCertificatesCommand extends Command
                     '%s #%d %s: until %s, %d days left',
                     $source,
                     $index + 1,
-                    'CA' === $source ? $certificate['name'] : 'serial '.$certificate['serial'],
+                    'client' === $source ? 'serial '.$certificate['serial'] : $certificate['name'],
                     $certificate['notAfter']->format('Y-m-d'),
                     $this->policy->daysLeft($certificate['notAfter'], $now),
                 );
@@ -84,7 +93,7 @@ final class CheckAlfaCertificatesCommand extends Command
 
         if ([] !== $byLevel['error']) {
             // Текст постоянный: одно событие в GlitchTip, детали — в контексте.
-            $this->logger->error('Alfa TLS certificates: expired, expiring within 14 days or unreadable', [
+            $this->logger->error('Alfa certificates: expired, expiring within 14 days or unreadable', [
                 'certificates' => $byLevel['error'],
                 'warning_certificates' => $byLevel['warning'],
             ]);
@@ -92,9 +101,9 @@ final class CheckAlfaCertificatesCommand extends Command
             return Command::FAILURE;
         }
         if ([] !== $byLevel['warning']) {
-            $this->logger->warning('Alfa TLS certificates: expiring within 30 days', ['certificates' => $byLevel['warning']]);
+            $this->logger->warning('Alfa certificates: expiring within 30 days', ['certificates' => $byLevel['warning']]);
         } else {
-            $this->logger->info('Alfa TLS certificates checked', ['checked' => $checked, 'client_configured' => null !== $clientPath]);
+            $this->logger->info('Alfa certificates checked', ['checked' => $checked, 'client_configured' => null !== $clientPath]);
         }
 
         return Command::SUCCESS;

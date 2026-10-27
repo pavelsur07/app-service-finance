@@ -7,6 +7,7 @@ namespace App\BankSync\Controller;
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Application\SaveBankConnectionAction;
 use App\BankSync\Exception\BankConnectionBusyException;
+use App\BankSync\Exception\BankStaticTokenNotSupportedException;
 use App\BankSync\Form\BankConnectionType;
 use App\BankSync\Repository\BankConnectionRepository;
 use App\Company\Security\ModuleAccess;
@@ -41,7 +42,7 @@ final class ConnectionEditController extends AbstractController
             ?? throw $this->createNotFoundException();
 
         $data = BankConnectionFormData::fromConnection($connection);
-        $form = $this->createForm(BankConnectionType::class, $data, ['is_new' => false]);
+        $form = $this->createForm(BankConnectionType::class, $data, ['is_new' => false, 'static_token' => $connection->getBankCode()->supportsStaticToken()]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -51,6 +52,8 @@ final class ConnectionEditController extends AbstractController
                 return $this->redirectToRoute('bank_sync_connection_index');
             } catch (BankConnectionBusyException) {
                 $form->addError(new FormError('Подключение сейчас обновляется. Сохраните ещё раз через минуту.'));
+            } catch (BankStaticTokenNotSupportedException) {
+                $form->addError(new FormError('Ключ и среду этого банка меняет только новый вход через банк.'));
             }
         }
 

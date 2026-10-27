@@ -86,6 +86,28 @@ final class BankConnectionStatusTransitionTest extends TestCase
         self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $connection->getStatus());
     }
 
+    public function testConsentExpiryIsStoredAsDayAndResetByNewSignIn(): void
+    {
+        $connection = self::connectionIn(BankConnectionStatus::ACTIVE);
+        $connection->recordAuthorizedSubject('user-1');
+        $connection->updateConsentExpiresAt(new \DateTimeImmutable('2027-10-26 15:30:00'));
+
+        self::assertSame('user-1', $connection->getExternalSubject());
+        self::assertEquals(new \DateTimeImmutable('2027-10-26 00:00:00'), $connection->getConsentExpiresAt());
+
+        $connection->reauthorize('{"fresh":true}', 'v1', 'user-2');
+
+        self::assertSame('user-2', $connection->getExternalSubject());
+        self::assertNull($connection->getConsentExpiresAt(), 'новое согласие — новый срок со сверкой');
+    }
+
+    public function testExternalSubjectLengthIsBounded(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        self::connectionIn(BankConnectionStatus::ACTIVE)->recordAuthorizedSubject(str_repeat('a', 256));
+    }
+
     private static function connectionIn(BankConnectionStatus $status): BankConnection
     {
         $connection = new BankConnection('0199f0a0-0000-7000-8000-000000000001', BankCode::ALFA, 'https://bank.example', '{"old":true}', 'v1');

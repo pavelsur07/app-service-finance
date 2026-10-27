@@ -50,6 +50,17 @@ class BankConnection
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $statusChangedAt;
 
+    /**
+     * Идентификатор пользователя у банка, который дал согласие (`sub` из `id_token`):
+     * псевдоним без ФИО. По нему подключение находится в ответе банка о согласиях.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $externalSubject = null;
+
+    /** Последний день действия согласия по данным банка; null — ещё не сверялся. */
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $consentExpiresAt = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -104,11 +115,43 @@ class BankConnection
 
     /**
      * Новый вход клиента (новое согласие или новый токен): из любого статуса в `ACTIVE`.
+     * Срок прежнего согласия больше не действует — новый придёт со сверкой согласий.
+     *
+     * @param string|null $externalSubject `sub` вошедшего пользователя; null — банк его не
+     *                                     сообщает (статический токен)
      */
-    public function reauthorize(string $credentialsEncrypted, string $credentialsKeyVersion): void
+    public function reauthorize(string $credentialsEncrypted, string $credentialsKeyVersion, ?string $externalSubject = null): void
     {
         $this->replaceCredentials($credentialsEncrypted, $credentialsKeyVersion);
+        $this->recordAuthorizedSubject($externalSubject);
         $this->changeStatus(BankConnectionStatus::ACTIVE, null);
+    }
+
+    /**
+     * Вход в новое подключение: кто дал согласие. Срок согласия — со сверкой.
+     */
+    public function recordAuthorizedSubject(?string $externalSubject): void
+    {
+        if (null !== $externalSubject) {
+            Assert::notEmpty($externalSubject);
+            Assert::maxLength($externalSubject, 255);
+        }
+        $this->externalSubject = $externalSubject;
+        $this->consentExpiresAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Срок действующего согласия по данным банка (ночная сверка).
+     */
+    public function updateConsentExpiresAt(\DateTimeImmutable $consentExpiresAt): void
+    {
+        $day = $consentExpiresAt->setTime(0, 0);
+        if ($this->consentExpiresAt == $day) {
+            return;
+        }
+        $this->consentExpiresAt = $day;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
@@ -219,6 +262,16 @@ class BankConnection
     public function getStatusChangedAt(): \DateTimeImmutable
     {
         return $this->statusChangedAt;
+    }
+
+    public function getExternalSubject(): ?string
+    {
+        return $this->externalSubject;
+    }
+
+    public function getConsentExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->consentExpiresAt;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

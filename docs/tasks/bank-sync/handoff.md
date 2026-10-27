@@ -1,43 +1,57 @@
-# bank-sync — handoff Stage 4
+# bank-sync — handoff Stage 5
 
-**Branch:** `feat/bank-sync-stage4` · **PR:** см. описание PR · **CI:** см. PR
+**Branch:** `feat/bank-sync-stage5` · **PR:** см. описание PR · **CI:** см. PR
 
 Поставка B (Stage 4–10, Альфа на проде скрыта). Для пользователей ничего не меняется:
-на проде нет клиентского сертификата Альфы и подключений к ней.
+на проде не заданы переменные Alfa ID — кнопки входа через Альфу нет, подключений 0.
 
 ## Summary of stages
-- Stage 4 — канал до API Альфы по двустороннему TLS: отдельный HTTP-клиент с нашим
-  сертификатом и доверием только к УЦ Минцифры, понятная ошибка, если сертификат не
-  настроен, ночной гейт сроков сертификатов, проба канала, runbook замены без простоя.
-  Подробно — `stages/stage-4.md`, «Итог этапа».
+- Stage 5 — вход клиента через Alfa ID (OIDC): пара приложения и сертификат подписи на
+  каждую среду, `nonce` и проверка `id_token`, `sub` пользователя банка в подключении,
+  отзыв токена при удалении, 403 → «войдите заново», ночная сверка сроков согласий,
+  срок согласия в списке подключений, у Альфы нет формы статического токена.
+  Подробно — `stages/stage-5.md`, «Итог этапа».
 
 ## Files changed
-- `site/src/BankSync/Infrastructure/Bank/Alfa/{AlfaTlsConfig,AlfaHttpClientFactory}.php`,
-  `Infrastructure/Security/PemCertificates.php`, `Exception/BankChannelNotConfiguredException.php`.
-- `site/src/BankSync/Command/{CheckAlfaCertificatesCommand,ProbeAlfaChannelCommand}.php`,
-  `Domain/Certificate/CertificateExpiryPolicy.php`, `Enum/CertificateExpiryLevel.php`.
-- `SyncBankConnectionHandler` — канал не настроен → error без ретраев.
-- `site/config/bank_sync/alfa/ca-bundle.pem` (публичные CA Минцифры), `config/services.yaml`, `site/.env`.
-- `docker/cron/app.cron` — гейт 07:50; `.gitignore` — ключи и архивы сертификатов.
-- Тесты unit/integration; `ARCHITECTURE.md` 2.79, `health-gates.md`, `alfa-demo.md`, `plan.md`.
+- Вход: `Infrastructure/Bank/Alfa/{AlfaIdConfig,AlfaIdEnvironment,AlfaAuthorizationProvider}.php`,
+  `Infrastructure/OAuth/{IdTokenVerifier,OAuthTokenResponse}.php`, `OAuthTokenEndpointClient`
+  (id_token, revoke), `Domain/OAuth/*` (nonce, `AuthorizationGrant`, `revoke()`, `environments()`),
+  Start/Complete Action и контроллеры.
+- Согласия: `Infrastructure/Bank/Alfa/AlfaConsentsClient.php`, `Domain/Consent/*`,
+  `Enum/ConsentState.php`, `Command/SyncAlfaConsentsCommand.php`,
+  `BankConnectionRepository::findConsentCheckTargets()`.
+- Удаление и ошибки: `DeleteBankConnectionAction` (отзыв под блокировкой),
+  `SyncBankConnectionHandler` (403 → `needs_reauth`).
+- UI: форма, New/Edit/Index контроллеры, `index.html.twig` (колонка «Согласие»).
+- `CheckAlfaCertificatesCommand` — сертификаты подписи `id_token`.
+- `Entity/BankConnection.php` + миграция; `config/services.yaml`, `services_test.yaml`,
+  `site/.env` (пустые `ALFA_*`), `docker/cron/app.cron` (07:52).
+- Тесты unit/integration/functional; `ARCHITECTURE.md` 2.80, `health-gates.md`,
+  `alfa-demo.md`, `plan.md`, `stage-4.md` (прод).
 
 ## Migrations
-- Нет.
+- `Version20261027090000`: `bank_sync_connection.external_subject VARCHAR(255) NULL`,
+  `consent_expires_at DATE NULL`. Обратимая, данные не трогает (на проде 0 строк).
 
 ## Public API / contract changes
-- Сервис `bank_sync.alfa.http_client` (ленивый) — у `AlfaApiClient`.
-- Переменные окружения `ALFA_TLS_CERT_PATH`, `ALFA_TLS_KEY_PATH`, `ALFA_TLS_KEY_PASSPHRASE` (необязательные).
-- Команды `bank-sync:alfa:certificates-check` (cron), `bank-sync:alfa:channel-probe --target=sandbox|production`.
+- `BankAuthorizationProviderInterface`: `environments()`, `exchangeCode(..., nonce)` →
+  `AuthorizationGrant`, `revoke()`.
+- Переменные `ALFA_{SANDBOX,PROD}_CLIENT_ID`, `_CLIENT_SECRET`, `_ID_SIGNING_CERT_PATH`
+  (необязательные).
+- Команда `bank-sync:alfa:consents-sync` (cron 07:52).
 
 ## Checks
 - PHPStan полный — 0 ошибок, baseline не изменён; CS и `strict_types` — чисто.
-- unit 4094 — OK; integration + functional 3238 — OK; BankSync 167 — OK.
-- Вживую: mTLS со своим тестовым сервером (TLS 1.2, ключ под паролем) проходит, без сертификата — нет.
+- Полный прогон после правок ревью (unit + integration + functional) — 7423 OK;
+  BankSync 258 — OK; миграция на пустой БД и откат — OK.
 
 ## Reviews
 - internal: done.
-- external: раунд 1 — 3 IMPORTANT, исправлены с тестами; раунд 2 — REVIEW_GREEN.
+- external (Codex, high): раунды 1–2 — 3 IMPORTANT + 1 MINOR, исправлены с тестами;
+  раунд 3 — REVIEW_GREEN.
 
 ## Risks, limitations, follow-ups
-- Проба песочницы Альфы ждёт `test_cert.zip` и пароль от Владельца.
-- На проде гейт проверяет только CA (клиентского сертификата нет до Stage 11).
+- 5.12 песочница ждёт договора, `client_id`/`client_secret`, `test_cert.zip` с паролем и
+  `cer.crt` от Владельца; scope Client Credentials для client-consents (`openid`) в
+  документации не назван — проверить там же.
+- После деплоя: колонки на месте, сверка в cron «не настроено», exit 0.

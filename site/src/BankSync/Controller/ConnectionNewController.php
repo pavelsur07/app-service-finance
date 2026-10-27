@@ -6,6 +6,8 @@ namespace App\BankSync\Controller;
 
 use App\BankSync\Application\DTO\BankConnectionFormData;
 use App\BankSync\Application\SaveBankConnectionAction;
+use App\BankSync\Enum\BankCode;
+use App\BankSync\Exception\BankStaticTokenNotSupportedException;
 use App\BankSync\Exception\BankTokenRequiredException;
 use App\BankSync\Form\BankConnectionType;
 use App\Company\Security\ModuleAccess;
@@ -33,8 +35,12 @@ final class ConnectionNewController extends AbstractController
         if ($request->isMethod('POST')) {
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
+        // Форма — для банков с токеном клиента; Альфа подключается только входом через Alfa ID.
+        $staticTokenBank = array_find(BankCode::cases(), static fn (BankCode $code): bool => $code->supportsStaticToken())
+            ?? throw $this->createNotFoundException();
 
         $data = new BankConnectionFormData();
+        $data->bankCode = $staticTokenBank;
         $form = $this->createForm(BankConnectionType::class, $data, ['is_new' => true]);
         $form->handleRequest($request);
 
@@ -45,6 +51,8 @@ final class ConnectionNewController extends AbstractController
                 return $this->redirectToRoute('bank_sync_connection_index');
             } catch (BankTokenRequiredException) {
                 $form->get('token')->addError(new FormError('Укажите API ключ.'));
+            } catch (BankStaticTokenNotSupportedException) {
+                $form->get('bankCode')->addError(new FormError('Этот банк подключается только входом через банк.'));
             }
         }
 

@@ -9,6 +9,7 @@ use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankStaticTokenNotSupportedException;
 use App\BankSync\Exception\BankTokenRequiredException;
 use App\BankSync\Infrastructure\OAuth\BankConnectionTokenLock;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
@@ -40,6 +41,7 @@ final readonly class SaveBankConnectionAction
      *
      * @throws BankConnectionNotFoundException подключение не принадлежит компании
      * @throws BankTokenRequiredException новое подключение без токена
+     * @throws BankStaticTokenNotSupportedException банк подключается только входом через банк
      * @throws BankConnectionBusyException токены подключения меняет другой процесс
      */
     public function __invoke(string $companyId, BankConnectionFormData $data, ?string $connectionId = null): string
@@ -49,6 +51,9 @@ final readonly class SaveBankConnectionAction
         $token = null !== $data->token && '' !== trim($data->token) ? trim($data->token) : null;
 
         if (null === $connectionId) {
+            if (!$data->bankCode->supportsStaticToken()) {
+                throw new BankStaticTokenNotSupportedException($data->bankCode->value);
+            }
             if (null === $token) {
                 throw new BankTokenRequiredException();
             }
@@ -71,6 +76,10 @@ final readonly class SaveBankConnectionAction
 
         $connection = $this->connections->findOneByIdAndCompanyId($connectionId, $companyId)
             ?? throw new BankConnectionNotFoundException($connectionId);
+        // Подключение по входу через банк: токены и среда — только новым входом, форма — флажок.
+        if (!$connection->getBankCode()->supportsStaticToken() && (null !== $token || $data->baseUrl !== $connection->getBaseUrl())) {
+            throw new BankStaticTokenNotSupportedException($connection->getBankCode()->value);
+        }
         $credentials = null !== $token ? $this->credentialsCodec->encryptStaticToken($token) : null;
 
         if (!$this->tokenLock->acquire($connectionId, self::TOKEN_LOCK_TIMEOUT_SECONDS)) {

@@ -27,10 +27,13 @@ final readonly class PendingAuthorization
         public string $codeVerifier,
         public string $redirectUri,
         public \DateTimeImmutable $expiresAt,
+        #[\SensitiveParameter]
+        public string $nonce,
     ) {
         Assert::uuid($state);
         Assert::uuid($companyId);
         Assert::uuid($connectionId);
+        Assert::notEmpty($nonce);
     }
 
     public function isExpired(\DateTimeImmutable $now): bool
@@ -53,6 +56,7 @@ final readonly class PendingAuthorization
             'code_verifier' => $this->codeVerifier,
             'redirect_uri' => $this->redirectUri,
             'expires_at' => $this->expiresAt->format(\DATE_ATOM),
+            'nonce' => $this->nonce,
         ];
     }
 
@@ -72,6 +76,7 @@ final readonly class PendingAuthorization
                 (string) $data['code_verifier'],
                 (string) $data['redirect_uri'],
                 new \DateTimeImmutable((string) $data['expires_at']),
+                (string) $data['nonce'],
             );
         } catch (\Throwable) {
             return null;

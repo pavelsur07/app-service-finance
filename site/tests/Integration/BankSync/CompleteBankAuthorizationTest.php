@@ -39,6 +39,7 @@ final class CompleteBankAuthorizationTest extends IntegrationTestCase
             $pkce->verifier,
             'http://localhost/bank-connections/oauth/callback',
             new \DateTimeImmutable('-1 second'),
+            'test-nonce',
         );
         $store = self::getContainer()->get(AuthorizationSessionStore::class);
         $store->save($pending, new \DateTimeImmutable('-11 minutes'));

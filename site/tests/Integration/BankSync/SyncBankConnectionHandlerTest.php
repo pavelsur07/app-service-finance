@@ -15,6 +15,7 @@ use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Enum\BankDirection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Infrastructure\Bank\BankProviderRegistry;
@@ -200,12 +201,47 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
 
     public function testBankRejectionIsUnrecoverable(): void
     {
-        // 403 — у токена нет scope: повторный вход того же набора не поможет. 401 — отдельно.
-        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 403);
+        // 400 — запрос, которого банк не принимает: ошибка адаптера, ретраи не помогут.
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 400);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
 
         $this->handle();
+    }
+
+    public function testForbiddenMarksNeedsReauthWithoutRetryOrError(): void
+    {
+        // 403 — сервис не входит в права токена: обновление не поможет, нужен вход с правами.
+        $this->useOAuth('+30 minutes');
+        $this->bank->accountsFailure = new BankApiRequestFailedException('alfa', 403);
+
+        $this->handle();
+
+        self::assertSame(BankConnectionStatus::NEEDS_REAUTH, $this->reloadConnection()->getStatus());
+        self::assertSame('insufficient_scope', $this->reloadConnection()->getStatusReason());
+        self::assertSame(0, StubBankAuthorizationProvider::$refreshCalls, 'обновление токена не поможет');
+        self::assertFalse($this->logs->hasErrorRecords());
+        self::assertTrue($this->logs->hasWarningThatContains('connection needs reauthorization'));
+        self::assertNotNull($this->requireLastImportLog()['finished_at'], 'журнал закрыт');
+
+        $this->bank->accountsListed = false;
+        $this->handle();
+        self::assertFalse($this->bank->accountsListed, 'следующее сообщение пропускает подключение');
+    }
+
+    public function testUnconfiguredSignInDuringRefreshIsUnrecoverableWithOneError(): void
+    {
+        $this->useOAuth('+2 minutes');
+        StubBankAuthorizationProvider::$refreshFailure = new BankAuthorizationNotConfiguredException('alfa', 'ALFA_PROD_CLIENT_ID is not set');
+
+        try {
+            $this->handle();
+            self::fail('misconfigured sign-in must not be retried');
+        } catch (UnrecoverableMessageHandlingException) {
+        }
+
+        self::assertCount(1, array_filter($this->logs->getRecords(), static fn ($record): bool => $record->level->value >= 400));
+        self::assertSame(BankConnectionStatus::ACTIVE, $this->reloadConnection()->getStatus(), 'не needs_reauth: чинить нам, а не клиенту');
     }
 
     public function testUnconfiguredBankChannelIsUnrecoverableWithOneErrorAndClosedLog(): void
@@ -292,7 +328,6 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
         $tokens = $this->storedTokens();
         self::assertSame('refreshed-access-1', $tokens->accessToken);
         self::assertSame('refreshed-refresh-1', $tokens->refreshToken, 'новый refresh сохранён');
-        self::assertNotNull($tokens->consentExpiresAt, 'срок согласия переживает обновление');
         self::assertTrue($this->logs->hasInfoThatContains('OAuth tokens refreshed'));
         $this->assertNoSensitiveDataInLogs();
     }
@@ -451,7 +486,6 @@ final class SyncBankConnectionHandlerTest extends IntegrationTestCase
             'oauth-access',
             'oauth-refresh',
             new \DateTimeImmutable($accessExpiresIn),
-            new \DateTimeImmutable('+300 days'),
         ));
         $this->bankConnection->reauthorize($credentials->storageJson, $credentials->keyVersion);
         $this->em->flush();

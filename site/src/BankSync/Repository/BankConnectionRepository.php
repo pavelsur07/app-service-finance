@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\BankSync\Repository;
 
+use App\BankSync\Domain\Consent\ConsentCheckTarget;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankConnectionStatus;
@@ -73,6 +74,40 @@ final class BankConnectionRepository extends ServiceEntityRepository
             ->orderBy('c.companyId', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Снимки подключений среды банка, у которых известен пользователь банка и есть что
+     * сверять (отозванные ждут нового входа). Без гидрации сущностей: сверка держит в памяти
+     * только снимки, а меняет по одной перечитанной строке.
+     *
+     * @companyScopeExempt CLI `bank-sync:alfa:consents-sync` сверяет согласия всех компаний одним ответом банка; меняет только срок и статус найденных подключений
+     *
+     * @return list<ConsentCheckTarget>
+     */
+    public function findConsentCheckTargets(BankCode $bankCode, string $baseUrl): array
+    {
+        /** @var list<array{id: string, companyId: string, externalSubject: string, consentExpiresAt: ?\DateTimeImmutable, credentialsEncrypted: string}> $rows */
+        $rows = $this->createQueryBuilder('c')
+            ->select('c.id', 'c.companyId', 'c.externalSubject', 'c.consentExpiresAt', 'c.credentialsEncrypted')
+            ->andWhere('c.bankCode = :bankCode')
+            ->andWhere('c.baseUrl = :baseUrl')
+            ->andWhere('c.externalSubject IS NOT NULL')
+            ->andWhere('c.status <> :revoked')
+            ->setParameter('bankCode', $bankCode->value)
+            ->setParameter('baseUrl', $baseUrl)
+            ->setParameter('revoked', BankConnectionStatus::REVOKED->value)
+            ->orderBy('c.id', \SortDirection::Ascending)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): ConsentCheckTarget => new ConsentCheckTarget(
+            $row['id'],
+            $row['companyId'],
+            $row['externalSubject'],
+            $row['consentExpiresAt']?->format('Y-m-d'),
+            $row['credentialsEncrypted'],
+        ), $rows);
     }
 
     /**

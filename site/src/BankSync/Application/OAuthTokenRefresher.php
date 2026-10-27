@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\BankSync\Application;
 
-use App\BankSync\Domain\OAuth\OAuthTokens;
 use App\BankSync\Entity\BankConnection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\UnknownBankCodeException;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
 use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
@@ -58,6 +59,8 @@ final readonly class OAuthTokenRefresher
      * @throws BankApiUnavailableException
      * @throws BankApiRequestFailedException
      * @throws UnknownBankCodeException у банка нет провайдера авторизации
+     * @throws BankAuthorizationNotConfiguredException вход в среде банка не настроен
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws DecryptionException|InvalidEncryptedPayloadException|MissingEncryptionKeyException
      */
     public function refreshIfNeeded(BankConnection $connection, #[\SensitiveParameter] ?string $rejectedAccessToken = null): bool
@@ -78,7 +81,6 @@ final readonly class OAuthTokenRefresher
         $fresh = $this->providers->get($connection->getBankCode())
             ->refresh($connection->getBaseUrl(), $tokens->refreshToken)
             ->withFallbackRefreshToken($tokens->refreshToken);
-        $fresh = new OAuthTokens($fresh->accessToken, $fresh->refreshToken, $fresh->accessExpiresAt, $fresh->consentExpiresAt ?? $tokens->consentExpiresAt);
 
         $credentials = $this->credentialsCodec->encryptOAuthTokens($fresh);
         $connection->replaceCredentials($credentials->storageJson, $credentials->keyVersion);

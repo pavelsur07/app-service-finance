@@ -64,6 +64,9 @@ services:
         factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
         public: true
 
-    # Заглушка входа в банк по OAuth: у Альфы до Stage 5 провайдера авторизации нет.
-    App\Tests\Support\BankSync\StubBankAuthorizationProvider:
-        tags: ['bank_sync.authorization_provider']
+    # Вход в Альфу в тестах — заглушка авторизационного сервера на месте провайдера Альфы.
+    # Сам провайдер покрыт unit-тестами (MockHttpClient).
+    App\BankSync\Infrastructure\Bank\Alfa\AlfaAuthorizationProvider:
+        class: App\Tests\Support\BankSync\StubBankAuthorizationProvider
+        autowire: false
+        arguments: []

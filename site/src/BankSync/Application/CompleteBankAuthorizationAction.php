@@ -9,10 +9,13 @@ use App\BankSync\Entity\BankConnection;
 use App\BankSync\Exception\BankApiRequestFailedException;
 use App\BankSync\Exception\BankApiUnavailableException;
 use App\BankSync\Exception\BankAuthorizationDeniedException;
+use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
+use App\BankSync\Exception\BankChannelNotConfiguredException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
+use App\BankSync\Exception\BankIdTokenInvalidException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
 use App\BankSync\Infrastructure\OAuth\AuthorizationStateClaims;
 use App\BankSync\Infrastructure\OAuth\BankAuthorizationProviderRegistry;
@@ -55,6 +58,9 @@ final readonly class CompleteBankAuthorizationAction
      * @throws BankAuthorizationStateInvalidException
      * @throws BankAuthorizationDeniedException
      * @throws BankAuthorizationRejectedException код или verifier отвергнут банком
+     * @throws BankIdTokenInvalidException `id_token` не прошёл проверку
+     * @throws BankAuthorizationNotConfiguredException вход в среде банка не настроен
+     * @throws BankChannelNotConfiguredException канал до банка (mTLS) не настроен
      * @throws BankApiUnavailableException
      * @throws BankApiRequestFailedException
      * @throws BankConnectionNotFoundException переподключаемое удалили, пока клиент был в банке
@@ -127,22 +133,32 @@ final readonly class CompleteBankAuthorizationAction
         }
 
         try {
-            $tokens = $this->providers->get($pending->bankCode)
-                ->exchangeCode($pending->baseUrl, $code, $pending->codeVerifier, $pending->redirectUri);
+            $grant = $this->providers->get($pending->bankCode)
+                ->exchangeCode($pending->baseUrl, $code, $pending->codeVerifier, $pending->redirectUri, $pending->nonce);
         } catch (BankApiRequestFailedException $exception) {
             // Не отказ клиента, а наша настройка или формат банка: вход не работает ни у кого.
             $this->logger->error('Bank authorization: token exchange failed', $context + ['status_code' => $exception->getStatusCode() ?? 'none']);
 
             throw $exception;
-        }
-        $credentials = $this->credentialsCodec->encryptOAuthTokens($tokens);
+        } catch (BankAuthorizationNotConfiguredException|BankChannelNotConfiguredException $exception) {
+            $this->logger->error('Bank authorization: bank sign-in is not configured', $context + ['problem' => $exception->getMessage()]);
 
-        $this->entityManager->wrapInTransaction(function () use ($pending, $credentials): void {
+            throw $exception;
+        } catch (BankIdTokenInvalidException $exception) {
+            // Подделка или банк сменил ключ подписи, а сертификат у нас старый — разбирает человек.
+            $this->logger->error('Bank authorization: id_token verification failed', $context + ['reason' => $exception->reason]);
+
+            throw $exception;
+        }
+        $credentials = $this->credentialsCodec->encryptOAuthTokens($grant->tokens);
+        $externalSubject = $grant->externalSubject;
+
+        $this->entityManager->wrapInTransaction(function () use ($pending, $credentials, $externalSubject): void {
             // Под блокировкой строку никто не менял с проверки выше; удалить подключение
             // блокировка не мешает — тогда NotFound и откат.
             $connection = $this->connections->findOneByIdAndCompanyId($pending->connectionId, $pending->companyId);
             if (null !== $connection) {
-                $connection->reauthorize($credentials->storageJson, $credentials->keyVersion);
+                $connection->reauthorize($credentials->storageJson, $credentials->keyVersion, $externalSubject);
 
                 return;
             }
@@ -150,14 +166,16 @@ final readonly class CompleteBankAuthorizationAction
                 throw new BankConnectionNotFoundException($pending->connectionId);
             }
 
-            $this->connections->add(new BankConnection(
+            $connection = new BankConnection(
                 $pending->companyId,
                 $pending->bankCode,
                 $pending->baseUrl,
                 $credentials->storageJson,
                 $credentials->keyVersion,
                 $pending->connectionId,
-            ));
+            );
+            $connection->recordAuthorizedSubject($externalSubject);
+            $this->connections->add($connection);
         });
     }
 }

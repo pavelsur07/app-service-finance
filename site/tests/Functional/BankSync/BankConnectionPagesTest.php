@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\BankSync;
 
+use App\BankSync\Domain\OAuth\OAuthTokens;
+use App\BankSync\Entity\BankConnection;
+use App\BankSync\Infrastructure\Security\BankCredentialsCodec;
 use App\BankSync\Message\SyncBankConnectionMessage;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -11,12 +14,16 @@ use App\Company\Entity\CompanyRole;
 use App\Company\Entity\User;
 use App\Company\Security\AccessLevel;
 use App\Company\Security\Module;
+use App\Shared\Security\Contract\FieldEncryptionServiceInterface;
+use App\Tests\Builders\BankSync\BankConnectionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\BankSync\StubBankAuthorizationProvider;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DomCrawler\Field\ChoiceFormField;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class BankConnectionPagesTest extends WebTestCaseBase
@@ -29,6 +36,7 @@ final class BankConnectionPagesTest extends WebTestCaseBase
     protected function setUp(): void
     {
         parent::setUp();
+        StubBankAuthorizationProvider::reset();
 
         $this->client = static::createClient();
         $owner = UserBuilder::aUser()
@@ -44,38 +52,26 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         $this->loginAs($owner);
     }
 
-    public function testCreateEditEnqueueAndDeleteConnection(): void
+    public function testAlfaHasNoStaticTokenForm(): void
     {
-        $crawler = $this->client->request('GET', '/bank-connections/new');
+        $crawler = $this->client->request('GET', '/bank-connections/');
         self::assertResponseIsSuccessful();
-        $this->client->submit($crawler->selectButton('Создать')->form([
-            'bank_connection[baseUrl]' => 'https://sandbox.alfabank.ru',
-            'bank_connection[token]' => self::TOKEN,
-        ]));
-        self::assertResponseRedirects('/bank-connections/');
+        self::assertCount(0, $crawler->filter('a[href="/bank-connections/new"]'), 'Альфа подключается только входом через Alfa ID');
 
-        $row = $this->connectionRow();
-        self::assertSame('https://sandbox.alfabank.ru', $row['base_url']);
-        self::assertStringNotContainsString(self::TOKEN, (string) json_encode($row, \JSON_THROW_ON_ERROR));
-        $ciphertext = $row['credentials_encrypted'];
+        $this->client->request('GET', '/bank-connections/new');
+        self::assertResponseStatusCodeSame(404);
+    }
 
-        $this->client->request('GET', '/bank-connections/');
+    public function testEditEnqueueAndDeleteOAuthConnection(): void
+    {
+        $connection = $this->persistOAuthConnection();
+        $id = $connection->getId();
+        $ciphertext = $this->connectionRow()['credentials_encrypted'];
+
+        $crawler = $this->client->request('GET', sprintf('/bank-connections/%s/edit', $id));
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('table', 'Альфа-Банк');
-        self::assertStringNotContainsString(self::TOKEN, (string) $this->client->getResponse()->getContent());
-
-        // Пустой ключ при редактировании оставляет прежний.
-        $crawler = $this->client->request('GET', sprintf('/bank-connections/%s/edit', $row['id']));
-        self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString(self::TOKEN, (string) $this->client->getResponse()->getContent());
-        $this->client->submit($crawler->selectButton('Сохранить')->form([
-            'bank_connection[baseUrl]' => 'https://baas.alfabank.ru',
-            'bank_connection[token]' => '',
-        ]));
-        self::assertResponseRedirects('/bank-connections/');
-        $edited = $this->connectionRow();
-        self::assertSame('https://baas.alfabank.ru', $edited['base_url']);
-        self::assertSame($ciphertext, $edited['credentials_encrypted']);
+        self::assertCount(0, $crawler->filter('input[name="bank_connection[token]"]'), 'поля токена нет');
+        self::assertCount(1, $crawler->filter('select[name="bank_connection[baseUrl]"][disabled]'), 'среда — только новым входом');
 
         $crawler = $this->client->request('GET', '/bank-connections/');
         $this->client->submit($crawler->selectButton('Запустить импорт сейчас')->form());
@@ -88,25 +84,61 @@ final class BankConnectionPagesTest extends WebTestCaseBase
             static fn (object $message): bool => $message instanceof SyncBankConnectionMessage,
         ));
         self::assertCount(1, $sent);
-        self::assertSame($row['id'], $sent[0]->connectionId);
+        self::assertSame($id, $sent[0]->connectionId);
         self::assertSame((string) $this->company->getId(), $sent[0]->companyId);
 
+        $crawler = $this->client->request('GET', sprintf('/bank-connections/%s/edit', $id));
+        $form = $crawler->selectButton('Сохранить')->form();
+        $isActive = $form['bank_connection[isActive]'];
+        self::assertInstanceOf(ChoiceFormField::class, $isActive);
+        $isActive->untick();
+        $this->client->submit($form);
+        self::assertResponseRedirects('/bank-connections/');
+        $edited = $this->connectionRow();
+        self::assertSame('disabled', $edited['status']);
+        self::assertSame('https://sandbox.alfabank.ru', $edited['base_url']);
+        self::assertSame($ciphertext, $edited['credentials_encrypted']);
+
         $crawler = $this->client->request('GET', '/bank-connections/');
-        $this->client->submit($crawler->filter(sprintf('form[action="/bank-connections/%s/delete"]', $row['id']))->form());
+        $this->client->submit($crawler->filter(sprintf('form[action="/bank-connections/%s/delete"]', $id))->form());
         self::assertResponseRedirects('/bank-connections/');
         self::assertFalse($this->connectionRowOrFalse());
+        self::assertSame(['oauth-refresh'], StubBankAuthorizationProvider::$revoked, 'токен отозван в банке');
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.toast-body', 'Подключение удалено');
     }
 
-    public function testNewConnectionRequiresToken(): void
+    public function testCraftedTokenOrEnvironmentForAlfaIsRejected(): void
     {
-        $crawler = $this->client->request('GET', '/bank-connections/new');
-        $this->client->submit($crawler->selectButton('Создать')->form([
-            'bank_connection[token]' => '   ',
-        ]));
+        $connection = $this->persistOAuthConnection();
+        $before = $this->connectionRow();
+        $crawler = $this->client->request('GET', sprintf('/bank-connections/%s/edit', $connection->getId()));
+        $token = $crawler->filter('input[name="bank_connection[_token]"]')->attr('value');
 
-        self::assertResponseStatusCodeSame(422);
-        self::assertStringContainsString('Укажите API ключ.', (string) $this->client->getResponse()->getContent());
-        self::assertFalse($this->connectionRowOrFalse());
+        $this->client->request('POST', sprintf('/bank-connections/%s/edit', $connection->getId()), ['bank_connection' => [
+            '_token' => $token,
+            'isActive' => '1',
+            'token' => self::TOKEN,
+        ]]);
+
+        self::assertSame($before['credentials_encrypted'], $this->connectionRow()['credentials_encrypted'], 'лишнее поле формы не превращает OAuth в статический токен');
+        $this->client->request('POST', '/bank-connections/new', ['bank_connection' => ['token' => self::TOKEN]]);
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame($before['credentials_encrypted'], $this->connectionRow()['credentials_encrypted']);
+    }
+
+    public function testConsentExpiryAndReconnectAreShown(): void
+    {
+        $connection = $this->persistOAuthConnection();
+        $connection->recordAuthorizedSubject('user-1');
+        $connection->updateConsentExpiresAt(new \DateTimeImmutable('+10 days'));
+        $this->em()->flush();
+
+        $crawler = $this->client->request('GET', '/bank-connections/');
+
+        self::assertSelectorTextContains('table', 'до '.(new \DateTimeImmutable('+10 days'))->format('d.m.Y'));
+        self::assertSelectorTextContains('table', 'Согласие скоро истечёт');
+        self::assertCount(1, $crawler->filter(sprintf('form[action="/bank-connections/oauth/start"] input[name="connection_id"][value="%s"]', $connection->getId())));
     }
 
     public function testReadOnlyMemberSeesPageButCannotCreate(): void
@@ -135,6 +167,38 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         $this->client->request('POST', '/bank-connections/new', ['bank_connection' => ['token' => self::TOKEN]]);
         self::assertResponseStatusCodeSame(403);
         self::assertFalse($this->connectionRowOrFalse());
+    }
+
+    public function testForeignConnectionDeleteIs404AndNotRevoked(): void
+    {
+        $otherOwner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('bank-pages-other@example.test')->build();
+        $otherCompany = CompanyBuilder::aCompany()->withId(Uuid::uuid4()->toString())->withOwner($otherOwner)->build();
+        $this->em()->persist($otherOwner);
+        $this->em()->persist($otherCompany);
+        $this->em()->flush();
+        $foreign = $this->persistOAuthConnection((string) $otherCompany->getId());
+
+        $this->client->request('POST', sprintf('/bank-connections/%s/delete', $foreign->getId()), ['_token' => 'any']);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame([], StubBankAuthorizationProvider::$revoked);
+        self::assertNotFalse($this->em()->getConnection()->fetchOne('SELECT id FROM bank_sync_connection WHERE id = :id', ['id' => $foreign->getId()]));
+    }
+
+    private function persistOAuthConnection(?string $companyId = null): BankConnection
+    {
+        /** @var FieldEncryptionServiceInterface $encryption */
+        $encryption = self::getContainer()->get(FieldEncryptionServiceInterface::class);
+        $connection = BankConnectionBuilder::aConnection()
+            ->withId(Uuid::uuid7()->toString())
+            ->withCompanyId($companyId ?? (string) $this->company->getId())
+            ->withBaseUrl('https://sandbox.alfabank.ru')
+            ->withCredentials((new BankCredentialsCodec($encryption))->encryptOAuthTokens(new OAuthTokens('oauth-access', 'oauth-refresh', new \DateTimeImmutable('+1 hour'))))
+            ->build();
+        $this->em()->persist($connection);
+        $this->em()->flush();
+
+        return $connection;
     }
 
     private function loginAs(User $user): void
