@@ -1,0 +1,619 @@
+/* Страница «Операция ДДС» (transaction/edit.html.twig).
+   Эталон: docs/design-system/DDS-OPERATION-SPEC.md §2, §4, §5; dds-refs/01–10.
+   Цвета — только токены `--vf-*`; поле-выбор — `.dds-field` из components/dds-pickers.css. */
+
+.dds-op {
+  color: var(--vf-text);
+}
+
+/* ---------- Шапка ---------- */
+.dds-op__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dds-op__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.dds-op__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+.dds-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface-alt);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dds-badge[hidden] {
+  display: none;
+}
+
+.dds-badge--in {
+  border-color: var(--vf-ok-border);
+  background: var(--vf-ok-bg);
+  color: var(--vf-ok-text);
+}
+
+.dds-badge--bank {
+  border-color: var(--vf-info-border);
+  background: var(--vf-info-bg);
+  color: var(--vf-info-text);
+}
+
+.dds-badge--deleted {
+  border-color: var(--vf-danger-border);
+  background: var(--vf-danger-bg);
+  color: var(--vf-danger-text);
+}
+
+.dds-badge--dirty {
+  border-color: var(--vf-warn-border);
+  background: var(--vf-warn-bg);
+  color: var(--vf-warn-text);
+  font-weight: 500;
+}
+
+/* Вторичная кнопка DS: 36px, граница, белый фон. */
+.dds-op__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface);
+  color: var(--vf-text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dds-op__btn:hover {
+  background: var(--vf-hover-bg);
+  color: var(--vf-text);
+}
+
+.dds-op .btn:focus-visible,
+.dds-op a:focus-visible,
+.dds-op input:focus-visible,
+.dds-op select:focus-visible,
+.dds-op textarea:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* ---------- Плашки ---------- */
+.dds-op__banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface-alt);
+  color: var(--vf-text-muted);
+}
+
+.dds-op__banner strong {
+  color: var(--vf-text);
+}
+
+.dds-op__banner--warn {
+  border-color: var(--vf-warn-border);
+  background: var(--vf-warn-bg);
+}
+
+.dds-op__banner--info {
+  display: block;
+}
+
+.dds-op__summary {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--vf-danger-border);
+  border-radius: var(--vf-radius);
+  background: var(--vf-danger-bg);
+  color: var(--vf-danger-text);
+}
+
+.dds-op__summary[hidden] {
+  display: none;
+}
+
+.dds-op__summary ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.dds-op__summary:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- Раскладка ---------- */
+.dds-op__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 24px;
+}
+
+.dds-op__main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.dds-op__form,
+.dds-op__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dds-op__aside {
+  position: sticky;
+  top: 16px;
+}
+
+/* ---------- Карточка ---------- */
+.dds-card {
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface);
+  box-shadow: var(--vf-shadow-xs);
+}
+
+.dds-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--vf-border);
+}
+
+.dds-card__title {
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vf-border);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.dds-card__head .dds-card__title {
+  padding: 4px 0;
+  border-bottom: 0;
+}
+
+.dds-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  padding: 20px;
+}
+
+.dds-card__empty {
+  margin: 0;
+  padding: 16px 20px;
+  color: var(--vf-text-muted);
+}
+
+/* ---------- Поля ---------- */
+.dds-op__field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dds-op__field--wide {
+  grid-column: 1 / -1;
+}
+
+.dds-op__label {
+  display: block;
+  float: none;
+  width: auto;
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.dds-op__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dds-op__counter,
+.dds-op__hint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--vf-text-muted);
+}
+
+.dds-op__hint {
+  margin-top: 4px;
+}
+
+.dds-op__counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.dds-op__input.form-control,
+.dds-op__input.form-select {
+  min-height: 36px;
+  border-color: var(--vf-border-strong);
+  border-radius: var(--vf-radius);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.dds-op__input.is-invalid {
+  border-color: var(--vf-danger-text);
+  box-shadow: inset 0 0 0 1px var(--vf-danger-text);
+}
+
+.dds-op__fieldset:disabled .dds-op__input,
+.dds-op__input:disabled {
+  background: var(--vf-surface-alt);
+  color: var(--vf-text-muted);
+}
+
+.dds-op .invalid-feedback {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--vf-danger-text);
+}
+
+.dds-op .invalid-feedback:empty {
+  display: none !important;
+}
+
+/* Направление — segmented radio. */
+.dds-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.dds-seg__opt {
+  position: relative;
+  margin: 0;
+}
+
+.dds-seg__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dds-seg__text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border: 1px solid var(--vf-border-strong);
+  background: var(--vf-surface);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dds-seg__opt:first-child .dds-seg__text {
+  border-radius: var(--vf-radius) 0 0 var(--vf-radius);
+}
+
+.dds-seg__opt:last-child .dds-seg__text {
+  margin-left: -1px;
+  border-radius: 0 var(--vf-radius) var(--vf-radius) 0;
+}
+
+.dds-seg__text:hover {
+  background: var(--vf-hover-bg);
+}
+
+.dds-seg__input:focus-visible + .dds-seg__text {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+}
+
+.dds-seg__opt--in .dds-seg__input:checked + .dds-seg__text {
+  position: relative;
+  border-color: var(--vf-ok-text);
+  background: var(--vf-ok-bg);
+  color: var(--vf-ok-text);
+}
+
+.dds-seg__opt--out .dds-seg__input:checked + .dds-seg__text {
+  position: relative;
+  border-color: var(--vf-primary);
+  background: var(--vf-primary-lt);
+  color: var(--vf-primary);
+}
+
+.dds-seg__input:disabled + .dds-seg__text {
+  background: var(--vf-surface-alt);
+  color: var(--vf-text-muted);
+  cursor: default;
+}
+
+/* Сумма: вправо, tabular, знак валюты в «кармашке» справа. */
+.dds-amount {
+  position: relative;
+}
+
+.dds-amount__input.form-control {
+  padding-right: 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dds-amount__cur {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-left: 1px solid var(--vf-border);
+  color: var(--vf-text-muted);
+  pointer-events: none;
+}
+
+/* Проект и Контрагент: прежние пикеры (логика без изменений) в виде `.dds-field`. */
+.dds-op__picker .input-group {
+  flex-wrap: nowrap;
+  height: 36px;
+  border: 1px solid var(--vf-border-strong);
+  border-radius: var(--vf-radius);
+  background: var(--vf-surface);
+}
+
+.dds-op__picker .input-group:focus-within {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+}
+
+.dds-op__picker .input-group > .form-control {
+  height: 34px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.dds-op__picker .input-group > .form-control:focus-visible {
+  outline: none;
+}
+
+.dds-op__picker .input-group > .btn,
+.dds-op__picker .input-group > .input-group-text {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--vf-border);
+  border-radius: 0;
+  background: none;
+  color: var(--vf-text-muted);
+  justify-content: center;
+}
+
+.dds-op__picker .input-group > .btn:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.dds-op__picker .input-group > .btn:hover {
+  background: var(--vf-ghost-hover-bg);
+  color: var(--vf-text);
+}
+
+.dds-op__picker .input-group > .btn:disabled,
+.dds-op__picker .cp-selected-mark {
+  display: none;
+}
+
+/* ---------- Сведения ---------- */
+.dds-info {
+  margin: 0;
+  padding: 12px 20px;
+}
+
+.dds-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.dds-info dt {
+  font-weight: 400;
+  color: var(--vf-text-muted);
+}
+
+.dds-info dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dds-info__note {
+  margin: 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--vf-border);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--vf-text-muted);
+}
+
+/* ---------- Панель действий ---------- */
+.dds-op__bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 12px 0;
+  border-top: 1px solid var(--vf-border);
+  background: var(--vf-surface);
+}
+
+.dds-op__status {
+  font-size: 13px;
+  color: var(--vf-text-muted);
+}
+
+.dds-op[data-dirty] .dds-op__status {
+  color: var(--vf-warn-text);
+}
+
+.dds-op__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dds-op__save {
+  height: 36px;
+  font-weight: 500;
+}
+
+/* ---------- Адаптив (SPEC §5) ---------- */
+@media (max-width: 1340px) {
+  .dds-op__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dds-op__aside {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .dds-card__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dds-op__head {
+    flex-wrap: wrap;
+  }
+
+  .dds-op__title {
+    font-size: 20px;
+    line-height: 28px;
+  }
+
+  .dds-op__banner,
+  .dds-card__head {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------- Документы ОПиУ ---------- */
+.dds-docs {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dds-docs thead th {
+  background: var(--vf-surface-alt);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vf-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.dds-docs__muted {
+  font-size: 12px;
+  color: var(--vf-text-muted);
+}
+
+.dds-docs__open {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vf-primary);
+}
+
+.dds-docs__total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--vf-border);
+  background: var(--vf-surface-alt);
+  border-radius: 0 0 var(--vf-radius) var(--vf-radius);
+}
+
+.dds-badge--rest-full {
+  border-color: var(--vf-ok-border);
+  background: var(--vf-ok-bg);
+  color: var(--vf-ok-text);
+}
+
+.dds-badge--rest-partial {
+  border-color: var(--vf-warn-border);
+  background: var(--vf-warn-bg);
+  color: var(--vf-warn-text);
+}
+
+.dds-badge--rest-over {
+  border-color: var(--vf-danger-border);
+  background: var(--vf-danger-bg);
+  color: var(--vf-danger-text);
+}
+
+.dds-badge--rest-none {
+  color: var(--vf-text-muted);
+}
+
+@media (max-width: 760px) {
+  .dds-docs__desc {
+    display: none;
+  }
+}

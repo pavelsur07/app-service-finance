@@ -103,7 +103,7 @@ final class CashTransactionCategoryTreeTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/finance/cash-transactions/'.$tx->getId().'/edit');
         self::assertResponseIsSuccessful();
 
-        $picker = $crawler->filter('[data-dds-picker]');
+        $picker = $crawler->filterXPath('//div[@data-dds-picker][.//select[@name="cash_transaction[cashflowCategory]"]]');
         self::assertCount(1, $picker);
         self::assertCount(1, $picker->filter('select[name="cash_transaction[cashflowCategory]"].dds-picker__native'));
         self::assertSame('[name="cash_transaction[direction]"]', $picker->attr('data-direction-source'));

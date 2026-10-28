@@ -28,6 +28,7 @@ use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\Document;
 use App\Finance\Exception\DocumentForeignReferenceException;
 use App\Shared\Audit\AuditContextProvider;
+use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
@@ -426,11 +427,16 @@ class CashTransactionController extends AbstractController
             }
         }
 
+        // «Разнесено в ОПиУ» — в Money по суммам операций документов, как и лимит создания документа.
+        $allocated = $tx->recalculateAllocatedAmount()->getAllocatedMoney();
+
         return $this->render('transaction/edit.html.twig', [
             'form' => $form->createView(),
             'tx' => $tx,
             'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
             'pnlDocuments' => $this->getDocumentsForTransaction($tx),
+            'pnlAllocated' => $allocated->toDecimalString(),
+            'pnlUnallocated' => Money::fromString($tx->getAmount(), $tx->getCurrency())->subtract($allocated)->toDecimalString(),
         ], new Response(status: $form->isSubmitted() && !$form->isValid() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
     }
 
