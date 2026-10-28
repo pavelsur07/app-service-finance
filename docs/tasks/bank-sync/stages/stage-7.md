@@ -145,8 +145,10 @@ site/src/BankSync/
 ## 6. Чек-лист приёмки
 
 Прод Stage 5/6 (7.0)
-- [ ] `consents-sync` 28.10: «not configured», exit 0, без `error` в GlitchTip.
-- [ ] гейт сертификатов ночью без `error`; пункты «Прод»/«CI» Stage 5 и 6 отмечены.
+- [x] `consents-sync` 28.10: «not configured», exit 0, без `error` в GlitchTip (07:52 после
+      перезапуска scheduler деплоем в 07:37: событий «exit status» и новых issue нет).
+- [x] гейт сертификатов ночью без `error`; пункты «Прод»/«CI» Stage 5 и 6 отмечены (кроме
+      проверки страницы под пользователем в `stage-5.md`).
 
 Доступ к песочнице (functional)
 - [x] не-администратор не видит кнопку песочницы; POST старта со средой песочницы → 403,
@@ -188,15 +190,15 @@ site/src/BankSync/
 Архитектура
 - [x] HTTP вне транзакций; команда проверки без `flush()`; номера счетов не в
       `warning`/`error`; PHPStan level 8 без роста baseline; CS, strict_types.
-- [ ] изменение `deploy.yml`/compose — HIGH-LOCAL: усиленное ревью, проверка на
-      деплое без секретов.
+- [x] изменение `deploy.yml`/compose — HIGH-LOCAL: усиленное ревью, проверка на
+      деплое без секретов (секретов `ALFA_*` в GitHub нет; деплои 31754ef2 и четыре следующих — success).
 
 Документация
 - [x] `ARCHITECTURE.md` (обороты, команда проверки, доступ к песочнице), `alfa-demo.md`,
       §4 и «История плана».
 
 Гейты и ревью
-- [ ] unit, integration, functional зелёные; внутреннее и внешнее (Codex) ревью; CI PR.
+- [x] unit, integration, functional зелёные; внутреннее и внешнее (Codex) ревью; CI PR (#2805: 14 проверок pass).
 
 Прод (после деплоя 7A, read-only)
 - [ ] контейнеры на новой версии, `/bank-connections/` открывается, кнопок Альфы нет,
