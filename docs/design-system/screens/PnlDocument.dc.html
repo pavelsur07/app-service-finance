@@ -62,9 +62,43 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
 .err{color:var(--danger);font-size:12px;margin-top:4px}
 .hint{color:var(--muted);font-size:12px;margin-top:4px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04)}
-.ln{display:grid;grid-template-columns:104px minmax(160px,1.5fr) minmax(130px,1fr) minmax(130px,1fr) 136px 76px;gap:12px;align-items:start}
+.ln{display:grid;grid-template-columns:104px minmax(220px,1.8fr) minmax(130px,1fr) minmax(130px,1fr) 136px 76px;gap:12px;align-items:start}
 @media (max-width:1180px){.ln{grid-template-columns:96px minmax(120px,1.4fr) minmax(100px,1fr) minmax(100px,1fr) 120px 72px}}
 @media (max-width:1340px){.split{grid-template-columns:minmax(0,1fr) !important}.split aside{position:static !important}}
+.wrap{display:flex;align-items:stretch;height:36px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)}
+.wrap:hover{background:#fbfcfe}
+.main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;border:0;background:none;text-align:left;cursor:pointer;border-radius:4px}
+.main:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.x{flex:none;width:34px;border:0;border-left:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:0 3px 3px 0}
+.x:hover{background:rgba(11,16,32,.07);color:var(--text)}
+.row{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;border:0;background:none;text-align:left;cursor:pointer;font-size:14px;line-height:20px}
+.lnk{background:none;border:0;padding:0;color:var(--primary);cursor:pointer;font-weight:500;font-size:13px}
+.lnk:hover{text-decoration:underline}
+.grp:hover{background:#f4f6fb !important}
+.grp[data-d="1"]{padding-left:34px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.grp[data-d="2"]{padding-left:56px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.grp[data-d="3"]{padding-left:78px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.grp[data-d="4"]{padding-left:100px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.leaf[data-d="1"]{padding-left:58px;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.leaf[data-d="2"]{padding-left:80px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.leaf[data-d="3"]{padding-left:102px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.leaf[data-d="4"]{padding-left:124px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.leaf[data-d="5"]{padding-left:146px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0,107px 0;background-repeat:no-repeat}
+.grp{font-weight:700;padding-left:12px}
+.grp[data-d="0"]{margin-top:4px}
+.leaf[aria-selected=true]{background-color:#eef3fd;font-weight:600}
+.leaf[data-cur=true]{background-color:#e8effd}
+.chev{transition:none}.chev[data-open=true]{transform:rotate(90deg)}
+.cat-name{font-weight:500}.cat-name[data-empty=true]{color:var(--muted);font-weight:400}
+.wrap[data-err=true]{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
+@media (max-width:760px){.ln{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ln-h{display:none}.ln>*{grid-column:auto}.ln>:nth-child(2){grid-column:1 / -1}.ln>.dsc-l{grid-column:1 / -1;line-height:20px;margin-top:4px}.ln>.dsc{grid-column:1 / -1}.pop-tr{width:auto;left:0;right:0;max-width:none}}
+.pop-tr{position:absolute;top:40px;left:0;width:440px;max-width:calc(100vw - 320px);z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18)}
+.ln{align-items:start}
+.dsc{grid-column:2 / 6;display:flex;align-items:center;gap:8px}
+.dsc-l{grid-column:1;font-size:12px;color:var(--muted);line-height:36px}
+.ovr{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--warn-text)}
+.ovr::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--warn-text)}
+.inh{margin-top:4px;font-size:12px;color:var(--muted)}
 </style>
 </helmet>
 
@@ -186,6 +220,16 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
                   </div>
                 </sc-if>
               </div>
+              <div>
+                <label class="lbl" for="f-prj">Проект <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+                <select id="f-prj" class="inp" aria-invalid="{{hPrjErr}}" onChange="{{onHPrj}}"><option value="" selected="{{hPrjEmpty}}">Выберите проект</option><sc-for list="{{hPrjOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.v}}</option></sc-for></select>
+                <sc-if value="{{hPrjErr}}" hint-placeholder-val="{{ false }}"><div class="err">Выберите проект</div></sc-if>
+              </div>
+              <div>
+                <label class="lbl" for="f-cfo">ЦФО</label>
+                <select id="f-cfo" class="inp" onChange="{{onHCfo}}"><option value="" selected="{{hCfoEmpty}}">Не указан</option><sc-for list="{{hCfoOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.v}}" selected="{{o.sel}}">{{o.v}}</option></sc-for></select>
+              </div>
+              <div style="grid-column:1 / -1;margin-top:-8px;padding:8px 12px;border-radius:4px;background:var(--head-bg);color:var(--muted);font-size:13px">Проект и ЦФО подставляются во все операции документа. В любой операции их можно изменить: такая операция будет отмечена, а изменения шапки её не затронут.</div>
               <div style="grid-column:1 / -1">
                 <label class="lbl" for="f-desc">Описание</label>
                 <textarea id="f-desc" class="inp" rows="3" maxlength="500" value="{{desc}}" onInput="{{onDesc}}" style="height:auto;padding:8px 12px;line-height:20px;resize:vertical">{{desc}}</textarea>
@@ -238,9 +282,9 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
               <button class="btn btn-sm" type="button" onClick="{{addLine}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить операцию</button>
             </div>
             <div role="table" aria-label="Операции документа">
-              <div role="row" class="ln" style="background:var(--head-bg);padding:10px 20px;font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;align-items:center">
+              <div role="row" class="ln ln-h" style="background:var(--head-bg);padding:10px 20px;font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;align-items:center">
                 <div role="columnheader">Тип</div>
-                <div role="columnheader">Статья ОПиУ *</div>
+                <div role="columnheader">Категория ОПиУ *</div>
                 <div role="columnheader">Проект *</div>
                 <div role="columnheader">ЦФО</div>
                 <div role="columnheader" style="text-align:right">Сумма, ₽ *</div>
@@ -249,16 +293,57 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
               <sc-for list="{{lines}}" as="l" hint-placeholder-count="2">
                 <div role="row" class="ln" style="padding:12px 20px;border-top:1px solid var(--border)">
                   <div role="cell"><select class="inp" aria-label="Тип операции {{l.n}}" value="{{l.dir}}" onChange="{{l.onDir}}"><option value="out" selected="{{l.isOut}}">Расход</option><option value="in" selected="{{l.isIn}}">Доход</option></select></div>
-                  <div role="cell">
-                    <select class="inp" aria-label="Статья ОПиУ, операция {{l.n}}" aria-invalid="{{l.artErr}}" value="{{l.article}}" onChange="{{l.onArticle}}"><option value="" selected="{{l.artEmpty}}">Выберите статью</option><sc-for list="{{l.articleOpts}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}" selected="{{o.sel}}">{{o.v}}</option></sc-for></select>
-                    <sc-if value="{{l.artErr}}" hint-placeholder-val="{{ false }}"><div class="err">Выберите статью</div></sc-if>
+                  <div role="cell" style="position:relative">
+                    <div class="wrap" data-err="{{l.artErr}}">
+                      <button id="{{l.bid}}" class="main" type="button" aria-haspopup="dialog" aria-expanded="{{l.catOpen}}" aria-label="Категория ОПиУ, операция {{l.n}}" onClick="{{l.toggleCat}}">
+                        <span class="cat-name" data-empty="{{l.artEmpty}}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{l.catLabel}}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-left:auto"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                      <sc-if value="{{l.catCanClear}}" hint-placeholder-val="{{ false }}"><button class="x" type="button" aria-label="Очистить категорию, операция {{l.n}}" onClick="{{l.clearCat}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></sc-if>
+                    </div>
+                    <sc-if value="{{l.catPath}}" hint-placeholder-val="{{ true }}"><div class="inh" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{l.catPath}}">{{l.catPath}}</div></sc-if>
+                    <sc-if value="{{l.artErr}}" hint-placeholder-val="{{ false }}"><div class="err">Выберите категорию ОПиУ</div></sc-if>
+                    <sc-if value="{{l.catNote}}" hint-placeholder-val="{{ false }}"><div class="hint" style="color:var(--warn-text)">{{l.catNoteText}}</div></sc-if>
+                    <sc-if value="{{l.catOpen}}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{closePop}}" aria-hidden="true" style="position:fixed;inset:0;z-index:25"></div>
+                      <div role="dialog" aria-label="Выбор категории ОПиУ" class="pop-tr">
+                        <div style="padding:12px;border-bottom:1px solid var(--border)">
+                          <div style="position:relative">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:12px;top:10px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                            <input id="{{l.sid}}" type="search" class="inp" aria-label="Найти категорию ОПиУ по названию" placeholder="Найти категорию" autocomplete="off" value="{{q}}" onInput="{{onQ}}" onKeyDown="{{l.catKey}}" style="padding-left:36px">
+                          </div>
+                          <div style="margin-top:8px;font-size:12px;color:var(--muted)">{{l.dirNote}} <button class="lnk" type="button" onClick="{{toggleAll}}" style="font-size:12px">{{dirAction}}</button></div>
+                        </div>
+                        <div role="tree" aria-label="Категории ОПиУ" style="max-height:320px;overflow-y:auto;padding:4px 0">
+                          <sc-for list="{{l.catRows}}" as="r" hint-placeholder-count="8">
+                            <sc-if value="{{r.isGroup}}" hint-placeholder-val="{{ false }}">
+                              <button class="row grp" type="button" role="treeitem" aria-expanded="{{r.open}}" onClick="{{r.toggle}}" data-d="{{r.depth}}" style="color:var(--text);font-size:13px">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-open="{{r.open}}" class="chev" style="flex:none"><path d="M9 6l6 6-6 6"/></svg>
+                                <span style="flex:1;min-width:0">{{r.name}}</span><span style="flex:none;margin-right:16px;min-width:20px;padding:0 6px;border-radius:10px;background:#e3e7f1;text-align:center;font-weight:600;font-size:12px;color:var(--muted)">{{r.count}}</span>
+                              </button>
+                            </sc-if>
+                            <sc-if value="{{r.isItem}}" hint-placeholder-val="{{ true }}">
+                              <button class="row leaf" type="button" role="treeitem" aria-selected="{{r.sel}}" data-cur="{{r.cur}}" data-d="{{r.depth}}" onClick="{{r.pick}}">
+                                <span style="flex:1;min-width:0"><span>{{r.pre}}</span><span style="font-weight:700;background:#fff1b8">{{r.hit}}</span><span>{{r.post}}</span></span>
+                                <span style="flex:none;font-size:12px;color:var(--muted)">{{r.tag}}</span>
+                                <span style="flex:none;width:28px;display:inline-flex;justify-content:center;color:var(--primary)">{{r.check}}</span>
+                              </button>
+                            </sc-if>
+                          </sc-for>
+                          <sc-if value="{{l.catEmpty}}" hint-placeholder-val="{{ false }}"><div style="padding:24px 16px;text-align:center;color:var(--muted)">Категория не найдена. Проверьте название или покажите все категории.</div></sc-if>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 16px;border-top:1px solid var(--border);background:var(--head-bg);font-size:12px;color:var(--muted);border-radius:0 0 8px 8px"><span>↑ ↓ — выбрать · Enter — подтвердить</span><span>Esc — закрыть</span></div>
+                      </div>
+                    </sc-if>
                   </div>
                   <div role="cell">
                     <select class="inp" aria-label="Проект, операция {{l.n}}" aria-invalid="{{l.prjErr}}" value="{{l.project}}" onChange="{{l.onProject}}"><option value="" selected="{{l.prjEmpty}}">Выберите проект</option><sc-for list="{{l.projectOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.v}}</option></sc-for></select>
                     <sc-if value="{{l.prjErr}}" hint-placeholder-val="{{ false }}"><div class="err">Выберите проект</div></sc-if>
+                    <sc-if value="{{l.po}}" hint-placeholder-val="{{ false }}"><div class="ovr">Изменён <button class="lnk" type="button" onClick="{{l.resetPrj}}" style="font-size:12px">Как в шапке</button></div></sc-if>
                   </div>
                   <div role="cell">
                     <select class="inp" aria-label="ЦФО, операция {{l.n}}" value="{{l.cfo}}" onChange="{{l.onCfo}}"><option value="" selected="{{l.cfoEmpty}}">Не указан</option><sc-for list="{{l.cfoOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.v}}" selected="{{o.sel}}">{{o.v}}</option></sc-for></select>
+                    <sc-if value="{{l.fo}}" hint-placeholder-val="{{ false }}"><div class="ovr">Изменён <button class="lnk" type="button" onClick="{{l.resetCfo}}" style="font-size:12px">Как в шапке</button></div></sc-if>
                     <sc-if value="{{l.cfoHint}}" hint-placeholder-val="{{ false }}"><div class="hint">Без ЦФО операция не попадёт в разрез по ЦФО</div></sc-if>
                   </div>
                   <div role="cell">
@@ -268,6 +353,10 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
                   <div role="cell" style="display:flex;gap:2px;justify-content:flex-end;height:36px;align-items:center">
                     <button class="icon-btn" type="button" aria-label="Дублировать операцию {{l.n}}" title="Дублировать" onClick="{{l.dup}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button>
                     <button class="icon-btn" type="button" aria-label="Удалить операцию {{l.n}}" title="Удалить" disabled="{{l.onlyOne}}" onClick="{{l.remove}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg></button>
+                  </div>
+                  <div class="dsc-l" role="presentation">Описание</div>
+                  <div class="dsc" role="cell">
+                    <input class="inp" type="text" maxlength="200" aria-label="Описание, операция {{l.n}}" placeholder="За что платим, например: аренда офиса, октябрь" value="{{l.desc}}" onInput="{{l.onDesc}}">
                   </div>
                 </div>
               </sc-for>
@@ -319,7 +408,57 @@ button:disabled{opacity:.45;cursor:not-allowed!important}
 </x-dc>
 
 <script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1d4ed8","options":["#1d4ed8","#0b1020","#b00020"]},"density":{"editor":"enum","default":"comfortable","options":["comfortable","compact"]},"$preview":{"width":1440,"height":1280}}'>
-const ARTICLES = ['Аренда помещения', 'Коммунальные услуги', 'Услуги подрядчиков', 'Выручка — Шоурум', 'Выручка — Интернет-магазин', 'Зарплата', 'Страхование', 'Логистика и доставка', 'Услуги банка', 'Амортизация', 'Прочие доходы'];
+const TREE = [
+  { id: 'g-in', name: 'Доходы', children: [
+    { id: 'g-rev', name: 'Выручка', children: [
+      { id: 'rev-showroom', name: 'Выручка — Шоурум', flow: 'in' },
+      { id: 'rev-shop', name: 'Выручка — Интернет-магазин', flow: 'in' },
+      { id: 'rev-mp', name: 'Выручка — Маркетплейсы', flow: 'in' }
+    ] },
+    { id: 'inc-other', name: 'Прочие доходы', flow: 'in' }
+  ] },
+  { id: 'g-out', name: 'Расходы', children: [
+    { id: 'g-cogs', name: 'Себестоимость', children: [
+      { id: 'cogs-goods', name: 'Закупка товара', flow: 'out' },
+      { id: 'cogs-log', name: 'Логистика и доставка', flow: 'out' }
+    ] },
+    { id: 'g-com', name: 'Коммерческие расходы', children: [
+      { id: 'mkt', name: 'Маркетинг — подрядчики', flow: 'out' },
+      { id: 'mp-fee', name: 'Комиссии маркетплейсов', flow: 'out' }
+    ] },
+    { id: 'g-adm', name: 'Управленческие расходы', children: [
+      { id: 'rent', name: 'Аренда помещения', flow: 'out' },
+      { id: 'util', name: 'Коммунальные услуги', flow: 'out' },
+      { id: 'contr', name: 'Услуги подрядчиков', flow: 'out' },
+      { id: 'ins', name: 'Страхование', flow: 'out' },
+      { id: 'g-pay', name: 'Заработная плата', children: [
+        { id: 'pay-dir', name: 'Директор', flow: 'out' },
+        { id: 'g-prod', name: 'Производство', children: [
+          { id: 'g-c1', name: 'Цех №1', children: [
+            { id: 'pay-c1-w', name: 'Сварщики', flow: 'out' },
+            { id: 'pay-c1-m', name: 'Монтажники', flow: 'out' }
+          ] },
+          { id: 'g-c2', name: 'Цех №2', children: [
+            { id: 'pay-c2-w', name: 'Станочники', flow: 'out' }
+          ] }
+        ] }
+      ] }
+    ] },
+    { id: 'g-oth', name: 'Прочие расходы', children: [
+      { id: 'bank', name: 'Услуги банка', flow: 'out' },
+      { id: 'amort', name: 'Амортизация', flow: 'out' },
+      { id: 'int', name: 'Проценты по кредитам', flow: 'out' }
+    ] }
+  ] }
+];
+function find(nodes, id, path) {
+  for (const n of nodes) {
+    if (n.children) { const r = find(n.children, id, (path ? path + ' › ' : '') + n.name); if (r) return r; }
+    else if (n.id === id) return { node: n, path: path || '' };
+  }
+  return null;
+}
+const FLOW = { in: 'Доход', out: 'Расход' };
 const PROJECTS = ['Общий', 'Шоурум', 'Интернет-магазин'];
 const CFOS = ['Продажи', 'Производство', 'Логистика', 'Маркетинг', 'Администрация'];
 const CON = [
@@ -334,15 +473,15 @@ const CON = [
 const MONTHS = [['2026-08', 'Август 2026'], ['2026-09', 'Сентябрь 2026'], ['2026-10', 'Октябрь 2026'], ['2026-11', 'Ноябрь 2026'], ['2026-12', 'Декабрь 2026']];
 const SRC = { date: '08.10.2026', account: 'Альфа-Банк (основной)', amount: -148500 };
 const INITIAL = {
-  date: '2026-10-08', period: '2026-10', number: '1204-Л', cid: 2,
+  date: '2026-10-08', period: '2026-10', number: '1204-Л', cid: 2, project: 'Шоурум', cfo: 'Администрация',
   desc: 'Лизинговый платёж по дог. 1204-Л за октябрь',
   lines: [
-    { id: 1, dir: 'out', article: 'Аренда помещения', project: 'Шоурум', cfo: 'Администрация', amount: '120 000,00' },
-    { id: 2, dir: 'out', article: 'Коммунальные услуги', project: 'Шоурум', cfo: 'Администрация', amount: '28 500,00' }
+    { id: 1, dir: 'out', article: 'rent', project: 'Шоурум', cfo: 'Администрация', po: false, fo: false, desc: 'Аренда офиса, октябрь 2026', amount: '120 000,00' },
+    { id: 2, dir: 'out', article: 'util', project: 'Общий', cfo: 'Администрация', po: true, fo: false, desc: 'Коммунальные платежи по договору аренды', amount: '28 500,00' }
   ]
 };
 const HISTORY0 = [
-  { what: 'Статья второй операции: «Аренда» → «Коммунальные услуги»', who: 'Анна Лазарева', when: '10.10.2026, 14:32' },
+  { what: 'Категория второй операции: «Аренда помещения» → «Коммунальные услуги»', who: 'Анна Лазарева', when: '10.10.2026, 14:32' },
   { what: 'Документ разбит на 2 операции', who: 'Анна Лазарева', when: '10.10.2026, 14:30' },
   { what: 'Создан из операции ДДС', who: 'Система', when: '08.10.2026, 09:15' }
 ];
@@ -364,7 +503,18 @@ const r2 = (x) => Math.round(x * 100) / 100;
 const OPT = (list, cur) => list.map((v) => ({ v, sel: v === cur }));
 
 class Component extends DCLogic {
-  state = { f: clone(INITIAL), saved: clone(INITIAL), submitted: false, conOpen: false, qc: '', menu: false, modal: '', toast: '', deleted: false, nextId: 3, history: HISTORY0 };
+  state = { f: clone(INITIAL), saved: clone(INITIAL), submitted: false, pop: 0, q: '', cursor: -1, collapsed: {}, showAll: false, notes: {}, conOpen: false, qc: '', menu: false, modal: '', toast: '', deleted: false, nextId: 3, history: HISTORY0 };
+
+  componentDidMount() {
+    this._key = (e) => { if (e.key === 'Escape') this.setState((s) => (s.modal ? { modal: '' } : s.pop ? { pop: 0, q: '', cursor: -1 } : s.menu ? { menu: false } : null)); };
+    if (typeof document !== 'undefined') document.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() { if (typeof document !== 'undefined') document.removeEventListener('keydown', this._key); }
+  componentDidUpdate(prevProps, prevState) {
+    if (typeof document === 'undefined') return;
+    if (this.state.pop && this.state.pop !== prevState.pop) setTimeout(() => { const el = document.getElementById('s-art-' + this.state.pop); if (el) el.focus(); }, 0);
+    if (!this.state.pop && prevState.pop) setTimeout(() => { const el = document.getElementById('b-art-' + prevState.pop); if (el) el.focus(); }, 0);
+  }
 
   renderVals() {
     const s = this.state, f = s.f;
@@ -378,14 +528,16 @@ class Component extends DCLogic {
     const errs = [];
     const dateErr = !f.date;
     if (dateErr) errs.push('Укажите дату документа');
+    const prjHdrErr = !f.project;
+    if (prjHdrErr) errs.push('Шапка: выберите проект');
     const lineErrs = f.lines.map((l, i) => {
       const v = parseAmt(l.amount);
       const e = { art: !l.article, prj: !l.project, amt: false, msg: '' };
       if (String(l.amount).trim() === '') { e.amt = true; e.msg = 'Введите сумму'; }
       else if (isNaN(v)) { e.amt = true; e.msg = 'Формат: 1 250,00'; }
       else if (v <= 0) { e.amt = true; e.msg = 'Больше нуля'; }
-      if (e.art) errs.push('Операция ' + (i + 1) + ': выберите статью');
-      if (e.prj) errs.push('Операция ' + (i + 1) + ': выберите проект');
+      if (e.art) errs.push('Операция ' + (i + 1) + ': выберите категорию ОПиУ');
+      if (e.prj && f.project) errs.push('Операция ' + (i + 1) + ': выберите проект');
       if (e.amt) errs.push('Операция ' + (i + 1) + ': ' + (e.msg === 'Введите сумму' ? 'введите сумму' : (e.msg === 'Больше нуля' ? 'сумма должна быть больше нуля' : 'неверный формат суммы')));
       return e;
     });
@@ -396,29 +548,100 @@ class Component extends DCLogic {
     const newLine = (st, base) => {
       const net2 = r2(st.f.lines.reduce((t, l) => t + val(l), 0));
       const rs = r2(SRC.amount - net2);
-      const last = st.f.lines[st.f.lines.length - 1] || {};
-      return Object.assign({ id: st.nextId, dir: rs > 0 ? 'in' : 'out', article: '', project: last.project || '', cfo: '', amount: rs !== 0 ? plain(rs) : '' }, base || {});
+            return Object.assign({ id: st.nextId, dir: rs > 0 ? 'in' : 'out', article: '', project: f.project, cfo: f.cfo, po: false, fo: false, desc: '', amount: rs !== 0 ? plain(rs) : '' }, base || {});
     };
-    const lines = f.lines.map((l, i) => ({
+    /* --- категория ОПиУ: дерево, только листья выбираются --- */
+    const q = s.q.trim().toLowerCase();
+    const matchAt = (name) => (q ? name.toLowerCase().indexOf(q) : -1);
+    const setNote = (id, text) => this.setState((st) => ({ notes: Object.assign({}, st.notes, { [id]: text }) }));
+    const catFor = (l, i) => {
+      const flowOk = (n) => s.showAll || n.flow === l.dir;
+      const leaves = [];
+      const build = (nodes, depth, force) => {
+        const out = []; let count = 0;
+        nodes.forEach((n) => {
+          if (n.children) {
+            const sub = build(n.children, depth + 1, force || matchAt(n.name) >= 0);
+            if (sub.count === 0) return;
+            const open = q ? true : !s.collapsed[n.id];
+            out.push({ isGroup: true, isItem: false, depth, name: n.name, count: sub.count, open, toggle: () => this.setState((x) => ({ collapsed: Object.assign({}, x.collapsed, { [n.id]: !x.collapsed[n.id] }) })) });
+            if (open) sub.rows.forEach((r) => out.push(r));
+            count += sub.count;
+          } else {
+            if (!flowOk(n)) return;
+            const at = matchAt(n.name);
+            if (q && !force && at < 0) return;
+            count += 1;
+            out.push({ isItem: true, isGroup: false, id: n.id, node: n, depth, at });
+          }
+        });
+        return { rows: out, count };
+      };
+      const tree = build(TREE, 0, false);
+      tree.rows.forEach((r) => { if (r.isItem) leaves.push(r); });
+      const open = s.pop === l.id;
+      const cc = s.cursor >= 0 ? Math.min(s.cursor, leaves.length - 1) : (q && leaves.length ? 0 : -1);
+      const pickCat = (id) => { upd(l.id, { article: id }); this.setState((x) => ({ pop: 0, q: '', cursor: -1, notes: Object.assign({}, x.notes, { [l.id]: '' }) })); };
+      const rows = tree.rows.map((r) => {
+        if (!r.isItem) return r;
+        const n = r.node, k = leaves.indexOf(r), at = r.at;
+        const isSel = n.id === l.article;
+        return { isItem: true, isGroup: false, depth: r.depth, cur: k === cc, sel: isSel,
+          pre: at >= 0 ? n.name.slice(0, at) : n.name, hit: at >= 0 ? n.name.slice(at, at + q.length) : '', post: at >= 0 ? n.name.slice(at + q.length) : '',
+          tag: s.showAll ? FLOW[n.flow] : '', check: isSel ? '✓' : '', pick: () => pickCat(n.id) };
+      });
+      const cur = l.article ? find(TREE, l.article, '') : null;
+      return {
+        bid: 'b-art-' + l.id, sid: 's-art-' + l.id, catOpen: open,
+        toggleCat: () => this.setState((x) => ({ pop: x.pop === l.id ? 0 : l.id, q: '', cursor: -1 })),
+        catLabel: cur ? cur.node.name : 'Выберите категорию', catPath: cur ? cur.path : '',
+        catCanClear: !!cur, clearCat: () => { upd(l.id, { article: '' }); setNote(l.id, ''); },
+        catNote: !!s.notes[l.id], catNoteText: s.notes[l.id] || '',
+        dirNote: s.showAll ? 'Показаны все категории.' : 'Категории для ' + (l.dir === 'in' ? 'дохода.' : 'расхода.'),
+        catRows: rows, catEmpty: leaves.length === 0,
+        catKey: (e) => {
+          const n = leaves.length;
+          if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ cursor: n ? (cc + 1) % n : -1 }); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ cursor: n ? (cc <= 0 ? n - 1 : cc - 1) : -1 }); }
+          else if (e.key === 'Enter') { e.preventDefault(); const t = leaves[cc >= 0 ? cc : 0]; if (t && (cc >= 0 || q)) pickCat(t.id); }
+        }
+      };
+    };
+    const changeDir = (l, dir) => {
+      const c = l.article ? find(TREE, l.article, '') : null;
+      const bad = c && c.node.flow !== dir;
+      upd(l.id, { dir, article: bad ? '' : l.article });
+      setNote(l.id, bad ? 'Категория «' + c.node.name + '» не подходит для ' + (dir === 'in' ? 'дохода' : 'расхода') + ' и сброшена. Выберите другую.' : '');
+    };
+    const lines = f.lines.map((l, i) => Object.assign({
       n: i + 1, dir: l.dir, isOut: l.dir === 'out', isIn: l.dir === 'in',
-      article: l.article, artEmpty: l.article === '', articleOpts: OPT(ARTICLES, l.article), artErr: show && lineErrs[i].art,
+      article: l.article, artEmpty: l.article === '', artErr: show && lineErrs[i].art,
       project: l.project, prjEmpty: l.project === '', projectOpts: OPT(PROJECTS, l.project), prjErr: show && lineErrs[i].prj,
-      cfo: l.cfo, cfoEmpty: l.cfo === '', cfoOpts: OPT(CFOS, l.cfo), cfoHint: l.cfo === '',
+      po: l.po, resetPrj: () => upd(l.id, { project: f.project, po: false }),
+      cfo: l.cfo, cfoEmpty: l.cfo === '', cfoOpts: OPT(CFOS, l.cfo), cfoHint: l.cfo === '', fo: l.fo,
+      resetCfo: () => upd(l.id, { cfo: f.cfo, fo: false }),
+      desc: l.desc || '', onDesc: (e) => upd(l.id, { desc: e.target.value }),
       amount: l.amount, amtErr: show && lineErrs[i].amt, amtMsg: lineErrs[i].msg,
       onlyOne: f.lines.length < 2,
-      onDir: (e) => upd(l.id, { dir: e.target.value }),
-      onArticle: (e) => upd(l.id, { article: e.target.value }),
-      onProject: (e) => upd(l.id, { project: e.target.value }),
-      onCfo: (e) => upd(l.id, { cfo: e.target.value }),
+      onDir: (e) => changeDir(l, e.target.value),
+      onProject: (e) => upd(l.id, { project: e.target.value, po: e.target.value !== f.project }),
+      onCfo: (e) => upd(l.id, { cfo: e.target.value, fo: e.target.value !== f.cfo }),
       onAmount: (e) => upd(l.id, { amount: e.target.value }),
       dup: () => this.setState((st) => { const a = st.f.lines.slice(); a.splice(i + 1, 0, Object.assign({}, l, { id: st.nextId })); return { f: Object.assign({}, st.f, { lines: a }), nextId: st.nextId + 1 }; }),
       remove: () => this.setState((st) => (st.f.lines.length < 2 ? null : { f: Object.assign({}, st.f, { lines: st.f.lines.filter((x) => x.id !== l.id) }) }))
-    }));
+    }, catFor(l, i)));
 
     const qc = s.qc.trim().toLowerCase();
     const conList = CON.filter((c) => !qc || c.name.toLowerCase().indexOf(qc) >= 0 || c.inn.indexOf(qc) >= 0);
     const cur = CON.filter((c) => c.id === f.cid)[0];
     const set = (patch) => this.setState((st) => ({ f: Object.assign({}, st.f, patch) }));
+    const setHdr = (key, flag, value) => this.setState((st) => {
+      const lines2 = st.f.lines.map((l) => (l[flag] ? l : Object.assign({}, l, { [key]: value })));
+      const kept = st.f.lines.filter((l) => l[flag]).length;
+      const label = key === 'project' ? 'Проект' : 'ЦФО';
+      const t = st.f.lines.length - kept;
+      return { f: Object.assign({}, st.f, { [key]: value, lines: lines2 }), toast: label + ' «' + (value || 'не указан') + '» подставлен в ' + t + ' из ' + st.f.lines.length + ' операций' + (kept ? '. В ' + kept + ' задан вручную' : '') };
+    });
     const nErr = errs.length;
     const word = nErr % 10 === 1 && nErr % 100 !== 11 ? 'ошибка' : (nErr % 10 >= 2 && nErr % 10 <= 4 && (nErr % 100 < 10 || nErr % 100 >= 20) ? 'ошибки' : 'ошибок');
     const d = f.date ? f.date.slice(8) + '.' + f.date.slice(5, 7) + '.' + f.date.slice(0, 4) : '';
@@ -431,6 +654,10 @@ class Component extends DCLogic {
       askDelete: () => this.setState({ menu: false, modal: 'delete' }),
       showErrors: show && nErr > 0, errCount: nErr + ' ' + word, errList: errs,
       date: f.date, dateErr: show && dateErr, onDate: (e) => set({ date: e.target.value }),
+      hPrjOpts: OPT(PROJECTS, f.project), hPrjEmpty: f.project === '', hPrjErr: show && prjHdrErr, onHPrj: (e) => setHdr('project', 'po', e.target.value),
+      hCfoOpts: OPT(CFOS, f.cfo), hCfoEmpty: f.cfo === '', onHCfo: (e) => setHdr('cfo', 'fo', e.target.value),
+      closePop: () => this.setState({ pop: 0, q: '', cursor: -1 }), q: s.q, onQ: (e) => this.setState({ q: e.target.value, cursor: -1 }),
+      dirAction: s.showAll ? 'Только подходящие' : 'Показать все', toggleAll: () => this.setState((x) => ({ showAll: !x.showAll })),
       period: f.period, onPeriod: (e) => set({ period: e.target.value }), periodOpts: MONTHS.map((m) => ({ v: m[0], label: m[1], sel: m[0] === f.period })),
       number: f.number, onNumber: (e) => set({ number: e.target.value }),
       conOpen: s.conOpen, toggleCon: () => this.setState((st) => ({ conOpen: !st.conOpen, qc: '' })), closeCon: () => this.setState({ conOpen: false, qc: '' }),
