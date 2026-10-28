@@ -1917,6 +1917,17 @@
   font-size: var(--vf-size-sm);
 }
 
+.vf-docform-help {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-sm);
+}
+
+.vf-docform-help li + li {
+  margin-top: var(--vf-space-2);
+}
+
 .vf-docform-recon {
   margin: 0;
 }

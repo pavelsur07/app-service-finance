@@ -250,7 +250,8 @@
         };
 
         // Новая операция — значения шапки (проект, ЦФО; контрагент — только в пустое поле).
-        const addOperation = function (amount) {
+        // quiet — строка при открытии формы создания: не правка пользователя и без фокуса.
+        const addOperation = function (amount, quiet) {
             const row = createRow();
             holder.appendChild(row);
             prefill(row, documentCounterpartyField, '[data-operation-counterparty]');
@@ -264,6 +265,9 @@
                 row.querySelector('[data-operation-amount]').value = money(amount);
             }
             syncMarks(row);
+            if (quiet) {
+                return;
+            }
             markDirty();
             focusRow(row);
         };
@@ -459,6 +463,10 @@
             if (badge) {
                 badge.hidden = false;
             }
+        }
+        // Создание (SPEC §6 п.5): одна пустая операция при открытии, если сервер не вернул строк.
+        if (form.getAttribute('data-document-mode') === 'new' && !holder.querySelector('[data-operation-row]')) {
+            addOperation(0, true);
         }
         holder.querySelectorAll('[data-operation-row]').forEach(syncMarks);
         recalc();

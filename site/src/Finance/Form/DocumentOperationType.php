@@ -84,6 +84,10 @@ class DocumentOperationType extends AbstractType
                 },
                 'choice_attr' => static fn (ProjectDirection $item) => !$item->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'required' => false,
+                // Пустой вариант: без него браузер выбирает первый проект, и операция без проекта
+                // (или новая строка при пустой шапке) молча сохраняется с чужим проектом.
+                // Пустое значение сервер заполняет из шапки (FinanceDocumentResponsibilityCenterNormalizer).
+                'placeholder' => '—',
                 'label' => 'Проект',
                 'attr' => [
                     'data-operation-project-direction' => 'true',
