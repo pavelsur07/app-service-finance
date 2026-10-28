@@ -1,35 +1,78 @@
 {% extends 'base.html.twig' %}
-{% block title %}Новая транзакция{% endblock %}
+
+{#
+  «Новая операция ДДС». Поля — общие с правкой (_dds_op_fields), поведение — assets/pages/dds_operation.js
+  в режиме создания (data-dds-op-new). Документов ОПиУ, «Ещё» и «Сведений» о правках до сохранения нет.
+  Скрытый idempotencyKey — ключ повтора, выданный при показе формы: двойная отправка не создаёт вторую операцию.
+#}
+{# Валюта до выбора — валюта выбранного счёта, а без выбора — первого (браузер выберет его в select). #}
+{% set accountChoices = form.moneyAccount.vars.choices %}
+{% set currency = form.currency.vars.value ?: null %}
+{% for choice in accountChoices %}
+    {% if currency is null and (choice.value == form.moneyAccount.vars.value or form.moneyAccount.vars.value is empty) %}
+        {% set currency = choice.attr['data-currency'] ?? null %}
+    {% endif %}
+{% endfor %}
+{% set currency = currency ?? 'RUB' %}
+
+{% block title %}Новая операция ДДС{% endblock %}
 
 {% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
-            {'label':'Главная','path':'app_home_index'},
-            {'label':'Финансы'},
-            {'label':'Транзакции','path':'cash_transaction_index','params': app.request.query.all},
+            {'label':'Деньги'},
+            {'label':'Операции ДДС','path':'cash_transaction_index','params': app.request.query.all},
             {'label':'Новая'}
         ]
     } %}
 {% endblock %}
 
 {% block content %}
-    <h2 class="page-title mb-3">Новая транзакция</h2>
-    {{ include('transaction/_form.html.twig') }}
-{% endblock %}
+<div class="dds-op" data-dds-op data-dds-op-new>
+    <div class="dds-op__head">
+        <div class="dds-op__heading">
+            <h1 class="dds-op__title">Новая операция ДДС</h1>
+        </div>
+    </div>
 
-{% block scripts %}
-    {{ parent() }}
-    <script>
-        const acc = document.querySelector('#form_moneyAccount');
-        const cur = document.querySelector('#form_currency');
-        if (acc && cur) {
-            acc.addEventListener('change', e => {
-                const opt = acc.options[acc.selectedIndex];
-                cur.value = opt.dataset.currency || '';
-            });
-            const initOpt = acc.options[acc.selectedIndex];
-            cur.value = initOpt ? initOpt.dataset.currency : '';
-        }
-    </script>
-{% endblock %}
+    {% set formErrors = form.vars.errors|length %}
+    {% for child in form.children %}{% set formErrors = formErrors + child.vars.errors|length %}{% endfor %}
+    <div class="dds-op__summary" data-dds-op-summary role="alert" tabindex="-1"{% if formErrors == 0 %} hidden{% endif %}>
+        <strong data-dds-op-summary-title>Не удалось сохранить: {{ formErrors }}. Исправьте отмеченные поля.</strong>
+        <ul data-dds-op-summary-list>
+            {% for error in form.vars.errors %}<li>{{ error.message }}</li>{% endfor %}
+            {% for child in form.children %}{% for error in child.vars.errors %}<li>{{ error.message }}</li>{% endfor %}{% endfor %}
+        </ul>
+    </div>
 
+    <div class="dds-op__grid">
+        <div class="dds-op__main">
+            {{ form_start(form, {attr: {id: 'dds-op-form', class: 'dds-op__form', novalidate: 'novalidate', 'data-dds-op-form': ''}}) }}
+            {{ form_widget(form._token) }}
+            {% if form.idempotencyKey is defined %}{{ form_widget(form.idempotencyKey) }}{% endif %}
+            {{ include('transaction/_dds_op_fields.html.twig', {currency: currency, disabled: false}) }}
+            {{ form_end(form, {render_rest: false}) }}
+        </div>
+
+        <aside class="dds-op__aside">
+            <section class="dds-card" aria-labelledby="dds-op-info-title">
+                <h2 class="dds-card__title" id="dds-op-info-title">Сведения</h2>
+                <dl class="dds-info">
+                    <div><dt>Источник</dt><dd>Вручную</dd></div>
+                </dl>
+                <p class="dds-info__note">Статья ДДС определяет, в какой раздел отчёта о движении денег попадёт операция. Без статьи операция остаётся в «Не распределено».</p>
+            </section>
+        </aside>
+    </div>
+
+    <div class="dds-op__bar">
+        <span class="dds-op__status" data-dds-op-status>Операция ещё не сохранена</span>
+        <div class="dds-op__actions">
+            <a href="{{ path('cash_transaction_index', app.request.query.all) }}" class="btn dds-op__btn" data-dds-op-cancel>Отмена</a>
+            <button type="submit" form="dds-op-form" class="btn btn-primary dds-op__save" data-dds-op-save>Сохранить</button>
+        </div>
+    </div>
+</div>
+
+{{ include('transaction/_edit_leave_modal.html.twig') }}
+{% endblock %}
