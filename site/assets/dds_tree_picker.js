@@ -17,6 +17,13 @@
  * направления несовместимая статья сбрасывается с заметкой.
  * События: `change` на select; `dds-picker:reset` на корне ({id, name, reason}).
  * Тексты узлов — только через textContent.
+ *
+ * Несколько экземпляров (строки коллекции): дерево одно на страницу —
+ * `data-tree-source` (селектор <script type="application/json">) вместо `data-tree`;
+ * открыт один popover за раз; `observeDdsTreePickers()` подключает виджет к
+ * строкам, добавленным позже (data-prototype), и отключает у удалённых.
+ * Подписи: `data-noun`, `data-not-found`, `data-flow-labels` ({in, out}),
+ * `data-path-below` — путь листа строкой под полем.
  */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const FLOW_LABEL = { in: 'Приток', out: 'Отток', both: '' };
@@ -50,17 +57,31 @@ function el(tag, attrs = {}, ...kids) {
 }
 
 let uidSeq = 0;
+let openPicker = null;
+const treeSources = new Map();
+
+function readTree(root) {
+  const source = root.dataset.treeSource;
+  if (!source) return JSON.parse(root.dataset.tree || '[]');
+  if (!treeSources.has(source)) {
+    const node = document.querySelector(source);
+    treeSources.set(source, node ? JSON.parse(node.textContent || '[]') : []);
+  }
+  return treeSources.get(source);
+}
 
 export class DdsTreePicker {
   constructor(root) {
     this.root = root;
     this.select = root.querySelector('select');
-    this.tree = JSON.parse(root.dataset.tree || '[]');
+    this.tree = readTree(root);
     this.placeholder = root.dataset.placeholder || 'Не распределено';
     // Виджет годится и для плоских справочников (ЦФО): подписи — из data-noun / data-empty-note.
     this.noun = root.dataset.noun || 'статью';
     this.emptyNote = root.dataset.emptyNote ?? 'Без статьи операция попадёт в «Не распределено».';
-    this.notFound = root.dataset.noun ? 'Ничего не найдено. Проверьте название' : 'Статья не найдена. Проверьте название';
+    this.notFound = root.dataset.notFound || (root.dataset.noun ? 'Ничего не найдено. Проверьте название' : 'Статья не найдена. Проверьте название');
+    this.flowLabels = { ...FLOW_LABEL, ...JSON.parse(root.dataset.flowLabels || '{}') };
+    this.pathBelow = root.hasAttribute('data-path-below');
     this.dirSelector = root.dataset.directionSource || '';
     this.inValue = root.dataset.dirInValue ?? 'in';
     this.outValue = root.dataset.dirOutValue ?? 'out';
@@ -119,7 +140,7 @@ export class DdsTreePicker {
     if (this.labelEl && !this.labelEl.id) this.labelEl.id = `${this.uid}-label`;
     const labelId = this.labelEl?.id || null;
     this.valueEl = el('span', { class: 'dds-field__value' });
-    this.pathEl = el('span', { class: 'dds-field__path' });
+    this.pathEl = el(this.pathBelow ? 'div' : 'span', { class: this.pathBelow ? 'dds-field__path dds-field__path--below' : 'dds-field__path' });
     this.btn = el(
       'button',
       {
@@ -131,7 +152,7 @@ export class DdsTreePicker {
         'aria-labelledby': labelId ? `${labelId} ${this.uid}-value` : null,
       },
       this.valueEl,
-      this.pathEl,
+      this.pathBelow ? '' : this.pathEl,
       icon('M6 9l6 6 6-6', 14, 'dds-field__chev'),
     );
     this.valueEl.id = `${this.uid}-value`;
@@ -175,7 +196,7 @@ export class DdsTreePicker {
       this.treeEl,
       el('div', { class: 'dds-pop__foot' }, el('span', {}, '↑ ↓ — выбрать · Enter — подтвердить'), el('span', {}, 'Esc — закрыть')),
     );
-    this.root.append(this.field, this.noteEl, this.pop);
+    this.root.append(this.field, this.pathBelow ? this.pathEl : '', this.noteEl, this.pop);
     this.root.classList.add('is-ready');
   }
 
@@ -228,6 +249,7 @@ export class DdsTreePicker {
   }
 
   destroy() {
+    if (openPicker === this) openPicker = null;
     document.removeEventListener('mousedown', this.onDocDown);
     if (this.onDir) document.querySelectorAll(this.dirSelector).forEach((n) => n.removeEventListener('change', this.onDir));
   }
@@ -244,6 +266,8 @@ export class DdsTreePicker {
 
   openPop() {
     if (this.disabled) return;
+    if (openPicker && openPicker !== this) openPicker.close(false);
+    openPicker = this;
     this.state.open = true;
     this.state.q = '';
     this.state.cursor = -1;
@@ -257,6 +281,7 @@ export class DdsTreePicker {
   }
 
   close(returnFocus) {
+    if (openPicker === this) openPicker = null;
     this.state.open = false;
     this.pop.hidden = true;
     this.btn.setAttribute('aria-expanded', 'false');
@@ -273,8 +298,11 @@ export class DdsTreePicker {
 
   syncField() {
     const cur = this.byId.get(String(this.value));
-    this.valueEl.textContent = cur ? cur.node.name : this.placeholder;
-    this.valueEl.classList.toggle('is-empty', !cur);
+    // Сохранённое значение вне листьев дерева (группа, статья другой структуры) не
+    // прячется за плейсхолдером: показываем текст варианта select'а как есть.
+    const legacy = !cur && this.value !== '' ? this.select?.selectedOptions[0]?.textContent.replace(/^[\s\u00a0—-]+/, '') : '';
+    this.valueEl.textContent = cur ? cur.node.name : legacy || this.placeholder;
+    this.valueEl.classList.toggle('is-empty', !cur && !legacy);
     this.pathEl.textContent = cur ? cur.path : '';
     this.btn.disabled = this.disabled;
     this.field.classList.toggle('is-disabled', this.disabled);
@@ -395,7 +423,7 @@ export class DdsTreePicker {
             tabindex: '-1',
           },
           name,
-          el('span', { class: 'dds-tree__tag' }, !d || this.state.showAll ? FLOW_LABEL[n.flow] || '' : ''),
+          el('span', { class: 'dds-tree__tag' }, !d || this.state.showAll ? this.flowLabels[n.flow] || '' : ''),
           el('span', { class: 'dds-tree__check' }, isSel ? '✓' : ''),
         );
         b.style.setProperty('--d', r.depth);
@@ -442,9 +470,32 @@ export class DdsTreePicker {
 
 const instances = new WeakMap();
 
-/** Подключает виджет ко всем `[data-dds-picker]` внутри root (повторный вызов безопасен). */
+/** Подключает виджет ко всем `[data-dds-picker]` внутри root и к самому root (повторный вызов безопасен). */
 export function initDdsTreePickers(root = document) {
-  root.querySelectorAll('[data-dds-picker]').forEach((node) => {
+  const nodes = [...root.querySelectorAll('[data-dds-picker]')];
+  if (root instanceof Element && root.matches('[data-dds-picker]')) nodes.unshift(root);
+  nodes.forEach((node) => {
     if (!instances.has(node)) instances.set(node, new DdsTreePicker(node));
   });
+}
+
+/** Следит за DOM: добавленные позже виджеты (строки из data-prototype, дубли) подключаются, удалённые — отключаются. */
+export function observeDdsTreePickers(root = document.body) {
+  const each = (node, fn) => {
+    if (!(node instanceof Element)) return;
+    if (node.matches('[data-dds-picker]')) fn(node);
+    node.querySelectorAll('[data-dds-picker]').forEach(fn);
+  };
+  new MutationObserver((records) => {
+    records.forEach((r) => {
+      r.addedNodes.forEach((n) => each(n, (node) => initDdsTreePickers(node)));
+      r.removedNodes.forEach((n) =>
+        each(n, (node) => {
+          if (node.isConnected) return;
+          instances.get(node)?.destroy();
+          instances.delete(node);
+        }),
+      );
+    });
+  }).observe(root, { childList: true, subtree: true });
 }

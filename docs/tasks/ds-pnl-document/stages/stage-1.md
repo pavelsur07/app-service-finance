@@ -29,8 +29,40 @@ Unit-тесты построителя зелёные; страница прав
 ошибка формы, не сохранение; сохранение документа с листом работает как раньше.
 
 ## 4. Чек-лист приёмки (CHECKLIST D, H)
-- [ ] Unit построителя: вложенность до 4 групп + лист, `flow`, порядок, пустые группы, изоляция по компании
-- [ ] Дерево строится одним запросом на страницу, фильтр по `company` (профайлер до/после)
+- [x] Unit построителя: вложенность до 4 групп + лист, `flow`, порядок, пустые группы, изоляция по компании
+- [x] Дерево строится одним запросом на страницу, фильтр по `company` (профайлер до/после)
 - [ ] Категория обязательна на сервере; группа или чужая статья не сохраняются (functional)
-- [ ] Имя поля `category`, value option и CSRF не изменились; существующие тесты Finance зелёные
-- [ ] Новый класс — `final`, `strict_types`, constructor injection; PHPStan по изменённым файлам чистый
+- [x] Имя поля `category`, value option и CSRF не изменились; существующие тесты Finance зелёные
+- [x] Новый класс — `final`, `strict_types`, constructor injection; PHPStan по изменённым файлам чистый
+
+---
+
+## Итог (28.10.2026)
+- `Finance\Application\Service\PLCategoryTreeBuilder` — дерево из статей
+  `findTreeByCompany()` (один запрос, порядок дерева, без чтения `children`); `flow`
+  листа — собственный `PLFlow`: INCOME → `in`, EXPENSE → `out`, NONE → `both`.
+- `Finance\Form\PLCategoryTreeType` (родитель `EntityType`, блок `pl_category_tree`):
+  тот же select, value = id; дерево в `vars.tree` либо по `tree_source` со страницы.
+  Тема `form/pl_category_tree_theme.html.twig` (глобально в `twig.yaml`) рендерит
+  поле через общий `partials/_dds_tree_picker.html.twig`.
+- `DocumentOperationType::category` → `PLCategoryTreeType`, имя поля, `choices`,
+  `data-flow` и подпись вариантов прежние; подпись поля «Категория ОПиУ»,
+  пустой вариант «Выберите категорию». `DocumentType::buildView` строит дерево
+  один раз (`category_tree`), `_page.html.twig` выводит его одним
+  `<script type="application/json" id="document-category-tree">` (JSON_HEX_TAG/AMP).
+- Тесты: unit `PLCategoryTreeBuilderTest` (5 уровней, `flow` листа, порядок, сирота,
+  сырые названия); functional `DocumentCategoryPickerTest` (виджет в каждой строке и в
+  data-prototype без копии дерева, дерево своей компании без чужих статей, сохранение
+  листа, чужая статья — ошибка поля без сохранения). Finance + Cash functional/unit —
+  526/526.
+- Запросы: `document_edit` 30 → 30 (дерево из того же `findTreeByCompany`).
+
+**Не сделано по решению (в отчёт, вопрос владельцу):** «категория обязательна на
+сервере» и запрет группы на сервере. Сейчас `required: false`, группы выбираемы в
+select; обязательность сломала бы сохранение документов с операциями без статьи
+(создание из ДДС без маппинга — «Без маппинга»), а `disabled` у групп — документов,
+где статья-группа уже стоит. В UI группа не выбирается, пустое значение подписано
+«Выберите категорию».
+
+Чек-лист: пункты 1, 2, 4, 5 — выполнены; пункт 3 — частично (чужая статья
+отклоняется; обязательность и запрет групп — вопрос владельцу).

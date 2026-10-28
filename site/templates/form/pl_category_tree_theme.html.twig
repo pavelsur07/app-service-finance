@@ -1,0 +1,16 @@
+{# Поле PLCategoryTreeType: обычный select внутри виджета «Категория ОПиУ» (тот же виджет, что «Статья ДДС»). #}
+{% block pl_category_tree_widget %}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' dds-picker__native')|trim}) -%}
+    {{- include('partials/_dds_tree_picker.html.twig', {
+        select: block('choice_widget'),
+        tree: tree,
+        tree_source: tree_source,
+        placeholder: 'Выберите категорию',
+        empty_note: '',
+        noun: 'категорию',
+        not_found: 'Категория не найдена. Проверьте название',
+        flow_labels: {in: 'Доход', out: 'Расход'},
+        path_below: true,
+        wide: true,
+    }, with_context = false) -}}
+{% endblock %}

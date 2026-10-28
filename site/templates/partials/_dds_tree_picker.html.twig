@@ -1,19 +1,28 @@
-{# Виджет «Статья ДДС» — дерево с поиском поверх обычного select (assets/dds_tree_picker.js).
-   Эталон: docs/design-system/components/dds-tree-picker/, SPEC §3.
+{# Виджет «Статья ДДС» / «Категория ОПиУ» — дерево с поиском поверх обычного select (assets/dds_tree_picker.js).
+   Эталон: docs/design-system/components/dds-tree-picker/, SPEC §3 (ДДС) и PNL-DOCUMENT-SPEC §5.3.
    Параметры:
      select     разметка select'а (form_widget поля; класс dds-picker__native) — он
                 остаётся в форме, отправляется и работает без JS
      tree       [{id, name, children: […]} | {id, name, flow: 'in'|'out'|'both'}], id листа == value option
+     tree_source  вместо tree: CSS-селектор <script type="application/json"> с деревом — одно
+                дерево на много экземпляров (строки коллекции)
      direction  null | {source: CSS-селектор поля направления, in: value притока, out: value оттока}
      placeholder  текст пустого значения (по умолчанию «Не распределено»)
-     empty_note   подсказка под пустым полем (по умолчанию — про «Не распределено»)
+     empty_note   подсказка под пустым полем (по умолчанию — про «Не распределено»; '' — без неё)
      noun         что выбираем, для подписей поиска и очистки (по умолчанию «статью»)
-   Для поля CashflowCategoryTreeType подключается сам — тема form/cashflow_category_tree_theme.html.twig. #}
-<div class="dds-picker" data-dds-picker
-     data-tree="{{ tree|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"
+     not_found    текст пустого поиска без точки (по умолчанию по noun)
+     flow_labels  {in, out} — теги листьев (по умолчанию «Приток»/«Отток»)
+     path_below   путь выбранного листа строкой под полем, а не в нём
+     wide         popover шириной 440 px независимо от ширины поля
+   Для полей CashflowCategoryTreeType и PLCategoryTreeType подключается сам — темы form/*_tree_theme.html.twig. #}
+<div class="dds-picker{{ wide|default(false) ? ' dds-picker--wide' : '' }}" data-dds-picker
+     {%- if tree_source|default(null) %} data-tree-source="{{ tree_source }}"{% else %} data-tree="{{ tree|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"{% endif %}
      data-placeholder="{{ placeholder|default('Не распределено') }}"
      {%- if empty_note is defined %} data-empty-note="{{ empty_note }}"{% endif %}
      {%- if noun is defined %} data-noun="{{ noun }}"{% endif %}
+     {%- if not_found is defined %} data-not-found="{{ not_found }}"{% endif %}
+     {%- if flow_labels is defined %} data-flow-labels="{{ flow_labels|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"{% endif %}
+     {%- if path_below|default(false) %} data-path-below{% endif %}
      {%- if direction|default(null) %}
      data-direction-source="{{ direction.source }}"
      data-dir-in-value="{{ direction.in }}"
