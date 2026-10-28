@@ -9,7 +9,9 @@ use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Company\Form\Type\CounterpartyPickerType;
+use App\Finance\Application\Service\PLCategoryTreeBuilder;
 use App\Finance\Entity\Document;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType as DocumentTypeEnum;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
@@ -20,12 +22,18 @@ use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class DocumentType extends AbstractType
 {
+    /** id элемента страницы с деревом статей ОПиУ для виджета «Категория ОПиУ» каждой операции. */
+    public const CATEGORY_TREE_ID = 'document-category-tree';
+
     public function __construct(
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
+        private readonly PLCategoryTreeBuilder $categoryTreeBuilder,
     ) {
     }
 
@@ -119,6 +127,16 @@ class DocumentType extends AbstractType
                 'data' => $document?->getId(),
             ]);
         }
+    }
+
+    public function buildView(FormView $view, FormInterface $form, array $options): void
+    {
+        // Одно дерево на все строки операций и data-prototype: строки ссылаются на него
+        // через tree_source, страница выводит его один раз (document/_page.html.twig).
+        /** @var iterable<PLCategory> $categories */
+        $categories = $options['categories'];
+        $view->vars['category_tree_id'] = self::CATEGORY_TREE_ID;
+        $view->vars['category_tree'] = $this->categoryTreeBuilder->build($categories);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

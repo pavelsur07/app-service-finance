@@ -12,7 +12,6 @@ use App\Company\Form\Type\CounterpartyPickerType;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -40,17 +39,18 @@ class DocumentOperationType extends AbstractType
             : null;
 
         $builder
-            ->add('category', EntityType::class, [
-                'class' => PLCategory::class,
+            // Виджет «Категория ОПиУ» поверх select; дерево одно на форму — DocumentType::buildView.
+            ->add('category', PLCategoryTreeType::class, [
                 'choices' => $options['categories'],
+                'tree_source' => '#'.DocumentType::CATEGORY_TREE_ID,
                 'choice_label' => static function (PLCategory $item) {
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 // Знак операции задаёт flow статьи: страница документа показывает по нему тип
                 // «Доход/Расход» и считает итоги до сохранения.
                 'choice_attr' => static fn (PLCategory $item): array => ['data-flow' => $item->getFlow()->value],
-                'label' => 'Статья ОПиУ',
-                'placeholder' => 'Выберите статью',
+                'label' => 'Категория ОПиУ',
+                'placeholder' => 'Выберите категорию',
                 'required' => false,
                 'empty_data' => null,
             ])

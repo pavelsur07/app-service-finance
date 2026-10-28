@@ -6,7 +6,7 @@ import './project_direction_picker.js';
 import './counterparty_picker.js';
 import './picker_pill.js';
 import './confirm_modal.js';
-import { initDdsTreePickers } from './dds_tree_picker.js';
+import { initDdsTreePickers, observeDdsTreePickers } from './dds_tree_picker.js';
 import { initDdsOperation } from './pages/dds_operation.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
@@ -54,10 +54,12 @@ document.addEventListener('click', (event) => {
   to.value = button.dataset.periodTo ?? '';
 });
 
-// Виджет «Статья ДДС» (partials/_dds_tree_picker.html.twig) поверх select формы;
+// Виджеты «Статья ДДС» / «Категория ОПиУ» (partials/_dds_tree_picker.html.twig) поверх
+// select формы, в том числе в строках, добавленных позже (коллекция операций документа);
 // страница «Операция ДДС» — после виджетов (её снимок формы видит их значения).
 const initDds = () => {
   initDdsTreePickers();
+  observeDdsTreePickers();
   initDdsOperation();
 };
 if (document.readyState === 'loading') {

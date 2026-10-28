@@ -218,8 +218,10 @@
         </div>
     </div>
     <div class="vf-docform-ops__head" aria-hidden="true">
-        <span>Тип</span><span>Статья ОПиУ</span><span class="text-end">Сумма{% if currency == 'RUB' %}, ₽{% endif %}</span><span>Контрагент</span><span>Проект</span><span>ЦФО</span><span></span>
+        <span>Тип</span><span>Категория ОПиУ</span><span class="text-end">Сумма{% if currency == 'RUB' %}, ₽{% endif %}</span><span>Контрагент</span><span>Проект</span><span>ЦФО</span><span></span>
     </div>
+    {# Дерево статей ОПиУ — одно на все строки и data-prototype (PLCategoryTreeType, tree_source). #}
+    <script type="application/json" id="{{ form.vars.category_tree_id }}">{{ form.vars.category_tree|json_encode(constant('JSON_UNESCAPED_UNICODE') b-or constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP'))|raw }}</script>
     {% set operationPrototype %}{{ page.opRow(form.operations.vars.prototype) }}{% endset %}
     <div class="vf-docform-ops__list" data-collection-holder data-prototype="{{ operationPrototype|e('html_attr') }}">
         {% for op in form.operations %}

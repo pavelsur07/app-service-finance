@@ -109,6 +109,22 @@
   white-space: nowrap;
 }
 
+/* Путь под полем — «Категория ОПиУ» (data-path-below): название занимает место пути в поле. */
+.dds-picker[data-path-below] .dds-field__value {
+  flex: 1;
+  max-width: none;
+}
+
+/* Путь под полем — «Категория ОПиУ» (data-path-below). */
+.dds-field__path--below {
+  margin-top: 4px;
+  line-height: 16px;
+}
+
+.dds-field__path--below:empty {
+  display: none;
+}
+
 .dds-field__chev {
   flex: none;
   color: var(--dds-muted);
@@ -383,9 +399,21 @@
   background-color: var(--dds-selected-bg);
 }
 
+/* Узкое поле (ячейка таблицы) — popover своей ширины, у правого края экрана не вылезает. */
+.dds-picker--wide .dds-pop {
+  right: auto;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+}
+
 @media (max-width: 600px) {
   .dds-pop {
     min-width: 0;
+  }
+
+  .dds-picker--wide .dds-pop {
+    right: 0;
+    width: auto;
   }
 }
 
