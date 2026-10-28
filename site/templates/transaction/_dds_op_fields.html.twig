@@ -1,0 +1,102 @@
+{#
+  Карточки «Операция» и «Аналитика» формы операции ДДС — общие для создания и правки.
+  Параметры: form, currency — валюта для знака суммы и подписи (дальше её ведёт JS по счёту),
+  disabled — только чтение (удалённая операция). Без выбора направление — первое (Приток), как у прежнего select.
+#}
+{% set currencyNames = {RUB: 'российский рубль', USD: 'доллар США', EUR: 'евро', KZT: 'казахстанский тенге'} %}
+<fieldset class="dds-op__fieldset"{% if disabled|default(false) %} disabled{% endif %}>
+    <section class="dds-card" aria-labelledby="dds-op-main-title">
+        <h2 class="dds-card__title" id="dds-op-main-title">Операция</h2>
+        <div class="dds-card__grid">
+            <div class="dds-op__field">
+                {{ form_label(form.occurredAt, 'Дата', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {{ form_widget(form.occurredAt, {attr: {class: 'form-control dds-op__input', 'data-dds-op-required': 'Укажите дату операции'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.occurredAt) }}</div>
+            </div>
+            <div class="dds-op__field">
+                {{ form_label(form.moneyAccount, 'Счёт', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {{ form_widget(form.moneyAccount, {attr: {class: 'form-select dds-op__input', 'data-dds-op-required': 'Выберите счёт', 'data-dds-op-account': ''}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.moneyAccount) }}</div>
+            </div>
+            <fieldset class="dds-op__field">
+                <legend class="form-label dds-op__label required">Направление</legend>
+                {# Тот же name и те же value, что у select ChoiceType: сервер разницы не видит. #}
+                <div class="dds-seg">
+                    {% for choice in form.direction.vars.choices %}
+                        {% set choiceIn = choice.data.value == 'INFLOW' %}
+                        <label class="dds-seg__opt dds-seg__opt--{{ choiceIn ? 'in' : 'out' }}">
+                            <input type="radio" class="dds-seg__input"
+                                   name="{{ form.direction.vars.full_name }}"
+                                   id="{{ form.direction.vars.id }}_{{ loop.index0 }}"
+                                   value="{{ choice.value }}"
+                                   {%- if choice.value == form.direction.vars.value or (form.direction.vars.value is empty and loop.first) %} checked{% endif %}
+                                   {%- if loop.first %} data-dds-op-required="Выберите направление"{% endif %}>
+                            <span class="dds-seg__text">
+                                <i class="ti ti-arrow-{{ choiceIn ? 'down' : 'up' }}" aria-hidden="true"></i>{{ choice.label }}
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% do form.direction.setRendered %}
+                <div class="invalid-feedback d-block">{{ form_errors(form.direction) }}</div>
+            </fieldset>
+            <div class="dds-op__field">
+                {{ form_label(form.amount, 'Сумма', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                <div class="dds-amount" data-dds-op-amount
+                     data-currency-names="{{ currencyNames|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"
+                     data-currency-symbols="{{ currencyNames|map((name, code) => vf_currency_symbol(code))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}">
+                    <span class="dds-amount__cur" data-dds-op-currency-symbol aria-hidden="true">{{ vf_currency_symbol(currency) }}</span>
+                    {{ form_widget(form.amount, {attr: {class: 'form-control dds-op__input dds-amount__input', inputmode: 'decimal', autocomplete: 'off', 'aria-describedby': 'dds-op-currency-hint', 'data-dds-op-required': 'Укажите сумму', 'data-dds-op-amount-input': ''}}) }}
+                    <div class="invalid-feedback d-block">{{ form_errors(form.amount) }}</div>
+                </div>
+                <div class="dds-op__hint" id="dds-op-currency-hint" data-dds-op-currency-hint>Валюта берётся из счёта: {{ currencyNames[currency] ?? currency }} ({{ currency }})</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="dds-card" aria-labelledby="dds-op-analytics-title">
+        <h2 class="dds-card__title" id="dds-op-analytics-title">Аналитика</h2>
+        <div class="dds-card__grid">
+            <div class="dds-op__field dds-op__field--wide">
+                {{ form_label(form.cashflowCategory, 'Статья ДДС', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {{ form_widget(form.cashflowCategory, {attr: {class: 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.cashflowCategory) }}</div>
+            </div>
+            <div class="dds-op__field dds-op__picker">
+                {{ form_label(form.projectDirection, 'Проект', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {{ form_widget(form.projectDirection, {attr: {class: 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.projectDirection) }}</div>
+            </div>
+            <div class="dds-op__field">
+                {{ form_label(form.responsibilityCenterId, 'ЦФО', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {# Тот же виджет, что у статьи: плоский список с поиском и очисткой поверх прежнего select. #}
+                {% set rcTree = [] %}
+                {% for choice in form.responsibilityCenterId.vars.choices %}
+                    {% set rcTree = rcTree|merge([{id: choice.value, name: choice.label, flow: 'both'}]) %}
+                {% endfor %}
+                {{ include('partials/_dds_tree_picker.html.twig', {
+                    select: form_widget(form.responsibilityCenterId, {attr: {class: 'form-select dds-picker__native'}}),
+                    tree: rcTree,
+                    direction: null,
+                    placeholder: 'Без ЦФО',
+                    empty_note: 'Без ЦФО операция не попадёт в разрез по ЦФО.',
+                    noun: 'ЦФО',
+                }, with_context = false) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.responsibilityCenterId) }}</div>
+            </div>
+            <div class="dds-op__field dds-op__field--wide dds-op__picker">
+                {{ form_label(form.counterpartyId, 'Контрагент', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                {{ form_widget(form.counterpartyId) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.counterpartyId) }}</div>
+            </div>
+            <div class="dds-op__field dds-op__field--wide">
+                <div class="dds-op__label-row">
+                    {{ form_label(form.description, 'Описание', {label_attr: {class: 'form-label dds-op__label'}}) }}
+                    <span class="dds-op__counter" data-dds-op-counter aria-live="polite">{{ (form.description.vars.value ?? '')|length }} из 500</span>
+                </div>
+                {{ form_widget(form.description, {attr: {class: 'form-control dds-op__input', rows: 3, maxlength: 500, 'data-dds-op-description': ''}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.description) }}</div>
+            </div>
+        </div>
+    </section>
+</fieldset>

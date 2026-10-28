@@ -62,6 +62,8 @@ export function initDdsOperation(root = document.querySelector('[data-dds-op]'))
   const status = root.querySelector('[data-dds-op-status]');
   const badge = root.querySelector('[data-dds-op-dirty-badge]');
   const leaveModal = document.querySelector('[data-dds-op-leave]');
+  // Создание: сохранять есть что сразу (значения по умолчанию — тоже операция), статус панели не меняется.
+  const isNew = root.hasAttribute('data-dds-op-new');
 
   /* ---------- сумма и валюта ---------- */
   if (amount) {
@@ -111,6 +113,7 @@ export function initDdsOperation(root = document.querySelector('[data-dds-op]'))
     dirty = serverErrors || snapshot() !== initial;
     root.toggleAttribute('data-dirty', dirty);
     if (badge) badge.hidden = !dirty;
+    if (isNew) return;
     if (status) status.textContent = dirty ? 'Есть несохранённые изменения' : 'Все изменения сохранены';
     save.disabled = !dirty;
   };
