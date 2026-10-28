@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Виджет «Статья ДДС» — демо</title>
+<link rel="stylesheet" href="/assets/styles/design-tokens.css">
+<link rel="stylesheet" href="/assets/styles/components/dds-pickers.css">
+<style>body{margin:0;padding:24px;width:560px;font:14px/20px Inter,system-ui,sans-serif;color:var(--vf-text);background:var(--vf-bg)}label{display:block;margin:16px 0 4px;font-weight:500}</style>
+</head>
+<body>
+<!-- Демо-страница для e2e (tests/e2e/dds-tree-picker.e2e.cjs): проектные CSS и JS виджета,
+     направление — select с value-индексами, как у ChoiceType формы операции. -->
+<label for="dir">Направление</label>
+<select id="dir" name="tx[direction]"><option value="0">Приток</option><option value="1" selected>Отток</option></select>
+<label id="cat-label" for="cat">Статья ДДС</label>
+<div class="dds-picker" data-dds-picker id="p"
+     data-direction-source='[name="tx[direction]"]' data-dir-in-value="0" data-dir-out-value="1"
+     data-placeholder="Не распределено"
+     data-tree='[{"id":"g1","name":"Поступления","children":[{"id":"1","name":"Выручка — Прочие","flow":"in"},{"id":"2","name":"Выручка — Маркетплейсы","flow":"in"}]},{"id":"g2","name":"Выбытие","children":[{"id":"3","name":"Комиссия банка","flow":"out"},{"id":"g3","name":"Заработная плата","children":[{"id":"4","name":"Директор","flow":"out"},{"id":"g4","name":"Производство","children":[{"id":"g5","name":"Цех №1","children":[{"id":"5","name":"Сварщики","flow":"out"}]}]}]}]},{"id":"g6","name":"Технические","children":[{"id":"6","name":"Не распределено","flow":"both"},{"id":"7","name":"&lt;script&gt;window.__xss=1&lt;/script&gt; & Ко","flow":"both"}]}]'>
+  <select id="cat" name="tx[cashflowCategory]" class="dds-picker__native"><option value=""></option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option></select>
+</div>
+<script type="module">
+  import { initDdsTreePickers } from '/assets/dds_tree_picker.js';
+  window.__changes = 0;
+  document.getElementById('cat').addEventListener('change', () => { window.__changes += 1; });
+  initDdsTreePickers();
+</script>
+</body>
+</html>

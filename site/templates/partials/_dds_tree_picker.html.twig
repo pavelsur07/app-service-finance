@@ -1,0 +1,19 @@
+{# Виджет «Статья ДДС» — дерево с поиском поверх обычного select (assets/dds_tree_picker.js).
+   Эталон: docs/design-system/components/dds-tree-picker/, SPEC §3.
+   Параметры:
+     select     разметка select'а (form_widget поля; класс dds-picker__native) — он
+                остаётся в форме, отправляется и работает без JS
+     tree       [{id, name, children: […]} | {id, name, flow: 'in'|'out'|'both'}], id листа == value option
+     direction  null | {source: CSS-селектор поля направления, in: value притока, out: value оттока}
+     placeholder  текст пустого значения (по умолчанию «Не распределено»)
+   Для поля CashflowCategoryTreeType подключается сам — тема form/cashflow_category_tree_theme.html.twig. #}
+<div class="dds-picker" data-dds-picker
+     data-tree="{{ tree|json_encode(constant('JSON_UNESCAPED_UNICODE'))|e('html_attr') }}"
+     data-placeholder="{{ placeholder|default('Не распределено') }}"
+     {%- if direction|default(null) %}
+     data-direction-source="{{ direction.source }}"
+     data-dir-in-value="{{ direction.in }}"
+     data-dir-out-value="{{ direction.out }}"
+     {%- endif %}>
+    {{ select|raw }}
+</div>

@@ -6,7 +6,6 @@ namespace App\Cash\Form\Transaction;
 
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -69,12 +68,9 @@ class CashTransactionType extends AbstractType
                 'disabled' => true,
                 'mapped' => false,
             ])
-            ->add('cashflowCategory', ChoiceType::class, [
-                'required' => false,
+            ->add('cashflowCategory', CashflowCategoryTreeType::class, [
                 'choices' => $this->categoryRepo->findTreeByCompany($company),
-                'choice_label' => static fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
-                'choice_value' => 'id',
-                'choice_attr' => static fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
+                'direction_field' => 'direction',
                 'mapped' => false,
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [

@@ -1,0 +1,84 @@
+/* DDS tree picker + общий вид поля-выбора (Статья ДДС, Проект, ЦФО, Контрагент).
+   Эталон: docs/design-system/screens/DdsCategoryPicker.dc.html и OperationDds.dc.html.
+   ВАЖНО: токены ниже — один слой алиасов. Сопоставь их с `--vf-*` из docs/design-system/sheets/Tokens
+   (меняй ТОЛЬКО этот блок). Значения-фолбэки = прототип. */
+:root{
+  --dds-primary:var(--vf-primary,#1d4ed8);
+  --dds-text:var(--vf-text,#0b1020);
+  --dds-muted:var(--vf-text-muted,#525b78);
+  --dds-surface:var(--vf-surface,#ffffff);
+  --dds-border:var(--vf-border,#dde1ec);
+  --dds-border-strong:var(--vf-border-strong,#c3c8d6);
+  --dds-head-bg:var(--vf-surface-subtle,#f4f6fb);
+  --dds-selected-bg:#e8effd;      /* выбранная/активная строка */
+  --dds-selected-soft:#eef3fd;
+  --dds-guide:#aab1c4;            /* направляющая вложенности */
+  --dds-count-bg:#e3e7f1;
+  --dds-hit:#fff1b8;              /* подсветка совпадения поиска */
+  --dds-warn:#9a4a00;
+  --dds-danger:var(--vf-danger-text,#9a001b);
+}
+
+/* ---------- Поле-кнопка (общее для всех pickers) ---------- */
+.dds-field{display:flex;align-items:stretch;height:36px;border:1px solid var(--dds-border-strong);border-radius:4px;background:var(--dds-surface)}
+.dds-field:hover{background:#fbfcfe}
+.dds-field[aria-invalid="true"],.dds-field.is-invalid{border-color:var(--dds-danger);box-shadow:inset 0 0 0 1px var(--dds-danger)}
+.dds-field:has(.dds-field__main:focus-visible){outline:2px solid var(--dds-primary);outline-offset:2px}
+.dds-field__main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;border:0;background:none;text-align:left;cursor:pointer;border-radius:4px;font:inherit;font-size:14px;color:var(--dds-text)}
+.dds-field__main:focus-visible{outline:none}
+.dds-field__value{flex:none;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.dds-field__value.is-empty{color:var(--dds-muted);font-weight:400}
+.dds-field__path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--dds-muted)}
+.dds-field__chev{flex:none;color:var(--dds-muted)}
+.dds-field__clear{flex:none;width:34px;border:0;border-left:1px solid var(--dds-border);background:none;color:var(--dds-muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:0 3px 3px 0}
+.dds-field__clear:hover{background:rgba(11,16,32,.07);color:var(--dds-text)}
+.dds-field__clear:focus-visible{outline:2px solid var(--dds-primary);outline-offset:-2px}
+.dds-field__note{margin-top:4px;font-size:12px;color:var(--dds-muted)}
+.dds-field__note.is-warn{color:var(--dds-warn)}
+.dds-picker{position:relative}
+.dds-picker__native{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+
+/* ---------- Popover ---------- */
+.dds-pop{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:320px;z-index:30;background:var(--dds-surface);border:1px solid var(--dds-border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18)}
+.dds-pop[hidden]{display:none}
+.dds-pop__head{padding:12px;border-bottom:1px solid var(--dds-border)}
+.dds-pop__search{position:relative}
+.dds-pop__search svg{position:absolute;left:12px;top:10px;color:var(--dds-muted);pointer-events:none}
+.dds-pop__input{width:100%;height:36px;padding:0 12px 0 36px;border:1px solid var(--dds-border-strong);border-radius:4px;background:var(--dds-surface);font:inherit;font-size:14px;color:var(--dds-text)}
+.dds-pop__input:focus-visible{outline:2px solid var(--dds-primary);outline-offset:-2px}
+.dds-pop__meta{margin-top:8px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:12px;color:var(--dds-muted)}
+.dds-link{background:none;border:0;padding:0;color:var(--dds-primary);cursor:pointer;font:inherit;font-size:12px;font-weight:500}
+.dds-link:hover{text-decoration:underline}
+.dds-pop__foot{display:flex;justify-content:space-between;gap:12px;padding:8px 16px;border-top:1px solid var(--dds-border);background:var(--dds-head-bg);font-size:12px;color:var(--dds-muted);border-radius:0 0 8px 8px}
+.dds-pop__empty{padding:24px 16px;text-align:center;color:var(--dds-muted)}
+
+/* ---------- Дерево ---------- */
+.dds-tree{max-height:340px;overflow-y:auto;padding:4px 0}
+.dds-tree__row{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;border:0;background-color:transparent;text-align:left;cursor:pointer;font:inherit;font-size:14px;line-height:20px;color:var(--dds-text)}
+.dds-tree__row:hover{background-color:var(--dds-head-bg)}
+.dds-tree__group{padding-left:12px;font-weight:700;font-size:13px}
+.dds-tree__group[data-d="0"]{margin-top:4px}
+.dds-tree__group:hover{background-color:var(--dds-head-bg)}
+.dds-tree__chev{flex:none;transition:transform .12s}
+.dds-tree__group[aria-expanded="true"] .dds-tree__chev{transform:rotate(90deg)}
+.dds-tree__name{flex:1;min-width:0}
+.dds-tree__count{flex:none;margin-right:16px;min-width:20px;padding:0 6px;border-radius:10px;background:var(--dds-count-bg);text-align:center;font-weight:600;font-size:12px;color:var(--dds-muted)}
+.dds-tree__hit{font-weight:700;background:var(--dds-hit)}
+.dds-tree__tag{flex:none;font-size:12px;color:var(--dds-muted)}
+.dds-tree__check{flex:none;width:28px;display:inline-flex;justify-content:center;color:var(--dds-primary)}
+.dds-tree__leaf[aria-selected="true"]{background-color:var(--dds-selected-soft);font-weight:600}
+.dds-tree__leaf[data-cur="true"]{background-color:var(--dds-selected-bg)}
+/* Шаг вложенности 22px; группы: padding = 12 + 22*d; листья: padding = 36 + 22*d;
+   направляющие: по одной на каждый уровень выше, x = 19 + 22*k. Поддержано до 4 уровней групп + лист. */
+.dds-tree__group[data-d="1"]{padding-left:34px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.dds-tree__group[data-d="2"]{padding-left:56px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.dds-tree__group[data-d="3"]{padding-left:78px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.dds-tree__group[data-d="4"]{padding-left:100px;font-weight:600;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.dds-tree__leaf[data-d="1"]{padding-left:58px;background-image:linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%;background-position:19px 0;background-repeat:no-repeat}
+.dds-tree__leaf[data-d="2"]{padding-left:80px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%;background-position:19px 0,41px 0;background-repeat:no-repeat}
+.dds-tree__leaf[data-d="3"]{padding-left:102px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0;background-repeat:no-repeat}
+.dds-tree__leaf[data-d="4"]{padding-left:124px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0;background-repeat:no-repeat}
+.dds-tree__leaf[data-d="5"]{padding-left:146px;background-image:linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4),linear-gradient(#aab1c4,#aab1c4);background-size:1px 100%,1px 100%,1px 100%,1px 100%,1px 100%;background-position:19px 0,41px 0,63px 0,85px 0,107px 0;background-repeat:no-repeat}
+
+@media (max-width:600px){.dds-pop{min-width:0}}
+@media (prefers-reduced-motion:reduce){.dds-tree__chev{transition:none}}

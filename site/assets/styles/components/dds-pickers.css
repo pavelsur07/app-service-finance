@@ -1,0 +1,396 @@
+/* Виджет «Статья ДДС» (дерево + поиск) и общий вид поля-выбора `.dds-field`.
+   Эталон: docs/design-system/components/dds-tree-picker/dds-pickers.css,
+   screens/DdsCategoryPicker.dc.html, dds-refs/02, 03, 11, 12.
+   Цвета — только через блок алиасов ниже (токены `--vf-*`, design-tokens.css).
+   Значений без токена на листах DS нет — они здесь же, с пометкой TODO(ds). */
+:root {
+  --dds-primary: var(--vf-primary);
+  --dds-text: var(--vf-text);
+  --dds-muted: var(--vf-text-muted);
+  --dds-surface: var(--vf-surface);
+  --dds-border: var(--vf-border);
+  --dds-border-strong: var(--vf-border-strong);
+  --dds-head-bg: var(--vf-surface-alt);
+  --dds-selected-bg: var(--vf-primary-lt);
+  --dds-warn: var(--vf-warn-text);
+  --dds-danger: var(--vf-danger-text);
+  --dds-clear-hover: var(--vf-ghost-hover-bg);
+  --dds-shadow: var(--vf-shadow-lg);
+  --dds-radius: var(--vf-radius);
+  --dds-radius-pop: var(--vf-radius-lg);
+  /* TODO(ds): токенов нет — значения эталона. */
+  --dds-field-hover: #fbfcfe;
+  --dds-selected-soft: #eef3fd;
+  --dds-guide: #aab1c4;
+  --dds-count-bg: #e3e7f1;
+  --dds-hit: #fff1b8;
+}
+
+/* ---------- Поле-кнопка (общее для полей-выбора) ---------- */
+.dds-picker {
+  position: relative;
+}
+
+.dds-field {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  border: 1px solid var(--dds-border-strong);
+  border-radius: var(--dds-radius);
+  background: var(--dds-surface);
+}
+
+.dds-field:hover {
+  background: var(--dds-field-hover);
+}
+
+.dds-field.is-invalid {
+  border-color: var(--dds-danger);
+  box-shadow: inset 0 0 0 1px var(--dds-danger);
+}
+
+.dds-field:has(.dds-field__main:focus-visible) {
+  outline: 2px solid var(--dds-primary);
+  outline-offset: 2px;
+}
+
+.dds-field.is-disabled {
+  background: var(--dds-head-bg);
+}
+
+.dds-field__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: var(--dds-radius);
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dds-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dds-field__main:focus-visible {
+  outline: none;
+}
+
+.dds-field__main:disabled {
+  color: var(--dds-muted);
+  cursor: default;
+}
+
+.dds-field__value {
+  flex: none;
+  max-width: 70%;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dds-field__value.is-empty {
+  font-weight: 400;
+  color: var(--dds-muted);
+}
+
+.dds-field__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--dds-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dds-field__chev {
+  flex: none;
+  color: var(--dds-muted);
+}
+
+.dds-field__clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  border: 0;
+  border-left: 1px solid var(--dds-border);
+  border-radius: 0 3px 3px 0;
+  background: none;
+  color: var(--dds-muted);
+  cursor: pointer;
+}
+
+.dds-field__clear:hover {
+  background: var(--dds-clear-hover);
+  color: var(--dds-text);
+}
+
+.dds-field__clear:focus-visible {
+  outline: 2px solid var(--dds-primary);
+  outline-offset: -2px;
+}
+
+.dds-field__clear[hidden] {
+  display: none;
+}
+
+.dds-field__note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--dds-muted);
+}
+
+.dds-field__note.is-warn {
+  color: var(--dds-warn);
+}
+
+/* Исходный select остаётся в форме и отправляется; прячется, только когда
+   виджет запущен (без JS работает как обычный select). */
+.dds-picker.is-ready .dds-picker__native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Popover ---------- */
+.dds-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  min-width: 320px;
+  border: 1px solid var(--dds-border);
+  border-radius: var(--dds-radius-pop);
+  background: var(--dds-surface);
+  box-shadow: var(--dds-shadow);
+}
+
+.dds-pop[hidden] {
+  display: none;
+}
+
+.dds-pop__head {
+  padding: 12px;
+  border-bottom: 1px solid var(--dds-border);
+}
+
+.dds-pop__search {
+  position: relative;
+}
+
+.dds-pop__search svg {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  color: var(--dds-muted);
+  pointer-events: none;
+}
+
+.dds-pop__input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 36px;
+  border: 1px solid var(--dds-border-strong);
+  border-radius: var(--dds-radius);
+  background: var(--dds-surface);
+  font: inherit;
+  font-size: 14px;
+  color: var(--dds-text);
+}
+
+.dds-pop__input:focus-visible {
+  outline: 2px solid var(--dds-primary);
+  outline-offset: -2px;
+}
+
+.dds-pop__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dds-muted);
+}
+
+.dds-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dds-primary);
+  cursor: pointer;
+}
+
+.dds-link:hover {
+  text-decoration: underline;
+}
+
+.dds-link:focus-visible {
+  outline: 2px solid var(--dds-primary);
+  outline-offset: 2px;
+}
+
+.dds-link[hidden] {
+  display: none;
+}
+
+.dds-pop__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--dds-border);
+  border-radius: 0 0 var(--dds-radius-pop) var(--dds-radius-pop);
+  background: var(--dds-head-bg);
+  font-size: 12px;
+  color: var(--dds-muted);
+}
+
+.dds-pop__empty {
+  padding: 24px 16px;
+  color: var(--dds-muted);
+  text-align: center;
+}
+
+/* ---------- Дерево ----------
+   Шаг вложенности 22px (`--d` — глубина строки, ставит JS): группа
+   12 + 22·d, лист 36 + 22·d; направляющая на каждый уровень выше,
+   x = 19 + 22·k. Работает для любой глубины. */
+.dds-tree {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.dds-tree__row {
+  --d: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 0 0 calc(36px + 22px * var(--d));
+  border: 0;
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 19px,
+    var(--dds-guide) 19px 20px,
+    transparent 20px 22px
+  );
+  background-repeat: no-repeat;
+  background-size: calc(22px * var(--d)) 100%;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dds-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dds-tree__row:hover {
+  background-color: var(--dds-head-bg);
+}
+
+.dds-tree__row:focus-visible {
+  outline: 2px solid var(--dds-primary);
+  outline-offset: -2px;
+}
+
+.dds-tree__group {
+  padding-left: calc(12px + 22px * var(--d));
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dds-tree__group[data-d="0"] {
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.dds-tree__chev {
+  flex: none;
+  transition: transform 0.12s;
+}
+
+.dds-tree__group[aria-expanded="true"] .dds-tree__chev {
+  transform: rotate(90deg);
+}
+
+.dds-tree__name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dds-tree__count {
+  flex: none;
+  min-width: 20px;
+  margin-right: 16px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--dds-count-bg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dds-muted);
+  text-align: center;
+}
+
+.dds-tree__hit {
+  background: var(--dds-hit);
+  font-weight: 700;
+}
+
+.dds-tree__tag {
+  flex: none;
+  font-size: 12px;
+  color: var(--dds-muted);
+}
+
+.dds-tree__check {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  width: 28px;
+  color: var(--dds-primary);
+}
+
+.dds-tree__leaf[aria-selected="true"] {
+  background-color: var(--dds-selected-soft);
+  font-weight: 600;
+}
+
+.dds-tree__leaf[data-cur="true"] {
+  background-color: var(--dds-selected-bg);
+}
+
+@media (max-width: 600px) {
+  .dds-pop {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dds-tree__chev {
+    transition: none;
+  }
+}
