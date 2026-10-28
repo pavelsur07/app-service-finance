@@ -399,8 +399,10 @@
   pointer-events: none;
 }
 
-/* Проект и Контрагент: прежние пикеры (логика без изменений) в виде `.dds-field`. */
-.dds-op__picker .input-group {
+/* Проект и Контрагент: прежние пикеры (логика без изменений) в виде `.dds-field` —
+   на «Операции ДДС» и в «Документе ОПиУ» (.vf-docform-picker). */
+.dds-op__picker .input-group,
+.vf-docform-picker .input-group {
   flex-wrap: nowrap;
   height: 36px;
   border: 1px solid var(--vf-border-strong);
@@ -408,12 +410,14 @@
   background: var(--vf-surface);
 }
 
-.dds-op__picker .input-group:focus-within {
+.dds-op__picker .input-group:focus-within,
+.vf-docform-picker .input-group:focus-within {
   outline: 2px solid var(--vf-primary);
   outline-offset: 2px;
 }
 
-.dds-op__picker .input-group > .form-control {
+.dds-op__picker .input-group > .form-control,
+.vf-docform-picker .input-group > .form-control {
   height: 34px;
   border: 0;
   background: transparent;
@@ -421,12 +425,15 @@
   font-weight: 500;
 }
 
-.dds-op__picker .input-group > .form-control:focus-visible {
+.dds-op__picker .input-group > .form-control:focus-visible,
+.vf-docform-picker .input-group > .form-control:focus-visible {
   outline: none;
 }
 
 .dds-op__picker .input-group > .btn,
-.dds-op__picker .input-group > .input-group-text {
+.vf-docform-picker .input-group > .btn,
+.dds-op__picker .input-group > .input-group-text,
+.vf-docform-picker .input-group > .input-group-text {
   width: 34px;
   min-width: 34px;
   padding: 0;
@@ -438,17 +445,21 @@
   justify-content: center;
 }
 
-.dds-op__picker .input-group > .btn:last-child {
+.dds-op__picker .input-group > .btn:last-child,
+.vf-docform-picker .input-group > .btn:last-child {
   border-radius: 0 3px 3px 0;
 }
 
-.dds-op__picker .input-group > .btn:hover {
+.dds-op__picker .input-group > .btn:hover,
+.vf-docform-picker .input-group > .btn:hover {
   background: var(--vf-ghost-hover-bg);
   color: var(--vf-text);
 }
 
 .dds-op__picker .input-group > .btn:disabled,
-.dds-op__picker .cp-selected-mark {
+.vf-docform-picker .input-group > .btn:disabled,
+.dds-op__picker .cp-selected-mark,
+.vf-docform-picker .cp-selected-mark {
   display: none;
 }
 

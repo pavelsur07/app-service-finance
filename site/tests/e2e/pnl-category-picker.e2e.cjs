@@ -22,7 +22,8 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     args: ['--no-sandbox', '--disable-dev-shm-usage', `--host-resolver-rules=MAP localhost ${SITE_IP}`],
   });
   const p = await browser.newPage();
-  await p.setViewport({ width: 1440, height: 1000 });
+  // высокое окно: строки операций не прячутся под прилипшей панелью сохранения
+  await p.setViewport({ width: 1440, height: 1500 });
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
 
@@ -39,8 +40,8 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     await p.screenshot({ path: path.join(SHOTS, name) });
   };
   const row = (i) => `[data-operation-row]:nth-child(${i + 1})`;
-  const pick = (i) => `${row(i)} [data-dds-picker]`;
-  const openState = () => p.$$eval('[data-dds-picker] .dds-pop', (pops) => pops.map((n) => !n.hidden));
+  const pick = (i) => `${row(i)} .vf-docform-op__cell--category [data-dds-picker]`;
+  const openState = () => p.$$eval('.vf-docform-op__cell--category [data-dds-picker] .dds-pop', (pops) => pops.map((n) => !n.hidden));
   const visibleRows = () => p.$$eval(`${pick(0)} .dds-tree__row`, (rows) => rows.map((r) => ({
     name: r.querySelector('.dds-tree__name').textContent,
     group: r.classList.contains('dds-tree__group'),
@@ -55,13 +56,15 @@ const EDIT = `/documents/${DOC_ID}/edit`;
   await p.type('input[name=_password]', 'password');
   await Promise.all([p.waitForNavigation(), p.click('button[type=submit]')]);
   await p.goto(`http://localhost${EDIT}`, { waitUntil: 'networkidle0' });
+  // панель отладки Symfony (dev-стенд) перекрывает подвал
+  await p.evaluate(() => document.querySelectorAll('.sf-toolbar, [id^="sfToolbar"], [id^="sfwdt"]').forEach((n) => n.remove()));
 
   await t('виджет в каждой строке, select спрятан, дерево одно на страницу', async () => {
     const r = await p.evaluate(() => ({
-      pickers: document.querySelectorAll('[data-operation-row] [data-dds-picker].is-ready').length,
+      pickers: document.querySelectorAll('[data-operation-row] .vf-docform-op__cell--category [data-dds-picker].is-ready').length,
       rows: document.querySelectorAll('[data-operation-row]').length,
       // select остаётся в форме, но визуально скрыт (1×1, clip)
-      selectVisible: [...document.querySelectorAll('[data-operation-row] select.dds-picker__native')].some((s) => s.getBoundingClientRect().width > 1),
+      selectVisible: [...document.querySelectorAll('[data-operation-row] [data-dds-picker] select.dds-picker__native')].some((s) => s.getBoundingClientRect().width > 1),
       trees: document.querySelectorAll('script#document-category-tree').length,
     }));
     return r.pickers === r.rows && r.rows >= 2 && !r.selectVisible && r.trees === 1 || JSON.stringify(r);
@@ -96,7 +99,7 @@ const EDIT = `/documents/${DOC_ID}/edit`;
   });
 
   await t('клик по группе раскрывает/сворачивает, значение не меняется', async () => {
-    const before = await p.$eval(`${row(0)} select.dds-picker__native`, (s) => s.value);
+    const before = await p.$eval(`${row(0)} [data-operation-category]`, (s) => s.value);
     const toggle = async () => p.evaluate(() => {
       const g = [...document.querySelectorAll('.dds-pop:not([hidden]) .dds-tree__group')].find((n) => n.textContent.includes('Выручка'));
       g.click();
@@ -105,7 +108,7 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     const first = await toggle();
     const collapsed = await p.evaluate(() => [...document.querySelectorAll('.dds-pop:not([hidden]) .dds-tree__group')].find((n) => n.textContent.includes('Выручка')).getAttribute('aria-expanded'));
     await p.evaluate(() => [...document.querySelectorAll('.dds-pop:not([hidden]) .dds-tree__group')].find((n) => n.textContent.includes('Выручка')).click());
-    const after = await p.$eval(`${row(0)} select.dds-picker__native`, (s) => s.value);
+    const after = await p.$eval(`${row(0)} [data-operation-category]`, (s) => s.value);
     return first === 'true' && collapsed === 'false' && before === after || JSON.stringify({ first, collapsed, before, after });
   });
 
@@ -149,7 +152,7 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     await p.keyboard.press('Enter');
     const r = await p.evaluate((sel) => {
       const root = document.querySelector(sel);
-      const s = root.querySelector('select.dds-picker__native');
+      const s = root.querySelector('select');
       return {
         text: s.selectedOptions[0].textContent.trim(),
         open: !root.querySelector('.dds-pop').hidden,
@@ -198,16 +201,16 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     await p.click('.add_item_link');
     await p.waitForFunction(() => {
       const rows = document.querySelectorAll('[data-operation-row]');
-      return rows[rows.length - 1].querySelector('[data-dds-picker].is-ready .dds-field__main');
+      return rows[rows.length - 1].querySelector('.vf-docform-op__cell--category [data-dds-picker].is-ready .dds-field__main');
     }, { timeout: 3000 });
     const last = '[data-operation-row]:last-child';
-    await p.click(`${last} .dds-field__main`);
+    await p.click(`${last} .vf-docform-op__cell--category .dds-field__main`);
     await p.keyboard.type('Аренда');
     await p.keyboard.press('Enter');
     const r = await p.$eval(last, (n) => ({
-      value: n.querySelector('.dds-field__value').textContent,
-      empty: n.querySelector('.dds-field__value').classList.contains('is-empty'),
-      selected: n.querySelector('select.dds-picker__native').selectedOptions[0].textContent.trim(),
+      value: n.querySelector('.vf-docform-op__cell--category .dds-field__value').textContent,
+      empty: n.querySelector('.vf-docform-op__cell--category .dds-field__value').classList.contains('is-empty'),
+      selected: n.querySelector('[data-operation-category]').selectedOptions[0].textContent.trim(),
     }));
     // строку убираем: сохраняем ниже без неё
     await p.click(`${last} .remove-item`);
@@ -215,10 +218,10 @@ const EDIT = `/documents/${DOC_ID}/edit`;
   });
 
   await t('сохранение: выбранная категория записана', async () => {
-    const id = await p.$eval(`${row(0)} select.dds-picker__native`, (s) => s.value);
-    await Promise.all([p.waitForNavigation(), p.click('.vf-docform-footer button[type=submit]')]);
+    const id = await p.$eval(`${row(0)} [data-operation-category]`, (s) => s.value);
+    await Promise.all([p.waitForNavigation(), p.click('[data-document-save]')]);
     await p.goto(`http://localhost${EDIT}`, { waitUntil: 'networkidle0' });
-    const saved = await p.$eval(`${row(0)} select.dds-picker__native`, (s) => s.value);
+    const saved = await p.$eval(`${row(0)} [data-operation-category]`, (s) => s.value);
     const name = await p.$eval(`${pick(0)} .dds-field__value`, (n) => n.textContent);
     return saved === id && name === 'Электроэнергия цеха' || JSON.stringify({ id, saved, name });
   });

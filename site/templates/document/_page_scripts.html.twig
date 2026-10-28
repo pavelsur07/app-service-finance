@@ -21,6 +21,58 @@
             }
         };
 
+        // Значение select'а с уведомлением пикеров (виджет ЦФО, пикер проекта читают его по change).
+        // Варианта нет среди option строки — не трогаем: иначе select молча сбросится в пустое.
+        const setSelect = function (field, value) {
+            if (!field || field.value === value) {
+                return field ? field.value === value : false;
+            }
+            if (value !== '' && !Array.from(field.options).some(function (o) { return o.value === value; })) {
+                return false;
+            }
+            field.value = value;
+            field.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        };
+        const optionText = function (field) {
+            const option = field && field.selectedOptions ? field.selectedOptions[0] : null;
+            return option ? option.textContent.replace(/^[\s\u00a0—-]+/, '').trim() : '';
+        };
+
+        // Проект и ЦФО шапки — значения операций по умолчанию (SPEC §4.1). Операция «наследует»,
+        // пока её значение равно шапке; флагов нет — признак считается сравнением при каждой смене.
+        const inherit = {
+            project: { header: documentProjectField, row: '[data-operation-project-direction]', name: 'Проект', verb: 'подставлен' },
+            cfo: { header: documentResponsibilityCenterField, row: '[data-operation-responsibility-center]', name: 'ЦФО', verb: 'подставлен' },
+        };
+        Object.keys(inherit).forEach(function (kind) {
+            inherit[kind].last = inherit[kind].header ? inherit[kind].header.value : '';
+        });
+        const syncMarks = function (row) {
+            Object.keys(inherit).forEach(function (kind) {
+                const cfg = inherit[kind];
+                const field = row.querySelector(cfg.row);
+                const mark = row.querySelector('[data-inherit-mark="' + kind + '"]');
+                if (mark) {
+                    mark.hidden = !cfg.header || !field || cfg.header.value === '' || field.value === cfg.header.value;
+                }
+            });
+        };
+        const operationsWord = function (n) {
+            return n % 10 === 1 && n % 100 !== 11 ? 'операции' : 'операций';
+        };
+        const notice = document.querySelector('[data-inherit-notice]');
+        let noticeTimer = null;
+        const showNotice = function (text) {
+            if (!notice) {
+                return;
+            }
+            notice.textContent = text;
+            notice.hidden = false;
+            clearTimeout(noticeTimer);
+            noticeTimer = setTimeout(function () { notice.hidden = true; }, 8000);
+        };
+
         // Деньги по DS-Money: неразрывные пробелы в разрядах, запятая, настоящий минус.
         const formatter = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const money = function (value) {
@@ -35,10 +87,20 @@
         const rest = function (value) {
             return money(value) + (currencyCode === 'RUB' ? '' : '\u00A0' + currencySymbol);
         };
+        // Сумма в поле — как в DS-Money («120 000,00»); на сервер уходит без разрядов и с точкой.
+        const amountNumber = function (text) {
+            const raw = String(text || '').replace(/[\s\u00a0\u202f]/g, '').replace('\u2212', '-').replace(',', '.');
+            return /^-?\d+(\.\d+)?$/.test(raw) ? parseFloat(raw) : null;
+        };
         const parseAmount = function (input) {
-            const raw = (input && input.value ? input.value : '').replace(/[\s  ]/g, '').replace(',', '.');
-            const value = parseFloat(raw);
-            return isFinite(value) ? value : 0;
+            const value = amountNumber(input ? input.value : '');
+            return value !== null && isFinite(value) ? value : 0;
+        };
+        const formatAmountInput = function (input) {
+            const value = amountNumber(input.value);
+            if (value !== null) {
+                input.value = money(value);
+            }
         };
         const flowOf = function (row) {
             const select = row.querySelector('[data-operation-category]');
@@ -110,6 +172,17 @@
             uncat.textContent = uncategorized ? uncategorized + ' без статьи — не входят в итог' : '';
             countBadge.textContent = String(rows.length);
             emptyState.hidden = rows.length > 0;
+            rows.forEach(function (row, i) {
+                const comment = row.querySelector('[data-operation-comment]');
+                if (comment) {
+                    comment.setAttribute('aria-label', 'Описание, операция ' + (i + 1));
+                }
+                // Единственную операцию не удалить (SPEC §5.1): документ без операций не попадёт в ОПиУ.
+                const remove = row.querySelector('.remove-item');
+                if (remove) {
+                    remove.disabled = rows.length === 1;
+                }
+            });
 
             if (allocation && isFinite(available)) {
                 const left = Math.round((available - sum) * 100) / 100;
@@ -125,7 +198,16 @@
             }
         };
 
+        // Правка: «Сохранить» неактивна, пока нет изменений (SPEC §3). Создание — активна всегда.
+        const saveButton = form.querySelector('[data-document-save]');
+        if (saveButton && form.getAttribute('data-document-mode') === 'edit' && !dirty) {
+            saveButton.disabled = true;
+        }
+
         const markDirty = function () {
+            if (saveButton) {
+                saveButton.disabled = false;
+            }
             if (dirty) {
                 recalc();
                 return;
@@ -149,28 +231,91 @@
             }
         });
 
-        const addOperation = function (amount) {
+        const createRow = function () {
             const html = holder.dataset.prototype.replace(/__name__/g, String(nextIndex++));
             const template = document.createElement('template');
             template.innerHTML = html.trim();
-            const row = template.content.firstElementChild;
+            return template.content.firstElementChild;
+        };
+        // Виджеты строки (категория, ЦФО, пикеры) подключаются наблюдателем DOM после вставки —
+        // фокус ставим следующей задачей, на кнопку виджета категории.
+        const focusRow = function (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setTimeout(function () {
+                const target = row.querySelector('.vf-docform-op__cell--category .dds-field__main') || row.querySelector('select, input:not([type="hidden"])');
+                if (target) {
+                    target.focus({ preventScroll: true });
+                }
+            }, 0);
+        };
+
+        // Новая операция — значения шапки (проект, ЦФО; контрагент — только в пустое поле).
+        const addOperation = function (amount) {
+            const row = createRow();
             holder.appendChild(row);
             prefill(row, documentCounterpartyField, '[data-operation-counterparty]');
-            prefill(row, documentProjectField, '[data-operation-project-direction]');
-            prefill(row, documentResponsibilityCenterField, '[data-operation-responsibility-center]');
+            Object.keys(inherit).forEach(function (kind) {
+                const cfg = inherit[kind];
+                if (cfg.header && cfg.header.value !== '') {
+                    setSelect(row.querySelector(cfg.row), cfg.header.value);
+                }
+            });
             if (amount) {
-                row.querySelector('[data-operation-amount]').value = amount.toFixed(2);
+                row.querySelector('[data-operation-amount]').value = money(amount);
             }
+            syncMarks(row);
             markDirty();
-            row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            const first = row.querySelector('select, input:not([type="hidden"])');
-            if (first) {
-                first.focus({ preventScroll: true });
-            }
+            focusRow(row);
+        };
+
+        // Дубль — копия значений исходной строки, сразу под ней (SPEC §4.1 п.6).
+        const duplicateOperation = function (source) {
+            const row = createRow();
+            source.after(row);
+            ['[data-operation-category]', '[data-operation-project-direction]', '[data-operation-responsibility-center]', '[data-operation-counterparty]'].forEach(function (selector) {
+                const from = source.querySelector(selector);
+                const to = row.querySelector(selector);
+                if (!from || !to || from.value === '') {
+                    return;
+                }
+                // Вариант мог быть добавлен в исходную строку позже (найден поиском контрагента).
+                if (!Array.from(to.options).some(function (o) { return o.value === from.value; }) && from.selectedOptions[0]) {
+                    to.appendChild(from.selectedOptions[0].cloneNode(true));
+                }
+                setSelect(to, from.value);
+            });
+            ['[data-operation-amount]', '[data-operation-comment]'].forEach(function (selector) {
+                const from = source.querySelector(selector);
+                const to = row.querySelector(selector);
+                if (from && to) {
+                    to.value = from.value;
+                }
+            });
+            syncMarks(row);
+            markDirty();
+            focusRow(row);
         };
 
         addButton.addEventListener('click', function () { addOperation(0); });
         holder.addEventListener('click', function (e) {
+            const duplicateButton = e.target.closest('[data-operation-duplicate]');
+            if (duplicateButton) {
+                duplicateOperation(duplicateButton.closest('[data-operation-row]'));
+                return;
+            }
+            const resetButton = e.target.closest('[data-inherit-reset]');
+            if (resetButton) {
+                const row = resetButton.closest('[data-operation-row]');
+                const cfg = inherit[resetButton.getAttribute('data-inherit-reset')];
+                setSelect(row.querySelector(cfg.row), cfg.header.value);
+                syncMarks(row);
+                const cell = row.querySelector(cfg.row).closest('.vf-docform-op__cell');
+                const focusTarget = cell.querySelector('.dds-field__main, input:not([type="hidden"])');
+                if (focusTarget) {
+                    focusTarget.focus();
+                }
+                return;
+            }
             const removeButton = e.target.closest('.remove-item');
             if (!removeButton) {
                 return;
@@ -181,6 +326,45 @@
                 markDirty();
                 addButton.focus();
             }
+        });
+        holder.addEventListener('change', function (e) {
+            const row = e.target.closest('[data-operation-row]');
+            if (row) {
+                syncMarks(row);
+            }
+        });
+
+        // Смена Проекта/ЦФО шапки — только в наследующие операции, остальные не трогаем.
+        Object.keys(inherit).forEach(function (kind) {
+            const cfg = inherit[kind];
+            if (!cfg.header) {
+                return;
+            }
+            cfg.header.addEventListener('change', function () {
+                const value = cfg.header.value;
+                const previous = cfg.last;
+                cfg.last = value;
+                if (value === previous) {
+                    return;
+                }
+                const rows = holder.querySelectorAll('[data-operation-row]');
+                let applied = 0;
+                rows.forEach(function (row) {
+                    const field = row.querySelector(cfg.row);
+                    if (field && field.value === previous && setSelect(field, value)) {
+                        applied += 1;
+                    }
+                    syncMarks(row);
+                });
+                if (!rows.length) {
+                    return;
+                }
+                const manual = rows.length - applied;
+                const what = value === ''
+                    ? cfg.name + ' очищен в ' + applied + ' из ' + rows.length + ' ' + operationsWord(rows.length) + '.'
+                    : cfg.name + ' «' + optionText(cfg.header) + '» ' + cfg.verb + ' в ' + applied + ' из ' + rows.length + ' ' + operationsWord(rows.length) + '.';
+                showNotice(what + (manual ? ' В ' + manual + ' задан вручную.' : ''));
+            });
         });
         if (allocation) {
             allocation.querySelector('[data-allocation-fill]').addEventListener('click', function () {
@@ -193,9 +377,31 @@
             });
         }
 
+        const description = form.querySelector('[data-document-description]');
+        const descriptionCounter = form.querySelector('[data-document-description-counter]');
+        if (description && descriptionCounter) {
+            description.addEventListener('input', function () {
+                descriptionCounter.textContent = description.value.length + ' из 500';
+            });
+        }
+
         form.addEventListener('input', markDirty);
         form.addEventListener('change', markDirty);
-        form.addEventListener('submit', function () { submitting = true; });
+        form.addEventListener('submit', function () {
+            submitting = true;
+            form.querySelectorAll('[data-operation-amount]').forEach(function (input) {
+                const value = amountNumber(input.value);
+                if (value !== null) {
+                    input.value = value.toFixed(2);
+                }
+            });
+        });
+        holder.addEventListener('focusout', function (e) {
+            if (e.target.matches('[data-operation-amount]')) {
+                formatAmountInput(e.target);
+            }
+        });
+        holder.querySelectorAll('[data-operation-amount]').forEach(formatAmountInput);
         document.querySelectorAll('[data-leave-safe-form]').forEach(function (f) {
             f.addEventListener('submit', function () { submitting = true; });
         });
@@ -254,6 +460,7 @@
                 badge.hidden = false;
             }
         }
+        holder.querySelectorAll('[data-operation-row]').forEach(syncMarks);
         recalc();
     });
 </script>

@@ -51,7 +51,7 @@ final class DocumentCategoryPickerTest extends WebTestCaseBase
 
         $prototype = (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype');
         self::assertStringContainsString('data-tree-source="#document-category-tree"', $prototype);
-        self::assertStringNotContainsString('data-tree=', $prototype, 'дерево не копируется в строку');
+        self::assertSame(1, substr_count($prototype, 'data-tree="'), 'дерево статей не копируется в строку: своё дерево только у плоского ЦФО');
 
         $treeScript = $crawler->filter('script#document-category-tree[type="application/json"]');
         self::assertCount(1, $treeScript);
@@ -61,6 +61,35 @@ final class DocumentCategoryPickerTest extends WebTestCaseBase
             $tree,
         );
         self::assertStringNotContainsString((string) $foreign->getId(), $treeScript->text());
+    }
+
+    /**
+     * Макет PNL-DOCUMENT-SPEC: Проект/ЦФО шапки наследуются операциями на клиенте — у строки и у
+     * data-prototype есть пометка «Изменён», ЦФО — тот же виджет; описание — прежнее поле comment.
+     */
+    public function testRowsCarryInheritanceMarksCfoPickerAndDescription(): void
+    {
+        $client = static::createClient();
+        [$user, $company, , $leaf] = $this->prepare();
+        $document = $this->persistDocument($company, $leaf, 1);
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('edit', $crawler->filter('form[data-document-form]')->attr('data-document-mode'));
+        self::assertCount(1, $crawler->filter('[data-dds-picker] select[data-document-responsibility-center]'));
+        $prototype = (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype');
+        foreach (['data-inherit-mark="project"', 'data-inherit-mark="cfo"', 'data-operation-duplicate', 'data-operation-comment', 'data-operation-responsibility-center'] as $hook) {
+            self::assertStringContainsString($hook, $prototype, $hook);
+            self::assertGreaterThan(0, $crawler->filter('[data-operation-row]')->filter(sprintf('[%s]', explode('=', $hook)[0]))->count(), $hook);
+        }
+        self::assertSame('Описание', trim($crawler->filter('label[for="document_operations_0_comment"]')->text()));
+        self::assertSame(
+            ['Дублировать документ', 'Выгрузить JSON', 'Удалить документ'],
+            $crawler->filter('.vf-page-head .dropdown-menu .dropdown-item')->each(static fn ($n): string => trim($n->text())),
+            'без основания пункта «Открыть операцию ДДС» нет',
+        );
     }
 
     public function testPickedLeafIsSavedThroughTheSameField(): void
@@ -98,6 +127,40 @@ final class DocumentCategoryPickerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertCount(1, $crawler->filter('select.is-invalid[name="document[operations][0][category]"]'), 'ошибка у поля, без сохранения');
         self::assertSame((string) $leaf->getId(), (string) $this->reloadedOperation($document)->getCategory()?->getId());
+    }
+
+    /**
+     * IDOR: документ, проект и ЦФО другой компании через форму не открываются и не сохраняются.
+     */
+    public function testForeignDocumentProjectAndCfoAreRejected(): void
+    {
+        $client = static::createClient();
+        [$user, $company, , $leaf] = $this->prepare();
+        $foreignCompany = CompanyBuilder::aCompany()->withIndex(random_int(1000, 9999))->withOwner($user)->build();
+        $foreignProject = new ProjectDirection(Uuid::uuid4()->toString(), $foreignCompany, 'Чужой проект');
+        $foreignCenter = new FinancialResponsibilityCenter((string) $foreignCompany->getId(), 'FOREIGN', 'Чужой ЦФО');
+        $foreignLeaf = PLCategoryBuilder::aPLCategory()->withId(Uuid::uuid4()->toString())->forCompany($foreignCompany)->withName('Чужая статья')->build();
+        $this->persist($foreignCompany, $foreignProject, $foreignCenter, $foreignLeaf);
+        $foreignDocument = $this->persistDocument($foreignCompany, $foreignLeaf, 1);
+        $document = $this->persistDocument($company, $leaf, 1);
+
+        $this->login($client, $user, $company);
+        $client->request('GET', sprintf('/documents/%s/edit', $foreignDocument->getId()));
+        self::assertResponseStatusCodeSame(404);
+
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+        $form = $crawler->selectButton('Сохранить')->form();
+        $values = $form->getPhpValues();
+        $values['document']['projectDirection'] = (string) $foreignProject->getId();
+        $values['document']['operations'][0]['responsibilityCenterId'] = $foreignCenter->getId();
+        $crawler = $client->request('POST', (string) $form->getUri(), $values);
+
+        self::assertResponseIsSuccessful();
+        $summary = $crawler->filter('[data-error-summary] li')->each(static fn ($n): string => trim($n->text()));
+        self::assertNotEmpty(array_filter($summary, static fn (string $line): bool => str_starts_with($line, 'Проект:')), 'чужой проект шапки: '.implode(' | ', $summary));
+        self::assertCount(1, $crawler->filter('select.is-invalid[name="document[operations][0][responsibilityCenterId]"]'), 'чужой ЦФО операции');
+        $this->em()->clear();
+        self::assertNull($this->em()->find(Document::class, $document->getId())?->getProjectDirection());
     }
 
     private function reloadedOperation(Document $document): DocumentOperation
