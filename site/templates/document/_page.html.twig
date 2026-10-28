@@ -1,10 +1,13 @@
 {#
   Страница документа ОПиУ — создание, копия и правка (document_new, document_copy, document_edit).
-  Эталон — docs/design-system/screens/PnlDocument.dc.html и pnl-refs/05–07; отчёт — docs/plan/ds-pnl-documents.md.
+  Эталон — docs/design-system/screens/PnlDocument.dc.html, PNL-DOCUMENT-SPEC.md и pnl-refs/01–12;
+  отчёты — docs/plan/ds-pnl-documents.md (раздел, PR 2 #2699) и docs/plan/ds-pnl-document.md (макет, виджет).
   Контекст: form; для правки — item и transactionAllocation (null, если нет основания).
   Хуки JS и тестов сохранены: data-collection-holder + data-prototype, .add_item_link, .remove-item,
   .document-operation-card, data-document-*, data-operation-*; имена полей и CSRF формы — прежние.
   Итоги, тип операции и остаток по основанию считает клиент для подсказки; истина — сервер при сохранении.
+  Проект/ЦФО шапки подставляются в операции на клиенте: операция «наследует», пока её значение
+  равно шапке (data-inherit-*; флагов в БД нет), — SPEC §4.1.
 #}
 {% set doc = item ?? form.vars.value %}
 {% set isEdit = item is defined and item is not null %}
@@ -40,7 +43,32 @@
     {% endfor %}
 {% endfor %}
 
+{# ЦФО — тот же виджет, что у категории: плоский список с поиском поверх прежнего select (как на «Операции ДДС»). #}
+{% macro cfoPicker(field, placeholder, emptyNote) %}
+    {% set rcTree = [] %}
+    {% for choice in field.vars.choices %}
+        {% set rcTree = rcTree|merge([{id: choice.value, name: choice.label, flow: 'both'}]) %}
+    {% endfor %}
+    {{ include('partials/_dds_tree_picker.html.twig', {
+        select: form_widget(field, {attr: field.vars.attr|merge({class: 'form-select dds-picker__native'})}),
+        tree: rcTree,
+        direction: null,
+        placeholder: placeholder,
+        empty_note: emptyNote,
+        noun: 'ЦФО',
+    }, with_context = false) }}
+{% endmacro %}
+
+{# Пометка «Изменён» у поля операции, отличного от шапки; «Как в шапке» возвращает значение шапки. #}
+{% macro inheritMark(kind) %}
+    <div class="vf-docform-op__mark" data-inherit-mark="{{ kind }}" hidden>
+        <span class="vf-docform-op__changed">Изменён</span>
+        <button type="button" class="vf-docform-op__reset" data-inherit-reset="{{ kind }}">Как в шапке</button>
+    </div>
+{% endmacro %}
+
 {% macro opRow(operationForm) %}
+    {% import _self as page %}
     {% set selected = operationForm.category.vars.value %}
     {% set flow = null %}
     {% for choice in operationForm.category.vars.choices %}
@@ -50,35 +78,54 @@
         <div class="vf-docform-op__type">
             <span class="vf-docform-flow" data-operation-flow-label data-flow="{{ flow ?? '' }}">{{ flow == 'INCOME' ? 'Доход' : (flow == 'EXPENSE' ? 'Расход' : '—') }}</span>
         </div>
-        {% for name in ['category', 'amount', 'counterparty', 'projectDirection', 'responsibilityCenterId'] %}
-            {% set field = operationForm[name] %}
-            <div class="vf-docform-op__cell vf-docform-op__cell--{{ name }}">
-                {{ form_label(field, null, {label_attr: {class: 'visually-hidden'}}) }}
-                {% if name == 'amount' %}
-                    {{ form_widget(field, {attr: {class: 'vf-num', inputmode: 'decimal', 'data-operation-amount': 'true', placeholder: '0,00'}}) }}
-                {% elseif name == 'category' %}
-                    {{ form_widget(field, {attr: {'data-operation-category': 'true'}}) }}
-                {% else %}
-                    {{ form_widget(field) }}
-                {% endif %}
-                {{ form_errors(field) }}
-                {% if name == 'responsibilityCenterId' and not field.vars.value %}
-                    <div class="form-hint vf-docform-op__hint">Без ЦФО операция не попадёт в разрез по ЦФО</div>
-                {% endif %}
-            </div>
-        {% endfor %}
-        <div class="vf-docform-op__cell vf-docform-op__cell--comment">
-            {{ form_label(operationForm.comment, null, {label_attr: {class: 'visually-hidden'}}) }}
-            {{ form_widget(operationForm.comment, {attr: {placeholder: 'Комментарий к операции'}}) }}
-            {{ form_errors(operationForm.comment) }}
+        <div class="vf-docform-op__cell vf-docform-op__cell--category">
+            {{ form_label(operationForm.category, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.category, {attr: {'data-operation-category': 'true'}}) }}
+            {{ form_errors(operationForm.category) }}
+        </div>
+        <div class="vf-docform-op__cell vf-docform-op__cell--projectDirection vf-docform-picker">
+            {{ form_label(operationForm.projectDirection, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.projectDirection) }}
+            {{ form_errors(operationForm.projectDirection) }}
+            {{ page.inheritMark('project') }}
+        </div>
+        <div class="vf-docform-op__cell vf-docform-op__cell--responsibilityCenterId">
+            {{ form_label(operationForm.responsibilityCenterId, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ page.cfoPicker(operationForm.responsibilityCenterId, 'Не указан', 'Без ЦФО операция не попадёт в разрез по ЦФО') }}
+            {{ form_errors(operationForm.responsibilityCenterId) }}
+            {{ page.inheritMark('cfo') }}
+        </div>
+        <div class="vf-docform-op__cell vf-docform-op__cell--amount">
+            {{ form_label(operationForm.amount, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.amount, {attr: {class: 'vf-num', inputmode: 'decimal', 'data-operation-amount': 'true', placeholder: '0,00'}}) }}
+            {{ form_errors(operationForm.amount) }}
         </div>
         <div class="vf-docform-op__actions">
+            <button type="button"
+                    class="btn btn-ghost-secondary btn-icon btn-sm"
+                    data-operation-duplicate
+                    title="Дублировать операцию"
+                    aria-label="Дублировать операцию">
+                <i class="ti ti-copy" aria-hidden="true"></i>
+            </button>
             <button type="button"
                     class="btn btn-ghost-secondary btn-icon btn-sm remove-item"
                     title="Удалить операцию"
                     aria-label="Удалить операцию">
                 <i class="ti ti-trash" aria-hidden="true"></i>
             </button>
+        </div>
+        <div class="vf-docform-op__sublabel vf-docform-op__sublabel--comment" aria-hidden="true">Описание</div>
+        <div class="vf-docform-op__cell vf-docform-op__cell--comment">
+            {{ form_label(operationForm.comment, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.comment, {attr: {placeholder: 'За что платим, например: аренда офиса, октябрь', 'data-operation-comment': 'true'}}) }}
+            {{ form_errors(operationForm.comment) }}
+        </div>
+        <div class="vf-docform-op__sublabel vf-docform-op__sublabel--counterparty" aria-hidden="true">Контрагент</div>
+        <div class="vf-docform-op__cell vf-docform-op__cell--counterparty vf-docform-picker">
+            {{ form_label(operationForm.counterparty, null, {label_attr: {class: 'visually-hidden'}}) }}
+            {{ form_widget(operationForm.counterparty) }}
+            {{ form_errors(operationForm.counterparty) }}
         </div>
         {{ form_errors(operationForm) }}
     </div>
@@ -112,15 +159,20 @@
                     Ещё <i class="ti ti-chevron-down ms-1" aria-hidden="true"></i>
                 </button>
                 <div class="dropdown-menu dropdown-menu-end">
+                    <a class="dropdown-item" href="{{ path('document_copy', {'id': doc.id}) }}">
+                        <i class="ti ti-copy me-2" aria-hidden="true"></i> Дублировать документ
+                    </a>
+                    {% if cashTransaction %}
+                        <a class="dropdown-item" href="{{ path('cash_transaction_show', {'id': cashTransaction.id}) }}">
+                            <i class="ti ti-arrows-exchange me-2" aria-hidden="true"></i> Открыть операцию ДДС
+                        </a>
+                    {% endif %}
                     <a class="dropdown-item" href="{{ path('document_export_json', {'id': doc.id}) }}" target="_blank" rel="noopener" data-leave-safe>
                         <i class="ti ti-download me-2" aria-hidden="true"></i> Выгрузить JSON
                     </a>
-                    <a class="dropdown-item" href="{{ path('document_copy', {'id': doc.id}) }}">
-                        <i class="ti ti-copy me-2" aria-hidden="true"></i> Копировать
-                    </a>
                     <div class="dropdown-divider"></div>
                     <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#document-delete-modal">
-                        <i class="ti ti-trash me-2" aria-hidden="true"></i> Удалить
+                        <i class="ti ti-trash me-2" aria-hidden="true"></i> Удалить документ
                     </button>
                 </div>
             </div>
@@ -129,7 +181,7 @@
 </div>
 
 {# Валюта документа — для сумм, которые считает JS: из основания ДДС без пересчёта, у ручного — рубли. #}
-{{ form_start(form, {attr: {class: 'vf-docform', novalidate: 'novalidate', 'data-document-form': 'true', 'data-currency': currency, 'data-currency-symbol': vf_currency_symbol(currency), 'data-marketplace': doc.type.value == 'marketplace_pl' ? 'true' : 'false'}}) }}
+{{ form_start(form, {attr: {class: 'vf-docform', novalidate: 'novalidate', 'data-document-form': 'true', 'data-document-mode': isEdit ? 'edit' : 'new', 'data-currency': currency, 'data-currency-symbol': vf_currency_symbol(currency), 'data-marketplace': doc.type.value == 'marketplace_pl' ? 'true' : 'false'}}) }}
 
 {% if summary is not empty %}
     <div class="alert alert-danger vf-docform-summary" role="alert" tabindex="-1" data-error-summary>
@@ -149,12 +201,23 @@
             <div class="card-body">
                 <div class="vf-docform-fields">
                     <div>{{ form_row(form.date, {label: 'Дата документа'}) }}</div>
-                    <div>{{ form_row(form.number, {label: 'Номер документа'}) }}</div>
                     <div>{{ form_row(form.type) }}</div>
-                    <div>{{ form_row(form.counterparty) }}</div>
-                    <div>{{ form_row(form.projectDirection) }}</div>
-                    <div>{{ form_row(form.responsibilityCenterId) }}</div>
-                    <div class="vf-docform-fields__wide">{{ form_row(form.description, {attr: {rows: 3}}) }}</div>
+                    <div>{{ form_row(form.number, {label: 'Номер документа', attr: {placeholder: 'Например, 1204-Л'}}) }}</div>
+                    <div class="vf-docform-picker">{{ form_row(form.counterparty) }}</div>
+                    <div class="vf-docform-picker">{{ form_row(form.projectDirection) }}</div>
+                    <div class="mb-3">
+                        {{ form_label(form.responsibilityCenterId) }}
+                        {{ page.cfoPicker(form.responsibilityCenterId, 'Не указан', '') }}
+                        {{ form_errors(form.responsibilityCenterId) }}
+                    </div>
+                    <div class="vf-docform-fields__wide">
+                        <p class="vf-docform-inherit">Проект и ЦФО подставляются во все операции документа. В любой операции их можно изменить: такая операция будет отмечена, а изменения шапки её не затронут.</p>
+                        <div class="vf-docform-inherit-notice" data-inherit-notice role="status" aria-live="polite" hidden></div>
+                    </div>
+                    <div class="vf-docform-fields__wide">
+                        {{ form_row(form.description, {attr: {rows: 3, maxlength: 500, 'data-document-description': 'true', 'aria-describedby': form.description.vars.id ~ '_counter'}}) }}
+                        <div class="vf-docform-counter" id="{{ form.description.vars.id }}_counter" data-document-description-counter>{{ form.description.vars.value|length }} из 500</div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -218,7 +281,7 @@
         </div>
     </div>
     <div class="vf-docform-ops__head" aria-hidden="true">
-        <span>Тип</span><span>Категория ОПиУ</span><span class="text-end">Сумма{% if currency == 'RUB' %}, ₽{% endif %}</span><span>Контрагент</span><span>Проект</span><span>ЦФО</span><span></span>
+        <span>Тип</span><span>Категория ОПиУ</span><span>Проект</span><span>ЦФО</span><span class="text-end">Сумма{% if currency == 'RUB' %}, ₽{% endif %}<span class="vf-docform-req">*</span></span><span></span>
     </div>
     {# Дерево статей ОПиУ — одно на все строки и data-prototype (PLCategoryTreeType, tree_source). #}
     <script type="application/json" id="{{ form.vars.category_tree_id }}">{{ form.vars.category_tree|json_encode(constant('JSON_UNESCAPED_UNICODE') b-or constant('JSON_HEX_TAG') b-or constant('JSON_HEX_AMP'))|raw }}</script>
@@ -247,10 +310,10 @@
 {{ form_rest(form) }}
 
 <div class="vf-docform-footer d-print-none">
-    <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Изменений нет' : 'Заполните документ и сохраните') }}</span>
+    <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Все изменения сохранены' : 'Заполните документ и сохраните') }}</span>
     <div class="btn-list">
         <a class="btn" href="{{ path('document_list_resume') }}">Отмена</a>
-        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <button type="submit" class="btn btn-primary" data-document-save>Сохранить</button>
     </div>
 </div>
 {{ form_end(form) }}
@@ -262,11 +325,11 @@
                 <form method="post" action="{{ path('document_delete', {'id': doc.id}) }}" data-leave-safe-form>
                     <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ doc.id) }}">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="document-delete-modal-title">Удалить документ ОПиУ?</h5>
+                        <h5 class="modal-title" id="document-delete-modal-title">Удалить документ?</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                     </div>
                     <div class="modal-body">
-                        Документ со всеми операциями будет перемещён в раздел «Удалённые». Его можно будет восстановить.
+                        Документ со всеми операциями перемещается в «Удалённые» и исключается из ОПиУ. Его можно восстановить.
                         Несохранённые правки будут потеряны.
                     </div>
                     <div class="modal-footer">

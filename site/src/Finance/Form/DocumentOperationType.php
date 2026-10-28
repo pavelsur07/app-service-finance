@@ -104,7 +104,7 @@ class DocumentOperationType extends AbstractType
             ])
             ->add('comment', TextType::class, [
                 'required' => false,
-                'label' => 'Комментарий',
+                'label' => 'Описание',
                 'constraints' => [new Length(max: 255)],
                 'attr' => ['maxlength' => 255],
             ]);

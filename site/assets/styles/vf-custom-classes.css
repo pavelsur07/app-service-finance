@@ -1878,8 +1878,14 @@
 
 .vf-docform-fields {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0 var(--vf-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--vf-space-5);
+}
+
+@media (max-width: 760px) {
+  .vf-docform-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .vf-docform-fields__wide {
@@ -1960,24 +1966,36 @@
   color: var(--vf-warn-text);
 }
 
-/* Операции: строка-сетка на всю ширину; на узком экране поля переносятся по две. */
+/* Операции (PNL-DOCUMENT-SPEC §5): Тип · Категория · Проект · ЦФО · Сумма · действия; второй
+   строкой «Описание», третьей — контрагент операции. 761–1340 px — поля по два с подписями,
+   ≤760 px — карточки. */
 .vf-docform-ops__head,
 .vf-docform-op {
   display: grid;
-  grid-template-columns: 72px minmax(200px, 1.6fr) 140px minmax(200px, 1.4fr) minmax(190px, 1.2fr) minmax(150px, 1fr) 36px;
+  grid-template-columns: 104px minmax(220px, 1.8fr) minmax(130px, 1fr) minmax(130px, 1fr) 136px 76px;
   gap: var(--vf-space-2) var(--vf-space-3);
   align-items: start;
-  padding: var(--vf-space-2) var(--vf-space-4);
+  padding: var(--vf-space-2) var(--vf-space-5);
 }
 
 .vf-docform-ops__head {
   background: var(--vf-bg);
   border-bottom: 1px solid var(--vf-border);
   color: var(--vf-text-muted);
-  font-size: var(--vf-size-xs);
-  font-weight: var(--vf-weight-semibold);
+  font-size: 11px;
+  font-weight: var(--vf-weight-bold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.vf-docform-req {
+  margin-left: 2px;
+  color: var(--vf-danger-text);
+}
+
+.vf-docform-op {
+  padding-top: var(--vf-space-3);
+  padding-bottom: var(--vf-space-3);
 }
 
 .vf-docform-op + .vf-docform-op {
@@ -2012,25 +2030,75 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vf-docform-op__hint {
-  margin-top: 4px;
-  color: var(--vf-text-muted);
-  font-size: var(--vf-size-xs);
-}
-
 .vf-docform-op__actions {
-  grid-column: -2 / -1;
-  grid-row: 1;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
   padding-top: 2px;
 }
 
-/* Комментарий — второй строкой под полями операции: в одной строке пикерам не хватало ширины. */
+.vf-docform-op__sublabel {
+  grid-column: 1;
+  padding-top: 9px;
+  color: var(--vf-text-secondary);
+  font-size: var(--vf-size-xs);
+}
+
 .vf-docform-op__cell--comment {
-  grid-column: 2 / -2;
+  grid-column: 2 / 6;
+}
+
+.vf-docform-op__cell--counterparty {
+  grid-column: 2 / 4;
 }
 
 .vf-docform-op > .invalid-feedback {
   grid-column: 2 / -1;
+}
+
+/* «Изменён» + «Как в шапке» — значение операции отличается от шапки (SPEC §4.1). */
+.vf-docform-op__mark {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  margin-top: 4px;
+  font-size: var(--vf-size-xs);
+  line-height: 16px;
+}
+
+.vf-docform-op__mark[hidden] {
+  display: none;
+}
+
+.vf-docform-op__changed {
+  color: var(--vf-warn-text);
+}
+
+.vf-docform-op__changed::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.vf-docform-op__reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vf-primary);
+  font-size: inherit;
+}
+
+.vf-docform-op__reset:hover {
+  text-decoration: underline;
+}
+
+.vf-docform-op__reset:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
 }
 
 .vf-docform-ops__empty {
@@ -2065,23 +2133,46 @@
   }
 
   .vf-docform-op {
-    grid-template-columns: 72px repeat(2, minmax(0, 1fr)) 36px;
+    grid-template-columns: 72px repeat(2, minmax(0, 1fr)) 76px;
+    padding-left: var(--vf-space-4);
+    padding-right: var(--vf-space-4);
   }
 
-  /* Колонки заданы явно: иначе автораскладка ставит поле в свободную узкую колонку кнопки удаления. */
-  .vf-docform-op__cell--category,
-  .vf-docform-op__cell--comment {
+  /* Колонки заданы явно: иначе автораскладка ставит поле в свободную колонку кнопок. */
+  .vf-docform-op__type {
+    grid-column: 1;
+    grid-row: 1 / 6;
+  }
+
+  .vf-docform-op__cell--category {
     grid-column: 2 / 4;
+    grid-row: 1;
   }
 
-  .vf-docform-op__cell--amount,
+  .vf-docform-op__actions {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
   .vf-docform-op__cell--projectDirection {
     grid-column: 2;
   }
 
-  .vf-docform-op__cell--counterparty,
   .vf-docform-op__cell--responsibilityCenterId {
     grid-column: 3;
+  }
+
+  .vf-docform-op__cell--amount {
+    grid-column: 2;
+  }
+
+  .vf-docform-op__cell--comment,
+  .vf-docform-op__cell--counterparty {
+    grid-column: 2 / 4;
+  }
+
+  .vf-docform-op__sublabel {
+    display: none;
   }
 
   .vf-docform-op__cell .visually-hidden {
@@ -2094,10 +2185,79 @@
     color: var(--vf-text-muted);
     font-size: var(--vf-size-xs);
   }
+}
+
+/* ≤760 px — операция карточкой в две колонки (SPEC §5.5). */
+@media (max-width: 760px) {
+  .vf-docform-op {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .vf-docform-op__type {
-    grid-row: 1 / 3;
+    grid-column: 1;
+    grid-row: 1;
   }
+
+  .vf-docform-op__actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .vf-docform-op__cell--category {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .vf-docform-op__cell--projectDirection {
+    grid-column: 1;
+  }
+
+  .vf-docform-op__cell--responsibilityCenterId {
+    grid-column: 2;
+  }
+
+  .vf-docform-op__cell--amount {
+    grid-column: 1;
+  }
+
+  .vf-docform-op__cell--comment,
+  .vf-docform-op__cell--counterparty {
+    grid-column: 1 / -1;
+  }
+
+  .vf-docform-op > .invalid-feedback {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Шапка документа — две колонки (SPEC §4); подсказка о наследовании, счётчик описания. */
+.vf-docform-inherit {
+  margin: 0 0 var(--vf-space-3);
+  padding: 10px 12px;
+  border-radius: var(--vf-radius);
+  background: var(--vf-bg);
+  color: var(--vf-text-secondary);
+  font-size: 13px;
+}
+
+.vf-docform-inherit-notice {
+  margin: 0 0 var(--vf-space-3);
+  padding: 8px 12px;
+  border-radius: var(--vf-radius);
+  background: var(--vf-green-lt);
+  color: var(--vf-green);
+  font-size: 13px;
+}
+
+.vf-docform-inherit-notice[hidden] {
+  display: none;
+}
+
+.vf-docform-counter {
+  margin-top: calc(-1 * var(--vf-space-2));
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-xs);
+  text-align: right;
 }
 
 /* Сохранить / Отмена — всегда под рукой: подвал прилипает к низу окна. */
