@@ -156,6 +156,7 @@ class DocumentController extends AbstractController
 
             if ($form->isValid()) {
                 $createDocument($document);
+                $this->addFlash('success', 'Документ ОПиУ создан.');
 
                 return $this->redirectToRoute('document_list_resume');
             }
@@ -207,6 +208,7 @@ class DocumentController extends AbstractController
 
             if ($form->isValid()) {
                 $createDocument($copy);
+                $this->addFlash('success', 'Документ ОПиУ создан.');
 
                 return $this->redirectToRoute('document_list_resume');
             }
@@ -316,6 +318,7 @@ class DocumentController extends AbstractController
 
                         return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
                     }
+                    $this->addFlash('success', 'Документ ОПиУ сохранён.');
 
                     return $this->redirectToRoute('document_list_resume');
                 }

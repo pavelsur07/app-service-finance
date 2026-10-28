@@ -138,7 +138,7 @@
             <ol class="breadcrumb">
                 <li class="breadcrumb-item">Доходы и расходы</li>
                 <li class="breadcrumb-item"><a href="{{ path('document_list_resume') }}">Документы ОПиУ</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ isEdit ? (doc.number ? '№ ' ~ doc.number : 'Документ') : 'Новый' }}</li>
+                <li class="breadcrumb-item active" aria-current="page">{{ isEdit ? (doc.number ? '№ ' ~ doc.number : 'Документ') : 'Новый документ' }}</li>
             </ol>
         </nav>
         <div class="vf-docform-head__line">
@@ -194,7 +194,7 @@
     </div>
 {% endif %}
 
-<div class="vf-docform-grid{{ allocation ? ' vf-docform-grid--aside' : '' }}">
+<div class="vf-docform-grid{{ allocation or not isEdit ? ' vf-docform-grid--aside' : '' }}">
     <div class="vf-docform-main">
         <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-main">
             <div class="card-header"><h2 class="card-title" id="doc-section-main">Основные данные</h2></div>
@@ -247,6 +247,21 @@
         {% endif %}
     </div>
 
+    {% if not isEdit and not allocation %}
+        {# Создание (SPEC §3): вместо истории изменений — подсказка; основания у ручного документа нет. #}
+        <aside class="vf-docform-aside">
+            <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-help" data-document-help>
+                <div class="card-header"><h2 class="card-title" id="doc-section-help">Как это работает</h2></div>
+                <div class="card-body">
+                    <ul class="vf-docform-help">
+                        <li>Проект и ЦФО из шапки подставляются в операции. В операции их можно изменить.</li>
+                        <li>Доход или расход — по категории ОПиУ операции.</li>
+                        <li>Операция без категории не попадёт в ОПиУ.</li>
+                    </ul>
+                </div>
+            </section>
+        </aside>
+    {% endif %}
     {% if allocation %}
         <aside class="vf-docform-aside">
             <section class="card vf-card vf-docform-section" aria-labelledby="doc-section-allocation"
@@ -310,10 +325,11 @@
 {{ form_rest(form) }}
 
 <div class="vf-docform-footer d-print-none">
-    <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Все изменения сохранены' : 'Заполните документ и сохраните') }}</span>
+    <span class="vf-docform-footer__state" data-dirty-text>{{ summary is not empty ? 'Есть ошибки — исправьте и сохраните ещё раз' : (isEdit ? 'Все изменения сохранены' : 'Документ ещё не создан. Заполните операции и нажмите «Создать документ».') }}</span>
     <div class="btn-list">
         <a class="btn" href="{{ path('document_list_resume') }}">Отмена</a>
-        <button type="submit" class="btn btn-primary" data-document-save>Сохранить</button>
+        {# value без name в POST не уходит; по нему DomCrawler (selectButton/submitForm) находит кнопку создания по прежнему тексту. #}
+        <button type="submit" class="btn btn-primary" data-document-save{% if not isEdit %} value="Сохранить"{% endif %}>{{ isEdit ? 'Сохранить' : 'Создать документ' }}</button>
     </div>
 </div>
 {{ form_end(form) }}
