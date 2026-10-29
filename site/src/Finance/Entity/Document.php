@@ -183,6 +183,10 @@ class Document
     {
         $this->assertOwnReference('counterparty', $counterparty?->getCompany(), $counterparty?->getId());
         $this->counterparty = $counterparty;
+        // Один документ — один контрагент: операции всегда несут контрагента шапки.
+        foreach ($this->operations as $operation) {
+            $operation->inheritCounterparty();
+        }
 
         return $this;
     }

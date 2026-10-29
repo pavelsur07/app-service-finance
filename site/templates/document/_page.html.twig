@@ -121,12 +121,6 @@
             {{ form_widget(operationForm.comment, {attr: {placeholder: 'За что платим, например: аренда офиса, октябрь', 'data-operation-comment': 'true'}}) }}
             {{ form_errors(operationForm.comment) }}
         </div>
-        <div class="vf-docform-op__sublabel vf-docform-op__sublabel--counterparty" aria-hidden="true">Контрагент</div>
-        <div class="vf-docform-op__cell vf-docform-op__cell--counterparty vf-docform-picker">
-            {{ form_label(operationForm.counterparty, null, {label_attr: {class: 'visually-hidden'}}) }}
-            {{ form_widget(operationForm.counterparty) }}
-            {{ form_errors(operationForm.counterparty) }}
-        </div>
         {{ form_errors(operationForm) }}
     </div>
 {% endmacro %}

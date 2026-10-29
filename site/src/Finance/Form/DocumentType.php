@@ -109,9 +109,6 @@ class DocumentType extends AbstractType
                     'project_directions' => $options['project_directions'],
                     'company' => $company,
                     'extra_responsibility_center_ids' => $extraResponsibilityCenterIds,
-                    // Новая операция получает контрагента шапки (_page_scripts.html.twig) — он
-                    // обязан быть среди вариантов операции, даже архивный.
-                    'header_counterparty_id' => $builder->getData()?->getCounterparty()?->getId(),
                 ],
                 'allow_add' => true,
                 'allow_delete' => true,

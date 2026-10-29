@@ -82,7 +82,6 @@ final readonly class CreatePLDocumentAction
         return (new DocumentOperation(Uuid::uuid7()->toString()))
             ->setAmount($command->amount)
             ->setPlCategory($this->resolveCategory($command->categoryId, $company))
-            ->setCounterparty($this->resolveCounterparty($command->counterpartyId, $company))
             ->setProjectDirection($this->resolveProjectDirection($command->projectDirectionId, $company))
             ->setResponsibilityCenterId($command->responsibilityCenterId)
             ->setComment($command->comment);

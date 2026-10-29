@@ -28,7 +28,9 @@ use Ramsey\Uuid\Uuid;
 trait DocumentListFixturesTrait
 {
     /**
-     * @param list<array{0: PLCategory|null, 1: string, 2?: ProjectDirection|null, 3?: string|null, 4?: Counterparty|null, 5?: string|null}> $operations
+     * Своего контрагента у операции нет — она получает контрагента документа.
+     *
+     * @param list<array{0: PLCategory|null, 1: string, 2?: ProjectDirection|null, 3?: string|null, 4?: string|null}> $operations
      */
     protected function persistDocument(
         string $number,
@@ -64,8 +66,7 @@ trait DocumentListFixturesTrait
             $operation->setAmount($row[1]);
             $operation->setProjectDirection($row[2] ?? null);
             $operation->setResponsibilityCenterId($row[3] ?? null);
-            $operation->setCounterparty($row[4] ?? null);
-            $operation->setComment($row[5] ?? null);
+            $operation->setComment($row[4] ?? null);
             $document->addOperation($operation);
             $this->em->persist($operation);
         }

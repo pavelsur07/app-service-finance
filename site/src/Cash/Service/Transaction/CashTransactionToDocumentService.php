@@ -59,7 +59,6 @@ class CashTransactionToDocumentService
     {
         $operation = new DocumentOperation();
         $operation->setAmount($transaction->getAmount());
-        $operation->setCounterparty($transaction->getCounterparty());
         $operation->setProjectDirection($this->resolveProjectDirection($transaction));
         $operation->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
 
@@ -106,7 +105,6 @@ class CashTransactionToDocumentService
         $operation = new DocumentOperation();
         $operation
             ->setAmount($amount->toDecimalString())
-            ->setCounterparty($transaction->getCounterparty())
             ->setCategory($plCategory)
             ->setProjectDirection($projectDirection)
             ->setResponsibilityCenterId($transaction->getResponsibilityCenterId());

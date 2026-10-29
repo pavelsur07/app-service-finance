@@ -67,6 +67,7 @@ class DocumentOperation
             $this->assertReferencesBelongTo($document);
         }
         $this->document = $document;
+        $this->inheritCounterparty();
         // Обе стороны связи: операция, привязанная напрямую, без этого не попала бы в коллекцию
         // документа, и Document::setCompany() не проверил бы её справочники.
         if (null !== $document && !$document->getOperations()->contains($this)) {
@@ -116,12 +117,17 @@ class DocumentOperation
         return $this->counterparty;
     }
 
-    public function setCounterparty(?Counterparty $counterparty): self
+    /**
+     * Контрагент операции — контрагент её документа (правило «один документ — один контрагент»):
+     * значение берётся только из шапки, задать операции своего нельзя.
+     *
+     * @internal для Document — вызывается при привязке и при смене контрагента шапки
+     */
+    public function inheritCounterparty(): void
     {
-        $this->document?->assertOwnReference('counterparty', $counterparty?->getCompany(), $counterparty?->getId());
-        $this->counterparty = $counterparty;
-
-        return $this;
+        if (null !== $this->document) {
+            $this->counterparty = $this->document->getCounterparty();
+        }
     }
 
     public function getProjectDirection(): ?ProjectDirection
@@ -163,11 +169,11 @@ class DocumentOperation
 
     /**
      * Справочники операции — компании документа (инвариант держит Document::assertOwnReference).
+     * Контрагента не проверяем: он берётся из шапки, которую проверяет сам документ.
      */
     public function assertReferencesBelongTo(Document $document): void
     {
         $document->assertOwnReference('P&L category', $this->category?->getCompany(), $this->category?->getId());
-        $document->assertOwnReference('counterparty', $this->counterparty?->getCompany(), $this->counterparty?->getId());
         $document->assertOwnReference('project direction', $this->projectDirection?->getCompany(), $this->projectDirection?->getId());
     }
 }

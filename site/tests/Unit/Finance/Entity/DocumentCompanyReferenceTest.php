@@ -76,19 +76,17 @@ final class DocumentCompanyReferenceTest extends TestCase
         );
     }
 
-    public function testAttachedOperationRejectsForeignCategoryCounterpartyAndProject(): void
+    public function testAttachedOperationRejectsForeignCategoryAndProject(): void
     {
         $document = $this->document();
         $operation = new DocumentOperation();
         $document->addOperation($operation);
 
         $operation->setCategory($this->category($this->own));
-        $operation->setCounterparty($this->counterparty($this->own));
         $operation->setProjectDirection($this->project($this->own));
 
         foreach ([
             'P&L category' => fn () => $operation->setCategory($this->category($this->foreign)),
-            'counterparty' => fn () => $operation->setCounterparty($this->counterparty($this->foreign)),
             'project direction' => fn () => $operation->setProjectDirection($this->project($this->foreign)),
         ] as $reference => $set) {
             try {

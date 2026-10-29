@@ -76,18 +76,18 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         $bank = $this->persistCounterparty($this->company, 'АО «Альфа-Банк»');
         $leasing = $this->persistCounterparty($this->company, 'АО «Балтийский лизинг»');
         $this->persistDocument('DOC', counterparty: $bank, project: $showroom, responsibilityCenterId: $centerId, operations: [
-            [$this->revenue, '61079.35'],                                   // всё — от документа
-            [$this->revenue, '30000.00', $online, null, $leasing, 'опт'],   // проект и контрагент — свои
+            [$this->revenue, '61079.35'],                             // всё — от документа
+            [$this->revenue, '30000.00', $online, null, 'опт'],       // проект — свой, контрагент — всегда документа
         ]);
 
         self::assertSame(['61079.35'], $this->amounts(projectDirectionId: (string) $showroom->getId()));
         self::assertSame(['30000.00'], $this->amounts(projectDirectionId: (string) $online->getId()));
         self::assertSame(['30000.00', '61079.35'], $this->amounts(responsibilityCenterId: $centerId));
-        // Фильтр по контрагенту — по шапке: операция со своим контрагентом остаётся в выборке
-        // документа, а свой контрагент операции фильтром не ищется.
+        // Один документ — один контрагент: фильтр и поиск по контрагенту находят все операции документа.
         self::assertSame(['30000.00', '61079.35'], $this->amounts(counterpartyId: $bank->getId()));
         self::assertSame([], $this->amounts(counterpartyId: $leasing->getId()));
-        self::assertSame(['30000.00'], $this->amounts(q: 'балтийский'));
+        self::assertSame(['30000.00', '61079.35'], $this->amounts(q: 'альфа'));
+        self::assertSame([], $this->amounts(q: 'балтийский'));
         self::assertSame(['30000.00'], $this->amounts(q: 'опт'));
         self::assertSame(['30000.00', '61079.35'], $this->amounts(q: 'шоурум'), 'Поиск по статье.');
     }

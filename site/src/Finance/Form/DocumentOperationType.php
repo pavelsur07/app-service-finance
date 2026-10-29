@@ -8,7 +8,6 @@ use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
-use App\Company\Form\Type\CounterpartyPickerType;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
@@ -17,6 +16,8 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
@@ -37,6 +38,17 @@ class DocumentOperationType extends AbstractType
         $currentResponsibilityCenterId = $operation instanceof DocumentOperation
             ? $operation->getResponsibilityCenterId()
             : null;
+
+        // Контрагент один на документ — только в шапке (Document::setCounterparty переносит его в
+        // операции). Страница, открытая до выкладки, ещё шлёт поле операции: отбрасываем его,
+        // а не роняем форму ошибкой «лишнее поле».
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event): void {
+            $data = $event->getData();
+            if (\is_array($data) && \array_key_exists('counterparty', $data)) {
+                unset($data['counterparty']);
+                $event->setData($data);
+            }
+        });
 
         $builder
             // Виджет «Категория ОПиУ» поверх select; дерево одно на форму — DocumentType::buildView.
@@ -65,16 +77,6 @@ class DocumentOperationType extends AbstractType
                         $operation->setAmount((string) $amount);
                     }
                 },
-            ])
-            ->add('counterparty', CounterpartyPickerType::class, [
-                'company_id' => (string) $options['company']->getId(),
-                'keep_id' => $builder->getData()?->getCounterparty()?->getId() ?? $options['header_counterparty_id'],
-                'value_type' => 'entity',
-                'search_url' => '/api/counterparties/search',
-                'browse' => true,
-                'attr' => [
-                    'data-operation-counterparty' => 'true',
-                ],
             ])
             ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
@@ -121,12 +123,10 @@ class DocumentOperationType extends AbstractType
             'categories' => [],
             'project_directions' => [],
             'extra_responsibility_center_ids' => [],
-            'header_counterparty_id' => null,
         ]);
         $resolver->setRequired('company');
         $resolver->setAllowedTypes('company', Company::class);
         $resolver->setAllowedTypes('extra_responsibility_center_ids', ['array']);
-        $resolver->setAllowedTypes('header_counterparty_id', ['string', 'null']);
     }
 
     /**
