@@ -82,6 +82,16 @@ const NEW = '/documents/new';
     return r.rows === 1 && r.amount === '' && r.removeDisabled && r.empty && r.count === '1' && r.picker || JSON.stringify(r);
   });
 
+  await t('контрагент — только в шапке, у операций поля нет', async () => {
+    const r = await p.evaluate(() => ({
+      header: !!document.querySelector('[data-document-counterparty]'),
+      rows: document.querySelectorAll('[data-operation-row]').length,
+      inRows: document.querySelectorAll('[data-operation-row] [data-cp-picker], [data-operation-row] [name$="[counterparty]"]').length,
+      sub: [...document.querySelectorAll('.vf-docform-op__sublabel')].map((n) => n.textContent.trim()),
+    }));
+    return r.header && r.rows > 0 && r.inRows === 0 && !r.sub.includes('Контрагент') || JSON.stringify(r);
+  });
+
   await t('справа «Как это работает», при 1440 — рядом с «Основными данными»', async () => {
     const r = await p.evaluate(() => {
       const help = document.querySelector('[data-document-help]');

@@ -1978,7 +1978,7 @@
 }
 
 /* Операции (PNL-DOCUMENT-SPEC §5): Тип · Категория · Проект · ЦФО · Сумма · действия; второй
-   строкой «Описание», третьей — контрагент операции. 761–1340 px — поля по два с подписями,
+   строкой «Описание». Контрагент один на документ — только в шапке. 761–1340 px — поля по два с подписями,
    ≤760 px — карточки. */
 .vf-docform-ops__head,
 .vf-docform-op {
@@ -2057,10 +2057,6 @@
 
 .vf-docform-op__cell--comment {
   grid-column: 2 / 6;
-}
-
-.vf-docform-op__cell--counterparty {
-  grid-column: 2 / 4;
 }
 
 .vf-docform-op > .invalid-feedback {
@@ -2177,8 +2173,7 @@
     grid-column: 2;
   }
 
-  .vf-docform-op__cell--comment,
-  .vf-docform-op__cell--counterparty {
+  .vf-docform-op__cell--comment {
     grid-column: 2 / 4;
   }
 
@@ -2231,8 +2226,7 @@
     grid-column: 1;
   }
 
-  .vf-docform-op__cell--comment,
-  .vf-docform-op__cell--counterparty {
+  .vf-docform-op__cell--comment {
     grid-column: 1 / -1;
   }
 
