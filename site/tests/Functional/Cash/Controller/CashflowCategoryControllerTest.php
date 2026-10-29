@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Cash\Controller;
 
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Tests\Builders\Cash\CashTransactionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class CashflowCategoryControllerTest extends WebTestCaseBase
 {
@@ -156,6 +167,128 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
         self::assertSame('Оборудование и мебель', $updated->getName());
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function usageProvider(): iterable
+    {
+        yield 'операция' => ['transaction', 'По статье 1 операция ДДС.'];
+        yield 'разбивка операции' => ['split', 'По статье 1 операция ДДС.'];
+        yield 'платёж в плане' => ['plan', 'По статье 1 платёж в платёжном календаре.'];
+        yield 'правило автокатегоризации' => ['rule', 'По статье 1 правило автокатегоризации.'];
+    }
+
+    #[DataProvider('usageProvider')]
+    public function testDeletingCategoryInUseKeepsItAndShowsReason(string $usage, string $reason): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $category = $this->category('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $company, 'Аренда');
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $this->em()->persist($account);
+
+        match ($usage) {
+            'transaction' => $this->em()->persist(
+                CashTransactionBuilder::aCashTransaction()->forCompany($company)->withMoneyAccount($account)->withCashflowCategory($category)->build(),
+            ),
+            'split' => $this->persistSplit(
+                CashTransactionBuilder::aCashTransaction()->forCompany($company)->withMoneyAccount($account)->build(),
+                $category,
+            ),
+            'plan' => $this->em()->persist(
+                new PaymentPlan('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', $company, $category, new \DateTimeImmutable('2026-10-29'), '100.00'),
+            ),
+            'rule' => $this->em()->persist(
+                new CashTransactionAutoRule('cccccccc-cccc-4ccc-8ccc-cccccccccccc', $company, 'Аренда', CashTransactionAutoRuleAction::FILL, CashTransactionAutoRuleOperationType::ANY, $category),
+            ),
+            default => throw new \LogicException($usage),
+        };
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', '/cashflow-categories/'.$category->getId().'/delete', [
+            '_token' => $this->deleteToken($client, (string) $category->getId()),
+        ]);
+
+        self::assertResponseRedirects('/cashflow-categories/');
+        $crawler = $client->followRedirect();
+        self::assertStringContainsString($reason, $crawler->filter('.toast.text-bg-danger')->text());
+        $this->em()->clear();
+        self::assertNotNull($this->em()->find(CashflowCategory::class, $category->getId()));
+    }
+
+    public function testDeletingUnusedCategoryRemovesIt(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $category = $this->category('dddddddd-dddd-4ddd-8ddd-dddddddddddd', $company, 'Реклама');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', '/cashflow-categories/'.$category->getId().'/delete', [
+            '_token' => $this->deleteToken($client, (string) $category->getId()),
+        ]);
+
+        self::assertResponseRedirects('/cashflow-categories/');
+        $this->em()->clear();
+        self::assertNull($this->em()->find(CashflowCategory::class, $category->getId()));
+    }
+
+    public function testIndexDeleteDialogBlocksCategoryInUse(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $used = $this->category('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', $company, 'Аренда');
+        $free = $this->category('ffffffff-ffff-4fff-8fff-ffffffffffff', $company, 'Реклама');
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $this->em()->persist($account);
+        $this->em()->persist(CashTransactionBuilder::aCashTransaction()->forCompany($company)->withMoneyAccount($account)->withCashflowCategory($used)->build());
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cashflow-categories/');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('#cashflow-category-confirm[data-confirm-modal]'));
+        $usedTrigger = $crawler->filter(sprintf('[data-confirm-action$="/%s/delete"]', $used->getId()));
+        self::assertSame('true', $usedTrigger->attr('data-confirm-blocked'));
+        self::assertSame('Статью нельзя удалить', $usedTrigger->attr('data-confirm-title'));
+        self::assertStringContainsString('По статье 1 операция ДДС.', (string) $usedTrigger->attr('data-confirm-body'));
+        self::assertSame('/finance/cash-transactions/?categoryId='.$used->getId(), $usedTrigger->attr('data-confirm-link-href'));
+        $freeTrigger = $crawler->filter(sprintf('[data-confirm-action$="/%s/delete"]', $free->getId()));
+        self::assertNull($freeTrigger->attr('data-confirm-blocked'));
+        self::assertSame('Удалить', $freeTrigger->attr('data-confirm-submit'));
+        self::assertSame('danger', $freeTrigger->attr('data-confirm-variant'));
+    }
+
+    public function testEditPageDeleteButtonIsBlockedForCategoryInUse(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $category = $this->category('abababab-abab-4bab-8bab-abababababab', $company, 'Аренда');
+        $this->em()->persist(new PaymentPlan('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', $company, $category, new \DateTimeImmutable('2026-10-29'), '100.00'));
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cashflow-categories/'.$category->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('#cashflow-category-confirm[data-confirm-modal]'));
+        $trigger = $crawler->filter('[data-bs-target="#cashflow-category-confirm"]');
+        self::assertSame('true', $trigger->attr('data-confirm-blocked'));
+        self::assertStringContainsString('По статье 1 платёж в платёжном календаре.', (string) $trigger->attr('data-confirm-body'));
+        // Операций нет — ссылке на список операций вести некуда.
+        self::assertNull($trigger->attr('data-confirm-link-href'));
+    }
+
     /** @return array{User, Company} */
     private function persistCompany(): array
     {
@@ -179,5 +312,18 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
         $this->em()->persist($category);
 
         return $category;
+    }
+
+    private function persistSplit(CashTransaction $transaction, CashflowCategory $category): void
+    {
+        $this->em()->persist($transaction);
+        $this->em()->persist(new CashTransactionSplit($transaction, $category, '100.00', CashTransactionSplitSource::MANUAL));
+    }
+
+    private function deleteToken(KernelBrowser $client, string $categoryId): string
+    {
+        $crawler = $client->request('GET', '/cashflow-categories/'.$categoryId.'/edit');
+
+        return (string) $crawler->filter('[data-confirm-token]')->attr('data-confirm-token');
     }
 }

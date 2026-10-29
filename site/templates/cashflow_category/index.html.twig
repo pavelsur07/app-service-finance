@@ -12,7 +12,7 @@
     } %}
 {% endblock %}#}
 
-{% macro render_items(items) %}
+{% macro render_items(items, usage) %}
     <ul class="cashflow-category-list list-unstyled mb-0">
     {% for item in items %}
         {% set has_children = item.children|length > 0 %}
@@ -42,16 +42,13 @@
                 </span>
                 <span class="cashflow-category-col cashflow-category-col--actions">
                     {% if not item.system %}
-                    <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
-                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                        <button class="btn btn-sm btn-danger">🗑</button>
-                    </form>
+                    {{ include('cashflow_category/_delete_trigger.html.twig', {category: item, usage: usage[item.id] ?? null, class: 'btn btn-sm btn-danger', label: '🗑'}, with_context = false) }}
                     {% endif %}
                 </span>
             </div>
             {% if has_children %}
                 <div class="cashflow-category-children" hidden>
-                    {{ _self.render_items(item.children) }}
+                    {{ _self.render_items(item.children, usage) }}
                 </div>
             {% endif %}
         </li>
@@ -216,10 +213,11 @@
                     <span class="cashflow-category-col cashflow-category-col--pl">ОПиУ</span>
                     <span class="cashflow-category-col cashflow-category-col--actions"></span>
                 </div>
-                {{ macros.render_items(items) }}
+                {{ macros.render_items(items, usage) }}
             </div>
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'cashflow-category-confirm'} only %}
 {% endblock %}
 
 {% block javascripts %}

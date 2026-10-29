@@ -7,6 +7,8 @@
     data-confirm-body     пояснение
     data-confirm-submit   подпись кнопки («В архив»)
     data-confirm-variant  danger — деструктивное действие (красная кнопка), иначе Action blue
+    data-confirm-blocked  true — действие запрещено: заголовок цвета опасности, кнопки действия нет
+    data-confirm-link-href, data-confirm-link-label — необязательная ссылка-выход («Показать операции»)
   Текст подставляет assets/confirm_modal.js через textContent.
   Параметры: id (обязателен).
 #}
@@ -20,7 +22,8 @@
                 </div>
                 <p class="vf-confirm__body" id="{{ id }}-body" data-confirm-body></p>
                 <div class="vf-confirm__footer">
-                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <a class="btn" href="#" data-confirm-link hidden></a>
+                    <button type="button" class="btn" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
                     <button type="submit" class="btn btn-primary" data-confirm-submit disabled>Подтвердить</button>
                 </div>
             </form>

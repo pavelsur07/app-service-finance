@@ -7,7 +7,9 @@ namespace App\Cash\Controller\Transaction;
 use App\Cash\Application\DeleteCashflowCategoryAction;
 use App\Cash\Application\SaveCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Exception\CashflowCategoryInUseException;
 use App\Cash\Form\Transaction\CashflowCategoryType;
+use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Facade\PLCategoryFacade;
@@ -29,12 +31,14 @@ class CashflowCategoryController extends AbstractController
     public function index(
         CashflowCategoryRepository $repo,
         ActiveCompanyService $companyService,
+        CashflowCategoryUsageQuery $usageQuery,
     ): Response {
         $company = $companyService->getActiveCompany();
         $items = $repo->findRootByCompany($company);
 
         return $this->render('cashflow_category/index.html.twig', [
             'items' => $items,
+            'usage' => $usageQuery((string) $company->getId()),
         ]);
     }
 
@@ -71,6 +75,7 @@ class CashflowCategoryController extends AbstractController
         SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
         PLCategoryFacade $plCategoryFacade,
+        CashflowCategoryUsageQuery $usageQuery,
     ): Response {
         $company = $companyService->getActiveCompany();
 
@@ -115,6 +120,7 @@ class CashflowCategoryController extends AbstractController
         SaveCashflowCategoryAction $save,
         ActiveCompanyService $companyService,
         PLCategoryFacade $plCategoryFacade,
+        CashflowCategoryUsageQuery $usageQuery,
     ): Response {
         $company = $companyService->getActiveCompany();
 
@@ -152,6 +158,7 @@ class CashflowCategoryController extends AbstractController
         return $this->render('cashflow_category/edit.html.twig', [
             'form' => $form->createView(),
             'article' => $article,
+            'usage' => $usageQuery((string) $company->getId(), $id)[$id] ?? null,
         ]);
     }
 
@@ -171,7 +178,7 @@ class CashflowCategoryController extends AbstractController
         if ($this->isCsrfTokenValid('delete'.$article->getId(), $request->request->get('_token'))) {
             try {
                 $deleteCategory($article);
-            } catch (\DomainException $exception) {
+            } catch (CashflowCategoryInUseException|\DomainException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
             }
         }
