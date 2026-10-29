@@ -32,6 +32,7 @@ final class DeletePLCategoryActionTest extends TestCase
         $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $this->usageQuery([[
             'category_id' => (string) $category->getId(),
             'children' => 2, 'doc_ops' => 3, 'deleted_doc_ops' => 0, 'cashflow' => 0, 'loans' => 0, 'sale_mappings' => 0,
+            'cashflow_refs' => null, 'loan_refs' => null,
         ]]));
 
         $this->expectException(PLCategoryInUseException::class);
@@ -86,7 +87,7 @@ final class DeletePLCategoryActionTest extends TestCase
     }
 
     /**
-     * @param list<array<string, int|string>> $rows
+     * @param list<array<string, int|string|null>> $rows
      */
     private function usageQuery(array $rows): PLCategoryUsageQuery
     {

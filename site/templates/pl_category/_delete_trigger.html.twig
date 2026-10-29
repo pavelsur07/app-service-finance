@@ -1,9 +1,37 @@
 {#
   Кнопка «Удалить» статьи ОПиУ: открывает #pl-category-confirm (partials/_confirm_modal).
-  Используемую статью удалить нельзя — диалог объясняет почему и ведёт к её документам.
-  Параметры: category, usage (PLCategoryUsage|null), class, label.
+  Используемую статью удалить нельзя — диалог объясняет почему и у каждой причины даёт ссылку-выход.
+  Параметры: category, usage (PLCategoryUsage|null), class, label,
+  list_link — вести вложенные статьи в список статей (на самом списке не нужно).
 #}
 {% set in_use = usage is not null and usage.used %}
+{% set links = [] %}
+{% if in_use %}
+    {% if usage.children > 0 and list_link|default(false) %}
+        {% set links = links|merge([{href: path('pl_category_index'), label: 'Вложенные статьи — в списке статей'}]) %}
+    {% endif %}
+    {% if usage.documentOperations > 0 %}
+        {% set links = links|merge([{href: path('document_index', {category: category.id}), label: 'Документы со статьёй'}]) %}
+    {% endif %}
+    {% if usage.deletedDocumentOperations > 0 %}
+        {% set links = links|merge([{href: path('document_deleted_index', {category: category.id}), label: 'Удалённые документы со статьёй'}]) %}
+    {% endif %}
+    {% for ref in usage.cashflowCategoryRefs|slice(0, 3) %}
+        {% set links = links|merge([{href: path('cashflow_category_edit', {id: ref.id}), label: 'Статья ДДС «' ~ ref.name ~ '»'}]) %}
+    {% endfor %}
+    {% if usage.cashflowCategoryRefs|length > 3 %}
+        {% set links = links|merge([{href: path('cashflow_category_index'), label: 'Все статьи ДДС'}]) %}
+    {% endif %}
+    {% for ref in usage.loanRefs|slice(0, 3) %}
+        {% set links = links|merge([{href: path('loan_edit', {id: ref.id}), label: 'Кредит «' ~ ref.name ~ '»'}]) %}
+    {% endfor %}
+    {% if usage.loanRefs|length > 3 %}
+        {% set links = links|merge([{href: path('loan_index'), label: 'Все кредиты'}]) %}
+    {% endif %}
+    {% if usage.saleMappings > 0 %}
+        {% set links = links|merge([{href: path('marketplace_pl_mappings_index'), label: 'Правила продаж маркетплейсов'}]) %}
+    {% endif %}
+{% endif %}
 <button type="button" class="{{ class }}"
         data-bs-toggle="modal" data-bs-target="#pl-category-confirm"
         data-confirm-action="{{ path('pl_category_delete', {id: category.id}) }}"
@@ -12,10 +40,7 @@
         data-confirm-blocked="true"
         data-confirm-title="Статью нельзя удалить"
         data-confirm-body="«{{ category.name }}» используется: {{ usage.summary }}. {{ usage.advice }}"
-        {% if usage.documentOperations > 0 %}
-        data-confirm-link-href="{{ path('document_index', {category: category.id}) }}"
-        data-confirm-link-label="Показать документы"
-        {% endif %}
+        data-confirm-links="{{ links|json_encode }}"
         {% else %}
         data-confirm-title="Удалить статью?"
         data-confirm-body="«{{ category.name }}» будет удалена без возможности восстановления. Её суммы в отчёте перейдут в «Без категории»."

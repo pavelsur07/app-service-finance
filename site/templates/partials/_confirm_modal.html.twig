@@ -9,6 +9,8 @@
     data-confirm-variant  danger — деструктивное действие (красная кнопка), иначе Action blue
     data-confirm-blocked  true — действие запрещено: заголовок цвета опасности, кнопки действия нет
     data-confirm-link-href, data-confirm-link-label — необязательная ссылка-выход («Показать операции»)
+    data-confirm-links    JSON-список ссылок-выходов [{"href": "...", "label": "..."}] — под пояснением,
+                          когда выходов несколько (у каждой причины запрета свой)
   Текст подставляет assets/confirm_modal.js через textContent.
   Параметры: id (обязателен).
 #}
@@ -21,6 +23,7 @@
                     <h2 class="vf-confirm__title" id="{{ id }}-title" data-confirm-title>Подтвердите действие</h2>
                 </div>
                 <p class="vf-confirm__body" id="{{ id }}-body" data-confirm-body></p>
+                <ul class="vf-confirm__links" data-confirm-links hidden></ul>
                 <div class="vf-confirm__footer">
                     <a class="btn" href="#" data-confirm-link hidden></a>
                     <button type="button" class="btn" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>

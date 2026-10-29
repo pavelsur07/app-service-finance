@@ -20,7 +20,7 @@
                     <div class="btn-list">
                         <a href="{{ path('pl_category_index') }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex"><i class="ti ti-arrow-left me-1"></i>К списку</a>
                         {% if not is_new %}
-                            {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: '<i class="ti ti-trash me-1"></i>Удалить'}, with_context = false) }}
+                            {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: '<i class="ti ti-trash me-1"></i>Удалить', list_link: true}, with_context = false) }}
                         {% endif %}
                         <button type="submit" form="pl-category-edit-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Сохранить</button>
                     </div>
@@ -112,7 +112,7 @@
 
                         <div class="card-footer d-flex align-items-center">
                             {% if not is_new %}
-                                {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: 'Удалить'}, with_context = false) }}
+                                {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: 'Удалить', list_link: true}, with_context = false) }}
                             {% endif %}
                             <div class="btn-list ms-auto">
                                 <a href="{{ path('pl_category_index') }}" class="btn">Отмена</a>

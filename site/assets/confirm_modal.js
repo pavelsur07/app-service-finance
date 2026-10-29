@@ -49,6 +49,25 @@ document.addEventListener('show.bs.modal', (event) => {
     link.href = data.confirmLinkHref || '#';
     link.textContent = data.confirmLinkLabel || '';
 
+    // Несколько выходов — у каждой причины запрета свой; адрес и подпись только через свойства.
+    const list = modal.querySelector('[data-confirm-links]');
+    list.replaceChildren();
+    let links = [];
+    try {
+        links = JSON.parse(data.confirmLinks || '[]');
+    } catch {
+        links = [];
+    }
+    links.filter((item) => item && item.href && item.label).forEach((item) => {
+        const anchor = document.createElement('a');
+        anchor.href = item.href;
+        anchor.textContent = item.label;
+        const li = document.createElement('li');
+        li.append(anchor);
+        list.append(li);
+    });
+    list.hidden = 0 === list.childElementCount;
+
     // Без JS кнопка остаётся disabled: пустая форма не уйдёт на текущую страницу.
     submit.disabled = blocked;
     triggers.set(modal, trigger);

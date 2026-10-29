@@ -115,12 +115,17 @@ class DocumentController extends AbstractController
         $requestedLimit = (int) $request->query->get('limit', 20);
         $limit = in_array($requestedLimit, [20, 30, 50], true) ? $requestedLimit : 20;
 
-        $pager = $repo->paginateDeletedByCompany((string) $company->getId(), $page, $limit);
+        // Из диалога удаления статьи ОПиУ: только документы, операции которых держат статью.
+        $categoryId = $request->query->getString('category');
+        $categoryId = Uuid::isValid($categoryId) ? $categoryId : null;
+
+        $pager = $repo->paginateDeletedByCompany((string) $company->getId(), $page, $limit, $categoryId);
 
         return $this->render('document/deleted_index.html.twig', [
             'items' => iterator_to_array($pager->getCurrentPageResults()),
             'pager' => $pager,
             'limit' => $pager->getMaxPerPage(),
+            'categoryId' => $categoryId,
         ]);
     }
 

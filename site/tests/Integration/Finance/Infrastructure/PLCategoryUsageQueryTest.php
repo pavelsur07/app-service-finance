@@ -75,8 +75,9 @@ final class PLCategoryUsageQueryTest extends IntegrationTestCase
         self::assertEquals(
             [
                 $overhead->getId() => new PLCategoryUsage(2, 0, 0, 0, 0, 0),
-                $rent->getId() => new PLCategoryUsage(0, 2, 1, 1, 0, 0),
-                $office->getId() => new PLCategoryUsage(0, 0, 0, 0, 2, 1),
+                $rent->getId() => new PLCategoryUsage(0, 2, 1, 1, 0, 0, [['id' => (string) $cashflow->getId(), 'name' => 'Аренда ДДС']]),
+                // Проценты и комиссия одного кредита на одну статью — один кредит.
+                $office->getId() => new PLCategoryUsage(0, 0, 0, 0, 1, 1, [], [['id' => $loan->getId(), 'name' => 'Кредит']]),
             ],
             $usage,
         );
