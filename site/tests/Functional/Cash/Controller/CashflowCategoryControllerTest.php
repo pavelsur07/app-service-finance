@@ -267,6 +267,28 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
         self::assertSame('danger', $freeTrigger->attr('data-confirm-variant'));
     }
 
+    public function testEditPageDeleteButtonIsBlockedForCategoryInUse(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $category = $this->category('abababab-abab-4bab-8bab-abababababab', $company, 'Аренда');
+        $this->em()->persist(new PaymentPlan('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', $company, $category, new \DateTimeImmutable('2026-10-29'), '100.00'));
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cashflow-categories/'.$category->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('#cashflow-category-confirm[data-confirm-modal]'));
+        $trigger = $crawler->filter('[data-bs-target="#cashflow-category-confirm"]');
+        self::assertSame('true', $trigger->attr('data-confirm-blocked'));
+        self::assertStringContainsString('По статье 1 платёж в платёжном календаре.', (string) $trigger->attr('data-confirm-body'));
+        // Операций нет — ссылке на список операций вести некуда.
+        self::assertNull($trigger->attr('data-confirm-link-href'));
+    }
+
     /** @return array{User, Company} */
     private function persistCompany(): array
     {

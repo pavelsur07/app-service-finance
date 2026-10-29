@@ -17,6 +17,6 @@ final class CashflowCategoryInUseException extends \RuntimeException
 
     public static function referenced(\Throwable $previous): self
     {
-        return new self('Статью нельзя удалить: на неё ссылаются операции, платежи или правила. '.self::ADVICE, 0, $previous);
+        return new self('Статью нельзя удалить: на неё ссылаются другие записи. Обновите страницу, чтобы увидеть причину.', 0, $previous);
     }
 }
