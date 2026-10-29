@@ -6,7 +6,7 @@ namespace App\Finance\Application;
 
 use App\Finance\Entity\PLCategory;
 use App\Finance\Exception\PLCategoryInUseException;
-use App\Finance\Repository\DocumentOperationRepository;
+use App\Finance\Infrastructure\Query\PLCategoryUsageQuery;
 use App\Finance\Repository\PLDailyTotalRepository;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -14,35 +14,31 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Удаляет статью ОПиУ и переносит её агрегаты `pl_daily_totals` в «Без категории».
  *
- * Операции документов (`document_operations`) в статью не мигрируют: это реальные
- * пользовательские записи, а не производный агрегат, поэтому их категория не
- * переносится молча. Удаление отклоняется, пока такие операции существуют — владелец
- * данных должен сам решить, куда их перекатегоризировать.
+ * Вложенные статьи и пользовательские записи, ссылающиеся на статью (операции документов,
+ * статьи ДДС, кредиты, правила разнесения продаж маркетплейсов), молча не переносятся:
+ * удаление отклоняется с перечнем причин — куда их деть, решает владелец данных.
  *
  * Принадлежность категории компании проверяет вызывающий контроллер.
  */
 final class DeletePLCategoryAction
 {
-    // Postgres складывает непроцитированные идентификаторы в нижний регистр, поэтому
-    // это то же имя, что видно в тексте ошибки FK (SQLSTATE 23503).
-    private const DOCUMENT_OPERATION_FK_CONSTRAINT = 'fk_doc_oper_category';
-
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PLDailyTotalRepository $dailyTotalRepository,
-        private readonly DocumentOperationRepository $documentOperationRepository,
+        private readonly PLCategoryUsageQuery $usageQuery,
     ) {
     }
 
     /**
-     * @throws PLCategoryInUseException если к статье привязаны операции документов ОПиУ
+     * @throws PLCategoryInUseException у статьи есть вложенные или на неё ссылаются другие записи
      */
     public function __invoke(PLCategory $category, string $companyId): void
     {
         $categoryId = (string) $category->getId();
 
-        if ($this->documentOperationRepository->countByCategory($companyId, $categoryId) > 0) {
-            throw new PLCategoryInUseException($categoryId);
+        $usage = ($this->usageQuery)($companyId, $categoryId)[$categoryId] ?? null;
+        if (null !== $usage && $usage->isUsed()) {
+            throw PLCategoryInUseException::withUsage($usage);
         }
 
         try {
@@ -51,16 +47,8 @@ final class DeletePLCategoryAction
                 $this->em->remove($category);
             });
         } catch (ForeignKeyConstraintViolationException $exception) {
-            // На pl_categories ссылаются и другие таблицы без ON DELETE (cashflow_categories,
-            // wildberries_report_detail_mappings, finance_loan). Их FK-нарушения — это не
-            // "привязаны операции документов", а отдельный дефект; транслируем только тот
-            // constraint, который эта Action действительно проверяет и умеет объяснить
-            // пользователю. Остальные пробрасываем как есть, а не маскируем под этот случай.
-            if (!str_contains($exception->getMessage(), self::DOCUMENT_OPERATION_FK_CONSTRAINT)) {
-                throw $exception;
-            }
-
-            throw new PLCategoryInUseException($categoryId, $exception);
+            // Ссылку добавили между проверкой и удалением; транзакция уже откачена.
+            throw PLCategoryInUseException::referenced($exception);
         }
     }
 }

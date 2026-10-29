@@ -1,0 +1,24 @@
+{#
+  Кнопка «Удалить» статьи ОПиУ: открывает #pl-category-confirm (partials/_confirm_modal).
+  Используемую статью удалить нельзя — диалог объясняет почему и ведёт к её документам.
+  Параметры: category, usage (PLCategoryUsage|null), class, label.
+#}
+{% set in_use = usage is not null and usage.used %}
+<button type="button" class="{{ class }}"
+        data-bs-toggle="modal" data-bs-target="#pl-category-confirm"
+        data-confirm-action="{{ path('pl_category_delete', {id: category.id}) }}"
+        data-confirm-token="{{ csrf_token('delete' ~ category.id) }}"
+        {% if in_use %}
+        data-confirm-blocked="true"
+        data-confirm-title="Статью нельзя удалить"
+        data-confirm-body="«{{ category.name }}» используется: {{ usage.summary }}. {{ usage.advice }}"
+        {% if usage.documentOperations > 0 %}
+        data-confirm-link-href="{{ path('document_index', {category: category.id}) }}"
+        data-confirm-link-label="Показать документы"
+        {% endif %}
+        {% else %}
+        data-confirm-title="Удалить статью?"
+        data-confirm-body="«{{ category.name }}» будет удалена без возможности восстановления. Её суммы в отчёте перейдут в «Без категории»."
+        data-confirm-submit="Удалить"
+        data-confirm-variant="danger"
+        {% endif %}>{{ label|raw }}</button>
