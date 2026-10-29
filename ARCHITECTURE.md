@@ -335,7 +335,7 @@
 - `App\Finance\Infrastructure\Export\PlOperationJsonExporter::export(companyId, companyName, exportedAt)` — единственное место сборки плоской выгрузки операций ОПиУ. Строка результата = одна `DocumentOperation` с продублированными полями своего документа; конверт `{exported_at, company, count, operations[]}`.
 - Маршрут `document_operations_export_json` (`GET /documents/operations/export.json`, `PlOperationJsonExportController`) — кнопка «Выгрузить JSON» в шапке страницы «Документы ОПиУ». Путь намеренно из двух сегментов: `/documents/export.json` перехватил бы `document_show` (`/documents/{id}`).
 - Выгрузка отдаёт все операции активной компании: фильтры страницы `document_index` (поиск, период, направление, проект, ЦФО и др.) к ней не применяются — кнопка выгружает всё. Изоляция компании — `WHERE d.company_id` плюс `company_id = d.company_id` в каждом JOIN справочника: FK на `pl_categories`, `"counterparty"` и `project_directions` компанию не несут, поэтому строка с чужой ссылкой отдаёт `NULL` вместо чужого названия. Закреплено тестами `testExcludesOtherCompanyOperations` и `testDoesNotLeakForeignCompanyReferenceNames`.
-- `amount` остаётся строкой (`NUMERIC(15,2)`); `counterparty` и `project` — значения операции с фоллбэком на документ, как их показывает экран.
+- `amount` остаётся строкой (`NUMERIC(15,2)`); `project` — значение операции с фоллбэком на документ, как его показывает экран; `counterparty` — контрагент документа (у операции он всегда тот же, см. «Один документ ОПиУ — один контрагент»).
 
 ### Finance: справочники документа ОПиУ — только своей компании
 
@@ -343,6 +343,13 @@
 - FK компанию не несут, поэтому без инварианта чужое название показали бы `show`, `edit`, `copy`, JSON документа и «Удалённые», а регистр ОПиУ разнёс бы сумму по чужой статье. Списки вкладок дополнительно присоединяют справочники только своей компании — на случай строк, записанных в обход сущности.
 - ЦФО (`responsibilityCenterId`) — строковый id без связи, сущность его не проверяет; путь записи — форма (активные ЦФО компании) и `FinanceDocumentResponsibilityCenterNormalizer`.
 - `CashTransactionController::createPnlDocument` ловит исключение: `logger->error` с `companyId` и flash вместо 500 (испорченная статья ДДС или справочник операции ДДС).
+
+### Finance: один документ ОПиУ — один контрагент
+
+- Источник правды — `documents.counterparty_id`. `document_operations.counterparty_id` — копия, которую ведёт только агрегат: `DocumentOperation::inheritCounterparty()` (`@internal`) читает значение своего документа; его вызывают `DocumentOperation::setDocument()` (а значит и `Document::addOperation()`) и `Document::setCounterparty()` — для всех операций. Публичного сеттера контрагента у операции нет, поэтому операцию с контрагентом, отличным от шапки, через сущность не построить.
+- Формы: поле `counterparty` — только у `DocumentType` (шапка). `DocumentOperationType` поля не имеет; ключ `counterparty` в POST строки (страница, открытая до выкладки) отбрасывается в `PRE_SUBMIT`.
+- Команды: контрагент — только `CreatePLDocumentCommand::$counterpartyId`; у `CreatePLDocumentOperationCommand` его нет. Пути из ДДС (`FinanceFacade::createDocumentFromCashTransaction`, `CashTransactionToDocumentService`), копия документа и займы задают контрагента только шапке.
+- Исторические расхождения выровнены миграцией `Version20261029120000` (бэкап — `document_counterparty_repair_backup`). Чтения `op.counterparty ?? document.counterparty` в списках, журнале, `show` и RawPl-отчёте дают то же значение.
 
 ### Finance: сверка регистра ОПиУ с документами
 
@@ -4277,6 +4284,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.83 | 2026-10-29 | Finance: один документ ОПиУ — один контрагент — правило в агрегате `Document` (`DocumentOperation::setCounterparty()` удалён, `inheritCounterparty()`), поле контрагента только в шапке формы, `CreatePLDocumentOperationCommand` без `counterpartyId`; миграция `Version20261029120000` выравнивает операции по шапке с бэкапом `document_counterparty_repair_backup` |
 | 2.82 | 2026-10-27 | BankSync: вход в песочницу Альфы (старт, callback, переподключение) — только `ROLE_ADMIN`, `BankEnvironmentNotAllowedException` → 403; обороты дня Альфы (`AlfaApiClient::getSummary()`, `AlfaStatementMapper::mapSummary()` → `AlfaStatementSummary`, без хранения); read-only проверка песочницы `bank-sync:alfa:sandbox-check` с обезличенными фикстурами; деплой передаёт `ALFA_TLS_*` и `ALFA_SANDBOX_*` из секретов и монтирует `shared/alfa` в `/app/var/secrets/alfa` только для чтения |
 | 2.81 | 2026-10-27 | BankSync: счета банка в подключении (`bank_sync_account`) и привязка к денежному счёту — выписка грузится только по привязке, подбор по номеру стал подсказкой формы; список счетов Альфы по open-banking v3.0 (`aisp-le/accounts`); страница «Счета банка»; Cash: `money_account.bank_api_source`, `CashFacade::getStatementImportAccount()`, `listStatementLinkCandidates()`, `mark/clearBankApiStatementSource()` вместо `findStatementImportAccount()` |
 | 2.80 | 2026-10-27 | BankSync: вход в Альфу через Alfa ID (OIDC) — пары приложения по среде `ALFA_{SANDBOX,PROD}_*`, `nonce` и проверка `id_token` (`IdTokenVerifier`), колонки `external_subject` и `consent_expires_at`; отзыв токена при удалении; 403 → `needs_reauth`; ночная сверка согласий `bank-sync:alfa:consents-sync` (07:52); форма статического токена только у банков, которые его поддерживают |
