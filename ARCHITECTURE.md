@@ -3054,6 +3054,7 @@ Telegram создаёт ДДС-транзакции только через це
 - Используется во ВСЕХ исходящих вызовах: `sendMessage`/`editMessageText`/`getFile`/скачивание файла (`TelegramWebhookController`) и `setWebhook`/`getWebhookInfo` (`TelegramBotController`).
 - Дефолт `https://api.telegram.org`. В проде app-сервер не имеет прямого доступа к Telegram → значение `https://tg.vashfindir.ru/bot-api` (reverse-proxy на шлюзе `tg-gateway`, `location /bot-api/`, доступ по IP app-сервера).
 - Схема: вход — `tg.vashfindir.ru/telegram/webhook` → app; выход — app → `tg.vashfindir.ru/bot-api/` → `api.telegram.org`.
+- Шлюз `tg-gateway` — сайт системного nginx на хосте `109.73.204.179` (там же `mybots.vashfindir.ru`, его не трогать): конфиг `tg-gateway/nginx/tg.vashfindir.ru.conf`, сертификат certbot (`certbot certonly --nginx`), деплой — `.github/workflows/deploy-tg-gateway.yml` (`nginx -t` + reload, секреты `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`). `/bot-api/` — `allow 217.198.13.171; deny all`, без access log (токен бота в URL).
 
 **Политика обработки ошибок вебхука:**
 - `TelegramWebhookController` ВСЕГДА отвечает HTTP 200 (иначе Telegram ретраит апдейт).
@@ -4290,6 +4291,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.85 | 2026-10-29 | Telegram: шлюз `tg-gateway` перенесён на `109.73.204.179` — сайт системного nginx вместо Traefik + Docker (порты 80/443 у `mybots`), проверка TLS к app включена, `/bot-api/` без access log |
 | 2.84 | 2026-10-29 | Cash: удаление используемой статьи ДДС — отказ с причиной вместо 500 (GlitchTip #449): `CashflowCategoryUsageQuery`, `CashflowCategoryInUseException`; диалог подтверждения получил режим запрета `data-confirm-blocked` и ссылку-выход |
 | 2.83 | 2026-10-29 | Finance: один документ ОПиУ — один контрагент — правило в агрегате `Document` (`DocumentOperation::setCounterparty()` удалён, `inheritCounterparty()`), поле контрагента только в шапке формы, `CreatePLDocumentOperationCommand` без `counterpartyId`; миграция `Version20261029120000` выравнивает операции по шапке с бэкапом `document_counterparty_repair_backup` |
 | 2.82 | 2026-10-27 | BankSync: вход в песочницу Альфы (старт, callback, переподключение) — только `ROLE_ADMIN`, `BankEnvironmentNotAllowedException` → 403; обороты дня Альфы (`AlfaApiClient::getSummary()`, `AlfaStatementMapper::mapSummary()` → `AlfaStatementSummary`, без хранения); read-only проверка песочницы `bank-sync:alfa:sandbox-check` с обезличенными фикстурами; деплой передаёт `ALFA_TLS_*` и `ALFA_SANDBOX_*` из секретов и монтирует `shared/alfa` в `/app/var/secrets/alfa` только для чтения |
