@@ -37,8 +37,20 @@ document.addEventListener('show.bs.modal', (event) => {
     submit.textContent = data.confirmSubmit || 'Подтвердить';
     submit.classList.toggle('btn-danger', 'danger' === data.confirmVariant);
     submit.classList.toggle('btn-primary', 'danger' !== data.confirmVariant);
+
+    // Запрещённое действие: объясняем причину, отправить форму нельзя ни кнопкой, ни Enter.
+    const blocked = 'true' === data.confirmBlocked;
+    modal.classList.toggle('vf-confirm--blocked', blocked);
+    submit.hidden = blocked;
+    modal.querySelector('[data-confirm-cancel]').textContent = blocked ? 'Закрыть' : 'Отмена';
+
+    const link = modal.querySelector('[data-confirm-link]');
+    link.hidden = !data.confirmLinkHref;
+    link.href = data.confirmLinkHref || '#';
+    link.textContent = data.confirmLinkLabel || '';
+
     // Без JS кнопка остаётся disabled: пустая форма не уйдёт на текущую страницу.
-    submit.disabled = false;
+    submit.disabled = blocked;
     triggers.set(modal, trigger);
 });
 

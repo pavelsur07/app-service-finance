@@ -1546,6 +1546,10 @@
   font-weight: var(--vf-weight-semibold);
 }
 
+.vf-confirm--blocked .vf-confirm__title {
+  color: var(--vf-danger-text);
+}
+
 .vf-confirm__body {
   margin: 0;
   padding: 0 var(--vf-space-5) 20px;

@@ -12,6 +12,7 @@ use App\Cash\Application\SaveMoneyFundAction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
@@ -20,6 +21,7 @@ use App\Tests\Builders\Cash\MoneyFundBuilder;
 use App\Tests\Builders\Cash\MoneyFundMovementBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -77,7 +79,7 @@ final class PersistenceActionsTest extends TestCase
         $this->entityManager->expects(self::once())->method('remove')->with($category);
         $this->entityManager->expects(self::once())->method('flush');
 
-        (new DeleteCashflowCategoryAction($this->entityManager))($category);
+        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing()))($category);
     }
 
     public function testDeleteSystemCashflowCategoryWritesNothing(): void
@@ -90,7 +92,7 @@ final class PersistenceActionsTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Системную категорию нельзя удалить.');
 
-        (new DeleteCashflowCategoryAction($this->entityManager))($category);
+        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing()))($category);
     }
 
     public function testChangeAutoRuleActivityFlushesOnlyOnRealChange(): void
@@ -142,5 +144,13 @@ final class PersistenceActionsTest extends TestCase
             CashTransactionAutoRuleOperationType::ANY,
             CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->build(),
         );
+    }
+
+    private function usageOfNothing(): CashflowCategoryUsageQuery
+    {
+        $connection = $this->createStub(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn([]);
+
+        return new CashflowCategoryUsageQuery($connection);
     }
 }
