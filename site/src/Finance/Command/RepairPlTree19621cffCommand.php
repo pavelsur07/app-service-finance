@@ -178,7 +178,7 @@ final class RepairPlTree19621cffCommand extends Command
         '01a188d0-7c6e-71ed-a0cc-3e7e089f2988' => ['OVERHEAD_PROD_RENT', false],
         '01a188d0-7c6f-7337-96f2-ca86321f90b8' => ['OVERHEAD_PROD_MAINT', false],
         '01a188d0-7c70-7018-a085-5bb5e835613c' => ['OVERHEAD_PROD_PAYROLL', false],
-        self::OVERHEAD_PROD_CERT => ['OVERHEAD_PROD_CERT', false],
+        self::OVERHEAD_PROD_CERT => ['OVERHEAD_PROD_CERT', true],
         '01a188d0-7c6d-723f-926c-aae5fa3ddbcc' => ['OVERHEAD_PROD_TOTAL', false],
         '01a188d0-7c71-7373-a790-ed7f546a10a4' => ['OVERHEAD_ADMIN_PAYROLL', false],
         '01a188d0-7c72-7332-94aa-fe394044df9e' => ['OVERHEAD_ADMIN_PAYROLL_TAX', false],
@@ -250,16 +250,23 @@ final class RepairPlTree19621cffCommand extends Command
         try {
             $this->retargetRules();
             $days = $this->moveOperations();
-            $this->restructure();
-            $this->deleteCategories();
-            $this->renameSalesCode();
+            // После отказа переноса удаления лишь размножили бы ошибки «на статью ссылаются».
+            if (0 === $this->failed) {
+                $this->restructure();
+                $this->deleteCategories();
+                $this->renameSalesCode();
+            }
 
             if (0 === $this->failed && $execute) {
                 $this->connection->commit();
                 $committed = true;
             }
+        } catch (\Throwable $e) {
+            $this->logger->error('[RepairPlTree19621cff] failed', $context + ['exception' => $e]);
+
+            throw $e;
         } finally {
-            if (!$committed) {
+            if (!$committed && $this->connection->isTransactionActive()) {
                 $this->connection->rollBack();
             }
             // Документы и статьи правились DBAL; ORM-копии в памяти устарели в обоих исходах.
@@ -351,7 +358,7 @@ final class RepairPlTree19621cffCommand extends Command
      */
     private function moveOperations(): array
     {
-        $sources = [self::COGS_PRODUCT, self::MP_STORAGE, self::MP_OTHER_DEDUCTIONS, ...array_keys(self::OP_MOVES)];
+        $sources = [self::COGS_PRODUCT, self::MP_STORAGE, self::MP_OTHER_DEDUCTIONS, self::OVERHEAD_PROD_CERT, ...array_keys(self::OP_MOVES)];
         $operations = $this->connection->fetchAllAssociative(
             "SELECT o.id, o.category_id, o.amount, o.comment, d.type, d.source, to_char(d.date, 'YYYY-MM-DD') AS day
              FROM document_operations o
@@ -391,7 +398,22 @@ final class RepairPlTree19621cffCommand extends Command
             return $days;
         }
 
+        foreach (array_unique(array_column($moves, 2)) as $target) {
+            $isLeaf = $this->connection->fetchOne(
+                "SELECT 1 FROM pl_categories WHERE id = :id AND company_id = :company AND type = 'LEAF_INPUT'",
+                ['id' => $target, 'company' => self::COMPANY_ID],
+            );
+            if (false === $isLeaf) {
+                ++$this->failed;
+                $this->rows[] = ['операции', $this->name($target), 'ОШИБКА: целевая статья — не лист ввода компании'];
+            }
+        }
+        if ($this->failed > 0) {
+            return $days;
+        }
+
         $before = $this->netByDay($days);
+        $storedBefore = $this->storedNetByDay($days);
 
         $byPair = [];
         foreach ($moves as [$id, $from, $to, $day, $amount]) {
@@ -436,9 +458,45 @@ final class RepairPlTree19621cffCommand extends Command
             $date = new \DateTimeImmutable($day);
             $this->registerUpdater->recalcRange($company, $date, $date);
         }
-        $this->rows[] = ['регистр', sprintf('пересчёт %d дн. (%s … %s)', count($days), $days[0], $days[count($days) - 1]), 'итог каждого дня не изменился'];
+        $this->rows[] = ['регистр', sprintf('пересчёт %d дн. (%s … %s)', count($days), $days[0], $days[count($days) - 1]), 'расчётный итог каждого дня не изменился'];
+
+        // Пересчёт заменяет день целиком: устаревшие строки и строки «без статьи» тоже уходят.
+        // Это не ошибка переноса, но меняет показанные цифры — выводится для сверки до --execute.
+        $storedAfter = $this->storedNetByDay($days);
+        foreach ($days as $day) {
+            if (0 !== bccomp($storedBefore[$day][0], $storedAfter[$day][0], 2) || $storedBefore[$day][1] > 0) {
+                $this->rows[] = ['регистр', $day, sprintf(
+                    'ВНИМАНИЕ: хранимый итог %s → %s, строк без статьи было %d',
+                    $storedBefore[$day][0],
+                    $storedAfter[$day][0],
+                    $storedBefore[$day][1],
+                )];
+            }
+        }
 
         return $days;
+    }
+
+    /**
+     * Хранимый итог регистра за день и число строк без статьи.
+     *
+     * @param list<string> $days
+     *
+     * @return array<string, array{0: string, 1: int}>
+     */
+    private function storedNetByDay(array $days): array
+    {
+        $result = [];
+        foreach ($days as $day) {
+            $row = $this->connection->fetchAssociative(
+                'SELECT coalesce(sum(amount_income - amount_expense), 0)::text AS net, count(*) FILTER (WHERE pl_category_id IS NULL) AS uncategorized
+                 FROM pl_daily_totals WHERE company_id = :company AND date = :day',
+                ['company' => self::COMPANY_ID, 'day' => $day],
+            );
+            $result[$day] = [bcadd((string) ($row['net'] ?? '0'), '0', 2), (int) ($row['uncategorized'] ?? 0)];
+        }
+
+        return $result;
     }
 
     /**
@@ -570,6 +628,15 @@ final class RepairPlTree19621cffCommand extends Command
         }
 
         foreach (self::FLOWS as $id => [$label, $from, $to]) {
+            // Направление задаёт доход/расход операций в регистре: со сменой при операциях
+            // регистр пришлось бы пересчитывать. На проде 29.10 операций у обеих статей нет.
+            $operations = (int) $this->connection->fetchOne('SELECT count(*) FROM document_operations WHERE category_id = :id', ['id' => $id]);
+            if ($operations > 0) {
+                ++$this->failed;
+                $this->rows[] = ['направление', sprintf('«%s»: %s → %s', $label, $from, $to), sprintf('ОШИБКА: у статьи %d операций', $operations)];
+
+                continue;
+            }
             $this->guarded(
                 'направление',
                 sprintf('«%s»: %s → %s', $label, $from, $to),
@@ -597,7 +664,7 @@ final class RepairPlTree19621cffCommand extends Command
             $refs = $this->references($id, null === $category['code'] ? null : (string) $category['code']);
             if ([] !== $refs) {
                 $what = implode(', ', array_map(static fn (string $k, int $n): string => $k.' '.$n, array_keys($refs), $refs));
-                if ($deferrable) {
+                if ($deferrable && [] === array_diff_key($refs, ['операций' => 0, 'строк регистра' => 0])) {
                     ++$this->deferred;
                     $this->rows[] = ['удаление', $label, 'отложено: '.$what];
                 } else {
@@ -664,7 +731,8 @@ final class RepairPlTree19621cffCommand extends Command
             'код',
             '«Продажи без СПП»: REV_NOT_SPP_SALES → REV_NOT_SPP',
             "UPDATE pl_categories c SET code = 'REV_NOT_SPP' WHERE c.id = :id AND c.company_id = :company AND c.code = 'REV_NOT_SPP_SALES'
-             AND NOT EXISTS (SELECT 1 FROM pl_categories o WHERE o.company_id = :company AND o.code = 'REV_NOT_SPP')",
+             AND NOT EXISTS (SELECT 1 FROM pl_categories o WHERE o.company_id = :company AND o.code = 'REV_NOT_SPP')
+             AND NOT EXISTS (SELECT 1 FROM pl_categories f WHERE f.company_id = :company AND f.formula ~* '\\mREV_NOT_SPP_SALES\\M')",
             ['id' => self::REV_NOT_SPP_SALES],
             'SELECT code FROM pl_categories WHERE id = :id AND company_id = :company',
             'REV_NOT_SPP',
@@ -711,7 +779,10 @@ final class RepairPlTree19621cffCommand extends Command
 
     private function name(string $categoryId): string
     {
-        $row = $this->connection->fetchAssociative('SELECT code, name FROM pl_categories WHERE id = :id', ['id' => $categoryId]);
+        $row = $this->connection->fetchAssociative(
+            'SELECT code, name FROM pl_categories WHERE id = :id AND company_id = :company',
+            ['id' => $categoryId, 'company' => self::COMPANY_ID],
+        );
 
         return false === $row ? $categoryId : (string) ($row['code'] ?? $row['name']);
     }

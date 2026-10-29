@@ -194,7 +194,7 @@ final class RepairPlTree19621cffCommandTest extends IntegrationTestCase
 
         // Ночное оперативное закрытие пересобирает текущий месяц по новым правилам.
         $this->connection->executeStatement('UPDATE document_operations SET category_id = :to WHERE document_id = :doc', ['to' => Repair::WH_STORAGE, 'doc' => $this->currentMonthDoc]);
-        $this->recalc((new \DateTimeImmutable('today'))->format('Y-m-d'));
+        $this->recalc((new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d'));
 
         $tester = $this->tester();
         self::assertSame(Command::SUCCESS, $tester->execute(['--execute' => true]), $tester->getDisplay());
@@ -233,6 +233,18 @@ final class RepairPlTree19621cffCommandTest extends IntegrationTestCase
         $tester = $this->tester();
         self::assertSame(Command::FAILURE, $tester->execute(['--execute' => true]));
         self::assertStringContainsString('итог дня -600.00 → -1400.00', $tester->getDisplay());
+        self::assertSame(103, $this->categoriesCount());
+    }
+
+    public function testFlowIsNotChangedUnderOperations(): void
+    {
+        $this->seed();
+        $this->operation($this->document('2026-04-30', 'CASHFLOW_EXPENSE', null), Repair::OPEX_MKT_WAGES, '50000.00', null);
+
+        $tester = $this->tester();
+        self::assertSame(Command::FAILURE, $tester->execute(['--execute' => true]));
+        self::assertStringContainsString('ОШИБКА: у статьи 1 операций', $tester->getDisplay());
+        self::assertSame('NONE', $this->one('SELECT flow FROM pl_categories WHERE id = :id', Repair::OPEX_MKT_WAGES));
         self::assertSame(103, $this->categoriesCount());
     }
 
@@ -324,7 +336,7 @@ final class RepairPlTree19621cffCommandTest extends IntegrationTestCase
         $this->operation($this->document('2026-03-23', 'CASHFLOW_EXPENSE', null), Repair::DIVIDENDS_ROOT, '6000.00', null);
 
         // Текущий месяц не переносится: его пересоберёт ночное закрытие.
-        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $today = (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
         $this->currentMonthDoc = $this->document($today, 'marketplace_pl', 'marketplace_ozon');
         $this->operation($this->currentMonthDoc, Repair::MP_STORAGE, '-100.00', '[Оперативное закрытие] Категория ozon_storage');
         $this->operation($this->currentMonthDoc, Repair::MP_OTHER_DEDUCTIONS, '-50.00', '[Оперативное закрытие] Категория ozon_disposal');
