@@ -14,6 +14,8 @@ final readonly class ImportPLCategoryTreeResult
      * @param int $companyRoots корневых статей у компании до импорта
      * @param int $recognizedRoots из них опознано корневыми узлами источника (по коду или имени)
      * @param list<ImportPLCategoryTreeRow> $skippedWithSimilar новые потомки похожих статей — не созданы вместе с ними
+     * @param string $fingerprint отпечаток того, что импорт запишет: предпросмотр отдаёт его форме,
+     *                            применение (ImportPLCategoryTreeCommand::$expectedFingerprint) сверяет
      */
     public function __construct(
         public array $created,
@@ -24,6 +26,7 @@ final readonly class ImportPLCategoryTreeResult
         public int $companyRoots = 0,
         public int $recognizedRoots = 0,
         public array $skippedWithSimilar = [],
+        public string $fingerprint = '',
     ) {
     }
 }

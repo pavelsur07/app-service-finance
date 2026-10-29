@@ -13,6 +13,7 @@ use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Exception\PLImportPreviewOutdatedException;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -843,6 +844,199 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         (new ImportPLCategoryTreeAction($companyRepository, $plCategoryRepository, $em, new PLCategoryNameSimilarity()))(
             new ImportPLCategoryTreeCommand([], '11111111-1111-1111-1111-000000000009', false),
         );
+    }
+
+    public function testWithoutUpdateExistingMatchedNodeKeepsItsFieldsAndNewChildGoesUnderIt(): void
+    {
+        [$target, $sourceNodes, $existingRoot, $plCategoryRepository] = $this->renamedRootWithNewChildScenario();
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist')->with(self::callback(
+            static fn (PLCategory $c): bool => 'Маркетинг' === $c->getName() && $existingRoot === $c->getParent(),
+        ));
+        $em->expects(self::once())->method('flush');
+
+        $result = $this->action($target, $plCategoryRepository, $em)(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), false, updateExisting: false),
+        );
+
+        self::assertCount(1, $result->created);
+        self::assertSame([], $result->updated);
+        self::assertSame(1, $result->unchangedCount);
+        self::assertSame('Старое имя', $existingRoot->getName());
+        self::assertSame(PLFlow::INCOME, $existingRoot->getFlow());
+    }
+
+    public function testUpdatedRowListsChangedFieldsAndMarksReportAffectingOnes(): void
+    {
+        [$target, $sourceNodes, , $plCategoryRepository] = $this->renamedRootWithNewChildScenario();
+
+        $result = $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class))(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
+        );
+
+        self::assertCount(1, $result->updated);
+        $changes = [];
+        foreach ($result->updated[0]->changes as $change) {
+            $changes[$change->field] = [$change->from, $change->to, $change->affectsReport];
+        }
+        self::assertSame([
+            'name' => ['Старое имя', 'Расходы', false],
+            'flow' => ['INCOME', 'EXPENSE', true],
+        ], $changes);
+    }
+
+    public function testRefusesPlanThatDiffersFromPreviewAndChangesNothing(): void
+    {
+        [$target, $sourceNodes, $existingRoot, $plCategoryRepository] = $this->renamedRootWithNewChildScenario();
+        $action = $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class));
+        $preview = $action(new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true));
+
+        // После предпросмотра статью переименовали — дифф уже другой.
+        $existingRoot->setName('Правка коллеги');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('persist');
+        $em->expects(self::never())->method('flush');
+        $em->expects(self::never())->method('wrapInTransaction');
+
+        try {
+            $this->action($target, $plCategoryRepository, $em)(new ImportPLCategoryTreeCommand(
+                $sourceNodes,
+                (string) $target->getId(),
+                false,
+                expectedFingerprint: $preview->fingerprint,
+            ));
+            self::fail('Ожидался отказ: план разошёлся с предпросмотром.');
+        } catch (PLImportPreviewOutdatedException) {
+        }
+
+        self::assertSame('Правка коллеги', $existingRoot->getName());
+    }
+
+    public function testAppliesPlanMatchingPreviewFingerprint(): void
+    {
+        [$target, $sourceNodes, $existingRoot, $plCategoryRepository] = $this->renamedRootWithNewChildScenario();
+        $preview = $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class))(
+            new ImportPLCategoryTreeCommand($sourceNodes, (string) $target->getId(), true),
+        );
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
+        $em->expects(self::once())->method('flush');
+
+        $result = $this->action($target, $plCategoryRepository, $em)(new ImportPLCategoryTreeCommand(
+            $sourceNodes,
+            (string) $target->getId(),
+            false,
+            expectedFingerprint: $preview->fingerprint,
+        ));
+
+        self::assertSame($preview->fingerprint, $result->fingerprint);
+        self::assertSame('Расходы', $existingRoot->getName());
+    }
+
+    public function testWithoutUpdateNewChildPathIsWhereItLandsInCompany(): void
+    {
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Аренда')->withCode('RENT')->build();
+        $sourceChild = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Склад')->withCode('RENT_WH')->withParent($sourceRoot)->build();
+
+        $companyOpex = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Опер. расходы')->withCode('OPEX')->build();
+        $companyRent = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Аренда офиса')->withCode('RENT')->withParent($companyOpex)->build();
+
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
+        $plCategoryRepository->method('findOneBy')->willReturnCallback(
+            static fn (array $criteria): ?PLCategory => 'RENT' === ($criteria['code'] ?? null) ? $companyRent : null,
+        );
+        $plCategoryRepository->method('findTreeByCompany')->willReturn([$companyOpex, $companyRent]);
+
+        $result = $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class))(
+            new ImportPLCategoryTreeCommand($this->nodes([$sourceRoot, $sourceChild]), (string) $target->getId(), true, updateExisting: false),
+        );
+
+        self::assertCount(1, $result->created);
+        self::assertSame('Опер. расходы / Аренда офиса / Склад', $result->created[0]->path);
+    }
+
+    public function testWithoutUpdateMatchedCategoryDoesNotRaiseFormulaWarnings(): void
+    {
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        // В файле «Выручка» без кода и с формулой на неизвестный код; у компании — «Выручка» с REV.
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Выручка')->build();
+        $sourceRoot->setFormula('UNKNOWN * 2');
+        $companyRevenue = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Выручка')->withCode('REV')->build();
+
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
+        $plCategoryRepository->method('findBy')->willReturn([$companyRevenue]);
+        $plCategoryRepository->method('findTreeByCompany')->willReturn([$companyRevenue]);
+        $plCategoryRepository->method('findCodesByCompany')->willReturn(['REV']);
+        $plCategoryRepository->method('findFormulasByCompany')->willReturn(['other' => 'REV + 1']);
+
+        $action = $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class));
+        $keep = $action(new ImportPLCategoryTreeCommand($this->nodes([$sourceRoot]), (string) $target->getId(), true, updateExisting: false));
+        $update = $action(new ImportPLCategoryTreeCommand($this->nodes([$sourceRoot]), (string) $target->getId(), true));
+
+        self::assertSame([], $keep->unresolvedFormulaCodes, 'без обновления формула не переносится, код REV не освобождается');
+        self::assertSame(['REV', 'UNKNOWN'], $update->unresolvedFormulaCodes);
+    }
+
+    public function testWithoutUpdateNewCategoryCannotTakeCodeKeptByMatchedOne(): void
+    {
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        // «Реклама» без кода совпала по названию со статьёй компании с кодом ADS; следующий узел
+        // приносит тот же ADS. Без обновления код не освобождается — понятный отказ, а не 500.
+        $sourceAds = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Реклама')->build();
+        $sourceOther = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Продвижение')->withCode('ADS')->build();
+        $companyAds = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Реклама')->withCode('ADS')->build();
+
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
+        $plCategoryRepository->method('findBy')->willReturnCallback(
+            static fn (array $criteria): array => 'Реклама' === $criteria['name'] ? [$companyAds] : [],
+        );
+        $plCategoryRepository->method('findOneBy')->willReturnCallback(
+            static fn (array $criteria): ?PLCategory => 'ADS' === ($criteria['code'] ?? null) ? $companyAds : null,
+        );
+        $plCategoryRepository->method('findTreeByCompany')->willReturn([$companyAds]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Код ADS в компании уже у статьи "Реклама"');
+
+        $this->action($target, $plCategoryRepository, $this->createMock(EntityManagerInterface::class))(
+            new ImportPLCategoryTreeCommand($this->nodes([$sourceAds, $sourceOther]), (string) $target->getId(), true, updateExisting: false),
+        );
+    }
+
+    /**
+     * Источник: «Расходы» (EXP, расход) / «Маркетинг»; в компании — «Старое имя» (EXP, доход) без потомков.
+     *
+     * @return array{0: Company, 1: list<PLCategoryTreeNode>, 2: PLCategory, 3: PLCategoryRepository&MockObject}
+     */
+    private function renamedRootWithNewChildScenario(): array
+    {
+        $source = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->build();
+
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)
+            ->withName('Расходы')->withCode('EXP')->withFlow(PLFlow::EXPENSE)->build();
+        $sourceChild = PLCategoryBuilder::aPLCategory()->forCompany($source)
+            ->withName('Маркетинг')->withCode('MKT')->withParent($sourceRoot)->build();
+        $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)
+            ->withName('Старое имя')->withCode('EXP')->withFlow(PLFlow::INCOME)->build();
+
+        $plCategoryRepository = $this->plCategoryRepositoryMock();
+        $plCategoryRepository->method('findOneBy')->willReturnCallback(
+            static fn (array $criteria): ?PLCategory => 'EXP' === ($criteria['code'] ?? null) ? $existingRoot : null,
+        );
+        $plCategoryRepository->method('findTreeByCompany')->willReturn([$existingRoot]);
+
+        return [$target, $this->nodes([$sourceRoot, $sourceChild]), $existingRoot, $plCategoryRepository];
     }
 
     /**

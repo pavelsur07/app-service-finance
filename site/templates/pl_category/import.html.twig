@@ -162,7 +162,14 @@
             </div>
         </div>
 
-        {% if preview is not null %}
+        {% set withUpdates = previewWithUpdates|default(null) %}
+        {% set keepError = keepError|default(null) %}
+        {% set updateError = updateError|default(null) %}
+        {% set shown = preview ?? withUpdates %}
+        {% if shown is not null %}
+            {% set canUpdate = previewMode != 'template' and withUpdates is not null and withUpdates.updated is not empty %}
+            {# «Только добавить» отказал, а обновление проходит: доступен только импорт с обновлением. #}
+            {% set forcedUpdate = preview is null %}
             <div class="card">
                 <div class="card-body">
                     <h3 class="card-title">
@@ -171,11 +178,18 @@
                         {% if previewMode == 'template' %}— базовый шаблон{% endif %}
                     </h3>
 
-                    {% if preview.unresolvedFormulaCodes is not empty %}
+                    {% if forcedUpdate %}
+                        <div class="alert alert-warning" data-import-keep-error>
+                            Только добавить недостающие статьи нельзя: {{ keepError }}
+                            Импорт возможен только с обновлением существующих статей — проверьте изменения ниже.
+                        </div>
+                    {% endif %}
+
+                    {% if shown.unresolvedFormulaCodes is not empty %}
                         <div class="alert alert-warning">
                             После импорта в формулах категорий этой компании останутся ссылки
                             на обозначения, которых в ней не будет:
-                            <strong>{{ preview.unresolvedFormulaCodes|join(', ') }}</strong>.
+                            <strong>{{ shown.unresolvedFormulaCodes|join(', ') }}</strong>.
                             Это могут быть как переносимые формулы, так и формулы категорий,
                             которых в источнике нет — импорт способен освободить код, на который
                             они ссылаются. Формулы не правятся автоматически, проверьте их вручную.
@@ -183,19 +197,19 @@
                         </div>
                     {% endif %}
 
-                    {% if preview.similar is not empty %}
+                    {% if shown.similar is not empty %}
                         <div class="alert alert-warning">
                             <p>Эти статьи шаблона не будут созданы: у вас есть статьи с похожими названиями.
                             Чтобы шаблон считал их своими, <a href="{{ path('pl_category_template_mapping') }}">сопоставьте их с шаблоном</a>.</p>
                             <ul class="mb-0">
-                                {% for row in preview.similar %}
+                                {% for row in shown.similar %}
                                     <li>{{ row.path }} <code>{{ row.code }}</code> — у вас «{{ row.existingName }}»</li>
                                 {% endfor %}
                             </ul>
-                            {% if preview.skippedWithSimilar is not empty %}
+                            {% if shown.skippedWithSimilar is not empty %}
                                 <p class="mt-2 mb-1">Вместе с ними не будут созданы вложенные статьи шаблона:</p>
                                 <ul class="mb-0">
-                                    {% for row in preview.skippedWithSimilar %}
+                                    {% for row in shown.skippedWithSimilar %}
                                         <li>{{ row.path }} <code>{{ row.code }}</code></li>
                                     {% endfor %}
                                 </ul>
@@ -207,20 +221,29 @@
                     <div class="row g-3 mb-3">
                         <div class="col-auto">
                             <div class="text-secondary">Будет создано</div>
-                            <div class="h2 mb-0">{{ preview.created|length }}</div>
+                            <div class="h2 mb-0">{{ shown.created|length }}</div>
                         </div>
-                        <div class="col-auto">
-                            <div class="text-secondary">Будет обновлено</div>
-                            <div class="h2 mb-0">{{ preview.updated|length }}</div>
-                        </div>
+                        {% if previewMode == 'template' %}
+                            <div class="col-auto">
+                                <div class="text-secondary">Будет обновлено</div>
+                                <div class="h2 mb-0">{{ shown.updated|length }}</div>
+                            </div>
+                        {% else %}
+                            <div class="col-auto">
+                                <div class="text-secondary">Отличаются у существующих</div>
+                                <div class="h2 mb-0" data-import-differing>{{ withUpdates is not null ? withUpdates.updated|length : '—' }}</div>
+                            </div>
+                        {% endif %}
                         <div class="col-auto">
                             <div class="text-secondary">Без изменений</div>
-                            <div class="h2 mb-0">{{ preview.unchangedCount }}</div>
+                            <div class="h2 mb-0">{{ previewMode != 'template' and withUpdates is not null and not forcedUpdate ? shown.unchangedCount - withUpdates.updated|length : shown.unchangedCount }}</div>
                         </div>
                     </div>
 
-                    {% if preview.created is empty and preview.updated is empty %}
+                    {% if shown.created is empty and not canUpdate and shown.updated is empty %}
                         <div class="alert alert-secondary mb-3">Изменений нет — импортировать нечего.</div>
+                    {% elseif shown.created is empty and (canUpdate or forcedUpdate) %}
+                        <div class="alert alert-secondary mb-3">Новых статей нет{{ forcedUpdate ? '' : ' — без отметки «Также обновить» импорт ничего не изменит' }}.</div>
                     {% else %}
                         <div class="table-responsive mb-3">
                             <table class="table table-vcenter card-table">
@@ -232,14 +255,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for row in preview.created %}
+                                    {% for row in shown.created %}
                                         <tr>
                                             <td><span class="badge bg-green-lt">Создать</span></td>
                                             <td>{{ row.path }}</td>
                                             <td>{{ row.code }}</td>
                                         </tr>
                                     {% endfor %}
-                                    {% for row in preview.updated %}
+                                    {% for row in (forcedUpdate ? [] : shown.updated) %}
                                         <tr>
                                             <td><span class="badge bg-blue-lt">Обновить</span></td>
                                             <td>{{ row.path }}</td>
@@ -248,6 +271,71 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+                    {% endif %}
+
+                    {% if previewMode != 'template' and withUpdates is null and updateError is not null %}
+                        <div class="alert alert-secondary mb-3" data-import-update-error>
+                            Обновить существующие статьи этим источником нельзя: {{ updateError }}
+                            Недостающие статьи добавить можно.
+                        </div>
+                    {% endif %}
+
+                    {% if canUpdate %}
+                        <div class="mb-3" data-import-updates>
+                            <h4>Существующие статьи отличаются от источника</h4>
+                            <p class="text-secondary">
+                                {% if forcedUpdate %}
+                                    Импорт перезапишет поля ниже значениями источника.
+                                {% else %}
+                                    По умолчанию импорт их не меняет — только добавляет недостающие статьи.
+                                    Отметьте «Также обновить», чтобы перезаписать поля ниже значениями источника.
+                                {% endif %}
+                                Изменения с пометкой «Меняет отчёт» влияют на расчёт ОПиУ: место статьи
+                                в дереве, знак, формулы и итоги.
+                            </p>
+                            {% if not forcedUpdate and withUpdates.unresolvedFormulaCodes is not empty and withUpdates.unresolvedFormulaCodes != shown.unresolvedFormulaCodes %}
+                                <div class="alert alert-warning">
+                                    Если обновить существующие статьи, в формулах категорий этой компании останутся
+                                    ссылки на обозначения, которых в ней не будет:
+                                    <strong>{{ withUpdates.unresolvedFormulaCodes|join(', ') }}</strong>.
+                                    Это могут быть как переносимые формулы, так и формулы категорий,
+                                    которых в источнике нет — обновление способно освободить код, на который
+                                    они ссылаются. Формулы не правятся автоматически, проверьте их вручную.
+                                </div>
+                            {% endif %}
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Статья</th>
+                                            <th>Поле</th>
+                                            <th>Сейчас</th>
+                                            <th>Станет</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in withUpdates.updated %}
+                                            {% for change in row.changes %}
+                                                <tr data-import-change="{{ change.field }}">
+                                                    {% if loop.first %}
+                                                        <td rowspan="{{ row.changes|length }}">
+                                                            {{ row.path }}
+                                                            {% if row.code %}<div class="text-secondary small"><code>{{ row.code }}</code></div>{% endif %}
+                                                        </td>
+                                                    {% endif %}
+                                                    <td>
+                                                        {{ change.label }}
+                                                        {% if change.affectsReport %}<span class="badge bg-red-lt ms-1">Меняет отчёт</span>{% endif %}
+                                                    </td>
+                                                    <td class="text-break">{{ change.from }}</td>
+                                                    <td class="text-break">{{ change.to }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     {% endif %}
 
@@ -260,8 +348,23 @@
                         {% else %}
                             <input type="hidden" name="sourceCompanyId" value="{{ selectedSourceCompanyId }}">
                         {% endif %}
+                        {% if previewMode != 'template' %}
+                            {% if forcedUpdate %}
+                                <input type="hidden" name="updateExisting" value="1">
+                                <input type="hidden" name="fingerprintWithUpdates" value="{{ withUpdates.fingerprint }}">
+                            {% else %}
+                                <input type="hidden" name="fingerprint" value="{{ shown.fingerprint }}">
+                            {% endif %}
+                            {% if canUpdate and not forcedUpdate %}
+                                <input type="hidden" name="fingerprintWithUpdates" value="{{ withUpdates.fingerprint }}">
+                                <label class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="updateExisting" value="1">
+                                    <span class="form-check-label">Также обновить существующие статьи ({{ withUpdates.updated|length }})</span>
+                                </label>
+                            {% endif %}
+                        {% endif %}
                         <input type="hidden" name="_token" value="{{ csrf_token('pl-category-import' ~ targetCompanyId) }}">
-                        <button type="submit" class="btn btn-primary"{{ (preview.created is empty and preview.updated is empty) ? ' disabled' : '' }}>
+                        <button type="submit" class="btn btn-primary"{{ (shown.created is empty and shown.updated is empty and not canUpdate) ? ' disabled' : '' }}>
                             Импортировать
                         </button>
                     </form>
