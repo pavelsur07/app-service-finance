@@ -505,7 +505,6 @@ class DocumentController extends AbstractController
             $operationCopy = new DocumentOperation();
             $operationCopy->setPlCategory($operation->getPlCategory());
             $operationCopy->setAmount($operation->getAmount());
-            $operationCopy->setCounterparty($operation->getCounterparty());
             $operationCopy->setProjectDirection($operation->getProjectDirection());
             $operationCopy->setResponsibilityCenterId($operation->getResponsibilityCenterId());
             $operationCopy->setComment($operation->getComment());

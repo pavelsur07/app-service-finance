@@ -15,6 +15,7 @@ use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
 use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
 use App\Finance\Enum\DocumentStatus;
@@ -43,7 +44,6 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
                 new CreatePLDocumentOperationCommand(
                     amount: '1500.00',
                     categoryId: (string) $category->getId(),
-                    counterpartyId: (string) $counterparty->getId(),
                     projectDirectionId: (string) $project->getId(),
                     comment: 'Операция 1',
                 ),
@@ -55,6 +55,10 @@ final class CreatePLDocumentActionTest extends IntegrationTestCase
         self::assertInstanceOf(Document::class, $document);
         self::assertSame('PL-501', $document->getNumber());
         self::assertCount(1, $document->getOperations());
+        // Контрагент один на документ: операция получает контрагента шапки.
+        $operation = $document->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        self::assertSame($counterparty->getId(), $operation->getCounterparty()?->getId());
 
         $dailyTotals = $this->em()->getRepository(PLDailyTotal::class)->findBy(['company' => $company]);
         self::assertCount(1, $dailyTotals);

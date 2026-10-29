@@ -109,7 +109,7 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
         self::assertSame(PLFlow::EXPENSE->value, $byId[(string) $second->getId()]['flow']);
     }
 
-    public function testCounterpartyAndProjectFallBackToDocument(): void
+    public function testCounterpartyIsTheDocumentsAndProjectFallsBackToDocument(): void
     {
         $client = static::createClient();
 
@@ -117,7 +117,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
         $category = $this->seedCategory($company, 'Выручка', 'REVENUE');
 
         $documentCounterparty = $this->seedCounterparty($company, 'ООО Документ');
-        $operationCounterparty = $this->seedCounterparty($company, 'ООО Операция');
         $documentProject = $this->seedProject($company, 'Проект документа');
         $operationProject = $this->seedProject($company, 'Проект операции');
 
@@ -127,7 +126,6 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
 
         $inherited = $this->addOperation($document, $category, '100.00');
         $overridden = $this->addOperation($document, $category, '200.00');
-        $overridden->setCounterparty($operationCounterparty);
         $overridden->setProjectDirection($operationProject);
         $this->em()->flush();
 
@@ -140,7 +138,8 @@ final class PlOperationJsonExportControllerTest extends WebTestCaseBase
 
         self::assertSame('ООО Документ', $byId[(string) $inherited->getId()]['counterparty']);
         self::assertSame('Проект документа', $byId[(string) $inherited->getId()]['project']);
-        self::assertSame('ООО Операция', $byId[(string) $overridden->getId()]['counterparty']);
+        // Один документ — один контрагент: у операции со своим проектом контрагент — документа.
+        self::assertSame('ООО Документ', $byId[(string) $overridden->getId()]['counterparty']);
         self::assertSame('Проект операции', $byId[(string) $overridden->getId()]['project']);
     }
 

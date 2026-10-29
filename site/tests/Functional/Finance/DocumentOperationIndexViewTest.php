@@ -272,7 +272,6 @@ final class DocumentOperationIndexViewTest extends WebTestCaseBase
         $operation = $document->getOperations()->first();
         self::assertInstanceOf(DocumentOperation::class, $operation);
         $operation->setProjectDirection($project);
-        $operation->setCounterparty($counterparty);
         $operation->setResponsibilityCenterId($center->getId());
         $em->flush();
     }

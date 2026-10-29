@@ -5,21 +5,8 @@
         if (!form) {
             return;
         }
-        const documentCounterpartyField = document.querySelector('[data-document-counterparty]');
         const documentProjectField = document.querySelector('[data-document-project-direction]');
         const documentResponsibilityCenterField = document.querySelector('[data-document-responsibility-center]');
-
-        // Префилл новой операции из шапки документа: только в пустое поле.
-        const prefill = function (card, source, selector) {
-            if (!source || !source.value) {
-                return;
-            }
-            const target = card.querySelector(selector);
-            if (target && !target.value) {
-                target.value = source.value;
-                target.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        };
 
         // Значение select'а с уведомлением пикеров (виджет ЦФО, пикер проекта читают его по change).
         // Варианта нет среди option строки — не трогаем: иначе select молча сбросится в пустое.
@@ -249,12 +236,11 @@
             }, 0);
         };
 
-        // Новая операция — значения шапки (проект, ЦФО; контрагент — только в пустое поле).
+        // Новая операция — значения шапки (проект, ЦФО). Контрагент один на документ — только в шапке.
         // quiet — строка при открытии формы создания: не правка пользователя и без фокуса.
         const addOperation = function (amount, quiet) {
             const row = createRow();
             holder.appendChild(row);
-            prefill(row, documentCounterpartyField, '[data-operation-counterparty]');
             Object.keys(inherit).forEach(function (kind) {
                 const cfg = inherit[kind];
                 if (cfg.header && cfg.header.value !== '') {
@@ -276,13 +262,13 @@
         const duplicateOperation = function (source) {
             const row = createRow();
             source.after(row);
-            ['[data-operation-category]', '[data-operation-project-direction]', '[data-operation-responsibility-center]', '[data-operation-counterparty]'].forEach(function (selector) {
+            ['[data-operation-category]', '[data-operation-project-direction]', '[data-operation-responsibility-center]'].forEach(function (selector) {
                 const from = source.querySelector(selector);
                 const to = row.querySelector(selector);
                 if (!from || !to || from.value === '') {
                     return;
                 }
-                // Вариант мог быть добавлен в исходную строку позже (найден поиском контрагента).
+                // Вариант мог быть добавлен в исходную строку позже (найден поиском в пикере).
                 if (!Array.from(to.options).some(function (o) { return o.value === from.value; }) && from.selectedOptions[0]) {
                     to.appendChild(from.selectedOptions[0].cloneNode(true));
                 }

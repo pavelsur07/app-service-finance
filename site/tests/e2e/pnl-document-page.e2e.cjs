@@ -88,6 +88,16 @@ const EDIT = `/documents/${DOC_ID}/edit`;
     return JSON.stringify(items) === JSON.stringify(['Дублировать документ', 'Открыть операцию ДДС', 'Выгрузить JSON', 'Удалить документ']) || JSON.stringify(items);
   });
 
+  await t('контрагент — только в шапке, у операций поля нет', async () => {
+    const r = await p.evaluate(() => ({
+      header: !!document.querySelector('[data-document-counterparty]'),
+      rows: document.querySelectorAll('[data-operation-row]').length,
+      inRows: document.querySelectorAll('[data-operation-row] [data-cp-picker], [data-operation-row] [name$="[counterparty]"]').length,
+      sub: [...document.querySelectorAll('.vf-docform-op__sublabel')].map((n) => n.textContent.trim()),
+    }));
+    return r.header && r.rows > 0 && r.inRows === 0 && !r.sub.includes('Контрагент') || JSON.stringify(r);
+  });
+
   await t('суммы в формате «70 000,00»', async () => {
     const v = await rowValues('[data-operation-amount]');
     return v[0] === '70 000,00' && v[1] === '30 000,00' || JSON.stringify(v);

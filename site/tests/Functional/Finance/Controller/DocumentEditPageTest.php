@@ -108,7 +108,9 @@ final class DocumentEditPageTest extends WebTestCaseBase
         foreach (['[data-collection-holder][data-prototype]', '.add_item_link', '.remove-item', '.document-operation-card', '[data-document-counterparty]', '[data-document-project-direction]', '[data-document-responsibility-center]', '[data-allocation][data-allocation-available]'] as $hook) {
             self::assertGreaterThan(0, $crawler->filter($hook)->count(), $hook);
         }
-        self::assertStringContainsString('data-operation-counterparty', (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype'));
+        // Контрагент один на документ — только в шапке, у строки операции поля нет.
+        self::assertStringNotContainsString('data-operation-counterparty', (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype'));
+        self::assertCount(0, $crawler->filter('[name="document[operations][0][counterparty]"]'));
     }
 
     public function testCommentIsSaved(): void
@@ -131,10 +133,10 @@ final class DocumentEditPageTest extends WebTestCaseBase
     }
 
     /**
-     * Регрессия: новая операция получает контрагента шапки (_page_scripts.html.twig), но архивного
-     * среди её вариантов не было — подстановка молча не срабатывала, поле оставалось пустым.
+     * Новая операция получает контрагента шапки на сервере — и архивного тоже (раньше его
+     * подставлял скрипт, и архивного среди вариантов строки могло не быть).
      */
-    public function testNewOperationAcceptsArchivedCounterpartyOfTheHeader(): void
+    public function testNewOperationTakesArchivedCounterpartyOfTheHeader(): void
     {
         $client = static::createClient();
         [$user, $company, $income] = $this->prepare();
@@ -150,27 +152,66 @@ final class DocumentEditPageTest extends WebTestCaseBase
         $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
         self::assertResponseIsSuccessful();
 
-        $prototype = (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype');
-        self::assertStringContainsString(sprintf('value="%s"', $archivedId), $prototype);
-        self::assertStringContainsString('data-archived="1"', $prototype);
-
         $values = $crawler->selectButton('Сохранить')->form()->getPhpValues();
-        $values['document']['operations'][5] = ['category' => (string) $income->getId(), 'amount' => '50.00', 'counterparty' => $archivedId];
+        $values['document']['operations'][5] = ['category' => (string) $income->getId(), 'amount' => '50.00'];
         $client->request('POST', sprintf('/documents/%s/edit', $document->getId()), $values);
         self::assertResponseRedirects('/documents/resume');
 
-        $this->em()->clear();
-        $reloaded = $this->em()->find(Document::class, $document->getId());
-        self::assertInstanceOf(Document::class, $reloaded);
-        $counterparties = array_map(
-            static fn (DocumentOperation $operation): ?string => $operation->getCounterparty()?->getId(),
-            $reloaded->getOperations()->toArray(),
-        );
-        self::assertContains($archivedId, $counterparties);
+        self::assertSame([$archivedId, $archivedId], $this->operationCounterparties($document));
     }
 
     /**
-     * Контрагент в шапке и в операциях — окно выбора как у пилюли фильтра (browse): тип варианта
+     * Один документ — один контрагент: смена контрагента в шапке переходит во все операции.
+     */
+    public function testHeaderCounterpartyChangeIsCarriedToAllOperations(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $income] = $this->prepare();
+        $document = $this->persistDocument($company, $income, false);
+        $old = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)->withName('Старый')->build();
+        $new = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)->withName('Новый')->build();
+        $this->em()->persist($old);
+        $this->em()->persist($new);
+        $document->setCounterparty($old);
+        $this->em()->flush();
+        $newId = $new->getId();
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+        $values = $crawler->selectButton('Сохранить')->form()->getPhpValues();
+        $values['document']['counterparty'] = $newId;
+        $values['document']['operations'][5] = ['category' => (string) $income->getId(), 'amount' => '50.00'];
+        $client->request('POST', sprintf('/documents/%s/edit', $document->getId()), $values);
+        self::assertResponseRedirects('/documents/resume');
+
+        self::assertSame([$newId, $newId], $this->operationCounterparties($document));
+    }
+
+    /**
+     * Своего контрагента операции через форму не передать: поля нет, а значение со страницы,
+     * открытой до выкладки, отбрасывается — операция остаётся с контрагентом шапки.
+     */
+    public function testOperationCounterpartyInPostIsIgnored(): void
+    {
+        $client = static::createClient();
+        [$user, $company, $income] = $this->prepare();
+        $document = $this->persistDocument($company, $income, false);
+        $other = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)->withName('Чужой для документа')->build();
+        $this->em()->persist($other);
+        $this->em()->flush();
+
+        $this->login($client, $user, $company);
+        $crawler = $client->request('GET', sprintf('/documents/%s/edit', $document->getId()));
+        $values = $crawler->selectButton('Сохранить')->form()->getPhpValues();
+        $values['document']['operations'][0]['counterparty'] = $other->getId();
+        $client->request('POST', sprintf('/documents/%s/edit', $document->getId()), $values);
+
+        self::assertResponseRedirects('/documents/resume');
+        self::assertSame([null], $this->operationCounterparties($document));
+    }
+
+    /**
+     * Контрагент в шапке — окно выбора как у пилюли фильтра (browse): тип варианта
      * нужен окну для групп и иконок.
      */
     public function testCounterpartyFieldsUseBrowseWindow(): void
@@ -189,7 +230,22 @@ final class DocumentEditPageTest extends WebTestCaseBase
         self::assertNotNull($header);
         self::assertSame('1', $header->attr('data-cp-browse'));
         self::assertSame($counterparty->getType()->value, $crawler->filter(sprintf('[data-document-counterparty] option[value="%s"]', $counterparty->getId()))->attr('data-type'));
-        self::assertStringContainsString('data-cp-browse="1"', (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype'));
+        self::assertStringNotContainsString('data-cp-picker', (string) $crawler->filter('[data-collection-holder]')->attr('data-prototype'), 'у строки операции контрагента нет');
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function operationCounterparties(Document $document): array
+    {
+        $this->em()->clear();
+        $reloaded = $this->em()->find(Document::class, $document->getId());
+        self::assertInstanceOf(Document::class, $reloaded);
+
+        return array_values(array_map(
+            static fn (DocumentOperation $operation): ?string => $operation->getCounterparty()?->getId(),
+            $reloaded->getOperations()->toArray(),
+        ));
     }
 
     private function persistDocument(Company $company, PLCategory $income, bool $withBase): Document

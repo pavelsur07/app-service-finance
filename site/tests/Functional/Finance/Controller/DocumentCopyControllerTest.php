@@ -69,7 +69,6 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $incomeOperation = new DocumentOperation();
         $incomeOperation->setPlCategory($incomeCategory);
         $incomeOperation->setAmount('100.00');
-        $incomeOperation->setCounterparty($counterparty);
         $incomeOperation->setProjectDirection($project);
         $incomeOperation->setResponsibilityCenterId($center->getId());
         $incomeOperation->setComment('Income line');
@@ -78,7 +77,6 @@ final class DocumentCopyControllerTest extends WebTestCaseBase
         $expenseOperation = new DocumentOperation();
         $expenseOperation->setPlCategory($expenseCategory);
         $expenseOperation->setAmount('40.00');
-        $expenseOperation->setCounterparty($counterparty);
         $expenseOperation->setProjectDirection($project);
         $expenseOperation->setResponsibilityCenterId($center->getId());
         $expenseOperation->setComment('Expense line');

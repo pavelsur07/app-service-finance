@@ -139,7 +139,6 @@ final class FinanceFacade
             $operations[] = new CreatePLDocumentOperationCommand(
                 amount: $amount,
                 categoryId: $entry->plCategoryId,
-                counterpartyId: null,
                 projectDirectionId: $entry->projectId ?? $projectDirectionId,
                 responsibilityCenterId: null,
                 comment: $entry->description,
@@ -308,7 +307,6 @@ final class FinanceFacade
 
         $operation = new DocumentOperation();
         $operation->setAmount($command->amount);
-        $operation->setCounterparty($counterparty);
         $operation->setProjectDirection($projectDirection);
         $operation->setResponsibilityCenterId($command->responsibilityCenterId);
         $operation->setCategory($plCategory);
