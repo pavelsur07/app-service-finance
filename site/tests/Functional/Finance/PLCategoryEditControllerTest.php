@@ -12,6 +12,7 @@ use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Repository\PLDailyTotalRepository;
+use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -290,7 +291,7 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertResponseRedirects('/pl-categories/');
 
         $client->followRedirect();
-        self::assertSelectorTextContains('.text-bg-danger .toast-body', 'привязаны операции');
+        self::assertSelectorTextContains('.text-bg-danger .toast-body', '1 операция документов ОПиУ');
 
         $this->em()->clear();
         self::assertInstanceOf(
@@ -304,5 +305,87 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         $reloadedCategory = $reloadedOperation->getCategory();
         self::assertNotNull($reloadedCategory, 'Операция не должна лишиться категории при отклонённом удалении.');
         self::assertSame($categoryId, (string) $reloadedCategory->getId());
+    }
+
+    /**
+     * GlitchTip #451: у статьи есть вложенные — FK pl_categories.parent_id без ON DELETE
+     * давал 500. Теперь отказ с причиной, обе статьи целы.
+     */
+    public function testDeleteOfCategoryWithChildrenIsRefusedWithReason(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Косвенные расходы')->build();
+        $child = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Аренда')->withParent($parent)->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, $parent, $child] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $parentId = (string) $parent->getId();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $company->getId());
+
+        // Список: у родителя диалог-запрет с причиной, у свободной вложенной — обычное подтверждение.
+        $crawler = $client->request('GET', '/pl-categories/');
+        self::assertResponseIsSuccessful();
+        $parentTrigger = $crawler->filter(sprintf('[data-confirm-action="/pl-categories/%s/delete"]', $parentId));
+        self::assertSame('true', $parentTrigger->attr('data-confirm-blocked'));
+        self::assertStringContainsString('1 вложенная статья', (string) $parentTrigger->attr('data-confirm-body'));
+        $childTrigger = $crawler->filter(sprintf('[data-confirm-action="/pl-categories/%s/delete"]', $child->getId()));
+        self::assertNull($childTrigger->attr('data-confirm-blocked'));
+        self::assertCount(1, $crawler->filter('#pl-category-confirm'));
+
+        $client->request('POST', '/pl-categories/'.$parentId.'/delete', [
+            '_token' => $this->csrfToken($client, 'delete'.$parentId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.text-bg-danger .toast-body', 'Статью нельзя удалить: 1 вложенная статья. Перенесите или удалите вложенные статьи, затем удалите эту.');
+
+        $this->em()->clear();
+        self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $company->getId()]));
+    }
+
+    public function testDeleteOfCategoryLinkedToCashflowCategoryIsRefusedWithReason(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Аренда')->build();
+        $cashflowCategory = CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->withName('Аренда офиса')->build();
+        $cashflowCategory->setPlCategory($category);
+
+        $em = $this->em();
+        foreach ([$user, $company, $category, $cashflowCategory] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $categoryId = (string) $category->getId();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/'.$categoryId.'/edit');
+        self::assertResponseIsSuccessful();
+        $triggers = $crawler->filter('[data-confirm-blocked="true"]');
+        self::assertGreaterThan(0, $triggers->count());
+        self::assertStringContainsString('1 связанная статья ДДС', (string) $triggers->first()->attr('data-confirm-body'));
+        self::assertStringContainsString('Переназначьте ссылки на другую статью', (string) $triggers->first()->attr('data-confirm-body'));
+        self::assertCount(1, $crawler->filter('#pl-category-confirm'));
+
+        $client->request('POST', '/pl-categories/'.$categoryId.'/delete', [
+            '_token' => $this->csrfToken($client, 'delete'.$categoryId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/');
+        $this->em()->clear();
+        self::assertInstanceOf(PLCategory::class, $this->em()->getRepository(PLCategory::class)->find($categoryId));
     }
 }

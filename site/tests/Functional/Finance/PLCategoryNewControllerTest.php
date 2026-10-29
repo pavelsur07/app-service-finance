@@ -40,8 +40,8 @@ final class PLCategoryNewControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h2.page-title', 'Новая строка ОПиУ');
         self::assertCount(1, $crawler->filter('form#pl-category-edit-form.card'));
-        self::assertCount(0, $crawler->filter('#pl-category-delete-form'));
-        self::assertCount(0, $crawler->filter('[form="pl-category-delete-form"]'));
+        self::assertCount(0, $crawler->filter('#pl-category-confirm'));
+        self::assertCount(0, $crawler->filter('[data-bs-target="#pl-category-confirm"]'));
         self::assertCount(1, $crawler->filter('select[id$="_flow"]'));
         self::assertCount(1, $crawler->filter('select[id$="_format"]'));
         self::assertCount(0, $crawler->filter('input[id$="_isVisible"]'));

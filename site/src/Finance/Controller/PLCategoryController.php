@@ -22,6 +22,7 @@ use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLTemplateApplicationSource;
 use App\Finance\Exception\PLCategoryInUseException;
 use App\Finance\Form\PLCategoryFormType;
+use App\Finance\Infrastructure\Query\PLCategoryUsageQuery;
 use App\Finance\Repository\PLCategoryRepository;
 use App\Finance\Repository\PLTemplateApplicationRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -52,13 +53,14 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/', name: 'pl_category_index', methods: ['GET'])]
-    public function index(ActiveCompanyService $companyService): Response
+    public function index(ActiveCompanyService $companyService, PLCategoryUsageQuery $usageQuery): Response
     {
         $company = $companyService->getActiveCompany();
         $items = $this->categoryRepository->findRootByCompany($company);
 
         return $this->render('pl_category/index.html.twig', [
             'items' => $items,
+            'usage' => $usageQuery((string) $company->getId()),
         ]);
     }
 
@@ -346,7 +348,7 @@ class PLCategoryController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'pl_category_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, PLCategory $category, SavePLCategoryAction $saveCategory, ActiveCompanyService $companyService): Response
+    public function edit(Request $request, PLCategory $category, SavePLCategoryAction $saveCategory, ActiveCompanyService $companyService, PLCategoryUsageQuery $usageQuery): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -383,10 +385,13 @@ class PLCategoryController extends AbstractController
             return $this->redirectToRoute('pl_category_index');
         }
 
+        $categoryId = (string) $category->getId();
+
         return $this->render('pl_category/edit.html.twig', [
             'form' => $form->createView(),
             'item' => $category,
             'available_categories' => $availableCategories,
+            'usage' => $usageQuery((string) $company->getId(), $categoryId)[$categoryId] ?? null,
         ]);
     }
 
@@ -404,8 +409,8 @@ class PLCategoryController extends AbstractController
             if (null !== $companyId) {
                 try {
                     $deleteAction($category, $companyId);
-                } catch (PLCategoryInUseException) {
-                    $this->addFlash('danger', 'Нельзя удалить статью, к которой привязаны операции документов ОПиУ. Сначала перекатегоризируйте их.');
+                } catch (PLCategoryInUseException $exception) {
+                    $this->addFlash('danger', $exception->getMessage());
 
                     return $this->redirectToRoute('pl_category_index');
                 }

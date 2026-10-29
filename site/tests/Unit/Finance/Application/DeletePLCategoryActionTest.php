@@ -6,17 +6,18 @@ namespace App\Tests\Unit\Finance\Application;
 
 use App\Finance\Application\DeletePLCategoryAction;
 use App\Finance\Exception\PLCategoryInUseException;
-use App\Finance\Repository\DocumentOperationRepository;
+use App\Finance\Infrastructure\Query\PLCategoryUsageQuery;
 use App\Finance\Repository\PLDailyTotalRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 final class DeletePLCategoryActionTest extends TestCase
 {
-    public function testRejectsDeletionWhenDocumentOperationsReferenceCategory(): void
+    public function testRejectsDeletionWithReasonWhenCategoryIsInUse(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('In use')->build();
@@ -28,93 +29,38 @@ final class DeletePLCategoryActionTest extends TestCase
         $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
         $dailyTotalRepository->expects(self::never())->method('moveCategoryRowsToUncategorized');
 
-        $documentOperationRepository = $this->createMock(DocumentOperationRepository::class);
-        $documentOperationRepository->method('countByCategory')->willReturn(3);
-
-        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $documentOperationRepository);
+        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $this->usageQuery([[
+            'category_id' => (string) $category->getId(),
+            'children' => 2, 'doc_ops' => 3, 'deleted_doc_ops' => 0, 'cashflow' => 0, 'loans' => 0, 'sale_mappings' => 0,
+        ]]));
 
         $this->expectException(PLCategoryInUseException::class);
+        $this->expectExceptionMessage('Статью нельзя удалить: 2 вложенные статьи, 3 операции документов ОПиУ. Перенесите или удалите вложенные статьи и переназначьте ссылки на другую статью, затем удалите эту.');
 
         $action($category, (string) $company->getId());
     }
 
     /**
-     * Операция появилась между проверкой countByCategory и flush — гонка, а не обычный
-     * путь. FK-исключение обязано транслироваться в тот же PLCategoryInUseException,
-     * а не долетать до контроллера как 500.
+     * Ссылка появилась между проверкой и удалением — гонка. FK-отказ любой таблицы обязан
+     * стать тем же PLCategoryInUseException, а не долететь до контроллера как 500.
      */
-    public function testTranslatesForeignKeyViolationFromFlushIntoDomainException(): void
+    public function testTranslatesForeignKeyViolationFromFlushIntoInUseException(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Race')->build();
 
-        $fkException = $this->fkExceptionWithMessage(
-            'An exception occurred while executing a query: SQLSTATE[23503]: Foreign key violation: 7 ERROR:  '
-            .'update or delete on table "pl_categories" violates foreign key constraint "fk_doc_oper_category" '
-            .'on table "document_operations"',
-        );
-
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('wrapInTransaction')->willThrowException($fkException);
+        $em->method('wrapInTransaction')->willThrowException($this->fkException(
+            'SQLSTATE[23503]: Foreign key violation: 7 ERROR:  update or delete on table "pl_categories" '
+            .'violates foreign key constraint "fk_aae71c73727aca70" on table "pl_categories"',
+        ));
 
-        $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
-        $documentOperationRepository = $this->createMock(DocumentOperationRepository::class);
-        $documentOperationRepository->method('countByCategory')->willReturn(0);
-
-        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $documentOperationRepository);
+        $action = new DeletePLCategoryAction($em, $this->createMock(PLDailyTotalRepository::class), $this->usageQuery([]));
 
         $this->expectException(PLCategoryInUseException::class);
+        $this->expectExceptionMessage('на неё ссылаются другие записи');
 
         $action($category, (string) $company->getId());
-    }
-
-    /**
-     * Находка внешнего ревью: на pl_categories ссылаются и другие таблицы без ON DELETE
-     * (cashflow_categories, wildberries_report_detail_mappings, finance_loan). FK-нарушение
-     * от них — не "привязаны операции документов", а отдельный дефект. Такое исключение
-     * обязано пробрасываться как есть, а не маскироваться под PLCategoryInUseException.
-     */
-    public function testDoesNotTranslateForeignKeyViolationFromAnUnrelatedConstraint(): void
-    {
-        $company = CompanyBuilder::aCompany()->build();
-        $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Unrelated FK')->build();
-
-        $fkException = $this->fkExceptionWithMessage(
-            'An exception occurred while executing a query: SQLSTATE[23503]: Foreign key violation: 7 ERROR:  '
-            .'update or delete on table "pl_categories" violates foreign key constraint "fk_cashflow_category_pl_category" '
-            .'on table "cashflow_categories"',
-        );
-
-        $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('wrapInTransaction')->willThrowException($fkException);
-
-        $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
-        $documentOperationRepository = $this->createMock(DocumentOperationRepository::class);
-        $documentOperationRepository->method('countByCategory')->willReturn(0);
-
-        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $documentOperationRepository);
-
-        $this->expectException(ForeignKeyConstraintViolationException::class);
-        $this->expectExceptionObject($fkException);
-
-        $action($category, (string) $company->getId());
-    }
-
-    private function fkExceptionWithMessage(string $message): ForeignKeyConstraintViolationException
-    {
-        $driverException = new class($message) extends \Exception implements \Doctrine\DBAL\Driver\Exception {
-            public function __construct(private readonly string $driverMessage)
-            {
-                parent::__construct($driverMessage);
-            }
-
-            public function getSQLState(): string
-            {
-                return '23503';
-            }
-        };
-
-        return new ForeignKeyConstraintViolationException($driverException, null);
     }
 
     public function testRemovesCategoryAndMergesDailyTotalsWhenNotInUse(): void
@@ -123,9 +69,6 @@ final class DeletePLCategoryActionTest extends TestCase
         $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Unused')->build();
         $companyId = (string) $company->getId();
         $categoryId = (string) $category->getId();
-
-        $documentOperationRepository = $this->createMock(DocumentOperationRepository::class);
-        $documentOperationRepository->method('countByCategory')->with($companyId, $categoryId)->willReturn(0);
 
         $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
         $dailyTotalRepository->expects(self::once())
@@ -138,8 +81,30 @@ final class DeletePLCategoryActionTest extends TestCase
             ->willReturnCallback(static fn (callable $fn) => $fn());
         $em->expects(self::once())->method('remove')->with($category);
 
-        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $documentOperationRepository);
-
+        $action = new DeletePLCategoryAction($em, $dailyTotalRepository, $this->usageQuery([]));
         $action($category, $companyId);
+    }
+
+    /**
+     * @param list<array<string, int|string>> $rows
+     */
+    private function usageQuery(array $rows): PLCategoryUsageQuery
+    {
+        $connection = $this->createStub(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn($rows);
+
+        return new PLCategoryUsageQuery($connection);
+    }
+
+    private function fkException(string $message): ForeignKeyConstraintViolationException
+    {
+        $driverException = new class($message) extends \Exception implements \Doctrine\DBAL\Driver\Exception {
+            public function getSQLState(): string
+            {
+                return '23503';
+            }
+        };
+
+        return new ForeignKeyConstraintViolationException($driverException, null);
     }
 }
