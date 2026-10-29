@@ -18,84 +18,50 @@ jobs:
             - name: 📦 Checkout repository
               uses: actions/checkout@v4
 
-            - name: 🛠 Install zip
-              run: sudo apt-get update && sudo apt-get install -y zip
-
             - name: 🔐 Setup SSH key
               uses: webfactory/ssh-agent@v0.8.0
               with:
-                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  ssh-private-key: ${{ secrets.TG_SSH_PRIVATE_KEY }}
 
-            - name: 📦 Create tg-gateway archive
-              run: |
-                  zip -r tg-gateway.zip tg-gateway/
-
-            - name: 📤 Upload archive to Kazakhstan VPS
+            - name: 📤 Upload nginx site
               run: |
                   scp -o StrictHostKeyChecking=no \
-                    tg-gateway.zip \
-                    ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}:${{ secrets.TG_SERVER_DIR }}
+                    tg-gateway/nginx/tg.vashfindir.ru.conf \
+                    ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}:/tmp/tg-gateway.conf
 
-            - name: 🚀 Deploy tg-gateway
+            - name: 🚀 Install site and reload nginx
               run: |
                   ssh -o StrictHostKeyChecking=no \
                     ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }} << 'EOF'
                       set -e
 
-                      cd ${{ secrets.TG_SERVER_DIR }}
-
-                      echo "📦 Распаковка tg-gateway"
-                      rm -rf ./current
-                      mkdir -p ./current
-                      unzip -o tg-gateway.zip -d ./current
-                      rm tg-gateway.zip
-
-                      cd ./current/tg-gateway
-
-                      echo "🔐 Инициализация acme.json"
-                      CERTS_VOLUME="tg-gateway_tg-traefik-certs"
-                      VOLUME_PATH=$(docker volume inspect "$CERTS_VOLUME" --format '{{.Mountpoint}}' 2>/dev/null || echo "")
-                      if [ -n "$VOLUME_PATH" ]; then
-                          ACME_FILE="$VOLUME_PATH/acme.json"
-                          if [ -f "$ACME_FILE" ]; then
-                              CERT_DOMAINS=$(jq -r '(.letsEncrypt.Certificates // []) | length' "$ACME_FILE" 2>/dev/null || echo "0")
-                              if [ "$CERT_DOMAINS" = "0" ]; then
-                                  echo "⚠️  acme.json существует но сертификатов нет — сбрасываем для повторного запроса"
-                                  rm -f "$ACME_FILE"
-                              else
-                                  echo "✅ acme.json содержит $CERT_DOMAINS сертификат(а)"
-                                  chmod 600 "$ACME_FILE"
-                              fi
-                          else
-                              echo "ℹ️  acme.json не найден — Traefik создаст при старте"
-                          fi
-                      else
-                          echo "ℹ️  Volume $CERTS_VOLUME не существует — будет создан при старте"
+                      if [ ! -f /etc/letsencrypt/live/tg.vashfindir.ru/fullchain.pem ]; then
+                          echo "❌ Нет сертификата tg.vashfindir.ru: certbot certonly --nginx -d tg.vashfindir.ru"
+                          exit 1
                       fi
 
-                      echo "🐳 Запуск tg-gateway"
-                      docker compose pull
-                      docker compose up -d --remove-orphans
+                      SITE=/etc/nginx/sites-available/tg-gateway
+                      BACKUP=$(mktemp)
+                      [ -f "$SITE" ] && cp "$SITE" "$BACKUP" || : > "$BACKUP"
 
-                      echo "🧹 Очистка старых образов"
-                      docker image prune -f
+                      install -m 0644 /tmp/tg-gateway.conf "$SITE"
+                      rm -f /tmp/tg-gateway.conf
+                      ln -sfn "$SITE" /etc/nginx/sites-enabled/tg-gateway
 
-                      echo "⏳ Ожидание старта контейнеров (15s)"
-                      sleep 15
+                      if ! nginx -t; then
+                          echo "❌ nginx -t не прошёл — возвращаю прежний конфиг"
+                          if [ -s "$BACKUP" ]; then cp "$BACKUP" "$SITE"; else rm -f "$SITE" /etc/nginx/sites-enabled/tg-gateway; fi
+                          rm -f "$BACKUP"
+                          exit 1
+                      fi
+                      rm -f "$BACKUP"
 
-                      echo "🔍 Статус контейнеров"
-                      docker compose ps
+                      systemctl reload nginx
 
-                      echo "🔍 Проверка nginx /health"
-                      docker exec tg-gateway-nginx wget -qO- http://127.0.0.1/health && echo "" || echo "⚠️  nginx /health недоступен"
-
-                      echo "🔍 Проверка связи с upstream"
-                      docker exec tg-gateway-nginx wget -q --timeout=5 --spider https://app.vashfindir.ru/telegram/webhook 2>&1 \
-                          && echo "✅ upstream app.vashfindir.ru доступен" \
-                          || echo "⚠️  upstream app.vashfindir.ru недоступен с этого сервера — проверьте firewall"
-
-                      echo "🔍 Логи Traefik (ACME)"
-                      docker logs tg-traefik 2>&1 | grep -iE "acme|cert|level=error|ERR" | tail -20 || true
+                      echo "🔍 Проверки"
+                      curl -fsS -m 10 --resolve tg.vashfindir.ru:443:127.0.0.1 https://tg.vashfindir.ru/health && echo ""
+                      curl -s -m 10 -o /dev/null -w "upstream app.vashfindir.ru: %{http_code}\n" https://app.vashfindir.ru/telegram/webhook
+                      curl -s -m 10 -o /dev/null -w "api.telegram.org: %{http_code}\n" https://api.telegram.org/
 
                       echo "✅ tg-gateway deploy completed"
                   EOF
