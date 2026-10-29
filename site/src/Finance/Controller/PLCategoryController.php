@@ -13,6 +13,7 @@ use App\Finance\Application\Action\ExtendPLTreeWithMarketplaceAction;
 use App\Finance\Application\Action\ImportPLCategoryTreeAction;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
 use App\Finance\Application\DeletePLCategoryAction;
+use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\SavePLCategoryAction;
 use App\Finance\Application\Service\PLCategoryTreeExporter;
@@ -100,6 +101,7 @@ class PLCategoryController extends AbstractController
 
         $sourceCompanyId = $request->query->get('sourceCompanyId');
         $preview = null;
+        $modes = [];
         $previewMode = null;
 
         $extendPreview = null;
@@ -127,18 +129,18 @@ class PLCategoryController extends AbstractController
             }
 
             try {
-                $preview = $importAction(new ImportPLCategoryTreeCommand(
+                $modes = $this->previewBothModes(
+                    $importAction,
                     $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
                     (string) $targetCompany->getId(),
-                    true,
-                ));
+                );
                 $previewMode = 'company';
             } catch (\DomainException $e) {
                 $this->addFlash('danger', $e->getMessage());
             }
         }
 
-        return $this->render('pl_category/import.html.twig', [
+        return $this->render('pl_category/import.html.twig', $modes + [
             'sources' => $sources,
             'selectedSourceCompanyId' => $sourceCompanyId,
             'targetCompanyId' => (string) $targetCompany->getId(),
@@ -193,12 +195,11 @@ class PLCategoryController extends AbstractController
         $json = (string) file_get_contents($file->getPathname());
 
         try {
-            $sourceNodes = $this->fileReader->read($json);
-            $preview = $importAction(new ImportPLCategoryTreeCommand(
-                $sourceNodes,
+            $modes = $this->previewBothModes(
+                $importAction,
+                $this->fileReader->read($json),
                 (string) $targetCompany->getId(),
-                true,
-            ));
+            );
         } catch (\DomainException $e) {
             $this->addFlash('danger', $e->getMessage());
 
@@ -210,13 +211,12 @@ class PLCategoryController extends AbstractController
             static fn (array $c): bool => $c['id'] !== (string) $targetCompany->getId(),
         ));
 
-        return $this->render('pl_category/import.html.twig', [
+        return $this->render('pl_category/import.html.twig', $modes + [
             'sources' => $sources,
             'selectedSourceCompanyId' => null,
             'targetCompanyId' => (string) $targetCompany->getId(),
             'businessProfile' => $targetCompany->getBusinessProfile(),
             'templateOrigin' => $this->templateApplications->findLatestByCompanyId((string) $targetCompany->getId()),
-            'preview' => $preview,
             'previewMode' => 'file',
             'uploadedFileName' => $file->getClientOriginalName(),
             // Содержимое едет обратно в форме, а не в сессии: применяется то,
@@ -262,6 +262,10 @@ class PLCategoryController extends AbstractController
             }
         }
 
+        // Существующие статьи перезаписываются, только если пользователь сам отметил это в
+        // предпросмотре; применяется ровно тот план, отпечаток которого был на экране.
+        $updateExisting = '1' === $request->request->get('updateExisting');
+
         try {
             $result = 'template' === $mode
                 ? ($this->applyTemplate)((string) $targetCompany->getId(), false, PLTemplateApplicationSource::SCREEN, $targetCompany->getBusinessProfile())
@@ -269,6 +273,8 @@ class PLCategoryController extends AbstractController
                     null === $sourceCompanyId ? $this->fileReader->read($this->submittedJson($request)) : $this->sourceNodesFromCompany($sourceCompanyId, $targetCompany),
                     (string) $targetCompany->getId(),
                     false,
+                    updateExisting: $updateExisting,
+                    expectedFingerprint: $this->submittedFingerprint($request, $updateExisting),
                 ));
         } catch (\DomainException $e) {
             // Без sourceCompanyId в redirect: GET заново пересчитал бы тот же
@@ -407,6 +413,56 @@ class PLCategoryController extends AbstractController
         }
 
         return $this->redirectToRoute('pl_category_index');
+    }
+
+    /**
+     * Предпросмотр импорта из файла или компании в двух режимах: «только добавить» — то, что
+     * применится по умолчанию, и «добавить и обновить» — что изменится у существующих статей,
+     * если пользователь это отметит. Режимы отказывают независимо: обновление может упереться
+     * в предел вложенности, а «только добавить» — в совпавшую статью, которая без обновления
+     * не годится в родители новым. Тогда недоступен только отказавший режим, с причиной; отказ
+     * обоих — ошибка предпросмотра.
+     *
+     * @param list<PLCategoryTreeNode> $sourceNodes
+     *
+     * @return array{preview: ?ImportPLCategoryTreeResult, previewWithUpdates: ?ImportPLCategoryTreeResult, keepError: ?string, updateError: ?string}
+     */
+    private function previewBothModes(ImportPLCategoryTreeAction $importAction, array $sourceNodes, string $targetCompanyId): array
+    {
+        $run = static function (bool $updateExisting) use ($importAction, $sourceNodes, $targetCompanyId): ImportPLCategoryTreeResult|\DomainException {
+            try {
+                return $importAction(new ImportPLCategoryTreeCommand($sourceNodes, $targetCompanyId, true, updateExisting: $updateExisting));
+            } catch (\DomainException $e) {
+                return $e;
+            }
+        };
+
+        $keep = $run(false);
+        $update = $run(true);
+        if ($keep instanceof \DomainException && $update instanceof \DomainException) {
+            throw $keep;
+        }
+
+        return [
+            'preview' => $keep instanceof ImportPLCategoryTreeResult ? $keep : null,
+            'previewWithUpdates' => $update instanceof ImportPLCategoryTreeResult ? $update : null,
+            'keepError' => $keep instanceof \DomainException ? $keep->getMessage() : null,
+            'updateError' => $update instanceof \DomainException ? $update->getMessage() : null,
+        ];
+    }
+
+    /**
+     * Отпечаток плана выбранного режима, показанного в предпросмотре. Без него применять нечего:
+     * импорт не знает, что видел пользователь.
+     */
+    private function submittedFingerprint(Request $request, bool $updateExisting): string
+    {
+        $fingerprint = $request->request->get($updateExisting ? 'fingerprintWithUpdates' : 'fingerprint');
+        if (!is_string($fingerprint) || '' === $fingerprint) {
+            throw new \DomainException('Данные предпросмотра не получены — откройте предпросмотр заново.');
+        }
+
+        return $fingerprint;
     }
 
     /**

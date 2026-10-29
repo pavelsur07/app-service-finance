@@ -6,11 +6,14 @@ namespace App\Tests\Functional\Finance;
 
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 
 final class PLCategoryImportControllerTest extends WebTestCaseBase
 {
@@ -89,10 +92,17 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/pl-categories/import?sourceCompanyId='.$source->getId());
 
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('Расходы', $crawler->filter('table')->text());
-        self::assertStringContainsString('Реклама', $crawler->filter('table')->text());
-        self::assertSame('1', trim($crawler->filter('.h2')->eq(0)->text()));
-        self::assertSame('1', trim($crawler->filter('.h2')->eq(1)->text()));
+        // Без обновления новая статья встаёт под совпавшую статью компании — путь компании.
+        self::assertStringContainsString('Старое имя / Реклама', $crawler->filter('table')->text());
+        self::assertSame('1', trim($crawler->filter('.h2')->eq(0)->text()), 'будет создано');
+        self::assertSame('1', trim($crawler->filter('.h2')->eq(1)->text()), 'отличаются у существующих');
+
+        // Что именно изменится у совпавшей статьи — поле, было и станет; галка обновления снята.
+        $nameChange = $crawler->filter('[data-import-change="name"]');
+        self::assertCount(1, $nameChange);
+        self::assertStringContainsString('Старое имя', $nameChange->text());
+        self::assertStringContainsString('Расходы', $nameChange->text());
+        self::assertCount(1, $crawler->filter('input[name="updateExisting"]:not([checked])'));
     }
 
     public function testApplyRequiresValidCsrfToken(): void
@@ -216,13 +226,8 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $target->getId());
 
-        $targetId = (string) $target->getId();
-        $token = $this->csrfToken($client, 'pl-category-import'.$targetId);
-
-        $client->request('POST', '/pl-categories/import/apply', [
-            'sourceCompanyId' => (string) $source->getId(),
-            '_token' => $token,
-        ]);
+        $crawler = $client->request('GET', '/pl-categories/import?sourceCompanyId='.$source->getId());
+        $client->submit($crawler->selectButton('Импортировать')->form(['updateExisting' => '1']));
 
         self::assertResponseRedirects('/pl-categories/');
 
@@ -235,10 +240,9 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertSame('Расходы', $updatedRoot->getName());
 
         // Повторный импорт того же источника — идемпотентен, дублей нет.
-        $client->request('POST', '/pl-categories/import/apply', [
-            'sourceCompanyId' => (string) $source->getId(),
-            '_token' => $this->csrfToken($client, 'pl-category-import'.$targetId),
-        ]);
+        $crawler = $client->request('GET', '/pl-categories/import?sourceCompanyId='.$source->getId());
+        self::assertCount(0, $crawler->filter('input[name="updateExisting"]'), 'отличий больше нет');
+        $client->submit($crawler->selectButton('Импортировать')->form());
 
         self::assertResponseRedirects('/pl-categories/');
 
@@ -281,9 +285,9 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('categories.json', $crawler->filter('.card-title')->last()->text());
         self::assertSame('1', trim($crawler->filter('.h2')->eq(0)->text()), 'будет создано');
-        self::assertSame('1', trim($crawler->filter('.h2')->eq(1)->text()), 'будет обновлено');
+        self::assertSame('1', trim($crawler->filter('.h2')->eq(1)->text()), 'отличаются у существующих');
 
-        $client->submitForm('Импортировать');
+        $client->submit($crawler->selectButton('Импортировать')->form(['updateExisting' => '1']));
 
         self::assertResponseRedirects('/pl-categories/');
 
@@ -327,7 +331,7 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
             if (2 === $attempt) {
                 // Второй заход: всё уже на месте, менять нечего.
                 self::assertSame('0', trim($crawler->filter('.h2')->eq(0)->text()), 'будет создано');
-                self::assertSame('0', trim($crawler->filter('.h2')->eq(1)->text()), 'будет обновлено');
+                self::assertSame('0', trim($crawler->filter('.h2')->eq(1)->text()), 'отличаются у существующих');
                 self::assertSame('2', trim($crawler->filter('.h2')->eq(2)->text()), 'без изменений');
             }
 
@@ -631,13 +635,177 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
         // сломанная формула живёт у категории, которой в файле нет.
         self::assertStringContainsString('формулы категорий, которых в источнике нет', $warning);
 
-        $client->submitForm('Импортировать');
+        // Код освобождает только обновление совпавшей статьи — его и отмечаем.
+        $client->submit($crawler->selectButton('Импортировать')->form(['updateExisting' => '1']));
 
         self::assertResponseRedirects('/pl-categories/');
         $flashes = $client->getRequest()->getSession()->getFlashBag()->peek('warning');
         self::assertCount(1, $flashes);
         self::assertStringContainsString('OLD', $flashes[0]);
         self::assertStringContainsString('формулы категорий, которых в файле не было', $flashes[0]);
+    }
+
+    public function testFileImportByDefaultOnlyAddsMissingCategories(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Старое имя')->withCode('EXP')->build();
+        $existingRootId = (string) $existingRoot->getId();
+
+        $em = $this->em();
+        foreach ([$user, $target, $existingRoot] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.(string) $target->getId()),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Расходы', ['code' => 'EXP', 'flow' => 'INCOME', 'children' => [$this->category('Реклама')]]),
+        ]))]);
+
+        self::assertResponseIsSuccessful();
+        // Смена движения меняет отчёт — помечена, смена имени — нет.
+        self::assertCount(1, $crawler->filter('[data-import-change="flow"] .badge'));
+        self::assertCount(0, $crawler->filter('[data-import-change="name"] .badge'));
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+
+        $this->em()->clear();
+        self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+        $root = $this->em()->getRepository(PLCategory::class)->find($existingRootId);
+        self::assertInstanceOf(PLCategory::class, $root);
+        self::assertSame('Старое имя', $root->getName(), 'без отметки существующая статья не меняется');
+        self::assertSame(PLFlow::EXPENSE, $root->getFlow());
+        $child = $this->em()->getRepository(PLCategory::class)->findOneBy(['company' => $target, 'name' => 'Реклама']);
+        self::assertInstanceOf(PLCategory::class, $child);
+        self::assertSame($existingRootId, (string) $child->getParent()?->getId(), 'новая статья встаёт под совпавшую');
+    }
+
+    public function testWhenOnlyAddingIsImpossibleScreenOffersImportWithUpdate(): void
+    {
+        // У компании EXP — строка ввода, в файле — группа с новой статьёй: без обновления
+        // статья встала бы под строку, которая потомков не суммирует. С обновлением EXP
+        // становится группой — этот режим экран и предлагает, вместо отказа целиком.
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Расходы')->withCode('EXP')->build();
+        $existingRoot->setType(PLCategoryType::LEAF_INPUT);
+        $existingRootId = (string) $existingRoot->getId();
+
+        $em = $this->em();
+        foreach ([$user, $target, $existingRoot] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.(string) $target->getId()),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Расходы', ['code' => 'EXP', 'type' => 'SUBTOTAL', 'children' => [$this->category('Реклама')]]),
+        ]))]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('считается не суммой вложенных статей', $crawler->filter('[data-import-keep-error]')->text());
+        self::assertCount(1, $crawler->filter('[data-import-change="type"]'));
+        self::assertCount(0, $crawler->filter('input[type="checkbox"][name="updateExisting"]'));
+
+        $client->submitForm('Импортировать');
+
+        self::assertResponseRedirects('/pl-categories/');
+        $this->em()->clear();
+        $root = $this->em()->getRepository(PLCategory::class)->find($existingRootId);
+        self::assertInstanceOf(PLCategory::class, $root);
+        self::assertSame(PLCategoryType::SUBTOTAL, $root->getType());
+        self::assertCount(2, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
+    }
+
+    public function testApplyRefusesWhenCategoriesChangedAfterPreview(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $target = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $existingRoot = PLCategoryBuilder::aPLCategory()->forCompany($target)->withName('Старое имя')->withCode('EXP')->build();
+        $existingRootId = (string) $existingRoot->getId();
+
+        $em = $this->em();
+        foreach ([$user, $target, $existingRoot] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $crawler = $client->request('POST', '/pl-categories/import/upload', [
+            '_token' => $this->csrfToken($client, 'pl-category-import-file'.(string) $target->getId()),
+        ], ['import_file' => $this->uploadFile($this->exportFile([
+            $this->category('Расходы', ['code' => 'EXP', 'children' => [$this->category('Реклама')]]),
+        ]))]);
+        self::assertResponseIsSuccessful();
+
+        // Пока предпросмотр открыт, статью правят в соседней вкладке.
+        $this->em()->getConnection()->executeStatement('UPDATE pl_categories SET name = ? WHERE id = ?', ['Правка коллеги', $existingRootId]);
+
+        $client->submit($crawler->selectButton('Импортировать')->form(['updateExisting' => '1']));
+
+        self::assertResponseRedirects('/pl-categories/import');
+        $flashes = $this->flashes($client, 'danger');
+        self::assertCount(1, $flashes);
+        self::assertStringContainsString('откройте предпросмотр заново', $flashes[0]);
+
+        $this->em()->clear();
+        self::assertCount(1, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]), 'ничего не создано');
+        $root = $this->em()->getRepository(PLCategory::class)->find($existingRootId);
+        self::assertInstanceOf(PLCategory::class, $root);
+        self::assertSame('Правка коллеги', $root->getName(), 'правка коллеги не перетёрта');
+    }
+
+    public function testApplyFromCompanyWithoutPreviewFingerprintIsRejected(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $source = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $target = CompanyBuilder::aCompany()->withIndex(2)->withOwner($user)->build();
+        $sourceRoot = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Расходы')->withCode('EXP')->build();
+
+        $em = $this->em();
+        foreach ([$user, $source, $target, $sourceRoot] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $target->getId());
+
+        $targetId = (string) $target->getId();
+        $client->request('POST', '/pl-categories/import/apply', [
+            'sourceCompanyId' => (string) $source->getId(),
+            '_token' => $this->csrfToken($client, 'pl-category-import'.$targetId),
+        ]);
+
+        self::assertResponseRedirects('/pl-categories/import');
+        self::assertSame(
+            ['Данные предпросмотра не получены — откройте предпросмотр заново.'],
+            $this->flashes($client, 'danger'),
+        );
+
+        $this->em()->clear();
+        self::assertCount(0, $this->em()->getRepository(PLCategory::class)->findBy(['company' => $target]));
     }
 
     /**
@@ -676,6 +844,17 @@ final class PLCategoryImportControllerTest extends WebTestCaseBase
             'company' => 'Компания из другого аккаунта',
             'categories' => $categories,
         ], \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function flashes(KernelBrowser $client, string $type): array
+    {
+        $session = $client->getRequest()->getSession();
+        self::assertInstanceOf(FlashBagAwareSessionInterface::class, $session);
+
+        return $session->getFlashBag()->peek($type);
     }
 
     private function uploadFile(string $json): UploadedFile

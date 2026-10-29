@@ -7,12 +7,14 @@ namespace App\Finance\Application\Action;
 use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Command\ImportPLCategoryTreeCommand;
+use App\Finance\Application\DTO\ImportPLCategoryTreeFieldChange;
 use App\Finance\Application\DTO\ImportPLCategoryTreeResult;
 use App\Finance\Application\DTO\ImportPLCategoryTreeRow;
 use App\Finance\Application\DTO\ImportPLCategoryTreeSimilarRow;
 use App\Finance\Application\DTO\PLCategoryTreeNode;
 use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Exception\PLImportPreviewOutdatedException;
 use App\Finance\Exception\PLTreeWouldDuplicateException;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,9 +29,11 @@ use Ramsey\Uuid\Uuid;
  * должен.
  *
  * Матчинг узла: по code, если он задан у источника (code уникален в рамках
- * всей компании), иначе по (parent, name). Совпавшие узлы обновляются,
- * несовпавшие — создаются. Узлы целевой компании, отсутствующие в источнике,
- * никогда не удаляются и не изменяются.
+ * всей компании), иначе по (parent, name). Совпавшие узлы обновляются (или
+ * остаются как есть без `updateExisting`), несовпавшие — создаются. Узлы
+ * целевой компании, отсутствующие в источнике, никогда не удаляются и не
+ * изменяются. С `expectedFingerprint` применяется только план, совпавший с
+ * показанным в предпросмотре.
  *
  * Второго дерева импорт не строит: корневые статьи в непустую компанию создаются, только если
  * источник опознал не меньше половины её корневых статей (PLTreeWouldDuplicateException). В режиме
@@ -58,12 +62,18 @@ final class ImportPLCategoryTreeAction
         $plan = $this->resolveMatches($targetCompany, $command->sourceNodes);
         $companyCategories = $this->plCategoryRepository->findTreeByCompany($targetCompany);
         [$similar, $skippedWithSimilar] = $command->onlyCreate ? $this->skipSimilar($plan, $companyCategories) : [[], []];
-        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $command->onlyCreate);
+        $keepExisting = $command->onlyCreate || !$command->updateExisting;
+        [$created, $updated, $unchangedCount] = $this->validateAndDiff($plan, $keepExisting);
         [$companyRoots, $recognizedRoots] = $this->guardAgainstSecondTree($plan, $companyCategories, $command->onlyCreate);
 
         // Строго до мутаций: метод сравнивает старый code совпавшего узла с
         // новым, а после applyFields() старого уже не существует.
-        $unresolvedFormulaCodes = $this->unresolvedFormulaCodes($targetCompany, $plan);
+        $unresolvedFormulaCodes = $this->unresolvedFormulaCodes($targetCompany, $plan, $keepExisting);
+
+        $result = new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes, $similar, $companyRoots, $recognizedRoots, $skippedWithSimilar, $this->fingerprint($plan));
+        if (null !== $command->expectedFingerprint && !hash_equals($command->expectedFingerprint, $result->fingerprint)) {
+            throw PLImportPreviewOutdatedException::create();
+        }
 
         // Мутации — только после того, как всё дерево прошло матчинг и
         // валидацию глубины. Порядок общий для create/update и совпадает с
@@ -96,7 +106,50 @@ final class ImportPLCategoryTreeAction
             });
         }
 
-        return new ImportPLCategoryTreeResult($created, $updated, $unchangedCount, $unresolvedFormulaCodes, $similar, $companyRoots, $recognizedRoots, $skippedWithSimilar);
+        return $result;
+    }
+
+    /**
+     * Отпечаток того, что импорт запишет: для каждой создаваемой и обновляемой статьи — все поля
+     * источника и куда она встанет (существующая статья — по id, новая — по узлу источника).
+     * Предпросмотр отдаёт его форме, применение сверяет со своим планом: любое расхождение в том,
+     * что будет записано, — отказ.
+     *
+     * @param list<array{sourceNode: PLCategoryTreeNode, targetParent: ?PLCategory, existing: ?PLCategory, resolved: PLCategory, operation: string}> $plan
+     */
+    private function fingerprint(array $plan): string
+    {
+        $existingIdByKey = [];
+        foreach ($plan as $item) {
+            if (null !== $item['existing']) {
+                $existingIdByKey[$item['sourceNode']->key] = (string) $item['existing']->getId();
+            }
+        }
+
+        $ops = [];
+        foreach ($plan as $item) {
+            if ('none' === $item['operation']) {
+                continue;
+            }
+            $node = $item['sourceNode'];
+            $parentKey = $node->parent?->key;
+            $ops[] = [
+                $item['operation'],
+                $item['existing']?->getId(),
+                null === $parentKey ? null : ($existingIdByKey[$parentKey] ?? 'new:'.$parentKey),
+                $node->name, $node->code, $node->type->value, $node->format->value, $node->flow->value,
+                $node->expenseType->value, $node->weightInParent, $node->isVisible, $node->formula,
+                $node->calcOrder, $node->sortOrder,
+                // Обновление сверяется и с тем, что сейчас у статьи: правка коллеги после
+                // предпросмотра меняет показанный дифф.
+                null !== $item['existing'] ? array_map(
+                    static fn (ImportPLCategoryTreeFieldChange $c): string => $c->field.'='.$c->from,
+                    $this->fieldChanges($item['existing'], $node, $item['targetParent']),
+                ) : [],
+            ];
+        }
+
+        return hash('sha256', json_encode($ops, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -231,13 +284,19 @@ final class ImportPLCategoryTreeAction
      *
      * @return list<string>
      */
-    private function unresolvedFormulaCodes(Company $targetCompany, array $plan): array
+    private function unresolvedFormulaCodes(Company $targetCompany, array $plan, bool $keepExisting): array
     {
         $formulas = [];
         $sourceCodes = [];
         $releasedCodes = [];
         foreach ($plan as $item) {
             $node = $item['sourceNode'];
+
+            // Без обновления совпавшая статья остаётся как есть: её формула не переносится,
+            // а код не освобождается.
+            if ($keepExisting && null !== $item['existing']) {
+                continue;
+            }
 
             if (null !== $node->formula && '' !== trim($node->formula)) {
                 $formulas[] = $node->formula;
@@ -462,7 +521,7 @@ final class ImportPLCategoryTreeAction
      *
      * @return array{0: ImportPLCategoryTreeRow[], 1: ImportPLCategoryTreeRow[], 2: int}
      */
-    private function validateAndDiff(array &$plan, bool $onlyCreate = false): array
+    private function validateAndDiff(array &$plan, bool $keepExisting = false): array
     {
         /** @var array<string, true> $matchedTargetIds id существующих target-узлов, которыми управляет источник */
         $matchedTargetIds = [];
@@ -472,8 +531,23 @@ final class ImportPLCategoryTreeAction
             }
         }
 
+        // Коды, которые остаются за совпавшими статьями компании: без обновления их никто не
+        // освобождает, и новая статья с таким кодом упала бы на уникальном индексе.
+        /** @var array<string, PLCategory> $keptCodes */
+        $keptCodes = [];
+        if ($keepExisting) {
+            foreach ($plan as $item) {
+                $code = $item['existing']?->getCode();
+                if (null !== $code) {
+                    $keptCodes[$code] = $item['existing'];
+                }
+            }
+        }
+
         /** @var array<string, int> $targetLevelBySourceKey */
         $targetLevelBySourceKey = [];
+        /** @var array<string, string> $targetPathBySourceKey путь статьи в компании после импорта */
+        $targetPathBySourceKey = [];
         $created = [];
         $updated = [];
         $unchangedCount = 0;
@@ -485,7 +559,7 @@ final class ImportPLCategoryTreeAction
 
             // Только создание: совпавшая категория остаётся на своём месте и
             // уровне — от него и считается глубина новых потомков.
-            if ($onlyCreate && null !== $existing) {
+            if ($keepExisting && null !== $existing) {
                 // Потомков суммирует только подытог без формулы (PlReportCalculator):
                 // строка ввода берёт свои факты, KPI и подытог с формулой — формулу.
                 // Если в шаблоне это сумма потомков, а у компании нет, новые
@@ -494,9 +568,10 @@ final class ImportPLCategoryTreeAction
                     && !$existing->getType()->sumsChildren($existing->getFormula())
                     && $this->hasChildren($plan, $sourceNode)
                 ) {
-                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании считается не суммой вложенных статей, а в шаблоне это группа. Сделайте её подытогом без формулы или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
+                    throw new \DomainException(\sprintf('Категория "%s" (код %s) в компании считается не суммой вложенных статей, а в переносимом дереве это группа. Сделайте её подытогом без формулы или уберите код, иначе новые статьи под ней не попадут в отчёт.', $existing->getName(), (string) $existing->getCode()));
                 }
                 $targetLevelBySourceKey[$sourceNode->key] = $existing->getLevel();
+                $targetPathBySourceKey[$sourceNode->key] = $this->categoryPath($existing);
                 ++$unchangedCount;
 
                 continue;
@@ -517,12 +592,20 @@ final class ImportPLCategoryTreeAction
                 throw new \DomainException(sprintf('Превышена максимальная вложенность (5 уровней) при переносе категории "%s".', $sourceNode->name));
             }
 
-            $path = $this->buildPath($sourceNode);
+            // Путь там, где статья окажется в компании: без обновления совпавший родитель
+            // остаётся на своём месте, и новая статья встаёт под ним, а не по пути источника.
+            $path = (null !== $sourceParent ? $targetPathBySourceKey[$sourceParent->key].' / ' : '').$sourceNode->name;
+            $targetPathBySourceKey[$sourceNode->key] = $path;
+
+            if (null === $existing && null !== $sourceNode->code && isset($keptCodes[$sourceNode->code])) {
+                throw new \DomainException(\sprintf('Код %s в компании уже у статьи "%s", которую источник сопоставил с другой строкой по названию. Без обновления существующих статей код не освободится — отметьте обновление или поправьте коды.', $sourceNode->code, $keptCodes[$sourceNode->code]->getName()));
+            }
 
             if (null !== $existing) {
-                if ($this->fieldsDiffer($existing, $sourceNode, $item['targetParent'])) {
+                $changes = $this->fieldChanges($existing, $sourceNode, $item['targetParent']);
+                if ([] !== $changes) {
                     $plan[$i]['operation'] = 'update';
-                    $updated[] = new ImportPLCategoryTreeRow($sourceNode->name, $sourceNode->code, $path);
+                    $updated[] = new ImportPLCategoryTreeRow($sourceNode->name, $sourceNode->code, $path, $changes);
                 } else {
                     ++$unchangedCount;
                 }
@@ -563,20 +646,64 @@ final class ImportPLCategoryTreeAction
         return $candidates[0] ?? null;
     }
 
-    private function fieldsDiffer(PLCategory $existing, PLCategoryTreeNode $source, ?PLCategory $targetParent): bool
+    /**
+     * Поля совпавшей статьи, которые импорт перезапишет. Пустой список — статья не меняется.
+     *
+     * @return list<ImportPLCategoryTreeFieldChange>
+     */
+    private function fieldChanges(PLCategory $existing, PLCategoryTreeNode $source, ?PLCategory $targetParent): array
     {
-        return $existing->getName() !== $source->name
-            || $existing->getCode() !== $source->code
-            || $existing->getType() !== $source->type
-            || $existing->getFormat() !== $source->format
-            || $existing->getFlow() !== $source->flow
-            || $existing->getExpenseType() !== $source->expenseType
-            || $existing->getWeightInParent() !== $source->weightInParent
-            || $existing->isVisible() !== $source->isVisible
-            || $existing->getFormula() !== $source->formula
-            || $existing->getCalcOrder() !== $source->calcOrder
-            || $existing->getSortOrder() !== $source->sortOrder
-            || $existing->getParent()?->getId() !== $targetParent?->getId();
+        $display = static fn (string|int|bool|null $v): string => match (true) {
+            null === $v => '—',
+            '' === $v => '(пустая строка)',
+            true === $v => 'да',
+            false === $v => 'нет',
+            default => (string) $v,
+        };
+
+        // [поле, подпись, было, станет, меняет цифры отчёта]
+        $fields = [
+            ['name', 'Наименование', $existing->getName(), $source->name, false],
+            ['code', 'Код', $existing->getCode(), $source->code, true],
+            ['type', 'Тип строки', $existing->getType()->value, $source->type->value, true],
+            ['format', 'Формат', $existing->getFormat()->value, $source->format->value, false],
+            ['flow', 'Движение', $existing->getFlow()->value, $source->flow->value, true],
+            ['expenseType', 'Тип расхода', $existing->getExpenseType()->value, $source->expenseType->value, false],
+            ['weightInParent', 'Вес в родителе', $existing->getWeightInParent(), $source->weightInParent, true],
+            ['isVisible', 'Показывать', $existing->isVisible(), $source->isVisible, false],
+            ['formula', 'Формула', $existing->getFormula(), $source->formula, true],
+            ['calcOrder', 'Порядок расчёта', $existing->getCalcOrder(), $source->calcOrder, true],
+            ['sortOrder', 'Сортировка', $existing->getSortOrder(), $source->sortOrder, false],
+        ];
+
+        $changes = [];
+        foreach ($fields as [$field, $label, $from, $to, $affectsReport]) {
+            if ($from !== $to) {
+                $changes[] = new ImportPLCategoryTreeFieldChange($field, $label, $display($from), $display($to), $affectsReport);
+            }
+        }
+
+        if ($existing->getParent()?->getId() !== $targetParent?->getId()) {
+            $changes[] = new ImportPLCategoryTreeFieldChange(
+                'parent',
+                'Родитель',
+                null !== $existing->getParent() ? $this->categoryPath($existing->getParent()) : '— (верхний уровень)',
+                null !== $source->parent ? $this->buildPath($source->parent) : '— (верхний уровень)',
+                true,
+            );
+        }
+
+        return $changes;
+    }
+
+    private function categoryPath(PLCategory $category): string
+    {
+        $names = [];
+        for ($node = $category; null !== $node; $node = $node->getParent()) {
+            array_unshift($names, $node->getName());
+        }
+
+        return implode(' / ', $names);
     }
 
     private function applyFields(PLCategory $target, PLCategoryTreeNode $source, ?PLCategory $targetParent): void
