@@ -11,6 +11,10 @@ namespace App\Finance\Application\DTO;
  */
 final readonly class PLCategoryUsage
 {
+    /**
+     * @param list<array{id: string, name: string}> $cashflowCategoryRefs связанные статьи ДДС поимённо
+     * @param list<array{id: string, name: string}> $loanRefs кредиты поимённо
+     */
     public function __construct(
         public int $children,
         public int $documentOperations,
@@ -18,6 +22,8 @@ final readonly class PLCategoryUsage
         public int $cashflowCategories,
         public int $loans,
         public int $saleMappings,
+        public array $cashflowCategoryRefs = [],
+        public array $loanRefs = [],
     ) {
     }
 

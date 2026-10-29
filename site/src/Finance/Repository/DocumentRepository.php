@@ -260,9 +260,11 @@ class DocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param string|null $categoryId только документы с операцией на эту статью ОПиУ
+     *
      * @return Pagerfanta<Document>
      */
-    public function paginateDeletedByCompany(string $companyId, int $page, int $perPage): Pagerfanta
+    public function paginateDeletedByCompany(string $companyId, int $page, int $perPage, ?string $categoryId = null): Pagerfanta
     {
         $perPage = max(1, min(200, $perPage));
 
@@ -279,6 +281,13 @@ class DocumentRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->orderBy('d.deletedAt', \SortDirection::Descending)
             ->addOrderBy('d.id', \SortDirection::Ascending);
+
+        // Через EXISTS, а не условие на op: fetch-join гидрировал бы документ без прочих операций.
+        if (null !== $categoryId) {
+            $queryBuilder
+                ->andWhere(sprintf('EXISTS (SELECT 1 FROM %s byCategory WHERE byCategory.document = d AND IDENTITY(byCategory.category) = :categoryId)', DocumentOperation::class))
+                ->setParameter('categoryId', $categoryId);
+        }
 
         $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
         $pager->setMaxPerPage($perPage);

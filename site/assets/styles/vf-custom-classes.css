@@ -1556,6 +1556,23 @@
   color: var(--vf-text-muted);
 }
 
+.vf-confirm__links {
+  margin: calc(-1 * var(--vf-space-2)) 0 0;
+  padding: 0 var(--vf-space-5) 20px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-1);
+}
+
+.vf-confirm__links[hidden] {
+  display: none;
+}
+
+.vf-confirm__links a::after {
+  content: ' →' / '';
+}
+
 .vf-confirm__footer {
   display: flex;
   justify-content: flex-end;

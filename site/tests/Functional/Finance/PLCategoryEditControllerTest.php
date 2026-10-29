@@ -338,6 +338,8 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertStringContainsString('1 вложенная статья', (string) $parentTrigger->attr('data-confirm-body'));
         $childTrigger = $crawler->filter(sprintf('[data-confirm-action="/pl-categories/%s/delete"]', $child->getId()));
         self::assertNull($childTrigger->attr('data-confirm-blocked'));
+        // На самом списке ссылка «в список статей» не нужна.
+        self::assertSame([], json_decode((string) $parentTrigger->attr('data-confirm-links'), true));
         self::assertCount(1, $crawler->filter('#pl-category-confirm'));
 
         $client->request('POST', '/pl-categories/'.$parentId.'/delete', [
@@ -379,6 +381,11 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertStringContainsString('1 связанная статья ДДС', (string) $triggers->first()->attr('data-confirm-body'));
         self::assertStringContainsString('Переназначьте ссылки на другую статью', (string) $triggers->first()->attr('data-confirm-body'));
         self::assertCount(1, $crawler->filter('#pl-category-confirm'));
+        // Выход к причине — карточка связанной статьи ДДС.
+        self::assertSame(
+            [['href' => '/cashflow-categories/'.$cashflowCategory->getId().'/edit', 'label' => 'Статья ДДС «Аренда офиса»']],
+            json_decode((string) $triggers->first()->attr('data-confirm-links'), true),
+        );
 
         $client->request('POST', '/pl-categories/'.$categoryId.'/delete', [
             '_token' => $this->csrfToken($client, 'delete'.$categoryId),
@@ -387,5 +394,81 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         self::assertResponseRedirects('/pl-categories/');
         $this->em()->clear();
         self::assertInstanceOf(PLCategory::class, $this->em()->getRepository(PLCategory::class)->find($categoryId));
+    }
+
+    public function testExitLinksLeadToDocumentsAndDeletedDocumentsOfCategory(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $category = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Реклама')->build();
+        $other = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Прочее')->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, $category, $other] as $entity) {
+            $em->persist($entity);
+        }
+        // Живой и удалённый документ на статью, удалённый — на другую статью.
+        $documents = [];
+        foreach ([[$category, false], [$category, true], [$other, true]] as [$cat, $deleted]) {
+            $document = new Document(Uuid::uuid4()->toString(), $company);
+            $operation = new DocumentOperation();
+            $operation->setAmount('10.00');
+            $operation->setCategory($cat);
+            $document->addOperation($operation);
+            if ($deleted) {
+                $document->markDeleted(null);
+            }
+            $em->persist($document);
+            $documents[] = $document;
+        }
+        $em->flush();
+
+        $categoryId = (string) $category->getId();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/'.$categoryId.'/edit');
+        self::assertResponseIsSuccessful();
+        $links = json_decode((string) $crawler->filter('[data-confirm-blocked="true"]')->first()->attr('data-confirm-links'), true);
+        self::assertSame([
+            ['href' => '/documents/?category='.$categoryId, 'label' => 'Документы со статьёй'],
+            ['href' => '/documents/deleted?category='.$categoryId, 'label' => 'Удалённые документы со статьёй'],
+        ], $links);
+
+        // Удалённые со статьёй — только свой документ, а не документ другой статьи.
+        $crawler = $client->request('GET', '/documents/deleted?category='.$categoryId);
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('[data-deleted-category-filter]'));
+        $html = (string) $client->getResponse()->getContent();
+        self::assertStringContainsString((string) $documents[1]->getId(), $html);
+        self::assertStringNotContainsString((string) $documents[2]->getId(), $html);
+    }
+
+    public function testEditPageLeadsChildrenReasonToCategoryList(): void
+    {
+        $client = static::createClient();
+
+        $user = UserBuilder::aUser()->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $parent = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Косвенные')->build();
+        $child = PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Аренда')->withParent($parent)->build();
+
+        $em = $this->em();
+        foreach ([$user, $company, $parent, $child] as $entity) {
+            $em->persist($entity);
+        }
+        $em->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $company->getId());
+
+        $crawler = $client->request('GET', '/pl-categories/'.$parent->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSame(
+            [['href' => '/pl-categories/', 'label' => 'Вложенные статьи — в списке статей']],
+            json_decode((string) $crawler->filter('[data-confirm-blocked="true"]')->first()->attr('data-confirm-links'), true),
+        );
     }
 }

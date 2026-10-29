@@ -34,6 +34,12 @@
     <div class="card-header">
         {% include 'document/_tabs.html.twig' with {active: 'deleted'} only %}
     </div>
+    {% if categoryId|default(null) %}
+        <div class="alert alert-info m-3 mb-0" data-deleted-category-filter>
+            Показаны только документы с операциями по выбранной статье ОПиУ.
+            <a href="{{ path('document_deleted_index') }}">Показать все удалённые</a>
+        </div>
+    {% endif %}
     {% if items is empty %}
         <div class="vf-empty">
             <span class="empty-icon" aria-hidden="true"><i class="ti ti-trash"></i></span>
@@ -106,9 +112,10 @@
                 {% endfor %}
             </select>
             <input type="hidden" name="page" value="1">
+            {% if categoryId|default(null) %}<input type="hidden" name="category" value="{{ categoryId }}">{% endif %}
         </form>
         <div class="ms-md-auto w-100 w-md-auto">
-            {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'document_deleted_index', params: {'limit': limit}} %}
+            {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'document_deleted_index', params: {'limit': limit}|merge(categoryId|default(null) ? {'category': categoryId} : {})} %}
         </div>
     </div>
 </div>
