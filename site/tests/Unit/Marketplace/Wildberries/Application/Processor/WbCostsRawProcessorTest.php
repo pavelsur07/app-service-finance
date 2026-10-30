@@ -1788,6 +1788,7 @@ final class WbCostsRawProcessorTest extends TestCase
             new WbDeductionCalculator(new SlugifyService()),
             new WbLoyaltyDiscountCalculator(),
             new \App\Marketplace\Wildberries\CostCalculator\WbReviewPointsWithheldCalculator(),
+            new \App\Marketplace\Wildberries\CostCalculator\WbLoyaltyProgramFeeCalculator(),
         ];
 
         return $calculators;
@@ -1855,6 +1856,40 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertCount(1, $entries);
         self::assertSame('wb_review_points_withheld', $entries[0]['category_code']);
         self::assertSame('350', $entries[0]['amount']);
+        self::assertArrayHasKey('operation_type', $entries[0]);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
+    }
+
+    /**
+     * С 28.10.2026 WB отдаёт комиссию за участие в программе лояльности отдельной
+     * операцией; ни один калькулятор её не поддерживал, строки уходили в
+     * unprocessed_cost_types и краснили гейт wb-costs:unrecognized-check.
+     */
+    public function testWbLoyaltyProgramFeeRowIsRecognizedByExactlyOneCalculator(): void
+    {
+        $row = [
+            'sellerOperName' => 'Стоимость участия в программе лояльности',
+            'bonusTypeName' => 'Комиссия ВБ за участие в программе лояльности "Баллы за отзывы"',
+            'rrdId' => 3137360497732,
+            'rrDate' => '2026-10-28',
+            'saleDt' => '2026-10-28T00:00:00Z',
+            'docTypeName' => '',
+            'cashbackAmount' => '0',
+            'cashbackCommissionChange' => '42.09',
+            'deduction' => '0',
+            'forPay' => '0',
+        ];
+
+        $supporting = array_values(array_filter(
+            $this->allWbCostCalculators(),
+            static fn (CostCalculatorInterface $candidate): bool => $candidate->supports($row),
+        ));
+
+        self::assertCount(1, $supporting);
+        $entries = $supporting[0]->calculate($row, null);
+        self::assertCount(1, $entries);
+        self::assertSame('wb_loyalty_program_fee', $entries[0]['category_code']);
+        self::assertSame('42.09', $entries[0]['amount']);
         self::assertArrayHasKey('operation_type', $entries[0]);
         self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
     }

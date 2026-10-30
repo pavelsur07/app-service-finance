@@ -4293,6 +4293,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.90 | 2026-10-30 | Marketplace: калькулятор `WbLoyaltyProgramFeeCalculator` (priority 98) — операция WB «Стоимость участия в программе лояльности», сумма из `cashbackCommissionChange` (`> 0` CHARGE, `< 0` STORNO); категория `wb_loyalty_program_fee` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` |
 | 2.89 | 2026-10-29 | Finance: одноразовая `app:finance:repair-pl-tree-19621cff` — дерево ОПиУ компании 19621cff к базовому шаблону маркетплейса (правила, операции с пересчётом регистра, структура); удаляется после применения |
 | 2.88 | 2026-10-29 | Finance: ссылки-выходы в диалоге запрета удаления статьи ОПиУ, фильтр удалённых документов по статье; общий диалог подтверждения — список выходов `data-confirm-links` |
 | 2.87 | 2026-10-29 | Finance: удаление используемой статьи ОПиУ — отказ с причиной вместо 500 (GlitchTip #451): `PLCategoryUsageQuery`, `PLCategoryUsage`, диалог-запрет в списке и карточке статьи |
