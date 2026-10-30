@@ -428,6 +428,51 @@
   строки месяца (дни месяца, ключ месяца, `ref`) одним запросом —
   согласованный снимок при параллельной замене.
 
+### ServiceGateway: ai-service
+
+ТЗ — `docs/tasks/ai/TZ_AI_service_VashFinDir.md`; сервис — `services/ai-service`
+(Python, в прод не выведен); контракт — `services/_contracts/ai-task/v1`.
+
+- Доступ — `AiServiceAccess`: `AI_SERVICE_ENABLED`, `AI_SERVICE_BASE_URL`,
+  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис»),
+  `AI_SERVICE_COMPANY_ALLOWLIST` (через запятую; пусто — никому, `*` — всем).
+  Любое пустое значение — выключено.
+- `AiTaskFacadeInterface` (реализация `AiTaskFacade`):
+  `requestTask(companyId, taskType, payload, idempotencyKey, ?requestedByUserId): ?string` —
+  выводит `task_id` из компании, типа и ключа (UUIDv5: повтор — тот же `task_id`)
+  и диспатчит `SubmitAiTaskMessage`; null —
+  выключено для компании. Ничего не пишет и не коммитит; вызывать после commit
+  своей транзакции. `isEnabledForCompany(companyId): bool`.
+- `SubmitAiTaskMessage` → `async_sync`. `SubmitAiTaskHandler` — `POST /internal/tasks`
+  с `Idempotency-Key`: сервис недоступен → исключение без Recoverable-маркера
+  (повторы по `max_retries` транспорта, затем `failed`; Recoverable обходит
+  лимит), выключено для компании → сообщение снимается с WARNING, отказ
+  сервиса (`AiTaskRejectedException`, стабильный `code`) или нарушение
+  контракта → `Unrecoverable`.
+- Клиент `AiServiceClient`: `timeout` 3 с, `max_duration` 10 с, `X-Trace-Id`;
+  транспорт, 401, 408, 429, 5xx → `ServiceUnavailableException`; прочие коды →
+  `AiTaskRejectedException`. Разбор `AiTaskV1Parser` строгий, как у
+  `ServiceCoverageV1Parser`, но результат с нарушением откладывается
+  (`AiResultsPage::$invalid`), а не отвергает страницу; фикстуры парсера —
+  копии `examples` контракта (тест сервиса сверяет их побайтно).
+- Результаты: `ImportAiResultsAction` — pull `GET /internal/tasks?status=done`
+  страницами по 100 до конца очереди (курсор обязан расти); HTTP вне
+  транзакции → каждый результат в своей `wrapInTransaction` → `ack` страницы
+  после commit. Сбой ack — сервис отдаст результаты снова, потребители
+  идемпотентны по `taskId`. Без потребителя, сбой потребителя (EM
+  пересоздаётся через `ManagerRegistry::resetManager()`), нарушение контракта —
+  результат не подтверждается и остаётся в сервисе, не загораживая следующие;
+  по каждому виду — один агрегированный ERROR за прогон.
+- Потребитель — `AiTaskResultConsumerInterface` (тег
+  `app.service_gateway.ai_task_result_consumer`): `supports(taskType)`,
+  `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт.
+  Вход `AiTaskResult` — DTO (`status` — `AiResultStatus`: `accepted`,
+  `needs_review`, `rejected`, `failed`; `checks` — `list<AiCheck>`; `output` —
+  массив по контракту задачи). Сейчас — `EchoAiTaskResultConsumer` (только лог).
+- Команды: `app:ai-service:echo --company-id=` — диагностическая задача
+  `echo`; `app:ai-service:import-results` (lock) — один проход импорта.
+  Cron импорта не подключён (вывод в прод — отдельное одобрение).
+
 ### Marketplace: WB financial report sync status (дневной статус)
 
 - Entity: `MarketplaceFinancialReportSyncStatus`.
@@ -4210,7 +4255,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
-| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad |
+| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, постановка задач ai-service (`SubmitAiTaskMessage`) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -4260,6 +4305,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.93 | 2026-10-30 | ServiceGateway: клиент ai-service — `AiTaskFacadeInterface`, `SubmitAiTaskMessage` (`async_sync`), `ImportAiResultsAction` с `AiTaskResultConsumerInterface`, команды `app:ai-service:echo` и `app:ai-service:import-results`, env `AI_SERVICE_*`; контракт `ai-task/v1`; каркас `services/ai-service` (этап 1 ТЗ ИИ). Миграций нет |
 | 2.92 | 2026-10-30 | Mcp: удалена неработающая заглушка MCP-сервера (`site/src/Mcp`, команда `app:mcp:serve`, `docs/mcp/`), префикс `App\Mcp\` в `ModuleAccessMap`, методы, нужные только ей: `CashFacade::listTransactions`, `listCashflowCategories`, `listAutoRules`, `upsertCashflowCategory`, `upsertAutoRule` с DTO `CashflowCategoryInput`, `AutoRuleInput`, `AutoRuleConditionInput`; `CashFacade::MAX_PER_PAGE`, `CashTransactionAutoRuleRepository::findByCompany`; `CompanyFacade::resolveIdByName` и `CompanyRepository::findIdsByExactName`. Миграций нет |
 | 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`, методы `CashFacade`, нужные только агенту (`sum*IncludingDeleted`, `listPlannedPayments`), с DTO `CashCategoryTurnover`, `PlannedPaymentSummary`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
 | 2.90 | 2026-10-30 | Marketplace: калькулятор `WbLoyaltyProgramFeeCalculator` (priority 98) — операция WB «Стоимость участия в программе лояльности», сумма из `cashbackCommissionChange` (`> 0` CHARGE, `< 0` STORNO); категория `wb_loyalty_program_fee` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` |
@@ -4442,6 +4488,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-09-28 | Marketplace | Preflight COSTS: нераспознанная затрата — категория вне каталога (`OzonCostCategory` / `WbCostCategory`, плюс легаси `ozon_other_service`); затраты без решения по ОПиУ блокируют. Блокируют только финальное закрытие (`PreflightMonthCloseCommand::$preliminary`); WB вне каталога — только без маппинга | Проверка искала лишь `ozon_other_service`, а by-day пишет `ozon_unknown_*`; затраты без маппинга молча выпадали из ОПиУ. Оперативный ОПиУ не должен замирать на новой услуге |
 | 2026-09-28 | Marketplace | Оперативное закрытие затрат Ozon берёт только распознанные коды (`OzonCostCategory::recognizedCodes()`); фильтр один на `UnprocessedCostsQuery` и `MarkProcessedQuery` — `PreliminaryCostFilter` | Раньше исключалась только `ozon_other_service`, а `ozon_unknown_*` из by-day попадали в оперативный ОПиУ; определение «нераспознанного» расходилось с preflight |
 | 2026-10-04 | Marketplace | Финальное закрытие месяца блокируется неполными днями WB-периода (`report_days_ready`), а после привязки строк — инвариантом «ничего подходящего не осталось» с откатом; оперативное закрытие — только предупреждение | R-04/M-01: месяц закрывался при `failed`/`conflict` днях и непривязанных строках; на проде июнь b57d7682 закрыт финально при дне в `conflict` |
+| 2026-10-30 | ai-service | ИИ-задачи — отдельный Python-сервис с общим pipeline `prepare → generate → parse → verify → decide → finalize`; вердикт решают проверки, высокий риск никогда не принимается автоматически | Модель не источник цифр: проверяемость и единый путь для всех задач |
+| 2026-10-30 | ai-service | LLM Gateway: провайдеры через адаптеры по семейству API (OpenAI-совместимый, Anthropic, YandexGPT), маршрут задачи в `routes.yaml`, режимы `single`/`fallback`, `vote` — этап 2 | Минимум 3 модели без зашитого провайдера; задачи SDK не импортируют |
+| 2026-10-30 | ServiceGateway | Обмен с ai-service — pull: Symfony ставит задачу (`Idempotency-Key`) и забирает результаты курсором с ack; сервис не пишет в Symfony | Сервис не знает о БД Symfony; повтор безопасен с обеих сторон |
 
 ## Api — внешние Bearer-ключи и подготовленные права (api-management)
 

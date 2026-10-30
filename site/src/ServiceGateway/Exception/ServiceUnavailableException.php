@@ -19,4 +19,9 @@ final class ServiceUnavailableException extends \RuntimeException
     {
         return new self(sprintf('Service %s responded with HTTP %d', $service, $status));
     }
+
+    public static function notConfigured(string $service): self
+    {
+        return new self(sprintf('Service %s is not configured: base URL or token is empty', $service));
+    }
 }

@@ -236,3 +236,24 @@ ozon-fetcher-lint:
 
 ozon-fetcher-migrate:
 	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-dev go run ./cmd/ozon-fetcher -migrate
+
+# ai-service (Python): гейты — services/python.md «Гейты».
+AI_SERVICE_DEV = $(DOCKER_COMPOSE) --profile services run --rm services-ai-service-dev
+
+ai-service-build:
+	$(DOCKER_COMPOSE) --profile services build services-ai-service services-ai-service-worker services-ai-service-dev
+
+ai-service-up: ai-service-build
+	$(DOCKER_COMPOSE) --profile services up -d services-ai-service services-ai-service-worker
+
+ai-service-migrate:
+	$(DOCKER_COMPOSE) --profile services run --rm services-ai-service migrate
+
+ai-service-lint:
+	$(AI_SERVICE_DEV) sh -c 'ruff check . && ruff format --check . && mypy'
+
+ai-service-test:
+	$(AI_SERVICE_DEV) pytest -m "not evals"
+
+ai-service-evals:
+	$(AI_SERVICE_DEV) pytest -m evals

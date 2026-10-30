@@ -218,6 +218,66 @@ services:
         profiles:
             - services
 
+    # ai-service (Python, docs/tasks/ai/): API и worker из одного образа.
+    # Dev-only токен и DSN; прод — только env/secrets (AGENTS.md §3.3).
+    services-ai-service:
+        build:
+            context: services/ai-service
+            dockerfile: docker/Dockerfile
+            target: runtime
+        restart: unless-stopped
+        environment: &ai-service-env
+            <<: *tz-env
+            AI_SERVICE_DB_DSN: "postgresql://svc_ai_service:ai_service_dev@services-postgres:5432/ai_service"
+            AI_SERVICE_API_TOKEN: "dev-only-ai-service-token"
+        command: ["api"]
+        ports:
+            - "8181:8080"   # dev-only проброс API
+        depends_on:
+            services-postgres:
+                condition: service_healthy
+        profiles:
+            - services
+
+    services-ai-service-worker:
+        build:
+            context: services/ai-service
+            dockerfile: docker/Dockerfile
+            target: runtime
+        restart: unless-stopped
+        environment: *ai-service-env
+        command: ["worker"]
+        healthcheck:
+            disable: true
+        depends_on:
+            services-postgres:
+                condition: service_healthy
+        profiles:
+            - services
+
+    # Тулчейн ai-service: ruff, mypy, pytest, evals (services/python.md «Гейты»).
+    # Монтируется весь репозиторий: тест контракта сверяет services/_contracts
+    # с копиями фикстур Symfony (site/tests/Fixtures/ServiceGateway/ai-task-v1).
+    services-ai-service-dev:
+        build:
+            context: services/ai-service
+            dockerfile: docker/Dockerfile
+            target: dev
+        working_dir: /repo/services/ai-service
+        environment:
+            <<: *tz-env
+            AI_TEST_DB_DSN: "postgresql://svc_ai_service:ai_service_dev@services-postgres:5432/ai_service_test"
+            PYTHONPATH: /repo/services/ai-service/src:/repo/services/ai-service
+            MYPY_CACHE_DIR: /tmp/mypy-cache
+            RUFF_CACHE_DIR: /tmp/ruff-cache
+        depends_on:
+            services-postgres:
+                condition: service_healthy
+        volumes:
+            - ./:/repo
+        profiles:
+            - services
+
     # Общая dev-БД сервисов монорепо (профиль services). Init-скрипты создают
     # БД и роли сервисов. Прод: отдельная БД на общем инстансе (services/AGENTS.md §9).
     services-postgres:

@@ -17,6 +17,7 @@ source normalization маркетплейсов. Symfony остаётся вла
 | Сервис | Язык | Назначение | Статус |
 |---|---|---|---|
 | [ozon-fetcher](ozon-fetcher/README.md) | Go | Получение финансовых данных Ozon Seller API, публикация source facts | scaffold |
+| [ai-service](ai-service/README.md) | Python | ИИ-задачи для Symfony: pipeline с проверками, несколько LLM | каркас, не в проде |
 
 ## Запуск (dev)
 
@@ -34,5 +35,5 @@ make ozon-fetcher-up      # запуск в dev-окружении
    (`AGENTS.md`, `README.md`, исходники, `docker/Dockerfile`).
 2. Dev-сервис в корневом `docker-compose.yml` с профилем `services`.
 3. Таргеты `make <name>-build` / `make <name>-up` / `make <name>-test` /
-   `make <name>-migrate` (гейты и миграции — `services/go.md`) в корневом `Makefile`.
+   `make <name>-migrate` (гейты и миграции — `services/go.md` / `services/python.md`) в корневом `Makefile`.
 4. Строка в таблице «Сервисы» выше.
