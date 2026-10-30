@@ -31,7 +31,6 @@
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
-| `Mcp` | MCP-сервер: инструменты для LLM-агентов над Cash-данными | — |
 | `Report` | Построители отчётов (ДДС cashflow) | — |
 | `ServiceGateway` | Шлюз к сервисам `services/`: клиенты, витрины их данных (`docs/architecture/service-gateway.md`) | — (данные сервисов без компаний) |
 
@@ -1127,10 +1126,6 @@ findByPublicId(int $publicId): ?Company
 // Только фактический владелец companies.user_id; роли участника и admin.write не подходят.
 isOwner(string $companyId, string $userId): bool
 
-// Глобально разрешить точное название без учёта регистра в единственный ID.
-// InvalidArgumentException — пустое название; DomainException — совпадений нет или несколько.
-resolveIdByName(string $name): string
-
 // ID всех активных компаний
 // @return list<string>
 getAllActiveCompanyIds(): array
@@ -1879,21 +1874,6 @@ deleteTransfer(string $companyId, string $transferId, ?string $actorUserId = nul
 
 // Атомарно восстановить агрегат и обе ноги
 restoreTransfer(string $companyId, string $transferId, ?string $actorUserId = null): void
-
-// Чтение: постраничный список транзакций компании, per_page ≤ CashFacade::MAX_PER_PAGE (200)
-listTransactions(string $companyId, array $filters = [], int $page = 1, int $perPage = 50): array
-
-// Чтение: плоское дерево статей ДДС компании (id, name, level, parentId, status, flowKind, sort, isSystem)
-listCashflowCategories(string $companyId): array
-
-// Чтение: автоправила компании вместе с условиями
-listAutoRules(string $companyId): array
-
-// Запись: создать (без id) или изменить (с id) статью ДДС, возвращает id
-upsertCashflowCategory(string $companyId, CashflowCategoryInput $input): string
-
-// Запись: создать (без id) или изменить (с id) автоправило, возвращает id
-upsertAutoRule(string $companyId, AutoRuleInput $input, ?string $actorUserId = null): string
 ```
 
 Чтение для дашборда Analytics (этап 7.1 плана Cash). Суммы — decimal string с двумя
@@ -1988,17 +1968,14 @@ DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `
 `src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
-запрошенная сущность к ней не относится. Во входных DTO `null` означает «не менять»,
-кроме tri-state поля `CashflowCategoryInput::parentId`: `parentIdProvided=false`
-сохраняет текущего родителя, UUID меняет его, а явный `null` при
-`parentIdProvided=true` переносит обычную категорию в root.
+запрошенная сущность к ней не относится.
 
 Обычные root-категории ДДС хранят собственный `flowKind`; дочерние наследуют
 его от root. Обычные категории могут быть дочерними у `CF_OP`, `CF_FIN`, `CF_INV`
 или обычной нетехнической категории. `CF_TECH`, `CF_TECH_IN`, `CF_TECH_OUT`, `CF_UNALLOC`
 не принимают обычных потомков, а `TECHNICAL` зарезервирован для системных категорий.
 
-**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей (в том числе из MCP-инструментов).
+**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для чтения и записи данных ДДС из других модулей.
 
 Другие модули не должны:
 - создавать `CashTransaction` напрямую;
@@ -3141,7 +3118,7 @@ enum Module: string
     case ADMIN = 'admin';              // Company (прочее), Billing, Telegram (пользовательские интеграции)
 }
 ```
-Группы `system` нет: `Admin`, `Mcp`, `/admin/*` и debug-роуты в exempt-зоне под
+Группы `system` нет: `Admin`, `/admin/*` и debug-роуты в exempt-зоне под
 `ROLE_ADMIN`/`ROLE_SUPER_ADMIN`. Модуль, который нельзя выдать шаблоном, в enum не нужен.
 
 ### `src/Company/Enum/CounterpartyDisplayNameSource.php`
@@ -3696,7 +3673,7 @@ read-страница обязана объявлять `methods: ['GET']`. Ма
 участник с ним отредактировал бы свой шаблон и выдал себе `finance:write`. То же для
 `ReportApiKeyController::generate/revoke`.
 
-**Exempt-зоны** (свои гейты, модульным не покрыты): `App\Admin\`, `App\Mcp\`,
+**Exempt-зоны** (свои гейты, модульным не покрыты): `App\Admin\`,
 `App\Analytics\`, `App\Notification\`, `App\Telegram\Controller\Admin\`,
 `App\Marketplace\Controller\Admin\`, `App\MarketplaceAds\Controller\Api\Admin\`,
 плюс точечно `ProfileController`, `UiModeController`, `CompanyController`,
@@ -4283,6 +4260,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.92 | 2026-10-30 | Mcp: удалена неработающая заглушка MCP-сервера (`site/src/Mcp`, команда `app:mcp:serve`, `docs/mcp/`), префикс `App\Mcp\` в `ModuleAccessMap`, методы, нужные только ей: `CashFacade::listTransactions`, `listCashflowCategories`, `listAutoRules`, `upsertCashflowCategory`, `upsertAutoRule` с DTO `CashflowCategoryInput`, `AutoRuleInput`, `AutoRuleConditionInput`; `CompanyFacade::resolveIdByName` и `CompanyRepository::findIdsByExactName`. Миграций нет |
 | 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`, методы `CashFacade`, нужные только агенту (`sum*IncludingDeleted`, `listPlannedPayments`), с DTO `CashCategoryTurnover`, `PlannedPaymentSummary`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
 | 2.90 | 2026-10-30 | Marketplace: калькулятор `WbLoyaltyProgramFeeCalculator` (priority 98) — операция WB «Стоимость участия в программе лояльности», сумма из `cashbackCommissionChange` (`> 0` CHARGE, `< 0` STORNO); категория `wb_loyalty_program_fee` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` |
 | 2.89 | 2026-10-29 | Finance: одноразовая `app:finance:repair-pl-tree-19621cff` — дерево ОПиУ компании 19621cff к базовому шаблону маркетплейса (правила, операции с пересчётом регистра, структура); удаляется после применения |

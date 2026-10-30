@@ -39,7 +39,7 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
     }
 
     /**
-     * Полный список правил компании без пагинации — для фасада и MCP-инструмента.
+     * Полный список правил компании без пагинации.
      *
      * @return CashTransactionAutoRule[]
      */

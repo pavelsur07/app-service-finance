@@ -39,14 +39,14 @@
 - [x] миграция `DROP TABLE` с обратимым `down()`
 - [x] мёртвые методы Cash, нужные только агенту, удалены вместе с тестами
 - [x] `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`
-- [ ] после деплоя: таблиц `ai_*` на проде нет
+- [x] после деплоя: таблиц `ai_*` на проде нет (30.10, read-only)
 
 ## Вне этапа
 
 - `LLM_API_URL`/`LLM_API_KEY` в `docker-compose.prod.yml` — изменение
   прод-Docker (§3.3 `AGENTS.md`), отдельным одобрением; переменные никем не
   читаются, оставить их безвредно.
-- Удаление `site/src/Mcp` — этап 0.2, отдельный PR.
+- Удаление `site/src/Mcp` — этап 0.2, ниже.
 
 ## Итог
 
@@ -68,4 +68,43 @@
   unit — 4215 OK; `tests/Integration/Cash` — 298 OK.
 - Внешнее ревью (Codex, effort medium, 1 раунд): `REVIEW_GREEN`.
 
-Чек-лист приёмки выполнен, кроме пункта «после деплоя».
+Чек-лист приёмки выполнен. На проде 30.10: PR #2824, миграция `Version20261030120000` применена, таблиц `ai_*` нет.
+
+---
+
+# Этап 0.2 — удаление заглушки `site/src/Mcp`
+
+## Задача
+
+Убрать локальный stdio MCP-сервер `app:mcp:serve` (7 инструментов над
+`CashFacade`/`CompanyFacade`): он нигде не запускается, на проде не
+используется. Инструменты для ИИ (этап 5 ТЗ) проектируются заново поверх
+Facade в `services/ai-service`.
+
+## Результат
+
+- нет `site/src/Mcp`, `docs/mcp/`, тестов `Unit/Mcp`, `Integration/Mcp`,
+  `Functional/Mcp`, `CashFacadeMcpSurfaceTest`;
+- удалены методы, у которых единственным потребителем был MCP:
+  `CashFacade::listTransactions`, `listCashflowCategories`, `listAutoRules`,
+  `upsertCashflowCategory`, `upsertAutoRule` (с приватными помощниками и
+  зависимостями), DTO `CashflowCategoryInput`, `AutoRuleInput`,
+  `AutoRuleConditionInput`; `CompanyFacade::resolveIdByName`,
+  `CompanyRepository::findIdsByExactName`;
+- миграций нет: у MCP своих таблиц не было.
+
+## Что считаем выполненным
+
+- grep по `App\Mcp`, `src/Mcp`, `app:mcp`, удалённым методам вне истории
+  (`Changelog`, ТЗ) пуст;
+- гейты handoff зелёные; baseline PHPStan только сократился.
+
+## Чек-лист приёмки
+
+- [ ] удалены `site/src/Mcp`, `docs/mcp/`, тесты MCP
+- [ ] методы `CashFacade`/`CompanyFacade`/`CompanyRepository`, нужные только MCP, удалены
+- [ ] `ModuleAccessMap` — exempt-префикс `App\Mcp\` убран
+- [ ] комментарии «для MCP-инструмента» в Cash убраны
+- [ ] `ARCHITECTURE.md` — строка модуля, методы Facade, exempt-зоны, Changelog
+- [ ] baseline PHPStan — запись `findIdsByExactName` удалена
+- [ ] `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, интеграционные Cash/Company
