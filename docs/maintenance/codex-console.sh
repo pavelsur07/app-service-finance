@@ -195,6 +195,20 @@ case "$cmd" in
       exit 2
     fi
     ;;
+  app:finance:repair-pl-tree-19621cff)
+    # Одноразовый ремонт дерева ОПиУ компании 19621cff (29.10.2026): правила
+    # продаж и затрат, проценты кредитов, статья ДДС, перенос операций из старых
+    # статей с пересчётом регистра, структура дерева. Без --execute — предпросмотр
+    # с откатом транзакции; с --execute пишет pl_categories, document_operations,
+    # pl_daily_totals, правила маркетплейса, finance_loan, cashflow_categories —
+    # отдельное одобрение Владельца (AGENTS.md §3.3). Удалить блок вместе с командой.
+    for arg in "$@"; do
+      case "$arg" in
+        --no-interaction|-n|--quiet|-q|--execute) ;;
+        *) echo "Argument not allowed for $cmd: $arg" >&2; exit 2 ;;
+      esac
+    done
+    ;;
   app:finance:pl-tree:apply-default)
     # Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json) для одной
     # компании — то же, что экран /pl-categories/import?source=template.
