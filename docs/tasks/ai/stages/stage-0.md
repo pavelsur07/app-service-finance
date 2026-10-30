@@ -66,5 +66,6 @@
   0 → 3 → 0), `doctrine:schema:validate --skip-sync`; PHP CS Fixer (весь
   проект, без кеша) — 0; strict_types — 0; PHPStan (1 воркер) — No errors;
   unit — 4215 OK; `tests/Integration/Cash` — 298 OK.
+- Внешнее ревью (Codex, effort medium, 1 раунд): `REVIEW_GREEN`.
 
 Чек-лист приёмки выполнен, кроме пункта «после деплоя».
