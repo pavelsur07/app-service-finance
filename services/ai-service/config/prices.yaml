@@ -1,0 +1,5 @@
+# Цены моделей для evals-compare, ₽ за 1 млн токенов (вход / выход).
+# Пусто — цена не известна, в таблице «—». Заполняется с выбором провайдеров (ТЗ §12).
+deepseek/deepseek-chat: {input: null, output: null}
+yandex/yandexgpt/latest: {input: null, output: null}
+anthropic/claude-haiku-5-5: {input: null, output: null}

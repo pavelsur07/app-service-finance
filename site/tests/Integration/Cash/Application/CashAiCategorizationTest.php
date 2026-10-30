@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Cash\Application;
 use App\Cash\Application\AcceptCashCategorySuggestionAction;
 use App\Cash\Application\DismissCashCategorySuggestionAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
+use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashCategorizationResultConsumer;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
@@ -376,6 +377,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
             $this->query(),
             $this->repository(),
             self::getContainer()->get(CashCategorizationTaskRepository::class),
+            new CashCategorizationPayloadMapper(),
             $this->ai,
             $this->em,
             $this->clock,

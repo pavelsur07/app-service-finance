@@ -1882,6 +1882,15 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   `CashTransactionsChanged`. `DismissCashCategorySuggestionAction` — только
   статус, под той же блокировкой подсказки. Решение человека окончательно:
   параллельный запрос получает `CashCategorySuggestionStateException`.
+- Payload задачи строит `Application\Service\CashCategorizationPayloadMapper` —
+  один код для постановки и выгрузки золотого набора.
+- `app:cash:ai-eval-export --company-id= [--per-category=20] [--limit=400]` —
+  read-only, JSON `cash-categorize-history/v1` в stdout: справочник и кейсы
+  «операция → статья» из `CashCategorizationQuery::findManuallyCategorized`
+  (одна разбивка `manual`, несистемная статья, не перевод, не удалена, без
+  принятой ИИ-подсказки; не больше N последних на статью); статья не из
+  текущего справочника конечных — кейс пропускается. Содержит ПДн в открытом
+  виде: в репозиторий — только через `python -m ai_service evals-import`.
 - Метки точности: `accepted`, `dismissed`; «исправлено» — операция получила
   другую статью при открытой подсказке (считается запросом). `app:cash:ai-categorize-stats
   --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`.
@@ -4365,6 +4374,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.95 | 2026-10-30 | Cash: выгрузка золотого набора ИИ-категоризации `app:cash:ai-eval-export`, `CashCategorizationPayloadMapper` (общий с постановкой); ai-service: `evals-import` (обезличивание), `evals-compare` (модель × точность × стоимость × задержка) |
 | 2.94 | 2026-10-30 | Cash: ИИ-подсказки статей ДДС — `cash_category_suggestion` и `cash_categorization_task` (миграция `Version20261030180000`), `RequestCashAiCategorizationAction` и команды `app:cash:ai-categorize`, `app:cash:ai-categorize-stats`, потребитель `CashCategorizationResultConsumer`, «Принять» / «Отклонить» в списке операций; ServiceGateway: `AiTaskFacadeInterface::taskIdFor`; контракт `ai-task/v1` 1.1.0 |
 | 2.93 | 2026-10-30 | ServiceGateway: клиент ai-service — `AiTaskFacadeInterface`, `SubmitAiTaskMessage` (`async_sync`), `ImportAiResultsAction` с `AiTaskResultConsumerInterface`, команды `app:ai-service:echo` и `app:ai-service:import-results`, env `AI_SERVICE_*`; контракт `ai-task/v1`; каркас `services/ai-service` (этап 1 ТЗ ИИ). Миграций нет |
 | 2.92 | 2026-10-30 | Mcp: удалена неработающая заглушка MCP-сервера (`site/src/Mcp`, команда `app:mcp:serve`, `docs/mcp/`), префикс `App\Mcp\` в `ModuleAccessMap`, методы, нужные только ей: `CashFacade::listTransactions`, `listCashflowCategories`, `listAutoRules`, `upsertCashflowCategory`, `upsertAutoRule` с DTO `CashflowCategoryInput`, `AutoRuleInput`, `AutoRuleConditionInput`; `CashFacade::MAX_PER_PAGE`, `CashTransactionAutoRuleRepository::findByCompany`; `CompanyFacade::resolveIdByName` и `CompanyRepository::findIdsByExactName`. Миграций нет |

@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application;
 
 use App\Cash\Application\DTO\CashAiCategorizationRequestResult;
-use App\Cash\Application\DTO\CashCategorizationCategory;
-use App\Cash\Application\DTO\CashCategorizationOperation;
+use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Entity\Transaction\CashCategorizationTask;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
@@ -37,8 +36,6 @@ final class RequestCashAiCategorizationAction
     public const BATCH_SIZE = 50;
     /** Лимиты контракта categorize_payload. */
     private const MAX_CATEGORIES = 1000;
-    private const MAX_PATH = 500;
-    private const MAX_COUNTERPARTY = 255;
     private const LOOKBACK_DAYS = 90;
     /** Автоправила срабатывают через ~10 с после записи операции; запас на очередь. */
     private const SETTLE_MINUTES = 10;
@@ -46,12 +43,12 @@ final class RequestCashAiCategorizationAction
     private const REDISPATCH_PER_RUN = 100;
     private const EXPIRE_AFTER_DAYS = 7;
     private const HOUSEKEEPING_PER_RUN = 1000;
-    private const AMOUNT = '/^\d{1,16}\.\d{2}$/D';
 
     public function __construct(
         private readonly CashCategorizationQuery $query,
         private readonly CashCategorySuggestionRepository $suggestions,
         private readonly CashCategorizationTaskRepository $tasks,
+        private readonly CashCategorizationPayloadMapper $mapper,
         private readonly AiTaskFacadeInterface $ai,
         private readonly EntityManagerInterface $entityManager,
         private readonly ClockInterface $clock,
@@ -91,8 +88,7 @@ final class RequestCashAiCategorizationAction
                 $now->modify(sprintf('-%d minutes', self::SETTLE_MINUTES)),
                 $limit,
             ),
-            // Отрицательные и сверхдлинные суммы контракт не принимает; таких операций в учёте быть не должно.
-            static fn (CashCategorizationOperation $op): bool => 1 === preg_match(self::AMOUNT, $op->amount),
+            $this->mapper->isRepresentable(...),
         ));
 
         $requested = 0;
@@ -100,7 +96,7 @@ final class RequestCashAiCategorizationAction
         foreach (array_chunk($operations, self::BATCH_SIZE) as $batch) {
             $key = 'cash-categorize:'.Uuid::uuid7()->toString();
             $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $key);
-            $payload = $this->payload($categories, $batch);
+            $payload = $this->mapper->payload($categories, $batch);
             $this->entityManager->wrapInTransaction(function () use ($batch, $companyId, $taskId, $key, $payload, $now): void {
                 $this->entityManager->persist(new CashCategorizationTask($taskId, $companyId, $key, $payload, $now));
                 foreach ($batch as $operation) {
@@ -192,35 +188,5 @@ final class RequestCashAiCategorizationAction
         ]);
 
         return \count($waiting);
-    }
-
-    /**
-     * @param list<CashCategorizationCategory> $categories
-     * @param list<CashCategorizationOperation> $operations
-     *
-     * @return array<string, mixed> payload по контракту categorize_payload
-     */
-    private function payload(array $categories, array $operations): array
-    {
-        return [
-            'categories' => array_map(static fn (CashCategorizationCategory $c): array => [
-                'id' => $c->id,
-                'path' => mb_substr($c->path, -self::MAX_PATH),
-                'direction' => match ($c->operationType) {
-                    'INFLOW' => 'inflow',
-                    'OUTFLOW' => 'outflow',
-                    default => 'any',
-                },
-            ], $categories),
-            'operations' => array_map(static fn (CashCategorizationOperation $o): array => [
-                'id' => $o->id,
-                'direction' => 'INFLOW' === $o->direction ? 'inflow' : 'outflow',
-                'amount' => $o->amount,
-                'currency' => $o->currency,
-                'date' => $o->occurredAt->format('Y-m-d'),
-                'description' => $o->description,
-                'counterparty' => null === $o->counterparty ? null : mb_substr($o->counterparty, 0, self::MAX_COUNTERPARTY),
-            ], $operations),
-        ];
     }
 }

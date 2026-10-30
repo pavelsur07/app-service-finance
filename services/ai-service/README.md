@@ -33,9 +33,25 @@ php bin/console app:ai-service:import-results
 php bin/console app:cash:ai-categorize-stats --company-id=<uuid>
 ```
 
+## Evals категоризации
+
+Наборы — `evals/categorize_transactions/` (синтетический) и `history/<имя>/`
+(из истории ручных категоризаций). Золотой набор из истории:
+
+```bash
+php bin/console app:cash:ai-eval-export --company-id=<uuid> > export.json   # ПДн в открытом виде, не коммитить
+python -m ai_service evals-import export.json --name <имя>                 # обезличивание; результат просмотреть
+python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/<имя>]
+```
+
+`evals-compare` гоняет каждую модель отдельно через тот же pipeline пачками по
+50 и печатает таблицу «модель × точность × стоимость × задержка»; цены —
+`config/prices.yaml` (₽ за 1 млн токенов), без ключей модели маршрута не
+вызываются (`--models stub/categorize --routes config/routes.dev.yaml` — без сети).
+
 ## Команды образа
 
-`python -m ai_service api | worker | migrate | cleanup-traces`.
+`python -m ai_service api | worker | migrate | cleanup-traces | evals-import | evals-compare`.
 
 ## Переменные окружения
 
