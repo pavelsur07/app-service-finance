@@ -85,19 +85,19 @@ final class PlPreviewSalesCoverageQuery
         return $this->connection->fetchFirstColumn(
             <<<'SQL'
             WITH activity AS (
-                SELECT sale_date AS day FROM marketplace_sales
+                SELECT DISTINCT DATE_TRUNC('month', sale_date)::date AS month FROM marketplace_sales
                 WHERE company_id = :companyId AND marketplace = 'ozon' AND sale_date BETWEEN :periodFrom AND :periodTo
-                UNION ALL
-                SELECT return_date AS day FROM marketplace_returns
+                UNION
+                SELECT DISTINCT DATE_TRUNC('month', return_date)::date AS month FROM marketplace_returns
                 WHERE company_id = :companyId AND marketplace = 'ozon' AND return_date BETWEEN :periodFrom AND :periodTo
             )
-            SELECT DISTINCT TO_CHAR(a.day, 'YYYY-MM') AS month
+            SELECT TO_CHAR(a.month, 'YYYY-MM') AS month
             FROM activity a
             WHERE NOT EXISTS (
                 SELECT 1 FROM marketplace_ozon_realizations r
                 WHERE r.company_id = :companyId
-                  AND r.period_from = DATE_TRUNC('month', a.day)::date
-                  AND r.period_to = (DATE_TRUNC('month', a.day) + INTERVAL '1 month - 1 day')::date
+                  AND r.period_from = a.month
+                  AND r.period_to = (a.month + INTERVAL '1 month - 1 day')::date
             )
             ORDER BY month
             SQL,

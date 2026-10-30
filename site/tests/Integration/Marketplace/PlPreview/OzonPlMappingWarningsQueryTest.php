@@ -25,6 +25,7 @@ final class OzonPlMappingWarningsQueryTest extends IntegrationTestCase
         $this->em->persist($sale);
         $this->em->persist($return);
         $this->em->flush();
+        $query = new OzonPlMappingWarningsQuery($this->connection);
         $before = $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_sale_mappings');
         $warnings = $query->fetch($companyId);
         self::assertCount(2, $warnings);
@@ -38,7 +39,7 @@ final class OzonPlMappingWarningsQueryTest extends IntegrationTestCase
         $sale->setIsActive(false);
         $return->setIsActive(false);
         $this->em->flush();
-        self::assertSame([], $query->fetch($companyId));
+        self::assertSame([], (new OzonPlMappingWarningsQuery($this->connection))->fetch($companyId));
     }
 
     public function testDifferentCustomTargetAndWildberriesAreNotConflicts(): void

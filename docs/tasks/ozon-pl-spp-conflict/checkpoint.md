@@ -1,14 +1,21 @@
 ## Current checkpoint
-Phase: Stage 2 / modal warnings
-Status: implementing
-Stage base commit: 1fc52299d
-Completed: shared scoped conflict query; preview warnings; auto setup blocking; missing realization warning.
-Baseline: 33 integration / 14 unit tests passed; schema 285 migrations applied locally.
-Regression: 3 expected failures on old code; green 5 tests/23 assertions after fix.
-Stage: 53 tests/240 assertions green.
-Review: pending focused static analysis and diff review.
-Exact next action: render warnings in modal, preserve sign mismatch, validate functional/Twig/JS.
-Stage 2 base: cd73ff430. Stage 1 focused PHPStan green, CS green, committed.
-Production audit: September sales 1031/1061 posted; returns 82/86 posted; realization 0/1064 posted.
-Active September marketplace_ozon revenue document has REV_SPP_SALES 2632144.00.
-Ruling: report historical discrepancy separately, no automatic historical rebuild.
+Phase: Stage 3 / final verification
+Status: checking
+Stage 3 base commit: 8f44048dd
+Completed: backend + UI; 53 module tests/240 assertions; 23 functional/170 assertions;
+Twig lint; modal JS smoke conflict/normal/error; frontend lint/build/API types green.
+Build initially failed because read-only node_modules blocked Vite temporary config;
+fixed isolated writable mount for .vite-temp, build passed in 8.13s.
+Prepared guarded repair.sql/rollback.sql; local synthetic SQL verifies repair(2), repeat(0),
+rollback(2), precondition rejection leaves legacy unchanged. Not executed on prod.
+Running: full PHPStan/CS/strict/unit; full make site-test (existing installed dependencies reused,
+site-composer-install skipped to preserve owner's shared vendor).
+Internal final review + follow-up: REVIEW_GREEN (0 B/I). External round 1 REVIEW_GREEN (0 B/I,2 MINOR fixed); filter regression red then fixed.
+Exact next action: inspect full gate output, fix real regressions; external review after internal green.
+Production: stale active September revenue document REV_SPP_SALES=2632144.00;
+1031/1061 sales,82/86 returns posted;0/1064 realizations posted. Historical repair not authorized.
+PR #2827 Draft master; branch fix/ozon-pl-spp-conflict; main owner worktree untouched.
+
+CI note: first push static analysis flagged assertCount(2) after an earlier same-query assertSame([]);
+PHPStan memoizes pure-method calls across em->flush. Test now creates a fresh query after DB mutation;
+production behavior unchanged. CI integration/functional/unit/style/API checks passed.

@@ -154,7 +154,7 @@ final readonly class BuildMarketplacePlPreviewAction
             adReconciliation: $adReconciliation,
             warnings: [
                 ...$pl->warnings,
-                ...(MarketplaceType::WILDBERRIES === $command->marketplace ? [] : $this->mappingWarnings->fetch($companyId)),
+                ...(null === $command->marketplace || MarketplaceType::OZON === $command->marketplace ? $this->mappingWarnings->fetch($companyId) : []),
                 ...$this->realizationWarnings($companyId, $from, $to, $command->marketplace),
                 ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage),
             ],

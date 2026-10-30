@@ -87,6 +87,12 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         self::assertStringContainsString('sale_revenue', implode(' ', $report->warnings));
         self::assertStringContainsString('sale_realization', implode(' ', $report->warnings));
         self::assertSame(300.0, $this->values($report)['REAL']['total']);
+        foreach ([MarketplaceType::WILDBERRIES, MarketplaceType::YANDEX_MARKET, MarketplaceType::SBER_MEGAMARKET] as $marketplace) {
+            $other = ($this->action)(new BuildMarketplacePlPreviewCommand(
+                $this->companyId(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'), $marketplace,
+            ));
+            self::assertStringNotContainsString('sale_revenue', implode(' ', $other->warnings), $marketplace->value);
+        }
         $legacy->setIsActive(false);
         $this->em->flush();
         self::assertStringNotContainsString('sale_revenue', implode(' ', $this->build()->warnings));
