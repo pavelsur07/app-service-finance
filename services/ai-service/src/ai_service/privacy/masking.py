@@ -11,6 +11,12 @@ from typing import Any
 
 _PATRONYMIC = r"[А-ЯЁ][а-яё]+(?:ович|евич|ич|овна|евна|ична|инична)"
 _NAME = r"[А-ЯЁ][а-яё]+"
+# Без учёта регистра (выписки пишут ФИО заглавными, люди — строчными): короткое «ич»
+# не берётся, иначе «доставка песок кирпич» стала бы ФИО.
+_PATRONYMIC_CI = r"[а-яё]+(?:ович|евич|овна|евна|ична|инична)"
+_WORD_CI = r"[а-яё]{2,}"
+# Фамилия при инициалах: «Иванов» или «ИВАНОВ».
+_SURNAME = r"[А-ЯЁ](?:[а-яё]+|[А-ЯЁ]+)"
 
 # Порядок важен: длинные цифровые последовательности — раньше коротких.
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -22,8 +28,15 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("INN", re.compile(r"(?<!\d)\d{12}(?!\d)")),
     # Фамилия Имя Отчество / Имя Отчество Фамилия.
     ("PERSON", re.compile(rf"\b{_NAME}\s+{_NAME}\s+{_PATRONYMIC}\b|\b{_NAME}\s+{_PATRONYMIC}\s+{_NAME}\b")),
+    (
+        "PERSON",
+        re.compile(
+            rf"\b{_WORD_CI}\s+{_WORD_CI}\s+{_PATRONYMIC_CI}\b|\b{_WORD_CI}\s+{_PATRONYMIC_CI}\s+{_WORD_CI}\b",
+            re.IGNORECASE,
+        ),
+    ),
     # Фамилия И. О. / И. О. Фамилия.
-    ("PERSON", re.compile(rf"\b{_NAME}\s+[А-ЯЁ]\.\s?[А-ЯЁ]\.(?!\w)|(?<!\w)[А-ЯЁ]\.\s?[А-ЯЁ]\.\s?{_NAME}\b")),
+    ("PERSON", re.compile(rf"\b{_SURNAME}\s+[А-ЯЁ]\.\s?[А-ЯЁ]\.(?!\w)|(?<!\w)[А-ЯЁ]\.\s?[А-ЯЁ]\.\s?{_SURNAME}\b")),
 )
 
 

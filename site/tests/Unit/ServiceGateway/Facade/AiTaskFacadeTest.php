@@ -44,6 +44,7 @@ final class AiTaskFacadeTest extends TestCase
         self::assertNotSame($first, $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'source-row-2'));
         self::assertNotSame($first, $facade->requestTask('0192f0a0-0000-7000-8000-0000000000c2', 'echo', ['text' => 'a'], 'source-row-1'));
         self::assertNotSame($first, $facade->requestTask(self::COMPANY, 'other', ['text' => 'a'], 'source-row-1'));
+        self::assertSame($first, $facade->requestTask(strtoupper(self::COMPANY), 'echo', ['text' => 'a'], 'source-row-1'));
     }
 
     public function testDoesNothingWhenCompanyIsNotAllowed(): void

@@ -102,11 +102,11 @@ init-скрипт БД, `make ai-service-*`.
   (сбой потребителя, нарушение контракта), карантин не загораживает новые;
   сервис: NUL в payload → 422, в ответе модели вырезается; 500 без текста
   ошибки; ошибка записи итога закрывает задачу как `failed`, worker не
-  падает; маскирование чисел и телефонов без «+»; `ON CONFLICT
+  падает; маскирование чисел, телефонов без «+», ФИО в любом регистре; `ON CONFLICT
   (idempotency_key)`, занятый `task_id` → 409 `task_id_conflict`;
   уверенность вне 0..1 отвергается; worker не стартует, если аренда короче
   худшего прогона маршрута.
-- Гейты: Python — ruff, ruff format, mypy strict (38 файлов), pytest 90
+- Гейты: Python — ruff, ruff format, mypy strict (38 файлов), pytest 96
   (unit + интеграционные на PostgreSQL + evals); PHP — PHPStan, CS,
   strict_types, unit 4240+ (весь набор), `ServiceGateway` 85, `lint:container`.
 - e2e (dev, локальные контейнеры): `app:ai-service:echo` → `async_sync` →

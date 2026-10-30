@@ -33,6 +33,8 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         ?string $requestedByUserId = null,
     ): ?string {
         Assert::uuid($companyId);
+        // Канонический вид: сервис нормализует UUID, и `ABC…`/`abc…` должны дать один task_id.
+        $companyId = strtolower($companyId);
         if (null !== $requestedByUserId) {
             Assert::uuid($requestedByUserId);
         }
