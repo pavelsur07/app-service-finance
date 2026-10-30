@@ -14,13 +14,19 @@ final readonly class RepairOzonPlMappingAction
     {
     }
 
+    /** @param array<string, mixed> $row */
+    public static function isRepairable(array $row): bool
+    {
+        return null !== $row['realization_id'] && (bool) $row['realization_negative'] === ('return_refund' === $row['amount_source']);
+    }
+
     public function __invoke(string $companyId): int
     {
         return $this->connection->transactional(function () use ($companyId): int {
             $this->connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:key))', ['key' => 'ozon_pl_mapping:'.$companyId]);
             $rows = $this->conflicts->fetchConflicts($companyId);
             foreach ($rows as $row) {
-                if (null === $row['realization_id'] || (bool) $row['realization_negative'] !== ('return_refund' === $row['amount_source'])) {
+                if (!self::isRepairable($row)) {
                     throw new \DomainException('Сначала настройте продажи и возвраты с СПП по отчёту «Реализация» на этих же статьях ОПиУ. Ни одно правило не изменено.');
                 }
             }

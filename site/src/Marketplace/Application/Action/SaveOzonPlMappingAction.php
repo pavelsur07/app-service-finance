@@ -17,15 +17,17 @@ final readonly class SaveOzonPlMappingAction
     {
     }
 
-    public function __invoke(MarketplaceSaleMapping $mapping): void
+    public function __invoke(MarketplaceSaleMapping $mapping): int
     {
         if (MarketplaceType::OZON !== $mapping->getMarketplace()) {
             throw new \InvalidArgumentException('Ожидалось правило Ozon.');
         }
-        $this->em->wrapInTransaction(function () use ($mapping): void {
+
+        return $this->em->wrapInTransaction(function () use ($mapping): int {
             $companyId = (string) $mapping->getCompany()->getId();
             $connection = $this->em->getConnection();
             $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:key))', ['key' => 'ozon_pl_mapping:'.$companyId]);
+            $deactivated = 0;
             if ($mapping->isActive()) {
                 $source = $mapping->getAmountSource();
                 $code = $mapping->getPlCategory()->getCode();
@@ -46,9 +48,11 @@ final readonly class SaveOzonPlMappingAction
                 )) {
                     throw new \DomainException('В этой статье уже включён другой источник Ozon. Сначала устраните двойной учёт.');
                 }
-                $this->mappings->deactivateOtherActive($mapping->getCompany(), MarketplaceType::OZON, $mapping->getOperationType(), $source, $mapping->getId());
+                $deactivated = $this->mappings->deactivateOtherActive($mapping->getCompany(), MarketplaceType::OZON, $mapping->getOperationType(), $source, $mapping->getId());
             }
             $this->em->persist($mapping);
+
+            return $deactivated;
         });
     }
 }

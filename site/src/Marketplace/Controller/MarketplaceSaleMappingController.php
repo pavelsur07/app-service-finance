@@ -9,6 +9,7 @@ use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Marketplace\Application\Action\RepairOzonPlMappingAction;
 use App\Marketplace\Application\Action\SaveOzonPlMappingAction;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
@@ -99,7 +100,7 @@ final class MarketplaceSaleMappingController extends AbstractController
             $ozon = [
                 'companyId' => $companyId,
                 'conflicts' => $conflicts,
-                'repairReady' => [] !== $conflicts && [] === array_filter($conflicts, static fn (array $row): bool => null === $row['realization_id'] || (bool) $row['realization_negative'] !== ('return_refund' === $row['amount_source'])),
+                'repairReady' => [] !== $conflicts && [] === array_filter($conflicts, static fn (array $row): bool => !RepairOzonPlMappingAction::isRepairable($row)),
                 'configured' => isset($realizationMappings['sale_realization'], $realizationMappings['return_realization'])
                     && !$realizationMappings['sale_realization']->isNegative() && $realizationMappings['return_realization']->isNegative(),
                 'currentMonth' => new \DateTimeImmutable($currentMonth.'-01'),
@@ -323,7 +324,10 @@ final class MarketplaceSaleMappingController extends AbstractController
     private function saveOzonAndRedirect(MarketplaceSaleMapping $mapping, Request $request): Response
     {
         try {
-            ($this->saveOzon)($mapping);
+            $deactivated = ($this->saveOzon)($mapping);
+            if ($deactivated > 0) {
+                $this->addFlash('success', 'Предыдущее активное правило для этого источника было деактивировано.');
+            }
             $this->addFlash('success', 'Настройка Ozon сохранена.');
         } catch (\DomainException $e) {
             $this->addFlash('error', $e->getMessage());

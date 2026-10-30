@@ -122,7 +122,7 @@
 
             var warnings = payload.warnings || [];
             if (warnings.length > 0) {
-                conflictsEl.textContent = isOzon ? 'Выручка с СПП завышена: в статьи включены начисления и реализация Ozon. Закройте это окно и нажмите «Исправить двойной учёт».' : warnings.join(' ');
+                conflictsEl.textContent = isOzon ? 'Выручка с СПП завышена: в статьи включены начисления и реализация Ozon. Закройте это окно и проверьте подсказку в блоке настройки Ozon на странице.' : warnings.join(' ');
                 conflictsEl.classList.remove('d-none');
             }
 

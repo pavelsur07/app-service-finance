@@ -222,6 +222,45 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         self::assertSame('Возвраты с СПП', $labels['return_realization']);
     }
 
+    public function testValidOzonRealizationCanBeDisabledAndEnabled(): void
+    {
+        $client = static::createClient();
+        $f = $this->fixture($client);
+        $id = (string) $this->em()->getConnection()->fetchOne(
+            "SELECT id FROM marketplace_sale_mappings WHERE company_id = :company AND marketplace = 'ozon' AND amount_source = 'sale_realization'",
+            ['company' => $f->company->getId()],
+        );
+        foreach ([false, true] as $expected) {
+            $client->request('POST', '/marketplace/pl-mappings/'.$id.'/toggle', [
+                '_token' => $this->csrfToken($client, 'toggle'.$id), 'redirect_marketplace' => 'ozon',
+            ]);
+            self::assertResponseRedirects();
+            self::assertSame($expected, (bool) $this->em()->getConnection()->fetchOne('SELECT is_active FROM marketplace_sale_mappings WHERE id = :id', ['id' => $id]));
+        }
+    }
+
+    public function testValidOzonSaveReportsPreviouslyDisabledRule(): void
+    {
+        $client = static::createClient();
+        $f = $this->fixture($client);
+        $old = new MarketplaceSaleMapping(Uuid::uuid4()->toString(), $f->company, MarketplaceType::OZON, AmountSource::SALE_GROSS, $f->costs);
+        $this->em()->persist($old);
+        $this->em()->flush();
+        $client->request('POST', '/marketplace/pl-mappings/create', [
+            '_token' => $this->csrfToken($client, 'marketplace_pl_mappings_create'),
+            'marketplace' => 'ozon', 'amount_source' => 'sale_gross',
+            'pl_category_id' => $f->revenue->getId(), 'is_active' => '1', 'redirect_marketplace' => 'ozon',
+        ]);
+        self::assertResponseRedirects();
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM marketplace_sale_mappings WHERE company_id = :company AND marketplace = 'ozon' AND amount_source = 'sale_gross' AND pl_category_id = :category AND is_active = true",
+            ['company' => $f->company->getId(), 'category' => $f->revenue->getId()],
+        ));
+        self::assertFalse((bool) $this->em()->getConnection()->fetchOne('SELECT is_active FROM marketplace_sale_mappings WHERE id = :id', ['id' => $old->getId()]));
+        $client->followRedirect();
+        self::assertStringContainsString('Предыдущее активное правило для этого источника было деактивировано', (string) $client->getResponse()->getContent());
+    }
+
     private function fixture(KernelBrowser $client): PlPreviewFixture
     {
         $f = new PlPreviewFixture($this->em(), 1181);
