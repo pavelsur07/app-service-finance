@@ -125,3 +125,6 @@ Facade в `services/ai-service`.
   strict_types — 0; PHPStan (1 воркер) — No errors; unit — 4205 OK;
   `tests/Integration/Cash` — 291 OK, `tests/Integration/Company` — 144 OK,
   `tests/Functional/Cash` — 166 OK.
+- Внешнее ревью (Codex, effort medium, 1 раунд): `REVIEW_GREEN`.
+
+Чек-лист приёмки выполнен.
