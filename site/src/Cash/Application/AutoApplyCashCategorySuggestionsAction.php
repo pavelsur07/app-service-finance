@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application;
 
 use App\Cash\Application\DTO\CashAiAutoApplyResult;
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashCategorySuggestionApplier;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Domain\Policy\CashAiAutoApplyPolicy;
@@ -34,6 +35,7 @@ final class AutoApplyCashCategorySuggestionsAction
         private readonly CashAiCategorizationSettingRepository $settings,
         private readonly CashCategorizationQuery $query,
         private readonly CashCategorySuggestionApplier $applier,
+        private readonly AutoRuleDispatchGuard $dispatchGuard,
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly ClockInterface $clock,
@@ -54,10 +56,11 @@ final class AutoApplyCashCategorySuggestionsAction
         $applied = 0;
         $stale = 0;
         foreach ($this->query->findAutoApplicable($companyId, CashAiAutoApplyPolicy::MIN_CONFIDENCE, self::PER_RUN) as $suggestionId) {
+            // Историю пишет applier (с `aiSuggestion`); общая запись подписчика перекрыла бы её.
             /** @var Outcome|null $outcome */
-            $outcome = $this->entityManager->wrapInTransaction(
+            $outcome = $this->dispatchGuard->suppress(fn (): mixed => $this->entityManager->wrapInTransaction(
                 fn (): ?Outcome => $this->applier->apply($companyId, $suggestionId, null, $this->clock->now()),
-            );
+            ));
             // null — человек решил между отбором и блокировкой, его решение остаётся.
             match ($outcome) {
                 Outcome::ACCEPTED => ++$applied,

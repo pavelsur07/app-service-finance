@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
+use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashCategorySuggestionApplier;
+use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Domain\Policy\CashAiAutoApplyPolicy;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -19,6 +21,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Repository\Transaction\CashAiCategorizationSettingRepository;
+use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashAiCategorizationSettingBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -138,15 +141,67 @@ final class CashAiAutoApplyTest extends IntegrationTestCase
         self::assertSame(1, $this->autoApply()->applied);
 
         // Человек поправил автоприменённую статью: 95 верных из 101 — ниже порога.
-        $this->em->clear();
-        $fresh = $this->em->find(CashTransaction::class, $tx->getId());
-        self::assertNotNull($fresh);
-        $fresh->setCashflowCategory($this->em->find(CashflowCategory::class, $this->revenue->getId()));
-        $this->em->flush();
+        $this->categorize($tx, $this->revenue, CashTransactionSplitSource::MANUAL);
 
         $result = $this->autoApply();
         self::assertSame(1, $result->gate->autoCorrected);
         self::assertSame(CashAiAutoApplyPolicy::REASON_LOW_PRECISION, $result->closedReason);
+    }
+
+    public function testAutomaticCategorizationIsNotAHumanDecision(): void
+    {
+        $this->enable();
+        $this->humanDecisions(right: 99, wrong: 0);
+        // Пока подсказка висела, статью проставило автоправило — это не подтверждение людьми.
+        $byRule = $this->transaction();
+        $this->suggestion($byRule, 0.97, 'accepted');
+        $this->categorize($byRule, $this->rent, CashTransactionSplitSource::AUTO);
+        // Автоправило сменило автоприменённую статью — это не исправление человеком.
+        $overridden = $this->transaction();
+        $this->connection->insert('cash_category_suggestion', [
+            'id' => Uuid::uuid7()->toString(),
+            'company_id' => (string) $this->company->getId(),
+            'transaction_id' => (string) $overridden->getId(),
+            'task_id' => Uuid::uuid4()->toString(),
+            'status' => 'auto_applied',
+            'category_id' => (string) $this->rent->getId(),
+            'confidence' => '0.9700',
+            'verdict' => 'accepted',
+            'requested_at' => '2026-10-01 12:00:00',
+        ]);
+        $this->categorize($overridden, $this->revenue, CashTransactionSplitSource::AUTO);
+        $this->suggestion($this->transaction(), 0.97, 'accepted');
+
+        $result = $this->autoApply();
+
+        self::assertSame(CashAiAutoApplyPolicy::REASON_TOO_FEW_DECISIONS, $result->closedReason);
+        self::assertSame(99, $result->gate->decisions());
+        self::assertSame(0, $result->gate->autoCorrected);
+    }
+
+    public function testAutoAppliedCategoryStaysReplaceableByAutoRulesUntilHumanChangesIt(): void
+    {
+        $this->enable();
+        $this->humanDecisions(right: 100, wrong: 0);
+        $tx = $this->transaction();
+        $this->suggestion($tx, 0.97, 'accepted');
+        self::assertSame(1, $this->autoApply()->applied);
+
+        $resolver = self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class);
+        $this->em->clear();
+        $fresh = $this->em->find(CashTransaction::class, $tx->getId());
+        self::assertNotNull($fresh);
+        self::assertTrue($resolver->resolve($fresh)->isAutoAssigned('cashflowCategory'));
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM audit_log WHERE entity_id = ? AND diff::jsonb #> \'{changes,cashflowCategory}\' IS NOT NULL',
+            [(string) $tx->getId()],
+        ));
+
+        $this->categorize($tx, $this->revenue, CashTransactionSplitSource::MANUAL);
+        $this->em->clear();
+        $fresh = $this->em->find(CashTransaction::class, $tx->getId());
+        self::assertNotNull($fresh);
+        self::assertFalse($resolver->resolve($fresh)->isAutoAssigned('cashflowCategory'));
     }
 
     public function testHumanDecisionBeforeTheLockWinsWithoutBreakingTheRun(): void
@@ -175,11 +230,7 @@ final class CashAiAutoApplyTest extends IntegrationTestCase
         $query = self::getContainer()->get(CashCategorizationQuery::class);
         self::assertSame([(string) $tx->getId() => 97], $query->autoAppliedConfidence((string) $this->company->getId(), [(string) $tx->getId()]));
 
-        $this->em->clear();
-        $fresh = $this->em->find(CashTransaction::class, $tx->getId());
-        self::assertNotNull($fresh);
-        $fresh->setCashflowCategory($this->em->find(CashflowCategory::class, $this->revenue->getId()));
-        $this->em->flush();
+        $this->categorize($tx, $this->revenue, CashTransactionSplitSource::MANUAL);
         self::assertSame([], $query->autoAppliedConfidence((string) $this->company->getId(), [(string) $tx->getId()]));
     }
 
@@ -192,11 +243,22 @@ final class CashAiAutoApplyTest extends IntegrationTestCase
             $container->get(CashAiCategorizationSettingRepository::class),
             $container->get(CashCategorizationQuery::class),
             $container->get(CashCategorySuggestionApplier::class),
+            $container->get(AutoRuleDispatchGuard::class),
             $this->em,
             $dispatcher,
             new MockClock(),
             new NullLogger(),
         ))((string) $this->company->getId());
+    }
+
+    /** Правка статьи операции: человек — разбивка `manual`, автоправило — `auto`. */
+    private function categorize(CashTransaction $tx, CashflowCategory $category, CashTransactionSplitSource $source): void
+    {
+        $fresh = $this->em->find(CashTransaction::class, $tx->getId());
+        self::assertNotNull($fresh);
+        $fresh->setCashflowCategory($this->em->find(CashflowCategory::class, $category->getId()));
+        self::getContainer()->get(CashTransactionSplitSynchronizer::class)->sync($fresh, $source);
+        $this->em->flush();
     }
 
     private function enable(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application\Service;
 
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashCategorySuggestionDecisionOutcome as Outcome;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus;
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
@@ -17,6 +18,9 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
+use App\Shared\Entity\AuditLog;
+use App\Shared\Enum\AuditLogAction;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Проставить статью операции из ИИ-подсказки: «Принять» человеком или автоприменение.
@@ -27,8 +31,11 @@ use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
  * перезаписывает никогда (ТЗ §6); иначе подсказка устаревает.
  *
  * Человек: разбивка `manual`, закрытый период и перевод — ошибка для показа. Автоприменение:
- * разбивка `auto` (её перезапишут автоправила и человек), закрытый период и перевод —
- * подсказка устаревает, решать некому.
+ * разбивка `auto` и своя запись истории с `aiSuggestion` — по ней
+ * `CashTransactionAutoRuleProvenanceResolver` считает статью авто-назначенной, и её
+ * перезаписывают автоправила в режиме `replace_auto_assigned` и человек; закрытый период и
+ * перевод — подсказка устаревает, решать некому. Общую запись `AuditLogSubscriber` вызывающий
+ * подавляет (`AutoRuleDispatchGuard::suppress`), иначе она перекрыла бы эту.
  */
 final readonly class CashCategorySuggestionApplier
 {
@@ -39,6 +46,7 @@ final readonly class CashCategorySuggestionApplier
         private CashCategorizationQuery $query,
         private CashTransactionService $transactionService,
         private CashTransactionSplitSynchronizer $splitSynchronizer,
+        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -89,11 +97,30 @@ final readonly class CashCategorySuggestionApplier
             return Outcome::STALE;
         }
 
+        $before = $transaction->getCashflowCategory()?->getId();
         $transaction->setCashflowCategory($category);
+        if (null === $userId) {
+            $this->recordAutoApplied($transaction, $suggestion, $before);
+        }
         $this->splitSynchronizer->sync($transaction, null === $userId ? CashTransactionSplitSource::AUTO : CashTransactionSplitSource::MANUAL);
         $this->decide($suggestion, $userId, $now);
 
         return Outcome::ACCEPTED;
+    }
+
+    private function recordAutoApplied(CashTransaction $transaction, CashCategorySuggestion $suggestion, ?string $before): void
+    {
+        $this->entityManager->persist(new AuditLog(
+            (string) $transaction->getCompany()->getId(),
+            CashTransaction::class,
+            (string) $transaction->getId(),
+            AuditLogAction::UPDATE,
+            [
+                'mode' => 'ai_auto_apply',
+                'aiSuggestion' => ['cashflowCategory' => ['id' => $suggestion->getId()]],
+                'changes' => ['cashflowCategory' => ['before' => $before, 'after' => $transaction->getCashflowCategory()?->getId()]],
+            ],
+        ));
     }
 
     private function decide(CashCategorySuggestion $suggestion, ?string $userId, \DateTimeImmutable $now): void

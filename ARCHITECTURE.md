@@ -1912,13 +1912,20 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   состояние ворот. Ворота — `Domain\Policy\CashAiAutoApplyPolicy`: флаг включён,
   решений по уверенным (`confidence ≥ 0.90`) подсказкам не меньше 100 и
   точность на них не ниже 0.95; решения — `accepted`, `dismissed`, «исправлено»
-  и автоприменения, после которых человек сменил статью (ошибка).
+  и автоприменения, после которых человек сменил статью (ошибка). Правка
+  операции считается решением человека только при ручной разбивке (`manual`):
+  статья от автоправила или импорта ворота не двигает.
   Статистика — `CashCategorizationQuery::autoApplyGateStats()`. Подсказка
   применяется при `confidence ≥ 0.90` и вердикте сервиса `accepted`.
   `AutoApplyCashCategorySuggestionsAction` запускается первым шагом
   `app:cash:ai-categorize`: ворота закрыты → ничего; иначе до 200 подсказок
   (`findAutoApplicable`, операция «без статьи»), по каждой своя
-  `wrapInTransaction` с `apply(..., null)`; один `CashTransactionsChanged` после
+  `wrapInTransaction` с `apply(..., null)` под `AutoRuleDispatchGuard::suppress`
+  (общая запись `AuditLogSubscriber` и постановка автоправил подавлены); applier
+  пишет свою запись `audit_log` с `aiSuggestion` и `changes.cashflowCategory` —
+  по ней `CashTransactionAutoRuleProvenanceResolver` считает статью
+  авто-назначенной, и автоправила в режиме `replace_auto_assigned` её
+  перезаписывают, пока её не сменил человек. Один `CashTransactionsChanged` после
   всех commit. В списке операций у автоприменённой статьи значок «ИИ» с
   уверенностью (`autoAppliedConfidence`), пока статья операции та же.
 - Payload задачи строит `Application\Service\CashCategorizationPayloadMapper` —

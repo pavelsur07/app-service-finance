@@ -143,6 +143,8 @@ final readonly class CashCategorizationQuery
      * Решения людей по подсказкам с уверенностью не ниже `$minConfidence` — ворота автоприменения.
      * Решение правкой операции — подсказка висела, а операция получила статью; исправленное
      * автоприменение — статья операции больше не та, что применил ИИ (удалённые не считаются).
+     * Правка считается решением человека только при ручной разбивке (`manual`): статья от
+     * автоправила или импорта качество подсказок не подтверждает и не опровергает.
      */
     public function autoApplyGateStats(string $companyId, float $minConfidence): CashAiAutoApplyGateStats
     {
@@ -153,12 +155,16 @@ final readonly class CashCategorizationQuery
                  count(*) FILTER (WHERE d.status = \'accepted\' OR (d.status = \'suggested\' AND d.edited AND d.tx_category = d.category_id)) AS right_count,
                  count(*) FILTER (WHERE d.status = \'dismissed\' OR (d.status = \'suggested\' AND d.edited AND d.tx_category <> d.category_id)) AS wrong_count,
                  count(*) FILTER (WHERE d.status = \'auto_applied\') AS auto_applied,
-                 count(*) FILTER (WHERE d.status = \'auto_applied\' AND d.tx_category IS DISTINCT FROM d.category_id) AS auto_corrected
+                 count(*) FILTER (WHERE d.status = \'auto_applied\' AND d.edited AND d.tx_category <> d.category_id) AS auto_corrected
              FROM (
                  SELECT s.status, s.category_id, tx.cashflow_category_id AS tx_category,
                         (tx.cashflow_category_id IS NOT NULL
                          AND category.system_code IS DISTINCT FROM :unallocated
-                         AND category.system_code IS DISTINCT FROM :legacyUnallocated) AS edited
+                         AND category.system_code IS DISTINCT FROM :legacyUnallocated
+                         AND EXISTS (
+                             SELECT 1 FROM cash_transaction_split split
+                             WHERE split.cash_transaction_id = tx.id AND split.source = :manual
+                         )) AS edited
                  FROM cash_category_suggestion s
                  JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
                  LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
@@ -169,6 +175,7 @@ final readonly class CashCategorizationQuery
                 'minConfidence' => $minConfidence,
                 'unallocated' => CashflowCategory::CODE_UNALLOCATED,
                 'legacyUnallocated' => CashflowCategory::SYSTEM_UNALLOCATED,
+                'manual' => CashTransactionSplitSource::MANUAL->value,
             ],
         );
         $autoCorrected = (int) ($row['auto_corrected'] ?? 0);

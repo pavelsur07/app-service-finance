@@ -85,7 +85,7 @@ final readonly class CashTransactionAutoRuleProvenanceResolver
 
         foreach ($latestAudits as $diff) {
             if (!is_array($diff)
-                || !isset($diff['autoRules'][$field]['id'], $diff['autoRules'][$field]['revision'])
+                || !$this->isAutomatic($diff, $field)
                 || !isset($diff['changes'])
                 || !array_key_exists($field, $diff['changes'])
                 || ($diff['changes'][$field]['after'] ?? null) !== $currentValue) {
@@ -94,6 +94,17 @@ final readonly class CashTransactionAutoRuleProvenanceResolver
         }
 
         return true;
+    }
+
+    /**
+     * Автоправило (`autoRules`) или автоприменённая ИИ-подсказка статьи (`aiSuggestion`).
+     *
+     * @param array<string, mixed> $diff
+     */
+    private function isAutomatic(array $diff, string $field): bool
+    {
+        return isset($diff['autoRules'][$field]['id'], $diff['autoRules'][$field]['revision'])
+            || 'cashflowCategory' === $field && isset($diff['aiSuggestion'][$field]['id']);
     }
 
     /** @param array<string, mixed>|null $diff */
