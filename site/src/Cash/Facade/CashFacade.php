@@ -12,7 +12,6 @@ use App\Cash\Application\DTO\AutoRuleInput;
 use App\Cash\Application\DTO\BankStatementDayInput;
 use App\Cash\Application\DTO\BankStatementDayResult;
 use App\Cash\Application\DTO\CashCategoryAmount;
-use App\Cash\Application\DTO\CashCategoryTurnover;
 use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryInput;
 use App\Cash\Application\DTO\CashflowCategoryNode;
@@ -26,7 +25,6 @@ use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
 use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
 use App\Cash\Application\DTO\MoneyAccountSummary;
-use App\Cash\Application\DTO\PlannedPaymentSummary;
 use App\Cash\Application\DTO\StatementImportAccount;
 use App\Cash\Application\DTO\StatementImportSummary;
 use App\Cash\Application\DTO\StatementLinkCandidate;
@@ -36,7 +34,6 @@ use App\Cash\Application\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -55,7 +52,6 @@ use App\Cash\Infrastructure\Query\CashReportQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Import\ImportLogRepository;
-use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -66,7 +62,6 @@ use App\Company\Entity\Counterparty;
 use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
-use Webmozart\Assert\Assert;
 
 final readonly class CashFacade
 {
@@ -88,7 +83,6 @@ final readonly class CashFacade
         private MoneyFundMovementRepository $moneyFundMovementRepository,
         private CashReportQuery $reportQuery,
         private DailyBalanceRecalculator $dailyBalanceRecalculator,
-        private PaymentPlanRepository $paymentPlanRepository,
         private ImportBankStatementDayAction $importBankStatementDay,
         private CashImportAccountLock $importAccountLock,
         private CashImportLogLease $importLogLease,
@@ -980,65 +974,6 @@ final readonly class CashFacade
             : $this->moneyAccountRepository->findBy(['company' => $company]);
 
         return $this->reportQuery->listOpeningBalancesAtDate($companyId, $date, array_values($accounts));
-    }
-
-    /**
-     * Поступления и выбытия по названию статьи. Удалённые операции и переводы входят
-     * (так считает AI-агент ДДС, см. «Находки» плана Cash).
-     *
-     * @return list<CashCategoryTurnover>
-     */
-    public function sumTurnoverByCategoryNameIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $this->requireCompany($companyId);
-
-        return $this->reportQuery->sumTurnoverByCategoryNameIncludingDeleted($companyId, $from, $to);
-    }
-
-    /**
-     * Чистый поток по дням. Удалённые операции и переводы входят.
-     *
-     * @return list<CashDailyAmount>
-     */
-    public function sumNetByDayIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $this->requireCompany($companyId);
-
-        return $this->reportQuery->sumNetByDayIncludingDeleted($companyId, $from, $to);
-    }
-
-    /**
-     * Поступления и выбытия за период. Удалённые операции и переводы входят.
-     *
-     * @return array{inflow: string, outflow: string}
-     */
-    public function sumTurnoverIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $this->requireCompany($companyId);
-
-        return $this->reportQuery->sumTurnoverIncludingDeleted($companyId, $from, $to);
-    }
-
-    /**
-     * Плановые платежи (PLANNED, APPROVED) с датой в периоде, по дате.
-     *
-     * @return list<PlannedPaymentSummary>
-     */
-    public function listPlannedPayments(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $plans = $this->paymentPlanRepository->findPlannedByCompanyAndPeriod($this->requireCompany($companyId), $from, $to);
-
-        return array_map(static function (PaymentPlan $plan): PlannedPaymentSummary {
-            $plannedAt = $plan->getPlannedAt();
-            Assert::notNull($plannedAt);
-
-            return new PlannedPaymentSummary(
-                $plannedAt,
-                $plan->getAmount(),
-                $plan->getCashflowCategory()->getName(),
-                $plan->getCounterparty()?->getName(),
-            );
-        }, $plans);
     }
 
     private function findExistingByImport(CreateCashTransactionCommand $command): ?CashTransaction

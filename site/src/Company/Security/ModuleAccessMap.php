@@ -52,7 +52,6 @@ final class ModuleAccessMap
         'App\\Report\\' => Module::FINANCE,
         'App\\Loan\\' => Module::FINANCE,
         'App\\BankSync\\' => Module::FINANCE,
-        'App\\Ai\\' => Module::FINANCE,
         'App\\Marketplace\\' => Module::MARKETPLACE,
         'App\\MarketplaceAds\\' => Module::MARKETPLACE,
         'App\\MarketplaceAnalytics\\' => Module::MARKETPLACE,

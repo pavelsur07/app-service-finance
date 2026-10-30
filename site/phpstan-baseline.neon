@@ -67,72 +67,6 @@ parameters:
 			path: src/Admin/Form/AdminAccountCreateType.php
 
 		-
-			message: '#^Property App\\Ai\\Entity\\AiAgent\:\:\$settings type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Entity/AiAgent.php
-
-		-
-			message: '#^Метод\-запрос App\\Ai\\Repository\\AiAgentRepository\:\:findEnabledByType\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Ai/Repository/AiAgentRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Ai\\Repository\\AiRunRepository\:\:findLatestForAgent\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Ai/Repository/AiRunRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Ai\\Repository\\AiRunRepository\:\:findLatestPendingRunForAgent\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Ai/Repository/AiRunRepository.php
-
-		-
-			message: '#^Метод\-запрос App\\Ai\\Repository\\AiSuggestionRepository\:\:countForRun\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
-			identifier: vashfindir.repositoryCompanyScope
-			count: 1
-			path: src/Ai/Repository/AiSuggestionRepository.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:normalizeResponse\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:normalizeResponse\(\) should return list\<array\<string, mixed\>\> but returns array\<mixed, mixed\>\.$#'
-			identifier: return.type
-			count: 2
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:normalizeResponse\(\) should return list\<array\<string, mixed\>\> but returns non\-empty\-array\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Agent\\CashflowAgent\:\:persistSuggestions\(\) has parameter \$llmPayload with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Service/Agent/CashflowAgent.php
-
-		-
-			message: '#^Method App\\Ai\\Service\\Llm\\LlmResponse\:\:tryDecodeJson\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Service/Llm/LlmResponse.php
-
-		-
-			message: '#^Property App\\Ai\\Service\\Llm\\LlmResponse\:\:\$json type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Ai/Service/Llm/LlmResponse.php
-
-		-
 			message: '#^Method App\\Analytics\\Application\\DashboardSnapshotService\:\:buildAlerts\(\) has parameter \$revenue with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -13208,18 +13142,6 @@ parameters:
 			identifier: vashfindir.flushOutsideBoundary
 			count: 1
 			path: src/Admin/Service/UserDeletionService.php
-
-		-
-			message: '#^flush\(\) в App\\Ai\\Repository\\AiRunRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Ai/Repository/AiRunRepository.php
-
-		-
-			message: '#^flush\(\) в App\\Ai\\Repository\\AiSuggestionRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 1
-			path: src/Ai/Repository/AiSuggestionRepository.php
 
 		-
 			message: '#^flush\(\) в App\\Balance\\Application\\BalanceStructureService\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

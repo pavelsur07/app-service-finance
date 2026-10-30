@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Cash\Infrastructure\Query;
 
-use App\Cash\Application\DTO\CashCategoryTurnover;
-use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowReportRow;
 use App\Cash\Application\DTO\CashflowReportRowFilter;
 use App\Cash\Application\DTO\CashStatementLine;
@@ -25,8 +23,7 @@ use Webmozart\Assert\Assert;
  *
  * Запросы перенесены без изменения условий: выписка — из
  * `Finance\Controller\ReportTransactionsStatementController` (этап 7.2 плана Cash),
- * отчёт ДДС — из `Report\Cashflow\CashflowReportBuilder`, сводки AI-агента — из
- * `Ai\Service\Agent\CashflowAgent` (этап 7.3).
+ * отчёт ДДС — из `Report\Cashflow\CashflowReportBuilder`.
  */
 final readonly class CashReportQuery
 {
@@ -322,117 +319,5 @@ final readonly class CashReportQuery
         }
 
         return $result;
-    }
-
-    /**
-     * Поступления и выбытия по названию статьи (без статьи — «Без категории»), по
-     * алфавиту. Как считал AI-агент ДДС: удалённые операции и переводы входят.
-     *
-     * @return list<CashCategoryTurnover>
-     */
-    public function sumTurnoverByCategoryNameIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        Assert::uuid($companyId);
-
-        $rows = $this->em->createQueryBuilder()
-            ->from(CashTransaction::class, 'transaction')
-            ->select("COALESCE(category.name, 'Без категории') AS categoryName")
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS inflow",
-                CashDirection::INFLOW->value
-            ))
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN COALESCE(split.amount, transaction.amount) ELSE 0 END) AS outflow",
-                CashDirection::OUTFLOW->value
-            ))
-            ->leftJoin('transaction.splits', 'split')
-            ->leftJoin('split.cashflowCategory', 'category')
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->setParameter('company', $companyId)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
-            ->groupBy('categoryName')
-            ->orderBy('categoryName', \SortDirection::Ascending)
-            ->getQuery()
-            ->getArrayResult();
-
-        return array_values(array_map(static fn (array $row): CashCategoryTurnover => new CashCategoryTurnover(
-            (string) $row['categoryName'],
-            bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
-            bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
-        ), $rows));
-    }
-
-    /**
-     * Чистый поток по дням (поступления минус выбытия), по возрастанию даты. Как
-     * считал AI-агент ДДС: удалённые операции и переводы входят.
-     *
-     * @return list<CashDailyAmount>
-     */
-    public function sumNetByDayIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        Assert::uuid($companyId);
-
-        $rows = $this->em->createQueryBuilder()
-            ->from(CashTransaction::class, 'transaction')
-            ->select('transaction.occurredAt AS day')
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE transaction.amount * -1 END) AS net",
-                CashDirection::INFLOW->value
-            ))
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->groupBy('day')
-            ->orderBy('day', \SortDirection::Ascending)
-            ->setParameter('company', $companyId)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
-            ->getQuery()
-            ->getArrayResult();
-
-        return array_values(array_map(static function (array $row): CashDailyAmount {
-            $day = $row['day'];
-
-            return new CashDailyAmount(
-                $day instanceof \DateTimeInterface ? $day->format('Y-m-d') : (string) $day,
-                bcadd((string) ($row['net'] ?? '0'), '0', 2),
-            );
-        }, $rows));
-    }
-
-    /**
-     * Поступления и выбытия за период. Как считал AI-агент ДДС: удалённые операции
-     * и переводы входят.
-     *
-     * @return array{inflow: string, outflow: string}
-     */
-    public function sumTurnoverIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        Assert::uuid($companyId);
-
-        /** @var array{inflow: string|null, outflow: string|null} $totals */
-        $totals = $this->em->createQueryBuilder()
-            ->from(CashTransaction::class, 'transaction')
-            ->select(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS inflow",
-                CashDirection::INFLOW->value
-            ))
-            ->addSelect(sprintf(
-                "SUM(CASE WHEN transaction.direction = '%s' THEN transaction.amount ELSE 0 END) AS outflow",
-                CashDirection::OUTFLOW->value
-            ))
-            ->andWhere('transaction.company = :company')
-            ->andWhere('transaction.occurredAt BETWEEN :from AND :to')
-            ->setParameter('company', $companyId)
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
-            ->getQuery()
-            ->getSingleResult();
-
-        return [
-            'inflow' => bcadd((string) ($totals['inflow'] ?? '0'), '0', 2),
-            'outflow' => bcadd((string) ($totals['outflow'] ?? '0'), '0', 2),
-        ];
     }
 }

@@ -43,38 +43,6 @@ class PaymentPlanRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return list<PaymentPlan>
-     */
-    public function findPlannedByCompanyAndPeriod(Company $company, \DateTimeInterface $from, \DateTimeInterface $to): array
-    {
-        $plannedStatuses = [
-            PaymentPlanStatus::PLANNED,
-            PaymentPlanStatus::APPROVED,
-        ];
-
-        $query = $this->createQueryBuilder('plan')
-            ->where('plan.company = :company')
-            ->andWhere('plan.plannedAt BETWEEN :from AND :to')
-            ->andWhere('plan.status IN (:statuses)')
-            ->setParameter('company', $company)
-            ->setParameter('from', \DateTimeImmutable::createFromInterface($from), Types::DATE_IMMUTABLE)
-            ->setParameter('to', \DateTimeImmutable::createFromInterface($to), Types::DATE_IMMUTABLE)
-            ->setParameter(
-                'statuses',
-                array_map(static fn (PaymentPlanStatus $status): string => $status->value, $plannedStatuses),
-                ArrayParameterType::STRING
-            )
-            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
-            ->addOrderBy('plan.createdAt', \SortDirection::Ascending)
-            ->getQuery();
-
-        /** @var list<PaymentPlan> $result */
-        $result = $query->getResult();
-
-        return $result;
-    }
-
-    /**
      * @return array<string, array{inflow:string,outflow:string,transfer:string}>
      */
     public function sumByDay(Company $company, \DateTimeInterface $from, \DateTimeInterface $to, ?MoneyAccount $account = null): array
