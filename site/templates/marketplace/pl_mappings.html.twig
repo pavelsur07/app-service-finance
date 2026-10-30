@@ -1,26 +1,34 @@
 {% extends 'marketplace/layout.html.twig' %}
 
 {% set active_tab = 'pl_mappings' %}
+{% set isOzon = marketplaceFilterValue == 'ozon' %}
 
 {% block tab_content %}
     <div class="card-header">
         <div class="row align-items-center w-100">
             <div class="col">
-                <h3 class="card-title">Маппинг ОПиУ ({{ operationType == 'sale' ? 'Продажи' : 'Возвраты' }})</h3>
+                <h3 class="card-title">{{ isOzon ? 'Настройка статей Ozon' : 'Маппинг ОПиУ (' ~ (operationType == 'sale' ? 'Продажи' : 'Возвраты') ~ ')' }}</h3>
                 <div class="text-muted small">
-                    Настройка правил AmountSource → Категория ОПиУ. Важно: активным может быть только одно правило на источник суммы.
+                    {% if isOzon %}
+                        Выберите, в какие статьи ОПиУ попадут продажи и возвраты до и после скидки Ozon.
+                    {% else %}
+                        Настройка правил AmountSource → Категория ОПиУ. Важно: активным может быть только одно правило на источник суммы.
+                    {% endif %}
                 </div>
             </div>
             <div class="col-auto ms-auto">
                 <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-mapping">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    Добавить правило
+                    {{ isOzon ? 'Добавить настройку' : 'Добавить правило' }}
                 </a>
             </div>
         </div>
     </div>
 
     <div class="card-body border-bottom">
+        {% if isOzon %}
+            {% include 'marketplace/pl_mappings/_ozon_status.html.twig' %}
+        {% endif %}
         <div class="row g-3 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">Операция</label>
@@ -74,10 +82,10 @@
             <div class="alert alert-warning mt-3 mb-0">
                 <div class="d-flex">
                     <div>
-                        <strong>Есть ненастроенные источники суммы:</strong>
+                        <strong>{{ isOzon ? 'Не все статьи настроены:' : 'Есть ненастроенные источники суммы:' }}</strong>
                         <div class="mt-1">
                             {% for src in missingAmountSources %}
-                                <span class="badge bg-orange-lt me-1">{{ src.displayName }}</span>
+                                <span class="badge bg-orange-lt me-1">{{ isOzon ? src.getDisplayNameForMarketplace(ozonMarketplace) : src.displayName }}</span>
                             {% endfor %}
                         </div>
                         <div class="text-muted small mt-2">
@@ -96,8 +104,8 @@
                 {% if marketplaceFilterValue == 'all' %}
                     <th>Маркетплейс</th>
                 {% endif %}
-                <th>Источник суммы</th>
-                <th>Категория ОПиУ</th>
+                <th>{{ isOzon ? 'Откуда берём сумму' : 'Источник суммы' }}</th>
+                <th>{{ isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ' }}</th>
                 <th>Проект</th>
                 <th>Знак</th>
                 <th>Статус</th>
@@ -125,14 +133,19 @@
                         {% endif %}
 
                         <td>
-                            <div class="fw-bold">{{ m.amountSource.displayName }}</div>
-                            <div class="text-muted small"><code>{{ m.amountSource.value }}</code></div>
+                            <div class="fw-bold">{{ m.amountSource.getDisplayNameForMarketplace(m.marketplace) }}</div>
+                            {% if m.marketplace.value == 'ozon' %}
+                                <div class="text-muted small">{{ m.amountSource.ozonDescription }}</div>
+                            {% else %}
+                                <div class="text-muted small"><code>{{ m.amountSource.value }}</code></div>
+                            {% endif %}
                         </td>
 
                         <td>
                             <div class="fw-bold">{{ m.plCategory.name }}</div>
                             <div class="text-muted small">
-                                {% if m.plCategory.code %}
+                                {% if m.marketplace.value == 'ozon' %}
+                                {% elseif m.plCategory.code %}
                                     <code>{{ m.plCategory.code }}</code>
                                 {% else %}
                                     <span class="text-muted">—</span>
@@ -192,7 +205,7 @@
                                     <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
 
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Редактировать правило</h5>
+                                        <h5 class="modal-title">{{ isOzon ? 'Изменить настройку Ozon' : 'Редактировать правило' }}</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
 
@@ -203,12 +216,13 @@
                                                 <input class="form-control" value="{{ m.marketplace.displayName }}" disabled>
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label">Источник суммы</label>
-                                                <input class="form-control" value="{{ m.amountSource.displayName }}" disabled>
+                                                <label class="form-label">{{ isOzon ? 'Откуда берём сумму' : 'Источник суммы' }}</label>
+                                                <input class="form-control" value="{{ m.amountSource.getDisplayNameForMarketplace(m.marketplace) }}" disabled>
+                                                {% if m.marketplace.value == 'ozon' %}<div class="form-hint">{{ m.amountSource.ozonDescription }}</div>{% endif %}
                                             </div>
 
                                             <div class="col-md-12">
-                                                <label class="form-label">Категория ОПиУ</label>
+                                                <label class="form-label">{{ isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ' }}</label>
                                                 <select name="pl_category_id" class="form-select" required>
                                                     {% for c in plCategories %}
                                                         {% set indent = '' %}
@@ -271,6 +285,10 @@
         </table>
     </div>
 
+    {% if isOzon and ozon.conflicts is not empty %}
+        {% include 'marketplace/pl_mappings/_ozon_repair_modal.html.twig' %}
+    {% endif %}
+
     <div class="modal modal-blur fade" id="modal-add-mapping" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -280,7 +298,7 @@
                     <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
 
                     <div class="modal-header">
-                        <h5 class="modal-title">Добавить правило маппинга</h5>
+                        <h5 class="modal-title">{{ isOzon ? 'Добавить настройку Ozon' : 'Добавить правило маппинга' }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
@@ -288,26 +306,31 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Маркетплейс</label>
-                                <select name="marketplace" class="form-select" required>
-                                    {% for mp in availableMarketplaces %}
-                                        <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
-                                            {{ mp.displayName }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
+                                {% if isOzon %}
+                                    <input type="hidden" name="marketplace" value="ozon">
+                                    <input class="form-control" value="Ozon" readonly>
+                                {% else %}
+                                    <select name="marketplace" class="form-select" required>
+                                        {% for mp in availableMarketplaces %}
+                                            <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
+                                                {{ mp.displayName }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                {% endif %}
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Источник суммы</label>
+                                <label class="form-label">{{ isOzon ? 'Откуда берём сумму' : 'Источник суммы' }}</label>
                                 <select name="amount_source" class="form-select" required>
                                     {% for src in amountSources %}
-                                        <option value="{{ src.value }}">{{ src.displayName }}</option>
+                                        <option value="{{ src.value }}">{{ isOzon ? src.getDisplayNameForMarketplace(ozonMarketplace) : src.displayName }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
 
                             <div class="col-md-12">
-                                <label class="form-label">Категория ОПиУ</label>
+                                <label class="form-label">{{ isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ' }}</label>
                                 <select name="pl_category_id" class="form-select" required>
                                     {% for c in plCategories %}
                                         {% set indent = '' %}

@@ -34,4 +34,18 @@ final class OzonRealizationStatusQuery
 
         return array_column($rows, 'month');
     }
+
+    /** @return list<string> обработанные полные месяцы, от последнего к первому */
+    public function processedMonths(string $companyId): array
+    {
+        return $this->connection->fetchFirstColumn(
+            "SELECT DISTINCT TO_CHAR(period_from, 'YYYY-MM') AS month
+             FROM marketplace_ozon_realizations
+             WHERE company_id = :companyId
+               AND period_from = DATE_TRUNC('month', period_from)::date
+               AND period_to = (DATE_TRUNC('month', period_from) + INTERVAL '1 month - 1 day')::date
+             ORDER BY month DESC",
+            ['companyId' => $companyId],
+        );
+    }
 }

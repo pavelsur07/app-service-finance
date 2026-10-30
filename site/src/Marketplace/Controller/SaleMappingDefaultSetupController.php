@@ -103,7 +103,7 @@ final class SaleMappingDefaultSetupController extends AbstractController
             'statusLabel' => $item->getStatus()->getLabel(),
             'operationType' => $item->getOperationType(),
             'amountSource' => $item->getAmountSource()->value,
-            'amountSourceLabel' => $item->getAmountSource()->getDisplayName(),
+            'amountSourceLabel' => $item->getAmountSource()->getDisplayNameForMarketplace($item->getMarketplace()),
             'plCode' => $item->getPlCode(),
             'plCategoryId' => $item->getPlCategoryId(),
             'plCategoryName' => $item->getPlCategoryName(),

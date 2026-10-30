@@ -7,7 +7,7 @@
              data-csrf-token="{{ csrf_token('marketplace_default_sale_mapping') }}"
              data-marketplace="{{ marketplaceFilterValue }}">
             <div class="modal-header">
-                <h5 class="modal-title">Базовый маппинг продаж и возвратов</h5>
+                <h5 class="modal-title">{{ marketplaceFilterValue == 'ozon' ? 'Настройка статей Ozon' : 'Базовый маппинг продаж и возвратов' }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
@@ -34,7 +34,7 @@
                 <small class="text-muted me-auto" data-default-sale-mapping-hint></small>
                 <button type="button" class="btn" data-bs-dismiss="modal">Закрыть</button>
                 <button type="button" class="btn btn-primary" data-default-sale-mapping-apply disabled>
-                    Применить базовый маппинг
+                    {{ marketplaceFilterValue == 'ozon' ? 'Применить настройку Ozon' : 'Применить базовый маппинг' }}
                 </button>
             </div>
         </div>
@@ -53,6 +53,7 @@
         var applyUrl = modalRoot.dataset.applyUrl;
         var token = modalRoot.dataset.csrfToken;
         var marketplace = modalRoot.dataset.marketplace;
+        var isOzon = marketplace === 'ozon';
 
         var loadingEl = modalRoot.querySelector('[data-default-sale-mapping-loading]');
         var previewEl = modalRoot.querySelector('[data-default-sale-mapping-preview]');
@@ -121,7 +122,7 @@
 
             var warnings = payload.warnings || [];
             if (warnings.length > 0) {
-                conflictsEl.textContent = warnings.join(' ');
+                conflictsEl.textContent = isOzon ? 'Выручка с СПП завышена: в статьи включены начисления и реализация Ozon. Закройте это окно и проверьте подсказку в блоке настройки Ozon на странице.' : warnings.join(' ');
                 conflictsEl.classList.remove('d-none');
             }
 
@@ -143,15 +144,15 @@
                     target = escapeHtml(item.existingPlCategoryName);
                     existing = '<div class="text-muted small">настроено вручную</div>';
                 } else if (item.plCategoryName) {
-                    target = escapeHtml(item.plCategoryName) + ' <span class="text-muted">(' + escapeHtml(item.plCode) + ')</span>';
+                    target = escapeHtml(item.plCategoryName) + (isOzon ? '' : ' <span class="text-muted">(' + escapeHtml(item.plCode) + ')</span>');
                 } else {
-                    target = '<span class="text-muted">' + escapeHtml(item.plCode) + ' — не найдена</span>';
+                    target = '<span class="text-muted">' + escapeHtml(isOzon ? item.amountSourceLabel : item.plCode) + ' — не найдена</span>';
                 }
 
                 return '<tr>'
                     + '<td>' + (item.operationType === 'return' ? 'Возврат' : 'Продажа') + '</td>'
                     + '<td><div>' + escapeHtml(item.amountSourceLabel) + '</div>'
-                    + '<div class="text-muted small"><code>' + escapeHtml(item.amountSource) + '</code></div></td>'
+                    + (isOzon ? '' : '<div class="text-muted small"><code>' + escapeHtml(item.amountSource) + '</code></div>') + '</td>'
                     + '<td>' + target + existing + '</td>'
                     + '<td>' + (item.isNegative ? '<span class="badge bg-orange-lt">минус</span>' : '<span class="text-muted">плюс</span>')
                     + (item.signMismatch
@@ -164,7 +165,7 @@
             }).join('');
 
             previewEl.innerHTML = '<div class="table-responsive"><table class="table table-sm table-vcenter">'
-                + '<thead><tr><th>Операция</th><th>Источник суммы</th><th>Категория ОПиУ</th><th>Знак</th><th>Статус</th></tr></thead>'
+                + '<thead><tr><th>Операция</th><th>' + (isOzon ? 'Откуда берём сумму' : 'Источник суммы') + '</th><th>' + (isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ') + '</th><th>Знак</th><th>Статус</th></tr></thead>'
                 + '<tbody>' + rows + '</tbody></table></div>';
         }
 
@@ -257,7 +258,7 @@
                 showError(e.message);
             } finally {
                 state.applying = false;
-                applyBtn.textContent = 'Применить базовый маппинг';
+                applyBtn.textContent = isOzon ? 'Применить настройку Ozon' : 'Применить базовый маппинг';
                 updateApplyState();
             }
         });

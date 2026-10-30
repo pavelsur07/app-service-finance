@@ -1,0 +1,28 @@
+{% if ozon.conflicts is not empty %}
+    <div class="alert alert-warning" role="alert" data-ozon-mapping-conflict>
+        <h4 class="alert-title">Выручка с СПП завышена</h4>
+        <div>В статьи с СПП включены начисления Ozon до скидки. Вместе с реализацией они дают двойной учёт.</div>
+        {% if is_granted('module.marketplace.write') %}
+            <button type="button" class="btn btn-warning mt-2" data-bs-toggle="modal" data-bs-target="#modal-ozon-mapping-repair" {{ not ozon.repairReady ? 'disabled' : '' }}>
+                Исправить двойной учёт
+            </button>
+            {% if not ozon.repairReady %}
+                <div class="mt-2">Сначала выключите старые правила и настройте продажи и возвраты по реализации на тех же статьях ОПиУ.</div>
+            {% endif %}
+        {% endif %}
+    </div>
+{% elseif ozon.configured %}
+    <div class="alert alert-success" role="status" data-ozon-mapping-status>Настроено правильно — продажи и возвраты с СПП считаются по реализации Ozon.</div>
+{% else %}
+    <div class="alert alert-info" role="status">Настройте продажи и возвраты с СПП по месячному отчёту «Реализация» Ozon.</div>
+{% endif %}
+<div class="text-muted mb-3" data-ozon-realization-status>
+    {% if ozon.currentLoaded %}
+        Реализация за {{ ozon.currentMonth|date('m.Y') }} загружена.
+    {% else %}
+        Реализация за {{ ozon.currentMonth|date('m.Y') }} ещё не загружена — сумма с СПП за этот месяц пока недоступна.
+    {% endif %}
+    {% if ozon.lastMonth and not ozon.currentLoaded %}
+        Реализация за {{ ozon.lastMonth|date('m.Y') }} загружена.
+    {% endif %}
+</div>

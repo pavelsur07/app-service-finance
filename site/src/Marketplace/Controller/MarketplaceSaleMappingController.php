@@ -9,14 +9,19 @@ use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Marketplace\Application\Action\RepairOzonPlMappingAction;
+use App\Marketplace\Application\Action\SaveOzonPlMappingAction;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\OzonPlMappingWarningsQuery;
+use App\Marketplace\Ozon\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Repository\MarketplaceSaleMappingRepository;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -32,6 +37,10 @@ final class MarketplaceSaleMappingController extends AbstractController
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly EntityManagerInterface $em,
+        private readonly SaveOzonPlMappingAction $saveOzon,
+        private readonly OzonPlMappingWarningsQuery $ozonConflicts,
+        private readonly OzonRealizationStatusQuery $ozonRealizationStatus,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -62,6 +71,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         $amountSources = array_values(array_filter(
             AmountSource::cases(),
             static fn (AmountSource $s): bool => $s->getOperationType() === $operationType
+                && (MarketplaceType::OZON !== $marketplace || !in_array($s, [AmountSource::SALE_REVENUE, AmountSource::RETURN_REFUND], true))
         ));
 
         $plCategories = $this->plCategoryRepository->findTreeByCompany($company);
@@ -77,7 +87,31 @@ final class MarketplaceSaleMappingController extends AbstractController
             }
         }
 
+        $ozon = null;
+        if (MarketplaceType::OZON === $marketplace) {
+            $companyId = (string) $company->getId();
+            $conflicts = array_map(static fn (array $row): array => $row + [
+                'label' => AmountSource::from((string) $row['amount_source'])->getDisplayNameForMarketplace(MarketplaceType::OZON),
+            ], $this->ozonConflicts->fetchConflicts($companyId));
+            $months = $this->ozonRealizationStatus->processedMonths($companyId);
+            $currentMonth = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m');
+            $realizationMappings = $this->mappingRepository->findActiveIndexedByAmountSource($company, MarketplaceType::OZON, 'sale')
+                + $this->mappingRepository->findActiveIndexedByAmountSource($company, MarketplaceType::OZON, 'return');
+            $ozon = [
+                'companyId' => $companyId,
+                'conflicts' => $conflicts,
+                'repairReady' => [] !== $conflicts && [] === array_filter($conflicts, static fn (array $row): bool => !RepairOzonPlMappingAction::isRepairable($row)),
+                'configured' => isset($realizationMappings['sale_realization'], $realizationMappings['return_realization'])
+                    && !$realizationMappings['sale_realization']->isNegative() && $realizationMappings['return_realization']->isNegative(),
+                'currentMonth' => new \DateTimeImmutable($currentMonth.'-01'),
+                'currentLoaded' => in_array($currentMonth, $months, true),
+                'lastMonth' => [] !== $months ? new \DateTimeImmutable($months[0].'-01') : null,
+            ];
+        }
+
         return $this->render('marketplace/pl_mappings.html.twig', [
+            'ozon' => $ozon,
+            'ozonMarketplace' => MarketplaceType::OZON,
             'availableMarketplaces' => MarketplaceType::cases(),
             'marketplaceFilterValue' => $marketplaceFilterValue,
             'operationType' => $operationType,
@@ -149,6 +183,10 @@ final class MarketplaceSaleMappingController extends AbstractController
             }
         }
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($mapping->isActive()) {
             $deactivated = $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -218,6 +256,12 @@ final class MarketplaceSaleMappingController extends AbstractController
             }
         }
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            $mapping->setIsActive($isActive);
+
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($isActive) {
             $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -253,6 +297,12 @@ final class MarketplaceSaleMappingController extends AbstractController
 
         $newState = !$mapping->isActive();
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            $mapping->setIsActive($newState);
+
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($newState) {
             $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -267,6 +317,21 @@ final class MarketplaceSaleMappingController extends AbstractController
         $this->em->flush();
 
         $this->addFlash('success', $newState ? 'Правило активировано' : 'Правило деактивировано');
+
+        return $this->redirectBackToIndex($request);
+    }
+
+    private function saveOzonAndRedirect(MarketplaceSaleMapping $mapping, Request $request): Response
+    {
+        try {
+            $deactivated = ($this->saveOzon)($mapping);
+            if ($deactivated > 0) {
+                $this->addFlash('success', 'Предыдущее активное правило для этого источника было деактивировано.');
+            }
+            $this->addFlash('success', 'Настройка Ozon сохранена.');
+        } catch (\DomainException $e) {
+            $this->addFlash('error', $e->getMessage());
+        }
 
         return $this->redirectBackToIndex($request);
     }
