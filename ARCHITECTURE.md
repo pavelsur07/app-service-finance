@@ -1852,13 +1852,15 @@ dry-run; каждая компания — своя транзакция; ост
 
 ### Cash: ИИ-подсказки статей ДДС (`cash_category_suggestion`)
 
-Режим подсказок, без автоприменения (`docs/tasks/ai/stages/stage-2.md`). Задача
+Подсказки с решением человека и автоприменение по флагу компании за воротами
+качества (`docs/tasks/ai/stages/stage-2.md`). Задача
 ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_payload` /
 `categorize_output`.
 
 - Entity `CashCategorySuggestion`: компания, операция, `task_id`, статус
   `CashCategorySuggestionStatus` (`requested` → `suggested` / `no_answer` /
-  `failed` / `stale`; `suggested` → `accepted` / `dismissed` / `stale`), статья,
+  `failed` / `stale`; `suggested` → `accepted` / `dismissed` / `auto_applied` /
+  `stale`), статья,
   уверенность `decimal(5,4)`, вердикт, модель, версия промпта, кто и когда решил.
   Unique (`task_id`, `transaction_id`); частичный unique
   `uniq_cash_category_suggestion_open` — не больше одной открытой
@@ -1898,6 +1900,27 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   `CashTransactionsChanged`. `DismissCashCategorySuggestionAction` — только
   статус, под той же блокировкой подсказки. Решение человека окончательно:
   параллельный запрос получает `CashCategorySuggestionStateException`.
+  Логика применения — `Application\Service\CashCategorySuggestionApplier::apply()`
+  (только `persist()`, транзакцией владеет вызывающий Action): с автором —
+  разбивка `MANUAL`, статус `accepted`, недопустимое состояние — исключение;
+  без автора (автоприменение) — разбивка `AUTO`, статус `auto_applied`, вместо
+  исключения `stale` (`not_applicable`) или `null`, чтобы EntityManager не
+  закрывался в цикле.
+- Автоприменение: флаг `cash_ai_categorization_setting` (PK `company_id`,
+  `auto_apply`, `updated_at`; нет строки = выключено), команда
+  `app:cash:ai-auto-apply --company-id= [--enable|--disable]` — флаг и
+  состояние ворот. Ворота — `Domain\Policy\CashAiAutoApplyPolicy`: флаг включён,
+  решений по уверенным (`confidence ≥ 0.90`) подсказкам не меньше 100 и
+  точность на них не ниже 0.95; решения — `accepted`, `dismissed`, «исправлено»
+  и автоприменения, после которых человек сменил статью (ошибка).
+  Статистика — `CashCategorizationQuery::autoApplyGateStats()`. Подсказка
+  применяется при `confidence ≥ 0.90` и вердикте сервиса `accepted`.
+  `AutoApplyCashCategorySuggestionsAction` запускается первым шагом
+  `app:cash:ai-categorize`: ворота закрыты → ничего; иначе до 200 подсказок
+  (`findAutoApplicable`, операция «без статьи»), по каждой своя
+  `wrapInTransaction` с `apply(..., null)`; один `CashTransactionsChanged` после
+  всех commit. В списке операций у автоприменённой статьи значок «ИИ» с
+  уверенностью (`autoAppliedConfidence`), пока статья операции та же.
 - Payload задачи строит `Application\Service\CashCategorizationPayloadMapper` —
   один код для постановки и выгрузки золотого набора.
 - `app:cash:ai-eval-export --company-id= [--per-category=20] [--limit=400]` —
@@ -1909,7 +1932,8 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   виде: в репозиторий — только через `python -m ai_service evals-import`.
 - Метки точности: `accepted`, `dismissed`; «исправлено» — операция получила
   другую статью при открытой подсказке (считается запросом). `app:cash:ai-categorize-stats
-  --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`.
+  --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`;
+  состояние ворот автоприменения — `app:cash:ai-auto-apply --company-id=`.
 
 ### Cash: идемпотентность файлового импорта и ручной транзакции
 
@@ -4390,6 +4414,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.96 | 2026-10-30 | Cash: автоприменение ИИ-подсказок статей ДДС — флаг `cash_ai_categorization_setting` (миграция `Version20261030220000`), `CashAiAutoApplyPolicy` (0.90 / 100 / 0.95), `AutoApplyCashCategorySuggestionsAction` в `app:cash:ai-categorize`, команда `app:cash:ai-auto-apply`, статус `auto_applied`, общий `CashCategorySuggestionApplier`, значок «ИИ» в списке операций |
 | 2.95 | 2026-10-30 | Cash: выгрузка золотого набора ИИ-категоризации `app:cash:ai-eval-export`, `CashCategorizationPayloadMapper` (общий с постановкой); ai-service: `evals-import` (обезличивание), `evals-compare` (модель × точность × стоимость × задержка) |
 | 2.94 | 2026-10-30 | Cash: ИИ-подсказки статей ДДС — `cash_category_suggestion` и `cash_categorization_task` (миграция `Version20261030180000`), `RequestCashAiCategorizationAction` и команды `app:cash:ai-categorize`, `app:cash:ai-categorize-stats`, потребитель `CashCategorizationResultConsumer`, «Принять» / «Отклонить» в списке операций; ServiceGateway: `AiTaskFacadeInterface::taskIdFor`; контракт `ai-task/v1` 1.1.0 |
 | 2.93 | 2026-10-30 | ServiceGateway: клиент ai-service — `AiTaskFacadeInterface`, `SubmitAiTaskMessage` (`async_sync`), `ImportAiResultsAction` с `AiTaskResultConsumerInterface`, команды `app:ai-service:echo` и `app:ai-service:import-results`, env `AI_SERVICE_*`; контракт `ai-task/v1`; каркас `services/ai-service` (этап 1 ТЗ ИИ). Миграций нет |
@@ -4579,6 +4604,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-10-30 | ai-service | LLM Gateway: провайдеры через адаптеры по семейству API (OpenAI-совместимый, Anthropic, YandexGPT), маршрут задачи в `routes.yaml`, режимы `single`/`fallback`, `vote` — этап 2 | Минимум 3 модели без зашитого провайдера; задачи SDK не импортируют |
 | 2026-10-30 | ServiceGateway | Обмен с ai-service — pull: Symfony ставит задачу (`Idempotency-Key`) и забирает результаты курсором с ack; сервис не пишет в Symfony | Сервис не знает о БД Symfony; повтор безопасен с обеих сторон |
 | 2026-10-30 | Cash | ИИ-категоризация ДДС — сначала только подсказки с решением человека; запись задачи (ключ, payload) и строки подсказок пишутся до постановки с предсказанным `task_id`, задача без ответа переотправляется тем же ключом и payload | Автоприменение — после периода подсказок (решение Владельца); падение между commit и dispatch или потерянное сообщение не теряют задачу, запоздалый ответ принимается |
+| 2026-10-30 | Cash | Автоприменение ИИ-подсказок — только по флагу компании и при открытых воротах (≥ 100 решений людей по уверенным подсказкам, точность ≥ 0.95); разбивка `auto`, статус `auto_applied`, исправление человеком считается ошибкой и закрывает ворота | Ошибочная статья тихо искажает ДДС и ОПиУ; автоприменение должно опираться на измеренную точность на данных компании и само выключаться при её падении |
 
 ## Api — внешние Bearer-ключи и подготовленные права (api-management)
 

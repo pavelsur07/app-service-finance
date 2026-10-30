@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
+use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -14,8 +15,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Webmozart\Assert\Assert;
 
 /**
- * Постановка ИИ-подсказок статей ДДС для операций компании без статьи.
- * Ничего не меняет в операциях; выключенный ИИ-сервис для компании — ничего не ставит.
+ * Постановка ИИ-подсказок статей ДДС для операций компании без статьи; перед ней —
+ * автоприменение уверенных подсказок, если ворота компании открыты (по умолчанию закрыты:
+ * без флага операции не меняются). Выключенный ИИ-сервис для компании — ничего не ставит.
  */
 #[AsCommand(
     name: 'app:cash:ai-categorize',
@@ -25,8 +27,10 @@ final class CashAiCategorizeCommand extends Command
 {
     use LockableTrait;
 
-    public function __construct(private readonly RequestCashAiCategorizationAction $action)
-    {
+    public function __construct(
+        private readonly AutoApplyCashCategorySuggestionsAction $autoApply,
+        private readonly RequestCashAiCategorizationAction $action,
+    ) {
         parent::__construct();
     }
 
@@ -57,10 +61,16 @@ final class CashAiCategorizeCommand extends Command
         }
 
         try {
+            // Сначала применить уже полученные уверенные подсказки (ворота компании), затем ставить новые.
+            $applied = ($this->autoApply)($companyId);
             $result = ($this->action)($companyId, $limit);
         } finally {
             $this->release();
         }
+
+        $output->writeln(null === $applied->closedReason
+            ? sprintf('ai-categorize: auto-applied %d, stale %d', $applied->applied, $applied->stale)
+            : 'ai-categorize: auto-apply closed: '.$applied->closedReason);
 
         if (!$result->enabled) {
             $output->writeln('ai-categorize: ai-service is disabled for the company');

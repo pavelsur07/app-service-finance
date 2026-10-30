@@ -9,6 +9,7 @@ use App\Cash\Application\DismissCashCategorySuggestionAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
 use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashCategorizationResultConsumer;
+use App\Cash\Application\Service\CashCategorySuggestionApplier;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -392,12 +393,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         $container = self::getContainer();
         $action = new AcceptCashCategorySuggestionAction(
             $this->em,
-            $this->repository(),
-            $container->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
-            $container->get(\App\Cash\Repository\Transaction\CashflowCategoryRepository::class),
-            $this->query(),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionSplitSynchronizer::class),
+            $container->get(CashCategorySuggestionApplier::class),
             $container->get(EventDispatcherInterface::class),
             $this->clock,
         );

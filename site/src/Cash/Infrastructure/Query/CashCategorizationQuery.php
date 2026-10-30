@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Infrastructure\Query;
 
+use App\Cash\Application\DTO\CashAiAutoApplyGateStats;
 use App\Cash\Application\DTO\CashCategorizationCategory;
 use App\Cash\Application\DTO\CashCategorizationHistoryCase;
 use App\Cash\Application\DTO\CashCategorizationOperation;
@@ -136,6 +137,109 @@ final readonly class CashCategorizationQuery
             self::operation($row),
             (string) $row['category_id'],
         ), $rows);
+    }
+
+    /**
+     * Решения людей по подсказкам с уверенностью не ниже `$minConfidence` — ворота автоприменения.
+     * Решение правкой операции — подсказка висела, а операция получила статью; исправленное
+     * автоприменение — статья операции больше не та, что применил ИИ (удалённые не считаются).
+     */
+    public function autoApplyGateStats(string $companyId, float $minConfidence): CashAiAutoApplyGateStats
+    {
+        Assert::uuid($companyId);
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT
+                 count(*) FILTER (WHERE d.status = \'accepted\' OR (d.status = \'suggested\' AND d.edited AND d.tx_category = d.category_id)) AS right_count,
+                 count(*) FILTER (WHERE d.status = \'dismissed\' OR (d.status = \'suggested\' AND d.edited AND d.tx_category <> d.category_id)) AS wrong_count,
+                 count(*) FILTER (WHERE d.status = \'auto_applied\') AS auto_applied,
+                 count(*) FILTER (WHERE d.status = \'auto_applied\' AND d.tx_category IS DISTINCT FROM d.category_id) AS auto_corrected
+             FROM (
+                 SELECT s.status, s.category_id, tx.cashflow_category_id AS tx_category,
+                        (tx.cashflow_category_id IS NOT NULL
+                         AND category.system_code IS DISTINCT FROM :unallocated
+                         AND category.system_code IS DISTINCT FROM :legacyUnallocated) AS edited
+                 FROM cash_category_suggestion s
+                 JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
+                 LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+                 WHERE s.company_id = :companyId AND s.confidence >= :minConfidence AND tx.deleted_at IS NULL
+             ) d',
+            [
+                'companyId' => $companyId,
+                'minConfidence' => $minConfidence,
+                'unallocated' => CashflowCategory::CODE_UNALLOCATED,
+                'legacyUnallocated' => CashflowCategory::SYSTEM_UNALLOCATED,
+            ],
+        );
+        $autoCorrected = (int) ($row['auto_corrected'] ?? 0);
+
+        return new CashAiAutoApplyGateStats(
+            right: (int) ($row['right_count'] ?? 0),
+            // Исправленное автоприменение — ошибка, которую человек увидел и поправил.
+            wrong: (int) ($row['wrong_count'] ?? 0) + $autoCorrected,
+            autoApplied: (int) ($row['auto_applied'] ?? 0),
+            autoCorrected: $autoCorrected,
+        );
+    }
+
+    /**
+     * Подсказки, которые можно применить без человека: показаны, уверенность не ниже порога,
+     * вердикт сервиса `accepted`, операция всё ещё без статьи.
+     *
+     * @return list<string> id подсказок
+     */
+    public function findAutoApplicable(string $companyId, float $minConfidence, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::range($limit, 1, 1000);
+
+        return array_map('strval', $this->connection->fetchFirstColumn(
+            'SELECT s.id
+             FROM cash_category_suggestion s
+             JOIN cash_transaction tx ON tx.id = s.transaction_id
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             WHERE s.company_id = :companyId AND s.status = \'suggested\' AND s.verdict = \'accepted\'
+               AND s.confidence >= :minConfidence
+               AND '.self::UNCATEGORIZED.'
+             ORDER BY s.requested_at, s.id
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'minConfidence' => $minConfidence,
+                'limit' => $limit,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        ));
+    }
+
+    /**
+     * Автоприменённые статьи, которые всё ещё стоят на операции: значок «ИИ» в списке.
+     *
+     * @param list<string> $transactionIds
+     *
+     * @return array<string, int> id операции → уверенность, %
+     */
+    public function autoAppliedConfidence(string $companyId, array $transactionIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::allUuid($transactionIds);
+        if ([] === $transactionIds) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllKeyValue(
+            'SELECT s.transaction_id, s.confidence
+             FROM cash_category_suggestion s
+             JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
+             WHERE s.company_id = :companyId AND s.status = \'auto_applied\' AND s.transaction_id IN (:ids)
+               AND tx.cashflow_category_id = s.category_id',
+            ['companyId' => $companyId, 'ids' => $transactionIds],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return array_map(static fn (mixed $confidence): int => (int) round(100 * (float) $confidence), $rows);
     }
 
     /**

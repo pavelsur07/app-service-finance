@@ -108,6 +108,8 @@ class CashTransactionController extends AbstractController
             'transferByTransactionId' => $transferByTransactionId,
             // ИИ-подсказки статей (режим подсказок): только у операций без статьи.
             'aiSuggestionByTransactionId' => $categorizationQuery->shownSuggestions((string) $company->getId(), array_values($transactionIds)),
+            // Статья, проставленная автоприменением и не изменённая: значок «ИИ» с уверенностью.
+            'aiAutoAppliedByTransactionId' => $categorizationQuery->autoAppliedConfidence((string) $company->getId(), array_values($transactionIds)),
             'hasStandaloneTransactions' => (bool) array_diff(
                 $transactionIds,
                 array_keys($transferByTransactionId),

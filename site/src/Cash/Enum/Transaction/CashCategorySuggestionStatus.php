@@ -23,6 +23,8 @@ enum CashCategorySuggestionStatus: string
     case STALE = 'stale';
     case ACCEPTED = 'accepted';
     case DISMISSED = 'dismissed';
+    /** Статья проставлена без человека: уверенная подсказка, ворота компании открыты (этап 2.3). */
+    case AUTO_APPLIED = 'auto_applied';
 
     /** Открытые статусы держат частичный unique: не больше одной подсказки на операцию. */
     public const OPEN = [self::REQUESTED, self::SUGGESTED];

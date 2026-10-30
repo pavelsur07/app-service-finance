@@ -7,9 +7,11 @@ namespace App\Tests\Functional\Cash\Controller;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -91,6 +93,31 @@ final class CashCategorySuggestionControllerTest extends WebTestCaseBase
         $this->em()->clear();
         self::assertNull($this->em()->find(CashTransaction::class, $txId)?->getCashflowCategory());
         self::assertSame(CashCategorySuggestionStatus::SUGGESTED, $this->em()->find(CashCategorySuggestion::class, $suggestionId)?->getStatus());
+    }
+
+    public function testAutoAppliedCategoryIsMarkedInTheList(): void
+    {
+        [$client, $suggestionId, $txId, $categoryId] = $this->prepare(8306);
+        $em = $this->em();
+        $suggestion = $em->find(CashCategorySuggestion::class, $suggestionId);
+        $tx = $em->find(CashTransaction::class, $txId);
+        $category = $em->find(CashflowCategory::class, $categoryId);
+        self::assertNotNull($suggestion);
+        self::assertNotNull($tx);
+        $tx->setCashflowCategory($category);
+        $tx->replaceSplits([new CashTransactionSplit($tx, $category ?? throw new \LogicException(), '85000.00', CashTransactionSplitSource::AUTO)]);
+        $suggestion->autoApply(new \DateTimeImmutable());
+        $em->flush();
+        $em->clear();
+
+        $crawler = $client->request('GET', '/finance/cash-transactions/');
+
+        self::assertResponseIsSuccessful();
+        $badge = $crawler->filter('.vf-ops-ai-auto');
+        self::assertCount(1, $badge);
+        self::assertSame('ИИ', trim($badge->text()));
+        self::assertStringContainsString('уверенность 91%', (string) $badge->attr('title'));
+        self::assertCount(0, $crawler->filter('.vf-ops-ai-suggestion'));
     }
 
     /**
