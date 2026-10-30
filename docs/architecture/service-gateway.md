@@ -89,12 +89,12 @@ Symfony обращается к сервисам по внутренней се�
 
 | Целевое | Факт |
 |---|---|
-| модуль `ServiceGateway`, реестр сервисов | модуль есть: клиент покрытия ozon-fetcher и витрина (`ARCHITECTURE.md`, «ServiceGateway»); реестра нет — адрес и токен в env `OZON_FETCHER_*`. Кабинеты сервис по-прежнему забирает сам из `/internal/marketplace-connections` |
-| `/internal/status`, `/internal/coverage` | `/internal/coverage` у ozon-fetcher — по контракту `service-coverage/v1`; `/internal/status` нет, вместо него `/internal/fetch-status` (своя схема) |
+| модуль `ServiceGateway`, реестр сервисов | модуль есть: клиент покрытия ozon-fetcher и витрина, клиент ai-service (`ARCHITECTURE.md`, «ServiceGateway»); реестра нет — адрес и токен в env `OZON_FETCHER_*`, `AI_SERVICE_*`. Кабинеты сервис по-прежнему забирает сам из `/internal/marketplace-connections` |
+| `/internal/status`, `/internal/coverage` | `/internal/coverage` у ozon-fetcher — по контракту `service-coverage/v1`; `/internal/status` нет, вместо него `/internal/fetch-status` (своя схема). ai-service: `/internal/status` есть, `/internal/coverage` не нужен (задачи, не загрузка данных) |
 | витрина `data_coverage`, экран «Сервисы» | общей витрины нет; витрина покрытия сервисов `service_coverage_*` (ozon-fetcher, обновление cron каждые 10 минут); экрана «Сервисы» нет |
-| circuit breaker, `trace_id` между Symfony и сервисом | нет |
-| токен на направление | ozon-fetcher: «сервис → Symfony» — `INTERNAL_AUTH_TOKEN`, «Symfony → сервис» — `SERVICE_API_TOKEN` (секрет `OZON_FETCHER_API_TOKEN`) |
-| сервис только во внутренней сети, свой GlitchTip, переключатель, bootstrap БД в деплое | **есть** (ozon-fetcher, PR #2706–#2713) |
+| circuit breaker, `trace_id` между Symfony и сервисом | circuit breaker нет; `X-Trace-Id` шлют клиенты ozon-fetcher и ai-service |
+| токен на направление | ozon-fetcher: «сервис → Symfony» — `INTERNAL_AUTH_TOKEN`, «Symfony → сервис» — `SERVICE_API_TOKEN` (секрет `OZON_FETCHER_API_TOKEN`); ai-service: только «Symfony → сервис» — `AI_SERVICE_API_TOKEN` (сервис в Symfony не ходит) |
+| сервис только во внутренней сети, свой GlitchTip, переключатель, bootstrap БД в деплое | **есть** (ozon-fetcher, PR #2706–#2713); ai-service — переключатель `AI_SERVICE_ENABLED` + allowlist компаний, в прод не выведен |
 
 Не выдавать целевое за существующее. Новый код со сервисами пишется по §2;
 существующий ozon-fetcher приводится к нему отдельной задачей.

@@ -1,0 +1,35 @@
+{
+    "items": [
+        {
+            "task_id": "0192f0a0-0000-7000-8000-000000000001",
+            "task_type": "echo",
+            "company_id": "0192f0a0-0000-7000-8000-0000000000c1",
+            "status": "accepted",
+            "output": {"text": "проверка связи"},
+            "checks": [{"name": "echo_matches_input", "passed": true, "severity": "block", "details": ""}],
+            "confidence": 1.0,
+            "trace_id": "0192f0a0-0000-7000-8000-0000000000f1",
+            "models": ["stub/echo"],
+            "prompt_version": "echo/v1",
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+            "error_code": null,
+            "completed_at": "2026-10-30T09:00:01+00:00"
+        },
+        {
+            "task_id": "0192f0a0-0000-7000-8000-000000000002",
+            "task_type": "echo",
+            "company_id": "0192f0a0-0000-7000-8000-0000000000c1",
+            "status": "failed",
+            "output": null,
+            "checks": [],
+            "confidence": null,
+            "trace_id": "0192f0a0-0000-7000-8000-0000000000f2",
+            "models": [],
+            "prompt_version": null,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+            "error_code": "llm_unavailable",
+            "completed_at": "2026-10-30T09:00:02+00:00"
+        }
+    ],
+    "next_cursor": "2"
+}

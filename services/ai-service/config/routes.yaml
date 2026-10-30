@@ -1,0 +1,36 @@
+# Маршруты задач к моделям (ТЗ §5.1). Провайдер, модель и режим — конфиг, не код.
+# Ключи — только env-переменные (имена здесь, значения — env / GitHub secrets).
+# Провайдер без ключа выключен: fallback его пропускает, single — задача уходит в повтор.
+#
+# Режимы: single — одна модель; fallback — при ошибке или таймауте следующая;
+# vote — этап 2 (пока конфиг с ним не загружается).
+
+providers:
+  stub:
+    type: stub
+  openai:
+    type: openai_compatible
+    base_url: https://api.openai.com/v1
+    api_key_env: AI_OPENAI_API_KEY
+  deepseek:
+    type: openai_compatible
+    base_url: https://api.deepseek.com/v1
+    api_key_env: AI_DEEPSEEK_API_KEY
+  local:
+    # self-hosted vLLM / Ollama с OpenAI-совместимым API
+    type: openai_compatible
+    base_url: http://localhost:11434/v1
+    api_key_env: AI_LOCAL_API_KEY
+  anthropic:
+    type: anthropic
+    api_key_env: AI_ANTHROPIC_API_KEY
+  yandex:
+    type: yandexgpt
+    api_key_env: AI_YANDEX_API_KEY
+    folder_id_env: AI_YANDEX_FOLDER_ID
+
+tasks:
+  # Диагностика пути Symfony → сервис → Symfony, без сети.
+  echo:
+    mode: single
+    models: [stub/echo]

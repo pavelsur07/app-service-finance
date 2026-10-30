@@ -1,0 +1,139 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://vashfindir.ru/contracts/ai-task/v1/schema.json",
+    "title": "AI Task",
+    "description": "Конверты API задач ai-service (docs/tasks/ai/TZ_AI_service_VashFinDir.md §4): постановка задачи Symfony → сервис, статус, результат, страница результатов и ack (pull-модель services/AGENTS.md §3). Payload и output задаются контрактом задачи по task_type; здесь — только диагностическая задача echo.",
+    "$defs": {
+        "uuid": {"type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"},
+        "task_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+        "result_status": {
+            "enum": ["accepted", "needs_review", "rejected", "failed"],
+            "description": "accepted — проверки пройдены; needs_review — показать человеку; rejected — ответ модели отвергнут проверками; failed — техническая ошибка, задача остаётся человеку"
+        },
+        "task_request": {
+            "description": "Тело POST /internal/tasks. Заголовок Idempotency-Key равен idempotency_key.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "task_type", "contract_version", "company_id", "idempotency_key", "requested_by", "created_at", "trace_id", "payload"],
+            "properties": {
+                "task_id": {"$ref": "#/$defs/uuid"},
+                "task_type": {"$ref": "#/$defs/task_type"},
+                "contract_version": {"const": "v1"},
+                "company_id": {"$ref": "#/$defs/uuid"},
+                "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 200},
+                "requested_by": {"type": "string", "minLength": 1, "maxLength": 64, "description": "UUID пользователя или system"},
+                "created_at": {"type": "string", "format": "date-time"},
+                "trace_id": {"$ref": "#/$defs/uuid"},
+                "payload": {"type": "object"}
+            }
+        },
+        "task_accepted": {
+            "description": "Ответ 202 на POST /internal/tasks — только после записи в БД. Повтор с тем же idempotency_key возвращает прежний task_id и duplicate=true.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "status", "duplicate"],
+            "properties": {
+                "task_id": {"$ref": "#/$defs/uuid"},
+                "status": {"$ref": "#/$defs/task_state"},
+                "duplicate": {"type": "boolean"}
+            }
+        },
+        "task_state": {
+            "enum": ["queued", "running", "done", "acked"],
+            "description": "Жизненный цикл задачи в сервисе: done — результат готов к забору, acked — Symfony подтвердил приём"
+        },
+        "task_status": {
+            "description": "Ответ GET /internal/tasks/{task_id}.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "task_type", "status", "attempts", "result_status", "created_at", "updated_at"],
+            "properties": {
+                "task_id": {"$ref": "#/$defs/uuid"},
+                "task_type": {"$ref": "#/$defs/task_type"},
+                "status": {"$ref": "#/$defs/task_state"},
+                "attempts": {"type": "integer", "minimum": 0},
+                "result_status": {"oneOf": [{"$ref": "#/$defs/result_status"}, {"type": "null"}]},
+                "created_at": {"type": "string", "format": "date-time"},
+                "updated_at": {"type": "string", "format": "date-time"}
+            }
+        },
+        "check": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "passed", "severity", "details"],
+            "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "passed": {"type": "boolean"},
+                "severity": {"enum": ["block", "review", "info"]},
+                "details": {"type": "string"}
+            }
+        },
+        "task_result": {
+            "description": "Результат задачи. output — по контракту задачи; null для failed/rejected и после ack.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "task_type", "company_id", "status", "output", "checks", "confidence", "trace_id", "models", "prompt_version", "usage", "error_code", "completed_at"],
+            "properties": {
+                "task_id": {"$ref": "#/$defs/uuid"},
+                "task_type": {"$ref": "#/$defs/task_type"},
+                "company_id": {"$ref": "#/$defs/uuid"},
+                "status": {"$ref": "#/$defs/result_status"},
+                "output": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+                "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+                "confidence": {"oneOf": [{"type": "number", "minimum": 0, "maximum": 1}, {"type": "null"}]},
+                "trace_id": {"$ref": "#/$defs/uuid"},
+                "models": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_-]+/.+$"}, "description": "provider/model каждого вызова, давшего ответ"},
+                "prompt_version": {"oneOf": [{"type": "string", "pattern": "^[a-z0-9_]+/v[0-9]+$"}, {"type": "null"}]},
+                "usage": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["input_tokens", "output_tokens"],
+                    "properties": {
+                        "input_tokens": {"type": "integer", "minimum": 0},
+                        "output_tokens": {"type": "integer", "minimum": 0}
+                    }
+                },
+                "error_code": {"oneOf": [{"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, {"type": "null"}], "description": "Только для failed: invalid_payload, unknown_task_type, llm_unavailable, internal_error"},
+                "completed_at": {"type": "string", "format": "date-time"}
+            }
+        },
+        "results_page": {
+            "description": "Ответ GET /internal/tasks?status=done&after=<cursor>&limit=<1..200>: неподтверждённые результаты по возрастанию курсора. До ack повторный запрос отдаёт те же результаты.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["items", "next_cursor"],
+            "properties": {
+                "items": {"type": "array", "items": {"$ref": "#/$defs/task_result"}},
+                "next_cursor": {"oneOf": [{"type": "string", "pattern": "^[0-9]+$"}, {"type": "null"}]}
+            }
+        },
+        "ack_request": {
+            "description": "Тело POST /internal/tasks/ack. Повторный ack идемпотентен.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_ids"],
+            "properties": {
+                "task_ids": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"$ref": "#/$defs/uuid"}}
+            }
+        },
+        "ack_response": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["acked"],
+            "properties": {"acked": {"type": "integer", "minimum": 0, "description": "Сколько задач перешло в acked этим запросом"}}
+        },
+        "echo_payload": {
+            "description": "payload задачи echo — диагностика пути Symfony → сервис → Symfony",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {"text": {"type": "string", "minLength": 1, "maxLength": 2000}}
+        },
+        "echo_output": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {"text": {"type": "string"}}
+        }
+    }
+}
