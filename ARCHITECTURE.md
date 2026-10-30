@@ -21,7 +21,6 @@
 | `Balance` | Автономный управленческий баланс, счета и журнал движений | `string $companyId` ✅ |
 | `Billing` | Биллинг и подписки | — |
 | `Loan` | Кредиты и займы | legacy |
-| `Ai` | Интеграция с LLM | — |
 | `Telegram` | Telegram-бот, вебхуки | — |
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
 | `Analytics` | Аналитические запросы и дашборды | — |
@@ -3144,7 +3143,7 @@ enum MarketplaceRawFormat: string
 ```php
 enum Module: string
 {
-    case FINANCE = 'finance';          // Cash, Finance, Balance, Report, Loan, Ai + Counterparty/ЦФО/ProjectDirection
+    case FINANCE = 'finance';          // Cash, Finance, Balance, Report, Loan + Counterparty/ЦФО/ProjectDirection
     case MARKETPLACE = 'marketplace';  // Marketplace, MarketplaceAds, MarketplaceAnalytics, Inventory, Ingestion, MoySklad
     case DEALS = 'deals';
     case CATALOG = 'catalog';
@@ -4293,6 +4292,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
 | 2.90 | 2026-10-30 | Marketplace: калькулятор `WbLoyaltyProgramFeeCalculator` (priority 98) — операция WB «Стоимость участия в программе лояльности», сумма из `cashbackCommissionChange` (`> 0` CHARGE, `< 0` STORNO); категория `wb_loyalty_program_fee` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` |
 | 2.89 | 2026-10-29 | Finance: одноразовая `app:finance:repair-pl-tree-19621cff` — дерево ОПиУ компании 19621cff к базовому шаблону маркетплейса (правила, операции с пересчётом регистра, структура); удаляется после применения |
 | 2.88 | 2026-10-29 | Finance: ссылки-выходы в диалоге запрета удаления статьи ОПиУ, фильтр удалённых документов по статье; общий диалог подтверждения — список выходов `data-confirm-links` |

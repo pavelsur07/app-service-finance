@@ -35,7 +35,6 @@ final class ModuleAccessMapTest extends TestCase
     public function testPrefixMapping(): void
     {
         self::assertSame(Module::FINANCE, $this->map->resolve('App\\Cash\\Controller\\Transaction\\CashTransactionController'));
-        self::assertSame(Module::FINANCE, $this->map->resolve('App\\Ai\\Controller\\AiSuggestionController'));
         self::assertSame(Module::MARKETPLACE, $this->map->resolve('App\\Marketplace\\Controller\\MarketplaceController'));
         self::assertSame(Module::MARKETPLACE, $this->map->resolve('App\\MarketplaceAds\\Controller\\AdsIndexController'));
         self::assertSame(Module::DEALS, $this->map->resolve('App\\Deals\\Controller\\DealController'));
