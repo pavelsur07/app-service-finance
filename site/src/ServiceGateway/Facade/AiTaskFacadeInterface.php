@@ -29,5 +29,11 @@ interface AiTaskFacadeInterface
         ?string $requestedByUserId = null,
     ): ?string;
 
+    /**
+     * task_id, который получит задача с этим ключом: потребитель записывает его до постановки
+     * (в своей транзакции), а `requestTask` после commit вернёт то же значение.
+     */
+    public function taskIdFor(string $companyId, string $taskType, string $idempotencyKey): string;
+
     public function isEnabledForCompany(string $companyId): bool;
 }

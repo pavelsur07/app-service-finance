@@ -201,6 +201,10 @@
                         {% else %}
                             <div class="vf-ops-strong">{% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
                         {% endif %}
+                        {% set aiSuggestion = aiSuggestionByTransactionId[tx.id]|default(null) %}
+                        {% if aiSuggestion %}
+                            {{ include('transaction/_ai_suggestion.html.twig', {suggestion: aiSuggestion}) }}
+                        {% endif %}
                         <div class="vf-ops-sub">
                             {% if tx.projectDirection %}{{ tx.projectDirection.name }} · {% endif %}
                             {% if transfer %}

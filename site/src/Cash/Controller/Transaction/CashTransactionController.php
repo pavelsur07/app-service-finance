@@ -17,6 +17,7 @@ use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Form\Transaction\CashTransactionType;
+use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
@@ -60,6 +61,7 @@ class CashTransactionController extends AbstractController
         CashflowCategoryRepository $categoryRepo,
         CounterpartyFacade $counterpartyFacade,
         CashTransferRepository $transferRepository,
+        CashCategorizationQuery $categorizationQuery,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -104,6 +106,8 @@ class CashTransactionController extends AbstractController
             'currencies' => FiatCurrency::cases(),
             'pager' => $pager,
             'transferByTransactionId' => $transferByTransactionId,
+            // ИИ-подсказки статей (режим подсказок): только у операций без статьи.
+            'aiSuggestionByTransactionId' => $categorizationQuery->shownSuggestions((string) $company->getId(), array_values($transactionIds)),
             'hasStandaloneTransactions' => (bool) array_diff(
                 $transactionIds,
                 array_keys($transferByTransactionId),

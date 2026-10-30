@@ -46,3 +46,29 @@ def test_invalid_config_is_rejected(raw: object, message: str) -> None:
 def test_worst_case_counts_models_retries_and_parse_attempts() -> None:
     route = Route(task_type="t", mode=Mode.FALLBACK, models=(ModelRef.parse("a/x"), ModelRef.parse("b/y")))
     assert worst_case_seconds(route, timeout_seconds=60, retries_per_model=1) == 2 * 2 * 2 * 60
+
+
+def test_default_lease_covers_worst_case_of_repository_routes() -> None:
+    from ai_service.config import Settings
+
+    defaults = Settings.model_fields
+    routing = load_routing(ROUTES_FILE, env={})
+    lease = defaults["worker_lease_seconds"].default
+    for route in routing.routes.values():
+        worst = worst_case_seconds(
+            route, defaults["llm_timeout_seconds"].default, defaults["llm_retries_per_model"].default
+        )
+        assert worst < lease, route.task_type
+
+
+def test_dev_routes_put_every_task_on_stub() -> None:
+    routing = load_routing(ROUTES_FILE.with_name("routes.dev.yaml"), env={})
+    assert all(ref.provider == "stub" for route in routing.routes.values() for ref in route.models)
+
+
+@pytest.mark.parametrize("name", ["routes.yaml", "routes.dev.yaml"])
+def test_every_registered_task_has_a_route(name: str) -> None:
+    from ai_service.tasks.registry import build_registry
+
+    routing = load_routing(ROUTES_FILE.with_name(name), env={})
+    assert set(build_registry().task_types()) <= set(routing.routes)

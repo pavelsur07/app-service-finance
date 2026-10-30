@@ -1,0 +1,242 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Cash\Infrastructure\Query;
+
+use App\Cash\Application\DTO\CashCategorizationCategory;
+use App\Cash\Application\DTO\CashCategorizationOperation;
+use App\Cash\Application\DTO\CashCategorizationStats;
+use App\Cash\Application\DTO\CashCategorySuggestionView;
+use App\Cash\Entity\Transaction\CashflowCategory;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\Connection;
+use Webmozart\Assert\Assert;
+
+/**
+ * Данные для ИИ-подсказок статей ДДС (docs/tasks/ai/stages/stage-2.md).
+ *
+ * «Без статьи» — статьи нет или это системная «Нераспределённое» (`CF_UNALLOC`,
+ * легаси `UNALLOCATED`), не больше одной строки разбивки (мультиразбивку сделал человек),
+ * не перевод, не удалена, дата не в закрытом периоде компании.
+ */
+final readonly class CashCategorizationQuery
+{
+    /** Операция с таким числом сбоев ответа больше не запрашивается: не платить за безнадёжные. Истечение без ответа (`expired`) — сбой доставки, не считается. */
+    public const MAX_FAILED_ATTEMPTS = 3;
+
+    private const UNCATEGORIZED = <<<'SQL'
+        tx.company_id = :companyId
+        AND tx.deleted_at IS NULL
+        AND tx.is_transfer = false
+        AND (tx.cashflow_category_id IS NULL OR category.system_code IN (:unallocatedCodes))
+        AND (SELECT count(*) FROM cash_transaction_split split WHERE split.cash_transaction_id = tx.id) <= 1
+        AND (company.finance_lock_before IS NULL OR tx.occurred_at >= company.finance_lock_before)
+        SQL;
+
+    public function __construct(private Connection $connection)
+    {
+    }
+
+    /**
+     * Операции без статьи, которым подсказку ещё не запрашивали (или прошлые попытки сорвались).
+     *
+     * @return list<CashCategorizationOperation>
+     */
+    public function findCandidates(string $companyId, \DateTimeImmutable $occurredFrom, \DateTimeImmutable $createdBefore, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::range($limit, 1, 1000);
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT tx.id, tx.direction, tx.amount, tx.currency, tx.occurred_at, tx.description,
+                    COALESCE(counterparty.display_name, counterparty.name) AS counterparty
+             FROM cash_transaction tx
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             LEFT JOIN counterparty ON counterparty.id = tx.counterparty_id AND counterparty.company_id = :companyId
+             WHERE '.self::UNCATEGORIZED.'
+               AND tx.occurred_at >= :occurredFrom
+               AND tx.created_at < :createdBefore
+               AND NOT EXISTS (
+                   SELECT 1 FROM cash_category_suggestion s
+                   WHERE s.company_id = :companyId AND s.transaction_id = tx.id
+                     AND s.status NOT IN (\'failed\', \'stale\')
+               )
+               AND (
+                   SELECT count(*) FROM cash_category_suggestion s
+                   WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status = \'failed\' AND s.error_code IS DISTINCT FROM \'expired\'
+               ) < :maxFailed
+             ORDER BY tx.occurred_at DESC, tx.id
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'occurredFrom' => $occurredFrom->format('Y-m-d'),
+                'createdBefore' => $createdBefore->format('Y-m-d H:i:s'),
+                'maxFailed' => self::MAX_FAILED_ATTEMPTS,
+                'limit' => $limit,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        );
+
+        return array_map(static fn (array $row): CashCategorizationOperation => new CashCategorizationOperation(
+            id: (string) $row['id'],
+            direction: (string) $row['direction'],
+            amount: (string) $row['amount'],
+            currency: (string) $row['currency'],
+            occurredAt: new \DateTimeImmutable((string) $row['occurred_at']),
+            description: null === $row['description'] ? null : (string) $row['description'],
+            counterparty: null === $row['counterparty'] ? null : (string) $row['counterparty'],
+        ), $rows);
+    }
+
+    /**
+     * Конечные активные несистемные статьи компании с путём от корня.
+     *
+     * @return list<CashCategorizationCategory>
+     */
+    public function findLeafCategories(string $companyId): array
+    {
+        Assert::uuid($companyId);
+
+        $rows = $this->connection->fetchAllAssociative(
+            'WITH RECURSIVE tree AS (
+                 SELECT c.id, c.parent_id, c.name::text AS path, c.status, c.is_system, c.operation_type
+                 FROM "cashflow_categories" c
+                 WHERE c.company_id = :companyId AND c.parent_id IS NULL
+                 UNION ALL
+                 SELECT c.id, c.parent_id, tree.path || \' / \' || c.name, c.status, c.is_system, c.operation_type
+                 FROM "cashflow_categories" c
+                 JOIN tree ON tree.id = c.parent_id
+                 WHERE c.company_id = :companyId
+             )
+             SELECT tree.id, tree.path, tree.operation_type
+             FROM tree
+             WHERE tree.status = \'active\'
+               AND tree.is_system = false
+               AND NOT EXISTS (SELECT 1 FROM "cashflow_categories" child WHERE child.parent_id = tree.id)
+             ORDER BY tree.path',
+            ['companyId' => $companyId],
+        );
+
+        return array_map(static fn (array $row): CashCategorizationCategory => new CashCategorizationCategory(
+            id: (string) $row['id'],
+            path: (string) $row['path'],
+            operationType: null === $row['operation_type'] ? null : (string) $row['operation_type'],
+        ), $rows);
+    }
+
+    /**
+     * Какие из операций всё ещё без статьи: подсказка к остальным устарела.
+     *
+     * @param list<string> $transactionIds
+     *
+     * @return array<string, true>
+     */
+    public function uncategorizedAmong(string $companyId, array $transactionIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::allUuid($transactionIds);
+        if ([] === $transactionIds) {
+            return [];
+        }
+
+        $ids = $this->connection->fetchFirstColumn(
+            'SELECT tx.id
+             FROM cash_transaction tx
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             WHERE '.self::UNCATEGORIZED.' AND tx.id IN (:ids)',
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'ids' => $transactionIds,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING, 'ids' => ArrayParameterType::STRING],
+        );
+
+        return array_fill_keys(array_map('strval', $ids), true);
+    }
+
+    /**
+     * Показываемые подсказки для операций страницы списка: одна выборка на страницу.
+     * Операция, уже получившая статью, подсказку не показывает.
+     *
+     * @param list<string> $transactionIds
+     *
+     * @return array<string, CashCategorySuggestionView> transactionId → подсказка
+     */
+    public function shownSuggestions(string $companyId, array $transactionIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::allUuid($transactionIds);
+        if ([] === $transactionIds) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT s.id, s.transaction_id, s.confidence, s.verdict, suggested.name AS category_name
+             FROM cash_category_suggestion s
+             JOIN cash_transaction tx ON tx.id = s.transaction_id
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             JOIN "cashflow_categories" suggested ON suggested.id = s.category_id AND suggested.company_id = :companyId
+             WHERE s.company_id = :companyId AND s.status = \'suggested\' AND s.transaction_id IN (:ids)
+               AND '.self::UNCATEGORIZED,
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'ids' => $transactionIds,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING, 'ids' => ArrayParameterType::STRING],
+        );
+
+        $views = [];
+        foreach ($rows as $row) {
+            $views[(string) $row['transaction_id']] = new CashCategorySuggestionView(
+                id: (string) $row['id'],
+                categoryName: (string) $row['category_name'],
+                confidencePercent: (int) round(100 * (float) $row['confidence']),
+                needsReview: 'accepted' !== $row['verdict'],
+            );
+        }
+
+        return $views;
+    }
+
+    public function stats(string $companyId): CashCategorizationStats
+    {
+        Assert::uuid($companyId);
+
+        /** @var array<string, int|string> $byStatus */
+        $byStatus = $this->connection->fetchAllKeyValue(
+            'SELECT status, count(*) FROM cash_category_suggestion WHERE company_id = :companyId GROUP BY status',
+            ['companyId' => $companyId],
+        );
+        // Висящая подсказка у операции, которая уже со статьёй: человек решил правкой операции.
+        $edited = $this->connection->fetchAssociative(
+            'SELECT count(*) FILTER (WHERE tx.cashflow_category_id IS DISTINCT FROM s.category_id) AS corrected,
+                    count(*) FILTER (WHERE tx.cashflow_category_id = s.category_id) AS confirmed
+             FROM cash_category_suggestion s
+             JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             WHERE s.company_id = :companyId AND s.status = \'suggested\'
+               AND tx.deleted_at IS NULL
+               AND tx.cashflow_category_id IS NOT NULL
+               AND category.system_code IS DISTINCT FROM :unallocated
+               AND category.system_code IS DISTINCT FROM :legacyUnallocated',
+            [
+                'companyId' => $companyId,
+                'unallocated' => CashflowCategory::CODE_UNALLOCATED,
+                'legacyUnallocated' => CashflowCategory::SYSTEM_UNALLOCATED,
+            ],
+        );
+
+        return new CashCategorizationStats(
+            byStatus: array_map('intval', $byStatus),
+            corrected: (int) ($edited['corrected'] ?? 0),
+            confirmedByEdit: (int) ($edited['confirmed'] ?? 0),
+        );
+    }
+}

@@ -1,0 +1,15 @@
+{# ИИ-подсказка статьи ДДС (docs/tasks/ai/stages/stage-2.md): решение принимает человек. #}
+{% set query = app.request.query.all %}
+<div class="vf-ops-ai-suggestion d-flex flex-wrap align-items-center gap-1 mt-1">
+    <span class="badge bg-azure-lt" title="Подсказка ИИ{{ suggestion.needsReview ? ', требует проверки' : '' }}. Уверенность {{ suggestion.confidencePercent }}%">
+        <i class="ti ti-bulb me-1" aria-hidden="true"></i>ИИ: {{ suggestion.categoryName }} · {{ suggestion.confidencePercent }}%
+    </span>
+    <form method="post" action="{{ path('cash_category_suggestion_accept', query|merge({id: suggestion.id})) }}" class="d-inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('cash_category_suggestion_' ~ suggestion.id) }}">
+        <button type="submit" class="btn btn-sm btn-ghost-success py-0 px-1" title="Проставить статью «{{ suggestion.categoryName }}»">Принять</button>
+    </form>
+    <form method="post" action="{{ path('cash_category_suggestion_dismiss', query|merge({id: suggestion.id})) }}" class="d-inline">
+        <input type="hidden" name="_token" value="{{ csrf_token('cash_category_suggestion_' ~ suggestion.id) }}">
+        <button type="submit" class="btn btn-sm btn-ghost-secondary py-0 px-1" title="Скрыть подсказку, статья не меняется">Отклонить</button>
+    </form>
+</div>
