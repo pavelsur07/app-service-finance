@@ -6,7 +6,7 @@ Spec: TASK.md и план в чате. Класс Large: финансовый о
 
 ## Phase 0
 - [x] Изучены preview, SQL, AmountSource, auto setup, 3 похожих query/action/test.
-- [ ] Baseline: профильные PlPreview и auto setup тесты в изолированных локальных контейнерах.
+- [x] Baseline: профильные PlPreview и auto setup тесты в изолированных локальных контейнерах.
 
 ## Stage 1: обнаружение конфликта на backend
 Risk: HIGH-LOCAL. stage_base_commit: 1fc52299d.
@@ -32,11 +32,13 @@ Checks: make site-stan/site-cs-check/site-cs-strict-types/site-test-unit/site-te
 Production выполнение runbook не входит в локальное разрешение.
 
 ## Чек-лист готовности
-- [ ] Regression red → green; корректные правила не дают предупреждений.
-- [ ] Чужие компании, WB, отключённые правила не дают ложных конфликтов.
-- [ ] Автонастройка ничего не исправляет молча и не добавляет конфликт.
+- [x] Regression red → green; корректные правила не дают предупреждений.
+- [x] Чужие компании, WB, отключённые правила не дают ложных конфликтов.
+- [x] Автонастройка ничего не исправляет молча и не добавляет конфликт.
 - [ ] Сентябрь Ozon после утверждённого ремонта: 995659.13 − 77169.07 = 918490.06.
 - [ ] Октябрь без реализации не выдаёт начисления без СПП за достоверную выручку с СПП.
-- [ ] Теги/XLSX используют общий report; неполный месяц сохраняет предупреждение.
-- [ ] Проверено влияние на проведённые документы; пересчёт без одобрения запрещён.
-- [ ] Полные gates и оба review; PR Ready, merge/deploy не выполнен без решения владельца.
+- [x] Теги/XLSX используют общий report; неполный месяц сохраняет предупреждение.
+- [x] Проверено влияние на проведённые документы; пересчёт без одобрения запрещён.
+- [x] Полные gates и оба review; PR подготовлен к Ready, merge/deploy не выполнен без решения владельца.
+
+Production acceptance checkboxes remain open intentionally: execution needs §3.3 named approval and owner write-channel. Local handoff is complete; see handoff.md.
