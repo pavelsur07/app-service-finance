@@ -48,7 +48,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         }
 
         // Повтор с тем же ключом возвращает тот же task_id, под которым придёт результат.
-        $taskId = Uuid::uuid5(self::TASK_ID_NAMESPACE, $companyId."\n".$taskType."\n".$idempotencyKey)->toString();
+        $taskId = $this->taskIdFor($companyId, $taskType, $idempotencyKey);
         $this->bus->dispatch(new SubmitAiTaskMessage(
             taskId: $taskId,
             taskType: $taskType,
@@ -62,6 +62,14 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         $this->logger->info('AI task requested.', ['companyId' => $companyId, 'taskType' => $taskType, 'taskId' => $taskId]);
 
         return $taskId;
+    }
+
+    public function taskIdFor(string $companyId, string $taskType, string $idempotencyKey): string
+    {
+        Assert::uuid($companyId);
+
+        // Канонический вид: сервис нормализует UUID, и `ABC…`/`abc…` должны дать один task_id.
+        return Uuid::uuid5(self::TASK_ID_NAMESPACE, strtolower($companyId)."\n".$taskType."\n".$idempotencyKey)->toString();
     }
 
     public function isEnabledForCompany(string $companyId): bool

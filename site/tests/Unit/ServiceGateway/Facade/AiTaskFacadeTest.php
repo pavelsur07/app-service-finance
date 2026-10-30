@@ -47,6 +47,16 @@ final class AiTaskFacadeTest extends TestCase
         self::assertSame($first, $facade->requestTask(strtoupper(self::COMPANY), 'echo', ['text' => 'a'], 'source-row-1'));
     }
 
+    public function testTaskIdForPredictsTheIdRequestTaskReturns(): void
+    {
+        $facade = $this->facade('*');
+        $predicted = $facade->taskIdFor(self::COMPANY, 'echo', 'source-row-1');
+
+        self::assertSame($predicted, $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'source-row-1'));
+        // Выключенная компания: id тот же, задача не ставится — потребитель может записать его заранее.
+        self::assertSame($predicted, $this->facade('')->taskIdFor(self::COMPANY, 'echo', 'source-row-1'));
+    }
+
     public function testDoesNothingWhenCompanyIsNotAllowed(): void
     {
         self::assertNull($this->facade('')->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'k'));

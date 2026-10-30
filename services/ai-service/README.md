@@ -1,7 +1,8 @@
 # ai-service
 
-Python-сервис ИИ-задач для Symfony (`docs/tasks/ai/`). Статус: **каркас**
-(этап 1) — ядро и диагностическая задача `echo`; в прод не выведен.
+Python-сервис ИИ-задач для Symfony (`docs/tasks/ai/`). Статус: ядро (этап 1),
+задачи `echo` и `categorize_transactions` (этап 2.1, подсказки статей ДДС); в
+прод не выведен.
 
 ## Запуск (dev)
 
@@ -20,6 +21,16 @@ Symfony (dev): `AI_SERVICE_ENABLED=true`, `AI_SERVICE_BASE_URL=http://services-a
 php bin/console app:ai-service:echo --company-id=<uuid>
 php bin/console messenger:consume async_sync --limit=1
 php bin/console app:ai-service:import-results
+```
+
+В dev-compose `AI_SERVICE_ROUTES_FILE=config/routes.dev.yaml` — все задачи на
+модели `stub` (без ключей и сети). Категоризация:
+
+```bash
+php bin/console app:cash:ai-categorize --company-id=<uuid>
+php bin/console messenger:consume async_sync --limit=1
+php bin/console app:ai-service:import-results
+php bin/console app:cash:ai-categorize-stats --company-id=<uuid>
 ```
 
 ## Команды образа
