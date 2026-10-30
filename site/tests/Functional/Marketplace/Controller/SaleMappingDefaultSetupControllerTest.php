@@ -58,6 +58,40 @@ final class SaleMappingDefaultSetupControllerTest extends WebTestCaseBase
         }
     }
 
+    public function testLegacyOzonSourcesBlockDefaultSetupWithoutWriting(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedBaseData();
+        $this->loginWithActiveCompany($client, $user, $company);
+        $this->insertManualMapping($company, 'sale', 'sale_revenue', 'REV_SPP_SALES', false);
+        $this->insertManualMapping($company, 'return', 'return_refund', 'REV_SPP_RETURNS', true);
+        $before = $this->countMappings();
+
+        $preview = $this->post($client, '/marketplace/pl-mappings/default/preview', 'ozon');
+        self::assertTrue($preview['hasBlockingIssues']);
+        self::assertCount(2, $preview['warnings']);
+        self::assertStringContainsString('sale_revenue', implode(' ', $preview['warnings']));
+        self::assertStringContainsString('return_refund', implode(' ', $preview['warnings']));
+        $apply = $this->post($client, '/marketplace/pl-mappings/default/apply', 'ozon');
+        self::assertFalse($apply['ok']);
+        self::assertSame($before, $this->countMappings());
+    }
+
+    public function testDisabledLegacySourcesDoNotBlockRealizationRules(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->seedBaseData();
+        $this->loginWithActiveCompany($client, $user, $company);
+        $this->insertManualMapping($company, 'sale', 'sale_revenue', 'REV_SPP_SALES', false, false);
+        $this->insertManualMapping($company, 'return', 'return_refund', 'REV_SPP_RETURNS', true, false);
+        $preview = $this->post($client, '/marketplace/pl-mappings/default/preview', 'ozon');
+        self::assertFalse($preview['hasBlockingIssues']);
+        self::assertSame([], $preview['warnings']);
+        $apply = $this->post($client, '/marketplace/pl-mappings/default/apply', 'ozon');
+        self::assertTrue($apply['ok']);
+        self::assertSame(6, $apply['summary']['created']);
+    }
+
     public function testApplyCreatesRulesWithCorrectSignAndIsIdempotent(): void
     {
         $client = static::createClient();

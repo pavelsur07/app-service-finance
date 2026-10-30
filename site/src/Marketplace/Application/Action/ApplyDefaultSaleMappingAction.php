@@ -35,7 +35,7 @@ final readonly class ApplyDefaultSaleMappingAction
             $marketplace = $preview->getMarketplace();
 
             if ($preview->hasBlockingIssues()) {
-                throw new \DomainException('Базовый маппинг не может быть применён: есть отсутствующие или невалидные категории ОПиУ.');
+                throw new \DomainException('Базовый маппинг не может быть применён: проверьте конфликты источников и отсутствующие или невалидные категории ОПиУ.');
             }
 
             foreach ($preview->getItems() as $item) {
