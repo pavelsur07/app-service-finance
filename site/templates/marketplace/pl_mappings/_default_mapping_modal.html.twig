@@ -12,9 +12,8 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-danger d-none" data-default-sale-mapping-blocking>
-                    Есть блокирующие проблемы. Проверьте статьи ОПиУ и источники сумм перед применением.
+                    Есть блокирующие проблемы. Исправьте дерево ОПиУ перед применением.
                 </div>
-                <div class="alert alert-danger d-none" data-default-sale-mapping-conflicts></div>
                 <div class="alert alert-warning d-none" data-default-sale-mapping-mismatch></div>
                 <div class="alert alert-danger d-none" data-default-sale-mapping-error></div>
                 <div class="alert alert-success d-none" data-default-sale-mapping-success></div>
@@ -61,7 +60,6 @@
         var successEl = modalRoot.querySelector('[data-default-sale-mapping-success]');
         var blockingEl = modalRoot.querySelector('[data-default-sale-mapping-blocking]');
         var mismatchEl = modalRoot.querySelector('[data-default-sale-mapping-mismatch]');
-        var conflictsEl = modalRoot.querySelector('[data-default-sale-mapping-conflicts]');
         var hintEl = modalRoot.querySelector('[data-default-sale-mapping-hint]');
         var applyBtn = modalRoot.querySelector('[data-default-sale-mapping-apply]');
 
@@ -80,7 +78,7 @@
         }
 
         function hideAlerts() {
-            [errorEl, successEl, blockingEl, mismatchEl, conflictsEl].forEach(function (el) { el.classList.add('d-none'); });
+            [errorEl, successEl, blockingEl, mismatchEl].forEach(function (el) { el.classList.add('d-none'); });
         }
 
         function showError(message) {
@@ -97,7 +95,7 @@
             if (!state.preview) {
                 hintEl.textContent = '';
             } else if (hasBlocking) {
-                hintEl.textContent = 'Применение недоступно: проверьте статьи ОПиУ и конфликты источников.';
+                hintEl.textContent = 'Применение недоступно: не хватает категорий ОПиУ.';
             } else if (actionable === 0) {
                 hintEl.textContent = 'Нет новых правил для применения.';
             } else {
@@ -117,12 +115,6 @@
 
             if (payload.hasBlockingIssues) {
                 blockingEl.classList.remove('d-none');
-            }
-
-            var warnings = payload.warnings || [];
-            if (warnings.length > 0) {
-                conflictsEl.textContent = warnings.join(' ');
-                conflictsEl.classList.remove('d-none');
             }
 
             var mismatched = items.filter(function (item) { return item.signMismatch; });

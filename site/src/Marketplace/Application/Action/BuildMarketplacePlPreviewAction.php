@@ -21,7 +21,6 @@ use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
 use App\Marketplace\Facade\PlPreviewAdSpendProviderInterface;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
-use App\Marketplace\Infrastructure\Query\OzonPlMappingWarningsQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewAdLedgerQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewCostCoverageQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewFactsQuery;
@@ -54,7 +53,6 @@ final readonly class BuildMarketplacePlPreviewAction
         private FinanceFacade $financeFacade,
         private PlPreviewAdLedgerQuery $adLedgerQuery,
         private PlPreviewAdSpendProviderInterface $adSpend,
-        private OzonPlMappingWarningsQuery $mappingWarnings,
     ) {
     }
 
@@ -154,7 +152,6 @@ final readonly class BuildMarketplacePlPreviewAction
             adReconciliation: $adReconciliation,
             warnings: [
                 ...$pl->warnings,
-                ...(null === $command->marketplace || MarketplaceType::OZON === $command->marketplace ? $this->mappingWarnings->fetch($companyId) : []),
                 ...$this->realizationWarnings($companyId, $from, $to, $command->marketplace),
                 ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage),
             ],
@@ -261,22 +258,14 @@ final readonly class BuildMarketplacePlPreviewAction
             return [];
         }
 
-        $missing = array_map(
-            static fn (string $month): string => sprintf(
-                'Реализация Ozon за %s не загружена или не обработана. Достоверная выручка с СПП за этот месяц недоступна; начисления без СПП её не заменяют.',
-                $month,
-            ),
-            $this->salesCoverageQuery->fetchMissingRealizationMonths($companyId, $from, $to),
-        );
-
-        return [...$missing, ...array_map(
+        return array_map(
             static fn (array $period): string => sprintf(
                 'Реализация Ozon за %s — %s входит в период не целиком и в предпросмотр не попала: выберите период, который содержит её полностью.',
                 $period['from']->format('d.m.Y'),
                 $period['to']->format('d.m.Y'),
             ),
             $this->salesCoverageQuery->fetchPartialRealizationPeriods($companyId, $from, $to),
-        )];
+        );
     }
 
     /**

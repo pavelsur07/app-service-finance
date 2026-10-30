@@ -125,13 +125,10 @@ final class ApplyDefaultSaleMappingConsoleCommand extends Command
 
             $preview = ($this->previewAction)(new PreviewDefaultSaleMappingCommand($pairCompanyId, $pairMarketplace->value));
             $this->renderPreview($io, $preview);
-            foreach ($preview->getWarnings() as $warning) {
-                $io->warning($warning);
-            }
 
             if ($preview->hasBlockingIssues()) {
                 ++$blocked;
-                $io->error('Заблокировано: конфликт источников или отсутствующая/невалидная статья ОПиУ. По этой паре ничего не записано.');
+                $io->error('Заблокировано: у компании нет нужных статей ОПиУ или они не LEAF_INPUT. По этой паре ничего не записано.');
 
                 continue;
             }
