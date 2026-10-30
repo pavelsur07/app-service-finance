@@ -713,6 +713,17 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 - Фильтр по тегу выполняется через список id из `ListingTagAssignmentRepository` (`listingIdsByTags()` / `taggedListingIds()`) и `IN` / `NOT IN` в DQL: таблица связей не замаплена. Известное ограничение — рассчитано на тысячи листингов компании (на проде максимум 636 на 19.10.2026); при десятках тысяч переносить фильтр в SQL.
 - Назначение `POST /api/marketplace/listings/tags/assign` (`MARKETPLACE_WRITE`): тело `{listingIds: [uuid…] (до 500) | filter: {…}, tagId | name}` — ровно одно из `listingIds` / `filter` (оба → 422 `listing_selection_required`, ни одного → 422 `listing_ids_required`). Режим `filter`: листинги находит `matchingIds()`, больше 5000 → 422 `filter_too_broad` без создания тега и связей. Ответ `{tagId, tagName, matched, assigned}`: `matched` — выбрано листингов компании, `assigned` — создано связей.
 
+### Marketplace: исправление двойного учёта Ozon в настройках
+
+`POST /marketplace/pl-mappings/ozon/repair` — только active company, MARKETPLACE_WRITE,
+CSRF `ozon_pl_mapping_repair`. `RepairOzonPlMappingAction` отключает конфликтующие
+legacy `sale_revenue`/`return_refund`, только если их активные корректные реализации
+уже на тех же статьях. Без replacements — отказ целиком, повтор — 0 изменений.
+`SaveOzonPlMappingAction` используется create/edit/toggle только Ozon и запрещает
+несоответствующий источник на стандартной статье с СПП и конфликт на одной статье.
+Оба Action сериализованы advisory lock `ozon_pl_mapping:<companyId>`. Другие marketplaces
+сохраняют прежний путь. Формулы, категории, документы учёта не меняются.
+
 ### Marketplace: базовый (автоматический) маппинг в ОПиУ
 
 Два независимых конфига в `config/marketplace/`, каждый со своим провайдером, preview- и apply-экшеном. Оба матчат категории ОПиУ по `pl_categories.code`, поэтому работают только на компании со стандартным деревом ОПиУ.

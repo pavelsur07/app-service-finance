@@ -9,6 +9,7 @@ use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Marketplace\Application\Action\SaveOzonPlMappingAction;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
@@ -32,6 +33,7 @@ final class MarketplaceSaleMappingController extends AbstractController
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly EntityManagerInterface $em,
+        private readonly SaveOzonPlMappingAction $saveOzon,
     ) {
     }
 
@@ -149,6 +151,10 @@ final class MarketplaceSaleMappingController extends AbstractController
             }
         }
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($mapping->isActive()) {
             $deactivated = $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -218,6 +224,12 @@ final class MarketplaceSaleMappingController extends AbstractController
             }
         }
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            $mapping->setIsActive($isActive);
+
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($isActive) {
             $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -253,6 +265,12 @@ final class MarketplaceSaleMappingController extends AbstractController
 
         $newState = !$mapping->isActive();
 
+        if (MarketplaceType::OZON === $mapping->getMarketplace()) {
+            $mapping->setIsActive($newState);
+
+            return $this->saveOzonAndRedirect($mapping, $request);
+        }
+
         if ($newState) {
             $this->mappingRepository->deactivateOtherActive(
                 $company,
@@ -267,6 +285,18 @@ final class MarketplaceSaleMappingController extends AbstractController
         $this->em->flush();
 
         $this->addFlash('success', $newState ? 'Правило активировано' : 'Правило деактивировано');
+
+        return $this->redirectBackToIndex($request);
+    }
+
+    private function saveOzonAndRedirect(MarketplaceSaleMapping $mapping, Request $request): Response
+    {
+        try {
+            ($this->saveOzon)($mapping);
+            $this->addFlash('success', 'Настройка Ozon сохранена.');
+        } catch (\DomainException $e) {
+            $this->addFlash('error', $e->getMessage());
+        }
 
         return $this->redirectBackToIndex($request);
     }
