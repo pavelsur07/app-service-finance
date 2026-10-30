@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Cash\Infrastructure\Query;
 
 use App\Cash\Application\DTO\CashCategorizationCategory;
+use App\Cash\Application\DTO\CashCategorizationHistoryCase;
 use App\Cash\Application\DTO\CashCategorizationOperation;
 use App\Cash\Application\DTO\CashCategorizationStats;
 use App\Cash\Application\DTO\CashCategorySuggestionView;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Webmozart\Assert\Assert;
@@ -80,7 +82,68 @@ final readonly class CashCategorizationQuery
             ['unallocatedCodes' => ArrayParameterType::STRING],
         );
 
-        return array_map(static fn (array $row): CashCategorizationOperation => new CashCategorizationOperation(
+        return array_map(self::operation(...), $rows);
+    }
+
+    /**
+     * История ручных категоризаций для золотого набора evals (docs/tasks/ai/stages/stage-2.md, 2.2):
+     * операции с одной ручной разбивкой и несистемной статьёй, не переводы, не удалённые, без
+     * принятой ИИ-подсказки (набор не учится на ответах модели). Не больше `$perCategory`
+     * последних операций на статью — частые статьи не заслоняют редкие.
+     *
+     * @return list<CashCategorizationHistoryCase>
+     */
+    public function findManuallyCategorized(string $companyId, int $perCategory, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::range($perCategory, 1, 1000);
+        Assert::range($limit, 1, 10000);
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT ranked.id, ranked.direction, ranked.amount, ranked.currency, ranked.occurred_at,
+                    ranked.description, ranked.counterparty, ranked.category_id
+             FROM (
+                 SELECT tx.id, tx.direction, tx.amount, tx.currency, tx.occurred_at, tx.description,
+                        COALESCE(counterparty.display_name, counterparty.name) AS counterparty,
+                        tx.cashflow_category_id AS category_id,
+                        row_number() OVER (PARTITION BY tx.cashflow_category_id ORDER BY tx.occurred_at DESC, tx.id) AS rank
+                 FROM cash_transaction tx
+                 JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id AND category.company_id = :companyId
+                 JOIN cash_transaction_split split ON split.cash_transaction_id = tx.id AND split.source = :manual
+                 LEFT JOIN counterparty ON counterparty.id = tx.counterparty_id AND counterparty.company_id = :companyId
+                 WHERE tx.company_id = :companyId
+                   AND tx.deleted_at IS NULL
+                   AND tx.is_transfer = false
+                   AND category.is_system = false
+                   AND (SELECT count(*) FROM cash_transaction_split other WHERE other.cash_transaction_id = tx.id) = 1
+                   AND NOT EXISTS (
+                       SELECT 1 FROM cash_category_suggestion s
+                       WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status = \'accepted\'
+                   )
+             ) ranked
+             WHERE ranked.rank <= :perCategory
+             ORDER BY ranked.occurred_at DESC, ranked.id
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'manual' => CashTransactionSplitSource::MANUAL->value,
+                'perCategory' => $perCategory,
+                'limit' => $limit,
+            ],
+        );
+
+        return array_map(static fn (array $row): CashCategorizationHistoryCase => new CashCategorizationHistoryCase(
+            self::operation($row),
+            (string) $row['category_id'],
+        ), $rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function operation(array $row): CashCategorizationOperation
+    {
+        return new CashCategorizationOperation(
             id: (string) $row['id'],
             direction: (string) $row['direction'],
             amount: (string) $row['amount'],
@@ -88,7 +151,7 @@ final readonly class CashCategorizationQuery
             occurredAt: new \DateTimeImmutable((string) $row['occurred_at']),
             description: null === $row['description'] ? null : (string) $row['description'],
             counterparty: null === $row['counterparty'] ? null : (string) $row['counterparty'],
-        ), $rows);
+        );
     }
 
     /**
