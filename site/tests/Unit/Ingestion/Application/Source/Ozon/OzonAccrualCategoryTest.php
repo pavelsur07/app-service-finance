@@ -178,6 +178,8 @@ final class OzonAccrualCategoryTest extends TestCase
             'ReturnFlowLogistic' => 'ozon_reverse_logistics',
             'RfbsServiceFee' => 'ozon_other_services',
             'SellerReturns' => 'ozon_warehouse_export',
+            'SellerReturnPreparationByPartner' => 'ozon_warehouse_export_preparation_partner',
+            'SellerReturnDelivery' => 'ozon_warehouse_export_delivery',
             'StarsMembership' => 'ozon_stars_membership',
             'StockInsurance' => 'ozon_stock_insurance',
             'SupplyInbound' => 'ozon_cargo_place_item_processing',

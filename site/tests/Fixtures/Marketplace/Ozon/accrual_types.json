@@ -629,6 +629,16 @@
       "id": 127,
       "name": "AnalyticsPlus",
       "description": ""
+    },
+    {
+      "id": 136,
+      "name": "SellerReturnPreparationByPartner",
+      "description": "Подготовка товара к вывозу партнёрами"
+    },
+    {
+      "id": 137,
+      "name": "SellerReturnDelivery",
+      "description": "Доставка вывоза"
     }
   ]
 }

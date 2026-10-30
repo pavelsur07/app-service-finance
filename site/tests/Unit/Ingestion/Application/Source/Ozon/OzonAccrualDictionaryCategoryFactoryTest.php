@@ -78,7 +78,7 @@ final class OzonAccrualDictionaryCategoryFactoryTest extends TestCase
             $codes[$category->code] = $row['name'];
         }
 
-        self::assertCount(126, $codes);
+        self::assertCount(128, $codes);
     }
 
     public function testCodeTakenByCatalogGetsTypeIdSuffix(): void

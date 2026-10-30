@@ -77,6 +77,8 @@ final readonly class OzonAccrualCategory
             new self('ozon_warehouse_export', 'Вывоз товара со склада силами Ozon', 'Услуги FBO', TransactionType::STORAGE, 700, parentLabel: 'Складские услуги', aliases: ['SellerReturns']),
             new self('ozon_warehouse_placement', 'Размещение товаров на складах', 'Услуги FBO', TransactionType::STORAGE, 710, parentLabel: 'Складские услуги', aliases: ['Placements']),
             new self('ozon_warehouse_export_preparation', 'Подготовка товара к вывозу', 'Услуги FBO', TransactionType::STORAGE, 720, parentLabel: 'Складские услуги'),
+            new self('ozon_warehouse_export_preparation_partner', 'Подготовка товара к вывозу партнёрами', 'Услуги FBO', TransactionType::STORAGE, 722, parentLabel: 'Складские услуги', aliases: ['SellerReturnPreparationByPartner']),
+            new self('ozon_warehouse_export_delivery', 'Доставка вывоза', 'Услуги FBO', TransactionType::LOGISTICS, 724, parentLabel: 'Складские услуги', aliases: ['SellerReturnDelivery']),
             new self('ozon_warehouse_additional_packaging', 'Дополнительная упаковка на складе Ozon', 'Услуги FBO', TransactionType::FEE, 730, parentLabel: 'Складские услуги', aliases: ['ItemPacking']),
             new self('ozon_fbs_return_short_placement', 'Краткосрочное размещение возврата FBS', 'Услуги FBO', TransactionType::STORAGE, 740, parentLabel: 'Складские услуги', aliases: ['TemporaryPlacement']),
             new self('ozon_incomplete_supply_booking', 'Бронирование места и персонала для поставки с неполным составом', 'Услуги FBO', TransactionType::ACCEPTANCE, 800, parentLabel: 'Услуги приёмки', aliases: ['Бронирование места и персонала для поставки с неполным составом Ozon']),

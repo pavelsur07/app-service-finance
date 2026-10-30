@@ -57,6 +57,9 @@ final class OzonAccrualServiceCategoryResolverTest extends TestCase
         yield 'ItemPacking' => ['84', 'ItemPacking', 'ozon_additional_packaging_warehouse'];
         yield 'Promotion' => ['54', 'Promotion', 'ozon_marketing_action'];
         yield 'SellerReturns' => ['71', 'SellerReturns', 'ozon_return_from_stock'];
+        // Появились в справочнике 30.10.2026; без них ушли бы в ozon_unknown_136/137.
+        yield 'SellerReturnPreparationByPartner' => ['136', 'SellerReturnPreparationByPartner', 'ozon_return_preparation_partner'];
+        yield 'SellerReturnDelivery' => ['137', 'SellerReturnDelivery', 'ozon_return_export_delivery'];
         // До 26.09.2026 уходила в ozon_unknown_52: 24 990 и 9 990 руб. в том же
         // ритме, в каком с января приходили в ozon_premium_promotion легаси-путём.
         yield 'PremiumSubscription' => ['52', 'PremiumSubscription', 'ozon_premium_promotion'];
