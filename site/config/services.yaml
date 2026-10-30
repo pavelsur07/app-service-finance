@@ -413,6 +413,10 @@ services:
         tags:
             - { name: 'app.marketplace.cost_calculator', priority: 98 }
 
+    App\Marketplace\Wildberries\CostCalculator\WbLoyaltyProgramFeeCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 98 }
+
     App\Marketplace\Wildberries\Application\Action\ProcessWbCostsAction:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
