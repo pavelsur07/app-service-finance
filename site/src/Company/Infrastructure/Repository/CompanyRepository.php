@@ -90,28 +90,6 @@ class CompanyRepository extends ServiceEntityRepository
     }
 
     /**
-     * Глобальный поиск используется только справочным MCP-инструментом.
-     *
-     * @return list<string>
-     */
-    public function findIdsByExactName(string $name): array
-    {
-        $rows = $this->createQueryBuilder('c')
-            ->select('c.id AS id')
-            ->where('LOWER(c.name) = LOWER(:name)')
-            ->setParameter('name', $name)
-            ->orderBy('c.id', \SortDirection::Ascending)
-            ->setMaxResults(2)
-            ->getQuery()
-            ->getArrayResult();
-
-        return array_map(
-            static fn (array $row): string => (string) $row['id'],
-            $rows,
-        );
-    }
-
-    /**
      * Возвращает список ID всех активных компаний в системе.
      * Используется воркерами и CLI-командами других модулей.
      *

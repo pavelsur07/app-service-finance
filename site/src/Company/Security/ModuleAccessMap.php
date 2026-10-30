@@ -96,7 +96,6 @@ final class ModuleAccessMap
         'App\\Marketplace\\Controller\\Internal\\',
 
         'App\\Admin\\',                          // админка под ROLE_ADMIN
-        'App\\Mcp\\',                            // MCP-интеграции со своей авторизацией
         'App\\Analytics\\',                      // общий дашборд/health; Stage 5 разделит виджеты
         'App\\Notification\\',                   // общие уведомления дашборда, не привязаны к модулю
         'App\\Telegram\\Controller\\Admin\\',    // /admin/*, гейт ROLE_ADMIN

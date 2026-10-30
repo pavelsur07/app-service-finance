@@ -841,18 +841,6 @@ parameters:
 			path: src/Cash/EventSubscriber/Transaction/CashTransactionAutoRulesSubscriber.php
 
 		-
-			message: '#^Method App\\Cash\\Facade\\CashFacade\:\:listAutoRules\(\) should return list\<array\<string, mixed\>\> but returns array\<array\{id\: string\|null, name\: string, action\: ''FILL''\|''UPDATE'', operationType\: ''ANY''\|''INFLOW''\|''OUTFLOW'', priority\: int, isActive\: bool, category\: array\{id\: string\|null, name\: string\}\|null, counterpartyId\: string\|null, \.\.\.\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Cash/Facade/CashFacade.php
-
-		-
-			message: '#^Method App\\Cash\\Facade\\CashFacade\:\:listCashflowCategories\(\) should return list\<array\<string, mixed\>\> but returns array\<array\{id\: string\|null, name\: string, level\: int, parentId\: string\|null, status\: ''active''\|''disabled'', flowKind\: ''FINANCING''\|''INVESTING''\|''OPERATING''\|''TECHNICAL'', sort\: int, isSystem\: bool\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Cash/Facade/CashFacade.php
-
-		-
 			message: '#^Class App\\Cash\\Form\\Accounts\\MoneyAccountType extends generic class Symfony\\Component\\Form\\AbstractType but does not specify its types\: TData$#'
 			identifier: missingType.generics
 			count: 1
@@ -2098,12 +2086,6 @@ parameters:
 		-
 			message: '#^Method App\\Company\\Infrastructure\\Repository\\CompanyRepository\:\:findByUserId\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
-			count: 1
-			path: src/Company/Infrastructure/Repository/CompanyRepository.php
-
-		-
-			message: '#^Method App\\Company\\Infrastructure\\Repository\\CompanyRepository\:\:findIdsByExactName\(\) should return list\<string\> but returns array\<string\>\.$#'
-			identifier: return.type
 			count: 1
 			path: src/Company/Infrastructure/Repository/CompanyRepository.php
 

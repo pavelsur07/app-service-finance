@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 /**
  * Единственная точка сохранения автоправила ДДС: проверка пары проект/ЦФО,
  * валидация сущности, аудит-штамп и flush.
- * Используется и HTTP-контроллером, и MCP-инструментом, поэтому не зависит от Request/формы.
+ * Не зависит от Request/формы.
  */
 final class SaveCashTransactionAutoRuleAction
 {

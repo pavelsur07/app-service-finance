@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
  * Единственная точка сохранения статьи ДДС: инварианты + flush.
- * Используется и HTTP-контроллером, и MCP-инструментом, поэтому не зависит от Request/формы.
+ * Не зависит от Request/формы.
  */
 final class SaveCashflowCategoryAction
 {

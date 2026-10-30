@@ -79,11 +79,6 @@ final class CashTransactionAutoRuleRepositoryTest extends IntegrationTestCase
             ['High priority', 'Same priority', 'Low priority'],
             array_map(static fn (CashTransactionAutoRule $rule): string => $rule->getName(), $repository->findActiveByCompany($company)),
         );
-        // Список страницы правил идёт в порядке создания: позже создано — ниже.
-        self::assertSame(
-            ['High priority', 'Low priority', 'Same priority', 'Inactive'],
-            array_map(static fn (CashTransactionAutoRule $rule): string => $rule->getName(), $repository->findByCompany($company)),
-        );
         self::assertSame(
             $highPriority->getId(),
             $repository->findOneByIdAndCompanyId((string) $highPriority->getId(), (string) $company->getId())?->getId(),
