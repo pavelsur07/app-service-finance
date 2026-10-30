@@ -17,7 +17,7 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("EMAIL", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
     ("ACCOUNT", re.compile(r"(?<!\d)\d{20}(?!\d)")),
     ("CARD", re.compile(r"(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)")),
-    ("PHONE", re.compile(r"(?<![\w+])(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)")),
+    ("PHONE", re.compile(r"(?<![\w+])(?:\+?7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)")),
     # ИНН физлица — 12 цифр; ИНН организации (10 цифр) не персональные данные и остаётся.
     ("INN", re.compile(r"(?<!\d)\d{12}(?!\d)")),
     # Фамилия Имя Отчество / Имя Отчество Фамилия.
@@ -55,6 +55,11 @@ class Masker:
             return [self._walk(v, skip) for v in value]
         if isinstance(value, dict):
             return {k: (v if k in skip else self._walk(v, skip)) for k, v in value.items()}
+        if isinstance(value, int) and not isinstance(value, bool):
+            # ИНН, телефон или счёт числом: маскированное значение становится строкой-токеном.
+            text = str(value)
+            masked = self.mask_text(text)
+            return value if masked == text else masked
         return value
 
     def _token(self, kind: str, original: str) -> str:

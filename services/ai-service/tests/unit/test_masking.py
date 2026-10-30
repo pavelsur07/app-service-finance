@@ -43,3 +43,8 @@ def test_mask_json_skips_listed_keys() -> None:
     payload = {"id": "500100732259", "amount": "12500.00", "purpose": "ИНН 500100732259", "items": ["+79123456789"]}
     masked = Masker().mask_json(payload, skip_keys={"id", "amount"})
     assert masked == {"id": "500100732259", "amount": "12500.00", "purpose": "ИНН [INN_1]", "items": ["[PHONE_1]"]}
+
+
+def test_mask_json_masks_personal_data_given_as_numbers() -> None:
+    masked = Masker().mask_json({"inn": 500100732259, "phone": 79123456789, "qty": 3, "ok": True}, skip_keys=set())
+    assert masked == {"inn": "[INN_1]", "phone": "[PHONE_1]", "qty": 3, "ok": True}

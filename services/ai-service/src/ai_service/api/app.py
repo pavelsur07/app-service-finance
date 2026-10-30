@@ -8,8 +8,10 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from psycopg import Connection
+from psycopg.errors import UniqueViolation
 from psycopg_pool import ConnectionPool
 
 from ai_service import SERVICE_NAME, __version__
@@ -60,6 +62,10 @@ def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str])
         structlog.contextvars.bind_contextvars(trace_id=request.headers.get("x-trace-id"))
         try:
             return await call_next(request)
+        except Exception as e:  # noqa: BLE001 — намеренно без traceback, см. комментарий
+            # Без traceback: текст ошибок БД и валидации несёт вход задачи (ПДн).
+            log.error("request_failed", path=request.url.path, error_type=type(e).__name__)
+            return JSONResponse({"error": {"code": "internal_error", "message": "Внутренняя ошибка"}}, status_code=500)
         finally:
             structlog.contextvars.unbind_contextvars("trace_id")
 
@@ -99,20 +105,24 @@ def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str])
             raise ApiError(422, "idempotency_key_mismatch", "Заголовок Idempotency-Key не равен idempotency_key")
         if body.task_type not in task_types:
             raise ApiError(422, "unknown_task_type", f"Неизвестный task_type {body.task_type}")
-        result = store.enqueue(
-            conn,
-            NewTask(
-                task_id=body.task_id,
-                task_type=body.task_type,
-                contract_version=body.contract_version,
-                company_id=body.company_id,
-                idempotency_key=body.idempotency_key,
-                requested_by=body.requested_by,
-                requested_at=body.created_at,
-                trace_id=body.trace_id,
-                payload=body.payload,
-            ),
-        )
+        try:
+            result = store.enqueue(
+                conn,
+                NewTask(
+                    task_id=body.task_id,
+                    task_type=body.task_type,
+                    contract_version=body.contract_version,
+                    company_id=body.company_id,
+                    idempotency_key=body.idempotency_key,
+                    requested_by=body.requested_by,
+                    requested_at=body.created_at,
+                    trace_id=body.trace_id,
+                    payload=body.payload,
+                ),
+            )
+        except UniqueViolation as e:
+            # Ключ новый, а task_id уже занят другой задачей.
+            raise ApiError(409, "task_id_conflict", "task_id уже использован другой задачей") from e
         if result.conflict:
             raise ApiError(409, "idempotency_conflict", "Ключ повтора уже использован с другим содержимым")
         log.info("task_enqueued", task_id=str(result.task_id), task_type=body.task_type, duplicate=result.duplicate)
@@ -146,6 +156,15 @@ def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str])
         acked = store.ack(conn, body.task_ids)
         log.info("tasks_acked", requested=len(body.task_ids), acked=acked)
         return AckResponse(acked=acked)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Ошибки без значений полей: вход задачи может содержать ПДн.
+        fields = sorted({".".join(str(p) for p in err["loc"]) for err in exc.errors()})
+        return JSONResponse(
+            {"error": {"code": "invalid_request", "message": "Некорректный запрос: " + ", ".join(fields)}},
+            status_code=422,
+        )
 
     @app.exception_handler(HTTPException)
     async def _http_error(_request: Request, exc: HTTPException) -> JSONResponse:

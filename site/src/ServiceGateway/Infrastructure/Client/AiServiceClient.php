@@ -113,8 +113,8 @@ final readonly class AiServiceClient implements AiServiceClientInterface
 
         if ($status !== $expectedStatus) {
             $this->logger->warning('ai-service request failed.', $context);
-            // 401 — рассинхрон токена при деплое, 5xx — сбой сервиса: повторяемо.
-            if (401 === $status || $status >= 500) {
+            // 401 — рассинхрон токена при деплое, 408/429 — прокси или перегрузка, 5xx — сбой сервиса: повторяемо.
+            if (\in_array($status, [401, 408, 429], true) || $status >= 500) {
                 throw ServiceUnavailableException::status(self::SERVICE, $status);
             }
 

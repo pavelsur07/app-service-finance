@@ -439,25 +439,30 @@
   Любое пустое значение — выключено.
 - `AiTaskFacadeInterface` (реализация `AiTaskFacade`):
   `requestTask(companyId, taskType, payload, idempotencyKey, ?requestedByUserId): ?string` —
-  генерирует `task_id` (UUIDv7) и диспатчит `SubmitAiTaskMessage`; null —
+  выводит `task_id` из компании, типа и ключа (UUIDv5: повтор — тот же `task_id`)
+  и диспатчит `SubmitAiTaskMessage`; null —
   выключено для компании. Ничего не пишет и не коммитит; вызывать после commit
   своей транзакции. `isEnabledForCompany(companyId): bool`.
 - `SubmitAiTaskMessage` → `async_sync`. `SubmitAiTaskHandler` — `POST /internal/tasks`
-  с `Idempotency-Key`: выключено или сервис недоступен → `Recoverable`
-  (повтор Messenger), отказ сервиса (`AiTaskRejectedException`, стабильный
-  `code`) или нарушение контракта → `Unrecoverable`. Повтор с тем же ключом
-  сервис возвращает исходным `task_id`.
+  с `Idempotency-Key`: сервис недоступен → исключение без Recoverable-маркера
+  (повторы по `max_retries` транспорта, затем `failed`; Recoverable обходит
+  лимит), выключено для компании → сообщение снимается с WARNING, отказ
+  сервиса (`AiTaskRejectedException`, стабильный `code`) или нарушение
+  контракта → `Unrecoverable`.
 - Клиент `AiServiceClient`: `timeout` 3 с, `max_duration` 10 с, `X-Trace-Id`;
-  транспорт, 401, 5xx → `ServiceUnavailableException`; прочие коды →
+  транспорт, 401, 408, 429, 5xx → `ServiceUnavailableException`; прочие коды →
   `AiTaskRejectedException`. Разбор `AiTaskV1Parser` строгий, как у
-  `ServiceCoverageV1Parser`; фикстуры парсера — копии `examples` контракта
-  (тест сервиса сверяет их побайтно).
+  `ServiceCoverageV1Parser`, но результат с нарушением откладывается
+  (`AiResultsPage::$invalid`), а не отвергает страницу; фикстуры парсера —
+  копии `examples` контракта (тест сервиса сверяет их побайтно).
 - Результаты: `ImportAiResultsAction` — pull `GET /internal/tasks?status=done`
-  страницами по 100 (≤ 20 страниц за вызов); на страницу HTTP вне
-  транзакции → потребители одной `wrapInTransaction` → `ack` после commit.
-  Сбой ack — сервис отдаст страницу снова, потребители идемпотентны по
-  `taskId`. Результат без потребителя не подтверждается (остаётся в сервисе,
-  один агрегированный ERROR).
+  страницами по 100 до конца очереди (курсор обязан расти); HTTP вне
+  транзакции → каждый результат в своей `wrapInTransaction` → `ack` страницы
+  после commit. Сбой ack — сервис отдаст результаты снова, потребители
+  идемпотентны по `taskId`. Без потребителя, сбой потребителя (EM
+  пересоздаётся через `ManagerRegistry::resetManager()`), нарушение контракта —
+  результат не подтверждается и остаётся в сервисе, не загораживая следующие;
+  по каждому виду — один агрегированный ERROR за прогон.
 - Потребитель — `AiTaskResultConsumerInterface` (тег
   `app.service_gateway.ai_task_result_consumer`): `supports(taskType)`,
   `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт.

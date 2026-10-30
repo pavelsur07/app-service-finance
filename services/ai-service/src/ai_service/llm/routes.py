@@ -116,3 +116,8 @@ def _env(env: dict[str, str], name: Any) -> str | None:
     if not isinstance(name, str):
         raise RoutingConfigError(f"env name must be a string, got {name!r}")
     return env.get(name) or None
+
+
+def worst_case_seconds(route: Route, timeout_seconds: float, retries_per_model: int, parse_attempts: int = 2) -> float:
+    """Верхняя оценка одного прогона задачи: все модели маршрута, все повторы, повтор разбора ответа."""
+    return parse_attempts * len(route.models) * (retries_per_model + 1) * timeout_seconds

@@ -20,6 +20,7 @@ from ai_service.verification.checks import CheckContext, CheckResult, Severity, 
 log = structlog.get_logger(__name__)
 
 SCHEMA_CHECK = "output_schema"
+CONFIDENCE_CHECK = "confidence_range"
 
 
 @dataclass(slots=True)
@@ -61,7 +62,11 @@ class Pipeline:
             return _failed("invalid_payload", {"task_type": spec.task_type, "errors": e.error_count()})
         masker = Masker()
         masked_payload = masker.mask_json(payload, spec.mask_skip_keys)
-        masked_input = spec.input_model.model_validate(masked_payload)
+        try:
+            masked_input = spec.input_model.model_validate(masked_payload)
+        except ValidationError as e:
+            # Токен длиннее значения или число стало строкой — схема задачи не допускает маскирования.
+            return _failed("masking_invalid", {"task_type": spec.task_type, "errors": e.error_count()})
 
         trace: dict[str, Any] = {
             "task_type": spec.task_type,
@@ -81,9 +86,11 @@ class Pipeline:
         for attempt in range(2):
             result = self._gateway.complete(spec.task_type, request)
             calls.extend(result.calls)
-            trace["responses"].append({"model": result.response.model, "text": result.response.text})
+            # NUL PostgreSQL не принимает в jsonb: без замены финализация падала бы на трассе.
+            text = result.response.text.replace("\x00", "")
+            trace["responses"].append({"model": result.response.model, "text": text})
             try:
-                output = spec.output_model.model_validate_json(_strip_fences(result.response.text))
+                output = spec.output_model.model_validate_json(_strip_fences(text))
                 break
             except ValidationError as e:
                 parse_error = f"{e.error_count()} validation error(s)"
@@ -117,7 +124,10 @@ class Pipeline:
         context = CheckContext(company_id=company_id, task_type=spec.task_type)
         checks = [CheckResult(SCHEMA_CHECK, True, Severity.BLOCK)]
         checks += [check(masked_input, output, context) for check in spec.checks]
-        confidence = spec.confidence(masked_input, output)
+        confidence: float | None = spec.confidence(masked_input, output)
+        if confidence is not None and not 0.0 <= confidence <= 1.0:
+            checks.append(CheckResult(CONFIDENCE_CHECK, False, Severity.BLOCK, "confidence outside 0..1"))
+            confidence = None
         verdict = decide(checks, confidence, spec.confidence_threshold)
         if spec.risk is Risk.HIGH and verdict is Verdict.ACCEPTED:
             verdict = Verdict.NEEDS_REVIEW

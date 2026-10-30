@@ -66,7 +66,7 @@ class Worker:
             outcome = self._process(task)
             if outcome is None:
                 return True
-            if not self._store.finalize(self._conn, task, outcome):
+            if not self._finalize(task, outcome):
                 log.warning("task_finalize_skipped", stage="finalize", outcome="lost_lease")
                 return True
             log.info(
@@ -99,10 +99,34 @@ class Worker:
             log.warning("task_llm_unavailable", stage="generate", outcome="retry", errors=errors)
             self._store.release_for_retry(self._conn, task, errors, self._backoff * task.attempts)
             return None
-        except Exception:
+        except Exception as e:  # noqa: BLE001 — намеренно без traceback, см. комментарий
             # Баг ядра или задачи: задача уходит человеку как failed, а не крутится в очереди.
-            log.exception("task_internal_error", stage="pipeline", outcome="failed")
+            # Только тип исключения: текст (ValidationError, ошибка БД) может нести вход задачи.
+            log.error("task_internal_error", stage="pipeline", outcome="failed", error_type=type(e).__name__)
             return PipelineOutcome(verdict=Verdict.FAILED, error_code="internal_error")
+
+    def _finalize(self, task: ClaimedTask, outcome: PipelineOutcome) -> bool:
+        """Сбой записи итога (данные, которые БД не принимает) не роняет worker: задача закрывается
+        как failed без трассы. Сбой и этой записи — задача вернётся по истечении аренды."""
+        try:
+            return self._store.finalize(self._conn, task, outcome)
+        except Exception as e:  # noqa: BLE001 — намеренно без traceback, см. комментарий
+            log.error("task_finalize_failed", stage="finalize", error_type=type(e).__name__)
+        fallback = PipelineOutcome(
+            verdict=Verdict.FAILED,
+            error_code="internal_error",
+            models=outcome.models,
+            prompt_version=outcome.prompt_version,
+            input_tokens=outcome.input_tokens,
+            output_tokens=outcome.output_tokens,
+        )
+        fallback.trace = {"task_type": task.task_type, "error_code": "internal_error", "stage": "finalize"}
+        outcome.verdict, outcome.error_code = fallback.verdict, fallback.error_code
+        try:
+            return self._store.finalize(self._conn, task, fallback)
+        except Exception as e:  # noqa: BLE001 — намеренно без traceback, см. комментарий
+            log.error("task_finalize_failed", stage="finalize_fallback", error_type=type(e).__name__)
+            return False
 
     def _cleanup_traces_if_due(self) -> None:
         now = time.monotonic()

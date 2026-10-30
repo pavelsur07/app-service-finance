@@ -12,9 +12,10 @@ use App\ServiceGateway\Exception\ServiceUnavailableException;
 use App\ServiceGateway\Infrastructure\Client\AiServiceClientInterface;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use App\ServiceGateway\MessageHandler\SubmitAiTaskHandler;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Exception\RecoverableExceptionInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 final class SubmitAiTaskHandlerTest extends TestCase
@@ -44,24 +45,39 @@ final class SubmitAiTaskHandlerTest extends TestCase
         self::assertSame($client->requests[0]['task_id'], $client->requests[1]['task_id']);
     }
 
-    public function testDisabledCompanyIsRetriedLater(): void
+    public function testDisabledCompanyDropsMessageWithWarning(): void
     {
         $client = new SubmitAiTaskRecordingClient();
+        $logs = new TestHandler();
 
-        $this->expectException(RecoverableMessageHandlingException::class);
-        try {
-            $this->handler($client, '')($this->message());
-        } finally {
-            self::assertSame([], $client->requests);
-        }
+        $this->handler($client, '', $logs)($this->message());
+
+        self::assertSame([], $client->requests);
+        self::assertTrue($logs->hasWarningThatContains('ai-service is disabled for the company'));
     }
 
-    public function testUnavailableServiceIsRetried(): void
+    public function testUnavailableServiceIsRetriedWithinTransportLimit(): void
     {
         $client = new SubmitAiTaskRecordingClient(ServiceUnavailableException::status('ai-service', 503));
 
-        $this->expectException(RecoverableMessageHandlingException::class);
-        $this->handler($client)($this->message());
+        try {
+            $this->handler($client)($this->message());
+            self::fail('expected ServiceUnavailableException');
+        } catch (\Throwable $e) {
+            // Recoverable-маркер обходит max_retries транспорта: сообщение не дошло бы до failed.
+            self::assertNotInstanceOf(RecoverableExceptionInterface::class, $e);
+            self::assertInstanceOf(ServiceUnavailableException::class, $e);
+        }
+    }
+
+    public function testServiceTaskIdMismatchIsLogged(): void
+    {
+        $client = new SubmitAiTaskRecordingClient(acceptedTaskId: '0192f0a0-0000-7000-8000-0000000000ff');
+        $logs = new TestHandler();
+
+        $this->handler($client, '*', $logs)($this->message());
+
+        self::assertTrue($logs->hasWarningThatContains('merged into a task with another id'));
     }
 
     public function testRejectedTaskIsNotRetried(): void
@@ -72,9 +88,13 @@ final class SubmitAiTaskHandlerTest extends TestCase
         $this->handler($client)($this->message());
     }
 
-    private function handler(AiServiceClientInterface $client, string $allowlist = '*'): SubmitAiTaskHandler
+    private function handler(AiServiceClientInterface $client, string $allowlist = '*', ?TestHandler $logs = null): SubmitAiTaskHandler
     {
-        return new SubmitAiTaskHandler($client, new AiServiceAccess(true, $allowlist, 'http://ai', 'token'), new NullLogger());
+        return new SubmitAiTaskHandler(
+            $client,
+            new AiServiceAccess(true, $allowlist, 'http://ai', 'token'),
+            new Logger('test', [$logs ?? new TestHandler()]),
+        );
     }
 
     private function message(): SubmitAiTaskMessage
@@ -97,8 +117,10 @@ final class SubmitAiTaskRecordingClient implements AiServiceClientInterface
     /** @var list<array<string, mixed>> */
     public array $requests = [];
 
-    public function __construct(private readonly ?\Throwable $error = null)
-    {
+    public function __construct(
+        private readonly ?\Throwable $error = null,
+        private readonly ?string $acceptedTaskId = null,
+    ) {
     }
 
     public function submitTask(array $request): AiTaskAccepted
@@ -107,7 +129,7 @@ final class SubmitAiTaskRecordingClient implements AiServiceClientInterface
             throw $this->error;
         }
         $this->requests[] = $request;
-        $taskId = $request['task_id'];
+        $taskId = $this->acceptedTaskId ?? $request['task_id'];
         \assert(\is_string($taskId));
 
         return new AiTaskAccepted($taskId, 'queued', \count($this->requests) > 1);

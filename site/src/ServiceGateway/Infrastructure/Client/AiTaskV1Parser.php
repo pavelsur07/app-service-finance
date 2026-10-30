@@ -10,7 +10,6 @@ use App\ServiceGateway\Application\DTO\AiTaskAccepted;
 use App\ServiceGateway\Application\DTO\AiTaskResult;
 use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Exception\ContractViolationException;
-use Ramsey\Uuid\Uuid;
 
 /**
  * Строгий разбор ответов ai-service по services/_contracts/ai-task/v1/schema.json:
@@ -39,6 +38,7 @@ final readonly class AiTaskV1Parser
     private const PROMPT_VERSION = '/^[a-z0-9_]+\/v[0-9]+$/D';
     private const ERROR_CODE = '/^[a-z][a-z0-9_]*$/D';
     private const CURSOR = '/^[0-9]+$/D';
+    private const UUID = '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/D';
     private const DATE_TIME_FORMATS = ['Y-m-d\TH:i:sP', 'Y-m-d\TH:i:s.uP'];
 
     public function parseAccepted(mixed $data): AiTaskAccepted
@@ -61,16 +61,23 @@ final readonly class AiTaskV1Parser
         if (!\is_array($data['items']) || !array_is_list($data['items'])) {
             throw $this->violation('$.items', 'must be an array');
         }
+        // Конверт страницы строгий; отдельный результат с нарушением откладывается,
+        // а не отвергает страницу: иначе один результат останавливал бы весь импорт.
         $items = [];
+        $invalid = [];
         foreach ($data['items'] as $i => $item) {
-            $items[] = $this->result($item, sprintf('$.items[%d]', $i));
+            try {
+                $items[] = $this->result($item, sprintf('$.items[%d]', $i));
+            } catch (ContractViolationException $e) {
+                $invalid[] = sprintf('task_id=%s: %s', $this->readableTaskId($item), $e->getMessage());
+            }
         }
         $cursor = $data['next_cursor'];
         if (null !== $cursor && (!\is_string($cursor) || 1 !== preg_match(self::CURSOR, $cursor))) {
             throw $this->violation('$.next_cursor', 'must be a numeric string or null');
         }
 
-        return new AiResultsPage($items, $cursor);
+        return new AiResultsPage($items, $cursor, $invalid);
     }
 
     private function result(mixed $value, string $path): AiTaskResult
@@ -217,10 +224,18 @@ final readonly class AiTaskV1Parser
         return $value;
     }
 
+    private function readableTaskId(mixed $item): string
+    {
+        $taskId = $item instanceof \stdClass ? ($item->task_id ?? null) : null;
+
+        return \is_string($taskId) && 1 === preg_match(self::UUID, $taskId) ? $taskId : '?';
+    }
+
     private function uuid(mixed $value, string $path): string
     {
         $value = $this->string($value, $path);
-        if (!Uuid::isValid($value)) {
+        // Шаблон схемы, а не Uuid::isValid: тот принимает `{…}` и `urn:uuid:…`.
+        if (1 !== preg_match(self::UUID, $value)) {
             throw $this->violation($path, 'must be a UUID');
         }
 

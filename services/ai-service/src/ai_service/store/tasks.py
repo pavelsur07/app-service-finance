@@ -66,7 +66,7 @@ class TaskStore:
                 INSERT INTO ai_task (id, task_type, contract_version, company_id, idempotency_key, request_hash,
                                      requested_by, trace_id, payload, requested_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (idempotency_key) DO NOTHING
                 RETURNING id, status
                 """,
                 (
@@ -85,9 +85,8 @@ class TaskStore:
             if row is not None:
                 return EnqueueResult(row[0], row[1], duplicate=False, conflict=False)
             existing = conn.execute(
-                "SELECT id, status, request_hash FROM ai_task WHERE idempotency_key = %s OR id = %s"
-                " ORDER BY (idempotency_key = %s) DESC LIMIT 1",
-                (task.idempotency_key, task.task_id, task.idempotency_key),
+                "SELECT id, status, request_hash FROM ai_task WHERE idempotency_key = %s",
+                (task.idempotency_key,),
             ).fetchone()
         if existing is None:  # pragma: no cover — конфликт без строки невозможен вне гонки с удалением
             raise RuntimeError("enqueue conflict without existing row")

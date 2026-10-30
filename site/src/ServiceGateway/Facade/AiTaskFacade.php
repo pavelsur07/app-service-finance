@@ -14,6 +14,9 @@ use Webmozart\Assert\Assert;
 
 final readonly class AiTaskFacade implements AiTaskFacadeInterface
 {
+    /** Пространство имён UUIDv5 для task_id: один ключ повтора — один task_id. */
+    private const TASK_ID_NAMESPACE = '0192f0a0-5a1d-7e3c-8a5e-6f0d1c2b3a49';
+
     public function __construct(
         private AiServiceAccess $access,
         private MessageBusInterface $bus,
@@ -42,7 +45,8 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
             return null;
         }
 
-        $taskId = Uuid::uuid7()->toString();
+        // Повтор с тем же ключом возвращает тот же task_id, под которым придёт результат.
+        $taskId = Uuid::uuid5(self::TASK_ID_NAMESPACE, $companyId."\n".$taskType."\n".$idempotencyKey)->toString();
         $this->bus->dispatch(new SubmitAiTaskMessage(
             taskId: $taskId,
             taskType: $taskType,

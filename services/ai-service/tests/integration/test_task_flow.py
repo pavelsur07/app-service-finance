@@ -188,3 +188,38 @@ def test_expired_traces_are_deleted(conn: psycopg.Connection[Any]) -> None:
 
 def test_migrations_are_idempotent(dsn: str, conn: psycopg.Connection[Any]) -> None:
     assert migrate(dsn, MIGRATIONS) == []
+
+
+def test_new_key_with_taken_task_id_is_conflict(client: TestClient) -> None:
+    body = task_body()
+    post(client, body)
+    response = post(client, {**body, "idempotency_key": "another-key"})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "task_id_conflict"
+
+
+def test_nul_in_payload_is_rejected_without_echoing_values(client: TestClient) -> None:
+    response = post(client, task_body(text="Иванов Иван Иванович \u0000"))
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert "Иванов" not in response.text
+
+
+def test_finalize_failure_closes_task_as_failed(
+    client: TestClient, conn: psycopg.Connection[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = task_body()
+    post(client, body)
+    original = TaskStore.finalize
+    calls = {"n": 0}
+
+    def flaky(self: TaskStore, *args: Any) -> bool:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise psycopg.errors.NumericValueOutOfRange("numeric field overflow")
+        return original(self, *args)
+
+    monkeypatch.setattr(TaskStore, "finalize", flaky)
+    assert worker(conn).run_once() is True
+    [item] = client.get("/internal/tasks", params={"status": "done"}).json()["items"]
+    assert (item["status"], item["error_code"]) == ("failed", "internal_error")

@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from ai_service.llm.routes import Mode, RoutingConfigError, load_routing, parse_routing
+from ai_service.llm.routes import (
+    Mode,
+    ModelRef,
+    Route,
+    RoutingConfigError,
+    load_routing,
+    parse_routing,
+    worst_case_seconds,
+)
 
 ROUTES_FILE = Path(__file__).resolve().parents[2] / "config" / "routes.yaml"
 
@@ -33,3 +41,8 @@ def test_provider_becomes_available_with_key_env() -> None:
 def test_invalid_config_is_rejected(raw: object, message: str) -> None:
     with pytest.raises(RoutingConfigError, match=message):
         parse_routing(raw, {})
+
+
+def test_worst_case_counts_models_retries_and_parse_attempts() -> None:
+    route = Route(task_type="t", mode=Mode.FALLBACK, models=(ModelRef.parse("a/x"), ModelRef.parse("b/y")))
+    assert worst_case_seconds(route, timeout_seconds=60, retries_per_model=1) == 2 * 2 * 2 * 60

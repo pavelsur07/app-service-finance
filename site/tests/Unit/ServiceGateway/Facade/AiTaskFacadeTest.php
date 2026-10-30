@@ -35,6 +35,17 @@ final class AiTaskFacadeTest extends TestCase
         self::assertSame('2026-10-30T12:00:00+03:00', $message->createdAt);
     }
 
+    public function testSameKeyGivesSameTaskIdAndOtherKeyOrCompanyAnother(): void
+    {
+        $facade = $this->facade('*');
+        $first = $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'source-row-1');
+
+        self::assertSame($first, $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'source-row-1'));
+        self::assertNotSame($first, $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'source-row-2'));
+        self::assertNotSame($first, $facade->requestTask('0192f0a0-0000-7000-8000-0000000000c2', 'echo', ['text' => 'a'], 'source-row-1'));
+        self::assertNotSame($first, $facade->requestTask(self::COMPANY, 'other', ['text' => 'a'], 'source-row-1'));
+    }
+
     public function testDoesNothingWhenCompanyIsNotAllowed(): void
     {
         self::assertNull($this->facade('')->requestTask(self::COMPANY, 'echo', ['text' => 'a'], 'k'));

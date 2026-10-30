@@ -12,13 +12,17 @@ use App\ServiceGateway\Infrastructure\Client\AiServiceClientInterface;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * POST /internal/tasks. Без БД: сообщение несёт все идентификаторы, повтор безопасен
- * (сервис сливает тот же `Idempotency-Key`). Выключенный сервис или его недоступность —
- * ретраи Messenger, затем failed-транспорт: задача ждёт, а не теряется.
+ * (сервис сливает тот же `Idempotency-Key`).
+ *
+ * Недоступность сервиса — исключение без Recoverable-маркера: Messenger повторяет по
+ * стратегии транспорта (`max_retries`), затем failed-транспорт. RecoverableMessageHandlingException
+ * обходит `max_retries` и крутил бы сообщение бесконечно.
+ * Сервис выключили для компании после постановки — сообщение снимается с WARNING:
+ * выключение намеренное, ждать его отмены в очереди незачем.
  */
 #[AsMessageHandler]
 final readonly class SubmitAiTaskHandler
@@ -36,9 +40,9 @@ final readonly class SubmitAiTaskHandler
         $this->logger->info('Submit AI task started.', $context);
 
         if (!$this->access->isEnabledForCompany($message->companyId)) {
-            $this->logger->warning('Submit AI task postponed: ai-service is disabled for the company.', $context);
+            $this->logger->warning('Submit AI task dropped: ai-service is disabled for the company.', $context);
 
-            throw new RecoverableMessageHandlingException('ai-service is disabled for the company');
+            return;
         }
 
         try {
@@ -57,13 +61,17 @@ final readonly class SubmitAiTaskHandler
         } catch (ServiceUnavailableException $e) {
             $this->logger->warning('Submit AI task will be retried: ai-service unavailable.', $context + ['error' => $e->getMessage()]);
 
-            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
+            throw $e;
         } catch (AiTaskRejectedException|ContractViolationException $e) {
             $this->logger->error('Submit AI task rejected.', $context + ['error' => $e->getMessage()]);
 
             throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
         }
 
+        if ($accepted->taskId !== $message->taskId) {
+            // task_id выводится из ключа повтора, расхождение — ключ занят другим содержимым ранее.
+            $this->logger->warning('Submit AI task merged into a task with another id.', $context + ['serviceTaskId' => $accepted->taskId]);
+        }
         $this->logger->info('Submit AI task finished.', $context + [
             'serviceTaskId' => $accepted->taskId,
             'duplicate' => $accepted->duplicate,

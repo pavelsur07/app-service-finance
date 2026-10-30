@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 TaskState = Literal["queued", "running", "done", "acked"]
 ResultStatus = Literal["accepted", "needs_review", "rejected", "failed"]
@@ -22,6 +22,24 @@ class TaskRequest(BaseModel):
     created_at: datetime
     trace_id: UUID
     payload: dict[str, Any]
+
+    @field_validator("payload")
+    @classmethod
+    def _no_nul(cls, value: dict[str, Any]) -> dict[str, Any]:
+        # PostgreSQL не хранит NUL в jsonb; отказ здесь — 422, а не 500 с текстом payload в логе ошибки БД.
+        if _has_nul(value):
+            raise ValueError("payload must not contain NUL characters")
+        return value
+
+
+def _has_nul(value: Any) -> bool:
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, list):
+        return any(_has_nul(v) for v in value)
+    if isinstance(value, dict):
+        return any("\x00" in k or _has_nul(v) for k, v in value.items())
+    return False
 
 
 class TaskAccepted(BaseModel):

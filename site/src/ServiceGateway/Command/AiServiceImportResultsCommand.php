@@ -56,8 +56,17 @@ final class AiServiceImportResultsCommand extends Command
                 'received' => $result->received,
                 'acked' => $result->acked,
                 'unhandled' => $result->unhandled,
+                'failed' => $result->failed,
+                'invalid' => $result->invalid,
             ]);
-            $output->writeln(sprintf('ai-service: %d received, %d acked, %d without consumer', $result->received, $result->acked, $result->unhandled));
+            $output->writeln(sprintf(
+                'ai-service: %d received, %d acked, %d without consumer, %d consumer failures, %d invalid',
+                $result->received,
+                $result->acked,
+                $result->unhandled,
+                $result->failed,
+                $result->invalid,
+            ));
 
             return self::SUCCESS;
         } catch (ServiceUnavailableException $e) {

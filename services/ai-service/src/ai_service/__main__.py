@@ -13,7 +13,7 @@ from ai_service.config import Settings
 from ai_service.core.pipeline import Pipeline
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.gateway import LlmGateway
-from ai_service.llm.routes import load_routing
+from ai_service.llm.routes import load_routing, worst_case_seconds
 from ai_service.store.migrate import migrate
 from ai_service.store.tasks import TaskStore
 from ai_service.tasks.registry import build_registry
@@ -50,6 +50,17 @@ def main(argv: list[str] | None = None) -> int:
         app = create_app(pool, settings.api_token.get_secret_value(), registry.task_types())
         uvicorn.run(app, host=settings.http_host, port=settings.http_port, log_config=None, access_log=False)
         return 0
+
+    # Аренда короче худшего прогона — вторая копия worker'а перехватит задачу и заплатит за вызовы ещё раз.
+    too_long = [
+        t
+        for t in registry.task_types()
+        if worst_case_seconds(routing.routes[t], settings.llm_timeout_seconds, settings.llm_retries_per_model)
+        >= settings.worker_lease_seconds
+    ]
+    if too_long:
+        print(f"worker lease is shorter than worst-case run for: {', '.join(too_long)}", file=sys.stderr)  # noqa: T201
+        return 2
 
     gateway = LlmGateway(routing, build_adapters(routing, settings.llm_timeout_seconds), settings.llm_retries_per_model)
     with psycopg.connect(dsn, autocommit=True) as conn:

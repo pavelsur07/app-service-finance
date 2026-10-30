@@ -95,9 +95,20 @@ init-скрипт БД, `make ai-service-*`.
 - Идемпотентность постановки: `task_id` не входит в отпечаток запроса —
   повтор фасада с новым `task_id` и тем же ключом возвращает исходную задачу;
   другие `task_type`/`company_id`/`payload` с тем же ключом → 409.
-- Гейты: Python — ruff, ruff format, mypy strict (38 файлов), pytest 82
+- Ревью (внутреннее и Codex) — исправлено в том же PR: `task_id` — UUIDv5 от
+  компании, типа и ключа (повтор фасада возвращает тот же id); отправка без
+  Recoverable (он обходит `max_retries`), выключенная компания — сообщение
+  снимается; импорт проходит очередь до конца и изолирует каждый результат
+  (сбой потребителя, нарушение контракта), карантин не загораживает новые;
+  сервис: NUL в payload → 422, в ответе модели вырезается; 500 без текста
+  ошибки; ошибка записи итога закрывает задачу как `failed`, worker не
+  падает; маскирование чисел и телефонов без «+»; `ON CONFLICT
+  (idempotency_key)`, занятый `task_id` → 409 `task_id_conflict`;
+  уверенность вне 0..1 отвергается; worker не стартует, если аренда короче
+  худшего прогона маршрута.
+- Гейты: Python — ruff, ruff format, mypy strict (38 файлов), pytest 90
   (unit + интеграционные на PostgreSQL + evals); PHP — PHPStan, CS,
-  strict_types, unit `ServiceGateway` 77, `lint:container`.
+  strict_types, unit 4240+ (весь набор), `ServiceGateway` 85, `lint:container`.
 - e2e (dev, локальные контейнеры): `app:ai-service:echo` → `async_sync` →
   worker `accepted` → `import-results`: 1 получен, 1 подтверждён; повторный
   импорт — 0. В БД сервиса после ack `payload` и `output` пусты, в трассе
