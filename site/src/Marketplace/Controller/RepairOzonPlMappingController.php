@@ -25,7 +25,7 @@ final class RepairOzonPlMappingController extends AbstractController
     public function __invoke(Request $request): Response
     {
         $companyId = (string) $this->companyService->getActiveCompany()->getId();
-        if (!$this->isCsrfTokenValid('ozon_pl_mapping_repair', $request->request->getString('_token'))) {
+        if (!$this->isCsrfTokenValid('ozon_pl_mapping_repair_'.$companyId, $request->request->getString('_token'))) {
             throw $this->createAccessDeniedException('Недействительный CSRF-токен.');
         }
         try {

@@ -7,6 +7,8 @@ namespace App\Tests\Functional\Marketplace\Controller;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Integration\Marketplace\PlPreview\PlPreviewFixture;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
@@ -30,10 +32,13 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
             return $row;
         }, $before);
 
-        $this->repair($client);
+        $this->repair($client, (string) $f->company->getId());
         self::assertResponseRedirects();
         self::assertSame($expected, $this->snapshot());
-        $this->repair($client);
+        $client->followRedirect();
+        self::assertSelectorNotExists('[data-ozon-mapping-conflict]');
+        self::assertSelectorTextContains('[data-ozon-mapping-status]', 'Настроено правильно');
+        $this->repair($client, (string) $f->company->getId());
         self::assertResponseRedirects();
         self::assertSame($expected, $this->snapshot());
     }
@@ -51,7 +56,7 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
             ['company' => $f->company->getId()],
         );
         $before = $this->snapshot();
-        $this->repair($client);
+        $this->repair($client, (string) $f->company->getId());
         self::assertResponseRedirects();
         self::assertSame($before, $this->snapshot());
         $client->followRedirect();
@@ -71,7 +76,7 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         self::assertNotNull($foreignOwner);
         $client->loginUser($foreignOwner);
         $this->setClientSessionValue($client, 'active_company_id', $f->foreign->getId());
-        $this->repair($client);
+        $this->repair($client, (string) $f->foreign->getId());
         self::assertResponseRedirects();
         self::assertSame($before, $this->snapshot());
     }
@@ -125,15 +130,15 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         $client = static::createClient();
         $f = $this->fixture($client);
         $this->legacy($f, AmountSource::SALE_REVENUE);
-        $user = \App\Tests\Builders\Company\UserBuilder::aUser()->withIndex(1189)->withRoles(['ROLE_USER'])->build();
-        $member = \App\Tests\Builders\Company\CompanyMemberBuilder::aMember()->withId(Uuid::uuid4()->toString())->withCompany($f->company)->withUser($user)->build();
+        $user = UserBuilder::aUser()->withIndex(1189)->withRoles(['ROLE_USER'])->build();
+        $member = CompanyMemberBuilder::aMember()->withId(Uuid::uuid4()->toString())->withCompany($f->company)->withUser($user)->build();
         $this->em()->persist($user);
         $this->em()->persist($member);
         $this->em()->flush();
         $before = $this->snapshot();
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $f->company->getId());
-        $this->repair($client);
+        $this->repair($client, (string) $f->company->getId());
         self::assertResponseStatusCodeSame(403);
         self::assertSame($before, $this->snapshot());
     }
@@ -151,6 +156,70 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         ]);
         self::assertResponseRedirects();
         self::assertTrue((bool) $this->em()->getConnection()->fetchOne('SELECT is_active FROM marketplace_sale_mappings WHERE id = :id', ['id' => $id]));
+    }
+
+    public function testOzonPageHasBusinessLabelsAndRepairConfirmation(): void
+    {
+        $client = static::createClient();
+        $f = $this->fixture($client);
+        $this->legacy($f, AmountSource::SALE_REVENUE);
+        $this->legacy($f, AmountSource::RETURN_REFUND);
+        $before = $this->snapshot();
+        $client->request('GET', '/marketplace/pl-mappings?marketplace=ozon&op=sale');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.card-title', 'Настройка статей Ozon');
+        self::assertSelectorTextContains('[data-ozon-mapping-conflict]', 'Выручка с СПП завышена');
+        self::assertSelectorExists('[data-bs-target="#modal-ozon-mapping-repair"]');
+        self::assertSelectorTextContains('#modal-ozon-mapping-repair', 'Применить исправление');
+        self::assertSelectorTextContains('#modal-ozon-mapping-repair', 'Продажи и возвраты с СПП будут рассчитываться только по реализации Ozon');
+        self::assertSelectorNotExists('#modal-add-mapping option[value="sale_revenue"]');
+        self::assertSelectorExists('#modal-add-mapping input[name="marketplace"][value="ozon"]');
+        self::assertSelectorTextContains('[data-ozon-realization-status]', 'ещё не загружена');
+        self::assertStringContainsString('Продажи с СПП', (string) $client->getResponse()->getContent());
+        self::assertSame($before, $this->snapshot(), 'GET не должен исправлять правила.');
+    }
+
+    public function testOtherMarketplaceDoesNotShowOzonUi(): void
+    {
+        $client = static::createClient();
+        $this->fixture($client);
+        $client->request('GET', '/marketplace/pl-mappings?marketplace=wildberries&op=sale');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.card-title', 'Маппинг ОПиУ');
+        self::assertSelectorNotExists('[data-ozon-mapping-conflict]');
+        self::assertSelectorNotExists('[data-ozon-realization-status]');
+        self::assertSelectorExists('#modal-add-mapping option[value="sale_revenue"]');
+    }
+
+    public function testConfirmationTokenCannotBeUsedAfterCompanySwitch(): void
+    {
+        $client = static::createClient();
+        $f = $this->fixture($client);
+        $this->legacy($f, AmountSource::SALE_REVENUE);
+        $member = CompanyMemberBuilder::aMember()->withId(Uuid::uuid4()->toString())
+            ->withCompany($f->foreign)->withUser($f->owner)->withRole('OWNER')->build();
+        $this->em()->persist($member);
+        $this->em()->flush();
+        $before = $this->snapshot();
+        $token = $this->csrfToken($client, 'ozon_pl_mapping_repair_'.$f->company->getId());
+        $this->setClientSessionValue($client, 'active_company_id', $f->foreign->getId());
+        $client->request('POST', self::REPAIR, ['_token' => $token]);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame($before, $this->snapshot());
+    }
+
+    public function testDefaultPreviewUsesOzonBusinessLabels(): void
+    {
+        $client = static::createClient();
+        $this->fixture($client);
+        $client->request('POST', '/marketplace/pl-mappings/default/preview', [
+            'marketplace' => 'ozon', '_token' => $this->csrfToken($client, 'marketplace_default_sale_mapping'),
+        ]);
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        $labels = array_column($payload['items'], 'amountSourceLabel', 'amountSource');
+        self::assertSame('Продажи с СПП', $labels['sale_realization']);
+        self::assertSame('Возвраты с СПП', $labels['return_realization']);
     }
 
     private function fixture(KernelBrowser $client): PlPreviewFixture
@@ -173,9 +242,9 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         return $mapping->getId();
     }
 
-    private function repair(KernelBrowser $client): void
+    private function repair(KernelBrowser $client, string $companyId): void
     {
-        $client->request('POST', self::REPAIR, ['_token' => $this->csrfToken($client, 'ozon_pl_mapping_repair')]);
+        $client->request('POST', self::REPAIR, ['_token' => $this->csrfToken($client, 'ozon_pl_mapping_repair_'.$companyId)]);
     }
 
     /** @return list<array<string, mixed>> */

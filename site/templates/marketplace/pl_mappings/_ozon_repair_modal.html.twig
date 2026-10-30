@@ -1,0 +1,27 @@
+<div class="modal modal-blur fade" id="modal-ozon-mapping-repair" tabindex="-1" aria-labelledby="ozon-repair-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ozon-repair-title">Исправить двойной учёт Ozon</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p>Отключим лишние правила начислений:</p>
+                <ul>
+                    {% for conflict in ozon.conflicts %}
+                        <li>{{ conflict.label }} → {{ conflict.name }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="mb-0">Продажи и возвраты с СПП будут рассчитываться только по реализации Ozon. Продажи и возвраты без СПП сохранятся.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn me-auto" data-bs-dismiss="modal">Отмена</button>
+                <form method="post" action="{{ path('marketplace_pl_mappings_ozon_repair') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('ozon_pl_mapping_repair_' ~ ozon.companyId) }}">
+                    <input type="hidden" name="op" value="{{ operationType }}">
+                    <button type="submit" class="btn btn-primary" {{ not ozon.repairReady ? 'disabled' : '' }}>Применить исправление</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

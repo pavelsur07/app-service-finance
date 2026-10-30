@@ -1,0 +1,14 @@
+### Stage 2 — DONE
+Base a2ff06e8c; MEDIUM; только Ozon mapping page и его default modal.
+Понятные 4 вида продаж/возвратов + стоимость, descriptions до/после скидки;
+технические коды скрыты в Ozon, другие marketplaces сохраняют прежние подписи.
+Единый warning + кнопка + перечень отключаемых правил в подтверждении, форма с
+company-scoped CSRF; смена компании после открытия подтверждения отклоняется.
+Статусы обработанных месячных реализаций; GET read-only, другой marketplace без Ozon UI.
+Checks: UI title regression red before implementation; module 62 tests/264 assertions;
+Twig 4 files green; focused PHPStan green; JS smoke actual inline-script conflict/normal/error
+(no technical codes in generated Ozon table), frontend lint/build/API types green.
+Последний UI-only прогон записан в handoff; исходные ошибки тестовых импортов исправлены.
+BrowserKit DOM + inline-script smoke выполнены; реальный browser visual smoke не выполнялся.
+Internal 0 BLOCKER/IMPORTANT; no CSS/new entry/dependencies; existing Tabler/DS feedback patterns.
+Next: full gates and fresh/internal + external review, no production changes.

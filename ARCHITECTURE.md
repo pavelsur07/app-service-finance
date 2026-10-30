@@ -716,11 +716,16 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 ### Marketplace: исправление двойного учёта Ozon в настройках
 
 `POST /marketplace/pl-mappings/ozon/repair` — только active company, MARKETPLACE_WRITE,
-CSRF `ozon_pl_mapping_repair`. `RepairOzonPlMappingAction` отключает конфликтующие
+CSRF по активной компании. `RepairOzonPlMappingAction` отключает конфликтующие
 legacy `sale_revenue`/`return_refund`, только если их активные корректные реализации
 уже на тех же статьях. Без replacements — отказ целиком, повтор — 0 изменений.
 `SaveOzonPlMappingAction` используется create/edit/toggle только Ozon и запрещает
 несоответствующий источник на стандартной статье с СПП и конфликт на одной статье.
+Подписи `AmountSource::getDisplayNameForMarketplace()` сохраняют прежний текст всех
+маркетплейсов кроме Ozon; `getOzonDescription()` даёт пояснение до/после скидки только UI.
+На экране настроек Ozon статус месячной реализации берётся из обработанных полных месяцев
+`OzonRealizationStatusQuery::processedMonths(companyId)`, GET не пишет данные.
+CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<companyId>`.
 Оба Action сериализованы advisory lock `ozon_pl_mapping:<companyId>`. Другие marketplaces
 сохраняют прежний путь. Формулы, категории, документы учёта не меняются.
 

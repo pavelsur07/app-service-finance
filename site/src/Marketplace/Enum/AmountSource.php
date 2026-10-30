@@ -72,6 +72,34 @@ enum AmountSource: string
         };
     }
 
+    public function getDisplayNameForMarketplace(MarketplaceType $marketplace): string
+    {
+        if (MarketplaceType::OZON !== $marketplace) {
+            return $this->getDisplayName();
+        }
+
+        return match ($this) {
+            self::SALE_GROSS => 'Продажи без СПП',
+            self::SALE_REALIZATION => 'Продажи с СПП',
+            self::RETURN_GROSS => 'Возвраты без СПП',
+            self::RETURN_REALIZATION => 'Возвраты с СПП',
+            self::SALE_REVENUE => 'Продажи из начислений (старое правило)',
+            self::RETURN_REFUND => 'Возвраты из начислений (старое правило)',
+            self::SALE_COST_PRICE => 'Себестоимость продаж',
+            self::RETURN_COST_PRICE => 'Себестоимость возвратов',
+        };
+    }
+
+    public function getOzonDescription(): string
+    {
+        return match ($this) {
+            self::SALE_GROSS, self::RETURN_GROSS => 'Начисления Ozon — до скидки Ozon.',
+            self::SALE_REALIZATION, self::RETURN_REALIZATION => 'Месячный отчёт «Реализация» — после скидки Ozon.',
+            self::SALE_REVENUE, self::RETURN_REFUND => 'Начисления до скидки Ozon. Не использовать в статьях с СПП.',
+            self::SALE_COST_PRICE, self::RETURN_COST_PRICE => 'Стоимость товара × количество.',
+        };
+    }
+
     /**
      * Для Ozon SALE_GROSS возвращает s.total_revenue, т.к. price_per_unit
      * у Ozon хранит accrual за posting целиком (не цену за штуку), а quantity —
