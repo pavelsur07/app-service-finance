@@ -6,12 +6,14 @@ import pytest
 
 from ai_service import __main__ as cli
 from ai_service.core.pipeline import Pipeline
+from ai_service.core.prompt import extract_data_block
 from ai_service.evals import compare
 from ai_service.evals.anonymize import ExportFormatError, anonymize_history
 from ai_service.evals.sets import EvalSet, load_sets, write_set
 from ai_service.llm.adapters.stub import StubAdapter
 from ai_service.llm.gateway import LlmGateway
 from ai_service.llm.routes import parse_routing
+from ai_service.llm.types import LlmRequest, LlmResponse
 from ai_service.tasks.registry import build_registry
 
 RENT = "0192f0a0-0000-7000-8000-00000000c001"
@@ -197,3 +199,59 @@ def test_write_and_load_round_trip(tmp_path: Path) -> None:
     )
     [loaded] = load_sets(tmp_path)
     assert loaded.name == "history/x"
+
+
+def test_anonymize_masks_personal_data_in_category_paths() -> None:
+    export = _export([])
+    export["categories"][0]["path"] = "Аренда / Иванов Иван Иванович +7 (912) 345-67-89"
+
+    categories, _ = anonymize_history(export)
+
+    assert "Иванов" not in categories[0]["path"]
+    assert "912" not in categories[0]["path"]
+    assert categories[0]["path"].startswith("Аренда / ")
+
+
+def _pipeline(model: str, adapter: Any) -> Pipeline:
+    routing = parse_routing(
+        {
+            "providers": {"stub": {"type": "stub"}},
+            "tasks": {compare.TASK: {"mode": "single", "models": [f"stub/{model}"]}},
+        },
+        {},
+    )
+    return Pipeline(build_registry(), LlmGateway(routing, {"stub": adapter}, retries_per_model=0))
+
+
+class _AlwaysRent:
+    """Модель, уверенно отвечающая «аренда» на всё, включая ловушки."""
+
+    def complete(self, model: str, request: LlmRequest) -> LlmResponse:
+        operations = json.loads(extract_data_block(request.user))["operations"]
+        items = [{"operation_id": o["id"], "category_id": "rent", "confidence": 0.99} for o in operations]
+        return LlmResponse(json.dumps({"items": items}), f"stub/{model}", 0, 0, 0)
+
+
+_CATEGORIES = [{"id": "rent", "path": "Расходы / Аренда", "direction": "outflow"}]
+_CASES: list[dict[str, Any]] = [
+    {"id": "ok", "operation": _operation("ok", "Оплата аренды"), "expected_category_id": "rent"},
+    {"id": "trap", "operation": _operation("trap", None), "expected_category_id": None},
+]
+
+
+def test_unavailable_model_counts_as_failed_batch_and_traps_are_not_passed() -> None:
+    score = compare.evaluate(_pipeline("fail", StubAdapter()), EvalSet("s", _CATEGORIES, _CASES))
+
+    assert (score.batches, score.failed_batches) == (1, 1)
+    assert score.cases == 2
+    assert score.correct == 0
+    assert (score.traps, score.traps_ok) == (1, 0)
+    assert score.labelled == 1
+
+
+def test_confident_wrong_answer_on_trap_counts_against_confident_precision() -> None:
+    score = compare.evaluate(_pipeline("always-rent", _AlwaysRent()), EvalSet("s", _CATEGORIES, _CASES))
+
+    assert (score.traps, score.traps_ok) == (1, 0)
+    assert (score.confident, score.confident_correct) == (2, 1)
+    assert (score.answered, score.answered_correct) == (1, 1)

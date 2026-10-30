@@ -6,7 +6,7 @@
 - дубли «назначение + контрагент + направление + статья» схлопываются: они не добавляют
   проверки, только вес частым платежам.
 
-Суммы, даты и пути статей остаются: без них модель не различит статьи. Результат смотрит
+Суммы и даты остаются; пути статей маскируются так же, как назначения. Результат смотрит
 человек до коммита — эвристика маскирования не гарантирует полноту.
 """
 
@@ -31,10 +31,14 @@ def anonymize_history(export: Any) -> tuple[list[dict[str, Any]], list[dict[str,
     if not isinstance(categories, list) or not isinstance(raw_cases, list):
         raise ExportFormatError("categories and cases must be lists")
 
-    category_ids = {c["id"]: f"c-{n:02d}" for n, c in enumerate(categories, 1)}
-    out_categories = [{"id": category_ids[c["id"]], "path": c["path"], "direction": c["direction"]} for c in categories]
-
     masker = Masker()
+    category_ids = {c["id"]: f"c-{n:02d}" for n, c in enumerate(categories, 1)}
+    # Названия статей пишет пользователь: ФИО или телефон в них — тоже ПДн.
+    out_categories = [
+        {"id": category_ids[c["id"]], "path": _scrub(masker, c["path"]), "direction": c["direction"]}
+        for c in categories
+    ]
+
     seen: set[tuple[str | None, str | None, str, str]] = set()
     cases: list[dict[str, Any]] = []
     for case in raw_cases:

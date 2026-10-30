@@ -2,10 +2,12 @@
 
 Каждая модель гоняется отдельно (маршрут single), наборы — пачками по лимиту контракта, через
 тот же pipeline, что в проде: маскирование, промпт, проверки, вердикт. Пачка без результата
-(сбой модели или блокирующая проверка) засчитывается как ошибка по всем её операциям.
+(модель недоступна, блокирующая проверка) засчитывается как ошибка по всем её операциям, в том
+числе по ловушкам: отсутствие ответа — не ответ «недостаточно данных».
 """
 
 import statistics
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -15,6 +17,7 @@ from ai_service.evals.sets import EvalSet
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.gateway import LlmGateway
 from ai_service.llm.routes import parse_routing
+from ai_service.llm.types import LlmUnavailableError
 from ai_service.tasks.registry import build_registry
 
 TASK = "categorize_transactions"
@@ -32,7 +35,7 @@ class Score:
     answered_correct: int = 0
     traps: int = 0
     traps_ok: int = 0
-    # Ответы с уверенностью не ниже порога задачи — то, что пойдёт в подсказки и автоприменение.
+    # Ответы со статьёй и уверенностью не ниже порога, включая ответы на ловушки.
     confident: int = 0
     confident_correct: int = 0
     batches: int = 0
@@ -80,18 +83,28 @@ def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
     threshold = spec.confidence_threshold
     score = Score()
     for chunk in _chunks(eval_set.cases, BATCH_SIZE):
-        outcome = pipeline.run(
-            TASK, EVAL_COMPANY, {"categories": eval_set.categories, "operations": [c["operation"] for c in chunk]}
-        )
+        payload = {"categories": eval_set.categories, "operations": [c["operation"] for c in chunk]}
         score.batches += 1
-        score.input_tokens += outcome.input_tokens
-        score.output_tokens += outcome.output_tokens
-        score.latencies_ms.append(int(outcome.trace.get("latency_ms", 0)))
         predicted: dict[str, tuple[str | None, float]] = {}
-        if outcome.output is None:
+        started = time.monotonic()
+        try:
+            outcome = pipeline.run(TASK, EVAL_COMPANY, payload)
+        except LlmUnavailableError as e:
+            # Таймаут, 429, недоступный провайдер: сбой пачки, сравнение продолжается.
             score.failed_batches += 1
+            score.input_tokens += sum(c.input_tokens for c in e.calls)
+            score.output_tokens += sum(c.output_tokens for c in e.calls)
+            score.latencies_ms.append(int((time.monotonic() - started) * 1000))
         else:
-            predicted = {i["operation_id"]: (i["category_id"], float(i["confidence"])) for i in outcome.output["items"]}
+            score.input_tokens += outcome.input_tokens
+            score.output_tokens += outcome.output_tokens
+            score.latencies_ms.append(int(outcome.trace.get("latency_ms", 0)))
+            if outcome.output is None:
+                score.failed_batches += 1
+            else:
+                predicted = {
+                    i["operation_id"]: (i["category_id"], float(i["confidence"])) for i in outcome.output["items"]
+                }
         for case in chunk:
             _score_case(score, case, predicted.get(case["id"]), threshold)
     return score
@@ -104,7 +117,7 @@ def render(rows: list[tuple[str, Score]], prices: dict[str, Price]) -> str:
         "точность",
         "покрытие",
         "точность ответов",
-        "точность ≥ порога (доля)",
+        "точность ≥ порога (доля кейсов)",
         "ловушки",
         "сбои пачек",
         "токены вход/выход",
@@ -121,7 +134,7 @@ def render(rows: list[tuple[str, Score]], prices: dict[str, Price]) -> str:
         lines.append(
             f"| {model} | {s.cases} | {_pct(s.correct, s.cases)} | {_pct(s.answered, s.labelled)} "
             f"| {_pct(s.answered_correct, s.answered)} "
-            f"| {_pct(s.confident_correct, s.confident)} ({_pct(s.confident, s.labelled)}) "
+            f"| {_pct(s.confident_correct, s.confident)} ({_pct(s.confident, s.cases)}) "
             f"| {_pct(s.traps_ok, s.traps)} | {s.failed_batches}/{s.batches} | {s.input_tokens}/{s.output_tokens} "
             f"| {cost} | {_latency(s.latencies_ms)} |"
         )
@@ -138,20 +151,25 @@ def parse_prices(raw: Any) -> dict[str, Price]:
 
 def _score_case(score: Score, case: dict[str, Any], answer: tuple[str | None, float] | None, threshold: float) -> None:
     expected = case["expected_category_id"]
-    category, confidence = answer if answer is not None else (None, 0.0)
+    is_trap = expected is None
     score.cases += 1
-    score.correct += int(category == expected)
-    if expected is None:
-        score.traps += 1
-        score.traps_ok += int(category is None)
+    score.traps += int(is_trap)
+    score.labelled += int(not is_trap)
+    if answer is None:
+        # Нет ответа (сбой пачки, операция пропущена) — ошибка; ловушка тоже не пройдена.
         return
-    score.labelled += 1
-    if category is not None:
+    category, confidence = answer
+    correct = category == expected
+    score.correct += int(correct)
+    if is_trap:
+        score.traps_ok += int(correct)
+    elif category is not None:
         score.answered += 1
-        score.answered_correct += int(category == expected)
-        if confidence >= threshold:
-            score.confident += 1
-            score.confident_correct += int(category == expected)
+        score.answered_correct += int(correct)
+    # Уверенный ответ со статьёй — кандидат на автоприменение, в том числе ошибочный ответ на ловушку.
+    if category is not None and confidence >= threshold:
+        score.confident += 1
+        score.confident_correct += int(correct)
 
 
 def _chunks(items: list[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:
