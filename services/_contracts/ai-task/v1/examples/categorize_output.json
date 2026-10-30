@@ -1,0 +1,14 @@
+{
+    "items": [
+        {
+            "operation_id": "0192f0a0-0000-7000-8000-0000000000e1",
+            "category_id": "0192f0a0-0000-7000-8000-00000000ca02",
+            "confidence": 0.95
+        },
+        {
+            "operation_id": "0192f0a0-0000-7000-8000-0000000000e2",
+            "category_id": null,
+            "confidence": 0.0
+        }
+    ]
+}

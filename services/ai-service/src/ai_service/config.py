@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     worker_poll_seconds: float = 1.0
-    worker_lease_seconds: int = 300
+    worker_lease_seconds: int = 900
     worker_max_attempts: int = 3
     worker_retry_backoff_seconds: int = 30
     trace_ttl_days: int = 30

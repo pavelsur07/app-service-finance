@@ -230,6 +230,7 @@ services:
             <<: *tz-env
             AI_SERVICE_DB_DSN: "postgresql://svc_ai_service:ai_service_dev@services-postgres:5432/ai_service"
             AI_SERVICE_API_TOKEN: "dev-only-ai-service-token"
+            AI_SERVICE_ROUTES_FILE: "/app/config/routes.dev.yaml"
         command: ["api"]
         ports:
             - "8181:8080"   # dev-only проброс API

@@ -10,6 +10,7 @@
 | `results_page` / `task_result` | `GET /internal/tasks?status=done&after=&limit=` |
 | `ack_request` / `ack_response` | `POST /internal/tasks/ack` |
 | `echo_payload` / `echo_output` | диагностическая задача `echo` |
+| `categorize_payload` / `categorize_output` | `categorize_transactions`: статьи компании + до 50 операций → статья или `null` на операцию |
 
 Правила:
 

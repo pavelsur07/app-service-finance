@@ -3,7 +3,7 @@
 # Провайдер без ключа выключен: fallback его пропускает, single — задача уходит в повтор.
 #
 # Режимы: single — одна модель; fallback — при ошибке или таймауте следующая;
-# vote — этап 2 (пока конфиг с ним не загружается).
+# vote — с первой задачей высокого риска (пока конфиг с ним не загружается).
 
 providers:
   stub:
@@ -34,3 +34,9 @@ tasks:
   echo:
     mode: single
     models: [stub/echo]
+
+  # Подсказка статьи ДДС (этап 2). Модели — кандидаты до решения §12 ТЗ: без ключей
+  # провайдеры выключены, живые вызовы — отдельное одобрение. Локально — config/routes.dev.yaml.
+  categorize_transactions:
+    mode: fallback
+    models: [deepseek/deepseek-chat, yandex/yandexgpt/latest, anthropic/claude-haiku-5-5]

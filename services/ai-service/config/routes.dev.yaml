@@ -1,0 +1,14 @@
+# Локальные маршруты (docker-compose профиль services): все задачи на stub без сети.
+# Прод и маршруты моделей — config/routes.yaml.
+
+providers:
+  stub:
+    type: stub
+
+tasks:
+  echo:
+    mode: single
+    models: [stub/echo]
+  categorize_transactions:
+    mode: single
+    models: [stub/categorize]
