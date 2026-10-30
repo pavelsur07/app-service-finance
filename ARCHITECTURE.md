@@ -1967,8 +1967,8 @@ recalculateDailyBalances(string $companyId, \DateTimeImmutable $from, \DateTimeI
 компании просто не попадают в ответ; `\DomainException` бросается только для
 неизвестной компании.
 
-Чтение для отчёта ДДС (`Report\Cashflow\CashflowReportBuilder`), Telegram-сводки и
-AI-агента ДДС (этап 7.3 плана Cash). `MoneyAccountSummary` с 7.3 несёт `currentBalance`.
+Чтение для отчёта ДДС (`Report\Cashflow\CashflowReportBuilder`) и Telegram-сводки
+(этап 7.3 плана Cash). `MoneyAccountSummary` с 7.3 несёт `currentBalance`.
 
 ```php
 // Все статьи ДДС компании в порядке обхода дерева; children — те же объекты, что в списке
@@ -1981,19 +1981,10 @@ listCashflowReportRows(string $companyId, \DateTimeImmutable $from, \DateTimeImm
 // Входящий остаток каждого счёта на начало дня: строка регистра за день, иначе последняя
 // до него (не раньше открытия счёта), иначе входящий остаток счёта. С $currency — счета валюты по названию
 getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $currency = null): list<MoneyAccountOpeningBalance>
-
-// Для AI-агента ДДС: удалённые операции и переводы ВХОДЯТ (так считал агент, см. «Находки» плана Cash)
-sumTurnoverByCategoryNameIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<CashCategoryTurnover>
-sumNetByDayIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<CashDailyAmount>
-sumTurnoverIncludingDeleted(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array{inflow: string, outflow: string}
-
-// Плановые платежи PLANNED/APPROVED с датой в периоде
-listPlannedPayments(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): list<PlannedPaymentSummary>
 ```
 
 DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `CashflowCategoryNode`,
-`CashflowReportRow`, `CashflowReportRowFilter`, `MoneyAccountOpeningBalance`, `CashCategoryTurnover`,
-`PlannedPaymentSummary` — в
+`CashflowReportRow`, `CashflowReportRowFilter`, `MoneyAccountOpeningBalance` — в
 `src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
@@ -4292,7 +4283,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
+| 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`, методы `CashFacade`, нужные только агенту (`sum*IncludingDeleted`, `listPlannedPayments`), с DTO `CashCategoryTurnover`, `PlannedPaymentSummary`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
 | 2.90 | 2026-10-30 | Marketplace: калькулятор `WbLoyaltyProgramFeeCalculator` (priority 98) — операция WB «Стоимость участия в программе лояльности», сумма из `cashbackCommissionChange` (`> 0` CHARGE, `< 0` STORNO); категория `wb_loyalty_program_fee` в `WbCostCategory`, правило по умолчанию → `PROMO_GIVEAWAYS` |
 | 2.89 | 2026-10-29 | Finance: одноразовая `app:finance:repair-pl-tree-19621cff` — дерево ОПиУ компании 19621cff к базовому шаблону маркетплейса (правила, операции с пересчётом регистра, структура); удаляется после применения |
 | 2.88 | 2026-10-29 | Finance: ссылки-выходы в диалоге запрета удаления статьи ОПиУ, фильтр удалённых документов по статье; общий диалог подтверждения — список выходов `data-confirm-links` |

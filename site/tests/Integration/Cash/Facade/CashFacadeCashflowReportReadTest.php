@@ -4,21 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Facade;
 
-use App\Cash\Application\DTO\CashCategoryTurnover;
-use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryNode;
 use App\Cash\Application\DTO\CashflowReportRow;
 use App\Cash\Application\DTO\CashflowReportRowFilter;
 use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
-use App\Cash\Application\DTO\PlannedPaymentSummary;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
-use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
@@ -152,47 +147,6 @@ final class CashFacadeCashflowReportReadTest extends IntegrationTestCase
             ['Б-раньше', 'В-день', 'Г-до-открытия', 'Рубли'],
             array_map(fn (MoneyAccountOpeningBalance $o): string => $this->em->find(MoneyAccount::class, $o->accountId)?->getName() ?? '', $this->facade->getReportOpeningBalances($id, $date, 'RUB')),
         );
-    }
-
-    public function testAgentAggregatesIncludeDeletedAndTransfers(): void
-    {
-        $op = $this->category($this->company, 'Аренда', CashflowFlowKind::OPERATING);
-        $this->tx($this->rub, CashDirection::INFLOW, '100.00', '2026-03-02', $op);
-        $this->tx($this->rub, CashDirection::OUTFLOW, '30.00', '2026-03-02');
-        $this->tx($this->rub, CashDirection::OUTFLOW, '5.00', '2026-03-03', $op)->markDeleted(null, 'test');
-        $this->tx($this->rub, CashDirection::INFLOW, '1.00', '2026-03-03')->setIsTransfer(true);
-        $this->tx($this->account($this->foreign, 'Чужой', 'RUB', '2026-01-01', '0.00'), CashDirection::INFLOW, '999.00', '2026-03-02');
-        $this->em->flush();
-        $id = (string) $this->company->getId();
-        $from = new \DateTimeImmutable('2026-03-01');
-        $to = new \DateTimeImmutable('2026-03-31');
-
-        self::assertEquals([
-            new CashCategoryTurnover('Аренда', '100.00', '5.00'),
-            new CashCategoryTurnover('Без категории', '1.00', '30.00'),
-        ], $this->facade->sumTurnoverByCategoryNameIncludingDeleted($id, $from, $to));
-        self::assertEquals([
-            new CashDailyAmount('2026-03-02', '70.00'),
-            new CashDailyAmount('2026-03-03', '-4.00'),
-        ], $this->facade->sumNetByDayIncludingDeleted($id, $from, $to));
-        self::assertSame(['inflow' => '101.00', 'outflow' => '35.00'], $this->facade->sumTurnoverIncludingDeleted($id, $from, $to));
-    }
-
-    public function testPlannedPaymentsAreFilteredByStatusAndPeriod(): void
-    {
-        $op = $this->category($this->company, 'Аренда', CashflowFlowKind::OPERATING);
-        foreach ([['2026-03-05', PaymentPlanStatus::APPROVED, '20.00'], ['2026-03-02', PaymentPlanStatus::PLANNED, '10.00'], ['2026-03-03', PaymentPlanStatus::DRAFT, '99.00'], ['2026-04-02', PaymentPlanStatus::PLANNED, '99.00']] as [$date, $status, $amount]) {
-            $plan = new PaymentPlan(Uuid::uuid4()->toString(), $this->company, $op, new \DateTimeImmutable($date), $amount);
-            $plan->setStatus($status);
-            $this->em->persist($plan);
-        }
-        $this->em->flush();
-
-        self::assertEquals([
-            new PlannedPaymentSummary(new \DateTimeImmutable('2026-03-02'), '10.00', 'Аренда', null),
-            new PlannedPaymentSummary(new \DateTimeImmutable('2026-03-05'), '20.00', 'Аренда', null),
-        ], $this->facade->listPlannedPayments((string) $this->company->getId(), new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31')));
-        self::assertSame([], $this->facade->listPlannedPayments((string) $this->foreign->getId(), new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31')));
     }
 
     public function testUnknownCompanyIsRejected(): void
