@@ -11,7 +11,6 @@ use App\Marketplace\Application\DTO\DefaultSaleMappingRule;
 use App\Marketplace\Enum\DefaultSaleMappingPreviewStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Provider\DefaultSaleMappingYamlProvider;
-use App\Marketplace\Infrastructure\Query\OzonPlMappingWarningsQuery;
 use App\Marketplace\Infrastructure\Query\PLCategoriesByCodeQuery;
 use App\Marketplace\Infrastructure\Query\SaleMappingsByAmountSourceQuery;
 
@@ -21,7 +20,6 @@ final readonly class PreviewDefaultSaleMappingAction
         private DefaultSaleMappingYamlProvider $yamlProvider,
         private PLCategoriesByCodeQuery $plCategoriesByCodeQuery,
         private SaleMappingsByAmountSourceQuery $saleMappingsQuery,
-        private OzonPlMappingWarningsQuery $mappingWarnings,
     ) {
     }
 
@@ -50,10 +48,7 @@ final readonly class PreviewDefaultSaleMappingAction
             $items[] = $this->buildItem($rule, $plByCode, $existingMappings);
         }
 
-        return new DefaultSaleMappingPreviewResult(
-            $marketplace, $items,
-            MarketplaceType::OZON === $marketplace ? $this->mappingWarnings->fetch($command->companyId) : [],
-        );
+        return new DefaultSaleMappingPreviewResult($marketplace, $items);
     }
 
     /**

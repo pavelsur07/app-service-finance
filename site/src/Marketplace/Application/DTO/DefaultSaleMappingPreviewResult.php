@@ -9,14 +9,10 @@ use App\Marketplace\Enum\MarketplaceType;
 
 final readonly class DefaultSaleMappingPreviewResult
 {
-    /**
-     * @param list<DefaultSaleMappingPreviewItem> $items
-     * @param list<string> $warnings конфликты источников, блокирующие автонастройку
-     */
+    /** @param list<DefaultSaleMappingPreviewItem> $items */
     public function __construct(
         private MarketplaceType $marketplace,
         private array $items,
-        private array $warnings = [],
     ) {
     }
 
@@ -55,16 +51,9 @@ final readonly class DefaultSaleMappingPreviewResult
         return $summary;
     }
 
-    /** @return list<string> */
-    public function getWarnings(): array
-    {
-        return $this->warnings;
-    }
-
     public function hasBlockingIssues(): bool
     {
-        return [] !== $this->warnings
-            || $this->getCountByStatus(DefaultSaleMappingPreviewStatus::MISSING_PL_CATEGORY) > 0
+        return $this->getCountByStatus(DefaultSaleMappingPreviewStatus::MISSING_PL_CATEGORY) > 0
             || $this->getCountByStatus(DefaultSaleMappingPreviewStatus::INVALID_TARGET_CATEGORY) > 0;
     }
 }

@@ -87,7 +87,6 @@ final class SaleMappingDefaultSetupController extends AbstractController
             'total' => $result->getTotal(),
             'summary' => $result->getSummary(),
             'hasBlockingIssues' => $result->hasBlockingIssues(),
-            'warnings' => $result->getWarnings(),
             'items' => array_map(
                 fn (DefaultSaleMappingPreviewItem $item): array => $this->previewItemToArray($item),
                 $result->getItems(),

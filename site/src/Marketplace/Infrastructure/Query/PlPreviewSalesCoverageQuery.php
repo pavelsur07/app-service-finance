@@ -79,32 +79,6 @@ final class PlPreviewSalesCoverageQuery
         return $result;
     }
 
-    /** @return list<string> месяцы с начислениями Ozon, но без обработанной месячной реализации */
-    public function fetchMissingRealizationMonths(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        return $this->connection->fetchFirstColumn(
-            <<<'SQL'
-            WITH activity AS (
-                SELECT DISTINCT DATE_TRUNC('month', sale_date)::date AS month FROM marketplace_sales
-                WHERE company_id = :companyId AND marketplace = 'ozon' AND sale_date BETWEEN :periodFrom AND :periodTo
-                UNION
-                SELECT DISTINCT DATE_TRUNC('month', return_date)::date AS month FROM marketplace_returns
-                WHERE company_id = :companyId AND marketplace = 'ozon' AND return_date BETWEEN :periodFrom AND :periodTo
-            )
-            SELECT TO_CHAR(a.month, 'YYYY-MM') AS month
-            FROM activity a
-            WHERE NOT EXISTS (
-                SELECT 1 FROM marketplace_ozon_realizations r
-                WHERE r.company_id = :companyId
-                  AND r.period_from = a.month
-                  AND r.period_to = (a.month + INTERVAL '1 month - 1 day')::date
-            )
-            ORDER BY month
-            SQL,
-            ['companyId' => $companyId, 'periodFrom' => $from->format('Y-m-d'), 'periodTo' => $to->format('Y-m-d')],
-        );
-    }
-
     /**
      * Документы «Реализации» Ozon, которые пересекают период, но не входят в него целиком: проведение
      * берёт документ только целиком, поэтому предпросмотр их не показывает — об этом надо сказать.
