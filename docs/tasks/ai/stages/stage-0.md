@@ -101,10 +101,27 @@ Facade в `services/ai-service`.
 
 ## Чек-лист приёмки
 
-- [ ] удалены `site/src/Mcp`, `docs/mcp/`, тесты MCP
-- [ ] методы `CashFacade`/`CompanyFacade`/`CompanyRepository`, нужные только MCP, удалены
-- [ ] `ModuleAccessMap` — exempt-префикс `App\Mcp\` убран
-- [ ] комментарии «для MCP-инструмента» в Cash убраны
-- [ ] `ARCHITECTURE.md` — строка модуля, методы Facade, exempt-зоны, Changelog
-- [ ] baseline PHPStan — запись `findIdsByExactName` удалена
-- [ ] `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, интеграционные Cash/Company
+- [x] удалены `site/src/Mcp`, `docs/mcp/`, тесты MCP
+- [x] методы `CashFacade`/`CompanyFacade`/`CompanyRepository`, нужные только MCP, удалены (с `CashFacade::MAX_PER_PAGE` и `CashTransactionAutoRuleRepository::findByCompany`)
+- [x] `ModuleAccessMap` — exempt-префикс `App\Mcp\` убран
+- [x] комментарии «для MCP-инструмента» в Cash убраны
+- [x] `ARCHITECTURE.md` — строка модуля, методы Facade, exempt-зоны, Changelog
+- [x] baseline PHPStan — запись `findIdsByExactName` удалена
+- [x] `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, интеграционные Cash/Company
+
+## Итог
+
+30.10.2026, ветка `chore/remove-mcp-stub`.
+
+- Удалено: `site/src/Mcp` (13 файлов), `docs/mcp/`, 4 теста, exempt-префикс в
+  `ModuleAccessMap`; 5 методов `CashFacade` с 3 DTO, константа `MAX_PER_PAGE`,
+  `CashTransactionAutoRuleRepository::findByCompany`,
+  `CompanyFacade::resolveIdByName`, `CompanyRepository::findIdsByExactName`;
+  3 записи baseline PHPStan.
+- Внутреннее ревью (свежая сессия): BLOCKER 0, IMPORTANT 0, MINOR 3 —
+  неиспользуемая константа, осиротевший метод репозитория, неотмеченный
+  чек-лист; все исправлены.
+- Проверки: `lint:container`; PHP CS Fixer (весь проект, без кеша) — 0;
+  strict_types — 0; PHPStan (1 воркер) — No errors; unit — 4205 OK;
+  `tests/Integration/Cash` — 291 OK, `tests/Integration/Company` — 144 OK,
+  `tests/Functional/Cash` — 166 OK.

@@ -38,22 +38,6 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    /**
-     * Полный список правил компании без пагинации.
-     *
-     * @return CashTransactionAutoRule[]
-     */
-    public function findByCompany(
-        Company $company,
-        ?CashTransactionAutoRuleAction $action = null,
-        ?CashTransactionAutoRuleOperationType $operationType = null,
-        ?CashflowCategory $category = null,
-    ): array {
-        return $this->createFilteredQueryBuilder($company, $action, $operationType, $category)
-            ->getQuery()
-            ->getResult();
-    }
-
     public function countByCompany(Company $company): int
     {
         return (int) $this->createQueryBuilder('r')

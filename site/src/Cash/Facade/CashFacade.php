@@ -52,8 +52,6 @@ use Ramsey\Uuid\Uuid;
 
 final readonly class CashFacade
 {
-    public const MAX_PER_PAGE = 200;
-
     public function __construct(
         private AddCashTransactionAction $addCashTransaction,
         private CashTransactionRepository $cashTransactionRepository,
