@@ -1849,13 +1849,18 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   закрытом периоде (`finance_lock_before`).
 - `RequestCashAiCategorizationAction(companyId, limit)` — точка входа команды
   `app:cash:ai-categorize --company-id= [--limit=200]` (lock по компании; cron
-  не подключён). Сервис выключен для компании → ничего. Сначала `requested`
-  старше 24 ч → `failed` (`lost`). Кандидаты — без статьи, за 90 дней, созданы
-  раньше чем 10 мин назад (автоправила отработали), без открытой подсказки и
-  меньше 3 неудачных. Справочник — активные несистемные конечные статьи с путём
-  (0 или больше 1000 → пропуск компании). Пачка до 50 операций: строки
-  `requested` с `task_id = taskIdFor(...)` в `wrapInTransaction`, после commit
-  `requestTask`. ИНН и счета не передаются.
+  не подключён). Сервис выключен для компании → ничего. Пачка до 50 операций:
+  `CashCategorizationTask` (`cash_categorization_task`: `id` = `task_id =
+  taskIdFor(...)`, ключ повтора, исходный payload, `dispatched_at`) и строки
+  `requested` — одной `wrapInTransaction`, после commit `requestTask`. Задача с
+  `requested` и последней отправкой старше 1 ч переотправляется с тем же ключом
+  и payload (отметка коммитится до отправки; сервис на тот же ключ с другим
+  payload ответил бы 409); строки без ответа старше 7 дней → `failed`
+  (`expired`); запись задачи без `requested` удаляется. Кандидаты — без статьи,
+  за 90 дней, созданы раньше чем 10 мин назад (автоправила отработали), без
+  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается).
+  Справочник — активные несистемные конечные статьи с путём (0 или больше 1000
+  → пропуск компании). ИНН и счета не передаются.
 - `CashCategorizationResultConsumer`: строки `requested` по `task_id` (повтор
   результата — no-op); `rejected`/`failed` или нарушение контракта → `failed`;
   нет ответа по операции → `failed` (`missing_item`); операция уже со статьёй →
@@ -1865,12 +1870,14 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   со статусом `suggested` — «ИИ: статья · %» и «Принять» / «Отклонить»
   (`POST /finance/cash-transactions/ai-suggestions/{id}/accept|dismiss`,
   `FINANCE_WRITE`, CSRF `cash_category_suggestion_{id}`).
-- `AcceptCashCategorySuggestionAction` — в `wrapInTransaction`: операция
-  `FOR UPDATE`; уже со статьёй (в т. ч. закрытый период) или статья недоступна →
+- `AcceptCashCategorySuggestionAction` — в `wrapInTransaction`: подсказка
+  `FOR UPDATE` (`refresh` с блокировкой, статус проверяется после захвата), затем
+  операция `FOR UPDATE` — порядок «подсказка → операция»; уже со статьёй (в т. ч. закрытый период) или статья недоступна →
   `stale`, статья человека не перезаписывается; иначе как ручная правка —
   `setCashflowCategory`, разбивка `MANUAL`, после commit
   `CashTransactionsChanged`. `DismissCashCategorySuggestionAction` — только
-  статус.
+  статус, под той же блокировкой подсказки. Решение человека окончательно:
+  параллельный запрос получает `CashCategorySuggestionStateException`.
 - Метки точности: `accepted`, `dismissed`; «исправлено» — операция получила
   другую статью при открытой подсказке (считается запросом). `app:cash:ai-categorize-stats
   --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`.
@@ -4354,7 +4361,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.94 | 2026-10-30 | Cash: ИИ-подсказки статей ДДС — `cash_category_suggestion` (миграция `Version20261030180000`), `RequestCashAiCategorizationAction` и команды `app:cash:ai-categorize`, `app:cash:ai-categorize-stats`, потребитель `CashCategorizationResultConsumer`, «Принять» / «Отклонить» в списке операций; ServiceGateway: `AiTaskFacadeInterface::taskIdFor`; контракт `ai-task/v1` 1.1.0 |
+| 2.94 | 2026-10-30 | Cash: ИИ-подсказки статей ДДС — `cash_category_suggestion` и `cash_categorization_task` (миграция `Version20261030180000`), `RequestCashAiCategorizationAction` и команды `app:cash:ai-categorize`, `app:cash:ai-categorize-stats`, потребитель `CashCategorizationResultConsumer`, «Принять» / «Отклонить» в списке операций; ServiceGateway: `AiTaskFacadeInterface::taskIdFor`; контракт `ai-task/v1` 1.1.0 |
 | 2.93 | 2026-10-30 | ServiceGateway: клиент ai-service — `AiTaskFacadeInterface`, `SubmitAiTaskMessage` (`async_sync`), `ImportAiResultsAction` с `AiTaskResultConsumerInterface`, команды `app:ai-service:echo` и `app:ai-service:import-results`, env `AI_SERVICE_*`; контракт `ai-task/v1`; каркас `services/ai-service` (этап 1 ТЗ ИИ). Миграций нет |
 | 2.92 | 2026-10-30 | Mcp: удалена неработающая заглушка MCP-сервера (`site/src/Mcp`, команда `app:mcp:serve`, `docs/mcp/`), префикс `App\Mcp\` в `ModuleAccessMap`, методы, нужные только ей: `CashFacade::listTransactions`, `listCashflowCategories`, `listAutoRules`, `upsertCashflowCategory`, `upsertAutoRule` с DTO `CashflowCategoryInput`, `AutoRuleInput`, `AutoRuleConditionInput`; `CashFacade::MAX_PER_PAGE`, `CashTransactionAutoRuleRepository::findByCompany`; `CompanyFacade::resolveIdByName` и `CompanyRepository::findIdsByExactName`. Миграций нет |
 | 2.91 | 2026-10-30 | Ai: удалён неработающий прототип модуля `Ai` (`CashflowAgent`, `LlmClient`, `/ai/suggestions`), env `LLM_API_URL`/`LLM_API_KEY`, методы `CashFacade`, нужные только агенту (`sum*IncludingDeleted`, `listPlannedPayments`), с DTO `CashCategoryTurnover`, `PlannedPaymentSummary`; миграция `Version20261030120000` удаляет пустые таблицы `ai_agent`, `ai_run`, `ai_suggestion`. ИИ — будущий `services/ai-service` (`docs/tasks/ai/`) |
@@ -4541,7 +4548,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-10-30 | ai-service | ИИ-задачи — отдельный Python-сервис с общим pipeline `prepare → generate → parse → verify → decide → finalize`; вердикт решают проверки, высокий риск никогда не принимается автоматически | Модель не источник цифр: проверяемость и единый путь для всех задач |
 | 2026-10-30 | ai-service | LLM Gateway: провайдеры через адаптеры по семейству API (OpenAI-совместимый, Anthropic, YandexGPT), маршрут задачи в `routes.yaml`, режимы `single`/`fallback`, `vote` — этап 2 | Минимум 3 модели без зашитого провайдера; задачи SDK не импортируют |
 | 2026-10-30 | ServiceGateway | Обмен с ai-service — pull: Symfony ставит задачу (`Idempotency-Key`) и забирает результаты курсором с ack; сервис не пишет в Symfony | Сервис не знает о БД Symfony; повтор безопасен с обеих сторон |
-| 2026-10-30 | Cash | ИИ-категоризация ДДС — сначала только подсказки с решением человека; строка подсказки пишется до постановки задачи с предсказанным `task_id`, зависшие закрываются через 24 ч | Автоприменение — после периода подсказок (решение Владельца); запись до dispatch не теряет задачу при падении между commit и dispatch |
+| 2026-10-30 | Cash | ИИ-категоризация ДДС — сначала только подсказки с решением человека; запись задачи (ключ, payload) и строки подсказок пишутся до постановки с предсказанным `task_id`, задача без ответа переотправляется тем же ключом и payload | Автоприменение — после периода подсказок (решение Владельца); падение между commit и dispatch или потерянное сообщение не теряют задачу, запоздалый ответ принимается |
 
 ## Api — внешние Bearer-ключи и подготовленные права (api-management)
 

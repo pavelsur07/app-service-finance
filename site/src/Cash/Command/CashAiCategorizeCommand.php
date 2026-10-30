@@ -68,10 +68,11 @@ final class CashAiCategorizeCommand extends Command
             return self::SUCCESS;
         }
         $output->writeln(sprintf(
-            'ai-categorize: %d operations in %d tasks requested, %d lost requests closed%s',
+            'ai-categorize: %d operations in %d tasks requested, %d tasks re-sent, %d requests expired%s',
             $result->requested,
             $result->tasks,
-            $result->lost,
+            $result->redispatched,
+            $result->expired,
             null === $result->skippedReason ? '' : ', skipped: '.$result->skippedReason,
         ));
 

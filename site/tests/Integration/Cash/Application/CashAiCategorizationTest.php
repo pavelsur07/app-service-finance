@@ -18,7 +18,9 @@ use App\Cash\Enum\Transaction\CashCategorySuggestionDecisionOutcome;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus as Status;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
+use App\Cash\Exception\CashCategorySuggestionStateException;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
+use App\Cash\Repository\Transaction\CashCategorizationTaskRepository;
 use App\Cash\Repository\Transaction\CashCategorySuggestionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -174,18 +176,87 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(1, $this->request()->requested);
     }
 
-    public function testLostRequestIsClosedAfterADay(): void
+    public function testTaskWithoutAnswerIsSentAgainWithSameKeyAndPayloadAndLateAnswerIsAccepted(): void
     {
-        $this->transaction('Оплата аренды');
+        $tx = $this->transaction('Оплата аренды офиса');
         $this->em->flush();
         $this->request();
+        // Категории поменялись после постановки: переотправка всё равно несёт исходный payload.
+        $this->em->persist($this->category('Новая статья', PaymentPlanType::OUTFLOW));
+        $this->em->flush();
 
-        $this->clock->modify('+25 hours');
+        $this->clock->modify('+30 minutes');
+        self::assertSame(0, $this->request()->redispatched, 'рано: последняя отправка меньше часа назад');
+
+        $this->clock->modify('+1 hour');
         $result = $this->request();
 
-        self::assertSame(1, $result->lost);
+        self::assertSame(1, $result->redispatched);
+        self::assertSame(0, $result->requested, 'операция с открытой подсказкой не ставится заново');
+        self::assertCount(2, $this->ai->requests);
+        self::assertSame($this->ai->requests[0]['key'], $this->ai->requests[1]['key']);
+        self::assertSame($this->ai->requests[0]['payload'], $this->ai->requests[1]['payload']);
+        self::assertSame($this->ai->requests[0]['taskId'], $this->ai->requests[1]['taskId']);
+
+        $this->consume($this->aiResult($this->ai->requests[0]['taskId'], [[(string) $tx->getId(), (string) $this->rent->getId(), 0.9]]));
+        self::assertSame(Status::SUGGESTED, $this->suggestionFor($tx)->getStatus());
+
+        // Ответ получен: запись задачи больше не нужна, переотправок нет.
+        $this->clock->modify('+2 hours');
+        self::assertSame(0, $this->request()->redispatched);
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_categorization_task'));
+    }
+
+    public function testRequestWithoutAnswerExpiresAfterAWeekWithoutCountingAsFailedAttempt(): void
+    {
+        $tx = $this->transaction('Оплата аренды');
+        $this->em->flush();
+
+        for ($i = 0; $i < 4; ++$i) {
+            $this->request();
+            $this->clock->modify('+8 days');
+        }
+        $result = $this->request();
+
+        // Четыре истечения подряд не исключили операцию (лимит MAX_FAILED_ATTEMPTS — для сбоев ответа).
+        self::assertSame(1, $result->expired);
         self::assertSame(1, $result->requested);
-        self::assertSame(2, $this->countSuggestions());
+        self::assertSame(Status::REQUESTED, $this->suggestionFor($tx)->getStatus());
+        self::assertSame(4, (int) $this->connection->fetchOne("SELECT count(*) FROM cash_category_suggestion WHERE error_code = 'expired'"));
+    }
+
+    public function testAcceptAfterDecisionCommittedByAnotherRequestKeepsThatDecision(): void
+    {
+        $tx = $this->transaction('Оплата аренды офиса');
+        $suggestion = $this->suggested($tx, $this->rent);
+        // Параллельный «Отклонить» закоммитил решение, пока эта копия подсказки лежала в памяти.
+        $this->connection->executeStatement(
+            "UPDATE cash_category_suggestion SET status = 'dismissed' WHERE id = ?",
+            [$suggestion->getId()],
+        );
+
+        try {
+            $this->accept($suggestion);
+            self::fail('решение, принятое другим запросом, не перезаписывается');
+        } catch (CashCategorySuggestionStateException) {
+        }
+
+        $this->em->clear();
+        self::assertNull($this->em->find(CashTransaction::class, $tx->getId())?->getCashflowCategory());
+        self::assertSame(Status::DISMISSED, $this->em->find(CashCategorySuggestion::class, $suggestion->getId())?->getStatus());
+    }
+
+    public function testDismissAfterAcceptCommittedByAnotherRequestIsRefused(): void
+    {
+        $tx = $this->transaction('Оплата аренды офиса');
+        $suggestion = $this->suggested($tx, $this->rent);
+        $this->connection->executeStatement(
+            "UPDATE cash_category_suggestion SET status = 'accepted' WHERE id = ?",
+            [$suggestion->getId()],
+        );
+
+        $this->expectException(CashCategorySuggestionStateException::class);
+        $this->dismissAction()((string) $this->company->getId(), $suggestion->getId(), (string) $this->user->getId());
     }
 
     public function testAcceptSetsCategoryLikeManualEditAndRecordsDecision(): void
@@ -304,6 +375,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         $action = new RequestCashAiCategorizationAction(
             $this->query(),
             $this->repository(),
+            self::getContainer()->get(CashCategorizationTaskRepository::class),
             $this->ai,
             $this->em,
             $this->clock,

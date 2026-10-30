@@ -7,8 +7,10 @@ namespace App\Cash\Application;
 use App\Cash\Application\DTO\CashAiCategorizationRequestResult;
 use App\Cash\Application\DTO\CashCategorizationCategory;
 use App\Cash\Application\DTO\CashCategorizationOperation;
+use App\Cash\Entity\Transaction\CashCategorizationTask;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
+use App\Cash\Repository\Transaction\CashCategorizationTaskRepository;
 use App\Cash\Repository\Transaction\CashCategorySuggestionRepository;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,9 +22,12 @@ use Webmozart\Assert\Assert;
 /**
  * Постановка ИИ-подсказок статей ДДС для операций без статьи (docs/tasks/ai/stages/stage-2.md).
  *
- * На пачку: строки `requested` с task_id пишутся одной транзакцией, задача ставится после
- * commit. Сбой между commit и постановкой не теряет операции навсегда: строка без ответа
- * дольше суток закрывается как `failed/lost`, и следующий прогон запрашивает операцию снова.
+ * На пачку: запись задачи (ключ повтора и payload) и строки `requested` с её task_id пишутся
+ * одной транзакцией, задача ставится после commit. Задача без ответа дольше часа после
+ * последней отправки переотправляется с тем же ключом и тем же payload (сбой между commit и
+ * отправкой, сообщение ушло в failed, сервис был недоступен) — запоздалый ответ первой
+ * отправки тоже принимается. Строки без ответа дольше 7 дней закрываются как
+ * `failed/expired`; транспортные сбои не считаются неудачной попыткой операции.
  * Параллельный прогон по той же компании отсекает частичный unique открытой подсказки
  * (команда держит lock).
  */
@@ -37,13 +42,16 @@ final class RequestCashAiCategorizationAction
     private const LOOKBACK_DAYS = 90;
     /** Автоправила срабатывают через ~10 с после записи операции; запас на очередь. */
     private const SETTLE_MINUTES = 10;
-    private const LOST_AFTER_HOURS = 24;
-    private const LOST_PER_RUN = 1000;
+    private const REDISPATCH_AFTER_HOURS = 1;
+    private const REDISPATCH_PER_RUN = 100;
+    private const EXPIRE_AFTER_DAYS = 7;
+    private const HOUSEKEEPING_PER_RUN = 1000;
     private const AMOUNT = '/^\d{1,16}\.\d{2}$/D';
 
     public function __construct(
         private readonly CashCategorizationQuery $query,
         private readonly CashCategorySuggestionRepository $suggestions,
+        private readonly CashCategorizationTaskRepository $tasks,
         private readonly AiTaskFacadeInterface $ai,
         private readonly EntityManagerInterface $entityManager,
         private readonly ClockInterface $clock,
@@ -60,11 +68,12 @@ final class RequestCashAiCategorizationAction
         }
 
         $now = $this->clock->now();
-        $lost = $this->closeLost($companyId, $now);
+        $expired = $this->expireAndCleanUp($companyId, $now);
+        $redispatched = $this->redispatchWaiting($companyId, $now);
 
         $categories = $this->query->findLeafCategories($companyId);
         if ([] === $categories) {
-            return new CashAiCategorizationRequestResult(enabled: true, lost: $lost, skippedReason: 'no_categories');
+            return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'no_categories');
         }
         if (\count($categories) > self::MAX_CATEGORIES) {
             $this->logger->warning('AI categorization skipped: category tree exceeds the contract limit.', [
@@ -72,7 +81,7 @@ final class RequestCashAiCategorizationAction
                 'categories' => \count($categories),
             ]);
 
-            return new CashAiCategorizationRequestResult(enabled: true, lost: $lost, skippedReason: 'too_many_categories');
+            return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'too_many_categories');
         }
 
         $operations = array_values(array_filter(
@@ -91,12 +100,14 @@ final class RequestCashAiCategorizationAction
         foreach (array_chunk($operations, self::BATCH_SIZE) as $batch) {
             $key = 'cash-categorize:'.Uuid::uuid7()->toString();
             $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $key);
-            $this->entityManager->wrapInTransaction(function () use ($batch, $companyId, $taskId, $now): void {
+            $payload = $this->payload($categories, $batch);
+            $this->entityManager->wrapInTransaction(function () use ($batch, $companyId, $taskId, $key, $payload, $now): void {
+                $this->entityManager->persist(new CashCategorizationTask($taskId, $companyId, $key, $payload, $now));
                 foreach ($batch as $operation) {
                     $this->entityManager->persist(new CashCategorySuggestion($companyId, $operation->id, $taskId, $now));
                 }
             });
-            $this->ai->requestTask($companyId, self::TASK_TYPE, $this->payload($categories, $batch), $key);
+            $this->ai->requestTask($companyId, self::TASK_TYPE, $payload, $key);
             $requested += \count($batch);
             ++$tasks;
         }
@@ -105,33 +116,82 @@ final class RequestCashAiCategorizationAction
             'companyId' => $companyId,
             'operations' => $requested,
             'tasks' => $tasks,
-            'lost' => $lost,
+            'redispatched' => $redispatched,
+            'expired' => $expired,
         ]);
 
-        return new CashAiCategorizationRequestResult(enabled: true, lost: $lost, requested: $requested, tasks: $tasks);
+        return new CashAiCategorizationRequestResult(
+            enabled: true,
+            expired: $expired,
+            redispatched: $redispatched,
+            requested: $requested,
+            tasks: $tasks,
+        );
     }
 
-    private function closeLost(string $companyId, \DateTimeImmutable $now): int
+    /**
+     * Строки без ответа дольше EXPIRE_AFTER_DAYS — `failed/expired`; записи задач без строк
+     * `requested` больше не нужны для переотправки и удаляются.
+     */
+    private function expireAndCleanUp(string $companyId, \DateTimeImmutable $now): int
     {
-        $lost = $this->suggestions->findRequestedBefore(
+        $expired = $this->suggestions->findRequestedBefore(
             $companyId,
-            $now->modify(sprintf('-%d hours', self::LOST_AFTER_HOURS)),
-            self::LOST_PER_RUN,
+            $now->modify(sprintf('-%d days', self::EXPIRE_AFTER_DAYS)),
+            self::HOUSEKEEPING_PER_RUN,
         );
-        if ([] === $lost) {
+        if ([] !== $expired) {
+            $this->entityManager->wrapInTransaction(static function () use ($expired, $now): void {
+                foreach ($expired as $suggestion) {
+                    $suggestion->fail('expired', null, $now);
+                }
+            });
+            $this->logger->warning('AI categorization requests without an answer expired.', [
+                'companyId' => $companyId,
+                'count' => \count($expired),
+            ]);
+        }
+
+        $settled = $this->tasks->findSettled($companyId, self::HOUSEKEEPING_PER_RUN);
+        if ([] !== $settled) {
+            $this->entityManager->wrapInTransaction(function () use ($settled): void {
+                foreach ($settled as $task) {
+                    $this->entityManager->remove($task);
+                }
+            });
+        }
+
+        return \count($expired);
+    }
+
+    /**
+     * Переотправка задач без ответа с исходным ключом и payload. Отметка отправки
+     * коммитится до отправки: падение между ними даст ещё одну переотправку через час.
+     */
+    private function redispatchWaiting(string $companyId, \DateTimeImmutable $now): int
+    {
+        $waiting = $this->tasks->findWaitingDispatchedBefore(
+            $companyId,
+            $now->modify(sprintf('-%d hours', self::REDISPATCH_AFTER_HOURS)),
+            self::REDISPATCH_PER_RUN,
+        );
+        if ([] === $waiting) {
             return 0;
         }
-        $this->entityManager->wrapInTransaction(static function () use ($lost, $now): void {
-            foreach ($lost as $suggestion) {
-                $suggestion->fail('lost', null, $now);
+        $this->entityManager->wrapInTransaction(static function () use ($waiting, $now): void {
+            foreach ($waiting as $task) {
+                $task->markDispatched($now);
             }
         });
-        $this->logger->warning('AI categorization requests without an answer were closed as lost.', [
+        foreach ($waiting as $task) {
+            $this->ai->requestTask($companyId, self::TASK_TYPE, $task->getPayload(), $task->getRequestKey());
+        }
+        $this->logger->warning('AI categorization tasks without an answer were dispatched again.', [
             'companyId' => $companyId,
-            'count' => \count($lost),
+            'count' => \count($waiting),
         ]);
 
-        return \count($lost);
+        return \count($waiting);
     }
 
     /**

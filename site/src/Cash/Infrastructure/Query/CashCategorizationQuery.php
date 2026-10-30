@@ -22,7 +22,7 @@ use Webmozart\Assert\Assert;
  */
 final readonly class CashCategorizationQuery
 {
-    /** Операция с таким числом сбоев подсказки больше не запрашивается: не платить за безнадёжные. */
+    /** Операция с таким числом сбоев ответа больше не запрашивается: не платить за безнадёжные. Истечение без ответа (`expired`) — сбой доставки, не считается. */
     public const MAX_FAILED_ATTEMPTS = 3;
 
     private const UNCATEGORIZED = <<<'SQL'
@@ -65,7 +65,7 @@ final readonly class CashCategorizationQuery
                )
                AND (
                    SELECT count(*) FROM cash_category_suggestion s
-                   WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status = \'failed\'
+                   WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status = \'failed\' AND s.error_code IS DISTINCT FROM \'expired\'
                ) < :maxFailed
              ORDER BY tx.occurred_at DESC, tx.id
              LIMIT :limit',

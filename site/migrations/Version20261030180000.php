@@ -19,7 +19,7 @@ final class Version20261030180000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Cash: cash_category_suggestion for AI category suggestions';
+        return 'Cash: cash_category_suggestion and cash_categorization_task for AI category suggestions';
     }
 
     public function up(Schema $schema): void
@@ -31,10 +31,15 @@ final class Version20261030180000 extends AbstractMigration
         $this->addSql('CREATE INDEX idx_cash_category_suggestion_company_status ON cash_category_suggestion (company_id, status, requested_at)');
         $this->addSql('ALTER TABLE cash_category_suggestion ADD CONSTRAINT fk_cash_category_suggestion_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE');
         $this->addSql('ALTER TABLE cash_category_suggestion ADD CONSTRAINT fk_cash_category_suggestion_transaction FOREIGN KEY (transaction_id) REFERENCES cash_transaction (id) ON DELETE CASCADE');
+
+        $this->addSql('CREATE TABLE cash_categorization_task (id UUID NOT NULL, company_id UUID NOT NULL, request_key VARCHAR(200) NOT NULL, payload JSON NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, dispatched_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, dispatch_count INT NOT NULL, PRIMARY KEY (id))');
+        $this->addSql('CREATE INDEX idx_cash_categorization_task_company_dispatched ON cash_categorization_task (company_id, dispatched_at)');
+        $this->addSql('ALTER TABLE cash_categorization_task ADD CONSTRAINT fk_cash_categorization_task_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE');
     }
 
     public function down(Schema $schema): void
     {
+        $this->addSql('DROP TABLE cash_categorization_task');
         $this->addSql('DROP TABLE cash_category_suggestion');
     }
 }

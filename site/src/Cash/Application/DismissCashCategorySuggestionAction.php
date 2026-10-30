@@ -27,9 +27,11 @@ final class DismissCashCategorySuggestionAction
         Assert::uuid($companyId);
         Assert::uuid($userId);
 
-        $suggestion = $this->suggestions->findOneForCompany($companyId, $suggestionId)
-            ?? throw CashCategorySuggestionNotFoundException::forId($suggestionId);
-        $suggestion->dismiss($userId, $this->clock->now());
-        $this->entityManager->flush();
+        // Блокировка строки — в явной транзакции: вне её FOR UPDATE снимается сразу после запроса.
+        $this->entityManager->wrapInTransaction(function () use ($companyId, $suggestionId, $userId): void {
+            $suggestion = $this->suggestions->findOneForCompanyForUpdate($companyId, $suggestionId)
+                ?? throw CashCategorySuggestionNotFoundException::forId($suggestionId);
+            $suggestion->dismiss($userId, $this->clock->now());
+        });
     }
 }

@@ -53,7 +53,7 @@ final class AcceptCashCategorySuggestionAction
 
         /** @var Outcome $outcome */
         $outcome = $this->entityManager->wrapInTransaction(function () use ($companyId, $suggestionId, $userId): Outcome {
-            $suggestion = $this->suggestions->findOneForCompany($companyId, $suggestionId)
+            $suggestion = $this->suggestions->findOneForCompanyForUpdate($companyId, $suggestionId)
                 ?? throw CashCategorySuggestionNotFoundException::forId($suggestionId);
             if (CashCategorySuggestionStatus::SUGGESTED !== $suggestion->getStatus()) {
                 throw CashCategorySuggestionStateException::fromStatus($suggestion->getStatus());
