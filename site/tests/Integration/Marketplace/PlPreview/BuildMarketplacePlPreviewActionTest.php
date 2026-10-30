@@ -11,12 +11,15 @@ use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListingTag;
+use App\Marketplace\Entity\MarketplaceSaleMapping;
+use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
+use App\Marketplace\Infrastructure\Query\OzonPlMappingWarningsQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewAdLedgerQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewCostCoverageQuery;
 use App\Marketplace\Infrastructure\Query\PlPreviewFactsQuery;
@@ -26,6 +29,7 @@ use App\Marketplace\Repository\MarketplaceListingTagRepository;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAds\Facade\PlPreviewAdSpendProvider;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -66,7 +70,46 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
             $container->get(FinanceFacade::class),
             new PlPreviewAdLedgerQuery($connection),
             new PlPreviewAdSpendProvider($container->get(MarketplaceAdsFacade::class)),
+            new OzonPlMappingWarningsQuery($connection),
         );
+    }
+
+    public function testLegacyOzonMappingWarnsWithoutChangingAmounts(): void
+    {
+        $legacy = new MarketplaceSaleMapping(
+            Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::OZON,
+            AmountSource::SALE_REVENUE, $this->fixture->realization,
+        );
+        $this->em->persist($legacy);
+        $this->em->flush();
+
+        $report = $this->build();
+        self::assertStringContainsString('sale_revenue', implode(' ', $report->warnings));
+        self::assertStringContainsString('sale_realization', implode(' ', $report->warnings));
+        self::assertSame(300.0, $this->values($report)['REAL']['total']);
+        foreach ([MarketplaceType::WILDBERRIES, MarketplaceType::YANDEX_MARKET, MarketplaceType::SBER_MEGAMARKET] as $marketplace) {
+            $other = ($this->action)(new BuildMarketplacePlPreviewCommand(
+                $this->companyId(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'), $marketplace,
+            ));
+            self::assertStringNotContainsString('sale_revenue', implode(' ', $other->warnings), $marketplace->value);
+        }
+        $legacy->setIsActive(false);
+        $this->em->flush();
+        self::assertStringNotContainsString('sale_revenue', implode(' ', $this->build()->warnings));
+    }
+
+    public function testMissingRealizationIsExplicitlyReported(): void
+    {
+        $sale = MarketplaceSaleBuilder::aSale()
+            ->forCompany($this->fixture->company)->forListing($this->fixture->ozA)
+            ->withMarketplace(MarketplaceType::OZON)->withSaleDate(new \DateTimeImmutable('2026-02-10'))->build();
+        $this->em->persist($sale);
+        $this->em->flush();
+        $report = ($this->action)(new BuildMarketplacePlPreviewCommand(
+            $this->companyId(), new \DateTimeImmutable('2026-02-01'), new \DateTimeImmutable('2026-02-28'), MarketplaceType::OZON,
+        ));
+        self::assertStringContainsString('2026-02', implode(' ', $report->warnings));
+        self::assertStringContainsString('не загружена или не обработана', implode(' ', $report->warnings));
     }
 
     public function testColumnsByTagCommonAndTotal(): void
