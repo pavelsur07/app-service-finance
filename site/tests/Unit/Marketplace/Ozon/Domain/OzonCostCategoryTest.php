@@ -223,6 +223,8 @@ final class OzonCostCategoryTest extends TestCase
         yield 'DefectFineComplaint' => ['DefectFineComplaint', 'ozon_fines_customer_complaint'];
         yield 'Drop-Off' => ['Drop-Off', 'ozon_dropoff'];
         yield 'Marketing' => ['Marketing', 'ozon_marketing_services'];
+        yield 'SellerReturnPreparationByPartner' => ['SellerReturnPreparationByPartner', 'ozon_return_preparation_partner'];
+        yield 'SellerReturnDelivery' => ['SellerReturnDelivery', 'ozon_return_export_delivery'];
         yield 'DefectFineErrors' => ['DefectFineErrors', 'ozon_defect_rate_fine'];
     }
 

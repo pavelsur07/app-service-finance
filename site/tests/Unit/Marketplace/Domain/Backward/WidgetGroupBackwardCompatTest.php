@@ -56,6 +56,8 @@ final class WidgetGroupBackwardCompatTest extends TestCase
         'ozon_crossdocking' => 'Услуги доставки и FBO',
         'ozon_supply_shortage' => 'Услуги доставки и FBO',
         'ozon_return_from_stock' => 'Услуги доставки и FBO',
+        'ozon_return_preparation_partner' => 'Услуги доставки и FBO',
+        'ozon_return_export_delivery' => 'Услуги доставки и FBO',
         'ozon_supply_additional' => 'Услуги доставки и FBO',
         'ozon_supply_surplus' => 'Услуги доставки и FBO',
         'ozon_storage' => 'Услуги доставки и FBO',

@@ -103,6 +103,8 @@ final class OzonAccrualByDayMapperTaxonomyTest extends IntegrationTestCase
         yield '29 LastMileCourier' => [29, 'LastMileCourier', 'ozon_delivery_to_pickup_partners', 'Услуги партнёров', TransactionType::LAST_MILE];
         yield '45 PickUpPointReturnAcceptance' => [45, 'PickUpPointReturnAcceptance', 'ozon_partner_return_processing', 'Услуги партнёров', TransactionType::FEE];
         yield '71 SellerReturns' => [71, 'SellerReturns', 'ozon_warehouse_export', 'Услуги FBO', TransactionType::STORAGE];
+        yield '136 SellerReturnPreparationByPartner' => [136, 'SellerReturnPreparationByPartner', 'ozon_warehouse_export_preparation_partner', 'Услуги FBO', TransactionType::STORAGE];
+        yield '137 SellerReturnDelivery' => [137, 'SellerReturnDelivery', 'ozon_warehouse_export_delivery', 'Услуги FBO', TransactionType::LOGISTICS];
         yield '46 Placements' => [46, 'Placements', 'ozon_warehouse_placement', 'Услуги FBO', TransactionType::STORAGE];
         yield '84 ItemPacking' => [84, 'ItemPacking', 'ozon_warehouse_additional_packaging', 'Услуги FBO', TransactionType::FEE];
         yield '78 TemporaryPlacement' => [78, 'TemporaryPlacement', 'ozon_fbs_return_short_placement', 'Услуги FBO', TransactionType::STORAGE];

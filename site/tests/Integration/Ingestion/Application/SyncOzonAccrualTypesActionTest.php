@@ -35,8 +35,8 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
 
         $result = $this->sync($raw);
 
-        self::assertSame(126, $result->rows);
-        self::assertCount(126, $result->createdTypeIds);
+        self::assertSame(128, $result->rows);
+        self::assertCount(128, $result->createdTypeIds);
         self::assertSame([], $result->updatedTypeIds);
         self::assertFalse($result->stale);
 
@@ -44,7 +44,7 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         self::assertSame('LastMileCourier', $row['name']);
         self::assertSame('Доставка до места выдачи', $row['description']);
         self::assertNull($this->typeRow(127)['description']);
-        self::assertSame(126, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_ozon_accrual_types'));
+        self::assertSame(128, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_ozon_accrual_types'));
     }
 
     public function testSameContentAgainChangesNothing(): void
@@ -55,7 +55,7 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         $result = $this->sync($this->storeVersion($this->fixtureRows(), '2026-10-08 02:31:00', $otherCompany), $otherCompany);
 
         self::assertFalse($result->hasChanges());
-        self::assertSame(126, $result->unchanged);
+        self::assertSame(128, $result->unchanged);
     }
 
     public function testChangedDescriptionUpdatesRowButKeepsNameAndFirstSeen(): void
@@ -186,7 +186,7 @@ final class SyncOzonAccrualTypesActionTest extends IntegrationTestCase
         $result = $this->sync($this->storeVersion($this->fixtureRows(), '2026-10-08 02:30:00'), dryRun: true);
 
         self::assertTrue($result->dryRun);
-        self::assertCount(126, $result->createdTypeIds);
+        self::assertCount(128, $result->createdTypeIds);
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_ozon_accrual_types'));
     }
 

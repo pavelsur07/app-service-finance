@@ -267,6 +267,20 @@ final readonly class OzonCostCategory
                 accrualTypeNames: ['SellerReturns'],
             ),
             new self(
+                code: 'ozon_return_preparation_partner',
+                name: 'Подготовка товара к вывозу партнёрами Ozon',
+                widgetGroup: 'Услуги доставки и FBO',
+                xlsxGroup: 'Услуги FBO',
+                accrualTypeNames: ['SellerReturnPreparationByPartner'],
+            ),
+            new self(
+                code: 'ozon_return_export_delivery',
+                name: 'Доставка вывоза Ozon',
+                widgetGroup: 'Услуги доставки и FBO',
+                xlsxGroup: 'Услуги FBO',
+                accrualTypeNames: ['SellerReturnDelivery'],
+            ),
+            new self(
                 code: 'ozon_supply_additional',
                 name: 'Обработка товара в грузоместе FBO Ozon',
                 widgetGroup: 'Услуги доставки и FBO',

@@ -102,6 +102,10 @@ marketplaces:
       - cost_code: ozon_return_from_stock
         pl_code: COGS_RETURNS_DELIVERY
         include_in_pl: true
+      - cost_code: ozon_return_export_delivery
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+        note: "SellerReturnDelivery (type 137), решение Владельца 30.10.2026"
       - cost_code: ozon_logistic_return_trans
         pl_code: COGS_RETURNS_DELIVERY
         include_in_pl: true
@@ -165,6 +169,10 @@ marketplaces:
         include_in_pl: true
         confidence: medium
         note: "Хранение возврата — складская услуга, не логистика"
+      - cost_code: ozon_return_preparation_partner
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+        note: "SellerReturnPreparationByPartner (type 136), решение Владельца 30.10.2026"
       - cost_code: ozon_return_storage_wh
         pl_code: OPEX_WH_STORAGE
         include_in_pl: true
