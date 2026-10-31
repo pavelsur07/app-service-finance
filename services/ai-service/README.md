@@ -46,12 +46,31 @@ python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/
 
 `evals-compare` гоняет каждую модель отдельно через тот же pipeline пачками по
 50 и печатает таблицу «модель × точность × стоимость × задержка»; цены —
-`config/prices.yaml` (₽ за 1 млн токенов), без ключей модели маршрута не
+`config/prices.yaml` (₽ за 1 млн токенов), без токена шлюза модели маршрута не
 вызываются (`--models stub/categorize --routes config/routes.dev.yaml` — без сети).
+Модели прод-маршрутов отвечают только через шлюз, то есть только с app-сервера
+(в контейнере `ai-service`; наборы — в образе, `AI_SERVICE_EVALS_DIR=/app/evals`).
+
+## Провайдеры — через шлюз ИИ
+
+`config/routes.yaml`: `openai`, `deepseek`, `kimi` с `base_url`
+`https://ai.vashfindir.ru/<провайдер>/v1` и одним токеном `AI_GATEWAY_TOKEN`;
+ключи провайдеров — только на шлюзе (`gateway/README.md`). Задан
+`AI_SERVICE_LLM_GATEWAY_URL` (в проде — всегда) → провайдер с `base_url` мимо
+шлюза или без него не загружается: `api`, `worker` и команды с моделями выходят с 2.
+
+```bash
+python -m ai_service gateway-check   # бесплатно: /models с токеном → 200, без → 401, по провайдеру маршрутов
+python -m ai_service llm-ping        # платно (доли копейки): «ok» одним словом, max_tokens 5
+```
+
+Обе — без БД, трассы не пишут; выход 0, только если ответили все провайдеры
+маршрутов; строки `<провайдер>: ok …` / `<провайдер>: fail <код>`, без токена и
+текста ответа.
 
 ## Команды образа
 
-`python -m ai_service api | worker | migrate | cleanup-traces | evals-import | evals-compare`.
+`python -m ai_service api | worker | migrate | cleanup-traces | evals-import | evals-compare | gateway-check | llm-ping`.
 
 ## Переменные окружения
 
@@ -61,4 +80,5 @@ python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/
 | `AI_SERVICE_API_TOKEN` | токен «Symfony → сервис», ≥ 16 символов |
 | `AI_SERVICE_ROUTES_FILE` | маршруты задач (по умолчанию `config/routes.yaml`) |
 | `AI_SERVICE_WORKER_*`, `AI_SERVICE_TRACE_TTL_DAYS`, `AI_SERVICE_LLM_*` | аренда, попытки, бэкофф, TTL трасс, таймаут и повторы LLM (`config.py`) |
-| `AI_OPENAI_API_KEY`, `AI_DEEPSEEK_API_KEY`, `AI_LOCAL_API_KEY`, `AI_ANTHROPIC_API_KEY`, `AI_YANDEX_API_KEY` + `AI_YANDEX_FOLDER_ID` | ключи провайдеров из `routes.yaml`; пусто — провайдер выключен |
+| `AI_GATEWAY_TOKEN` | токен шлюза ИИ для провайдеров `routes.yaml`; пусто — провайдеры выключены |
+| `AI_SERVICE_LLM_GATEWAY_URL` | URL шлюза; задан — `base_url` провайдеров обязаны начинаться с него |

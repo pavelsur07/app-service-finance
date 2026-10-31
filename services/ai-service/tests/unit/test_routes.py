@@ -3,16 +3,20 @@ from pathlib import Path
 import pytest
 
 from ai_service.llm.routes import (
+    AdapterType,
     Mode,
     ModelRef,
     Route,
+    RoutingConfig,
     RoutingConfigError,
+    assert_via_gateway,
     load_routing,
     parse_routing,
     worst_case_seconds,
 )
 
 ROUTES_FILE = Path(__file__).resolve().parents[2] / "config" / "routes.yaml"
+GATEWAY = "https://ai.vashfindir.ru"
 
 
 def test_repository_routes_load_and_only_stub_is_available_without_keys() -> None:
@@ -21,10 +25,51 @@ def test_repository_routes_load_and_only_stub_is_available_without_keys() -> Non
     assert {name for name, p in routing.providers.items() if p.available} == {"stub"}
 
 
-def test_provider_becomes_available_with_key_env() -> None:
-    routing = load_routing(ROUTES_FILE, env={"AI_OPENAI_API_KEY": "k", "AI_YANDEX_API_KEY": "k"})
-    assert routing.providers["openai"].available
-    assert not routing.providers["yandex"].available  # нужен ещё folder_id
+def test_repository_providers_share_gateway_token() -> None:
+    routing = load_routing(ROUTES_FILE, env={"AI_GATEWAY_TOKEN": "t"})
+    assert {name for name, p in routing.providers.items() if p.available} == {"stub", "openai", "deepseek", "kimi"}
+    assert {p.api_key for p in routing.providers.values() if p.type is not AdapterType.STUB} == {"t"}
+
+
+def test_repository_routes_go_through_gateway() -> None:
+    assert_via_gateway(load_routing(ROUTES_FILE, env={}), GATEWAY)
+
+
+def test_repository_route_uses_only_configured_gateway_providers() -> None:
+    # Kimi — вне маршрута до ключа на шлюзе (#2837): общий токен, шлюз ответил бы 503.
+    route = load_routing(ROUTES_FILE, env={}).routes["categorize_transactions"]
+    assert [ref.provider for ref in route.models] == ["deepseek", "openai"]
+
+
+def _one_provider(spec: dict[str, object]) -> RoutingConfig:
+    return parse_routing({"providers": {"stub": {"type": "stub"}, "p": spec}}, {})
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        {"type": "openai_compatible", "base_url": "https://api.openai.com/v1"},
+        {"type": "openai_compatible", "base_url": "https://ai.vashfindir.ru.evil/openai/v1"},
+        {"type": "openai_compatible", "base_url": "http://ai.vashfindir.ru/openai/v1"},
+        {"type": "openai_compatible", "base_url": "https://ai.vashfindir.ru"},
+        {"type": "openai_compatible"},
+        {"type": "anthropic"},
+        {"type": "yandexgpt"},
+    ],
+)
+def test_provider_bypassing_gateway_is_rejected(spec: dict[str, object]) -> None:
+    with pytest.raises(RoutingConfigError, match="provider p"):
+        assert_via_gateway(_one_provider(spec), GATEWAY)
+
+
+@pytest.mark.parametrize("gateway", [GATEWAY, GATEWAY + "/"])
+def test_provider_behind_gateway_passes(gateway: str) -> None:
+    assert_via_gateway(_one_provider({"type": "openai_compatible", "base_url": GATEWAY + "/x/v1"}), gateway)
+
+
+@pytest.mark.parametrize("gateway", [None, ""])
+def test_gateway_guard_is_off_without_gateway_url(gateway: str | None) -> None:
+    assert_via_gateway(_one_provider({"type": "openai_compatible", "base_url": "https://api.openai.com/v1"}), gateway)
 
 
 @pytest.mark.parametrize(

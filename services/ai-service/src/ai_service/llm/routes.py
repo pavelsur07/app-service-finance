@@ -118,6 +118,22 @@ def _env(env: dict[str, str], name: Any) -> str | None:
     return env.get(name) or None
 
 
+def assert_via_gateway(routing: RoutingConfig, gateway_url: str | None) -> None:
+    """Прод: провайдеры (кроме stub) — только через шлюз ИИ (docs/tasks/ai/gateway/g2.md).
+
+    Префикс «<шлюз>/», а не хост: не пропустит ни `ai.vashfindir.ru.evil`, ни `http://`.
+    Провайдер без base_url идёт на адрес адаптера по умолчанию — мимо шлюза.
+    """
+    if not gateway_url:
+        return
+    prefix = gateway_url.rstrip("/") + "/"
+    for name, provider in routing.providers.items():
+        if provider.type is AdapterType.STUB:
+            continue
+        if not provider.base_url or not provider.base_url.startswith(prefix):
+            raise RoutingConfigError(f"provider {name}: base_url must start with {prefix} (AI_SERVICE_LLM_GATEWAY_URL)")
+
+
 def worst_case_seconds(route: Route, timeout_seconds: float, retries_per_model: int, parse_attempts: int = 2) -> float:
     """Верхняя оценка одного прогона задачи: все модели маршрута, все повторы, повтор разбора ответа."""
     return parse_attempts * len(route.models) * (retries_per_model + 1) * timeout_seconds

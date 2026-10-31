@@ -1,6 +1,9 @@
 # Маршруты задач к моделям (ТЗ §5.1). Провайдер, модель и режим — конфиг, не код.
-# Ключи — только env-переменные (имена здесь, значения — env / GitHub secrets).
-# Провайдер без ключа выключен: fallback его пропускает, single — задача уходит в повтор.
+#
+# Провайдеры — только через шлюз ИИ (docs/tasks/ai/gateway/): ключи провайдеров живут на
+# шлюзе, сервис предъявляет один токен шлюза AI_GATEWAY_TOKEN. При заданном
+# AI_SERVICE_LLM_GATEWAY_URL сервис не стартует, если base_url провайдера мимо шлюза.
+# Провайдер без токена в env выключен: fallback его пропускает, single — задача уходит в повтор.
 #
 # Режимы: single — одна модель; fallback — при ошибке или таймауте следующая;
 # vote — с первой задачей высокого риска (пока конфиг с ним не загружается).
@@ -10,24 +13,17 @@ providers:
     type: stub
   openai:
     type: openai_compatible
-    base_url: https://api.openai.com/v1
-    api_key_env: AI_OPENAI_API_KEY
+    base_url: https://ai.vashfindir.ru/openai/v1
+    api_key_env: AI_GATEWAY_TOKEN
   deepseek:
     type: openai_compatible
-    base_url: https://api.deepseek.com/v1
-    api_key_env: AI_DEEPSEEK_API_KEY
-  local:
-    # self-hosted vLLM / Ollama с OpenAI-совместимым API
+    base_url: https://ai.vashfindir.ru/deepseek/v1
+    api_key_env: AI_GATEWAY_TOKEN
+  kimi:
+    # В маршруты — после ключа на шлюзе (#2837): с общим токеном шлюз ответил бы 503.
     type: openai_compatible
-    base_url: http://localhost:11434/v1
-    api_key_env: AI_LOCAL_API_KEY
-  anthropic:
-    type: anthropic
-    api_key_env: AI_ANTHROPIC_API_KEY
-  yandex:
-    type: yandexgpt
-    api_key_env: AI_YANDEX_API_KEY
-    folder_id_env: AI_YANDEX_FOLDER_ID
+    base_url: https://ai.vashfindir.ru/kimi/v1
+    api_key_env: AI_GATEWAY_TOKEN
 
 tasks:
   # Диагностика пути Symfony → сервис → Symfony, без сети.
@@ -35,8 +31,8 @@ tasks:
     mode: single
     models: [stub/echo]
 
-  # Подсказка статьи ДДС (этап 2). Модели — кандидаты до решения §12 ТЗ: без ключей
-  # провайдеры выключены, живые вызовы — отдельное одобрение. Локально — config/routes.dev.yaml.
+  # Подсказка статьи ДДС (этап 2). Модели — кандидаты: порядок утверждается по evals-compare
+  # (G3, живые вызовы — по команде Владельца). Локально — config/routes.dev.yaml.
   categorize_transactions:
     mode: fallback
-    models: [deepseek/deepseek-chat, yandex/yandexgpt/latest, anthropic/claude-haiku-5-5]
+    models: [deepseek/deepseek-chat, openai/gpt-4.1-mini]

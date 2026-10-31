@@ -756,11 +756,7 @@ jobs:
                   OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
                   AI_SERVICE_API_TOKEN: ${{ secrets.AI_SERVICE_API_TOKEN }}
                   AI_SERVICE_DB_PASSWORD: ${{ secrets.AI_SERVICE_DB_PASSWORD }}
-                  AI_OPENAI_API_KEY: ${{ secrets.AI_OPENAI_API_KEY }}
-                  AI_DEEPSEEK_API_KEY: ${{ secrets.AI_DEEPSEEK_API_KEY }}
-                  AI_ANTHROPIC_API_KEY: ${{ secrets.AI_ANTHROPIC_API_KEY }}
-                  AI_YANDEX_API_KEY: ${{ secrets.AI_YANDEX_API_KEY }}
-                  AI_YANDEX_FOLDER_ID: ${{ secrets.AI_YANDEX_FOLDER_ID }}
+                  AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
                   AI_SERVICE_COMPANY_ALLOWLIST: ${{ vars.AI_SERVICE_COMPANY_ALLOWLIST }}
                   ALFA_TLS_CERT_PATH: ${{ secrets.ALFA_TLS_CERT_PATH }}
                   ALFA_TLS_KEY_PATH: ${{ secrets.ALFA_TLS_KEY_PATH }}
@@ -771,7 +767,7 @@ jobs:
               run: |
                   # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
                   # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
-                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_OPENAI_API_KEY AI_DEEPSEEK_API_KEY AI_ANTHROPIC_API_KEY AI_YANDEX_API_KEY AI_YANDEX_FOLDER_ID; do
+                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
                     case "${!v}" in
                       *[!A-Za-z0-9._~-]*)
                         echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
@@ -872,11 +868,8 @@ jobs:
                     export AI_SERVICE_API_TOKEN='${{ secrets.AI_SERVICE_API_TOKEN }}'
                     export AI_SERVICE_DB_PASSWORD='${{ secrets.AI_SERVICE_DB_PASSWORD }}'
                     export AI_SERVICE_COMPANY_ALLOWLIST='${{ vars.AI_SERVICE_COMPANY_ALLOWLIST }}'
-                    export AI_OPENAI_API_KEY='${{ secrets.AI_OPENAI_API_KEY }}'
-                    export AI_DEEPSEEK_API_KEY='${{ secrets.AI_DEEPSEEK_API_KEY }}'
-                    export AI_ANTHROPIC_API_KEY='${{ secrets.AI_ANTHROPIC_API_KEY }}'
-                    export AI_YANDEX_API_KEY='${{ secrets.AI_YANDEX_API_KEY }}'
-                    export AI_YANDEX_FOLDER_ID='${{ secrets.AI_YANDEX_FOLDER_ID }}'
+                    # Провайдеры ИИ — через шлюз ai.vashfindir.ru: на app только его токен.
+                    export AI_GATEWAY_TOKEN='${{ secrets.AI_GATEWAY_TOKEN }}'
                     export AI_SERVICE_SENTRY_DSN='${{ secrets.AI_SERVICE_SENTRY_DSN }}'
                     # Альфа (BankSync, docs/tasks/bank-sync/alfa-demo.md): секреты не заведены → пусто →
                     # Альфа не настроена. Символы проверены шагом выше. Сертификаты — в shared/alfa
@@ -889,7 +882,7 @@ jobs:
                     export ALFA_SANDBOX_ID_SIGNING_CERT_PATH='${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}'
                     export ALFA_SECRETS_DIR="$(cd .. && pwd)/shared/alfa"
                     mkdir -p "$ALFA_SECRETS_DIR"
-                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_OPENAI_API_KEY AI_DEEPSEEK_API_KEY AI_ANTHROPIC_API_KEY AI_YANDEX_API_KEY AI_YANDEX_FOLDER_ID; do
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
                       eval "val=\${$v}"
                       case "$val" in
                         *[!A-Za-z0-9._~-]*)
@@ -950,8 +943,8 @@ jobs:
                     if [ "$AI_SERVICE_ENABLED" = "true" ]; then
                       export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}ai-service"
                       echo "🐳 [4c/5] ai-service: БД и роль, образ, миграции, запуск API и воркера"
-                      if [ -z "$AI_SERVICE_DB_PASSWORD" ] || [ ${#AI_SERVICE_API_TOKEN} -lt 32 ]; then
-                        echo "❌ AI_SERVICE_ENABLED=true, но не заведён AI_SERVICE_DB_PASSWORD или AI_SERVICE_API_TOKEN (≥ 32 символов)"
+                      if [ -z "$AI_SERVICE_DB_PASSWORD" ] || [ ${#AI_SERVICE_API_TOKEN} -lt 32 ] || [ ${#AI_GATEWAY_TOKEN} -lt 32 ]; then
+                        echo "❌ AI_SERVICE_ENABLED=true, но не заведён AI_SERVICE_DB_PASSWORD, AI_SERVICE_API_TOKEN или AI_GATEWAY_TOKEN (≥ 32 символов)"
                         exit 1
                       fi
                       # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
@@ -959,6 +952,9 @@ jobs:
                         psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ai-service/db-bootstrap.sql
                       docker compose -f docker-compose.prod.yml pull ai-service ai-service-worker
                       docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service migrate < /dev/null
+                      # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
+                      # без токена → 401; бесплатно. Провал — до запуска воркера.
+                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service gateway-check < /dev/null
                       docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service ai-service-worker
                       echo "✅ ai-service healthy"
                     else

@@ -9,10 +9,13 @@
 
 ## Что сделать один раз
 
-1. **Провайдеры (ТЗ §12).** Ключи только тех провайдеров, что утверждены;
-   маршрут задачи — `services/ai-service/config/routes.yaml`
-   (`categorize_transactions`: `fallback` deepseek → yandex → anthropic).
-   Провайдер без ключа выключен, `fallback` его пропускает.
+1. **Провайдеры — через шлюз ИИ** (`docs/tasks/ai/gateway/`). Ключи OpenAI,
+   DeepSeek, Kimi живут только на шлюзе `ai.vashfindir.ru`; сервис предъявляет
+   токен шлюза `AI_GATEWAY_TOKEN` (тот же секрет, что у деплоя шлюза).
+   Маршрут — `services/ai-service/config/routes.yaml`
+   (`categorize_transactions`: `fallback` deepseek → openai; Kimi — после ключа,
+   #2837). Прод-compose задаёт `AI_SERVICE_LLM_GATEWAY_URL`: провайдер мимо шлюза
+   — сервис не стартует.
 2. **GlitchTip:** проект `ai-service` → DSN.
 3. **GitHub → Settings → Secrets and variables → Actions.**
 
@@ -23,10 +26,7 @@
    | `AI_SERVICE_API_TOKEN` | случайная строка ≥ 32 символов — токен «Symfony → сервис» |
    | `AI_SERVICE_DB_PASSWORD` | случайный пароль роли `svc_ai_service` |
    | `AI_SERVICE_SENTRY_DSN` | DSN из п. 2; пусто — только лог |
-   | `AI_DEEPSEEK_API_KEY` | ключ DeepSeek (если утверждён) |
-   | `AI_YANDEX_API_KEY`, `AI_YANDEX_FOLDER_ID` | ключ и каталог YandexGPT (если утверждён) |
-   | `AI_ANTHROPIC_API_KEY` | ключ Anthropic (если утверждён) |
-   | `AI_OPENAI_API_KEY` | ключ OpenAI (если утверждён) |
+   | `AI_GATEWAY_TOKEN` | уже заведён для шлюза (G1); ≥ 32 символов |
 
    Variables:
 
@@ -37,24 +37,31 @@
 
 4. **Деплой** (merge в master или `production_action=deploy`). Шаг `[4c/5]`
    сам создаёт роль `svc_ai_service` и БД `ai_service`
-   (`docker/ai-service/db-bootstrap.sql`), прогоняет миграции сервиса и
-   запускает `ai-service` (API) и `ai-service-worker`.
+   (`docker/ai-service/db-bootstrap.sql`), прогоняет миграции сервиса,
+   проверяет шлюз (`gateway-check`: `/models` с токеном → 200, без → 401 у
+   каждого провайдера маршрутов; бесплатно; провал — деплой красный до запуска)
+   и запускает `ai-service` (API) и `ai-service-worker`.
 
 ## Включение по шагам
 
-1. `AI_SERVICE_ENABLED=true`, allowlist пуст, деплой. `docker ps` —
-   `ai-service` `healthy`, `ai-service-worker` `Up`.
-2. Путь Symfony → сервис → Symfony без моделей: allowlist — одна компания,
+1. `AI_SERVICE_ENABLED=true`, allowlist пуст, деплой. В логе деплоя —
+   `deepseek: ok 200/401`, `openai: ok 200/401`; `docker ps` — `ai-service`
+   `healthy`, `ai-service-worker` `Up`.
+2. Связь с моделями (по команде Владельца — доли копейки):
+   `docker exec ai-service python -m ai_service llm-ping` — `ok <модель> <мс>` у
+   каждого провайдера. Затем `evals-compare` на синтетике в том же контейнере —
+   порядок моделей маршрута.
+3. Путь Symfony → сервис → Symfony без моделей: allowlist — одна компания,
    деплой, затем
    `docker exec scheduler php bin/console app:ai-service:echo --company-id=<uuid>`,
    через минуту `docker exec scheduler php bin/console app:ai-service:import-results`
    — `1 received, 1 acked`.
-3. Подсказки статей одной компании: cron `25 * * * *` ставит задачи
+4. Подсказки статей одной компании: cron `25 * * * *` ставит задачи
    (`app:cash:ai-categorize --all-enabled`), `*/5` забирает результаты.
    Подсказки видны в списке операций; автоприменение выключено, пока не
    включено командой `app:cash:ai-auto-apply --company-id= --enable` после
    ворот качества (этап 2.3).
-4. Метки точности — `app:cash:ai-categorize-stats --company-id=`; остальные
+5. Метки точности — `app:cash:ai-categorize-stats --company-id=`; остальные
    компании — дописать в allowlist и задеплоить.
 
 ## Проверка после деплоя
@@ -78,4 +85,5 @@
 
 `AI_SERVICE_API_TOKEN` и `AI_SERVICE_DB_PASSWORD` — сменить секрет и
 задеплоить: Symfony и сервис получают новое значение одним деплоем, пароль
-роли синхронизирует `db-bootstrap.sql`. Ключ провайдера — так же.
+роли синхронизирует `db-bootstrap.sql`. `AI_GATEWAY_TOKEN` и ключи провайдеров —
+`gateway/README.md`, «Ротация токена шлюза».

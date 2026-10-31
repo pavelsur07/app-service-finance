@@ -27,5 +27,7 @@ class Settings(BaseSettings):
     trace_ttl_days: int = 30
     trace_cleanup_interval_seconds: int = 3600
 
+    # Шлюз ИИ (docs/tasks/ai/gateway/): задан — провайдеры мимо него не загружаются.
+    llm_gateway_url: str | None = None
     llm_timeout_seconds: float = 60.0
     llm_retries_per_model: int = 1

@@ -624,12 +624,11 @@ services:
             TZ: Europe/Moscow
             AI_SERVICE_DB_DSN: postgresql://svc_ai_service:${AI_SERVICE_DB_PASSWORD:-}@site-postgres:5432/ai_service
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
-            # Ключи провайдеров из config/routes.yaml; пусто — провайдер выключен.
-            AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
-            AI_DEEPSEEK_API_KEY: ${AI_DEEPSEEK_API_KEY:-}
-            AI_ANTHROPIC_API_KEY: ${AI_ANTHROPIC_API_KEY:-}
-            AI_YANDEX_API_KEY: ${AI_YANDEX_API_KEY:-}
-            AI_YANDEX_FOLDER_ID: ${AI_YANDEX_FOLDER_ID:-}
+            # Провайдеры ИИ — только через шлюз (docs/tasks/ai/gateway/): ключи провайдеров живут на
+            # шлюзе, здесь — токен шлюза. URL — литерал: пустая переменная не выключит проверку,
+            # что base_url провайдеров в config/routes.yaml ведут на шлюз.
+            AI_GATEWAY_TOKEN: ${AI_GATEWAY_TOKEN:-}
+            AI_SERVICE_LLM_GATEWAY_URL: https://ai.vashfindir.ru
             # Ошибки (ERROR) — в свой проект GlitchTip (секрет AI_SERVICE_SENTRY_DSN; пусто — только лог).
             SENTRY_DSN: ${AI_SERVICE_SENTRY_DSN:-}
             SENTRY_RELEASE: ${SENTRY_RELEASE:-}
