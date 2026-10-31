@@ -20,7 +20,11 @@ def build_adapters(routing: RoutingConfig, timeout_seconds: float) -> dict[str, 
                 if not provider.base_url:
                     raise ValueError(f"provider {name}: base_url is required")
                 adapters[name] = OpenAiCompatibleAdapter(
-                    provider=name, base_url=provider.base_url, api_key=provider.api_key or "", timeout=timeout_seconds
+                    provider=name,
+                    base_url=provider.base_url,
+                    api_key=provider.api_key or "",
+                    timeout=timeout_seconds,
+                    extra_body=provider.extra_body,
                 )
             case AdapterType.ANTHROPIC:
                 adapters[name] = AnthropicAdapter(

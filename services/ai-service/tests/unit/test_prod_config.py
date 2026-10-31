@@ -66,3 +66,13 @@ def test_deploy_waits_only_for_services_with_healthcheck() -> None:
     ]
     assert waited
     assert [line for line, bad in waited if bad] == []
+
+
+def test_every_prod_route_model_has_price() -> None:
+    prices = yaml.safe_load((ROUTES_FILE.with_name("prices.yaml")).read_text(encoding="utf-8"))
+    routing = load_routing(ROUTES_FILE, env={})
+    models = {ref.key for route in routing.routes.values() for ref in route.models if ref.provider != "stub"}
+    assert models
+    for model in models:
+        assert isinstance(prices.get(model, {}).get("input"), (int, float)), model
+        assert isinstance(prices[model].get("output"), (int, float)), model

@@ -13,8 +13,9 @@
    DeepSeek, Kimi живут только на шлюзе `ai.vashfindir.ru`; сервис предъявляет
    токен шлюза `AI_GATEWAY_TOKEN` (тот же секрет, что у деплоя шлюза).
    Маршрут — `services/ai-service/config/routes.yaml`
-   (`categorize_transactions`: `fallback` deepseek → openai; Kimi — после ключа,
-   #2837). Прод-compose задаёт `AI_SERVICE_LLM_GATEWAY_URL`: провайдер мимо шлюза
+   (`categorize_transactions`: `fallback` `deepseek-flash` без размышления →
+   `gpt-4.1-mini`, по `evals-compare` 31.10 — `docs/tasks/ai/gateway/g3.md`; Kimi —
+   после ключа, #2837). Прод-compose задаёт `AI_SERVICE_LLM_GATEWAY_URL`: провайдер мимо шлюза
    — сервис не стартует.
 2. **GlitchTip:** проект `ai-service` → DSN.
 3. **GitHub → Settings → Secrets and variables → Actions.**

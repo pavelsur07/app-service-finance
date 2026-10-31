@@ -16,9 +16,11 @@ class OpenAiCompatibleAdapter:
         base_url: str,
         api_key: str,
         timeout: float,
+        extra_body: dict[str, Any] | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._provider = provider
+        self._extra_body = dict(extra_body or {})
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._api_key = api_key
         self._client = httpx.Client(timeout=timeout, transport=transport)
@@ -33,6 +35,7 @@ class OpenAiCompatibleAdapter:
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
         }
+        body.update(self._extra_body)
         data, latency_ms = post_json(self._client, self._url, {"Authorization": f"Bearer {self._api_key}"}, body)
         try:
             text = data["choices"][0]["message"]["content"]

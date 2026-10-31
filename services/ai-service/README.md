@@ -59,6 +59,10 @@ python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/
 `AI_SERVICE_LLM_GATEWAY_URL` (в проде — всегда) → провайдер с `base_url` мимо
 шлюза или без него не загружается: `api`, `worker` и команды с моделями выходят с 2.
 
+`extra_body` провайдера — поля, которые OpenAI-совместимый адаптер добавляет в тело
+запроса (у `deepseek` — `thinking: {type: disabled}`: `deepseek-flash` по умолчанию
+«размышляет»). `model`, `messages`, `max_tokens`, `temperature` в нём запрещены.
+
 ```bash
 python -m ai_service gateway-check   # бесплатно: /models с токеном → 200, без → 401, по провайдеру маршрутов
 python -m ai_service llm-ping        # платно (доли копейки): «ok» одним словом, max_tokens 5

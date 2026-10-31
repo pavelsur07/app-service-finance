@@ -19,6 +19,10 @@ providers:
     type: openai_compatible
     base_url: https://ai.vashfindir.ru/deepseek/v1
     api_key_env: AI_GATEWAY_TOKEN
+    # deepseek-flash по умолчанию «размышляет»: +54% токенов ответа и +1 с на пачку при той
+    # же точности на синтетике (docs/tasks/ai/gateway/g3.md).
+    extra_body:
+      thinking: {type: disabled}
   kimi:
     # В маршруты — после ключа на шлюзе (#2837): с общим токеном шлюз ответил бы 503.
     type: openai_compatible
@@ -31,8 +35,9 @@ tasks:
     mode: single
     models: [stub/echo]
 
-  # Подсказка статьи ДДС (этап 2). Модели — кандидаты: порядок утверждается по evals-compare
-  # (G3, живые вызовы — по команде Владельца). Локально — config/routes.dev.yaml.
+  # Подсказка статьи ДДС (этап 2). Порядок — по evals-compare на синтетике (G3, g3.md): точность
+  # равная, DeepSeek быстрее и дешевле. deepseek-chat DeepSeek выводит — имя deepseek-flash.
+  # Локально — config/routes.dev.yaml.
   categorize_transactions:
     mode: fallback
-    models: [deepseek/deepseek-chat, openai/gpt-4.1-mini]
+    models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]

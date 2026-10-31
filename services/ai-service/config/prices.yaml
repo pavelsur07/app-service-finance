@@ -1,6 +1,8 @@
-# Цены моделей для evals-compare, ₽ за 1 млн токенов (вход / выход).
-# Пусто — цена не известна, в таблице «—». Заполняется по прайсам провайдеров вместе с
-# evals-compare (G3, docs/tasks/ai/gateway/g2.md).
-deepseek/deepseek-chat: {input: null, output: null}
-openai/gpt-4.1-mini: {input: null, output: null}
+# Цены моделей для evals-compare, ₽ за 1 млн токенов (вход без кеша / выход).
+# Пусто — цена не известна, в таблице «—». Курс ЦБ на 31.10.2026 — 80,5573 ₽/$
+# (docs/tasks/ai/gateway/g3.md); пересчитывать при смене прайса или заметном сдвиге курса.
+# deepseek-flash — дневной тариф $0,30 / $1,20 (ночью вдвое дешевле): верхняя граница.
+deepseek/deepseek-flash: {input: 24.17, output: 96.67}
+# gpt-4.1-mini — $0,40 / $1,60.
+openai/gpt-4.1-mini: {input: 32.22, output: 128.89}
 kimi/kimi-k2-0905-preview: {input: null, output: null}
