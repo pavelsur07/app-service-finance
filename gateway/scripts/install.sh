@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Установка конфигов шлюза на хосте. Запускает .github/workflows/deploy-gateway.yml:
 #   bash install.sh <каталог с распакованным gateway/nginx>
-# Все управляемые файлы ставятся набором: при провале nginx -t или проверок
-# после reload возвращается прежний набор целиком.
+# Все управляемые файлы ставятся набором: при любом неуспешном выходе после
+# бэкапа (сбой установки, nginx -t, reload, проверок) возвращается прежний набор целиком.
 set -euo pipefail
 
 SRC=${1:?usage: install.sh <gateway/nginx dir>}
@@ -32,12 +32,24 @@ if [ ${#EXISTING[@]} -gt 0 ]; then
     tar -C / -cpf "$BACKUP" "${EXISTING[@]}"
 fi
 
-rollback() {
+DONE=0
+on_exit() {
+    local rc=$?
+    trap - EXIT
+    if [ "$DONE" = 1 ]; then rm -f "$BACKUP"; exit 0; fi
+    set +e
     echo "↩️  Возвращаю прежний набор файлов шлюза"
     for p in "${MANAGED[@]}"; do rm -rf "/${p:?}"; done
-    if [ ${#EXISTING[@]} -gt 0 ]; then tar -C / -xpf "$BACKUP"; fi
-    nginx -t
+    if [ ${#EXISTING[@]} -eq 0 ] || tar -C / -xpf "$BACKUP"; then
+        if nginx -t && systemctl reload nginx; then
+            rm -f "$BACKUP"
+            exit "$rc"
+        fi
+    fi
+    echo "❌ Откат не завершён — бэкап сохранён: $BACKUP (tar -C / -xpf)"
+    exit "$rc"
 }
+trap on_exit EXIT
 
 install -m 0644 "$SRC/conf.d/gateway-log-format.conf" /etc/nginx/conf.d/gateway-log-format.conf
 rm -rf /etc/nginx/snippets/gateway
@@ -48,8 +60,6 @@ ln -sfn /etc/nginx/sites-available/tg-gateway /etc/nginx/sites-enabled/tg-gatewa
 
 if ! nginx -t; then
     echo "❌ nginx -t не прошёл"
-    rollback
-    rm -f "$BACKUP"
     exit 1
 fi
 systemctl reload nginx
@@ -73,12 +83,9 @@ check "tg неизвестный путь" 404 "${TG[@]}" https://tg.vashfindir.
 
 if [ "$ok" != 1 ]; then
     echo "❌ Проверки шлюза не прошли"
-    rollback
-    systemctl reload nginx
-    rm -f "$BACKUP"
     exit 1
 fi
-rm -f "$BACKUP"
+DONE=1
 
 # Доступность upstream — информативно: их сбой не повод откатывать конфиг шлюза.
 curl -s -m 10 -o /dev/null -w "upstream app.vashfindir.ru: %{http_code}\n" https://app.vashfindir.ru/telegram/webhook || true

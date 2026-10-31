@@ -23,7 +23,8 @@ app ──▶ tg.vashfindir.ru/bot-api/ ──▶ api.telegram.org              
 - `upstream-tls.conf` — проверка TLS upstream; `proxy_ssl_name` задаёт location.
 - `log_format gateway_json` — в `conf.d`, чтобы быть объявленным раньше сайтов.
   Путь без query, без заголовков и тел. Location с секретом в пути
-  (`/bot-api/` — токен бота) — `access_log off`.
+  (`/bot-api/` — токен бота) — `access_log off` и `error_log /dev/null`:
+  ошибки upstream пишут исходный запрос.
 - Логи: `/var/log/nginx/tg-gateway.{access,error}.log`, ротирует штатный
   logrotate nginx (daily, 14).
 
@@ -36,7 +37,8 @@ app ──▶ tg.vashfindir.ru/bot-api/ ──▶ api.telegram.org              
 - push в master и ручной запуск — то же, затем `scripts/install.sh` на хосте:
   бэкап всех управляемых файлов → установка → `nginx -t` → reload → проверки
   (`/health` 200 по 80 и 443, `/bot-api/` с самого хоста 403, неизвестный путь
-  404). Провал `nginx -t` или проверки — откат всего набора и reload.
+  404). Любой неуспешный выход после бэкапа — откат всего набора и reload;
+  если не удался и он, бэкап остаётся на хосте (путь в логе).
   Доступность `app.vashfindir.ru` и `api.telegram.org` печатается, но не
   откатывает.
 
