@@ -24,10 +24,11 @@ app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провай
 | — (собирает `scripts/render-secrets.sh` из GitHub Secrets) | `/etc/nginx/gateway-secrets.conf`, root:root 0600 |
 
 - `gateway-app.conf` — `geo $gateway_from_app`: IP app-сервера, при его смене
-  правится только здесь. `snippets/app-only.conf` — `if … return 403`, а не
-  `allow/deny`: срабатывает раньше проверки токена (чужой IP получает 403, не
-  401) и не пишет в error log путь запроса.
-- `ai-client.conf` — токен клиента (`$ai_client_ok`), после `app-only.conf`.
+  правится только здесь. `snippets/app-only.conf` (Telegram) — `if … return
+  403`, а не `allow/deny`: не пишет в error log путь запроса с токеном бота.
+- `ai-gate.conf` — вход к провайдерам ИИ в контексте server: чужой IP → 403,
+  затем токен (`$ai_client_ok`) → 401. В server, а не в location: до выбора
+  location, где nginx уже проверяет размер тела (иначе 413 раньше 403/401).
   В `gateway-secrets.conf` токен — регулярка `~^Bearer …$`: строковые ключи
   `map` nginx сравнивает без учёта регистра.
 - `ai-upstream.conf` — заголовки к провайдеру и от него и `error_log /dev/null`

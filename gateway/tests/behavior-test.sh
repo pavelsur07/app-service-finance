@@ -197,6 +197,10 @@ req app "${AUTH[@]}" "$AI/kimi/v1/models"; check "B7 kimi без ключа → 
 # B8
 docker exec "$ID-app" sh -c 'head -c 1100000 /dev/zero > /tmp/big'
 req app "${AUTH[@]}" --data-binary @/tmp/big "$AI/openai/v1/chat/completions?leak=Q413"; check "B8 тело > 1 МБ → 413" '[ "$CODE" = 413 ]'
+docker exec "$ID-stranger" sh -c 'head -c 1100000 /dev/zero > /tmp/big'
+req stranger "${AUTH[@]}" --data-binary @/tmp/big "$AI/openai/v1/chat/completions"; check "B2 большое тело с чужого IP → 403, не 413" '[ "$CODE" = 403 ]'
+req app --data-binary @/tmp/big "$AI/deepseek/v1/chat/completions"; check "B3 большое тело без токена → 401, не 413" '[ "$CODE" = 401 ]'
+req stranger --data-binary @/tmp/big "$AI/unknown"; check "B10 большое тело на неизвестный путь → 404" '[ "$CODE" = 404 ] || [ "$CODE" = 413 ]'
 docker exec "$ID-app" sh -c 'head -c 500000 /dev/zero > /tmp/ok'
 req app "${AUTH[@]}" --data-binary @/tmp/ok "$AI/openai/v1/chat/completions"; check "B8 тело 0,5 МБ проходит" '[ "$CODE" = 200 ]'
 

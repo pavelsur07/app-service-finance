@@ -55,7 +55,7 @@ rm -rf /bad; cp -r /stage /bad; echo 'garbage;' >> /bad/nginx/sites/ai.vashfindi
 expect_rollback "битый сайт ai → откат" /bad "$BEFORE"
 rm -rf /bad; cp -r /stage /bad; rm /bad/nginx/snippets/*.conf
 expect_rollback "сбой установки → откат" /bad "$BEFORE"
-rm -rf /bad; cp -r /stage /bad; sed -i 's|include /etc/nginx/snippets/gateway/app-only.conf;||' /bad/nginx/sites/ai.vashfindir.ru.conf
+rm -rf /bad; cp -r /stage /bad; sed -i 's|include /etc/nginx/snippets/gateway/ai-gate.conf;||' /bad/nginx/sites/ai.vashfindir.ru.conf
 expect_rollback "провал проверки (ai открыт не только app) → откат" /bad "$BEFORE"
 rm -rf /bad; cp -r /stage /bad; rm /bad/gateway-secrets.conf
 expect_rollback "нет файла секретов → откат" /bad "$BEFORE"
