@@ -31,8 +31,8 @@ has() {
 
 expect_ok "все значения" AI_GATEWAY_TOKEN=$TOKEN AI_GATEWAY_TOKEN_NEXT=${TOKEN}ff \
     AI_OPENAI_API_KEY=sk-proj-Ab_1.2~3 AI_DEEPSEEK_API_KEY=sk-ds AI_KIMI_API_KEY=sk-kimi
-has "токен" "\"Bearer $TOKEN\" 1;"
-has "следующий токен" "\"Bearer ${TOKEN}ff\" 1;"
+has "токен — регулярка целиком" "\"~^Bearer $TOKEN\$\" 1;"
+has "следующий токен" "\"~^Bearer ${TOKEN}ff\$\" 1;"
 has "ключ openai" 'map $host $ai_openai_key { default "sk-proj-Ab_1.2~3"; }'
 has "ключ deepseek" 'map $host $ai_deepseek_key { default "sk-ds"; }'
 has "ключ kimi" 'map $host $ai_kimi_key { default "sk-kimi"; }'
@@ -45,6 +45,9 @@ has "пустой ключ kimi" 'map $host $ai_kimi_key { default ""; }'
 if grep -q 'Bearer "' "$WORK/out.conf" || grep -c 'Bearer' "$WORK/out.conf" | grep -qv '^1$'; then
     echo "FAIL пустой NEXT не должен давать строку токена"; fail=1
 else echo "ok   пустой NEXT пропущен"; fi
+
+expect_ok "точка в токене экранируется" AI_GATEWAY_TOKEN=${TOKEN}.x
+has "экранированная точка" "\"~^Bearer ${TOKEN}\\.x\$\" 1;"
 
 expect_fail "нет токена" AI_OPENAI_API_KEY=sk-o
 expect_fail "короткий токен" AI_GATEWAY_TOKEN=abc

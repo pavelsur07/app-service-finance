@@ -28,11 +28,13 @@ app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провай
   `allow/deny`: срабатывает раньше проверки токена (чужой IP получает 403, не
   401) и не пишет в error log путь запроса.
 - `ai-client.conf` — токен клиента (`$ai_client_ok`), после `app-only.conf`.
+  В `gateway-secrets.conf` токен — регулярка `~^Bearer …$`: строковые ключи
+  `map` nginx сравнивает без учёта регистра.
 - `ai-upstream.conf` — заголовки к провайдеру и от него; подключается в
   location: `proxy_set_header` из server в location со своими не наследуется.
 - `upstream-tls.conf` — проверка TLS upstream; `proxy_ssl_name` задаёт location.
 - `log_format gateway_json` — в `conf.d`, чтобы быть объявленным раньше сайтов.
-  Путь без query, без заголовков и тел. `/bot-api/` (токен бота в пути) —
+  Исходный путь без query (`$gateway_log_path`), без заголовков и тел. `/bot-api/` (токен бота в пути) —
   `access_log off` и `error_log /dev/null`.
 - Логи: `/var/log/nginx/{tg,ai}-gateway.{access,error}.log`, ротирует штатный
   logrotate nginx (daily, 14).
@@ -78,6 +80,11 @@ app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провай
 - Проверка 1 — после установки: `GET /models` у каждого настроенного провайдера
   с его ключом прямо с хоста. Не 200 — деплой красный (выход 3), но конфиг не
   откатывается. Провайдер без ключа — `not configured`.
+
+SSH к хосту — только с закреплённым ключом `gateway/known_hosts`
+(`StrictHostKeyChecking=yes`): архив несёт ключи провайдеров. Сменился ключ
+хоста — сверить отпечаток на самом хосте (`ssh-keygen -lf
+/etc/ssh/ssh_host_ed25519_key.pub`) и обновить файл.
 
 Секреты: `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`;
 `AI_GATEWAY_TOKEN` (обязателен), `AI_GATEWAY_TOKEN_NEXT`,

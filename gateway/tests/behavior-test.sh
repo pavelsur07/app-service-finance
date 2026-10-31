@@ -46,18 +46,38 @@ openssl x509 -req -in "$WORK/mock/req.csr" -CA "$WORK/ca/ca.pem" -CAkey "$WORK/c
     -CAcreateserial -days 1 -out "$WORK/mock/cert.pem" \
     -extfile <(printf 'subjectAltName=%s' "${SAN%,}") 2>/dev/null
 
-cat > "$WORK/mock/default.conf" <<'CONF'
-server {
-    listen 443 ssl;
-    ssl_certificate /mock/cert.pem;
-    ssl_certificate_key /mock/key.pem;
-    client_max_body_size 10m;
-    location / {
-        add_header openai-organization org-secret always;
-        add_header openai-project proj-secret always;
-        add_header Set-Cookie "__cf_bm=abc" always;
-        default_type application/json;
-        return 200 '{"uri":"$request_uri","host":"$host","auth":"$http_authorization","cookie":"$http_cookie","xff":"$http_x_forwarded_for","xri":"$http_x_real_ip","org":"$http_openai_organization","proj":"$http_openai_project"}';
+# Мок — njs: эхо метода, пути, заголовков и тела; /status/NNN в пути — ответ с этим статусом.
+cat > "$WORK/mock/echo.js" <<'JS'
+function handle(r) {
+    var m = r.uri.match(/\/status\/(\d{3})/);
+    var h = r.headersIn;
+    var body = r.requestText || '';
+    r.headersOut['openai-organization'] = 'org-secret';
+    r.headersOut['openai-project'] = 'proj-secret';
+    r.headersOut['Set-Cookie'] = '__cf_bm=abc';
+    r.headersOut['Content-Type'] = 'application/json';
+    r.return(m ? parseInt(m[1]) : 200, JSON.stringify({
+        method: r.method, uri: r.variables.request_uri, host: h.host || '',
+        auth: h.authorization || '',
+        cookie: h.cookie || '', xff: h['x-forwarded-for'] || '', xri: h['x-real-ip'] || '',
+        org: h['openai-organization'] || '', proj: h['openai-project'] || '',
+        body_len: body.length, body: body.length < 1000 ? body : ''
+    }));
+}
+export default { handle };
+JS
+cat > "$WORK/mock/nginx.conf" <<'CONF'
+load_module modules/ngx_http_js_module.so;
+events {}
+http {
+    js_import echo from /mock/echo.js;
+    server {
+        listen 443 ssl;
+        ssl_certificate /mock/cert.pem;
+        ssl_certificate_key /mock/key.pem;
+        client_max_body_size 10m;
+        client_body_buffer_size 10m;
+        location / { js_content echo.handle; }
     }
 }
 CONF
@@ -74,7 +94,7 @@ chmod -R a+rX "$WORK"
 ALIASES=()
 for name in "${UPSTREAMS[@]}"; do ALIASES+=(--network-alias "$name"); done
 docker run -d --name "$ID-mock" --network "$NET" --ip "$MOCK_IP" "${ALIASES[@]}" \
-    -v "$WORK/mock:/mock:ro" -v "$WORK/mock/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+    -v "$WORK/mock:/mock:ro" -v "$WORK/mock/nginx.conf:/etc/nginx/nginx.conf:ro" \
     "$NGINX_IMAGE" >/dev/null || die "mock"
 docker run -d --name "$ID-gw" --network "$NET" --ip "$GW_IP" \
     -v "$WORK/gw/nginx:/etc/nginx:ro" -v "$WORK/gw/letsencrypt:/etc/letsencrypt:ro" \
@@ -131,6 +151,9 @@ req stranger "$AI/deepseek/v1/models"; check "B2 чужой IP без токен
 req app "$AI/openai/v1/models"; check "B3 без токена → 401" '[ "$CODE" = 401 ] && [[ "$BODY" == *unauthorized* ]]'
 req app -H "Authorization: Bearer wrong$TOKEN" "$AI/openai/v1/models"; check "B3 неверный токен → 401" '[ "$CODE" = 401 ]'
 req app -H "Authorization: $TOKEN" "$AI/openai/v1/models"; check "B3 токен без Bearer → 401" '[ "$CODE" = 401 ]'
+req app -H "Authorization: Bearer ${TOKEN^^}" "$AI/openai/v1/models"; check "B3 токен в другом регистре → 401" '[ "$CODE" = 401 ]'
+req app -H "Authorization: Bearer ${NEXT^^}" "$AI/openai/v1/models"; check "B3 следующий токен в другом регистре → 401" '[ "$CODE" = 401 ]'
+req app -H "Authorization: Bearer ${TOKEN}x" "$AI/openai/v1/models"; check "B3 токен с лишним символом → 401" '[ "$CODE" = 401 ]'
 
 # B4 + B5 + B6
 req app "${AUTH[@]}" -H "Cookie: s=1" -H "X-Forwarded-For: 1.2.3.4" -H "X-Real-IP: 1.2.3.4" \
@@ -146,6 +169,15 @@ check "B6 служебные заголовки ответа скрыты" '! gr
 req app -H "Authorization: Bearer $NEXT" "$AI/deepseek/v1/chat/completions"
 check "B4 следующий токен (ротация) → 200" '[ "$CODE" = 200 ]'
 check "B5 deepseek: Host и ключ" '[[ "$BODY" == *"\"host\":\"api.deepseek.com\""* ]] && [[ "$BODY" == *"Bearer sk-test-deepseek"* ]]'
+
+req app "${AUTH[@]}" -X POST -H "Content-Type: application/json" \
+    -d '{"model":"gpt-x","messages":[{"role":"user","content":"ok"}]}' "$AI/openai/v1/chat/completions"
+check "B5 POST: метод и тело доходят без изменений" '[ "$CODE" = 200 ] && [[ "$BODY" == *"\"method\":\"POST\""* ]] && [[ "$BODY" == *"\"body\":\"{\\\"model\\\":\\\"gpt-x\\\",\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"ok\\\"}]}\""* ]]'
+req app "${AUTH[@]}" "$AI/openai/status/400"
+check "B6 ошибка провайдера: статус и тело как у провайдера" '[ "$CODE" = 400 ] && [[ "$BODY" == *"\"uri\":\"/status/400\""* ]]'
+check "B6 служебные заголовки скрыты и в ответе с ошибкой" '! grep -qiE "^(set-cookie|openai-organization|openai-project):" <<<"$HEADERS"'
+req app "${AUTH[@]}" "$AI/deepseek/status/503"
+check "B6 503 провайдера не подменяется ответом шлюза" '[ "$CODE" = 503 ] && [[ "$BODY" == *"\"host\":\"api.deepseek.com\""* ]]'
 
 # B7
 req app "${AUTH[@]}" "$AI/kimi/v1/models"; check "B7 kimi без ключа → 503" '[ "$CODE" = 503 ] && [[ "$BODY" == *provider_not_configured* ]]'
@@ -177,7 +209,7 @@ check "B9 всплеск → 429 ($codes)" '[[ "$codes" == *" 429"* ]] && [[ "$c
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.access.log /var/log/nginx/tg-gateway.access.log' > "$WORK/access.log" 2>/dev/null
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.error.log /var/log/nginx/tg-gateway.error.log' > "$WORK/error.log" 2>/dev/null
 CODE=- BODY=
-check "B11 access log ai пишется" 'grep -q "\"path\":\"/openai/v1/models\"" "$WORK/access.log"'
+check "B11 access log: успешный запрос с исходным путём и статусом" 'grep -q "\"path\":\"/openai/v1/models\",\"status\":200" "$WORK/access.log"'
 check "B11 в журналах нет токена, ключей, query, токена бота" '! grep -qE "$TOKEN|$NEXT|sk-test-|limit=2|SECRET" "$WORK/access.log" "$WORK/error.log"'
 
 exit $fail

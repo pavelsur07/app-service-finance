@@ -69,6 +69,8 @@ jobs:
                   AI_KIMI_API_KEY: ${{ secrets.AI_KIMI_API_KEY }}
               run: |
                   umask 077
+                  # Секреты уходят только на хост с закреплённым ключом (gateway/known_hosts).
+                  SSH_OPTS=(-o HostKeyAlias=gateway-host -o UserKnownHostsFile=gateway/known_hosts -o StrictHostKeyChecking=yes)
                   BUNDLE=$(mktemp -d)
                   trap 'rm -rf "$BUNDLE" gateway.tgz' EXIT
                   gateway/scripts/render-secrets.sh "$BUNDLE/gateway-secrets.conf"
@@ -76,13 +78,14 @@ jobs:
                   mkdir "$BUNDLE/scripts"
                   cp gateway/scripts/install.sh "$BUNDLE/scripts/"
                   tar -C "$BUNDLE" -czf gateway.tgz nginx scripts gateway-secrets.conf
-                  scp -o StrictHostKeyChecking=no gateway.tgz "$TARGET":/tmp/gateway.tgz
+                  scp "${SSH_OPTS[@]}" gateway.tgz "$TARGET":/tmp/gateway.tgz
 
             - name: 🚀 Install and reload nginx
               env:
                   TARGET: ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}
               run: |
-                  ssh -o StrictHostKeyChecking=no "$TARGET" << 'EOF'
+                  ssh -o HostKeyAlias=gateway-host -o UserKnownHostsFile=gateway/known_hosts \
+                      -o StrictHostKeyChecking=yes "$TARGET" << 'EOF'
                       set -e
                       umask 077
                       STAGE=$(mktemp -d)
