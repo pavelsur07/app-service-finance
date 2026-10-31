@@ -5,69 +5,123 @@
 Источник правды — этот каталог: ручные правки на хосте перезапишет деплой.
 
 ```
-Telegram ──▶ tg.vashfindir.ru/telegram/webhook ──▶ app.vashfindir.ru   (вход, публичный)
-app ──▶ tg.vashfindir.ru/bot-api/ ──▶ api.telegram.org                 (выход, только IP app)
+Telegram ──▶ tg.vashfindir.ru/telegram/webhook ──▶ app.vashfindir.ru         (вход, публичный)
+app ──▶ tg.vashfindir.ru/bot-api/ ──▶ api.telegram.org                       (выход, только IP app)
+app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провайдер ИИ           (только IP app + токен)
 ```
 
-План развития (домен `ai.` для провайдеров ИИ) — `docs/tasks/ai/gateway/plan.md`.
+План и этапы — `docs/tasks/ai/gateway/` (`plan.md`, `g0.md`, `g1.md`), секреты — `keys.md`.
 
 ## Файлы
 
 | Репозиторий | Хост |
 |---|---|
 | `nginx/conf.d/gateway-log-format.conf` | `/etc/nginx/conf.d/gateway-log-format.conf` |
+| `nginx/conf.d/gateway-app.conf` | `/etc/nginx/conf.d/gateway-app.conf` |
 | `nginx/snippets/*.conf` | `/etc/nginx/snippets/gateway/` |
 | `nginx/sites/tg.vashfindir.ru.conf` | `/etc/nginx/sites-available/tg-gateway` + symlink в `sites-enabled` |
+| `nginx/sites/ai.vashfindir.ru.conf` | `/etc/nginx/sites-available/ai-gateway` + symlink в `sites-enabled` |
+| — (собирает `scripts/render-secrets.sh` из GitHub Secrets) | `/etc/nginx/gateway-secrets.conf`, root:root 0600 |
 
-- `app-only.conf` — IP app-сервера; при его смене правится только здесь.
+- `gateway-app.conf` — `geo $gateway_from_app`: IP app-сервера, при его смене
+  правится только здесь. `snippets/app-only.conf` (Telegram) — `if … return
+  403`, а не `allow/deny`: не пишет в error log путь запроса с токеном бота.
+- `ai-gate.conf` — вход к провайдерам ИИ в контексте server: чужой IP → 403,
+  затем токен (`$ai_client_ok`) → 401. В server, а не в location: до выбора
+  location, где nginx уже проверяет размер тела (иначе 413 раньше 403/401).
+  В `gateway-secrets.conf` токен — регулярка `~^Bearer …$`: строковые ключи
+  `map` nginx сравнивает без учёта регистра.
+- `ai-upstream.conf` — заголовки к провайдеру и от него и `error_log /dev/null`
+  (ошибки 413/429/upstream пишут строку запроса с query); подключается в
+  location: `proxy_set_header` из server в location со своими не наследуется.
 - `upstream-tls.conf` — проверка TLS upstream; `proxy_ssl_name` задаёт location.
 - `log_format gateway_json` — в `conf.d`, чтобы быть объявленным раньше сайтов.
-  Путь без query, без заголовков и тел. Location с секретом в пути
-  (`/bot-api/` — токен бота) — `access_log off` и `error_log /dev/null`:
-  ошибки upstream пишут исходный запрос.
-- Логи: `/var/log/nginx/tg-gateway.{access,error}.log`, ротирует штатный
+  Исходный путь без query (`$gateway_log_path`), без заголовков и тел. `/bot-api/` (токен бота в пути) —
+  `access_log off` и `error_log /dev/null`.
+- Логи: `/var/log/nginx/{tg,ai}-gateway.{access,error}.log`, ротирует штатный
   logrotate nginx (daily, 14).
+
+## Шлюз ИИ (`ai.vashfindir.ru`)
+
+- Клиент (ai-service): `base_url` = `https://ai.vashfindir.ru/<провайдер>/v1`,
+  `Authorization: Bearer <AI_GATEWAY_TOKEN>`. Шлюз меняет его на ключ провайдера.
+- Upstream: `openai` → `api.openai.com`, `deepseek` → `api.deepseek.com`,
+  `kimi` → `api.moonshot.ai`. Из запроса берётся только путь — не открытый прокси.
+- Ответы шлюза: чужой IP 403; нет или неверный токен 401 `unauthorized`;
+  провайдер без ключа 503 `provider_not_configured`; тело > 1 МБ 413; больше
+  10 r/s (burst 20) на провайдера 429; неизвестный путь 404. Таймаут ответа
+  провайдера 120 с, стриминг без буферизации.
+- Провайдеру не уходят `Cookie`, `X-Forwarded-For`, `X-Real-IP`,
+  `OpenAI-Organization`, `OpenAI-Project`; клиенту — `Set-Cookie`,
+  `openai-organization`, `openai-project`.
+
+### Ротация токена шлюза
+
+1. Новый токен → секрет `AI_GATEWAY_TOKEN_NEXT`, деплой шлюза (принимает оба).
+2. Новый токен → секрет `AI_GATEWAY_TOKEN` у ai-service, деплой app.
+3. На шлюзе: `AI_GATEWAY_TOKEN` = новый, `AI_GATEWAY_TOKEN_NEXT` очистить, деплой шлюза.
+
+Ключ провайдера: новый ключ в кабинете → секрет → деплой шлюза (проверка 1
+покажет 200) → старый ключ удалить в кабинете.
 
 ## Деплой
 
 `.github/workflows/deploy-gateway.yml`:
 
-- PR с изменениями `gateway/**` — `shellcheck` и `scripts/nginx-test.sh`
-  (`nginx -t` в `nginx:1.28` с раскладкой Ubuntu и сертификатами-заглушками);
-- push в master и ручной запуск — то же, затем `scripts/install.sh` на хосте:
-  бэкап всех управляемых файлов → установка → `nginx -t` → reload → проверки
-  (`/health` 200 по 80 и 443, `/bot-api/` с самого хоста 403, неизвестный путь
-  404). Любой неуспешный выход после бэкапа — откат всего набора и reload;
-  если не удался и он, бэкап остаётся на хосте (путь в логе).
-  Доступность `app.vashfindir.ru` и `api.telegram.org` печатается, но не
-  откатывает.
+- PR с изменениями `gateway/**` — `shellcheck`, `scripts/nginx-test.sh`
+  (`nginx -t`), тесты `tests/render-secrets-test.sh`, `tests/behavior-test.sh`
+  (поведение обоих доменов в docker с мок-upstream), `tests/install-test.sh`
+  (установка и откат);
+- push в master и ручной запуск — то же, затем на раннере
+  `scripts/render-secrets.sh` (значения проверяются, не печатаются), архив
+  уходит в приватный каталог `mktemp -d` на хосте (создаётся до загрузки,
+  удаляется при любом исходе), и там `scripts/install.sh`: бэкап всех управляемых файлов → установка → `nginx -t`
+  → reload → проверки хоста (`/health` обоих доменов по 80 и 443, `/bot-api/` и
+  `/openai/` с самого хоста → 403, неизвестный путь → 404). Любой сбой до
+  конца проверок — откат всего набора и reload; если не удался и он, бэкап
+  остаётся на хосте (путь в логе).
+- Проверка 1 — после установки: `GET /models` у каждого настроенного провайдера
+  с его ключом прямо с хоста. Не 200 — деплой красный (выход 3), но конфиг не
+  откатывается. Провайдер без ключа — `not configured`.
 
-Секреты: `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`.
+SSH к хосту — только с закреплённым ключом `gateway/known_hosts`
+(`StrictHostKeyChecking=yes`): архив несёт ключи провайдеров. Сменился ключ
+хоста — сверить отпечаток на самом хосте (`ssh-keygen -lf
+/etc/ssh/ssh_host_ed25519_key.pub`) и обновить файл.
+
+Секреты: `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`;
+`AI_GATEWAY_TOKEN` (обязателен), `AI_GATEWAY_TOKEN_NEXT`,
+`AI_OPENAI_API_KEY`, `AI_DEEPSEEK_API_KEY`, `AI_KIMI_API_KEY`.
 
 Локально перед PR:
 
 ```bash
 gateway/scripts/nginx-test.sh          # nginx -t
 gateway/scripts/nginx-test.sh --dump   # + эффективный конфиг (nginx -T)
+gateway/tests/render-secrets-test.sh
+gateway/tests/behavior-test.sh
+gateway/tests/install-test.sh
 ```
 
 Новый файл в наборе — добавить в `MANAGED` и установку `scripts/install.sh`,
-в раскладку `scripts/nginx-test.sh` и в таблицу выше. Новый домен — сертификат
-до деплоя (`certbot certonly --nginx -d <домен>`) и домен в `CERTS`/`DOMAINS`
-обоих скриптов.
+в `scripts/layout.sh` и в таблицу выше. Новый домен — сертификат до деплоя
+(`certbot certonly --nginx -d <домен>`), домен в `CERTS` (`install.sh`) и
+`GATEWAY_DOMAINS` (`layout.sh`).
 
 ## Откат
 
 - Провал при деплое — откатывает `install.sh` сам.
 - После успешного деплоя — `git revert` и деплой.
-- Вручную на хосте: прежний файл сайта из git в
-  `/etc/nginx/sites-available/tg-gateway`, затем `nginx -t && systemctl reload nginx`.
+- Экстренно только ИИ: `rm /etc/nginx/sites-enabled/ai-gateway && nginx -t &&
+  systemctl reload nginx` — Telegram не затронут.
 
 ## Проверка вручную
 
 ```bash
-curl -s https://tg.vashfindir.ru/health                       # alive
+curl -s https://tg.vashfindir.ru/health                                          # alive
+curl -s https://ai.vashfindir.ru/health                                          # alive
 curl -s -o /dev/null -w '%{http_code}\n' https://tg.vashfindir.ru/bot-api/getMe   # 403 не с app
+curl -s -o /dev/null -w '%{http_code}\n' https://ai.vashfindir.ru/openai/v1/models # 403 не с app
 ```
 
-Сквозная: написать боту — операция создаётся (вебхук), бот отвечает (`/bot-api/`).
+Сквозная Telegram: написать боту — операция создаётся (вебхук), бот отвечает (`/bot-api/`).

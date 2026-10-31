@@ -12,7 +12,7 @@
 |---|---|---|
 | `AI_OPENAI_API_KEY` | platform.openai.com → API keys → Create new secret key | Проект только под сервис; в Limits — месячный лимит расходов |
 | `AI_DEEPSEEK_API_KEY` | platform.deepseek.com → API keys | Баланс пополняется заранее — пополнить на небольшую сумму |
-| `AI_KIMI_API_KEY` | platform.moonshot.ai → API Keys | Международная платформа (`api.moonshot.ai`), не `.cn` |
+| `AI_KIMI_API_KEY` | platform.moonshot.ai → API Keys | Международная платформа (`api.moonshot.ai`), не `.cn`; пока нет — issue #2837, шлюз отвечает 503 `provider_not_configured` |
 
 Для каждого провайдера:
 
@@ -35,7 +35,8 @@ openssl rand -hex 24
 ```
 
 На время ротации — второй секрет `AI_GATEWAY_TOKEN_NEXT` (шлюз принимает оба;
-порядок — `gateway/README.md` после G0).
+порядок — `gateway/README.md`, «Ротация токена шлюза»). Без `AI_GATEWAY_TOKEN`
+деплой шлюза останавливается до установки — Telegram не затрагивается.
 
 ## 3. Секреты ai-service на app-сервере
 
