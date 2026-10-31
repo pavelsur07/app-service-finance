@@ -48,8 +48,13 @@ x-php-env: &php-env
     # site_var_log, а cron-команды лишь ставят сообщения — их обработка замеряется в воркерах.
     # См. docs/architecture/marketplace-audit/09-m1-diagnostics.md.
     MARKETPLACE_PERF_DIAGNOSTICS: ${MARKETPLACE_PERF_DIAGNOSTICS:-1}
-    LLM_API_URL: "https://example.com/v1/chat/completions"
-    LLM_API_KEY: "change-me"
+    # ─── ai-service (docs/maintenance/ai-service-prod.md) ───
+    # Выключено, пока не заданы AI_SERVICE_ENABLED=true и токен; пустой allowlist — ни одной компании,
+    # `*` — все. Задачи ставит воркер async_sync, результаты забирает cron (scheduler).
+    AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
+    AI_SERVICE_BASE_URL: http://ai-service:8080
+    AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+    AI_SERVICE_COMPANY_ALLOWLIST: ${AI_SERVICE_COMPANY_ALLOWLIST:-}
     # Публичный URL вебхука Telegram — точка приёма апдейтов (шлюз tg-gateway)
     TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
     # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
@@ -496,6 +501,11 @@ services:
             # Пустой токен — обновление выключено (exit 0).
             OZON_FETCHER_BASE_URL: http://ozon-fetcher:8080
             OZON_FETCHER_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
+            # ai-service: cron импорта результатов и подсказок статей (как в x-php-env).
+            AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
+            AI_SERVICE_BASE_URL: http://ai-service:8080
+            AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+            AI_SERVICE_COMPANY_ALLOWLIST: ${AI_SERVICE_COMPANY_ALLOWLIST:-}
             APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
             APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
@@ -596,6 +606,69 @@ services:
             resources:
                 limits:
                     memory: 384M
+                reservations:
+                    memory: 64M
+
+
+    # ИИ-задачи (services/ai-service): API и воркер. Профиль: не стартуют, пока деплой не включит
+    # их переменной AI_SERVICE_ENABLED=true. Без ingress: только сеть default, Symfony ходит по
+    # http://ai-service:8080 с AI_SERVICE_API_TOKEN. См. docs/maintenance/ai-service-prod.md.
+    ai-service:
+        image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
+        container_name: ai-service
+        profiles: ["ai-service"]
+        command: ["api"]
+        restart: always
+        logging: *default-logging
+        environment: &ai-service-env
+            TZ: Europe/Moscow
+            AI_SERVICE_DB_DSN: postgresql://svc_ai_service:${AI_SERVICE_DB_PASSWORD:-}@site-postgres:5432/ai_service
+            AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+            # Ключи провайдеров из config/routes.yaml; пусто — провайдер выключен.
+            AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
+            AI_DEEPSEEK_API_KEY: ${AI_DEEPSEEK_API_KEY:-}
+            AI_ANTHROPIC_API_KEY: ${AI_ANTHROPIC_API_KEY:-}
+            AI_YANDEX_API_KEY: ${AI_YANDEX_API_KEY:-}
+            AI_YANDEX_FOLDER_ID: ${AI_YANDEX_FOLDER_ID:-}
+            # Ошибки (ERROR) — в свой проект GlitchTip (секрет AI_SERVICE_SENTRY_DSN; пусто — только лог).
+            SENTRY_DSN: ${AI_SERVICE_SENTRY_DSN:-}
+            SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+            SENTRY_ENVIRONMENT: prod
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        stop_grace_period: 30s
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
+    ai-service-worker:
+        image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
+        container_name: ai-service-worker
+        profiles: ["ai-service"]
+        command: ["worker"]
+        restart: always
+        logging: *default-logging
+        environment: *ai-service-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        # Задача с захваченной арендой после остановки вернётся в очередь по истечении аренды.
+        stop_grace_period: 60s
+        # У воркера нет HTTP: проверка образа (GET /health) к нему неприменима.
+        healthcheck:
+            disable: true
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
                 reservations:
                     memory: 64M
 

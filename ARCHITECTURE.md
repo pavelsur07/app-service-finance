@@ -1870,8 +1870,10 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   она `CF_UNALLOC`/`UNALLOCATED`, нет разбивки, не перевод, не удалена, не в
   закрытом периоде (`finance_lock_before`).
 - `RequestCashAiCategorizationAction(companyId, limit)` — точка входа команды
-  `app:cash:ai-categorize --company-id= [--limit=200]` (lock по компании; cron
-  не подключён). Сервис выключен для компании → ничего. Пачка до 50 операций:
+  `app:cash:ai-categorize --company-id= [--limit=200]` (lock по компании) и
+  cron `app:cash:ai-categorize --all-enabled` (компании allowlist с операциями за
+  90 дней, `CashAiCategorizationCompaniesQuery`; сбой компании не останавливает
+  остальные). Сервис выключен для компании → ничего. Пачка до 50 операций:
   `CashCategorizationTask` (`cash_categorization_task`: `id` = `task_id =
   taskIdFor(...)`, ключ повтора, исходный payload, `dispatched_at`) и строки
   `requested` — одной `wrapInTransaction`, после commit `requestTask`. Задача с
@@ -4339,6 +4341,8 @@ config/
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | **Инфраструктура** | | |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
+| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:directories:integrity-check` | `37 7 * * *` | Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; exit 1 + один агрегированный `error`; деревья ОПиУ без кодов шаблона — справочный `info` |
@@ -4433,6 +4437,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.98 | 2026-10-31 | ai-service на проде (выключен): сервисы `ai-service`/`ai-service-worker` за профилем в `docker-compose.prod.yml`, шаг деплоя `[4c/5]` (`docker/ai-service/db-bootstrap.sql`, миграции), CI-гейты `services-python` и образ `ai-service`, env `AI_SERVICE_*` у PHP и scheduler, cron `app:ai-service:import-results` и `app:cash:ai-categorize --all-enabled`, GlitchTip сервиса; runbook `docs/maintenance/ai-service-prod.md` |
 | 2.97 | 2026-10-31 | Cash: предложения автоправил по ИИ-подсказкам — `CashCategorizationQuery::findRuleProposals()`, DTO `CashAiRuleProposal`, раздел «Предложения ИИ» на «Кандидатах правил» с переходом в предзаполненную форму правила. Миграций нет |
 | 2.96 | 2026-10-30 | Cash: автоприменение ИИ-подсказок статей ДДС — флаг `cash_ai_categorization_setting` (миграция `Version20261030220000`), `CashAiAutoApplyPolicy` (0.90 / 100 / 0.95), `AutoApplyCashCategorySuggestionsAction` в `app:cash:ai-categorize`, команда `app:cash:ai-auto-apply`, статус `auto_applied`, общий `CashCategorySuggestionApplier`, значок «ИИ» в списке операций |
 | 2.95 | 2026-10-30 | Cash: выгрузка золотого набора ИИ-категоризации `app:cash:ai-eval-export`, `CashCategorizationPayloadMapper` (общий с постановкой); ai-service: `evals-import` (обезличивание), `evals-compare` (модель × точность × стоимость × задержка) |

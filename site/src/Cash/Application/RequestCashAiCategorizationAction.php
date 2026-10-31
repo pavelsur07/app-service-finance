@@ -36,7 +36,7 @@ final class RequestCashAiCategorizationAction
     public const BATCH_SIZE = 50;
     /** Лимиты контракта categorize_payload. */
     private const MAX_CATEGORIES = 1000;
-    private const LOOKBACK_DAYS = 90;
+    public const LOOKBACK_DAYS = 90;
     /** Автоправила срабатывают через ~10 с после записи операции; запас на очередь. */
     private const SETTLE_MINUTES = 10;
     private const REDISPATCH_AFTER_HOURS = 1;

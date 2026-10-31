@@ -29,6 +29,7 @@ jobs:
             frontend: ${{ steps.matrix.outputs.frontend }}
             landing: ${{ steps.matrix.outputs.landing }}
             services: ${{ steps.matrix.outputs.services }}
+            ai_service: ${{ steps.matrix.outputs.ai_service }}
             matrix: ${{ steps.matrix.outputs.matrix }}
         steps:
             - name: 📦 Checkout repository
@@ -76,6 +77,9 @@ jobs:
                       # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
                       services:
                         - 'services/ozon-fetcher/**'
+                      # Python-сервис ИИ-задач (docs/tasks/ai, docs/maintenance/ai-service-prod.md).
+                      ai_service:
+                        - 'services/ai-service/**'
                       # Не входит в deployable-матрицу: правка конфига или baseline
                       # PHPStan обязана снова прогнать анализ, но production-образы
                       # и деплой от неё не зависят. Dev-образ php-cli при этом может
@@ -102,14 +106,16 @@ jobs:
                   la='${{ steps.f.outputs.landing }}'
                   sa='${{ steps.f.outputs.static_analysis }}'
                   sv='${{ steps.f.outputs.services }}'
+                  ai='${{ steps.f.outputs.ai_service }}'
 
                   # На master деплой тянет ВСЕ образы по SHA коммита, включая
                   # ozon-fetcher, — поэтому его образ собирается вместе с остальными.
                   if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
-                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ] || [ "$sv" = 'true' ]; then
+                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ] || [ "$sv" = 'true' ] || [ "$ai" = 'true' ]; then
                       be=true
                       la=true
                       sv=true
+                      ai=true
                     fi
                   fi
 
@@ -119,6 +125,7 @@ jobs:
                     la=false
                     sa=false
                     sv=false
+                    ai=false
 
                     if [ "$PRODUCTION_ACTION" != 'none' ] && [ "$GITHUB_REF" != 'refs/heads/master' ]; then
                       echo '::error::Production gates can run only from master'
@@ -134,6 +141,7 @@ jobs:
                       be=true
                       la=true
                       sv=true
+                      ai=true
                     fi
                   fi
 
@@ -155,12 +163,16 @@ jobs:
                   if [ "$sv" = "true" ]; then
                     items+=('{"service":"ozon-fetcher","context":"./services/ozon-fetcher","file":"./services/ozon-fetcher/docker/Dockerfile","image":"ozon-fetcher"}')
                   fi
+                  if [ "$ai" = "true" ]; then
+                    items+=('{"service":"ai-service","context":"./services/ai-service","file":"./services/ai-service/docker/Dockerfile","image":"ai-service"}')
+                  fi
                   IFS=,
                   echo "backend=$be" >> "$GITHUB_OUTPUT"
                   echo "frontend=$fe" >> "$GITHUB_OUTPUT"
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "static_analysis=$sa" >> "$GITHUB_OUTPUT"
                   echo "services=$sv" >> "$GITHUB_OUTPUT"
+                  echo "ai_service=$ai" >> "$GITHUB_OUTPUT"
                   echo "matrix={\"include\":[${items[*]}]}" >> "$GITHUB_OUTPUT"
 
     # Dev-образ php-cli для тестовых job'ов: публикуется в ghcr и переиспользуется.
@@ -582,11 +594,51 @@ jobs:
             - name: 🧪 go test -race
               run: docker run --rm -e CGO_ENABLED=1 -v "$PWD/services/ozon-fetcher:/src" -w /src golang:1.27 go test -race ./...
 
+    # Гейты Python-сервиса ИИ (services/python.md): dev-цель того же Dockerfile, что локально
+    # (`make ai-service-lint ai-service-test`); интеграционные тесты — на своей PostgreSQL с
+    # тем же init, что dev-compose. Evals (pytest -m evals) — вручную, не в CI.
+    services-python:
+        name: 🐍 ai-service gates
+        needs: changes
+        if: ${{ needs.changes.outputs.ai_service == 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v6
+
+            - name: 🐳 Dev image
+              run: docker build --target dev -t ai-service-dev:ci -f services/ai-service/docker/Dockerfile services/ai-service
+
+            - name: 🐘 PostgreSQL for integration tests
+              run: |
+                  docker network create ai-ci
+                  docker run -d --name services-postgres --network ai-ci \
+                    -e POSTGRES_PASSWORD=ci-only \
+                    -v "$PWD/services/docker/postgres/init/02-ai-service.sql:/docker-entrypoint-initdb.d/02-ai-service.sql:ro" \
+                    postgres:15-alpine
+                  for _ in $(seq 1 30); do
+                    docker exec services-postgres pg_isready -U postgres -d ai_service_test -q && exit 0
+                    sleep 2
+                  done
+                  docker logs services-postgres
+                  exit 1
+
+            - name: 🧹 ruff, format, mypy
+              run: docker run --rm -v "$PWD:/repo" -w /repo/services/ai-service -e RUFF_CACHE_DIR=/tmp/ruff -e MYPY_CACHE_DIR=/tmp/mypy ai-service-dev:ci sh -c 'ruff check . && ruff format --check . && mypy'
+
+            # Весь репозиторий: тест контракта читает services/_contracts.
+            - name: 🧪 pytest
+              run: |
+                  docker run --rm --network ai-ci -v "$PWD:/repo" -w /repo/services/ai-service \
+                    -e AI_TEST_DB_DSN=postgresql://svc_ai_service:ai_service_dev@services-postgres:5432/ai_service_test \
+                    -e PYTHONPATH=/repo/services/ai-service/src:/repo/services/ai-service \
+                    ai-service-dev:ci pytest -m "not evals"
+
     build-and-push:
-        needs: [ changes, unit-tests, cs-check, services-go ]
+        needs: [ changes, unit-tests, cs-check, services-go, services-python ]
         # !cancelled() — чтобы job стартовал даже когда unit-tests/cs-check пропущены (frontend/landing-only).
         # != 'failure'  — но НЕ собираем, если бэкенд-тесты, проверка стиля или гейты сервиса упали.
-        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs['services-go'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs['services-go'].result != 'failure' && needs['services-python'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -702,6 +754,14 @@ jobs:
                   OZON_FETCHER_S3_ACCESS_KEY_ID: ${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}
                   OZON_FETCHER_S3_SECRET_ACCESS_KEY: ${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}
                   OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
+                  AI_SERVICE_API_TOKEN: ${{ secrets.AI_SERVICE_API_TOKEN }}
+                  AI_SERVICE_DB_PASSWORD: ${{ secrets.AI_SERVICE_DB_PASSWORD }}
+                  AI_OPENAI_API_KEY: ${{ secrets.AI_OPENAI_API_KEY }}
+                  AI_DEEPSEEK_API_KEY: ${{ secrets.AI_DEEPSEEK_API_KEY }}
+                  AI_ANTHROPIC_API_KEY: ${{ secrets.AI_ANTHROPIC_API_KEY }}
+                  AI_YANDEX_API_KEY: ${{ secrets.AI_YANDEX_API_KEY }}
+                  AI_YANDEX_FOLDER_ID: ${{ secrets.AI_YANDEX_FOLDER_ID }}
+                  AI_SERVICE_COMPANY_ALLOWLIST: ${{ vars.AI_SERVICE_COMPANY_ALLOWLIST }}
                   ALFA_TLS_CERT_PATH: ${{ secrets.ALFA_TLS_CERT_PATH }}
                   ALFA_TLS_KEY_PATH: ${{ secrets.ALFA_TLS_KEY_PATH }}
                   ALFA_TLS_KEY_PASSPHRASE: ${{ secrets.ALFA_TLS_KEY_PASSPHRASE }}
@@ -711,7 +771,7 @@ jobs:
               run: |
                   # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
                   # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
-                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_OPENAI_API_KEY AI_DEEPSEEK_API_KEY AI_ANTHROPIC_API_KEY AI_YANDEX_API_KEY AI_YANDEX_FOLDER_ID; do
                     case "${!v}" in
                       *[!A-Za-z0-9._~-]*)
                         echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
@@ -744,6 +804,13 @@ jobs:
                   case "$OZON_FETCHER_CONNECTION_ALLOWLIST" in
                     *[!A-Za-z0-9,_-]*)
                       echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
+                      exit 1 ;;
+                  esac
+                  # Allowlist ai-service: UUID компаний через запятую или «*» — все.
+                  case "$AI_SERVICE_COMPANY_ALLOWLIST" in
+                    '*') ;;
+                    *[!A-Za-z0-9,-]*)
+                      echo "❌ AI_SERVICE_COMPANY_ALLOWLIST: UUID через запятую или «*»"
                       exit 1 ;;
                   esac
 
@@ -799,6 +866,18 @@ jobs:
                     # ://@ — но одинарные кавычки, а в DSN их не бывает.
                     export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
+                    # ai-service (docs/maintenance/ai-service-prod.md): без AI_SERVICE_ENABLED=true сервис не
+                    # стартует, а Symfony видит его выключенным. Алфавит секретов проверен шагом выше.
+                    export AI_SERVICE_ENABLED='${{ vars.AI_SERVICE_ENABLED }}'
+                    export AI_SERVICE_API_TOKEN='${{ secrets.AI_SERVICE_API_TOKEN }}'
+                    export AI_SERVICE_DB_PASSWORD='${{ secrets.AI_SERVICE_DB_PASSWORD }}'
+                    export AI_SERVICE_COMPANY_ALLOWLIST='${{ vars.AI_SERVICE_COMPANY_ALLOWLIST }}'
+                    export AI_OPENAI_API_KEY='${{ secrets.AI_OPENAI_API_KEY }}'
+                    export AI_DEEPSEEK_API_KEY='${{ secrets.AI_DEEPSEEK_API_KEY }}'
+                    export AI_ANTHROPIC_API_KEY='${{ secrets.AI_ANTHROPIC_API_KEY }}'
+                    export AI_YANDEX_API_KEY='${{ secrets.AI_YANDEX_API_KEY }}'
+                    export AI_YANDEX_FOLDER_ID='${{ secrets.AI_YANDEX_FOLDER_ID }}'
+                    export AI_SERVICE_SENTRY_DSN='${{ secrets.AI_SERVICE_SENTRY_DSN }}'
                     # Альфа (BankSync, docs/tasks/bank-sync/alfa-demo.md): секреты не заведены → пусто →
                     # Альфа не настроена. Символы проверены шагом выше. Сертификаты — в shared/alfa
                     # рядом с current (current пересоздаётся каждым деплоем), монтируются только для чтения.
@@ -810,7 +889,7 @@ jobs:
                     export ALFA_SANDBOX_ID_SIGNING_CERT_PATH='${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}'
                     export ALFA_SECRETS_DIR="$(cd .. && pwd)/shared/alfa"
                     mkdir -p "$ALFA_SECRETS_DIR"
-                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY; do
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_OPENAI_API_KEY AI_DEEPSEEK_API_KEY AI_ANTHROPIC_API_KEY AI_YANDEX_API_KEY AI_YANDEX_FOLDER_ID; do
                       eval "val=\${$v}"
                       case "$val" in
                         *[!A-Za-z0-9._~-]*)
@@ -847,7 +926,7 @@ jobs:
                     # ozon-fetcher — за профилем: без OZON_FETCHER_ENABLED=true не стартует.
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
                     if [ "$OZON_FETCHER_ENABLED" = "true" ]; then
-                      export COMPOSE_PROFILES=ozon-fetcher
+                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}ozon-fetcher"
                       echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
                       if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$OZON_FETCHER_API_TOKEN" ]; then
                         echo "❌ OZON_FETCHER_ENABLED=true, но не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / OZON_FETCHER_API_TOKEN"
@@ -864,6 +943,27 @@ jobs:
                     else
                       echo "⏸ ozon-fetcher выключен (vars.OZON_FETCHER_ENABLED != true)"
                       docker compose -f docker-compose.prod.yml --profile ozon-fetcher stop ozon-fetcher 2>/dev/null || true
+                    fi
+
+                    # ai-service — за профилем: без AI_SERVICE_ENABLED=true не стартует.
+                    # Миграции его БД — до шага 5/5 (docs/maintenance/ai-service-prod.md).
+                    if [ "$AI_SERVICE_ENABLED" = "true" ]; then
+                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}ai-service"
+                      echo "🐳 [4c/5] ai-service: БД и роль, образ, миграции, запуск API и воркера"
+                      if [ -z "$AI_SERVICE_DB_PASSWORD" ] || [ ${#AI_SERVICE_API_TOKEN} -lt 32 ]; then
+                        echo "❌ AI_SERVICE_ENABLED=true, но не заведён AI_SERVICE_DB_PASSWORD или AI_SERVICE_API_TOKEN (≥ 32 символов)"
+                        exit 1
+                      fi
+                      # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
+                      docker compose -f docker-compose.prod.yml exec -T -e AI_SERVICE_DB_PASSWORD site-postgres \
+                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ai-service/db-bootstrap.sql
+                      docker compose -f docker-compose.prod.yml pull ai-service ai-service-worker
+                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service migrate < /dev/null
+                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service ai-service-worker
+                      echo "✅ ai-service healthy"
+                    else
+                      echo "⏸ ai-service выключен (vars.AI_SERVICE_ENABLED != true)"
+                      docker compose -f docker-compose.prod.yml --profile ai-service stop ai-service ai-service-worker 2>/dev/null || true
                     fi
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"

@@ -27,6 +27,7 @@ from ai_service.llm.routes import load_routing, worst_case_seconds
 from ai_service.store.migrate import migrate
 from ai_service.store.tasks import TaskStore
 from ai_service.tasks.registry import build_registry
+from ai_service.tracing.errors import configure_error_reporting
 from ai_service.tracing.logging import configure_logging
 from ai_service.worker.worker import Worker
 
@@ -58,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = Settings()  # значения — из env
     configure_logging(settings.log_level)
+    configure_error_reporting()
     dsn = settings.db_dsn.get_secret_value()
 
     if args.command == "migrate":

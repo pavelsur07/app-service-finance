@@ -342,6 +342,13 @@
 # Сервис недоступен — WARNING и exit 0, витрина прежняя; нарушение контракта — ERROR и exit 1; повтор — следующий запуск (docs/architecture/service-gateway.md §2.6).
 */10 * * * * cd /app && php bin/console app:service-gateway:coverage:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
+# обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,
+# нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — компании allowlist с операциями за 90 дней,
+# сначала автоприменение по флагу компании; сбой компании — ERROR и exit 1, остальные идут дальше.
+*/5 * * * * cd /app && php bin/console app:ai-service:import-results --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+25 * * * * cd /app && php bin/console app:cash:ai-categorize --all-enabled --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.
