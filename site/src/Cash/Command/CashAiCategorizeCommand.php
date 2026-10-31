@@ -8,6 +8,8 @@ use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
 use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -24,7 +26,8 @@ use Webmozart\Assert\Assert;
  * без флага операции не меняются). Выключенный ИИ-сервис для компании — ничего не ставит.
  *
  * `--all-enabled` (cron) — по очереди все компании allowlist с операциями за окно
- * кандидатов; сбой одной компании пишется в лог и не останавливает остальные.
+ * кандидатов; сбой одной компании пишется в лог и не останавливает остальные: после него
+ * EntityManager пересоздаётся.
  */
 #[AsCommand(
     name: 'app:cash:ai-categorize',
@@ -38,6 +41,7 @@ final class CashAiCategorizeCommand extends Command
         private readonly CashAiCategorizationCompaniesQuery $companies,
         private readonly AiTaskFacadeInterface $aiTasks,
         private readonly LockFactory $lockFactory,
+        private readonly ManagerRegistry $managerRegistry,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -88,6 +92,12 @@ final class CashAiCategorizeCommand extends Command
                 // Сбой одной компании не должен лишать подсказок остальные; повтор — следующий запуск.
                 ++$failed;
                 $this->logger->error('AI categorization failed for a company.', ['companyId' => $id, 'exception' => $e]);
+                // Исключение внутри wrapInTransaction закрывает EntityManager: следующая компания —
+                // со свежим (сервисы держат lazy-ссылку, resetManager подменяет её содержимое).
+                $manager = $this->managerRegistry->getManager();
+                if ($manager instanceof EntityManagerInterface && !$manager->isOpen()) {
+                    $this->managerRegistry->resetManager();
+                }
                 $output->writeln(sprintf('<error>ai-categorize: %s failed: %s</error>', $id, $e->getMessage()));
             }
         }
