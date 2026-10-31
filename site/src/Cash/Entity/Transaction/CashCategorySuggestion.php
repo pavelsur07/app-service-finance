@@ -143,6 +143,16 @@ class CashCategorySuggestion
         $this->decide(Status::DISMISSED, $userId, $at);
     }
 
+    /**
+     * Статья проставлена автоприменением: решения человека нет, автор пустой.
+     */
+    public function autoApply(\DateTimeImmutable $at): void
+    {
+        $this->assertStatus(Status::SUGGESTED);
+        $this->status = Status::AUTO_APPLIED;
+        $this->decidedAt = $at;
+    }
+
     private function decide(Status $decision, string $userId, \DateTimeImmutable $at): void
     {
         $this->assertStatus(Status::SUGGESTED);

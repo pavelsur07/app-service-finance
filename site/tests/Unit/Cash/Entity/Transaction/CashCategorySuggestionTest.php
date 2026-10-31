@@ -65,4 +65,23 @@ final class CashCategorySuggestionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $suggestion->suggest(self::CATEGORY, 1.5, 'accepted', null, null, new \DateTimeImmutable());
     }
+
+    public function testAutoApplyHasNoAuthorAndIsFinal(): void
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()->suggesting(self::CATEGORY, 0.95)->build();
+        $suggestion->autoApply(new \DateTimeImmutable());
+
+        self::assertSame(Status::AUTO_APPLIED, $suggestion->getStatus());
+        self::assertNull($suggestion->getDecidedByUserId());
+        $this->expectException(CashCategorySuggestionStateException::class);
+        $suggestion->dismiss(self::USER, new \DateTimeImmutable());
+    }
+
+    public function testOnlyShownSuggestionIsAutoApplied(): void
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()->build();
+
+        $this->expectException(CashCategorySuggestionStateException::class);
+        $suggestion->autoApply(new \DateTimeImmutable());
+    }
 }
