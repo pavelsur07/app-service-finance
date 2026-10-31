@@ -47,6 +47,22 @@ def test_deploy_passes_gateway_token_not_provider_keys() -> None:
     assert len(loops) == 2
     assert all(" AI_GATEWAY_TOKEN" in line for line in loops)
     # Включённый сервис проверяет шлюз (проверки 2 и 4) до запуска воркера.
-    assert deploy.index("ai-service gateway-check") < deploy.index(
-        "up -d --no-deps --wait ai-service ai-service-worker"
-    )
+    assert deploy.index("ai-service gateway-check") < deploy.index("up -d --no-deps --wait ai-service\n")
+    assert deploy.index("ai-service gateway-check") < deploy.index("up -d --no-deps ai-service-worker\n")
+
+
+def test_deploy_waits_only_for_services_with_healthcheck() -> None:
+    """`up --wait` падает на сервисе без healthcheck (G3, 31.10: воркер ai-service)."""
+    compose = yaml.safe_load((REPO / "docker-compose.prod.yml").read_text(encoding="utf-8"))
+    no_healthcheck = {
+        name for name, svc in compose["services"].items() if (svc.get("healthcheck") or {}).get("disable") is True
+    }
+    assert "ai-service-worker" in no_healthcheck
+    deploy = (REPO / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+    waited = [
+        (line.strip(), set(line.split("--wait", 1)[1].split()) & no_healthcheck)
+        for line in deploy.splitlines()
+        if "docker compose" in line and " up " in line and "--wait" in line
+    ]
+    assert waited
+    assert [line for line, bad in waited if bad] == []

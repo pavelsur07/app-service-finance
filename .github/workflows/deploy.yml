@@ -955,7 +955,9 @@ jobs:
                       # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
                       # без токена → 401; бесплатно. Провал — до запуска воркера.
                       docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service gateway-check < /dev/null
-                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service ai-service-worker
+                      # --wait — только API: у воркера healthcheck выключен, и `up --wait` на нём падает.
+                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service
+                      docker compose -f docker-compose.prod.yml up -d --no-deps ai-service-worker
                       echo "✅ ai-service healthy"
                     else
                       echo "⏸ ai-service выключен (vars.AI_SERVICE_ENABLED != true)"
