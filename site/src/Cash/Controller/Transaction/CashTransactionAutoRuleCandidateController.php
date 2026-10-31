@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\CashTransactionAutoRuleCandidateQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +23,7 @@ final class CashTransactionAutoRuleCandidateController extends AbstractControlle
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CashTransactionAutoRuleCandidateQuery $candidateQuery,
+        private readonly CashCategorizationQuery $categorizationQuery,
     ) {
     }
 
@@ -33,6 +35,8 @@ final class CashTransactionAutoRuleCandidateController extends AbstractControlle
 
         return $this->render('cash_transaction_auto_rule/candidates.html.twig', [
             'candidates' => $this->candidateQuery->findForCompany($companyId, $from, $today),
+            'aiProposals' => $this->categorizationQuery->findRuleProposals($companyId),
+            'aiProposalMinConfirmed' => CashCategorizationQuery::RULE_PROPOSAL_MIN_CONFIRMED,
             'dateFrom' => $from,
             'dateTo' => $today,
             'minSamples' => CashTransactionAutoRuleCandidateQuery::MIN_SAMPLES,

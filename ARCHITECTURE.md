@@ -1941,6 +1941,16 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   другую статью при открытой подсказке (считается запросом). `app:cash:ai-categorize-stats
   --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`;
   состояние ворот автоприменения — `app:cash:ai-auto-apply --company-id=`.
+- Предложения автоправил — `CashCategorizationQuery::findRuleProposals()`
+  (детерминированно, без LLM): группа «контрагент + направление» по операциям с
+  ИИ-подсказкой; статья человека — текущая статья операции с ручной разбивкой;
+  не меньше `RULE_PROPOSAL_MIN_CONFIRMED` (3) операций, все в одну статью, нет
+  отклонённой подсказки этой статьи, контрагент не в архиве, нет активного правила
+  с условием `COUNTERPARTY` на него. Раздел «Предложения ИИ» на странице
+  «Кандидаты правил» (`CashTransactionAutoRuleCandidateController`), кнопка
+  «Создать правило» — форма нового правила с `?fromTransaction=` последней
+  подтверждённой операции (`CashTransactionAutoRulePrefiller`); правило сохраняет
+  человек.
 
 ### Cash: идемпотентность файлового импорта и ручной транзакции
 
@@ -4421,6 +4431,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.97 | 2026-10-31 | Cash: предложения автоправил по ИИ-подсказкам — `CashCategorizationQuery::findRuleProposals()`, DTO `CashAiRuleProposal`, раздел «Предложения ИИ» на «Кандидатах правил» с переходом в предзаполненную форму правила. Миграций нет |
 | 2.96 | 2026-10-30 | Cash: автоприменение ИИ-подсказок статей ДДС — флаг `cash_ai_categorization_setting` (миграция `Version20261030220000`), `CashAiAutoApplyPolicy` (0.90 / 100 / 0.95), `AutoApplyCashCategorySuggestionsAction` в `app:cash:ai-categorize`, команда `app:cash:ai-auto-apply`, статус `auto_applied`, общий `CashCategorySuggestionApplier`, значок «ИИ» в списке операций |
 | 2.95 | 2026-10-30 | Cash: выгрузка золотого набора ИИ-категоризации `app:cash:ai-eval-export`, `CashCategorizationPayloadMapper` (общий с постановкой); ai-service: `evals-import` (обезличивание), `evals-compare` (модель × точность × стоимость × задержка) |
 | 2.94 | 2026-10-30 | Cash: ИИ-подсказки статей ДДС — `cash_category_suggestion` и `cash_categorization_task` (миграция `Version20261030180000`), `RequestCashAiCategorizationAction` и команды `app:cash:ai-categorize`, `app:cash:ai-categorize-stats`, потребитель `CashCategorizationResultConsumer`, «Принять» / «Отклонить» в списке операций; ServiceGateway: `AiTaskFacadeInterface::taskIdFor`; контракт `ai-task/v1` 1.1.0 |
