@@ -78,10 +78,16 @@ if ! nginx -t; then
 fi
 systemctl reload nginx
 
+# reload асинхронный: сразу после него соединение может принять старый worker
+# (без нового сайта и сертификата) — проверка повторяется, пока ответ не совпадёт.
 check() {
-    local name=$1 expected=$2 code
+    local name=$1 expected=$2 code attempt
     shift 2
-    code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$@" || true)
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$@" || true)
+        [ "$code" = "$expected" ] && break
+        [ "$attempt" = 10 ] || sleep 0.5
+    done
     echo "$name: $code (ожидается $expected)"
     [ "$code" = "$expected" ]
 }
