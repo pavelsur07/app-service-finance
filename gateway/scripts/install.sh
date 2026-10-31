@@ -39,8 +39,10 @@ on_exit() {
     if [ "$DONE" = 1 ]; then rm -f "$BACKUP"; exit 0; fi
     set +e
     echo "↩️  Возвращаю прежний набор файлов шлюза"
-    for p in "${MANAGED[@]}"; do rm -rf "/${p:?}"; done
-    if [ ${#EXISTING[@]} -eq 0 ] || tar -C / -xpf "$BACKUP"; then
+    local clean=1
+    for p in "${MANAGED[@]}"; do rm -rf "/${p:?}" || clean=0; done
+    # Неудалённый новый файл tar не перекроет — набор был бы смешанным.
+    if [ "$clean" = 1 ] && { [ ${#EXISTING[@]} -eq 0 ] || tar -C / -xpf "$BACKUP"; }; then
         if nginx -t && systemctl reload nginx; then
             rm -f "$BACKUP"
             exit "$rc"
