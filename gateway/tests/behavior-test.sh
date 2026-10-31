@@ -152,7 +152,8 @@ AI=https://ai.vashfindir.ru
 # B1
 req stranger "$AI/health"; check "B1 /health 443 с любого IP" '[ "$CODE" = 200 ] && [ "$BODY" = alive ]'
 req stranger http://ai.vashfindir.ru/health; check "B1 /health 80" '[ "$CODE" = 200 ]'
-req stranger http://ai.vashfindir.ru/openai/v1/models; check "B1 80 → https" '[ "$CODE" = 301 ]'
+req stranger -e "http://ref.example/?leak=R80" "http://ai.vashfindir.ru/openai/v1/models?leak=Q80"; check "B1 80 → https" '[ "$CODE" = 301 ]'
+req stranger "http://tg.vashfindir.ru/x?leak=T80"; check "B12 tg 80 → https" '[ "$CODE" = 301 ]'
 
 # B2
 req stranger "${AUTH[@]}" "$AI/openai/v1/models"; check "B2 чужой IP с верным токеном → 403" '[ "$CODE" = 403 ]'
@@ -231,6 +232,9 @@ req app "${AUTH[@]}" "$AI/openai/v1/models?leak=Q502"; check "502/504 при н�
 # B11 — журналы
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.access.log /var/log/nginx/tg-gateway.access.log' > "$WORK/access.log" 2>/dev/null
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.error.log /var/log/nginx/tg-gateway.error.log' > "$WORK/error.log" 2>/dev/null
+# Журналы nginx по умолчанию (в образе — вывод контейнера): сюда пишет всё, что
+# не перекрыто access_log/error_log сайта.
+docker logs "$ID-gw" >> "$WORK/error.log" 2>&1
 CODE=- BODY=
 check "B11 access log: успешный запрос с исходным путём и статусом" 'grep -q "\"path\":\"/openai/v1/models\",\"status\":200" "$WORK/access.log"'
 check "B11 в журналах нет токена, ключей, query, токена бота (и на 413/429/502)" '! grep -qE "$TOKEN|$NEXT|sk-test-|limit=2|leak=|SECRET" "$WORK/access.log" "$WORK/error.log"'
