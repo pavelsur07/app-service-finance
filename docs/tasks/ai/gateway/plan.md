@@ -46,16 +46,18 @@ Kong/Envoy не нужны: шесть маршрутов, nginx на хосте
 ## Структура в репозитории
 
 ```
-gateway/                          (вместо tg-gateway/)
+gateway/                          (вместо tg-gateway/, G0)
   nginx/
+    conf.d/gateway-log-format.conf  JSON: статус, upstream, время; без query, Authorization и тел
     snippets/
       app-only.conf               allow 217.198.13.171; deny all — IP app в одном месте
       upstream-tls.conf           proxy_ssl_verify, CA, verify_depth, server_name
-      log-format.conf             JSON: статус, upstream, время; без Authorization и тел
     sites/
-      00-default.conf             неизвестный Host → 444
-      tg.vashfindir.ru.conf       текущий tg-gateway 1:1
-      ai.vashfindir.ru.conf       /openai/ /deepseek/ /kimi/
+      tg.vashfindir.ru.conf       Telegram
+      ai.vashfindir.ru.conf       /openai/ /deepseek/ /kimi/ (G1)
+      00-default.conf             неизвестный Host → закрыть (G1, отдельным решением)
+  scripts/install.sh              установка набора с откатом (запускает деплой)
+  scripts/nginx-test.sh           nginx -t в контейнере (CI и локально)
   README.md                       схема, секреты, ротация, откат
 .github/workflows/deploy-gateway.yml   (вместо deploy-tg-gateway.yml)
 ```
@@ -93,7 +95,8 @@ gateway/                          (вместо tg-gateway/)
 
 ### G0. tg-gateway → `gateway/` без изменения поведения
 
-- Сниппеты, `00-default`, `deploy-gateway.yml`; старый workflow удаляется.
+- Подробно — `g0.md`. Сниппеты, JSON-лог, `deploy-gateway.yml`; старый workflow
+  удаляется. `00-default` перенесён в G1: он меняет ответ чужим сайтам хоста.
 - Проверка: `nginx -T` до/после — разница только в include и формате лога;
   `/health`, `/bot-api/` → `api.telegram.org`; Владелец пишет боту — операция
   создаётся.
@@ -103,6 +106,8 @@ gateway/                          (вместо tg-gateway/)
 
 - Владелец: DNS A `ai.vashfindir.ru → 109.73.204.179`, `certbot`, секреты
   (`keys.md`).
+- `00-default`: неизвестный Host → 444 / `ssl_reject_handshake` — после сверки
+  с `mybots` (сейчас он отвечает на неизвестные Host на 443).
 - `ai.vashfindir.ru.conf`: `/health`, `/openai/`, `/deepseek/`, `/kimi/`;
   `app-only` + токен; подмена `Authorization`; `limit_req`; остальное 404.
 - Деплой проверяет ключи провайдеров с хоста шлюза (проверка 1 ниже).
