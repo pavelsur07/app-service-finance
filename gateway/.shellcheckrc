@@ -1,6 +1,6 @@
 # shellcheck для gateway/scripts и gateway/tests.
 # SC2016: условия check/has — строки для eval, одинарные кавычки намеренно.
-# SC2329: cleanup вызывается из trap.
+# SC2329 (SC2317 в старых версиях): cleanup вызывается из trap.
 source-path=SCRIPTDIR
 external-sources=true
-disable=SC2016,SC2329
+disable=SC2016,SC2329,SC2317
